@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Wrench } from "lucide-react";
 import type { TimelineEvent } from "@/types/ui";
 
 interface ToolCardProps {
@@ -14,32 +14,33 @@ export function ToolCard({ event }: ToolCardProps) {
   const status = isToolCall ? event.status : "success";
 
   const statusConfig = {
-    running: { label: "运行中", className: "bg-accent-yellow/10 text-accent-yellow" },
-    success: { label: "成功", className: "bg-accent-green/10 text-accent-green" },
-    error: { label: "失败", className: "bg-accent-red/10 text-accent-red" },
+    running: { label: "运行中", dot: "bg-accent-yellow" },
+    success: { label: "成功", dot: "bg-accent-green" },
+    error: { label: "失败", dot: "bg-accent-red" },
   };
 
   const config = statusConfig[status];
 
   return (
     <div className="flex justify-center">
-      <div className="max-w-[90%] w-full rounded-xl border border-border-default bg-bg-secondary">
-        {/* Header */}
+      <div className="max-w-[90%] w-full rounded-2xl border border-border-default bg-bg-secondary overflow-hidden">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-text-primary hover:bg-bg-tertiary/50 transition-colors rounded-xl"
+          className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-bg-hover transition-colors"
         >
-          <span className="text-accent-blue">🔧</span>
-          <span className="flex-1 text-left">{toolName}</span>
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${config.className}`}>{config.label}</span>
+          <Wrench size={15} className="text-text-muted shrink-0" />
+          <span className="flex-1 text-left font-medium text-text-primary">{toolName}</span>
+          <span className="flex items-center gap-1.5 text-xs text-text-muted">
+            <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+            {config.label}
+          </span>
           {expanded ? <ChevronUp size={14} className="text-text-muted" /> : <ChevronDown size={14} className="text-text-muted" />}
         </button>
 
-        {/* Body */}
         {expanded && (
           <div className="px-4 pb-3 space-y-2">
             {isToolCall && Object.keys(event.arguments).length > 0 && (
-              <pre className="text-xs text-text-secondary bg-bg-primary rounded-lg p-2 overflow-x-auto border border-border-subtle">
+              <pre className="text-xs text-text-secondary bg-bg-primary rounded-xl p-3 overflow-x-auto border border-border-subtle font-mono leading-relaxed">
                 {JSON.stringify(event.arguments, null, 2)}
               </pre>
             )}

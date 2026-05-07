@@ -7,7 +7,7 @@ interface StatusCardProps {
 export function StatusCard({ event }: StatusCardProps) {
   return (
     <div className="flex justify-center">
-      <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-full bg-bg-secondary border border-border-subtle text-xs text-text-muted">
+      <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-bg-secondary border border-border-subtle text-xs text-text-muted">
         {event.message && <span>{event.message}</span>}
         {event.tokenCount !== undefined && (
           <span>Tokens: {event.tokenCount}</span>

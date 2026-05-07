@@ -3,46 +3,48 @@
 @config "../tailwind.config.ts";
 
 :root {
-  /* Light theme - refined Codex-like palette */
-  --bg-primary: #fafafa;
-  --bg-secondary: #f3f4f6;
-  --bg-tertiary: #e5e7eb;
+  /* Codex 暖色调 Light */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f5f2;
+  --bg-tertiary: #efedea;
   --bg-elevated: #ffffff;
   --bg-composer: #ffffff;
-  --border-default: #e5e7eb;
-  --border-subtle: #f3f4f6;
-  --border-strong: #d1d5db;
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-  --text-accent: #2563eb;
-  --accent-blue: #2563eb;
-  --accent-green: #16a34a;
-  --accent-yellow: #d97706;
-  --accent-red: #dc2626;
-  --accent-orange: #ea580c;
-  --accent-purple: #9333ea;
+  --bg-hover: #f0eeeb;
+  --border-default: #e8e6e1;
+  --border-subtle: #f0eeeb;
+  --border-strong: #d4d0c8;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6e6e6e;
+  --text-muted: #a3a3a3;
+  --text-accent: #0078d4;
+  --accent-blue: #0078d4;
+  --accent-green: #107c10;
+  --accent-yellow: #c19c00;
+  --accent-red: #d13438;
+  --accent-orange: #d83b01;
+  --accent-purple: #8764b8;
 }
 
 [data-theme="dark"] {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #21262d;
-  --bg-elevated: #1c2128;
-  --bg-composer: #161b22;
-  --border-default: #30363d;
-  --border-subtle: #21262d;
-  --border-strong: #484f58;
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #484f58;
-  --text-accent: #58a6ff;
-  --accent-blue: #58a6ff;
-  --accent-green: #3fb950;
-  --accent-yellow: #d29922;
-  --accent-red: #f85149;
-  --accent-orange: #fd7e14;
-  --accent-purple: #a371f7;
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-elevated: #2d2d30;
+  --bg-composer: #252526;
+  --bg-hover: #3e3e42;
+  --border-default: #3e3e42;
+  --border-subtle: #2d2d30;
+  --border-strong: #5a5a5a;
+  --text-primary: #cccccc;
+  --text-secondary: #9cdcfe;
+  --text-muted: #6e6e6e;
+  --text-accent: #4fc1ff;
+  --accent-blue: #4fc1ff;
+  --accent-green: #4ec9b0;
+  --accent-yellow: #dcdcaa;
+  --accent-red: #f48771;
+  --accent-orange: #ce9178;
+  --accent-purple: #c586c0;
 }
 
 * {
@@ -65,12 +67,13 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -79,7 +82,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -119,24 +122,16 @@ body {
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-  margin-top: 1.5em;
-  margin-bottom: 0.75em;
+  margin-top: 1.2em;
+  margin-bottom: 0.6em;
   font-weight: 600;
   line-height: 1.3;
   color: var(--text-primary);
 }
 
-.markdown-body h1 {
-  font-size: 1.5em;
-}
-
-.markdown-body h2 {
-  font-size: 1.25em;
-}
-
-.markdown-body h3 {
-  font-size: 1.1em;
-}
+.markdown-body h1 { font-size: 1.4em; }
+.markdown-body h2 { font-size: 1.2em; }
+.markdown-body h3 { font-size: 1.05em; }
 
 .markdown-body ul,
 .markdown-body ol {
@@ -144,24 +139,18 @@ body {
   padding-left: 1.5em;
 }
 
-.markdown-body ul {
-  list-style-type: disc;
-}
-
-.markdown-body ol {
-  list-style-type: decimal;
-}
+.markdown-body ul { list-style-type: disc; }
+.markdown-body ol { list-style-type: decimal; }
 
 .markdown-body li {
   margin-bottom: 0.25em;
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid var(--accent-blue);
+  border-left: 3px solid var(--border-strong);
   padding-left: 1em;
   margin: 1em 0;
   color: var(--text-secondary);
-  font-style: italic;
 }
 
 .markdown-body code {
@@ -223,10 +212,4 @@ body {
 
 .markdown-body strong {
   font-weight: 600;
-}
-
-/* Animation for thinking indicator */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
 }

@@ -12,12 +12,12 @@ export function TodoCard({ event }: TodoCardProps) {
 
   return (
     <div className="flex justify-center">
-      <div className="max-w-[90%] w-full rounded-xl border border-border-default bg-bg-secondary px-4 py-3">
+      <div className="max-w-[90%] w-full rounded-2xl border border-border-default bg-bg-secondary px-4 py-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-text-primary">📋 任务列表</span>
+          <span className="text-sm font-medium text-text-primary">任务列表</span>
           <span className="text-xs text-text-muted">{doneCount}/{total}</span>
         </div>
-        <div className="w-full h-1 bg-bg-tertiary rounded-full mb-3">
+        <div className="w-full h-1 bg-bg-hover rounded-full mb-3">
           <div
             className="h-full bg-accent-blue rounded-full transition-all"
             style={{ width: `${progress}%` }}

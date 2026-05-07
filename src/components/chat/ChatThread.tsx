@@ -33,7 +33,7 @@ function EventRenderer({ event }: { event: TimelineEvent }) {
     case "compaction":
       return (
         <div className="flex justify-center">
-          <div className="text-xs text-text-muted bg-bg-secondary rounded-full px-4 py-1.5 border border-border-subtle">
+          <div className="text-xs text-text-muted bg-bg-secondary rounded-full px-4 py-1.5">
             {event.type === "subagent" ? `🤖 ${event.agentName} ${event.status}` : event.phase === "begin" ? "📝 上下文压缩中..." : "✅ 上下文压缩完成"}
           </div>
         </div>
@@ -47,9 +47,8 @@ export function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when events change (smooth for new messages)
   const lastEventId = session?.events[session?.events.length - 1]?.id;
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -61,7 +60,7 @@ export function ChatThread() {
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
       {session.events.map((event) => (
         <EventRenderer key={event.id} event={event} />
       ))}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, Mic, ArrowUp, Square, Clock } from "lucide-react";
+import { Plus, AlertTriangle, Mic, ArrowUp, Square, Clock, ChevronDown } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -28,7 +28,6 @@ export function Composer() {
       textareaRef.current.style.height = "auto";
     }
 
-    // 立即本地添加用户消息
     const userEvent: TimelineEvent = {
       id: genId(),
       type: "user_message",
@@ -36,7 +35,6 @@ export function Composer() {
       content: trimmed,
     };
 
-    // 如果正在运行，加入排队队列
     if (isRunning) {
       addPendingMessage(trimmed);
       updateSession(currentSession.id, (session) => ({
@@ -47,7 +45,6 @@ export function Composer() {
       return;
     }
 
-    // 立即本地添加用户消息 + 思考中占位符
     const thinkingPlaceholder: TimelineEvent = {
       id: genId(),
       type: "assistant_message",
@@ -88,7 +85,6 @@ export function Composer() {
     }
   };
 
-  // File drop handling
   const [isDragging, setIsDragging] = useState(false);
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -103,7 +99,7 @@ export function Composer() {
     setIsDragging(false);
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0 && currentSession) {
-      const paths = files.map((f) => f.path || f.name).join(", ");
+      const paths = files.map((f) => (f as unknown as { path?: string }).path || f.name).join(", ");
       setInput((prev) => (prev ? prev + "\n" : "") + `[附件: ${paths}]`);
     }
   };
@@ -116,7 +112,6 @@ export function Composer() {
     }
   };
 
-  // Focus input when triggered globally (Cmd/Ctrl+K)
   const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
   useEffect(() => {
     if (focusInputTrigger > 0) {
@@ -131,88 +126,95 @@ export function Composer() {
   }[permissionMode];
 
   return (
-    <div
-      className="px-4 pb-3"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {/* Pending messages indicator */}
+    <div className="px-4 pb-4 pt-2" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       {pendingMessages.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-1.5 mb-2 text-xs text-text-muted bg-bg-secondary rounded-full w-fit mx-auto">
+        <div className="flex items-center gap-2 px-4 py-1 mb-2 text-xs text-text-muted bg-bg-secondary rounded-full w-fit mx-auto">
           <Clock size={12} />
           <span>排队中: {pendingMessages.length} 条消息</span>
         </div>
       )}
 
-      {/* Drop overlay */}
       {isDragging && (
-        <div className="absolute inset-x-4 bottom-3 top-0 rounded-2xl border-2 border-dashed border-accent-blue bg-accent-blue/5 flex items-center justify-center z-10 pointer-events-none">
+        <div className="absolute inset-x-4 bottom-4 top-2 rounded-[24px] border-2 border-dashed border-accent-blue bg-accent-blue/5 flex items-center justify-center z-10 pointer-events-none">
           <span className="text-sm text-accent-blue font-medium">释放以添加附件</span>
         </div>
       )}
 
-      <div className={`rounded-2xl border bg-bg-composer shadow-sm transition-colors ${isDragging ? "border-accent-blue" : "border-border-default"}`}>
-        {/* Input area */}
-        <div className="px-4 pt-3">
+      <div className={`rounded-[24px] border bg-bg-composer shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-colors ${isDragging ? "border-accent-blue" : "border-border-default"} ${!currentSession ? "opacity-60" : ""}`}>
+        {/* Input */}
+        <div className="px-5 pt-4 pb-1">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
-            placeholder={currentSession ? "可向 Kimi 询问任何事。Shift+Enter 换行" : "请先选择项目"}
+            placeholder={currentSession ? "可向 Kimi 询问任何事。输入 @ 使用插件或提及文件" : "请先选择项目"}
             disabled={!currentSession}
             rows={1}
-            className="w-full resize-none bg-transparent text-text-primary placeholder:text-text-muted outline-none text-sm leading-relaxed min-h-[24px] max-h-[200px]"
+            className="w-full resize-none bg-transparent text-text-primary placeholder:text-text-muted outline-none text-[15px] leading-relaxed min-h-[24px] max-h-[200px]"
           />
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-3 pb-3 pt-1">
+        <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
           <div className="flex items-center gap-1">
             <button
               disabled={!currentSession}
-              className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-secondary disabled:opacity-40 transition-colors"
+              className="p-2 rounded-xl hover:bg-bg-hover text-text-secondary disabled:opacity-30 transition-colors"
               title="附件"
+              aria-label="附件"
             >
               <Plus size={18} />
             </button>
             <button
               disabled={!currentSession}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-bg-tertiary text-accent-orange text-sm disabled:opacity-40 transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl hover:bg-bg-hover text-accent-orange text-sm disabled:opacity-30 transition-colors"
             >
-              <AlertTriangle size={14} />
-              <span>{permissionLabel}</span>
+              <AlertTriangle size={13} />
+              <span className="flex items-center gap-0.5">
+                {permissionLabel}
+                <ChevronDown size={12} />
+              </span>
             </button>
           </div>
 
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-text-muted px-2">kimi-latest</span>
+          <div className="flex items-center gap-0.5">
             <button
               disabled={!currentSession}
-              className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-secondary disabled:opacity-40 transition-colors"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-xl hover:bg-bg-hover text-text-muted text-sm disabled:opacity-30 transition-colors"
+            >
+              <span>kimi-latest</span>
+              <ChevronDown size={12} />
+            </button>
+            <button
+              disabled={!currentSession}
+              className="p-2 rounded-xl hover:bg-bg-hover text-text-secondary disabled:opacity-30 transition-colors"
               title="语音输入"
+              aria-label="语音输入"
             >
               <Mic size={18} />
             </button>
-            {isRunning && (
+            {isRunning ? (
               <button
                 onClick={handleStop}
-                className="p-2 rounded-full bg-accent-red text-white hover:opacity-90 transition-opacity"
+                className="p-2.5 rounded-full bg-bg-tertiary text-text-secondary hover:bg-accent-red hover:text-white transition-colors"
                 title="停止"
+                aria-label="停止"
               >
-                <Square size={16} fill="currentColor" />
+                <Square size={14} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || !currentSession}
+                className="p-2.5 rounded-full bg-bg-tertiary text-text-secondary hover:bg-text-primary hover:text-white disabled:opacity-30 transition-colors"
+                title="发送"
+                aria-label="发送"
+              >
+                <ArrowUp size={16} />
               </button>
             )}
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || !currentSession}
-              className="p-2 rounded-full bg-accent-blue text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
-              title={isRunning ? "排队发送" : "发送"}
-            >
-              {isRunning ? <Clock size={16} /> : <ArrowUp size={16} />}
-            </button>
           </div>
         </div>
       </div>

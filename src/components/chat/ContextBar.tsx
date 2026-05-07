@@ -1,12 +1,11 @@
-import { FolderOpen, Monitor, GitBranch, Download } from "lucide-react";
+import { FolderOpen, Monitor, GitBranch, ChevronDown, Download } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 
 export function ContextBar() {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
-  const sessions = useSessionStore((s) => s.sessions);
-  const session = sessions.find((s) => s.id === currentSession?.id);
+  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
 
   const handleExport = () => {
     if (!session) return;
@@ -35,33 +34,32 @@ export function ContextBar() {
   };
 
   return (
-    <div className="flex items-center justify-center gap-5 px-4 py-2.5 text-xs text-text-muted border-t border-border-default bg-bg-secondary/50">
-      <div className="flex items-center gap-1.5">
+    <div className="flex items-center justify-center gap-1 px-4 pb-3 pt-1">
+      <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors">
         <FolderOpen size={12} />
-        <span className="font-medium text-text-secondary">{project?.name ?? "选择项目"}</span>
-      </div>
-      <div className="w-px h-3 bg-border-default" />
-      <div className="flex items-center gap-1.5">
+        <span>{project?.name ?? "选择项目"}</span>
+        <ChevronDown size={10} />
+      </button>
+      <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors">
         <Monitor size={12} />
         <span>本地模式</span>
-      </div>
-      <div className="w-px h-3 bg-border-default" />
-      <div className="flex items-center gap-1.5">
+        <ChevronDown size={10} />
+      </button>
+      <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors">
         <GitBranch size={12} />
         <span>{project?.gitBranch ?? "main"}</span>
-      </div>
+        <ChevronDown size={10} />
+      </button>
       {session && (
-        <>
-          <div className="w-px h-3 bg-border-default" />
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 hover:text-text-secondary transition-colors"
-            title="导出聊天记录"
-          >
-            <Download size={12} />
-            <span>导出</span>
-          </button>
-        </>
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
+          title="导出聊天记录"
+          aria-label="导出聊天记录"
+        >
+          <Download size={12} />
+          <span>导出</span>
+        </button>
       )}
     </div>
   );
