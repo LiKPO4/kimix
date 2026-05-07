@@ -35,13 +35,5 @@ export const useAppStore = create<AppStore>((set) => ({
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
   setSearchQuery: (q) => set({ searchQuery: q }),
-  setTheme: (theme) => {
-    set({ theme });
-    if (theme === "system") {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
-    } else {
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-  },
+  setTheme: (theme) => set({ theme }),
 }));

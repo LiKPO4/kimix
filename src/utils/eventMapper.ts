@@ -61,8 +61,20 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     }
 
     case "ToolCallPart": {
-      // Streaming tool arguments - handled by updating existing ToolCallEvent
-      return null;
+      const func = (payload.function ?? {}) as Record<string, unknown>;
+      return {
+        id: generateId(),
+        type: "tool_call",
+        timestamp: Date.now(),
+        toolCallId: (payload.tool_call_id as string) ?? (payload.id as string) ?? generateId(),
+        toolName: (func.name as string) ?? "unknown",
+        status: "running",
+        arguments: (() => {
+          try { return func.arguments ? JSON.parse(func.arguments as string) : {}; }
+          catch { return {}; }
+        })(),
+        rawArguments: (func.arguments as string) ?? "",
+      };
     }
 
     case "ToolResult": {
