@@ -1,0 +1,162 @@
+export type Theme = "dark" | "light" | "system";
+
+export type PermissionMode = "manual" | "approve_for_session" | "yolo";
+
+export interface AppState {
+  currentProject: Project | null;
+  currentSession: Session | null;
+  permissionMode: PermissionMode;
+  isRunning: boolean;
+  sidebarOpen: boolean;
+  theme: Theme;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  lastOpenedAt: number;
+  gitBranch?: string;
+}
+
+export interface Session {
+  id: string;
+  title: string;
+  projectPath: string;
+  createdAt: number;
+  updatedAt: number;
+  events: TimelineEvent[];
+  isLoading: boolean;
+}
+
+export type TimelineEvent =
+  | UserMessageEvent
+  | AssistantMessageEvent
+  | ToolCallEvent
+  | ToolResultEvent
+  | ApprovalRequestEvent
+  | StatusUpdateEvent
+  | SubagentEvent
+  | CompactionEvent
+  | ErrorEvent
+  | DiffEvent
+  | TodoEvent;
+
+export interface UserMessageEvent {
+  id: string;
+  type: "user_message";
+  timestamp: number;
+  content: string;
+}
+
+export interface AssistantMessageEvent {
+  id: string;
+  type: "assistant_message";
+  timestamp: number;
+  content: string;
+  thinking?: string;
+  isThinking: boolean;
+  isComplete: boolean;
+}
+
+export interface ToolCallEvent {
+  id: string;
+  type: "tool_call";
+  timestamp: number;
+  toolCallId: string;
+  toolName: string;
+  status: "running" | "success" | "error";
+  arguments: Record<string, unknown>;
+  rawArguments?: string;
+}
+
+export interface ToolResultEvent {
+  id: string;
+  type: "tool_result";
+  timestamp: number;
+  toolCallId: string;
+  toolName: string;
+  result: unknown;
+  display?: ToolDisplay;
+}
+
+export interface ToolDisplay {
+  diff?: FileDiff;
+  todo?: TodoItem[];
+  status?: string;
+}
+
+export interface FileDiff {
+  path: string;
+  oldText: string;
+  newText: string;
+}
+
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: "pending" | "in_progress" | "done";
+}
+
+export interface ApprovalRequestEvent {
+  id: string;
+  type: "approval_request";
+  timestamp: number;
+  requestId: string;
+  toolName: string;
+  description: string;
+  details: string;
+  riskLevel: "low" | "medium" | "high";
+  status: "pending" | "approved" | "rejected";
+}
+
+export interface StatusUpdateEvent {
+  id: string;
+  type: "status_update";
+  timestamp: number;
+  step?: number;
+  totalSteps?: number;
+  tokenCount?: number;
+  contextSize?: number;
+  message?: string;
+}
+
+export interface SubagentEvent {
+  id: string;
+  type: "subagent";
+  timestamp: number;
+  agentName: string;
+  status: "running" | "completed" | "error";
+  events: TimelineEvent[];
+}
+
+export interface CompactionEvent {
+  id: string;
+  type: "compaction";
+  timestamp: number;
+  phase: "begin" | "end";
+}
+
+export interface ErrorEvent {
+  id: string;
+  type: "error";
+  timestamp: number;
+  message: string;
+  source?: "sdk" | "ipc" | "ui";
+}
+
+export interface DiffEvent {
+  id: string;
+  type: "diff";
+  timestamp: number;
+  filePath: string;
+  oldText: string;
+  newText: string;
+}
+
+export interface TodoEvent {
+  id: string;
+  type: "todo";
+  timestamp: number;
+  items: TodoItem[];
+}
