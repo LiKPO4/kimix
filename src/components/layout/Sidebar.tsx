@@ -3,8 +3,9 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 
+
 export function Sidebar() {
-  const { currentProject, sidebarOpen, toggleSidebar, setCurrentProject, setCurrentSession } = useAppStore();
+  const { currentProject, currentSession, sidebarOpen, toggleSidebar, setCurrentProject, setCurrentSession, setSettingsOpen } = useAppStore();
   const { recentProjects, setRecentProjects, addSession, sessions } = useSessionStore();
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
 
@@ -79,7 +80,15 @@ export function Sidebar() {
           <FolderOpenIcon size={16} />
           <span>打开项目</span>
         </button>
-        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default hover:bg-bg-tertiary hover:border-border-strong transition-all text-text-primary text-sm bg-bg-elevated">
+        <button
+          onClick={async () => {
+            if (currentProject) {
+              await createSessionForProject(currentProject);
+            }
+          }}
+          disabled={!currentProject}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default hover:bg-bg-tertiary hover:border-border-strong transition-all text-text-primary text-sm bg-bg-elevated disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           <Plus size={16} />
           <span>新对话</span>
         </button>
@@ -123,7 +132,12 @@ export function Sidebar() {
                   {pSessions.map((s) => (
                     <button
                       key={s.id}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/40 transition-colors text-left"
+                      onClick={() => setCurrentSession(s)}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors text-left ${
+                        currentSession?.id === s.id
+                          ? "text-accent-blue bg-accent-blue/5"
+                          : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/40"
+                      }`}
                     >
                       <MessageSquare size={12} />
                       <span className="truncate">{s.title}</span>
@@ -144,7 +158,10 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-3 border-t border-border-default space-y-0.5">
-        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-bg-tertiary transition-colors text-text-secondary text-sm">
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-bg-tertiary transition-colors text-text-secondary text-sm"
+        >
           <Settings size={16} />
           <span>设置</span>
         </button>

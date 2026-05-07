@@ -10,6 +10,8 @@ interface AppStore extends AppState {
   setTheme: (theme: Theme) => void;
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  focusInputTrigger: number;
+  triggerFocusInput: () => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -20,6 +22,7 @@ export const useAppStore = create<AppStore>((set) => ({
   sidebarOpen: true,
   theme: "light",
   settingsOpen: false,
+  focusInputTrigger: 0,
 
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
@@ -27,6 +30,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setIsRunning: (running) => set({ isRunning: running }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+  triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
   setTheme: (theme) => {
     set({ theme });
     if (theme === "system") {

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, AlertTriangle, Mic, ArrowUp, Square, Clock } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -95,6 +95,14 @@ export function Composer() {
       el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
     }
   };
+
+  // Focus input when triggered globally (Cmd/Ctrl+K)
+  const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
+  useEffect(() => {
+    if (focusInputTrigger > 0) {
+      textareaRef.current?.focus();
+    }
+  }, [focusInputTrigger]);
 
   const permissionLabel = {
     manual: "手动审批",

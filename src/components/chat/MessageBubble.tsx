@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Loader2, ChevronDown, ChevronUp, User, Bot } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, User, Bot, Copy, Check, RotateCcw } from "lucide-react";
+import { useAppStore } from "@/stores/appStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
@@ -11,11 +13,66 @@ export function MessageBubble({ event }: MessageBubbleProps) {
   const [showThinking, setShowThinking] = useState(false);
 
   if (event.type === "user_message") {
+    const [copied, setCopied] = useState(false);
+    const currentSession = useAppStore((s) => s.currentSession);
+    const isRunning = useAppStore((s) => s.isRunning);
+    const setIsRunning = useAppStore((s) => s.setIsRunning);
+    const updateSession = useSessionStore((s) => s.updateSession);
+
+    const handleCopy = async () => {
+      await navigator.clipboard.writeText(event.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleResend = async () => {
+      if (!currentSession || isRunning) return;
+      const thinkingPlaceholder: TimelineEvent = {
+        id: Math.random().toString(36).substring(2, 11),
+        type: "assistant_message",
+        timestamp: Date.now(),
+        content: "",
+        isThinking: true,
+        isComplete: false,
+      };
+      updateSession(currentSession.id, (session) => ({
+        ...session,
+        events: [...session.events, thinkingPlaceholder],
+        updatedAt: Date.now(),
+      }));
+      setIsRunning(true);
+      try {
+        await window.api.sendPrompt({ sessionId: currentSession.id, content: event.content });
+      } catch (err) {
+        console.error("Resend failed:", err);
+        setIsRunning(false);
+      }
+    };
+
     return (
       <div className="flex justify-end group">
         <div className="flex items-start gap-2.5 max-w-[85%]">
-          <div className="rounded-2xl rounded-tr-sm bg-accent-blue text-white px-5 py-3 text-[15px] leading-relaxed shadow-sm">
-            {event.content}
+          <div className="relative">
+            <div className="rounded-2xl rounded-tr-sm bg-accent-blue text-white px-5 py-3 text-[15px] leading-relaxed shadow-sm">
+              {event.content}
+            </div>
+            <div className="absolute -left-8 top-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={handleCopy}
+                className="p-1 rounded-md hover:bg-bg-tertiary text-text-muted"
+                title="复制"
+              >
+                {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+              </button>
+              <button
+                onClick={handleResend}
+                disabled={isRunning}
+                className="p-1 rounded-md hover:bg-bg-tertiary text-text-muted disabled:opacity-30"
+                title="重新发送"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
           </div>
           <div className="w-7 h-7 rounded-full bg-accent-blue/10 flex items-center justify-center shrink-0 mt-1">
             <User size={14} className="text-accent-blue" />
@@ -25,13 +82,20 @@ export function MessageBubble({ event }: MessageBubbleProps) {
     );
   }
 
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(event.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="flex justify-start group">
       <div className="flex items-start gap-2.5 max-w-[85%]">
         <div className="w-7 h-7 rounded-full bg-bg-tertiary flex items-center justify-center shrink-0 mt-1 border border-border-default">
           <Bot size={14} className="text-text-secondary" />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 relative">
           {/* Thinking placeholder */}
           {event.isThinking && !event.content && !event.thinking && (
             <div className="rounded-2xl rounded-tl-sm bg-bg-elevated border border-border-default px-5 py-3 shadow-sm">
@@ -44,8 +108,17 @@ export function MessageBubble({ event }: MessageBubbleProps) {
 
           {/* Content */}
           {(event.content || (!event.isThinking && event.thinking)) && (
-            <div className="rounded-2xl rounded-tl-sm bg-bg-elevated border border-border-default px-5 py-3 text-[15px] leading-relaxed text-text-primary shadow-sm">
-              <MarkdownRenderer content={event.content} />
+            <div className="relative">
+              <div className="rounded-2xl rounded-tl-sm bg-bg-elevated border border-border-default px-5 py-3 text-[15px] leading-relaxed text-text-primary shadow-sm">
+                <MarkdownRenderer content={event.content} />
+              </div>
+              <button
+                onClick={handleCopy}
+                className="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-bg-tertiary text-text-muted"
+                title="复制"
+              >
+                {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+              </button>
             </div>
           )}
 

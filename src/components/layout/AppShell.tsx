@@ -2,6 +2,7 @@ import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
 
 export function AppShell() {
   return (
@@ -12,6 +13,7 @@ export function AppShell() {
         <Composer />
         <ContextBar />
       </div>
+      <SettingsPanel />
     </div>
   );
 }

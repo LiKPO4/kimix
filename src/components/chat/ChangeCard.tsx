@@ -18,7 +18,6 @@ function DiffViewer({ oldText, newText }: { oldText?: string; newText?: string }
   const newLines = (newText ?? "").split("\n");
 
   // Simple line-by-line diff
-  const maxLen = Math.max(oldLines.length, newLines.length);
   const diffLines: { type: "same" | "removed" | "added"; oldLine?: string; newLine?: string }[] = [];
 
   let oldIdx = 0, newIdx = 0;

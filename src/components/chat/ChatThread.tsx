@@ -26,7 +26,7 @@ function EventRenderer({ event }: { event: TimelineEvent }) {
     case "todo":
       return <TodoCard event={event} />;
     case "diff":
-      return <ChangeCard changes={[{ path: event.filePath, additions: 0, deletions: 0 }]} />;
+      return <ChangeCard changes={[{ path: event.filePath, oldText: event.oldText, newText: event.newText }]} />;
     case "error":
       return <ErrorCard event={event} />;
     case "subagent":
