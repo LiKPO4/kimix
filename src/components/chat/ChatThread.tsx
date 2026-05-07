@@ -45,8 +45,7 @@ function EventRenderer({ event }: { event: TimelineEvent }) {
 
 export function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
-  const sessions = useSessionStore((s) => s.sessions);
-  const session = sessions.find((s) => s.id === currentSession?.id);
+  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when events change (smooth for new messages)

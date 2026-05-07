@@ -1,8 +1,11 @@
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import type { Project } from "./types/ipc";
+
+const execAsync = promisify(exec);
 
 const DATA_DIR = path.join(os.homedir(), ".kimix");
 const PROJECTS_FILE = path.join(DATA_DIR, "projects.json");
@@ -45,27 +48,27 @@ export function removeRecentProject(id: string): void {
   writeProjects(existing.filter((p) => p.id !== id));
 }
 
-export function getGitBranch(projectPath: string): string | undefined {
+export async function getGitBranch(projectPath: string): Promise<string | undefined> {
   try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+    const { stdout } = await execAsync("git rev-parse --abbrev-ref HEAD", {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
     });
-    return branch.trim();
+    return stdout.trim();
   } catch {
     return undefined;
   }
 }
 
-export function getGitStatus(projectPath: string): string {
+export async function getGitStatus(projectPath: string): Promise<string> {
   try {
-    const status = execSync("git status --short", {
+    const { stdout } = await execAsync("git status --short", {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
     });
-    return status.trim();
+    return stdout.trim();
   } catch {
     return "";
   }

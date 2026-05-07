@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as kimiBridge from "./kimiBridge";
 import * as projectService from "./projectService";
+import * as settingsService from "./settingsService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,7 +84,7 @@ ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) => 
     path: p,
     name: path.basename(p),
     lastOpenedAt: Date.now(),
-    gitBranch: projectService.getGitBranch(p),
+    gitBranch: await projectService.getGitBranch(p),
   };
   projectService.addRecentProject(project);
   return {
@@ -108,8 +109,8 @@ ipcMain.handle("project:removeRecent", async (_, id: string) => {
 });
 
 ipcMain.handle("project:getGitInfo", async (_, projectPath: string) => {
-  const branch = projectService.getGitBranch(projectPath);
-  const status = projectService.getGitStatus(projectPath);
+  const branch = await projectService.getGitBranch(projectPath);
+  const status = await projectService.getGitStatus(projectPath);
   return { success: true, data: { branch: branch ?? "main", status } };
 });
 
@@ -182,26 +183,16 @@ ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; session
 
 // App IPC handlers
 ipcMain.handle("app:getSettings", async () => {
-  return {
-    success: true,
-    data: {
-      defaultModel: "kimi-latest",
-      defaultThinking: true,
-      maxTurns: 50,
-      enableCompaction: true,
-      defaultPermissionMode: "manual",
-      theme: "light",
-      fontSize: 14,
-      showThinking: true,
-      expandToolCalls: false,
-      autoReadAgentsMd: true,
-      autoShowGitStatus: true,
-    },
-  };
+  return { success: true, data: settingsService.loadSettings() };
 });
 
 ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
-  return { success: true, data: undefined };
+  try {
+    settingsService.saveSettings(settings as ReturnType<typeof settingsService.loadSettings>);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("app:openExternal", async (_, url: string) => {
