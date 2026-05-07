@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { MoreHorizontal } from "lucide-react";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
@@ -60,10 +61,25 @@ export function ChatThread() {
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
-      {session.events.map((event) => (
-        <EventRenderer key={event.id} event={event} />
-      ))}
-    </div>
+    <>
+      {/* Chat Thread Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border-default bg-bg-primary shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-sm font-medium text-text-primary truncate">{session.title}</h2>
+        </div>
+        <button
+          className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors"
+          title="更多操作"
+          aria-label="更多操作"
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      </div>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
+        {session.events.map((event) => (
+          <EventRenderer key={event.id} event={event} />
+        ))}
+      </div>
+    </>
   );
 }

@@ -7,6 +7,7 @@ import { mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
+  const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setIsRunning = useAppStore((s) => s.setIsRunning);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
@@ -19,6 +20,7 @@ function App() {
     window.api.getSettings().then((res) => {
       if (res.success) {
         setTheme(res.data.theme);
+        setPermissionMode(res.data.defaultPermissionMode);
       }
     });
 
@@ -121,13 +123,33 @@ function App() {
     };
     document.addEventListener("keydown", handleKeyDown);
 
+    // Auto-save settings when theme/permission changes
+    const unsubSettings = useAppStore.subscribe((state, prev) => {
+      if (state.theme !== prev.theme || state.permissionMode !== prev.permissionMode) {
+        window.api.saveSettings({
+          theme: state.theme,
+          defaultPermissionMode: state.permissionMode,
+          defaultModel: "kimi-latest",
+          defaultThinking: true,
+          maxTurns: 50,
+          enableCompaction: true,
+          fontSize: 14,
+          showThinking: true,
+          expandToolCalls: false,
+          autoReadAgentsMd: true,
+          autoShowGitStatus: true,
+        }).catch(() => {});
+      }
+    });
+
     return () => {
       unsubscribeEvent();
       unsubscribeStatus();
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      unsubSettings();
     };
-  }, [setTheme, setIsRunning, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, currentSession]);
+  }, [setTheme, setPermissionMode, setIsRunning, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, currentSession]);
 
   return (
     <ThemeProvider>

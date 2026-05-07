@@ -17,8 +17,20 @@ function formatRelativeTime(ts: number): string {
 }
 
 export function Sidebar() {
-  const { currentProject, currentSession, sidebarOpen, toggleSidebar, setCurrentProject, setCurrentSession, setSettingsOpen } = useAppStore();
-  const { recentProjects, setRecentProjects, addSession, sessions, deleteSession } = useSessionStore();
+  const currentProject = useAppStore((s) => s.currentProject);
+  const currentSession = useAppStore((s) => s.currentSession);
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+
+  const recentProjects = useSessionStore((s) => s.recentProjects);
+  const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
+  const addSession = useSessionStore((s) => s.addSession);
+  const sessions = useSessionStore((s) => s.sessions);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
+
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,18 +110,29 @@ export function Sidebar() {
           <Plus size={16} className="text-text-secondary" />
           <span>新对话</span>
         </button>
-        <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors">
+        <button
+          disabled
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40 cursor-not-allowed"
+          title="搜索功能即将上线"
+        >
           <Search size={16} className="text-text-secondary" />
           <span>搜索</span>
         </button>
-        <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors">
+        <button
+          disabled
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40 cursor-not-allowed"
+          title="技能功能即将上线"
+        >
           <Wrench size={16} className="text-text-secondary" />
           <span>技能</span>
         </button>
-        <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors">
+        <button
+          disabled
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40 cursor-not-allowed"
+          title="自动化功能即将上线"
+        >
           <Zap size={16} className="text-text-secondary" />
           <span>自动化</span>
-          <span className="ml-auto text-xs text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded-full">1</span>
         </button>
       </div>
 
@@ -117,8 +140,16 @@ export function Sidebar() {
 
       {/* Projects */}
       <div className="flex-1 overflow-y-auto px-2">
-        <div className="text-[11px] font-medium text-text-muted px-3 py-1.5">
-          项目
+        <div className="flex items-center justify-between px-3 py-1.5">
+          <span className="text-[11px] font-medium text-text-muted">项目</span>
+          <button
+            onClick={handleOpenProject}
+            className="p-1 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors"
+            title="打开项目"
+            aria-label="打开项目"
+          >
+            <ChevronRight size={12} />
+          </button>
         </div>
 
         {recentProjects.map((project) => {
@@ -145,16 +176,6 @@ export function Sidebar() {
               >
                 <FolderOpen size={15} className="shrink-0 opacity-70" />
                 <span className="flex-1 text-left truncate">{project.name}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenProject();
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-tertiary text-text-muted"
-                  title="打开项目"
-                >
-                  <ChevronRight size={12} />
-                </button>
               </button>
 
               {isExpanded && pSessions.length > 0 && (

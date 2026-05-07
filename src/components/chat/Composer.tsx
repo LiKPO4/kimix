@@ -126,7 +126,7 @@ export function Composer() {
   }[permissionMode];
 
   return (
-    <div className="px-4 pb-4 pt-2" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+    <div className="px-4 pb-4 pt-2 relative" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       {pendingMessages.length > 0 && (
         <div className="flex items-center gap-2 px-4 py-1 mb-2 text-xs text-text-muted bg-bg-secondary rounded-full w-fit mx-auto">
           <Clock size={12} />

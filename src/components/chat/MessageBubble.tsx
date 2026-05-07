@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Loader2, ChevronDown, ChevronUp, Copy, Check, RotateCcw } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Copy, Check, RotateCcw, ThumbsUp, ThumbsDown, Share2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -90,6 +90,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
 
 function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "assistant_message" }> }) {
   const [showThinking, setShowThinking] = useState(false);
+  const [liked, setLiked] = useState<"up" | "down" | null>(null);
   const { copied, trigger } = useCopyTimeout();
 
   return (
@@ -116,6 +117,36 @@ function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { typ
               aria-label="复制"
             >
               {copied ? <Check size={13} className="text-accent-green" /> : <Copy size={13} />}
+            </button>
+          </div>
+        )}
+
+        {/* Reaction buttons */}
+        {!event.isThinking && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+            <button
+              onClick={() => setLiked(liked === "up" ? null : "up")}
+              className={`p-1 rounded-md transition-colors ${liked === "up" ? "text-accent-blue bg-accent-blue/10" : "text-text-muted hover:bg-bg-hover"}`}
+              title="赞"
+              aria-label="赞"
+            >
+              <ThumbsUp size={13} />
+            </button>
+            <button
+              onClick={() => setLiked(liked === "down" ? null : "down")}
+              className={`p-1 rounded-md transition-colors ${liked === "down" ? "text-accent-red bg-accent-red/10" : "text-text-muted hover:bg-bg-hover"}`}
+              title="踩"
+              aria-label="踩"
+            >
+              <ThumbsDown size={13} />
+            </button>
+            <button
+              onClick={() => trigger(event.content)}
+              className="p-1 rounded-md text-text-muted hover:bg-bg-hover transition-colors"
+              title="分享"
+              aria-label="分享"
+            >
+              <Share2 size={13} />
             </button>
           </div>
         )}

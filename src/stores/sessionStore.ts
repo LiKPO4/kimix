@@ -53,11 +53,11 @@ export const useSessionStore = create<SessionStore>((set) => ({
     set((state) => ({ pendingMessages: [...state.pendingMessages, msg] })),
 
   shiftPendingMessage: () => {
-    let first: string | undefined;
+    let result: string | undefined;
     set((state) => {
-      [first, ...state.pendingMessages] = state.pendingMessages;
+      result = state.pendingMessages[0];
       return { pendingMessages: state.pendingMessages.slice(1) };
     });
-    return first;
+    return result;
   },
 }));
