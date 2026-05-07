@@ -88,6 +88,26 @@ export function Composer() {
     }
   };
 
+  // File drop handling
+  const [isDragging, setIsDragging] = useState(false);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0 && currentSession) {
+      const paths = files.map((f) => f.path || f.name).join(", ");
+      setInput((prev) => (prev ? prev + "\n" : "") + `[附件: ${paths}]`);
+    }
+  };
+
   const handleInput = () => {
     const el = textareaRef.current;
     if (el) {
@@ -111,7 +131,12 @@ export function Composer() {
   }[permissionMode];
 
   return (
-    <div className="px-4 pb-3">
+    <div
+      className="px-4 pb-3"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Pending messages indicator */}
       {pendingMessages.length > 0 && (
         <div className="flex items-center gap-2 px-4 py-1.5 mb-2 text-xs text-text-muted bg-bg-secondary rounded-full w-fit mx-auto">
@@ -120,7 +145,14 @@ export function Composer() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border-default bg-bg-composer shadow-sm">
+      {/* Drop overlay */}
+      {isDragging && (
+        <div className="absolute inset-x-4 bottom-3 top-0 rounded-2xl border-2 border-dashed border-accent-blue bg-accent-blue/5 flex items-center justify-center z-10 pointer-events-none">
+          <span className="text-sm text-accent-blue font-medium">释放以添加附件</span>
+        </div>
+      )}
+
+      <div className={`rounded-2xl border bg-bg-composer shadow-sm transition-colors ${isDragging ? "border-accent-blue" : "border-border-default"}`}>
         {/* Input area */}
         <div className="px-4 pt-3">
           <textarea

@@ -1,4 +1,4 @@
-import { Plus, Settings, FolderOpen, ChevronRight, ChevronDown, FolderOpenIcon, MessageSquare } from "lucide-react";
+import { Plus, Settings, FolderOpen, ChevronRight, ChevronDown, FolderOpenIcon, MessageSquare, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -6,7 +6,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 
 export function Sidebar() {
   const { currentProject, currentSession, sidebarOpen, toggleSidebar, setCurrentProject, setCurrentSession, setSettingsOpen } = useAppStore();
-  const { recentProjects, setRecentProjects, addSession, sessions } = useSessionStore();
+  const { recentProjects, setRecentProjects, addSession, sessions, deleteSession } = useSessionStore();
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
 
   useEffect(() => {
@@ -130,18 +130,35 @@ export function Sidebar() {
               {isExpanded && pSessions.length > 0 && (
                 <div className="ml-6 mt-0.5 space-y-0.5">
                   {pSessions.map((s) => (
-                    <button
+                    <div
                       key={s.id}
-                      onClick={() => setCurrentSession(s)}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors text-left ${
+                      className={`group flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-colors ${
                         currentSession?.id === s.id
                           ? "text-accent-blue bg-accent-blue/5"
                           : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/40"
                       }`}
                     >
-                      <MessageSquare size={12} />
-                      <span className="truncate">{s.title}</span>
-                    </button>
+                      <button
+                        onClick={() => setCurrentSession(s)}
+                        className="flex-1 flex items-center gap-2 text-left min-w-0"
+                      >
+                        <MessageSquare size={12} />
+                        <span className="truncate">{s.title}</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(s.id);
+                          if (currentSession?.id === s.id) {
+                            setCurrentSession(null);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent-red/10 hover:text-accent-red transition-all"
+                        title="删除会话"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

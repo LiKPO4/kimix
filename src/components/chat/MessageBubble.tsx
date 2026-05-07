@@ -12,6 +12,16 @@ interface MessageBubbleProps {
 export function MessageBubble({ event }: MessageBubbleProps) {
   const [showThinking, setShowThinking] = useState(false);
 
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatFullTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
   if (event.type === "user_message") {
     const [copied, setCopied] = useState(false);
     const currentSession = useAppStore((s) => s.currentSession);
@@ -73,6 +83,11 @@ export function MessageBubble({ event }: MessageBubbleProps) {
                 <RotateCcw size={14} />
               </button>
             </div>
+            <div className="text-right mt-1">
+              <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" title={formatFullTime(event.timestamp)}>
+                {formatTime(event.timestamp)}
+              </span>
+            </div>
           </div>
           <div className="w-7 h-7 rounded-full bg-accent-blue/10 flex items-center justify-center shrink-0 mt-1">
             <User size={14} className="text-accent-blue" />
@@ -95,13 +110,22 @@ export function MessageBubble({ event }: MessageBubbleProps) {
         <div className="w-7 h-7 rounded-full bg-bg-tertiary flex items-center justify-center shrink-0 mt-1 border border-border-default">
           <Bot size={14} className="text-text-secondary" />
         </div>
-        <div className="space-y-1.5 relative">
+        <div className="space-y-1">
           {/* Thinking placeholder */}
           {event.isThinking && !event.content && !event.thinking && (
             <div className="rounded-2xl rounded-tl-sm bg-bg-elevated border border-border-default px-5 py-3 shadow-sm">
               <div className="flex items-center gap-2 text-text-muted text-sm">
                 <Loader2 size={14} className="animate-spin" />
-                <span>思考中...</span>
+                <span className="flex gap-0.5">
+                  {"思考中".split("").map((c, i) => (
+                    <span key={i} className="inline-block" style={{ animation: `pulse-dot 1.5s ${i * 0.15}s infinite` }}>{c}</span>
+                  ))}
+                  <span className="inline-flex gap-0.5">
+                    {[0, 1, 2].map((i) => (
+                      <span key={i} className="inline-block w-1 h-1 rounded-full bg-text-muted" style={{ animation: `pulse-dot 1.5s ${i * 0.3}s infinite` }} />
+                    ))}
+                  </span>
+                </span>
               </div>
             </div>
           )}
@@ -122,6 +146,11 @@ export function MessageBubble({ event }: MessageBubbleProps) {
             </div>
           )}
 
+          <div className="mt-1">
+            <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" title={formatFullTime(event.timestamp)}>
+              {formatTime(event.timestamp)}
+            </span>
+          </div>
           {/* Thinking block */}
           {event.thinking && (
             <div className="ml-1">
