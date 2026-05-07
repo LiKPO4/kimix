@@ -61,16 +61,19 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               {children}
             </blockquote>
           ),
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent-blue hover:underline"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ children, href }) => {
+            const safeHref = href?.startsWith("http://") || href?.startsWith("https://") || href?.startsWith("mailto:") ? href : "#";
+            return (
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-blue hover:underline"
+              >
+                {children}
+              </a>
+            );
+          },
           table: ({ children }) => (
             <div className="overflow-x-auto my-3 rounded-lg border border-border-default">
               <table className="w-full text-sm text-text-primary">{children}</table>

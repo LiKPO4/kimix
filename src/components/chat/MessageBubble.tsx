@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, ChevronDown, ChevronUp, User, Bot, Copy, Check, RotateCcw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -8,9 +8,6 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "assistant_message" }>;
 }
-
-export function MessageBubble({ event }: MessageBubbleProps) {
-  const [showThinking, setShowThinking] = useState(false);
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
@@ -22,87 +19,98 @@ function formatFullTime(ts: number): string {
   return d.toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-  if (event.type === "user_message") {
-    const [copied, setCopied] = useState(false);
-    const currentSession = useAppStore((s) => s.currentSession);
-    const isRunning = useAppStore((s) => s.isRunning);
-    const setIsRunning = useAppStore((s) => s.setIsRunning);
-    const updateSession = useSessionStore((s) => s.updateSession);
+function useCopyTimeout() {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-    const handleCopy = async () => {
-      await navigator.clipboard.writeText(event.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  const trigger = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setCopied(false), 2000);
+  };
+
+  return { copied, trigger };
+}
+
+function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
+  const { copied, trigger } = useCopyTimeout();
+  const currentSession = useAppStore((s) => s.currentSession);
+  const isRunning = useAppStore((s) => s.isRunning);
+  const setIsRunning = useAppStore((s) => s.setIsRunning);
+  const updateSession = useSessionStore((s) => s.updateSession);
+
+  const handleResend = async () => {
+    if (!currentSession || isRunning) return;
+    const thinkingPlaceholder: TimelineEvent = {
+      id: Math.random().toString(36).substring(2, 11),
+      type: "assistant_message",
+      timestamp: Date.now(),
+      content: "",
+      isThinking: true,
+      isComplete: false,
     };
+    updateSession(currentSession.id, (session) => ({
+      ...session,
+      events: [...session.events, thinkingPlaceholder],
+      updatedAt: Date.now(),
+    }));
+    setIsRunning(true);
+    try {
+      await window.api.sendPrompt({ sessionId: currentSession.id, content: event.content });
+    } catch (err) {
+      console.error("Resend failed:", err);
+      setIsRunning(false);
+    }
+  };
 
-    const handleResend = async () => {
-      if (!currentSession || isRunning) return;
-      const thinkingPlaceholder: TimelineEvent = {
-        id: Math.random().toString(36).substring(2, 11),
-        type: "assistant_message",
-        timestamp: Date.now(),
-        content: "",
-        isThinking: true,
-        isComplete: false,
-      };
-      updateSession(currentSession.id, (session) => ({
-        ...session,
-        events: [...session.events, thinkingPlaceholder],
-        updatedAt: Date.now(),
-      }));
-      setIsRunning(true);
-      try {
-        await window.api.sendPrompt({ sessionId: currentSession.id, content: event.content });
-      } catch (err) {
-        console.error("Resend failed:", err);
-        setIsRunning(false);
-      }
-    };
-
-    return (
-      <div className="flex justify-end group">
-        <div className="flex items-start gap-2.5 max-w-[85%]">
-          <div className="relative">
-            <div className="rounded-2xl rounded-tr-sm bg-accent-blue text-white px-5 py-3 text-[15px] leading-relaxed shadow-sm">
-              {event.content}
-            </div>
-            <div className="absolute -left-8 top-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={handleCopy}
-                className="p-1 rounded-md hover:bg-bg-tertiary text-text-muted"
-                title="复制"
-              >
-                {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
-              </button>
-              <button
-                onClick={handleResend}
-                disabled={isRunning}
-                className="p-1 rounded-md hover:bg-bg-tertiary text-text-muted disabled:opacity-30"
-                title="重新发送"
-              >
-                <RotateCcw size={14} />
-              </button>
-            </div>
-            <div className="text-right mt-1">
-              <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" title={formatFullTime(event.timestamp)}>
-                {formatTime(event.timestamp)}
-              </span>
-            </div>
+  return (
+    <div className="flex justify-end group">
+      <div className="flex items-start gap-2.5 max-w-[85%]">
+        <div className="relative">
+          <div className="rounded-2xl rounded-tr-sm bg-accent-blue text-white px-5 py-3 text-[15px] leading-relaxed shadow-sm">
+            {event.content}
           </div>
-          <div className="w-7 h-7 rounded-full bg-accent-blue/10 flex items-center justify-center shrink-0 mt-1">
-            <User size={14} className="text-accent-blue" />
+          <div className="absolute -left-8 top-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => trigger(event.content)}
+              className="p-1 rounded-md hover:bg-bg-tertiary text-text-muted"
+              title="复制"
+              aria-label="复制消息"
+            >
+              {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+            </button>
+            <button
+              onClick={handleResend}
+              disabled={isRunning}
+              className="p-1 rounded-md hover:bg-bg-tertiary text-text-muted disabled:opacity-30"
+              title="重新发送"
+              aria-label="重新发送"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+          <div className="text-right mt-1">
+            <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" title={formatFullTime(event.timestamp)}>
+              {formatTime(event.timestamp)}
+            </span>
           </div>
         </div>
+        <div className="w-7 h-7 rounded-full bg-accent-blue/10 flex items-center justify-center shrink-0 mt-1">
+          <User size={14} className="text-accent-blue" />
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(event.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "assistant_message" }> }) {
+  const [showThinking, setShowThinking] = useState(false);
+  const { copied, trigger } = useCopyTimeout();
 
   return (
     <div className="flex justify-start group">
@@ -116,16 +124,7 @@ function formatFullTime(ts: number): string {
             <div className="rounded-2xl rounded-tl-sm bg-bg-elevated border border-border-default px-5 py-3 shadow-sm">
               <div className="flex items-center gap-2 text-text-muted text-sm">
                 <Loader2 size={14} className="animate-spin" />
-                <span className="flex gap-0.5">
-                  {"思考中".split("").map((c, i) => (
-                    <span key={i} className="inline-block" style={{ animation: `pulse-dot 1.5s ${i * 0.15}s infinite` }}>{c}</span>
-                  ))}
-                  <span className="inline-flex gap-0.5">
-                    {[0, 1, 2].map((i) => (
-                      <span key={i} className="inline-block w-1 h-1 rounded-full bg-text-muted" style={{ animation: `pulse-dot 1.5s ${i * 0.3}s infinite` }} />
-                    ))}
-                  </span>
-                </span>
+                <span>思考中...</span>
               </div>
             </div>
           )}
@@ -137,9 +136,10 @@ function formatFullTime(ts: number): string {
                 <MarkdownRenderer content={event.content} />
               </div>
               <button
-                onClick={handleCopy}
+                onClick={() => trigger(event.content)}
                 className="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-bg-tertiary text-text-muted"
                 title="复制"
+                aria-label="复制消息"
               >
                 {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
               </button>
@@ -151,6 +151,7 @@ function formatFullTime(ts: number): string {
               {formatTime(event.timestamp)}
             </span>
           </div>
+
           {/* Thinking block */}
           {event.thinking && (
             <div className="ml-1">
@@ -172,4 +173,11 @@ function formatFullTime(ts: number): string {
       </div>
     </div>
   );
+}
+
+export function MessageBubble({ event }: MessageBubbleProps) {
+  if (event.type === "user_message") {
+    return <UserMessageBubble event={event} />;
+  }
+  return <AssistantMessageBubble event={event} />;
 }

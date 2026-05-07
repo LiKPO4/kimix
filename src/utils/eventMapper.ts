@@ -52,7 +52,10 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         toolCallId: (payload.id as string) ?? generateId(),
         toolName: (func.name as string) ?? "unknown",
         status: "running",
-        arguments: func.arguments ? JSON.parse(func.arguments as string) : {},
+        arguments: (() => {
+          try { return func.arguments ? JSON.parse(func.arguments as string) : {}; }
+          catch { return {}; }
+        })(),
         rawArguments: (func.arguments as string) ?? "",
       };
     }

@@ -8,11 +8,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
-export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"] || "http://localhost:5173";
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist");
+export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const RENDERER_DIST = path.join(process.env.APP_ROOT, "..", "out", "renderer");
 
-process.env.VITE_PUBLIC = process.env["VITE_DEV_SERVER_URL"]
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
 
@@ -35,18 +34,22 @@ function createWindow() {
 
   kimiBridge.setMainWindow(mainWindow);
 
-  if (process.env["VITE_DEV_SERVER_URL"]) {
-    mainWindow.loadURL(process.env["VITE_DEV_SERVER_URL"]);
-  } else {
+  if (VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL);
+  } else {
+    mainWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return { action: "deny" };
+    }
     shell.openExternal(url);
     return { action: "deny" };
   });
 
-  mainWindow.webContents.on("dom-ready", () => {
+  mainWindow.webContents.once("dom-ready", () => {
     setTimeout(() => {
       mainWindow?.webContents.executeJavaScript(`document.getElementById("root")?.innerHTML?.substring(0, 500)`)
         .then((html: unknown) => {
@@ -56,6 +59,11 @@ function createWindow() {
           console.log("[KIMIX DOM] error:", err);
         });
     }, 3000);
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    kimiBridge.setMainWindow(null);
   });
 }
 
@@ -117,7 +125,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
 
 ipcMain.handle("kimi:sendPrompt", async (_, request: { sessionId: string; content: string }) => {
   try {
-    // Start prompt in background (don't await the full turn)
+    // Fire-and-forget: don't await the full turn
     kimiBridge.sendPrompt(request.sessionId, request.content).catch((err) => {
       console.error("Send prompt error:", err);
     });
@@ -139,6 +147,15 @@ ipcMain.handle("kimi:stopTurn", async (_, request: { sessionId: string }) => {
 ipcMain.handle("kimi:approveRequest", async (_, request: { sessionId: string; requestId: string; approved: boolean; scope?: "once" | "session" }) => {
   try {
     await kimiBridge.approveRequest(request.sessionId, request.requestId, request.approved, request.scope);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:closeSession", async (_, request: { sessionId: string }) => {
+  try {
+    await kimiBridge.closeSession(request.sessionId);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -188,6 +205,10 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
 });
 
 ipcMain.handle("app:openExternal", async (_, url: string) => {
+  const u = new URL(url);
+  if (u.protocol !== "http:" && u.protocol !== "https:") {
+    throw new Error("Invalid protocol");
+  }
   await shell.openExternal(url);
   return { success: true, data: undefined };
 });

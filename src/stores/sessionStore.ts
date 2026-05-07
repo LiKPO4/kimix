@@ -15,7 +15,7 @@ interface SessionStore {
   shiftPendingMessage: () => string | undefined;
 }
 
-export const useSessionStore = create<SessionStore>((set, get) => ({
+export const useSessionStore = create<SessionStore>((set) => ({
   sessions: [],
   recentProjects: [],
   pendingMessages: [],
@@ -53,11 +53,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set((state) => ({ pendingMessages: [...state.pendingMessages, msg] })),
 
   shiftPendingMessage: () => {
-    const state = get();
-    const [first, ...rest] = state.pendingMessages;
-    if (first !== undefined) {
-      set({ pendingMessages: rest });
-    }
+    let first: string | undefined;
+    set((state) => {
+      [first, ...state.pendingMessages] = state.pendingMessages;
+      return { pendingMessages: state.pendingMessages.slice(1) };
+    });
     return first;
   },
 }));

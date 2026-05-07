@@ -125,6 +125,7 @@ function App() {
       unsubscribeEvent();
       unsubscribeStatus();
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [setTheme, setIsRunning, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, currentSession]);
 

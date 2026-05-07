@@ -11,6 +11,7 @@ import type { BrowserWindow } from "electron";
 
 const activeSessions = new Map<string, Session>();
 const activeTurns = new Map<string, Turn>();
+const sendingLocks = new Set<string>();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -19,11 +20,19 @@ export function setMainWindow(win: BrowserWindow | null) {
 }
 
 function sendEvent(sessionId: string, event: unknown) {
-  mainWindow?.webContents.send("kimi:event", { sessionId, event });
+  try {
+    mainWindow?.webContents.send("kimi:event", { sessionId, event });
+  } catch {
+    // Window may be destroyed
+  }
 }
 
 function sendStatus(sessionId: string, status: "idle" | "running" | "error" | "interrupted" | "completed") {
-  mainWindow?.webContents.send("kimi:status", { sessionId, status });
+  try {
+    mainWindow?.webContents.send("kimi:status", { sessionId, status });
+  } catch {
+    // Window may be destroyed
+  }
 }
 
 export async function startSession(options: {
@@ -32,11 +41,15 @@ export async function startSession(options: {
   model?: string;
   thinking?: boolean;
 }): Promise<{ sessionId: string; workDir: string }> {
+  const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
+  if (existing) {
+    await existing.close();
+    activeSessions.delete(options.sessionId!);
+  }
+
   const session = createSession({
     workDir: options.workDir,
     sessionId: options.sessionId,
-    // Let CLI use its own default model from config.toml
-    // model: options.model, 
     thinking: options.thinking ?? true,
     executable: "kimi",
   });
@@ -46,12 +59,13 @@ export async function startSession(options: {
 }
 
 export async function sendPrompt(sessionId: string, content: string) {
-  const session = activeSessions.get(sessionId);
-  if (!session) throw new Error("Session not found");
+  if (sendingLocks.has(sessionId)) throw new Error("Turn already in progress");
+  sendingLocks.add(sessionId);
 
-  const existingTurn = activeTurns.get(sessionId);
-  if (existingTurn) {
-    throw new Error("Turn already in progress");
+  const session = activeSessions.get(sessionId);
+  if (!session) {
+    sendingLocks.delete(sessionId);
+    throw new Error("Session not found");
   }
 
   const turn = session.prompt(content);
@@ -64,22 +78,28 @@ export async function sendPrompt(sessionId: string, content: string) {
     }
 
     const result = await turn.result;
+    sendEvent(sessionId, { type: "TurnResult", payload: { result } });
     sendStatus(sessionId, "completed");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    sendEvent(sessionId, { type: "Error", payload: { message } });
-    sendStatus(sessionId, "error");
+    try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
+    try { sendStatus(sessionId, "error"); } catch {}
   } finally {
     activeTurns.delete(sessionId);
+    sendingLocks.delete(sessionId);
   }
 }
 
 export async function stopTurn(sessionId: string) {
   const turn = activeTurns.get(sessionId);
   if (!turn) return;
-  await turn.interrupt();
-  activeTurns.delete(sessionId);
-  sendStatus(sessionId, "interrupted");
+  try {
+    await turn.interrupt();
+  } finally {
+    activeTurns.delete(sessionId);
+    sendingLocks.delete(sessionId);
+    sendStatus(sessionId, "interrupted");
+  }
 }
 
 export async function approveRequest(
@@ -105,6 +125,12 @@ export async function closeSession(sessionId: string) {
   if (session) {
     await session.close();
     activeSessions.delete(sessionId);
+  }
+  const turn = activeTurns.get(sessionId);
+  if (turn) {
+    try { await turn.interrupt(); } catch {}
+    activeTurns.delete(sessionId);
+    sendingLocks.delete(sessionId);
   }
 }
 
