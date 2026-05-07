@@ -49,10 +49,10 @@ export function ChatThread() {
   const session = sessions.find((s) => s.id === currentSession?.id);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when events change
+  // Auto-scroll to bottom when events change (smooth for new messages)
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
   }, [session?.events.length]);
 

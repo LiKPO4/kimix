@@ -54,7 +54,11 @@ function App() {
       if (mapped) {
         updateSession(payload.sessionId, (session) => {
           const events = mergeEvents(session.events, mapped);
-          return { ...session, events, updatedAt: Date.now() };
+          // Auto-update session title from first user message
+          const title = session.title === "新会话" && mapped.type === "user_message"
+            ? mapped.content.slice(0, 30) + (mapped.content.length > 30 ? "..." : "")
+            : session.title;
+          return { ...session, events, title, updatedAt: Date.now() };
         });
       }
     });

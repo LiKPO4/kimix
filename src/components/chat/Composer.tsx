@@ -129,7 +129,7 @@ export function Composer() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
-            placeholder={currentSession ? "可向 Kimi 询问任何事。输入 @ 使用插件或提及文件" : "请先选择项目"}
+            placeholder={currentSession ? "可向 Kimi 询问任何事。Shift+Enter 换行" : "请先选择项目"}
             disabled={!currentSession}
             rows={1}
             className="w-full resize-none bg-transparent text-text-primary placeholder:text-text-muted outline-none text-sm leading-relaxed min-h-[24px] max-h-[200px]"

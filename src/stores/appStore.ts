@@ -12,6 +12,8 @@ interface AppStore extends AppState {
   setSettingsOpen: (open: boolean) => void;
   focusInputTrigger: number;
   triggerFocusInput: () => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -23,6 +25,7 @@ export const useAppStore = create<AppStore>((set) => ({
   theme: "light",
   settingsOpen: false,
   focusInputTrigger: 0,
+  searchQuery: "",
 
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
@@ -31,6 +34,7 @@ export const useAppStore = create<AppStore>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
+  setSearchQuery: (q) => set({ searchQuery: q }),
   setTheme: (theme) => {
     set({ theme });
     if (theme === "system") {
