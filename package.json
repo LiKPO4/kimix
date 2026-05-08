@@ -1,6 +1,14 @@
 {
   "name": "kimix",
   "version": "0.1.0",
+  "packageManager": "pnpm@11.0.8",
+  "pnpm": {
+    "allowBuilds": {
+      "electron-winstaller": true,
+      "electron": true,
+      "esbuild": true
+    }
+  },
   "description": "A Codex-style desktop UI for Kimi Code CLI",
   "main": "./out/main/index.cjs",
   "author": "",

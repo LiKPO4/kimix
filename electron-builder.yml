@@ -44,6 +44,7 @@ linux:
     - target: deb
       arch: [x64]
   category: Development
+  maintainer: LiKPO4
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
