@@ -55,6 +55,13 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
     },
+    autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#F6F4EF',
+      symbolColor: '#1a1a1a',
+      height: 48
+    },
   });
 
   kimiBridge.setMainWindow(mainWindow);

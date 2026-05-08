@@ -231,8 +231,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
   // Merge streaming assistant messages
   if (incoming.type === "assistant_message") {
-    const last = existing[existing.length - 1];
-    if (last && last.type === "assistant_message" && !last.isComplete) {
+    const lastIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
+    if (lastIndex !== -1) {
+      const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
       const updated: typeof last = {
         ...last,
         content: last.content + incoming.content,
@@ -240,7 +241,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         isThinking: incoming.isThinking ?? last.isThinking,
         isComplete: incoming.isComplete,
       };
-      return [...existing.slice(0, -1), updated];
+      const result = [...existing];
+      result[lastIndex] = updated;
+      return result;
     }
   }
 
