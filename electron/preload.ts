@@ -11,16 +11,18 @@ import type {
   StopTurnResponse,
   ApproveRequest,
   ApproveResponse,
+  CloseSessionRequest,
+  CloseSessionResponse,
   ListSessionsRequest,
   ListSessionsResponse,
   LoadSessionRequest,
   LoadSessionResponse,
   GitInfoResponse,
   SettingsResponse,
+  SaveSettingsRequest,
   KimiEventPayload,
   KimiStatusPayload,
   Project,
-  AppSettings,
 } from "./types/ipc";
 
 const api = {
@@ -45,6 +47,8 @@ const api = {
     ipcRenderer.invoke("kimi:stopTurn", req),
   approveRequest: (req: ApproveRequest): Promise<ApproveResponse> =>
     ipcRenderer.invoke("kimi:approveRequest", req),
+  closeSession: (req: CloseSessionRequest): Promise<CloseSessionResponse> =>
+    ipcRenderer.invoke("kimi:closeSession", req),
   listSessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
     ipcRenderer.invoke("kimi:listSessions", req),
   loadSession: (req: LoadSessionRequest): Promise<LoadSessionResponse> =>
@@ -64,7 +68,7 @@ const api = {
 
   // App
   getSettings: (): Promise<SettingsResponse> => ipcRenderer.invoke("app:getSettings"),
-  saveSettings: (settings: AppSettings): Promise<void> =>
+  saveSettings: (settings: SaveSettingsRequest): Promise<void> =>
     ipcRenderer.invoke("app:saveSettings", settings),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("app:openExternal", url),

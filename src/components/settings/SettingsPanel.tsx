@@ -25,17 +25,24 @@ export function SettingsPanel() {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSettingsOpen(false)}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      onClick={() => setSettingsOpen(false)}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
       <div
         className="w-full max-w-md bg-bg-elevated rounded-2xl shadow-xl border border-border-default overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-          <h2 className="text-lg font-semibold text-text-primary">设置</h2>
+          <h2 id="settings-title" className="text-lg font-semibold text-text-primary">设置</h2>
           <button
             onClick={() => setSettingsOpen(false)}
             className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-muted hover:text-text-secondary transition-colors"
+            aria-label="关闭设置"
           >
             <X size={18} />
           </button>

@@ -62,11 +62,11 @@ export function Sidebar() {
   const handleOpenProject = async () => {
     const res = await window.api.openProject();
     if (res.success && res.data) {
-      const project = {
-        ...res.data,
-        id: crypto.randomUUID(),
-        lastOpenedAt: Date.now(),
-      };
+      const data = res.data;
+      const existing = recentProjects.find((p) => p.path === data.path);
+      const project = existing
+        ? { ...existing, lastOpenedAt: Date.now() }
+        : { ...data, id: crypto.randomUUID(), lastOpenedAt: Date.now() };
       setCurrentProject(project);
       await createSessionForProject(project);
       const recent = await window.api.listRecentProjects();

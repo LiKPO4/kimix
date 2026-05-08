@@ -1,12 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, Mic, ArrowUp, Square, Clock, ChevronDown } from "lucide-react";
+import { Plus, AlertTriangle, Mic, ArrowUp, Square, Clock, ChevronDown, Check } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { TimelineEvent } from "@/types/ui";
+import type { TimelineEvent, PermissionMode } from "@/types/ui";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
 }
+
+const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string }[] = [
+  { value: "manual", label: "手动审批", desc: "每次操作都需要确认" },
+  { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动允许" },
+  { value: "yolo", label: "完全访问权限", desc: "无需确认，直接执行" },
+];
+
+const MODEL_OPTIONS = ["kimi-latest"];
 
 export function Composer() {
   const [input, setInput] = useState("");
@@ -15,9 +23,29 @@ export function Composer() {
   const permissionMode = useAppStore((s) => s.permissionMode);
   const currentSession = useAppStore((s) => s.currentSession);
   const setIsRunning = useAppStore((s) => s.setIsRunning);
+  const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const updateSession = useSessionStore((s) => s.updateSession);
   const addPendingMessage = useSessionStore((s) => s.addPendingMessage);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
+
+  const [showPermissionMenu, setShowPermissionMenu] = useState(false);
+  const [showModelMenu, setShowModelMenu] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("kimi-latest");
+  const permissionBtnRef = useRef<HTMLDivElement>(null);
+  const modelBtnRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (permissionBtnRef.current && !permissionBtnRef.current.contains(e.target as Node)) {
+        setShowPermissionMenu(false);
+      }
+      if (modelBtnRef.current && !modelBtnRef.current.contains(e.target as Node)) {
+        setShowModelMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -99,7 +127,10 @@ export function Composer() {
     setIsDragging(false);
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0 && currentSession) {
-      const paths = files.map((f) => (f as unknown as { path?: string }).path || f.name).join(", ");
+      const paths = files.map((f) => {
+        const path = typeof (f as { path?: unknown }).path === "string" ? (f as { path: string }).path : f.name;
+        return path;
+      }).join(", ");
       setInput((prev) => (prev ? prev + "\n" : "") + `[附件: ${paths}]`);
     }
   };
@@ -167,26 +198,69 @@ export function Composer() {
             >
               <Plus size={18} />
             </button>
-            <button
-              disabled={!currentSession}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl hover:bg-bg-hover text-accent-orange text-sm disabled:opacity-30 transition-colors"
-            >
-              <AlertTriangle size={13} />
-              <span className="flex items-center gap-0.5">
-                {permissionLabel}
-                <ChevronDown size={12} />
-              </span>
-            </button>
+            <div ref={permissionBtnRef} className="relative">
+              <button
+                disabled={!currentSession}
+                onClick={() => setShowPermissionMenu((v) => !v)}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl hover:bg-bg-hover text-accent-orange text-sm disabled:opacity-30 transition-colors"
+              >
+                <AlertTriangle size={13} />
+                <span className="flex items-center gap-0.5">
+                  {permissionLabel}
+                  <ChevronDown size={12} />
+                </span>
+              </button>
+              {showPermissionMenu && (
+                <div className="absolute bottom-full left-0 mb-1.5 w-52 rounded-xl border border-border-default bg-bg-elevated shadow-lg py-1 z-20">
+                  {PERMISSION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setPermissionMode(opt.value);
+                        setShowPermissionMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-bg-hover flex items-center justify-between ${permissionMode === opt.value ? "text-accent-blue" : "text-text-primary"}`}
+                    >
+                      <div>
+                        <div className="font-medium">{opt.label}</div>
+                        <div className="text-xs text-text-muted">{opt.desc}</div>
+                      </div>
+                      {permissionMode === opt.value && <Check size={14} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-0.5">
-            <button
-              disabled={!currentSession}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-xl hover:bg-bg-hover text-text-muted text-sm disabled:opacity-30 transition-colors"
-            >
-              <span>kimi-latest</span>
-              <ChevronDown size={12} />
-            </button>
+            <div ref={modelBtnRef} className="relative">
+              <button
+                disabled={!currentSession}
+                onClick={() => setShowModelMenu((v) => !v)}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-xl hover:bg-bg-hover text-text-muted text-sm disabled:opacity-30 transition-colors"
+              >
+                <span>{selectedModel}</span>
+                <ChevronDown size={12} />
+              </button>
+              {showModelMenu && (
+                <div className="absolute bottom-full right-0 mb-1.5 w-40 rounded-xl border border-border-default bg-bg-elevated shadow-lg py-1 z-20">
+                  {MODEL_OPTIONS.map((model) => (
+                    <button
+                      key={model}
+                      onClick={() => {
+                        setSelectedModel(model);
+                        setShowModelMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-bg-hover flex items-center justify-between ${selectedModel === model ? "text-accent-blue" : "text-text-primary"}`}
+                    >
+                      {model}
+                      {selectedModel === model && <Check size={14} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               disabled={!currentSession}
               className="p-2 rounded-xl hover:bg-bg-hover text-text-secondary disabled:opacity-30 transition-colors"

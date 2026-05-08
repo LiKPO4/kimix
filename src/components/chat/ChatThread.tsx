@@ -48,7 +48,7 @@ export function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastEventId = session?.events[session?.events.length - 1]?.id;
+  const lastEventId = session?.events.at(-1)?.id;
 
   useEffect(() => {
     if (scrollRef.current) {

@@ -21,7 +21,15 @@ function readProjects(): Project[] {
   if (!fs.existsSync(PROJECTS_FILE)) return [];
   try {
     const data = fs.readFileSync(PROJECTS_FILE, "utf-8");
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (p): p is Project =>
+        p && typeof p === "object" &&
+        typeof p.id === "string" &&
+        typeof p.path === "string" &&
+        typeof p.name === "string"
+    );
   } catch {
     return [];
   }
@@ -29,7 +37,12 @@ function readProjects(): Project[] {
 
 function writeProjects(projects: Project[]) {
   ensureDataDir();
-  fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2));
+  try {
+    fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2));
+  } catch (err) {
+    console.error("Failed to write projects file:", err);
+    throw err;
+  }
 }
 
 export function getRecentProjects(): Project[] {

@@ -33,14 +33,24 @@ export function loadSettings(): AppSettings {
   }
   try {
     const raw = fs.readFileSync(SETTINGS_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ...DEFAULT_SETTINGS };
+    }
+    return { ...DEFAULT_SETTINGS, ...(parsed as Partial<AppSettings>) };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
 }
 
-export function saveSettings(settings: AppSettings): void {
+export function saveSettings(settings: Partial<AppSettings>): void {
   ensureDir();
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
+  try {
+    const current = loadSettings();
+    const merged = { ...current, ...settings };
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to save settings:", err);
+    throw err;
+  }
 }

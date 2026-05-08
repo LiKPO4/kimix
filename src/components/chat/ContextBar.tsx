@@ -4,8 +4,16 @@ import { useSessionStore } from "@/stores/sessionStore";
 
 export function ContextBar() {
   const project = useAppStore((s) => s.currentProject);
+  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
+
+  const handleOpenProject = async () => {
+    const res = await window.api.openProject({ defaultPath: project?.path });
+    if (res.success && res.data) {
+      setCurrentProject(res.data);
+    }
+  };
 
   const handleExport = () => {
     if (!session) return;
@@ -30,22 +38,33 @@ export function ContextBar() {
     a.href = url;
     a.download = `${session.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "_")}.md`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
     <div className="flex items-center justify-center gap-1 px-4 pb-3 pt-1">
-      <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors">
+      <button
+        onClick={handleOpenProject}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
+      >
         <FolderOpen size={12} />
         <span>{project?.name ?? "选择项目"}</span>
         <ChevronDown size={10} />
       </button>
-      <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors">
+      <button
+        disabled
+        title="即将推出"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors disabled:opacity-40"
+      >
         <Monitor size={12} />
         <span>本地模式</span>
         <ChevronDown size={10} />
       </button>
-      <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors">
+      <button
+        disabled
+        title="即将推出"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors disabled:opacity-40"
+      >
         <GitBranch size={12} />
         <span>{project?.gitBranch ?? "main"}</span>
         <ChevronDown size={10} />

@@ -5,8 +5,12 @@ node_modules
 # Build outputs
 out
 dist
-build
 *.tgz
+
+# Keep build resources for electron-builder
+!build/icon.png
+!build/icon.ico
+!build/entitlements.mac.plist
 
 # Logs
 logs

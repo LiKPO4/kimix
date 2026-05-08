@@ -20,18 +20,20 @@ export function setMainWindow(win: BrowserWindow | null) {
 }
 
 function sendEvent(sessionId: string, event: unknown) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
-    mainWindow?.webContents.send("kimi:event", { sessionId, event });
-  } catch {
-    // Window may be destroyed
+    mainWindow.webContents.send("kimi:event", { sessionId, event });
+  } catch (err) {
+    console.error("[kimiBridge] sendEvent failed:", err);
   }
 }
 
 function sendStatus(sessionId: string, status: "idle" | "running" | "error" | "interrupted" | "completed") {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
-    mainWindow?.webContents.send("kimi:status", { sessionId, status });
-  } catch {
-    // Window may be destroyed
+    mainWindow.webContents.send("kimi:status", { sessionId, status });
+  } catch (err) {
+    console.error("[kimiBridge] sendStatus failed:", err);
   }
 }
 
@@ -43,8 +45,18 @@ export async function startSession(options: {
 }): Promise<{ sessionId: string; workDir: string }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
   if (existing) {
-    await existing.close();
     activeSessions.delete(options.sessionId!);
+    try {
+      await existing.close();
+    } catch (err) {
+      console.error(`Failed to close existing session ${options.sessionId}:`, err);
+    }
+  }
+
+  // Prevent concurrent creation of the same sessionId
+  if (options.sessionId && activeSessions.has(options.sessionId)) {
+    const session = activeSessions.get(options.sessionId)!;
+    return { sessionId: session.sessionId, workDir: session.workDir };
   }
 
   const session = createSession({
@@ -68,7 +80,14 @@ export async function sendPrompt(sessionId: string, content: string) {
     throw new Error("Session not found");
   }
 
-  const turn = session.prompt(content);
+  let turn: Turn;
+  try {
+    turn = session.prompt(content);
+  } catch (err) {
+    sendingLocks.delete(sessionId);
+    throw err;
+  }
+
   activeTurns.set(sessionId, turn);
   sendStatus(sessionId, "running");
 
@@ -123,8 +142,12 @@ export async function approveRequest(
 export async function closeSession(sessionId: string) {
   const session = activeSessions.get(sessionId);
   if (session) {
-    await session.close();
     activeSessions.delete(sessionId);
+    try {
+      await session.close();
+    } catch (err) {
+      console.error(`Failed to close session ${sessionId}:`, err);
+    }
   }
   const turn = activeTurns.get(sessionId);
   if (turn) {
@@ -132,6 +155,10 @@ export async function closeSession(sessionId: string) {
     activeTurns.delete(sessionId);
     sendingLocks.delete(sessionId);
   }
+}
+
+export function getActiveSessionIds(): string[] {
+  return Array.from(activeSessions.keys());
 }
 
 export async function getSessions(workDir: string) {

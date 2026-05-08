@@ -6,7 +6,7 @@ interface FileCardProps {
 }
 
 export function FileCard({ filePath, fileType }: FileCardProps) {
-  const name = filePath.split("/").pop() ?? filePath;
+  const name = filePath.split(/[\\/]/).pop() ?? filePath;
 
   return (
     <div className="flex justify-center">

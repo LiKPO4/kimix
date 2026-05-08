@@ -1,14 +1,27 @@
 import type { TimelineEvent } from "@/types/ui";
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function isString(v: unknown): v is string {
+  return typeof v === "string";
+}
+
+function isNumber(v: unknown): v is number {
+  return typeof v === "number";
+}
+
 export function mapStreamEvent(event: unknown): TimelineEvent | null {
-  const e = event as Record<string, unknown>;
-  const type = e.type as string;
-  const payload = (e.payload ?? {}) as Record<string, unknown>;
+  if (!isRecord(event)) return null;
+  const type = event.type;
+  if (!isString(type)) return null;
+  const payload = isRecord(event.payload) ? event.payload : {};
 
   switch (type) {
     case "TurnBegin": {
       const input = payload.user_input;
-      const text = typeof input === "string" ? input : "";
+      const text = isString(input) ? input : "";
       return {
         id: generateId(),
         type: "user_message",
@@ -18,24 +31,24 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     }
 
     case "ContentPart": {
-      const partType = (payload as Record<string, unknown>).type as string;
-      if (partType === "text") {
+      const partType = payload.type;
+      if (partType === "text" && isString(payload.text)) {
         return {
           id: generateId(),
           type: "assistant_message",
           timestamp: Date.now(),
-          content: (payload as Record<string, unknown>).text as string,
+          content: payload.text,
           isThinking: false,
           isComplete: false,
         };
       }
-      if (partType === "think") {
+      if (partType === "think" && isString(payload.think)) {
         return {
           id: generateId(),
           type: "assistant_message",
           timestamp: Date.now(),
           content: "",
-          thinking: (payload as Record<string, unknown>).think as string,
+          thinking: payload.think,
           isThinking: true,
           isComplete: false,
         };
@@ -44,65 +57,70 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     }
 
     case "ToolCall": {
-      const func = (payload.function ?? {}) as Record<string, unknown>;
+      const func = isRecord(payload.function) ? payload.function : {};
       return {
         id: generateId(),
         type: "tool_call",
         timestamp: Date.now(),
-        toolCallId: (payload.id as string) ?? generateId(),
-        toolName: (func.name as string) ?? "unknown",
+        toolCallId: isString(payload.id) ? payload.id : generateId(),
+        toolName: isString(func.name) ? func.name : "unknown",
         status: "running",
         arguments: (() => {
-          try { return func.arguments ? JSON.parse(func.arguments as string) : {}; }
+          try { return isString(func.arguments) ? JSON.parse(func.arguments) : {}; }
           catch { return {}; }
         })(),
-        rawArguments: (func.arguments as string) ?? "",
+        rawArguments: isString(func.arguments) ? func.arguments : "",
       };
     }
 
     case "ToolCallPart": {
-      const func = (payload.function ?? {}) as Record<string, unknown>;
+      const func = isRecord(payload.function) ? payload.function : {};
       return {
         id: generateId(),
         type: "tool_call",
         timestamp: Date.now(),
-        toolCallId: (payload.tool_call_id as string) ?? (payload.id as string) ?? generateId(),
-        toolName: (func.name as string) ?? "unknown",
+        toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : isString(payload.id) ? payload.id : generateId(),
+        toolName: isString(func.name) ? func.name : "unknown",
         status: "running",
         arguments: (() => {
-          try { return func.arguments ? JSON.parse(func.arguments as string) : {}; }
+          try { return isString(func.arguments) ? JSON.parse(func.arguments) : {}; }
           catch { return {}; }
         })(),
-        rawArguments: (func.arguments as string) ?? "",
+        rawArguments: isString(func.arguments) ? func.arguments : "",
       };
     }
 
     case "ToolResult": {
-      const returnValue = (payload.return_value ?? {}) as Record<string, unknown>;
+      const returnValue = isRecord(payload.return_value) ? payload.return_value : {};
       const output = returnValue.output;
       let display: { diff?: { path: string; oldText: string; newText: string }; todo?: { id: string; content: string; status: "pending" | "in_progress" | "done" }[] } | undefined;
 
       if (Array.isArray(output)) {
-        const blocks = output as Array<Record<string, unknown>>;
+        const blocks = output.filter(isRecord);
         const diffBlock = blocks.find((b) => b.type === "diff");
         const todoBlock = blocks.find((b) => b.type === "todo");
-        if (diffBlock) {
+        if (diffBlock && isString(diffBlock.path) && isString(diffBlock.old_text) && isString(diffBlock.new_text)) {
           display = {
             diff: {
-              path: diffBlock.path as string,
-              oldText: diffBlock.old_text as string,
-              newText: diffBlock.new_text as string,
+              path: diffBlock.path,
+              oldText: diffBlock.old_text,
+              newText: diffBlock.new_text,
             },
           };
         }
-        if (todoBlock) {
+        if (todoBlock && Array.isArray(todoBlock.items)) {
           display = {
             ...display,
-            todo: ((todoBlock.items as Array<Record<string, unknown>>) ?? []).map((item, i) => ({
-              id: `todo-${i}`,
-              content: item.title as string,
-              status: item.status as "pending" | "in_progress" | "done",
-            })),
+            todo: todoBlock.items.filter(isRecord).map((item, i) => {
+              const status = isString(item.status) && ["pending", "in_progress", "done"].includes(item.status)
+                ? item.status as "pending" | "in_progress" | "done"
+                : "pending";
+              return {
+                id: `todo-${i}`,
+                content: isString(item.title) ? item.title : "",
+                status,
+              };
+            }),
           };
         }
       }
@@ -111,7 +129,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         id: generateId(),
         type: "tool_result",
         timestamp: Date.now(),
-        toolCallId: (payload.tool_call_id as string) ?? "",
+        toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : "",
         toolName: "unknown",
         result: returnValue.output ?? "",
         display,
@@ -123,24 +141,24 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         id: generateId(),
         type: "approval_request",
         timestamp: Date.now(),
-        requestId: (payload.id as string) ?? "",
-        toolName: (payload.sender as string) ?? "unknown",
-        description: (payload.description as string) ?? "需要审批",
-        details: (payload.action as string) ?? "",
+        requestId: isString(payload.id) ? payload.id : "",
+        toolName: isString(payload.sender) ? payload.sender : "unknown",
+        description: isString(payload.description) ? payload.description : "需要审批",
+        details: isString(payload.action) ? payload.action : "",
         riskLevel: "medium",
         status: "pending",
       };
     }
 
     case "StatusUpdate": {
-      const tokenUsage = (payload.token_usage ?? {}) as Record<string, number>;
+      const tokenUsage = isRecord(payload.token_usage) ? payload.token_usage : {};
       return {
         id: generateId(),
         type: "status_update",
         timestamp: Date.now(),
-        tokenCount: tokenUsage.output ?? 0,
-        contextSize: (payload.context_usage as number) ?? 0,
-        message: payload.message_id ? `消息 ${payload.message_id}` : undefined,
+        tokenCount: isNumber(tokenUsage.output) ? tokenUsage.output : 0,
+        contextSize: isNumber(payload.context_usage) ? payload.context_usage : 0,
+        message: isNumber(payload.message_id) || isString(payload.message_id) ? `消息 ${payload.message_id}` : undefined,
       };
     }
 
@@ -165,7 +183,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         id: generateId(),
         type: "subagent",
         timestamp: Date.now(),
-        agentName: (payload.agent_name as string) ?? "subagent",
+        agentName: isString(payload.agent_name) ? payload.agent_name : "subagent",
         status: "running",
         events: [],
       };
@@ -182,12 +200,17 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
     }
 
+    case "TurnResult": {
+      // Result already streamed via ContentPart/TurnEnd; no extra UI needed
+      return null;
+    }
+
     case "Error": {
       return {
         id: generateId(),
         type: "error",
         timestamp: Date.now(),
-        message: (payload.message as string) ?? "未知错误",
+        message: isString(payload.message) ? payload.message : "未知错误",
         source: "sdk",
       };
     }

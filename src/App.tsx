@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
@@ -14,6 +14,9 @@ function App() {
   const updateSession = useSessionStore((s) => s.updateSession);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const currentSession = useAppStore((s) => s.currentSession);
+  const currentSessionRef = useRef(currentSession);
+  currentSessionRef.current = currentSession;
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     // Load settings
@@ -22,30 +25,44 @@ function App() {
         setTheme(res.data.theme);
         setPermissionMode(res.data.defaultPermissionMode);
       }
-    });
+    }).catch(() => {});
 
     // Load recent projects
     window.api.listRecentProjects().then((res) => {
       if (res.success) {
         setRecentProjects(res.data);
       }
-    });
+    }).catch(() => {});
 
-    // Load persisted sessions
-    const stored = localStorage.getItem("kimix_sessions");
-    if (stored) {
+    // Load persisted sessions and pending messages
+    const storedSessions = localStorage.getItem("kimix_sessions");
+    if (storedSessions) {
       try {
-        const sessions = JSON.parse(stored);
-        useSessionStore.setState({ sessions });
+        const parsed = JSON.parse(storedSessions);
+        if (Array.isArray(parsed)) {
+          useSessionStore.setState({ sessions: parsed });
+        }
       } catch {
         // ignore parse error
       }
     }
+    const storedPending = localStorage.getItem("kimix_pending");
+    if (storedPending) {
+      try {
+        const parsed = JSON.parse(storedPending);
+        if (Array.isArray(parsed) && parsed.every((p) => typeof p === "string")) {
+          useSessionStore.setState({ pendingMessages: parsed });
+        }
+      } catch {
+        // ignore
+      }
+    }
 
-    // Save sessions before unload
+    // Save sessions + pending before unload
     const handleBeforeUnload = () => {
       const state = useSessionStore.getState();
       localStorage.setItem("kimix_sessions", JSON.stringify(state.sessions));
+      localStorage.setItem("kimix_pending", JSON.stringify(state.pendingMessages));
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
@@ -87,9 +104,10 @@ function App() {
               }],
               updatedAt: Date.now(),
             }));
-            setTimeout(() => {
+            const timer = setTimeout(() => {
               window.api.sendPrompt({ sessionId: payload.sessionId, content: next });
             }, 300);
+            timersRef.current.push(timer);
           }
         }
       }
@@ -97,12 +115,23 @@ function App() {
 
     // Global keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore when a modal is open
+      if (document.querySelector('[aria-modal="true"]')) {
+        return;
+      }
+
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return;
+      }
+
       const isMod = e.metaKey || e.ctrlKey;
 
       // Escape: stop generation
       if (e.key === "Escape") {
-        if (currentSession) {
-          window.api.stopTurn({ sessionId: currentSession.id }).catch(() => {});
+        const cs = currentSessionRef.current;
+        if (cs) {
+          window.api.stopTurn({ sessionId: cs.id }).catch(() => {});
         }
         return;
       }
@@ -129,15 +158,6 @@ function App() {
         window.api.saveSettings({
           theme: state.theme,
           defaultPermissionMode: state.permissionMode,
-          defaultModel: "kimi-latest",
-          defaultThinking: true,
-          maxTurns: 50,
-          enableCompaction: true,
-          fontSize: 14,
-          showThinking: true,
-          expandToolCalls: false,
-          autoReadAgentsMd: true,
-          autoShowGitStatus: true,
         }).catch(() => {});
       }
     });
@@ -148,8 +168,10 @@ function App() {
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       unsubSettings();
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setIsRunning, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, currentSession]);
+  }, [setTheme, setPermissionMode, setIsRunning, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects]);
 
   return (
     <ThemeProvider>

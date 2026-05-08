@@ -4,10 +4,7 @@
 
 export type OpenProjectResponse = {
   success: true;
-  data: {
-    path: string;
-    name: string;
-  } | null;
+  data: Project | null;
 } | {
   success: false;
   error: string;
@@ -89,6 +86,18 @@ export type ApproveResponse = {
   error: string;
 };
 
+export type CloseSessionRequest = {
+  sessionId: string;
+}
+
+export type CloseSessionResponse = {
+  success: true;
+  data: void;
+} | {
+  success: false;
+  error: string;
+};
+
 export type ListSessionsRequest = {
   workDir: string;
 }
@@ -157,6 +166,8 @@ export type SettingsResponse = {
   success: false;
   error: string;
 };
+
+export type SaveSettingsRequest = Partial<AppSettings>;
 
 export type KimiEventPayload = {
   sessionId: string;

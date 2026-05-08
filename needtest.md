@@ -185,6 +185,74 @@
 
 ---
 
+## Round 5 审查修复
+
+### 主进程（Critical + High）
+- [ ] **CSP 安全策略** - 生产/开发环境分别配置了 Content-Security-Policy
+- [ ] **单实例锁** - 应用启动时检查 `requestSingleInstanceLock()`，重复启动会聚焦已有窗口
+- [ ] **URL 解析安全** - `setWindowOpenHandler` 和 `app:openExternal` 都包裹了 try-catch
+- [ ] **closeSession 异常阻断** - 先从 Map 删除再调用 `session.close()`，异常不阻塞后续清理
+- [ ] **startSession 竞态** - 先 `activeSessions.delete()` 再 `await existing.close()`
+- [ ] **Zod 输入校验** - `project:addRecent` 和 `app:saveSettings` 使用 Zod Schema 校验
+- [ ] **sendPrompt try-catch 简化** - 移除了永远不会执行的外层 catch
+
+### 主进程（Medium）
+- [ ] **readProjects JSON 校验** - 解析后检查 `Array.isArray` 并过滤字段类型
+- [ ] **loadSettings JSON 校验** - 解析后检查是否为对象，防止 `null` 展开报错
+- [ ] **writeProjects/saveSettings 错误处理** - 磁盘写入异常会抛出并打印日志
+- [ ] **sendEvent/sendStatus 日志** - 非窗口销毁异常会打印到控制台
+- [ ] **before-quit 可靠关闭** - 有活跃 session 时 `preventDefault()`，等待全部关闭后再退出
+- [ ] **Renderer 崩溃处理** - 监听 `render-process-gone`，崩溃时自动重启
+- [ ] **未捕获异常日志** - 主进程顶部添加 `unhandledRejection` / `uncaughtException` 处理器
+- [ ] **project:open defaultPath 校验** - 检查类型为字符串后再传入对话框
+
+### 前端（High）
+- [ ] **ChatThread `lastEventId` 崩溃** - `session?.events[session?.events.length - 1]?.id` 改为 `.at(-1)?.id`
+- [ ] **MarkdownRenderer `components` useMemo** - 自定义组件对象缓存，避免流式输出时频繁卸载/挂载
+- [ ] **App.tsx setTimeout 泄漏** - 使用 `timersRef` 收集 timer ID，cleanup 时统一 `clearTimeout`
+- [ ] **ChangeCard 嵌套交互元素** - 外层改为 `<div role="button">`，内部恢复为真实 `<button>`
+
+### 前端（Medium）
+- [ ] **eventMapper 运行时守卫** - `isRecord`/`isString`/`isNumber` 替代裸 `as` 断言
+- [ ] **localStorage 运行时校验** - 解析后检查 `Array.isArray`
+- [ ] **IPC Promise rejection** - `getSettings`/`listRecentProjects` 添加 `.catch(() => {})`
+- [ ] **Escape 快捷键排除输入框** - 在 `<textarea>`/`<input>`/contentEditable 中按 Escape 不触发 stopTurn
+- [ ] **sessionStore shiftPendingMessage** - 改为 `set` 回调内部读取 state，消除循环引用
+- [ ] **ContextBar revokeObjectURL** - 延迟 1 秒释放，避免下载启动前 URL 失效
+- [ ] **main.tsx 非空断言** - `document.getElementById("root")!` 改为显式空检查
+
+---
+
+## Round 6 审查修复
+
+### 主进程（Critical + High）
+- [ ] **before-quit 递归** - 添加 `isQuitting` 锁 + `Promise.race` 10 秒超时
+- [ ] **project:removeRecent 校验** - 校验 `typeof id === "string"`
+- [ ] **kimi:sendPrompt 校验** - 校验 request 为对象且包含 string 类型的 sessionId/content
+- [ ] **shell.openExternal 拒绝捕获** - `.catch(() => {})` 处理 Promise 拒绝
+- [ ] **will-navigate 拦截** - 阻止窗口导航到外部 URL
+- [ ] **render-process-gone 开发模式** - 开发模式仅记录日志，不自动重启
+- [ ] **kimiBridge startSession 竞态** - 关闭旧会话后再次检查 `activeSessions.has()`
+- [ ] **sendEvent/sendStatus 提前检查** - `mainWindow` 为 null 或已销毁时直接返回
+
+### 前端（Critical + High）
+- [ ] **MarkdownRenderer link 引用计数** - 模块级 refCount，防止多实例 unmount 时样式丢失
+- [ ] **App.tsx useRef currentSession** - 从 useEffect 依赖中移除 `currentSession`，消除订阅间隙
+- [ ] **MarkdownRenderer code inline prop** - 使用 react-markdown 的 `inline` 参数判断，而非 `className`
+- [ ] **ChangeCard DiffViewer 提取** - 提取到模块顶层 + `useMemo` 缓存 diff 结果
+- [ ] **SettingsPanel ARIA** - 添加 `role="dialog"`、`aria-modal`、`aria-labelledby`、关闭按钮 `aria-label`
+- [ ] **App.tsx Escape 模态框检查** - 存在 `[aria-modal="true"]` 时不触发 stopTurn
+
+### 前端（Medium）
+- [ ] **MarkdownRenderer remarkPlugins/rehypePlugins useMemo** - 缓存插件数组
+- [ ] **MarkdownRenderer safeHref** - 非法链接渲染为 `<span>` 而非 `<a href="#">`
+- [ ] **Sidebar 重复项目** - 打开已存在路径的项目时复用现有 `id`
+- [ ] **eventMapper as string** - `item.status` 使用 `isString` 守卫
+- [ ] **Composer 类型断言** - 拖放文件 `path` 运行时检查
+- [ ] **App.tsx pendingMessages 持久化** - `beforeunload` 时一并保存到 localStorage
+
+---
+
 ## 已知问题 / 待优化
 
 1. **Windows GPU 缓存警告** - 非致命，可忽略
@@ -193,9 +261,33 @@
 4. **文件附件** - 拖放后只显示路径文本，未真正上传到 Kimi
 5. **会话标题** - 仅截取前 30 字符，未来可让 AI 自动生成摘要标题
 6. **代码 Diff 算法** - 当前是简单行对比，非真正的 LCS diff
-7. **模型选择器** - 硬编码为"kimi-latest"，下拉功能未实现
-8. **权限模式下拉** - 显示当前模式，下拉切换功能未实现
-9. **ContextBar 下拉** - 项目/模式/分支显示下拉箭头，下拉菜单未实现
+7. **模型选择器** - 下拉功能已实现（当前仅 kimi-latest 可用）
+8. **权限模式下拉** - 下拉切换功能已实现
+9. **ContextBar 项目选择** - 点击可打开项目对话框，模式和分支为占位
 10. **ChatThread Header 更多操作** - 按钮存在，下拉菜单未实现
 11. **FileCard** - 组件存在但未在事件流中渲染（缺少对应事件类型）
-12. **深色模式代码高亮** - 当前固定使用 github.css（亮色主题），深色模式下代码块样式不协调
+12. **深色模式代码高亮** - 已修复为根据主题动态切换 github/github-dark.css
+
+---
+
+## 打包与发布测试
+
+### 27. 本地打包
+- [ ] 执行 `pnpm dist:win` 成功生成 `.exe` 安装包和便携版
+- [ ] 安装包大小约 80-90MB（包含 Electron 运行时）
+- [ ] 安装包能正常安装并启动应用
+- [ ] 便携版 `Kimix x.x.x.exe` 无需安装可直接运行
+
+### 28. GitHub Actions CI/CD
+- [ ] 推送 `v*` 标签触发 Release workflow
+- [ ] Windows runner 成功构建 `.exe`
+- [ ] macOS runner 成功构建 `.dmg` + `.zip`
+- [ ] Linux runner 成功构建 `.AppImage` + `.deb`
+- [ ] 所有产物自动上传到 GitHub Release
+- [ ] Release 页面显示正确的版本号和更新日志
+
+### 29. 首次安装体验
+- [ ] 安装后桌面出现快捷方式
+- [ ] 开始菜单出现 Kimix 条目
+- [ ] 首次启动正常加载，无白屏
+- [ ] 能正常选择项目、创建会话、发送消息

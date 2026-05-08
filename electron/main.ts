@@ -1,9 +1,32 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import * as kimiBridge from "./kimiBridge";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
+
+// Log unhandled errors to prevent silent crashes
+process.on("unhandledRejection", (reason) => {
+  console.error("[MAIN] Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[MAIN] Uncaught Exception:", err);
+});
+
+// Single instance lock
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,6 +40,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST;
 
 let mainWindow: BrowserWindow | null = null;
+let isQuitting = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -29,7 +53,7 @@ function createWindow() {
       preload: path.join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -42,24 +66,50 @@ function createWindow() {
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    const u = new URL(url);
-    if (u.protocol !== "http:" && u.protocol !== "https:") {
-      return { action: "deny" };
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "http:" && u.protocol !== "https:") {
+        return { action: "deny" };
+      }
+      shell.openExternal(url).catch(() => {});
+    } catch {
+      // Invalid URL format
     }
-    shell.openExternal(url);
     return { action: "deny" };
   });
 
-  mainWindow.webContents.once("dom-ready", () => {
-    setTimeout(() => {
-      mainWindow?.webContents.executeJavaScript(`document.getElementById("root")?.innerHTML?.substring(0, 500)`)
-        .then((html: unknown) => {
-          console.log("[KIMIX DOM] root content:", html || "(empty)");
-        })
-        .catch((err: unknown) => {
-          console.log("[KIMIX DOM] error:", err);
-        });
-    }, 3000);
+  // Prevent navigation away from the app
+  mainWindow.webContents.on("will-navigate", (e) => {
+    e.preventDefault();
+  });
+
+  // CSP for production; dev mode needs broader rules for HMR
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [
+          VITE_DEV_SERVER_URL
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*;"
+            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self';"
+        ],
+      },
+    });
+  });
+
+  // Renderer crash handler (production only)
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error("Renderer process gone:", details.reason, details.exitCode);
+    if (VITE_DEV_SERVER_URL) {
+      // Dev mode: just log, don't restart to avoid HMR loops
+      return;
+    }
+    dialog.showErrorBox(
+      "Application Error",
+      `The renderer process has crashed (${details.reason}). The application will now restart.`
+    );
+    app.relaunch();
+    app.quit();
   });
 
   mainWindow.on("closed", () => {
@@ -71,16 +121,20 @@ function createWindow() {
 // Project IPC handlers
 ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) => {
   if (!mainWindow) return { success: false, error: "Window not available" };
+  const defaultPath =
+    request?.defaultPath && typeof request.defaultPath === "string"
+      ? request.defaultPath
+      : undefined;
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openDirectory"],
-    defaultPath: request?.defaultPath,
+    defaultPath,
   });
   if (result.canceled || result.filePaths.length === 0) {
     return { success: true, data: null };
   }
   const p = result.filePaths[0];
   const project = {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     path: p,
     name: path.basename(p),
     lastOpenedAt: Date.now(),
@@ -98,12 +152,27 @@ ipcMain.handle("project:listRecent", async () => {
   return { success: true, data: projects };
 });
 
+const ProjectSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(256),
+  path: z.string().max(4096),
+  lastOpenedAt: z.number(),
+  gitBranch: z.string().optional(),
+});
+
 ipcMain.handle("project:addRecent", async (_, project: unknown) => {
-  projectService.addRecentProject(project as ReturnType<typeof projectService.getRecentProjects>[number]);
+  const parsed = ProjectSchema.safeParse(project);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid project data" };
+  }
+  projectService.addRecentProject(parsed.data);
   return { success: true, data: undefined };
 });
 
-ipcMain.handle("project:removeRecent", async (_, id: string) => {
+ipcMain.handle("project:removeRecent", async (_, id: unknown) => {
+  if (typeof id !== "string") {
+    return { success: false, error: "Invalid project id" };
+  }
   projectService.removeRecentProject(id);
   return { success: true, data: undefined };
 });
@@ -124,16 +193,21 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
   }
 });
 
-ipcMain.handle("kimi:sendPrompt", async (_, request: { sessionId: string; content: string }) => {
-  try {
-    // Fire-and-forget: don't await the full turn
-    kimiBridge.sendPrompt(request.sessionId, request.content).catch((err) => {
-      console.error("Send prompt error:", err);
-    });
-    return { success: true, data: { turnId: request.sessionId } };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
+  if (!request || typeof request !== "object") {
+    return { success: false, error: "Invalid request" };
   }
+  const req = request as Record<string, unknown>;
+  const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+  const content = typeof req.content === "string" ? req.content : "";
+  if (!sessionId || !content) {
+    return { success: false, error: "Missing sessionId or content" };
+  }
+  // Fire-and-forget: don't await the full turn
+  kimiBridge.sendPrompt(sessionId, content).catch((err) => {
+    console.error("Send prompt error:", err);
+  });
+  return { success: true, data: { sessionId } };
 });
 
 ipcMain.handle("kimi:stopTurn", async (_, request: { sessionId: string }) => {
@@ -186,9 +260,28 @@ ipcMain.handle("app:getSettings", async () => {
   return { success: true, data: settingsService.loadSettings() };
 });
 
+const SettingsSchema = z.object({
+  defaultModel: z.string().optional(),
+  defaultThinking: z.boolean().optional(),
+  maxTurns: z.number().int().min(1).max(1000).optional(),
+  enableCompaction: z.boolean().optional(),
+  defaultPermissionMode: z.enum(["manual", "approve_for_session", "yolo"]).optional(),
+  theme: z.enum(["dark", "light", "system"]).optional(),
+  fontSize: z.number().int().min(8).max(32).optional(),
+  showThinking: z.boolean().optional(),
+  expandToolCalls: z.boolean().optional(),
+  defaultOpenDir: z.string().optional(),
+  autoReadAgentsMd: z.boolean().optional(),
+  autoShowGitStatus: z.boolean().optional(),
+});
+
 ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
   try {
-    settingsService.saveSettings(settings as ReturnType<typeof settingsService.loadSettings>);
+    const parsed = SettingsSchema.safeParse(settings);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid settings data" };
+    }
+    settingsService.saveSettings(parsed.data);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -196,12 +289,32 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
 });
 
 ipcMain.handle("app:openExternal", async (_, url: string) => {
-  const u = new URL(url);
-  if (u.protocol !== "http:" && u.protocol !== "https:") {
-    throw new Error("Invalid protocol");
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return { success: false, error: "Invalid protocol" };
+    }
+    await shell.openExternal(url);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
-  await shell.openExternal(url);
-  return { success: true, data: undefined };
+});
+
+app.on("before-quit", (event) => {
+  if (isQuitting) return;
+  const ids = kimiBridge.getActiveSessionIds();
+  if (ids.length === 0) return;
+  event.preventDefault();
+  isQuitting = true;
+  Promise.race([
+    Promise.all(ids.map((id) => kimiBridge.closeSession(id).catch(() => {}))),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 10000)),
+  ]).then(() => {
+    app.quit();
+  }).catch(() => {
+    app.quit();
+  });
 });
 
 app.on("window-all-closed", () => {

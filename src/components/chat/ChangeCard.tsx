@@ -1,5 +1,5 @@
 import { Undo2, ExternalLink, ChevronDown, FileCode, Plus, Minus } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 interface Change {
   path: string;
@@ -14,28 +14,29 @@ interface ChangeCardProps {
 function DiffViewer({ oldText, newText }: { oldText?: string; newText?: string }) {
   if (!oldText && !newText) return null;
 
-  const oldLines = (oldText ?? "").split("\n");
-  const newLines = (newText ?? "").split("\n");
+  const diffLines = useMemo(() => {
+    const oldLines = (oldText ?? "").split("\n");
+    const newLines = (newText ?? "").split("\n");
+    const lines: { type: "same" | "removed" | "added"; oldLine?: string; newLine?: string }[] = [];
 
-  // Simple line-by-line diff
-  const diffLines: { type: "same" | "removed" | "added"; oldLine?: string; newLine?: string }[] = [];
-
-  let oldIdx = 0, newIdx = 0;
-  while (oldIdx < oldLines.length || newIdx < newLines.length) {
-    const o = oldLines[oldIdx];
-    const n = newLines[newIdx];
-    if (o === n) {
-      diffLines.push({ type: "same", oldLine: o, newLine: n });
-      oldIdx++;
-      newIdx++;
-    } else if (oldIdx < oldLines.length && (newIdx >= newLines.length || oldLines.slice(oldIdx).indexOf(n) === -1)) {
-      diffLines.push({ type: "removed", oldLine: o });
-      oldIdx++;
-    } else {
-      diffLines.push({ type: "added", newLine: n });
-      newIdx++;
+    let oldIdx = 0, newIdx = 0;
+    while (oldIdx < oldLines.length || newIdx < newLines.length) {
+      const o = oldLines[oldIdx];
+      const n = newLines[newIdx];
+      if (o === n) {
+        lines.push({ type: "same", oldLine: o, newLine: n });
+        oldIdx++;
+        newIdx++;
+      } else if (oldIdx < oldLines.length && (newIdx >= newLines.length || oldLines.slice(oldIdx).indexOf(n) === -1)) {
+        lines.push({ type: "removed", oldLine: o });
+        oldIdx++;
+      } else {
+        lines.push({ type: "added", newLine: n });
+        newIdx++;
+      }
     }
-  }
+    return lines;
+  }, [oldText, newText]);
 
   return (
     <div className="mt-2 rounded-lg border border-border-default overflow-hidden bg-bg-primary">
@@ -82,9 +83,12 @@ export function ChangeCard({ changes }: ChangeCardProps) {
     <div className="flex justify-center">
       <div className="max-w-[95%] w-full rounded-xl border border-border-default bg-bg-secondary overflow-hidden">
         {/* Header */}
-        <button
+        <div
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-bg-tertiary/50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-bg-tertiary/50 transition-colors cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded); }}
         >
           <div className="flex items-center gap-2">
             <FileCode size={16} className="text-accent-blue" />
@@ -119,7 +123,7 @@ export function ChangeCard({ changes }: ChangeCardProps) {
             </button>
             <ChevronDown size={14} className={`text-text-muted transition-transform ${expanded ? "rotate-180" : ""}`} />
           </div>
-        </button>
+        </div>
 
         {/* File list */}
         {expanded && (
