@@ -1,4 +1,4 @@
-import { Plus, Settings, FolderOpen, ChevronRight, MessageSquare, Trash2, Search, Wrench, Zap } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, ChevronRight, MessageSquare, Trash2, Search, LayoutGrid, Clock, PanelLeftOpen } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -15,6 +15,8 @@ function formatRelativeTime(ts: number): string {
   if (days < 7) return `${days} 天`;
   return `${weeks} 周`;
 }
+
+const navItemClass = "flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[15px] text-[#302d28] transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40";
 
 export function Sidebar() {
   const currentProject = useAppStore((s) => s.currentProject);
@@ -78,16 +80,16 @@ export function Sidebar() {
 
   if (!sidebarOpen) {
     return (
-      <div className="w-12 border-r border-border-default bg-bg-secondary flex flex-col items-center py-2 gap-1 shrink-0">
+      <aside className="flex w-[52px] shrink-0 flex-col items-center bg-[#f6f4ef] px-1 py-1.5">
         <button
           onClick={toggleSidebar}
-          className="p-2 rounded-lg hover:bg-bg-hover text-text-secondary transition-colors"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f]"
           title="展开侧边栏"
           aria-label="展开侧边栏"
         >
-          <ChevronRight size={18} />
+          <PanelLeftOpen size={18} />
         </button>
-      </div>
+      </aside>
     );
   }
 
@@ -95,9 +97,8 @@ export function Sidebar() {
     sessions.filter((s) => s.projectPath === projectPath);
 
   return (
-    <div className="w-[280px] border-r border-border-default bg-bg-secondary flex flex-col h-full shrink-0 select-none">
-      {/* Top Navigation */}
-      <div className="px-3 pt-3 pb-1 space-y-0.5">
+    <aside className="flex h-full w-[320px] shrink-0 select-none flex-col bg-[#f6f4ef] pb-2 pl-1 pr-2">
+      <div className="no-drag space-y-1 px-2 pb-2">
         <button
           onClick={async () => {
             if (currentProject) {
@@ -105,139 +106,128 @@ export function Sidebar() {
             }
           }}
           disabled={!currentProject}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40"
+          className={navItemClass}
         >
-          <Plus size={16} className="text-text-secondary" />
+          <SquarePen size={17} className="shrink-0 text-[#706b63]" />
           <span>新对话</span>
         </button>
-        <button
-          disabled
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40 cursor-not-allowed"
-          title="搜索功能即将上线"
-        >
-          <Search size={16} className="text-text-secondary" />
+        <button disabled className={navItemClass} title="搜索功能即将上线">
+          <Search size={17} className="shrink-0 text-[#706b63]" />
           <span>搜索</span>
         </button>
-        <button
-          disabled
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40 cursor-not-allowed"
-          title="技能功能即将上线"
-        >
-          <Wrench size={16} className="text-text-secondary" />
+        <button disabled className={navItemClass} title="技能功能即将上线">
+          <LayoutGrid size={17} className="shrink-0 text-[#706b63]" />
           <span>技能</span>
         </button>
-        <button
-          disabled
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-text-primary text-sm hover:bg-bg-hover transition-colors disabled:opacity-40 cursor-not-allowed"
-          title="自动化功能即将上线"
-        >
-          <Zap size={16} className="text-text-secondary" />
-          <span>自动化</span>
+        <button disabled className={`${navItemClass} justify-between`} title="自动化功能即将上线">
+          <span className="flex items-center gap-3">
+            <Clock size={17} className="shrink-0 text-[#706b63]" />
+            <span>自动化</span>
+          </span>
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[12px] text-[#8a847a]">1</span>
         </button>
       </div>
 
-      <div className="mx-3 my-2 border-t border-border-default" />
-
-      {/* Projects */}
-      <div className="flex-1 overflow-y-auto px-2">
-        <div className="flex items-center justify-between px-3 py-1.5">
-          <span className="text-[11px] font-medium text-text-muted">项目</span>
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2">
+        <div className="mb-2 flex items-center justify-between px-3">
+          <span className="text-[13px] font-medium text-[#8a847a]">项目</span>
           <button
             onClick={handleOpenProject}
-            className="p-1 rounded-md hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-black/5 hover:text-[#26231f]"
             title="打开项目"
             aria-label="打开项目"
           >
-            <ChevronRight size={12} />
+            <ChevronRight size={14} />
           </button>
         </div>
 
-        {recentProjects.map((project) => {
-          const isExpanded = expandedProject === project.id;
-          const isActive = currentProject?.id === project.id;
-          const pSessions = projectSessions(project.path);
+        <div className="space-y-3">
+          {recentProjects.map((project) => {
+            const isExpanded = expandedProject === project.id;
+            const isActive = currentProject?.id === project.id;
+            const pSessions = projectSessions(project.path);
 
-          return (
-            <div key={project.id} className="mb-0.5">
-              <button
-                onClick={async () => {
-                  setCurrentProject(project);
-                  setExpandedProject(isExpanded ? null : project.id);
-                  const hasSession = sessions.some((s) => s.projectPath === project.path);
-                  if (!hasSession) {
-                    await createSessionForProject(project);
-                  }
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm ${
-                  isActive
-                    ? "bg-bg-hover text-text-primary"
-                    : "hover:bg-bg-hover text-text-secondary"
-                }`}
-              >
-                <FolderOpen size={15} className="shrink-0 opacity-70" />
-                <span className="flex-1 text-left truncate">{project.name}</span>
-              </button>
+            return (
+              <section key={project.id} className="space-y-1">
+                <button
+                  onClick={async () => {
+                    setCurrentProject(project);
+                    setExpandedProject(isExpanded ? null : project.id);
+                    const hasSession = sessions.some((s) => s.projectPath === project.path);
+                    if (!hasSession) {
+                      await createSessionForProject(project);
+                    }
+                  }}
+                  className={`flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-[15px] transition-colors ${
+                    isActive
+                      ? "bg-black/5 text-[#26231f]"
+                      : "text-[#625d55] hover:bg-black/5 hover:text-[#26231f]"
+                  }`}
+                >
+                  <FolderOpen size={16} className="shrink-0 text-[#777168]" />
+                  <span className="min-w-0 flex-1 truncate text-left">{project.name}</span>
+                </button>
 
-              {isExpanded && pSessions.length > 0 && (
-                <div className="ml-5 mt-0.5 space-y-0.5">
-                  {pSessions.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`group flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
-                        currentSession?.id === s.id
-                          ? "bg-bg-hover text-text-primary"
-                          : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
-                      }`}
-                    >
-                      <MessageSquare size={11} className="shrink-0 opacity-50" />
-                      <button
-                        onClick={() => setCurrentSession(s)}
-                        className="flex-1 text-left truncate min-w-0"
+                {isExpanded && pSessions.length > 0 && (
+                  <div className="space-y-0.5 pl-7 pr-1">
+                    {pSessions.map((s) => (
+                      <div
+                        key={s.id}
+                        className={`group flex h-8 items-center gap-2 rounded-lg px-2 text-[14px] transition-colors ${
+                          currentSession?.id === s.id
+                            ? "bg-black/6 text-[#24211d]"
+                            : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
+                        }`}
                       >
-                        {s.title}
-                      </button>
-                      <span className="shrink-0 text-[10px] text-text-muted opacity-60">
-                        {formatRelativeTime(s.updatedAt)}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteSession(s.id);
-                          if (currentSession?.id === s.id) {
-                            setCurrentSession(null);
-                          }
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent-red/10 hover:text-accent-red transition-all"
-                        title="删除会话"
-                        aria-label="删除会话"
-                      >
-                        <Trash2 size={10} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                        <MessageSquare size={12} className="shrink-0 text-[#9a948b]" />
+                        <button
+                          onClick={() => setCurrentSession(s)}
+                          className="min-w-0 flex-1 truncate text-left"
+                        >
+                          {s.title}
+                        </button>
+                        <span className="shrink-0 text-[12px] text-[#9a948b]">
+                          {formatRelativeTime(s.updatedAt)}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(s.id);
+                            if (currentSession?.id === s.id) {
+                              setCurrentSession(null);
+                            }
+                          }}
+                          className="rounded p-0.5 text-[#9a948b] opacity-0 transition-all hover:bg-accent-red/10 hover:text-accent-red group-hover:opacity-100"
+                          title="删除会话"
+                          aria-label="删除会话"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
 
         {recentProjects.length === 0 && !currentProject && (
-          <div className="px-3 py-4 text-xs text-text-muted text-center">
+          <div className="px-3 py-8 text-center text-[13px] text-[#9a948b]">
             尚未选择项目
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-2 border-t border-border-default">
+      <div className="px-2 pt-2">
         <button
           onClick={() => setSettingsOpen(true)}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-hover transition-colors text-text-secondary text-sm"
+          className="flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[15px] text-[#302d28] transition-colors hover:bg-black/5"
         >
-          <Settings size={16} />
+          <Settings size={17} className="text-[#706b63]" />
           <span>设置</span>
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

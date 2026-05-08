@@ -1,18 +1,36 @@
 import { create } from "zustand";
 import type { Session, TimelineEvent, Project } from "@/types/ui";
 
+export interface PendingMessage {
+  id: string;
+  content: string;
+  createdAt: number;
+}
+
 interface SessionStore {
   sessions: Session[];
   recentProjects: Project[];
-  pendingMessages: string[];
+  pendingMessages: PendingMessage[];
   addSession: (session: Session) => void;
   updateSession: (id: string, updater: (s: Session) => Session) => void;
   addEvent: (sessionId: string, event: TimelineEvent) => void;
   loadHistory: (sessionId: string, events: TimelineEvent[]) => void;
   deleteSession: (id: string) => void;
   setRecentProjects: (projects: Project[]) => void;
-  addPendingMessage: (msg: string) => void;
-  shiftPendingMessage: () => string | undefined;
+  addPendingMessage: (content: string) => void;
+  updatePendingMessage: (id: string, content: string) => void;
+  removePendingMessage: (id: string) => void;
+  movePendingMessage: (id: string, direction: "up" | "down") => void;
+  promotePendingMessage: (id: string) => void;
+  shiftPendingMessage: () => PendingMessage | undefined;
+}
+
+function createPendingMessage(content: string): PendingMessage {
+  return {
+    id: crypto.randomUUID(),
+    content,
+    createdAt: Date.now(),
+  };
 }
 
 export const useSessionStore = create<SessionStore>((set) => ({
@@ -49,11 +67,45 @@ export const useSessionStore = create<SessionStore>((set) => ({
 
   setRecentProjects: (projects) => set({ recentProjects: projects }),
 
-  addPendingMessage: (msg) =>
-    set((state) => ({ pendingMessages: [...state.pendingMessages, msg] })),
+  addPendingMessage: (content) =>
+    set((state) => ({ pendingMessages: [...state.pendingMessages, createPendingMessage(content)] })),
+
+  updatePendingMessage: (id, content) =>
+    set((state) => ({
+      pendingMessages: state.pendingMessages.map((msg) =>
+        msg.id === id ? { ...msg, content } : msg
+      ),
+    })),
+
+  removePendingMessage: (id) =>
+    set((state) => ({
+      pendingMessages: state.pendingMessages.filter((msg) => msg.id !== id),
+    })),
+
+  movePendingMessage: (id, direction) =>
+    set((state) => {
+      const index = state.pendingMessages.findIndex((msg) => msg.id === id);
+      if (index < 0) return state;
+      const nextIndex = direction === "up" ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= state.pendingMessages.length) return state;
+      const pendingMessages = [...state.pendingMessages];
+      const [item] = pendingMessages.splice(index, 1);
+      pendingMessages.splice(nextIndex, 0, item);
+      return { pendingMessages };
+    }),
+
+  promotePendingMessage: (id) =>
+    set((state) => {
+      const index = state.pendingMessages.findIndex((msg) => msg.id === id);
+      if (index <= 0) return state;
+      const pendingMessages = [...state.pendingMessages];
+      const [item] = pendingMessages.splice(index, 1);
+      pendingMessages.unshift(item);
+      return { pendingMessages };
+    }),
 
   shiftPendingMessage: () => {
-    let result: string | undefined;
+    let result: PendingMessage | undefined;
     set((state) => {
       result = state.pendingMessages[0];
       return { pendingMessages: state.pendingMessages.slice(1) };

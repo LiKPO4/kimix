@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import type { PendingMessage } from "@/stores/sessionStore";
 import { mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 
 function App() {
@@ -50,8 +51,25 @@ function App() {
     if (storedPending) {
       try {
         const parsed = JSON.parse(storedPending);
-        if (Array.isArray(parsed) && parsed.every((p) => typeof p === "string")) {
-          useSessionStore.setState({ pendingMessages: parsed });
+        if (Array.isArray(parsed)) {
+          const pendingMessages = parsed
+            .map((item) => {
+              if (typeof item === "string") {
+                return { id: crypto.randomUUID(), content: item, createdAt: Date.now() };
+              }
+              if (
+                item &&
+                typeof item === "object" &&
+                typeof item.id === "string" &&
+                typeof item.content === "string" &&
+                typeof item.createdAt === "number"
+              ) {
+                return item;
+              }
+              return null;
+            })
+            .filter((item): item is PendingMessage => item !== null);
+          useSessionStore.setState({ pendingMessages });
         }
       } catch {
         // ignore
@@ -105,7 +123,7 @@ function App() {
               updatedAt: Date.now(),
             }));
             const timer = setTimeout(() => {
-              window.api.sendPrompt({ sessionId: payload.sessionId, content: next });
+              window.api.sendPrompt({ sessionId: payload.sessionId, content: next.content });
             }, 300);
             timersRef.current.push(timer);
           }

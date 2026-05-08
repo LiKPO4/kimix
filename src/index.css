@@ -4,8 +4,8 @@
 
 :root {
   /* Codex 暖色调 Light */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f7f5f2;
+  --bg-primary: #F6F4EF;
+  --bg-secondary: #ffffff;
   --bg-tertiary: #efedea;
   --bg-elevated: #ffffff;
   --bg-composer: #ffffff;
@@ -67,7 +67,7 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 /* Scrollbar styling */
@@ -90,9 +90,23 @@ body {
 }
 
 /* Focus styles */
-*:focus-visible {
+*:not(.no-focus-outline):focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
+}
+
+.kimix-composer-surface:focus,
+.kimix-composer-surface:focus-visible,
+.kimix-composer-surface:focus-within,
+.kimix-composer-surface textarea:focus,
+.kimix-composer-surface textarea:focus-visible {
+  outline: none;
+}
+
+.kimix-composer-surface *,
+.kimix-composer-surface *:focus,
+.kimix-composer-surface *:focus-visible {
+  outline: none;
 }
 
 /* Selection */
@@ -103,8 +117,8 @@ body {
 
 /* Markdown body styles */
 .markdown-body {
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.72;
   color: var(--text-primary);
 }
 
