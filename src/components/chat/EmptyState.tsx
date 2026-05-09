@@ -48,26 +48,28 @@ export function EmptyState() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6">
-      <h1 className="text-[28px] font-normal text-text-primary mb-6">
-        要在 {project?.name ?? "项目"} 中构建什么？
-      </h1>
+    <div className="kimix-content-x flex h-full w-full items-center justify-center">
+      <div className="flex w-full flex-col items-center">
+        <h1 className="mb-6 text-[28px] font-normal text-text-primary">
+          要在 {project?.name ?? "项目"} 中构建什么？
+        </h1>
 
-      {project && (
-        <div className="w-full max-w-md space-y-0">
-          {suggestions.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => handleSuggestion(s.text)}
-              disabled={isRunning}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors disabled:opacity-50 rounded-lg"
-            >
-              <s.icon size={18} className="text-text-muted shrink-0" />
-              <span>{s.text}</span>
-            </button>
-          ))}
-        </div>
-      )}
+        {project && (
+          <div className="w-full max-w-[560px] space-y-0">
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => handleSuggestion(s.text)}
+                disabled={isRunning}
+                className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary disabled:opacity-50"
+              >
+                <s.icon size={18} className="text-text-muted shrink-0" />
+                <span>{s.text}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

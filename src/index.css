@@ -109,6 +109,18 @@ body {
   outline: none;
 }
 
+/* 对话区与输入区统一水平留白（保证 ChatThread / EmptyState / Composer 左右边缘严格对齐） */
+.kimix-content-x {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+@media (min-width: 1024px) {
+  .kimix-content-x {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+}
+
 /* Selection */
 ::selection {
   background-color: var(--accent-blue);

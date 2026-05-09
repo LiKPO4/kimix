@@ -3,6 +3,7 @@ import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, 
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent, PermissionMode } from "@/types/ui";
+import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -15,16 +16,21 @@ const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string }
 ];
 
 const MODEL_OPTIONS = ["kimi-latest"];
-const iconButtonClass = "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35";
+
+const iconButtonClass =
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35";
 
 export function Composer() {
   const [input, setInput] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<ComposerInputHandle>(null);
+
   const isRunning = useAppStore((s) => s.isRunning);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const currentSession = useAppStore((s) => s.currentSession);
   const setIsRunning = useAppStore((s) => s.setIsRunning);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
+  const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
+
   const updateSession = useSessionStore((s) => s.updateSession);
   const addPendingMessage = useSessionStore((s) => s.addPendingMessage);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
@@ -39,6 +45,7 @@ export function Composer() {
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
+
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const modelBtnRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +62,12 @@ export function Composer() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  useEffect(() => {
+    if (focusInputTrigger > 0) {
+      inputRef.current?.focus();
+    }
+  }, [focusInputTrigger]);
+
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean }) => {
     if (!currentSession) return;
 
@@ -64,7 +77,6 @@ export function Composer() {
       timestamp: Date.now(),
       content,
     };
-
     const thinkingPlaceholder: TimelineEvent = {
       id: genId(),
       type: "assistant_message",
@@ -97,20 +109,16 @@ export function Composer() {
 
     setInput("");
     setEditingPendingId(null);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    inputRef.current?.reset();
 
     if (editingPendingId) {
       updatePendingMessage(editingPendingId, trimmed);
       return;
     }
-
     if (isRunning) {
       addPendingMessage(trimmed);
       return;
     }
-
     await sendPromptContent(trimmed);
   };
 
@@ -123,50 +131,28 @@ export function Composer() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
-
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0 && currentSession) {
-      const paths = files.map((f) => {
-        const path = typeof (f as { path?: unknown }).path === "string" ? (f as { path: string }).path : f.name;
-        return path;
-      }).join(", ");
+      const paths = files
+        .map((f) => {
+          const p = typeof (f as { path?: unknown }).path === "string" ? (f as { path: string }).path : f.name;
+          return p;
+        })
+        .join(", ");
       setInput((prev) => (prev ? prev + "\n" : "") + `[附件: ${paths}]`);
     }
   };
-
-  const handleInput = () => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = "auto";
-      el.style.height = `${Math.min(el.scrollHeight, 156)}px`;
-    }
-  };
-
-  const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
-  useEffect(() => {
-    if (focusInputTrigger > 0) {
-      textareaRef.current?.focus();
-    }
-  }, [focusInputTrigger]);
 
   const handleSendPendingNow = async (id: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
@@ -184,18 +170,13 @@ export function Composer() {
     if (!pending) return;
     setInput(pending.content);
     setEditingPendingId(id);
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      handleInput();
-    });
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleCancelPendingEdit = () => {
     setInput("");
     setEditingPendingId(null);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    inputRef.current?.reset();
   };
 
   const permissionLabel = {
@@ -204,9 +185,13 @@ export function Composer() {
     yolo: "完全访问权限",
   }[permissionMode];
 
+  const placeholder = currentSession
+    ? "向 Kimi 询问任何事。输入 @ 使用插件或提及文件"
+    : "请先选择项目";
+
   return (
     <div
-      className="relative mx-auto flex w-full max-w-[760px] flex-col px-0 pb-0 pt-3"
+      className="relative flex w-full flex-col pt-3"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -265,7 +250,8 @@ export function Composer() {
       )}
 
       <div
-        className={`kimix-composer-surface flex min-w-0 flex-col overflow-visible rounded-[22px] border bg-white px-2 py-2 transition-colors ${
+        style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 14, paddingBottom: 10 }}
+        className={`kimix-composer-surface flex min-w-0 flex-col overflow-hidden rounded-[22px] border bg-white transition-colors ${
           isDragging
             ? "border-accent-blue"
             : isFocused
@@ -273,21 +259,18 @@ export function Composer() {
               : "border-[#dfdbd2] shadow-[0_1px_2px_rgba(25,23,20,0.06)]"
         } ${!currentSession ? "opacity-60" : ""}`}
       >
-        <textarea
-          ref={textareaRef}
+        <ComposerInput
+          ref={inputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
+          onChange={setInput}
+          onSubmit={handleSend}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder={currentSession ? "向 Kimi 询问任何事。输入 @ 使用插件或提及文件" : "请先选择项目"}
+          placeholder={placeholder}
           disabled={!currentSession}
-          rows={1}
-          className="no-focus-outline block max-h-[156px] min-h-[32px] w-full resize-none border-0 bg-transparent px-4 py-3 text-[15px] leading-6 text-[#27231f] shadow-none outline-none ring-0 caret-[#24211d] placeholder:text-[#b8b2a8] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
         />
 
-        <div className="flex h-10 min-w-0 flex-nowrap items-center justify-between gap-3 px-1 pb-0 pt-0 sm:px-1">
+        <div className="mt-3 flex h-10 min-w-0 flex-nowrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-1">
             {editingPendingId && (
               <button
@@ -390,7 +373,6 @@ export function Composer() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }

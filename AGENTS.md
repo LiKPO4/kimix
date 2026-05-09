@@ -24,6 +24,36 @@
 - 删除、覆盖、批量迁移、发布、强推、重置、清理历史等不可逆操作前先征得用户确认。
 - 实现与用户原话存在数值、范围或语义偏差时，必须说明。
 
+## 视觉改动方法论（Kimix 项目血泪经验）
+
+> 场景：调整 UI 间距/留白/边框等数值，用户反复反馈"没生效"时的标准流程。
+
+### 核心纲领：矫枉必须过正 → 先放大验证 → 再量回撤
+
+1. **第一步永远先做"过正"改动**：目标数值 ×3，确保肉眼无法忽视。
+   - 例：要加 20px padding，先改 `paddingLeft: 60`；要减 `pb-2` 到 0，先直接删掉。
+   - 如果 ×3 后**仍看不出**变化 → 不是改小了，是**改动根本没生效**，去排查链路。
+   - 如果 ×3 后**明显生效** → 回撤到目标值（或略大一点），一次做准。
+
+2. **改动不生效时，逐项排除**：
+   - 旧 Electron 进程残留：`taskkill /F /IM electron.exe /T & taskkill /F /IM node.exe /T`。
+     Kimix 场景反复出现旧窗口占用、dev 新窗口没真正打开的情况。
+   - 构建缓存：`rmdir /S /Q out` + `rmdir /S /Q node_modules\.vite` + `rmdir /S /Q node_modules\.cache`。
+   - 发图系统：用户截图系统偶发延迟。看到截图上的版本号和期望不一致时，**立即要求用户重发**，不要基于错图推理。
+   - **版本号锚定**：每一轮改动必须 bump 版本号（`package.json` + `Sidebar` + `SettingsPanel` 三处同步），差距要大（v0.1.7 → v1.0.0），方便一眼判断画面是不是最新。
+   - Tailwind JIT 动态类名：Kimix 当前配置下，某些 spacing 类（如 `px-16`、`pb-8`、`pt-10`）会出现**不生成**的情况。涉及 padding/margin 数值调整时，**优先用 inline `style={{ paddingLeft: 20 }}` 或任意值语法 `[padding-left:20px]`**，不要用 `px-*`/`pb-*` 这类 spacing scale 类。
+
+3. **改完后的标准验证流程**：
+   - 杀掉所有 `electron.exe`、`node.exe` 旧进程。
+   - 清 `out/` + `.vite` + `.cache`。
+   - `pnpm build`（观察新 hash）→ `pnpm dev`（后台启动）。
+   - 版本号同步 bump，三处一起改。
+   - 让用户截图验收，版本号对上才开始看内容。
+
+4. **默认 shell 的 PATH 问题**：
+   本机 cmd 默认 PATH 不含 Node/pnpm，执行构建前必须前置：
+   `set "PATH=C:\Program Files\nodejs;C:\Users\lijialin08\AppData\Roaming\npm;%PATH%"`
+
 ## Git
 
 - 开工前看 `git status`。

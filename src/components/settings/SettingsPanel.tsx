@@ -104,8 +104,8 @@ export function SettingsPanel() {
           </div>
 
           {/* Info */}
-          <div className="text-xs text-text-muted text-center pt-2 border-t border-border-default">
-            Kimix v0.1.0 · 设置将自动保存到本地
+          <div className="text-sm text-text-muted text-center pt-2 border-t border-border-default">
+            Kimix v1.0.2 · 设置将自动保存到本地
           </div>
         </div>
       </div>

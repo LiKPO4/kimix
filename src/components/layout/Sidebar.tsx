@@ -97,7 +97,7 @@ export function Sidebar() {
     sessions.filter((s) => s.projectPath === projectPath);
 
   return (
-    <aside className="flex h-full w-[320px] shrink-0 select-none flex-col bg-[#f6f4ef] pb-2 pl-1 pr-2">
+    <aside style={{ paddingLeft: 12, paddingRight: 10 }} className="flex h-full w-[320px] shrink-0 select-none flex-col bg-[#f6f4ef] pb-2">
       <div className="no-drag space-y-1 px-2 pb-2">
         <button
           onClick={async () => {
@@ -222,11 +222,11 @@ export function Sidebar() {
       <div className="px-2 pt-2">
         <button
           onClick={() => setSettingsOpen(true)}
-          className="flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[15px] text-[#302d28] transition-colors hover:bg-black/5"
+          className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-[16px] text-[#302d28] transition-colors hover:bg-black/5"
         >
-          <Settings size={17} className="text-[#706b63]" />
+          <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[11px] text-[#aaa49a]">v0.1.0</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v1.0.2</span>
         </button>
       </div>
     </aside>

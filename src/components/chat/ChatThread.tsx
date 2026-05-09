@@ -60,8 +60,8 @@ export function ChatThread() {
   }
 
   return (
-    <div ref={scrollRef} className="h-full overflow-y-auto px-5 py-8 sm:px-8">
-      <div className="mx-auto flex w-full max-w-[820px] flex-col gap-7">
+    <div ref={scrollRef} className="kimix-content-x h-full overflow-y-auto py-8">
+      <div className="flex w-full flex-col gap-7">
         {session.events.map((event) => (
           <EventRenderer key={event.id} event={event} />
         ))}

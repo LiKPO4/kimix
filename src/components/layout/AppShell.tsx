@@ -126,14 +126,14 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-2 pb-2.5 pr-2.5">
+      <div style={{ paddingBottom: 28, paddingRight: 10 }} className="flex min-h-0 flex-1 gap-2">
         <Sidebar />
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[#e5e1d8] bg-white shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
           <ContextBar />
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <ChatThread />
           </div>
-          <div className="shrink-0 bg-white px-10 pb-4">
+          <div className="kimix-content-x shrink-0 bg-white pb-8 pt-2">
             <Composer />
           </div>
         </main>
