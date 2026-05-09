@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
+import { ContextBar } from "@/components/chat/ContextBar";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 
 const MENU_ITEMS: Record<string, { label: string; hint?: string; disabled?: boolean }[]> = {
@@ -56,8 +57,8 @@ export function AppShell() {
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-[#f6f4ef] text-[15px] text-text-primary">
-      <header className="drag-region z-50 flex h-12 w-full shrink-0 items-center justify-between px-3">
-        <div className="no-drag flex h-full items-center gap-4">
+      <header className="z-50 flex h-12 w-full shrink-0 items-center justify-between px-3" style={{ WebkitAppRegion: "drag" as const }}>
+        <div className="flex h-full items-center gap-4" style={{ WebkitAppRegion: "no-drag" as const }}>
           <div className="flex items-center gap-1.5 text-[#7d7972]">
             <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="后退">
               <ArrowLeft size={17} />
@@ -100,12 +101,35 @@ export function AppShell() {
         <div className="pointer-events-none absolute left-1/2 max-w-[380px] -translate-x-1/2 truncate text-[14px] font-medium text-[#1f1d1a]">
           {currentSession?.title || "新对话"}
         </div>
-        <div className="no-drag w-[140px]" />
+        <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: "no-drag" as const }}>
+          <button
+            onClick={() => window.api.minimizeWindow()}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 text-[#7d7972]"
+            aria-label="最小化"
+          >
+            <Minus size={14} />
+          </button>
+          <button
+            onClick={() => window.api.maximizeWindow()}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 text-[#7d7972]"
+            aria-label="最大化"
+          >
+            <Square size={12} />
+          </button>
+          <button
+            onClick={() => window.api.closeWindow()}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent-red/10 hover:text-accent-red text-[#7d7972]"
+            aria-label="关闭"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1 gap-2 pb-2.5 pr-2.5">
         <Sidebar />
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[#e5e1d8] bg-white shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+          <ContextBar />
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <ChatThread />
           </div>

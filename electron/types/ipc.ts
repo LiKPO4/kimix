@@ -179,3 +179,10 @@ export type KimiStatusPayload = {
   status: "idle" | "running" | "error" | "interrupted" | "completed";
 }
 
+export type WindowControlResponse = {
+  success: true;
+} | {
+  success: false;
+  error: string;
+}
+

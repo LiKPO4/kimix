@@ -42,7 +42,7 @@ export function ContextBar() {
   };
 
   return (
-    <div className="flex items-center justify-center gap-1 px-4 pb-3 pt-1">
+    <div className="flex items-center justify-center gap-1 px-4 py-2 border-b border-[#f0ede7] shrink-0">
       <button
         onClick={handleOpenProject}
         className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"

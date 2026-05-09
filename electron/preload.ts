@@ -72,6 +72,11 @@ const api = {
     ipcRenderer.invoke("app:saveSettings", settings),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("app:openExternal", url),
+
+  // Window controls
+  minimizeWindow: (): Promise<void> => ipcRenderer.invoke("window:minimize"),
+  maximizeWindow: (): Promise<void> => ipcRenderer.invoke("window:maximize"),
+  closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
 };
 
 contextBridge.exposeInMainWorld("api", api);

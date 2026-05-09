@@ -273,21 +273,19 @@ export function Composer() {
               : "border-[#dfdbd2] shadow-[0_1px_2px_rgba(25,23,20,0.06)]"
         } ${!currentSession ? "opacity-60" : ""}`}
       >
-        <div className="rounded-[16px] bg-white px-10 pb-2 pt-3 sm:px-12">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder={currentSession ? "向 Kimi 询问任何事。输入 @ 使用插件或提及文件" : "请先选择项目"}
-            disabled={!currentSession}
-            rows={1}
-            className="no-focus-outline block max-h-[156px] min-h-[32px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-[#27231f] shadow-none outline-none ring-0 caret-[#24211d] placeholder:text-[#b8b2a8] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
-          />
-        </div>
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onInput={handleInput}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder={currentSession ? "向 Kimi 询问任何事。输入 @ 使用插件或提及文件" : "请先选择项目"}
+          disabled={!currentSession}
+          rows={1}
+          className="no-focus-outline block max-h-[156px] min-h-[32px] w-full resize-none border-0 bg-transparent px-4 py-3 text-[15px] leading-6 text-[#27231f] shadow-none outline-none ring-0 caret-[#24211d] placeholder:text-[#b8b2a8] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
+        />
 
         <div className="flex h-10 min-w-0 flex-nowrap items-center justify-between gap-3 px-1 pb-0 pt-0 sm:px-1">
           <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -393,19 +391,6 @@ export function Composer() {
         </div>
       </div>
 
-      <div className="mt-2 flex w-full items-center justify-start px-4 text-[12px] text-[#8f887e]">
-        <div className="flex min-w-0 items-center gap-4">
-          <button className="flex items-center gap-1 transition-colors hover:text-[#24211d]">
-            <span>本地模式</span>
-            <ChevronDown size={11} />
-          </button>
-          <button className="flex min-w-0 items-center gap-1 transition-colors hover:text-[#24211d]">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
-            <span className="truncate">main</span>
-            <ChevronDown size={11} />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -56,12 +56,7 @@ function createWindow() {
       sandbox: true,
     },
     autoHideMenuBar: true,
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#F6F4EF',
-      symbolColor: '#1a1a1a',
-      height: 48
-    },
+    frame: false,
   });
 
   kimiBridge.setMainWindow(mainWindow);
@@ -306,6 +301,32 @@ ipcMain.handle("app:openExternal", async (_, url: string) => {
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
+});
+
+// Window controls
+ipcMain.handle("window:minimize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+  return { success: true };
+});
+
+ipcMain.handle("window:maximize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+  return { success: true };
+});
+
+ipcMain.handle("window:close", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+  return { success: true };
 });
 
 app.on("before-quit", (event) => {
