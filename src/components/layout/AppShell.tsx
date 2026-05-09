@@ -182,24 +182,24 @@ export function AppShell() {
                 </div>
                 {projectMenuOpen && (
                   <div className="absolute right-0 top-full z-40 mt-3 w-[288px] overflow-hidden rounded-xl border border-[#e5e1d8] bg-white py-3.5 text-[14px] text-[#2f2b26] shadow-[0_16px_36px_rgba(25,23,20,0.16)]">
-                    <button onClick={() => openProjectEditor("vscode")} className="flex h-12 w-full items-center gap-4 px-5 text-left transition-colors hover:bg-[#f3f1ec]">
-                      <Code2 size={17} className="shrink-0 text-[#3483eb]" />
+                    <button onClick={() => openProjectEditor("vscode")} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <Code2 size={17} className="w-6 shrink-0 text-[#3483eb]" />
                       <span>使用 VS Code 打开</span>
                     </button>
-                    <button onClick={openProjectPath} className="flex h-12 w-full items-center gap-4 px-5 text-left transition-colors hover:bg-[#f3f1ec]">
-                      <FolderOpen size={17} className="shrink-0 text-[#d19a32]" />
+                    <button onClick={openProjectPath} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <FolderOpen size={17} className="w-6 shrink-0 text-[#d19a32]" />
                       <span>在文件资源管理器中打开</span>
                     </button>
-                    <button onClick={openProjectTerminal} className="flex h-12 w-full items-center gap-4 px-5 text-left transition-colors hover:bg-[#f3f1ec]">
-                      <SquareTerminal size={17} className="shrink-0 text-[#777168]" />
+                    <button onClick={openProjectTerminal} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <SquareTerminal size={17} className="w-6 shrink-0 text-[#777168]" />
                       <span>Terminal</span>
                     </button>
-                    <button onClick={() => openProjectEditor("trae")} className="flex h-12 w-full items-center gap-4 px-5 text-left transition-colors hover:bg-[#f3f1ec]">
-                      <GitBranch size={17} className="shrink-0 text-[#9a948b]" />
+                    <button onClick={() => openProjectEditor("trae")} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <GitBranch size={17} className="w-6 shrink-0 text-[#9a948b]" />
                       <span>使用 Trae 打开</span>
                     </button>
-                    <button onClick={() => openProjectEditor("coder")} className="flex h-12 w-full items-center gap-4 px-5 text-left transition-colors hover:bg-[#f3f1ec]">
-                      <Code2 size={17} className="shrink-0 text-[#9a948b]" />
+                    <button onClick={() => openProjectEditor("coder")} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <Code2 size={17} className="w-6 shrink-0 text-[#9a948b]" />
                       <span>使用 Coder 打开</span>
                     </button>
                   </div>
