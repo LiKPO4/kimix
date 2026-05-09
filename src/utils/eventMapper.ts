@@ -152,12 +152,19 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
 
     case "StatusUpdate": {
       const tokenUsage = isRecord(payload.token_usage) ? payload.token_usage : {};
+      const inputTokenCount =
+        (isNumber(tokenUsage.input_other) ? tokenUsage.input_other : 0) +
+        (isNumber(tokenUsage.input_cache_read) ? tokenUsage.input_cache_read : 0) +
+        (isNumber(tokenUsage.input_cache_creation) ? tokenUsage.input_cache_creation : 0);
+      const contextSize = isNumber(payload.context_usage) ? payload.context_usage : 0;
       return {
         id: generateId(),
         type: "status_update",
         timestamp: Date.now(),
         tokenCount: isNumber(tokenUsage.output) ? tokenUsage.output : 0,
-        contextSize: isNumber(payload.context_usage) ? payload.context_usage : 0,
+        inputTokenCount,
+        contextSize,
+        contextLimit: 256000,
         message: isNumber(payload.message_id) || isString(payload.message_id) ? `消息 ${payload.message_id}` : undefined,
       };
     }
@@ -238,8 +245,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         ...last,
         content: last.content + incoming.content,
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
-        isThinking: incoming.isThinking ?? last.isThinking,
+        isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
+        durationMs: incoming.isComplete ? Math.max(0, incoming.timestamp - last.timestamp) : last.durationMs,
       };
       const result = [...existing];
       result[lastIndex] = updated;
@@ -250,13 +258,29 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   // Merge streaming tool calls
   if (incoming.type === "tool_call") {
     const last = existing[existing.length - 1];
-    if (last && last.type === "tool_call" && last.status === "running" && last.toolName === incoming.toolName) {
+    if (last && last.type === "tool_call" && last.status === "running" && last.toolCallId === incoming.toolCallId) {
       const updated: typeof last = {
         ...last,
         arguments: { ...last.arguments, ...incoming.arguments },
         rawArguments: (last.rawArguments ?? "") + (incoming.rawArguments ?? ""),
       };
       return [...existing.slice(0, -1), updated];
+    }
+  }
+
+  if (incoming.type === "tool_result") {
+    const result = [...existing];
+    const callIndex = result.findLastIndex(
+      (e) => e.type === "tool_call" && e.toolCallId === incoming.toolCallId
+    );
+    if (callIndex !== -1) {
+      const call = result[callIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
+      result[callIndex] = {
+        ...call,
+        status: "success",
+        durationMs: Math.max(0, incoming.timestamp - call.timestamp),
+      };
+      return result;
     }
   }
 

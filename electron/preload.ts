@@ -5,6 +5,8 @@ import type {
   ListRecentResponse,
   StartSessionRequest,
   StartSessionResponse,
+  CheckKimiCliRequest,
+  CheckKimiCliResponse,
   SendPromptRequest,
   SendPromptResponse,
   StopTurnRequest,
@@ -18,11 +20,15 @@ import type {
   LoadSessionRequest,
   LoadSessionResponse,
   GitInfoResponse,
+  OpenEditorRequest,
+  OpenPathRequest,
+  OpenTerminalRequest,
   SettingsResponse,
   SaveSettingsRequest,
   KimiEventPayload,
   KimiStatusPayload,
   Project,
+  VoidResponse,
 } from "./types/ipc";
 
 const api = {
@@ -37,10 +43,18 @@ const api = {
     ipcRenderer.invoke("project:removeRecent", id),
   getGitInfo: (projectPath: string): Promise<GitInfoResponse> =>
     ipcRenderer.invoke("project:getGitInfo", projectPath),
+  openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("project:openPath", req),
+  openProjectEditor: (req: OpenEditorRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("project:openEditor", req),
+  openProjectTerminal: (req: OpenTerminalRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("project:openTerminal", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>
     ipcRenderer.invoke("kimi:startSession", req),
+  checkKimiCli: (req?: CheckKimiCliRequest): Promise<CheckKimiCliResponse> =>
+    ipcRenderer.invoke("kimi:checkCli", req),
   sendPrompt: (req: SendPromptRequest): Promise<SendPromptResponse> =>
     ipcRenderer.invoke("kimi:sendPrompt", req),
   stopTurn: (req: StopTurnRequest): Promise<StopTurnResponse> =>
@@ -72,6 +86,13 @@ const api = {
     ipcRenderer.invoke("app:saveSettings", settings),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("app:openExternal", url),
+
+  // Bootstrap
+  onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {
+    const handler = (_: unknown, payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => callback(payload);
+    ipcRenderer.on("kimix:bootstrap", handler);
+    return () => ipcRenderer.off("kimix:bootstrap", handler);
+  },
 
   // Window controls
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke("window:minimize"),

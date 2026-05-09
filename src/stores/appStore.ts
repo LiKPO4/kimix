@@ -6,6 +6,9 @@ interface AppStore extends AppState {
   setCurrentSession: (session: Session | null) => void;
   setPermissionMode: (mode: PermissionMode) => void;
   setIsRunning: (running: boolean) => void;
+  setRunningSessionId: (sessionId: string | null) => void;
+  setDefaultThinking: (thinking: boolean) => void;
+  setDetailedContext: (enabled: boolean) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   settingsOpen: boolean;
@@ -21,6 +24,9 @@ export const useAppStore = create<AppStore>((set) => ({
   currentSession: null,
   permissionMode: "manual",
   isRunning: false,
+  runningSessionId: null,
+  defaultThinking: true,
+  detailedContext: false,
   sidebarOpen: true,
   theme: "light",
   settingsOpen: false,
@@ -31,6 +37,9 @@ export const useAppStore = create<AppStore>((set) => ({
   setCurrentSession: (session) => set({ currentSession: session }),
   setPermissionMode: (mode) => set({ permissionMode: mode }),
   setIsRunning: (running) => set({ isRunning: running }),
+  setRunningSessionId: (sessionId) => set({ runningSessionId: sessionId, isRunning: Boolean(sessionId) }),
+  setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
+  setDetailedContext: (enabled) => set({ detailedContext: enabled }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),

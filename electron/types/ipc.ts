@@ -31,6 +31,7 @@ export type StartSessionRequest = {
   sessionId?: string;
   model?: string;
   thinking?: boolean;
+  yoloMode?: boolean;
 }
 
 export type StartSessionResponse = {
@@ -44,9 +45,34 @@ export type StartSessionResponse = {
   error: string;
 };
 
+export type CheckKimiCliResponse = {
+  success: true;
+  data: {
+    available: boolean;
+    verified: boolean;
+    command: string;
+    path?: string;
+    output?: string;
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type CheckKimiCliRequest = {
+  verify?: boolean;
+};
+
 export type SendPromptRequest = {
   sessionId: string;
   content: string;
+  images?: {
+    name: string;
+    dataUrl: string;
+  }[];
+  thinking?: boolean;
+  yoloMode?: boolean;
 }
 
 export type SendPromptResponse = {
@@ -144,6 +170,27 @@ export type GitInfoResponse = {
   error: string;
 };
 
+export type OpenPathRequest = {
+  path: string;
+}
+
+export type OpenEditorRequest = {
+  path: string;
+  editor: "vscode" | "trae" | "coder";
+}
+
+export type OpenTerminalRequest = {
+  path: string;
+}
+
+export type VoidResponse = {
+  success: true;
+  data: void;
+} | {
+  success: false;
+  error: string;
+};
+
 export type AppSettings = {
   defaultModel: string;
   defaultThinking: boolean;
@@ -153,6 +200,7 @@ export type AppSettings = {
   theme: "dark" | "light" | "system";
   fontSize: number;
   showThinking: boolean;
+  detailedContext: boolean;
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   autoReadAgentsMd: boolean;
@@ -181,6 +229,14 @@ export type KimiStatusPayload = {
 
 export type WindowControlResponse = {
   success: true;
+} | {
+  success: false;
+  error: string;
+}
+
+export type DefaultWorkDirResponse = {
+  success: true;
+  data: string;
 } | {
   success: false;
   error: string;

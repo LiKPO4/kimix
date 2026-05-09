@@ -1,4 +1,4 @@
-import {
+﻿import {
   createSession,
   listSessions,
   parseSessionEvents,
@@ -6,6 +6,7 @@ import {
   type Turn,
   type StreamEvent,
   type ApprovalResponse,
+  type ContentPart,
 } from "@moonshot-ai/kimi-agent-sdk";
 import type { BrowserWindow } from "electron";
 
@@ -42,6 +43,7 @@ export async function startSession(options: {
   sessionId?: string;
   model?: string;
   thinking?: boolean;
+  yoloMode?: boolean;
 }): Promise<{ sessionId: string; workDir: string }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
   if (existing) {
@@ -63,6 +65,7 @@ export async function startSession(options: {
     workDir: options.workDir,
     sessionId: options.sessionId,
     thinking: options.thinking ?? true,
+    yoloMode: options.yoloMode ?? false,
     executable: "kimi",
   });
 
@@ -70,7 +73,7 @@ export async function startSession(options: {
   return { sessionId: session.sessionId, workDir: session.workDir };
 }
 
-export async function sendPrompt(sessionId: string, content: string) {
+export async function sendPrompt(sessionId: string, content: string | ContentPart[], options?: { thinking?: boolean; yoloMode?: boolean }) {
   if (sendingLocks.has(sessionId)) throw new Error("Turn already in progress");
   sendingLocks.add(sessionId);
 
@@ -78,6 +81,12 @@ export async function sendPrompt(sessionId: string, content: string) {
   if (!session) {
     sendingLocks.delete(sessionId);
     throw new Error("Session not found");
+  }
+  if (typeof options?.thinking === "boolean") {
+    session.thinking = options.thinking;
+  }
+  if (typeof options?.yoloMode === "boolean") {
+    session.yoloMode = options.yoloMode;
   }
 
   let turn: Turn;
@@ -91,22 +100,24 @@ export async function sendPrompt(sessionId: string, content: string) {
   activeTurns.set(sessionId, turn);
   sendStatus(sessionId, "running");
 
-  try {
-    for await (const event of turn) {
-      sendEvent(sessionId, event);
-    }
+  void (async () => {
+    try {
+      for await (const event of turn) {
+        sendEvent(sessionId, event);
+      }
 
-    const result = await turn.result;
-    sendEvent(sessionId, { type: "TurnResult", payload: { result } });
-    sendStatus(sessionId, "completed");
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
-    try { sendStatus(sessionId, "error"); } catch {}
-  } finally {
-    activeTurns.delete(sessionId);
-    sendingLocks.delete(sessionId);
-  }
+      const result = await turn.result;
+      sendEvent(sessionId, { type: "TurnResult", payload: { result } });
+      sendStatus(sessionId, "completed");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
+      try { sendStatus(sessionId, "error"); } catch {}
+    } finally {
+      activeTurns.delete(sessionId);
+      sendingLocks.delete(sessionId);
+    }
+  })();
 }
 
 export async function stopTurn(sessionId: string) {

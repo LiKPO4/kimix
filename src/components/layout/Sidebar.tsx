@@ -1,7 +1,8 @@
-import { SquarePen, Settings, FolderOpen, ChevronRight, MessageSquare, Trash2, Search, LayoutGrid, Clock, PanelLeftOpen } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, ChevronRight, MessageSquare, Trash2, Search, LayoutGrid, Clock, PanelLeftOpen, MoreHorizontal, Pin, Archive, X, Loader2, FolderSearch, GitBranch } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import type { Project } from "@/types/ui";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -21,6 +22,9 @@ const navItemClass = "flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[1
 export function Sidebar() {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
+  const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const permissionMode = useAppStore((s) => s.permissionMode);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
@@ -34,6 +38,13 @@ export function Sidebar() {
   const deleteSession = useSessionStore((s) => s.deleteSession);
 
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
+
+  useEffect(() => {
+    const close = () => setOpenProjectMenu(null);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
 
   useEffect(() => {
     if (currentProject) {
@@ -41,10 +52,12 @@ export function Sidebar() {
     }
   }, [currentProject]);
 
-  const createSessionForProject = async (project: { path: string; name: string }) => {
+  const createSessionForProject = async (project: Project) => {
     const sessionRes = await window.api.startSession({
       workDir: project.path,
-      thinking: true,
+      model: "kimi-code/kimi-for-coding",
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
     });
     if (sessionRes.success) {
       const session = {
@@ -57,7 +70,9 @@ export function Sidebar() {
         isLoading: false,
       };
       addSession(session);
+      setCurrentProject(project);
       setCurrentSession(session);
+      setExpandedProject(project.id);
     }
   };
 
@@ -149,24 +164,85 @@ export function Sidebar() {
 
             return (
               <section key={project.id} className="space-y-1">
-                <button
-                  onClick={async () => {
-                    setCurrentProject(project);
-                    setExpandedProject(isExpanded ? null : project.id);
-                    const hasSession = sessions.some((s) => s.projectPath === project.path);
-                    if (!hasSession) {
-                      await createSessionForProject(project);
-                    }
-                  }}
-                  className={`flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-[15px] transition-colors ${
+                <div
+                  className={`group/project relative flex h-9 w-full items-center gap-1 rounded-xl pl-3 pr-1 text-[15px] transition-colors ${
                     isActive
                       ? "bg-black/5 text-[#26231f]"
                       : "text-[#625d55] hover:bg-black/5 hover:text-[#26231f]"
                   }`}
                 >
-                  <FolderOpen size={16} className="shrink-0 text-[#777168]" />
-                  <span className="min-w-0 flex-1 truncate text-left">{project.name}</span>
-                </button>
+                  <button
+                    onClick={async () => {
+                      setCurrentProject(project);
+                      setExpandedProject(isExpanded ? null : project.id);
+                      const hasSession = sessions.some((s) => s.projectPath === project.path);
+                      if (!hasSession) {
+                        await createSessionForProject(project);
+                      }
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                  >
+                    <FolderOpen size={16} className="shrink-0 text-[#777168]" />
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                  </button>
+                  <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenProjectMenu((current) => current === project.id ? null : project.id);
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+                      title="项目菜单"
+                      aria-label="项目菜单"
+                    >
+                      <MoreHorizontal size={15} />
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setCurrentProject(project);
+                        setExpandedProject(project.id);
+                        await createSessionForProject(project);
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+                      title="在该项目下新对话"
+                      aria-label="在该项目下新对话"
+                    >
+                      <SquarePen size={14} />
+                    </button>
+                  </div>
+                  {openProjectMenu === project.id && (
+                    <div
+                      className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-[#e5e1d8] bg-white py-1.5 text-[13px] text-[#3a362f] shadow-[0_16px_36px_rgba(25,23,20,0.16)]"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                        <Pin size={14} className="text-[#706b63]" />
+                        <span>置顶项目</span>
+                      </button>
+                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                        <FolderSearch size={14} className="text-[#706b63]" />
+                        <span>在资源管理器中打开</span>
+                      </button>
+                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                        <GitBranch size={14} className="text-[#706b63]" />
+                        <span>创建永久工作树</span>
+                      </button>
+                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                        <SquarePen size={14} className="text-[#706b63]" />
+                        <span>重命名项目</span>
+                      </button>
+                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                        <Archive size={14} className="text-[#706b63]" />
+                        <span>归档对话</span>
+                      </button>
+                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[#8b3d34] transition-colors hover:bg-[#f9ece9]">
+                        <X size={14} />
+                        <span>移除</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {isExpanded && pSessions.length > 0 && (
                   <div className="space-y-0.5 pl-7 pr-1">
@@ -179,7 +255,11 @@ export function Sidebar() {
                             : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
                         }`}
                       >
-                        <MessageSquare size={12} className="shrink-0 text-[#9a948b]" />
+                        {runningSessionId === s.id ? (
+                          <Loader2 size={12} className="kimix-spin shrink-0 text-[#9a948b]" />
+                        ) : (
+                          <MessageSquare size={12} className="shrink-0 text-[#9a948b]" />
+                        )}
                         <button
                           onClick={() => setCurrentSession(s)}
                           className="min-w-0 flex-1 truncate text-left"
@@ -226,7 +306,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v1.0.2</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.3.3</span>
         </button>
       </div>
     </aside>

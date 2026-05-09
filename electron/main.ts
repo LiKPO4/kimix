@@ -1,11 +1,81 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { execFile, spawn } from "node:child_process";
 import { z } from "zod";
 import * as kimiBridge from "./kimiBridge";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
+import type { ContentPart } from "@moonshot-ai/kimi-agent-sdk";
+
+function checkCommand(command: string): Promise<string | null> {
+  const lookup = process.platform === "win32" ? "where" : "which";
+  return new Promise((resolve) => {
+    execFile(lookup, [command], { windowsHide: true }, (error, stdout) => {
+      if (error) {
+        resolve(null);
+        return;
+      }
+      const first = stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+      resolve(first ?? null);
+    });
+  });
+}
+
+function runCommand(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(command, args, { windowsHide: true, timeout: 5000 }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve((stdout || stderr).trim());
+    });
+    child.on("error", reject);
+  });
+}
+
+function spawnDetached(command: string, args: string[], cwd?: string) {
+  const child = spawn(command, args, {
+    cwd,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: false,
+  });
+  child.unref();
+}
+
+async function openTerminalAt(dir: string) {
+  if (process.platform === "win32") {
+    const wtPath = await checkCommand("wt");
+    if (wtPath) {
+      spawnDetached(wtPath, ["-d", dir], dir);
+      return;
+    }
+    spawnDetached("powershell.exe", ["-NoExit", "-NoLogo", "-Command", "Set-Location -LiteralPath $args[0]", dir], dir);
+    return;
+  }
+
+  const terminal = await checkCommand("x-terminal-emulator") ?? await checkCommand("gnome-terminal") ?? await checkCommand("konsole");
+  if (terminal) {
+    spawnDetached(terminal, [], dir);
+    return;
+  }
+
+  throw new Error("未找到可用终端");
+}
+
+async function openEditorAt(target: "vscode" | "trae" | "coder", dir: string) {
+  const command = target === "vscode" ? "code" : target;
+  const commandPath = await checkCommand(command);
+  if (!commandPath) {
+    const label = target === "vscode" ? "VS Code" : target;
+    throw new Error(`未找到 ${label} 命令`);
+  }
+  spawnDetached(commandPath, [dir], dir);
+}
 
 // Log unhandled errors to prevent silent crashes
 process.on("unhandledRejection", (reason) => {
@@ -42,6 +112,23 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 
+function ensureDirectoryExists(dir: string) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function getDefaultProject() {
+  const workDir = settingsService.getDefaultWorkDir();
+  ensureDirectoryExists(workDir);
+  return {
+    id: "default-kimi-project",
+    path: workDir,
+    name: path.basename(workDir) || "kimi",
+    lastOpenedAt: Date.now(),
+  };
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -57,6 +144,7 @@ function createWindow() {
     },
     autoHideMenuBar: true,
     frame: false,
+    icon: path.join(process.env.APP_ROOT, "..", "Kimix.png"),
   });
 
   kimiBridge.setMainWindow(mainWindow);
@@ -66,6 +154,10 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
+
+  mainWindow.webContents.once("did-finish-load", () => {
+    void restoreLastContext();
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
@@ -118,6 +210,16 @@ function createWindow() {
     mainWindow = null;
     kimiBridge.setMainWindow(null);
   });
+}
+
+async function restoreLastContext() {
+  const recentProjects = projectService.getRecentProjects();
+  const project = recentProjects[0] ?? getDefaultProject();
+
+  projectService.addRecentProject(project);
+
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("kimix:bootstrap", { project });
 }
 
 // Project IPC handlers
@@ -185,8 +287,109 @@ ipcMain.handle("project:getGitInfo", async (_, projectPath: string) => {
   return { success: true, data: { branch: branch ?? "main", status } };
 });
 
+ipcMain.handle("project:openPath", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const dir = (request as { path?: unknown }).path;
+    if (typeof dir !== "string" || !dir) {
+      return { success: false, error: "Invalid path" };
+    }
+    if (!fs.existsSync(dir)) {
+      return { success: false, error: "Path does not exist" };
+    }
+    await shell.openPath(dir);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:openEditor", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const dir = (request as { path?: unknown }).path;
+    const editor = (request as { editor?: unknown }).editor;
+    if (typeof dir !== "string" || !dir || !["vscode", "trae", "coder"].includes(String(editor))) {
+      return { success: false, error: "Invalid editor request" };
+    }
+    if (!fs.existsSync(dir)) {
+      return { success: false, error: "Path does not exist" };
+    }
+    await openEditorAt(editor as "vscode" | "trae" | "coder", dir);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:openTerminal", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const dir = (request as { path?: unknown }).path;
+    if (typeof dir !== "string" || !dir) {
+      return { success: false, error: "Invalid path" };
+    }
+    if (!fs.existsSync(dir)) {
+      return { success: false, error: "Path does not exist" };
+    }
+    await openTerminalAt(dir);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 // Kimi IPC handlers
-ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean }) => {
+ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
+  try {
+    const kimiPath = await checkCommand("kimi");
+    if (!kimiPath) {
+      return {
+        success: true,
+        data: {
+          available: false,
+          verified: false,
+          command: "kimi",
+          message: "未找到 kimi CLI，请检查 PATH",
+        },
+      };
+    }
+    if (request?.verify) {
+      const output = await runCommand(kimiPath, ["--version"]);
+      return {
+        success: true,
+        data: {
+          available: true,
+          verified: true,
+          command: "kimi",
+          path: kimiPath,
+          output,
+          message: output || "Kimi CLI 响应正常",
+        },
+      };
+    }
+    return {
+      success: true,
+      data: {
+        available: true,
+        verified: false,
+        command: "kimi",
+        path: kimiPath,
+        message: "已找到 kimi CLI，点击检查验证响应",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean }) => {
   try {
     const result = await kimiBridge.startSession(request);
     return { success: true, data: result };
@@ -202,14 +405,32 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
   const req = request as Record<string, unknown>;
   const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
   const content = typeof req.content === "string" ? req.content : "";
-  if (!sessionId || !content) {
+  const images = Array.isArray(req.images)
+    ? req.images.filter((item): item is { name: string; dataUrl: string } =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as { name?: unknown }).name === "string" &&
+        typeof (item as { dataUrl?: unknown }).dataUrl === "string" &&
+        (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
+      )
+    : [];
+  const thinking = typeof req.thinking === "boolean" ? req.thinking : undefined;
+  const yoloMode = typeof req.yoloMode === "boolean" ? req.yoloMode : undefined;
+  if (!sessionId || (!content && images.length === 0)) {
     return { success: false, error: "Missing sessionId or content" };
   }
-  // Fire-and-forget: don't await the full turn
-  kimiBridge.sendPrompt(sessionId, content).catch((err) => {
-    console.error("Send prompt error:", err);
-  });
-  return { success: true, data: { sessionId } };
+  const promptContent: string | ContentPart[] = images.length > 0
+    ? [
+        ...(content ? [{ type: "text" as const, text: content }] : []),
+        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl } })),
+      ]
+    : content;
+  try {
+    await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode });
+    return { success: true, data: { sessionId } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("kimi:stopTurn", async (_, request: { sessionId: string }) => {
@@ -271,6 +492,7 @@ const SettingsSchema = z.object({
   theme: z.enum(["dark", "light", "system"]).optional(),
   fontSize: z.number().int().min(8).max(32).optional(),
   showThinking: z.boolean().optional(),
+  detailedContext: z.boolean().optional(),
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   autoReadAgentsMd: z.boolean().optional(),

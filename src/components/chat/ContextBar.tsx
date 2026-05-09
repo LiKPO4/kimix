@@ -1,4 +1,4 @@
-import { FolderOpen, Monitor, GitBranch, ChevronDown, Download } from "lucide-react";
+import { Download, FolderOpen, GitBranch, Monitor } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 
@@ -42,41 +42,34 @@ export function ContextBar() {
   };
 
   return (
-    <div className="flex items-center justify-center gap-1 px-4 py-2 border-b border-[#f0ede7] shrink-0">
-      <button
-        onClick={handleOpenProject}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
-      >
-        <FolderOpen size={12} />
-        <span>{project?.name ?? "选择项目"}</span>
-        <ChevronDown size={10} />
-      </button>
-      <button
-        disabled
-        title="即将推出"
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors disabled:opacity-40"
-      >
-        <Monitor size={12} />
-        <span>本地模式</span>
-        <ChevronDown size={10} />
-      </button>
-      <button
-        disabled
-        title="即将推出"
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors disabled:opacity-40"
-      >
-        <GitBranch size={12} />
-        <span>{project?.gitBranch ?? "main"}</span>
-        <ChevronDown size={10} />
-      </button>
+    <div className="flex min-h-7 w-full items-center justify-between gap-3 px-1 pt-2 text-[12px] text-[#8a847a]">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <button
+          onClick={handleOpenProject}
+          className="flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          title={project?.path ?? "选择项目"}
+        >
+          <FolderOpen size={13} className="shrink-0" />
+          <span className="max-w-[220px] truncate">{project?.name ?? "选择项目"}</span>
+        </button>
+        <div className="hidden min-w-0 items-center gap-1.5 sm:flex" title="本地模式">
+          <Monitor size={13} className="shrink-0" />
+          <span className="truncate">本地模式</span>
+        </div>
+        <div className="hidden min-w-0 items-center gap-1.5 md:flex" title={project?.gitBranch ?? "当前分支"}>
+          <GitBranch size={13} className="shrink-0" />
+          <span className="max-w-[150px] truncate">{project?.gitBranch ?? "main"}</span>
+        </div>
+      </div>
+
       {session && (
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
           title="导出聊天记录"
           aria-label="导出聊天记录"
         >
-          <Download size={12} />
+          <Download size={13} />
           <span>导出</span>
         </button>
       )}

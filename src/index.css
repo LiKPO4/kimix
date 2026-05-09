@@ -121,6 +121,221 @@ body {
   }
 }
 
+@keyframes kimix-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.kimix-spin {
+  animation: kimix-spin 0.9s linear infinite;
+}
+
+.kimix-settings-panel {
+  width: min(448px, calc(100vw - 40px));
+  max-height: 78vh;
+  overflow: hidden;
+  border: 1px solid #dedad2;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(25, 23, 20, 0.22);
+}
+
+.kimix-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #ebe7df;
+}
+
+.kimix-settings-title {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 650;
+  color: #24211d;
+}
+
+.kimix-settings-icon-button {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #8f887e;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.kimix-settings-icon-button:hover {
+  background: #f1eee8;
+  color: #24211d;
+}
+
+.kimix-settings-body {
+  max-height: calc(78vh - 61px);
+  overflow-y: auto;
+  padding: 16px 20px 14px;
+}
+
+.kimix-settings-section + .kimix-settings-section {
+  margin-top: 20px;
+}
+
+.kimix-settings-section-title,
+.kimix-settings-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #3a362f;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kimix-settings-row-title {
+  justify-content: space-between;
+}
+
+.kimix-settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.kimix-settings-theme {
+  display: flex;
+  height: 58px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #e5e1d8;
+  border-radius: 12px;
+  color: #625d55;
+  font-size: 13px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.kimix-settings-theme:hover {
+  background: #faf8f4;
+}
+
+.kimix-settings-theme.is-active {
+  border-color: #0078d4;
+  background: #eef7ff;
+  color: #0078d4;
+}
+
+.kimix-settings-check-button {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #625d55;
+  font-size: 13px;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.kimix-settings-check-button:hover:not(:disabled) {
+  background: #f1eee8;
+  color: #24211d;
+}
+
+.kimix-settings-check-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.kimix-settings-connection {
+  margin-top: 12px;
+  border: 1px solid #e5e1d8;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #faf8f4;
+}
+
+.kimix-settings-connection.is-verified {
+  border-color: #b7dfb7;
+  background: #f3fbf3;
+}
+
+.kimix-settings-connection.is-missing {
+  border-color: #f0d7b8;
+  background: #fff8ef;
+}
+
+.kimix-settings-connection-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kimix-settings-connection-copy,
+.kimix-settings-permission-copy {
+  min-width: 0;
+}
+
+.kimix-settings-connection-label,
+.kimix-settings-permission-label {
+  color: #24211d;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.kimix-settings-connection-detail,
+.kimix-settings-permission-desc {
+  margin-top: 3px;
+  color: #8f887e;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.kimix-settings-permissions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.kimix-settings-permission {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid #e5e1d8;
+  border-radius: 12px;
+  padding: 12px 16px;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.kimix-settings-permission:hover {
+  background: #faf8f4;
+}
+
+.kimix-settings-permission.is-active {
+  border-color: #0078d4;
+  background: #eef7ff;
+}
+
+.kimix-settings-permission.is-active .kimix-settings-permission-label {
+  color: #0078d4;
+}
+
+.kimix-settings-footer {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #ebe7df;
+  color: #aaa49a;
+  text-align: center;
+  font-size: 13px;
+}
+
 /* Selection */
 ::selection {
   background-color: var(--accent-blue);
@@ -129,8 +344,8 @@ body {
 
 /* Markdown body styles */
 .markdown-body {
-  font-size: 16px;
-  line-height: 1.72;
+  font-size: 15px;
+  line-height: 1.68;
   color: var(--text-primary);
 }
 

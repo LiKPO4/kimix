@@ -1,15 +1,20 @@
-import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
+import type { TimelineEvent } from "@/types/ui";
 import { mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
-  const setIsRunning = useAppStore((s) => s.setIsRunning);
+  const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
+  const setDetailedContext = useAppStore((s) => s.setDetailedContext);
+  const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
+  const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const permissionMode = useAppStore((s) => s.permissionMode);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -18,24 +23,68 @@ function App() {
   const currentSessionRef = useRef(currentSession);
   currentSessionRef.current = currentSession;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const bootstrapDoneRef = useRef(false);
 
   useEffect(() => {
-    // Load settings
     window.api.getSettings().then((res) => {
       if (res.success) {
         setTheme(res.data.theme);
         setPermissionMode(res.data.defaultPermissionMode);
+        setDefaultThinking(res.data.defaultThinking);
+        setDetailedContext(res.data.detailedContext);
       }
     }).catch(() => {});
 
-    // Load recent projects
     window.api.listRecentProjects().then((res) => {
-      if (res.success) {
-        setRecentProjects(res.data);
-      }
+      if (res.success) setRecentProjects(res.data);
     }).catch(() => {});
 
-    // Load persisted sessions and pending messages
+    const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
+      if (bootstrapDoneRef.current) return;
+      bootstrapDoneRef.current = true;
+      useAppStore.setState({ currentProject: payload.project });
+
+      window.api.listRecentProjects().then((res) => {
+        if (res.success) setRecentProjects(res.data);
+      }).catch(() => {});
+
+      window.api.listSessions({ workDir: payload.project.path }).then(async (res) => {
+        if (!res.success) return;
+        const latest = res.data[0];
+        const startRes = await window.api.startSession({
+          workDir: payload.project.path,
+          sessionId: latest?.id,
+          thinking: useAppStore.getState().defaultThinking,
+          yoloMode: useAppStore.getState().permissionMode === "yolo",
+        });
+        if (!startRes.success || !latest) return;
+
+        const loaded = await window.api.loadSession({
+          workDir: payload.project.path,
+          sessionId: latest.id,
+        });
+        if (!loaded.success) return;
+
+        const session = {
+          id: startRes.data.sessionId,
+          title: latest.brief || "新会话",
+          projectPath: payload.project.path,
+          createdAt: latest.updatedAt,
+          updatedAt: latest.updatedAt,
+          events: (Array.isArray(loaded.data.events) ? loaded.data.events : []) as TimelineEvent[],
+          isLoading: false,
+        };
+
+        useSessionStore.setState((state) => ({
+          sessions: state.sessions.some((item) => item.id === session.id)
+            ? state.sessions.map((item) => (item.id === session.id ? session : item))
+            : [session, ...state.sessions],
+        }));
+        useAppStore.setState({ currentSession: session });
+        setRunningSessionId(null);
+      }).catch(() => {});
+    });
+
     const storedSessions = localStorage.getItem("kimix_sessions");
     if (storedSessions) {
       try {
@@ -47,6 +96,7 @@ function App() {
         // ignore parse error
       }
     }
+
     const storedPending = localStorage.getItem("kimix_pending");
     if (storedPending) {
       try {
@@ -57,13 +107,7 @@ function App() {
               if (typeof item === "string") {
                 return { id: crypto.randomUUID(), content: item, createdAt: Date.now() };
               }
-              if (
-                item &&
-                typeof item === "object" &&
-                typeof item.id === "string" &&
-                typeof item.content === "string" &&
-                typeof item.createdAt === "number"
-              ) {
+              if (item && typeof item === "object" && typeof item.id === "string" && typeof item.content === "string" && typeof item.createdAt === "number") {
                 return item;
               }
               return null;
@@ -76,7 +120,6 @@ function App() {
       }
     }
 
-    // Save sessions + pending before unload
     const handleBeforeUnload = () => {
       const state = useSessionStore.getState();
       localStorage.setItem("kimix_sessions", JSON.stringify(state.sessions));
@@ -84,14 +127,12 @@ function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Listen for Kimi events
     const unsubscribeEvent = window.api.onKimiEvent((payload) => {
       if (!payload.event) return;
       const mapped = mapStreamEvent(payload.event);
       if (mapped) {
         updateSession(payload.sessionId, (session) => {
           const events = mergeEvents(session.events, mapped);
-          // Auto-update session title from first user message
           const title = session.title === "新会话" && mapped.type === "user_message"
             ? mapped.content.slice(0, 30) + (mapped.content.length > 30 ? "..." : "")
             : session.title;
@@ -102,50 +143,70 @@ function App() {
 
     const unsubscribeStatus = window.api.onKimiStatus((payload) => {
       if (payload.status === "running") {
-        setIsRunning(true);
-      } else if (["completed", "error", "interrupted"].includes(payload.status)) {
-        setIsRunning(false);
-        // 自动发送排队中的下一条消息
-        if (payload.status === "completed") {
-          const next = useSessionStore.getState().shiftPendingMessage();
-          if (next) {
-            // 先添加思考中占位符
-            updateSession(payload.sessionId, (session) => ({
-              ...session,
-              events: [...session.events, {
-                id: Math.random().toString(36).substring(2, 11),
+        setRunningSessionId(payload.sessionId);
+        return;
+      }
+
+      if (!["completed", "error", "interrupted"].includes(payload.status)) {
+        return;
+      }
+
+      setRunningSessionId(null);
+
+      if (payload.status === "error" || payload.status === "interrupted") {
+        updateSession(payload.sessionId, (session) => ({
+          ...session,
+          events: session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)),
+          updatedAt: Date.now(),
+        }));
+      }
+
+      if (payload.status === "completed") {
+        const next = useSessionStore.getState().shiftPendingMessage();
+        if (next) {
+          const placeholderId = Math.random().toString(36).substring(2, 11);
+          updateSession(payload.sessionId, (session) => ({
+            ...session,
+            events: [
+              ...session.events,
+              {
+                id: placeholderId,
                 type: "assistant_message" as const,
                 timestamp: Date.now(),
                 content: "",
-                isThinking: true,
+                isThinking: defaultThinking,
                 isComplete: false,
-              }],
-              updatedAt: Date.now(),
-            }));
-            const timer = setTimeout(() => {
-              window.api.sendPrompt({ sessionId: payload.sessionId, content: next.content });
-            }, 300);
-            timersRef.current.push(timer);
-          }
+              },
+            ],
+            updatedAt: Date.now(),
+          }));
+          const timer = setTimeout(() => {
+            window.api.sendPrompt({
+              sessionId: payload.sessionId,
+              content: next.content,
+              thinking: defaultThinking,
+              yoloMode: permissionMode === "yolo",
+            }).catch(() => {
+              updateSession(payload.sessionId, (session) => ({
+                ...session,
+                events: session.events.filter((event) => event.id !== placeholderId),
+                updatedAt: Date.now(),
+              }));
+              setRunningSessionId(null);
+            });
+          }, 300);
+          timersRef.current.push(timer);
         }
       }
     });
 
-    // Global keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore when a modal is open
-      if (document.querySelector('[aria-modal="true"]')) {
-        return;
-      }
+      if (document.querySelector('[aria-modal="true"]')) return;
 
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        return;
-      }
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
 
       const isMod = e.metaKey || e.ctrlKey;
-
-      // Escape: stop generation
       if (e.key === "Escape") {
         const cs = currentSessionRef.current;
         if (cs) {
@@ -153,29 +214,25 @@ function App() {
         }
         return;
       }
-
-      // Cmd/Ctrl+B: toggle sidebar
       if (isMod && e.key === "b") {
         e.preventDefault();
         toggleSidebar();
         return;
       }
-
-      // Cmd/Ctrl+K: focus input
       if (isMod && e.key === "k") {
         e.preventDefault();
         triggerFocusInput();
-        return;
       }
     };
     document.addEventListener("keydown", handleKeyDown);
 
-    // Auto-save settings when theme/permission changes
     const unsubSettings = useAppStore.subscribe((state, prev) => {
-      if (state.theme !== prev.theme || state.permissionMode !== prev.permissionMode) {
+      if (state.theme !== prev.theme || state.permissionMode !== prev.permissionMode || state.defaultThinking !== prev.defaultThinking || state.detailedContext !== prev.detailedContext) {
         window.api.saveSettings({
           theme: state.theme,
           defaultPermissionMode: state.permissionMode,
+          defaultThinking: state.defaultThinking,
+          detailedContext: state.detailedContext,
         }).catch(() => {});
       }
     });
@@ -183,13 +240,14 @@ function App() {
     return () => {
       unsubscribeEvent();
       unsubscribeStatus();
+      unsubscribeBootstrap();
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       unsubSettings();
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setIsRunning, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects]);
+  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
 
   return (
     <ThemeProvider>

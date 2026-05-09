@@ -7,7 +7,7 @@ const CONFIG_DIR = path.join(os.homedir(), ".kimix");
 const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
 
 const DEFAULT_SETTINGS: AppSettings = {
-  defaultModel: "kimi-latest",
+  defaultModel: "kimi-code/kimi-for-coding",
   defaultThinking: true,
   maxTurns: 50,
   enableCompaction: true,
@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: "light",
   fontSize: 14,
   showThinking: true,
+  detailedContext: false,
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
@@ -53,4 +54,9 @@ export function saveSettings(settings: Partial<AppSettings>): void {
     console.error("Failed to save settings:", err);
     throw err;
   }
+}
+
+export function getDefaultWorkDir(): string {
+  const settings = loadSettings();
+  return settings.defaultOpenDir?.trim() || path.join(os.homedir(), "kimi");
 }

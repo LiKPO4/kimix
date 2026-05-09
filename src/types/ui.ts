@@ -7,6 +7,9 @@ export interface AppState {
   currentSession: Session | null;
   permissionMode: PermissionMode;
   isRunning: boolean;
+  runningSessionId: string | null;
+  defaultThinking: boolean;
+  detailedContext: boolean;
   sidebarOpen: boolean;
   theme: Theme;
 }
@@ -57,6 +60,7 @@ export interface AssistantMessageEvent {
   thinking?: string;
   isThinking: boolean;
   isComplete: boolean;
+  durationMs?: number;
 }
 
 export interface ToolCallEvent {
@@ -68,6 +72,7 @@ export interface ToolCallEvent {
   status: "running" | "success" | "error";
   arguments: Record<string, unknown>;
   rawArguments?: string;
+  durationMs?: number;
 }
 
 export interface ToolResultEvent {
@@ -117,7 +122,9 @@ export interface StatusUpdateEvent {
   step?: number;
   totalSteps?: number;
   tokenCount?: number;
+  inputTokenCount?: number;
   contextSize?: number;
+  contextLimit?: number;
   message?: string;
 }
 

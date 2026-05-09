@@ -13,14 +13,15 @@ interface ComposerInputProps {
   onSubmit: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 }
 
-const MAX_HEIGHT = 156;
-const MIN_HEIGHT = 24;
+const MAX_HEIGHT = 132;
+const MIN_HEIGHT = 21;
 
 export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>(
   function ComposerInput(
-    { value, placeholder, disabled, onChange, onSubmit, onFocus, onBlur },
+    { value, placeholder, disabled, onChange, onSubmit, onFocus, onBlur, onPaste },
     ref,
   ) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -59,12 +60,13 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
         onBlur={onBlur}
+        onPaste={onPaste}
         placeholder={placeholder}
         aria-label={placeholder}
         disabled={disabled}
         rows={1}
         style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT, overflowWrap: "anywhere", wordBreak: "break-word" }}
-        className="no-focus-outline block w-full resize-none whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-[15px] leading-6 text-[#27231f] placeholder:text-[#b8b2a8] shadow-none outline-none ring-0 caret-[#24211d] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
+        className="no-focus-outline block w-full resize-none whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-[14.5px] leading-[21px] text-[#27231f] placeholder:text-[#b8b2a8] shadow-none outline-none ring-0 caret-[#24211d] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
       />
     );
   },
