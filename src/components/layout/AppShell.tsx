@@ -615,7 +615,7 @@ export function AppShell() {
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <ChatThread />
           </div>
-          <div className="kimix-content-x shrink-0 bg-white pt-2" style={{ paddingBottom: 14 }}>
+          <div className="kimix-content-x shrink-0 bg-white" style={{ paddingTop: 8, paddingBottom: 10 }}>
             <div className="kimix-chat-column">
               <Composer />
               <ContextBar />

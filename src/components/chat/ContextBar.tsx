@@ -42,22 +42,22 @@ export function ContextBar() {
   };
 
   return (
-    <div className="flex min-h-7 w-full items-center justify-between gap-3 px-1 pt-2 text-[12px] text-[#8a847a]">
+    <div className="flex h-[34px] w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[#7c756c]">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           onClick={handleOpenProject}
-          className="flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          className="flex h-8 min-w-0 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
           title={project?.path ?? "选择项目"}
         >
-          <FolderOpen size={13} className="shrink-0" />
+          <FolderOpen size={16} className="shrink-0" />
           <span className="max-w-[220px] truncate">{project?.name ?? "选择项目"}</span>
         </button>
         <div className="hidden min-w-0 items-center gap-1.5 sm:flex" title="本地模式">
-          <Monitor size={13} className="shrink-0" />
+          <Monitor size={16} className="shrink-0" />
           <span className="truncate">本地模式</span>
         </div>
         <div className="hidden min-w-0 items-center gap-1.5 md:flex" title={project?.gitBranch ?? "当前分支"}>
-          <GitBranch size={13} className="shrink-0" />
+          <GitBranch size={16} className="shrink-0" />
           <span className="max-w-[150px] truncate">{project?.gitBranch ?? "main"}</span>
         </div>
       </div>
@@ -65,11 +65,11 @@ export function ContextBar() {
       {session && (
         <button
           onClick={handleExport}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          className="flex h-8 shrink-0 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
           title="导出聊天记录"
           aria-label="导出聊天记录"
         >
-          <Download size={13} />
+          <Download size={16} />
           <span>导出</span>
         </button>
       )}
