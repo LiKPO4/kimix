@@ -1,4 +1,4 @@
-import type { TimelineEvent } from "@/types/ui";
+import type { TimelineEvent, TodoItem } from "@/types/ui";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -12,16 +12,58 @@ function isNumber(v: unknown): v is number {
   return typeof v === "number";
 }
 
+const LATEST_TOOL_CALL = "__kimix_latest_tool_call__";
+
+function parseArguments(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) return value;
+  if (!isString(value) || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function mergeArguments(rawArguments: string, fallback: Record<string, unknown>): Record<string, unknown> {
+  const parsed = parseArguments(rawArguments);
+  return Object.keys(parsed).length > 0 ? parsed : fallback;
+}
+
+function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | null {
+  if (items.length === 0) return null;
+  return {
+    id: generateId(),
+    type: "todo",
+    timestamp,
+    items,
+  };
+}
+
+function extractUserInput(input: unknown): string {
+  if (isString(input)) return input;
+  if (!Array.isArray(input)) return "";
+  return input
+    .map((part) => {
+      if (!isRecord(part)) return "";
+      if (part.type === "text" && isString(part.text)) return part.text;
+      if (part.type === "image_url") return "[图片]";
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function mapStreamEvent(event: unknown): TimelineEvent | null {
   if (!isRecord(event)) return null;
-  const type = event.type;
+  const source = isRecord(event.message) ? event.message : event;
+  const type = source.type;
   if (!isString(type)) return null;
-  const payload = isRecord(event.payload) ? event.payload : {};
+  const payload = isRecord(source.payload) ? source.payload : {};
 
   switch (type) {
     case "TurnBegin": {
-      const input = payload.user_input;
-      const text = isString(input) ? input : "";
+      const text = extractUserInput(payload.user_input);
       return {
         id: generateId(),
         type: "user_message",
@@ -58,6 +100,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
 
     case "ToolCall": {
       const func = isRecord(payload.function) ? payload.function : {};
+      const rawArguments = isString(func.arguments) ? func.arguments : "";
       return {
         id: generateId(),
         type: "tool_call",
@@ -65,38 +108,49 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         toolCallId: isString(payload.id) ? payload.id : generateId(),
         toolName: isString(func.name) ? func.name : "unknown",
         status: "running",
-        arguments: (() => {
-          try { return isString(func.arguments) ? JSON.parse(func.arguments) : {}; }
-          catch { return {}; }
-        })(),
-        rawArguments: isString(func.arguments) ? func.arguments : "",
+        arguments: parseArguments(rawArguments),
+        rawArguments,
+      };
+    }
+
+    case "SteerInput": {
+      const text = extractUserInput(payload.user_input);
+      if (!text.trim()) return null;
+      return {
+        id: generateId(),
+        type: "steer_message",
+        timestamp: Date.now(),
+        content: text,
+        status: "sent",
       };
     }
 
     case "ToolCallPart": {
-      const func = isRecord(payload.function) ? payload.function : {};
+      const rawArguments = isString(payload.arguments_part)
+        ? payload.arguments_part
+        : isString(payload.arguments)
+          ? payload.arguments
+          : "";
       return {
         id: generateId(),
         type: "tool_call",
         timestamp: Date.now(),
-        toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : isString(payload.id) ? payload.id : generateId(),
-        toolName: isString(func.name) ? func.name : "unknown",
+        toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : isString(payload.id) ? payload.id : LATEST_TOOL_CALL,
+        toolName: "unknown",
         status: "running",
-        arguments: (() => {
-          try { return isString(func.arguments) ? JSON.parse(func.arguments) : {}; }
-          catch { return {}; }
-        })(),
-        rawArguments: isString(func.arguments) ? func.arguments : "",
+        arguments: parseArguments(rawArguments),
+        rawArguments,
       };
     }
 
     case "ToolResult": {
       const returnValue = isRecord(payload.return_value) ? payload.return_value : {};
       const output = returnValue.output;
+      const displayBlocks = Array.isArray(returnValue.display) ? returnValue.display : Array.isArray(output) ? output : [];
       let display: { diff?: { path: string; oldText: string; newText: string }; todo?: { id: string; content: string; status: "pending" | "in_progress" | "done" }[] } | undefined;
 
-      if (Array.isArray(output)) {
-        const blocks = output.filter(isRecord);
+      if (displayBlocks.length > 0) {
+        const blocks = displayBlocks.filter(isRecord);
         const diffBlock = blocks.find((b) => b.type === "diff");
         const todoBlock = blocks.find((b) => b.type === "todo");
         if (diffBlock && isString(diffBlock.path) && isString(diffBlock.old_text) && isString(diffBlock.new_text)) {
@@ -257,14 +311,45 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
   // Merge streaming tool calls
   if (incoming.type === "tool_call") {
-    const last = existing[existing.length - 1];
-    if (last && last.type === "tool_call" && last.status === "running" && last.toolCallId === incoming.toolCallId) {
+    const partialWithoutId = incoming.toolCallId === LATEST_TOOL_CALL;
+    const sameCallIndex = partialWithoutId
+      ? -1
+      : existing.findLastIndex((e) => e.type === "tool_call" && e.status === "running" && e.toolCallId === incoming.toolCallId);
+    const latestCallIndex = existing.findLastIndex((e) => e.type === "tool_call" && e.status === "running");
+    const targetIndex = sameCallIndex !== -1 ? sameCallIndex : partialWithoutId ? latestCallIndex : -1;
+
+    if (targetIndex !== -1) {
+      const last = existing[targetIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
+      const rawArguments = (last.rawArguments ?? "") + (incoming.rawArguments ?? "");
+      const fallbackArguments = { ...last.arguments, ...incoming.arguments };
       const updated: typeof last = {
         ...last,
-        arguments: { ...last.arguments, ...incoming.arguments },
-        rawArguments: (last.rawArguments ?? "") + (incoming.rawArguments ?? ""),
+        toolName: incoming.toolName && incoming.toolName !== "unknown" ? incoming.toolName : last.toolName,
+        arguments: mergeArguments(rawArguments, fallbackArguments),
+        rawArguments,
       };
-      return [...existing.slice(0, -1), updated];
+      const result = [...existing];
+      result[targetIndex] = updated;
+      return result;
+    }
+
+    if (partialWithoutId) {
+      return existing;
+    }
+  }
+
+  if (incoming.type === "steer_message") {
+    const duplicateIndex = existing.findLastIndex(
+      (e) => e.type === "steer_message" && e.content === incoming.content
+    );
+    if (duplicateIndex !== -1) {
+      const result = [...existing];
+      result[duplicateIndex] = {
+        ...result[duplicateIndex],
+        status: incoming.status,
+        error: incoming.error,
+      } as TimelineEvent;
+      return result;
     }
   }
 
@@ -280,11 +365,28 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         status: "success",
         durationMs: Math.max(0, incoming.timestamp - call.timestamp),
       };
-      return result;
+      const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
+      return todoEvent ? [...result, todoEvent] : result;
+    }
+    const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
+    if (todoEvent) return [...existing, todoEvent];
+  }
+
+  if (incoming.type === "status_update") {
+    const last = existing[existing.length - 1];
+    if (last?.type === "status_update") {
+      return [...existing.slice(0, -1), incoming];
     }
   }
 
   return [...existing, incoming];
+}
+
+export function mapHistoryEvents(events: unknown[]): TimelineEvent[] {
+  return events.reduce<TimelineEvent[]>((items, event) => {
+    const mapped = mapStreamEvent(event);
+    return mapped ? mergeEvents(items, mapped) : items;
+  }, []);
 }
 
 function generateId(): string {

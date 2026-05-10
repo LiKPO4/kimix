@@ -81,18 +81,22 @@ export function ToolCard({ event }: ToolCardProps) {
       <div className="w-full">
         <button
           onClick={() => setExpanded((value) => !value)}
-          className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-[13px] text-[#8f887e] transition-colors hover:bg-[#f3f1ec]"
+          className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec]"
+          style={{ gap: 8, paddingLeft: 4, paddingRight: 10 }}
         >
-          {expanded ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-          <Icon size={14} className="shrink-0" />
+          {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
+          <Icon size={15} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">
             {statusText} {meta.label}
           </span>
-          {duration && <span className="shrink-0 text-[#aaa49a]">{duration}</span>}
+          {duration && <span className="shrink-0 text-[#9a948b]">{duration}</span>}
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
         </button>
         {expanded && (
-          <pre className="mt-1 max-h-40 overflow-auto rounded-lg bg-[#f7f5f1] px-3 py-2 text-[12px] leading-relaxed text-[#706b63]">
+          <pre
+            className="mt-2 max-h-52 min-w-0 overflow-auto rounded-xl bg-[#f7f5f1] whitespace-pre-wrap break-words text-[14px] leading-7 text-[#706b63]"
+            style={{ paddingLeft: 32, paddingRight: 32, paddingTop: 20, paddingBottom: 20 }}
+          >
             {details || meta.detail}
           </pre>
         )}

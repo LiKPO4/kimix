@@ -9,6 +9,8 @@ import type {
   CheckKimiCliResponse,
   SendPromptRequest,
   SendPromptResponse,
+  SteerPromptRequest,
+  SteerPromptResponse,
   StopTurnRequest,
   StopTurnResponse,
   ApproveRequest,
@@ -17,12 +19,18 @@ import type {
   CloseSessionResponse,
   ListSessionsRequest,
   ListSessionsResponse,
+  ListSlashCommandsRequest,
+  ListSlashCommandsResponse,
   LoadSessionRequest,
   LoadSessionResponse,
   GitInfoResponse,
   OpenEditorRequest,
   OpenPathRequest,
+  SearchProjectFilesRequest,
+  SearchProjectFilesResponse,
   OpenTerminalRequest,
+  AppInfoResponse,
+  CheckUpdateResponse,
   SettingsResponse,
   SaveSettingsRequest,
   KimiEventPayload,
@@ -49,6 +57,8 @@ const api = {
     ipcRenderer.invoke("project:openEditor", req),
   openProjectTerminal: (req: OpenTerminalRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openTerminal", req),
+  searchProjectFiles: (req: SearchProjectFilesRequest): Promise<SearchProjectFilesResponse> =>
+    ipcRenderer.invoke("project:searchFiles", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>
@@ -57,12 +67,16 @@ const api = {
     ipcRenderer.invoke("kimi:checkCli", req),
   sendPrompt: (req: SendPromptRequest): Promise<SendPromptResponse> =>
     ipcRenderer.invoke("kimi:sendPrompt", req),
+  steerPrompt: (req: SteerPromptRequest): Promise<SteerPromptResponse> =>
+    ipcRenderer.invoke("kimi:steerPrompt", req),
   stopTurn: (req: StopTurnRequest): Promise<StopTurnResponse> =>
     ipcRenderer.invoke("kimi:stopTurn", req),
   approveRequest: (req: ApproveRequest): Promise<ApproveResponse> =>
     ipcRenderer.invoke("kimi:approveRequest", req),
   closeSession: (req: CloseSessionRequest): Promise<CloseSessionResponse> =>
     ipcRenderer.invoke("kimi:closeSession", req),
+  listSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
+    ipcRenderer.invoke("kimi:listSlashCommands", req),
   listSessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
     ipcRenderer.invoke("kimi:listSessions", req),
   loadSession: (req: LoadSessionRequest): Promise<LoadSessionResponse> =>
@@ -84,6 +98,8 @@ const api = {
   getSettings: (): Promise<SettingsResponse> => ipcRenderer.invoke("app:getSettings"),
   saveSettings: (settings: SaveSettingsRequest): Promise<void> =>
     ipcRenderer.invoke("app:saveSettings", settings),
+  getAppInfo: (): Promise<AppInfoResponse> => ipcRenderer.invoke("app:getInfo"),
+  checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("app:openExternal", url),
 
@@ -97,6 +113,16 @@ const api = {
   // Window controls
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke("window:minimize"),
   maximizeWindow: (): Promise<void> => ipcRenderer.invoke("window:maximize"),
+  reloadWindow: (): Promise<void> => ipcRenderer.invoke("window:reload"),
+  setZoomLevel: (delta: number): Promise<{ success: boolean; data: number }> => ipcRenderer.invoke("window:setZoomLevel", delta),
+  resetZoom: (): Promise<{ success: boolean; data: number }> => ipcRenderer.invoke("window:resetZoom"),
+  toggleFullScreen: (): Promise<{ success: boolean; data: boolean }> => ipcRenderer.invoke("window:toggleFullScreen"),
+  isWindowMaximized: (): Promise<{ success: boolean; data: boolean }> => ipcRenderer.invoke("window:isMaximized"),
+  onWindowMaximizedChange: (callback: (payload: { maximized: boolean }) => void) => {
+    const handler = (_: unknown, payload: { maximized: boolean }) => callback(payload);
+    ipcRenderer.on("window:maximized-change", handler);
+    return () => ipcRenderer.off("window:maximized-change", handler);
+  },
   closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
 };
 

@@ -6,7 +6,6 @@ import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
 import { ChangeCard } from "./ChangeCard";
-import { TodoCard } from "./TodoCard";
 import { StatusCard } from "./StatusCard";
 import { ApprovalCard } from "./ApprovalCard";
 import { ErrorCard } from "./ErrorCard";
@@ -29,10 +28,11 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
     <div className="w-full">
       <button
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-[13px] text-[#8f887e] transition-colors hover:bg-[#f3f1ec]"
+        className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec]"
+        style={{ gap: 8, paddingLeft: 4, paddingRight: 10 }}
       >
-        {expanded ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-        <Wrench size={14} className="shrink-0" />
+        {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
+        <Wrench size={15} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate">{summary || "正在运行命令"}</span>
       </button>
       {expanded && (
@@ -49,6 +49,7 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
 function EventRenderer({ event }: { event: TimelineEvent }) {
   switch (event.type) {
     case "user_message":
+    case "steer_message":
     case "assistant_message":
       return <MessageBubble event={event} />;
     case "tool_call":
@@ -60,7 +61,7 @@ function EventRenderer({ event }: { event: TimelineEvent }) {
     case "status_update":
       return <StatusCard event={event} />;
     case "todo":
-      return <TodoCard event={event} />;
+      return null;
     case "diff":
       return <ChangeCard changes={[{ path: event.filePath, oldText: event.oldText, newText: event.newText }]} />;
     case "error":
@@ -100,10 +101,10 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     if (type === "tool_result") return;
     if (
       type !== "user_message" &&
+      type !== "steer_message" &&
       type !== "assistant_message" &&
       type !== "approval_request" &&
       type !== "status_update" &&
-      type !== "todo" &&
       type !== "diff" &&
       type !== "error" &&
       type !== "subagent" &&
@@ -125,6 +126,10 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
       const content = (event as { content?: unknown }).content;
       return typeof content === "string" && content.trim().length > 0;
     }
+    if (type === "steer_message") {
+      const content = (event as { content?: unknown }).content;
+      return typeof content === "string" && content.trim().length > 0;
+    }
     if (type === "assistant_message") {
       const content = (event as { content?: unknown }).content;
       const thinking = (event as { thinking?: unknown }).thinking;
@@ -142,7 +147,6 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
     if (
       type === "tool_call" ||
       type === "approval_request" ||
-      type === "todo" ||
       type === "diff" ||
       type === "error" ||
       type === "subagent" ||
@@ -159,7 +163,7 @@ export function ChatThread() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastUserEventId = session?.events.filter((event) => event.type === "user_message").at(-1)?.id;
+  const lastUserEventId = session?.events.filter((event) => event.type === "user_message" || event.type === "steer_message").at(-1)?.id;
   const renderItems = useMemo(() => buildRenderItems(session?.events ?? []), [session?.events]);
 
   useEffect(() => {
@@ -174,7 +178,7 @@ export function ChatThread() {
 
   return (
     <div ref={scrollRef} className="kimix-content-x h-full overflow-y-auto" style={{ paddingTop: 42, paddingBottom: 42 }}>
-      <div className="mx-auto flex w-full max-w-[736px] flex-col" style={{ gap: 18 }}>
+      <div className="kimix-chat-column flex w-full flex-col" style={{ gap: 18 }}>
         {renderItems.map((item) => (
           item.type === "tool_group"
             ? <ToolGroup key={item.id} tools={item.tools} />

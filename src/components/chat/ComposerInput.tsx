@@ -14,14 +14,15 @@ interface ComposerInputProps {
   onFocus?: () => void;
   onBlur?: () => void;
   onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onKeyDownCapture?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 
 const MAX_HEIGHT = 132;
-const MIN_HEIGHT = 21;
+const MIN_HEIGHT = 52;
 
 export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>(
   function ComposerInput(
-    { value, placeholder, disabled, onChange, onSubmit, onFocus, onBlur, onPaste },
+    { value, placeholder, disabled, onChange, onSubmit, onFocus, onBlur, onPaste, onKeyDownCapture },
     ref,
   ) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -43,6 +44,8 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      onKeyDownCapture?.(e);
+      if (e.defaultPrevented) return;
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         onSubmit();
@@ -65,7 +68,7 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
         aria-label={placeholder}
         disabled={disabled}
         rows={1}
-        style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT, overflowWrap: "anywhere", wordBreak: "break-word" }}
+        style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT, overflowWrap: "anywhere", wordBreak: "break-word", paddingTop: 6, paddingBottom: 6 }}
         className="no-focus-outline block w-full resize-none whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-[14.5px] leading-[21px] text-[#27231f] placeholder:text-[#b8b2a8] shadow-none outline-none ring-0 caret-[#24211d] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
       />
     );

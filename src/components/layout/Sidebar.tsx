@@ -1,8 +1,10 @@
-import { SquarePen, Settings, FolderOpen, ChevronRight, MessageSquare, Trash2, Search, LayoutGrid, Clock, PanelLeftOpen, MoreHorizontal, Pin, Archive, X, Loader2, FolderSearch, GitBranch } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, ChevronRight, Trash2, Search, LayoutGrid, Clock, PanelLeftOpen, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project } from "@/types/ui";
+import { mapHistoryEvents } from "@/utils/eventMapper";
+import { deriveSessionTitle } from "@/utils/sessionTitle";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -22,9 +24,9 @@ const navItemClass = "flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[1
 export function Sidebar() {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
-  const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
+  const runningSessionId = useAppStore((s) => s.runningSessionId);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
@@ -36,6 +38,7 @@ export function Sidebar() {
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
   const deleteSession = useSessionStore((s) => s.deleteSession);
+  const updateSession = useSessionStore((s) => s.updateSession);
 
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
@@ -111,6 +114,27 @@ export function Sidebar() {
   const projectSessions = (projectPath: string) =>
     sessions.filter((s) => s.projectPath === projectPath);
 
+  const selectSession = async (sessionId: string) => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    setCurrentSession(session);
+    if (session.events.some((event) => event.type === "user_message" || event.type === "assistant_message")) return;
+
+    const loaded = await window.api.loadSession({
+      workDir: session.projectPath,
+      sessionId: session.id,
+    });
+    if (!loaded.success) return;
+    const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+    updateSession(session.id, (current) => ({
+      ...current,
+      events,
+      title: deriveSessionTitle(events, current.title),
+      isLoading: false,
+      updatedAt: Date.now(),
+    }));
+  };
+
   return (
     <aside style={{ paddingLeft: 12, paddingRight: 10 }} className="flex h-full w-[320px] shrink-0 select-none flex-col bg-[#f6f4ef] pb-2">
       <div className="no-drag space-y-1 px-2 pb-2">
@@ -156,15 +180,19 @@ export function Sidebar() {
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {recentProjects.map((project) => {
             const isExpanded = expandedProject === project.id;
             const isActive = currentProject?.id === project.id;
             const pSessions = projectSessions(project.path);
 
             return (
-              <section key={project.id} className="space-y-1">
+              <section
+                key={project.id}
+                style={{ display: "flex", flexDirection: "column", gap: 8 }}
+              >
                 <div
+                  style={{ paddingLeft: 20, paddingRight: 10 }}
                   className={`group/project relative flex h-9 w-full items-center gap-1 rounded-xl pl-3 pr-1 text-[15px] transition-colors ${
                     isActive
                       ? "bg-black/5 text-[#26231f]"
@@ -245,46 +273,58 @@ export function Sidebar() {
                 </div>
 
                 {isExpanded && pSessions.length > 0 && (
-                  <div className="space-y-0.5 pl-7 pr-1">
-                    {pSessions.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`group flex h-8 items-center gap-2 rounded-lg px-2 text-[14px] transition-colors ${
-                          currentSession?.id === s.id
-                            ? "bg-black/6 text-[#24211d]"
-                            : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
-                        }`}
-                      >
-                        {runningSessionId === s.id ? (
-                          <Loader2 size={12} className="kimix-spin shrink-0 text-[#9a948b]" />
-                        ) : (
-                          <MessageSquare size={12} className="shrink-0 text-[#9a948b]" />
-                        )}
-                        <button
-                          onClick={() => setCurrentSession(s)}
-                          className="min-w-0 flex-1 truncate text-left"
+                  <div
+                    style={{
+                      paddingLeft: 20,
+                      paddingRight: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 5,
+                    }}
+                  >
+                    {pSessions.map((s) => {
+                      const isSessionBusy = runningSessionId === s.id || s.isLoading;
+
+                      return (
+                        <div
+                          key={s.id}
+                          style={{ paddingLeft: 16, paddingRight: 10 }}
+                          className={`group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
+                            currentSession?.id === s.id
+                              ? "bg-black/6 text-[#24211d]"
+                              : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
+                          }`}
                         >
-                          {s.title}
-                        </button>
-                        <span className="shrink-0 text-[12px] text-[#9a948b]">
-                          {formatRelativeTime(s.updatedAt)}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteSession(s.id);
-                            if (currentSession?.id === s.id) {
-                              setCurrentSession(null);
-                            }
-                          }}
-                          className="rounded p-0.5 text-[#9a948b] opacity-0 transition-all hover:bg-accent-red/10 hover:text-accent-red group-hover:opacity-100"
-                          title="删除会话"
-                          aria-label="删除会话"
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      </div>
-                    ))}
+                          <button
+                            onClick={() => void selectSession(s.id)}
+                            className="min-w-0 flex-1 truncate text-left"
+                          >
+                            {s.title}
+                          </button>
+                          <span className="flex h-5 min-w-[34px] shrink-0 items-center justify-end text-[12px] text-[#9a948b]">
+                            {isSessionBusy ? (
+                              <Loader2 size={14} className="animate-spin text-[#8f887e]" aria-label="会话正在运行" />
+                            ) : (
+                              formatRelativeTime(s.updatedAt)
+                            )}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSession(s.id);
+                              if (currentSession?.id === s.id) {
+                                setCurrentSession(null);
+                              }
+                            }}
+                            className="rounded p-0.5 text-[#9a948b] opacity-0 transition-all hover:bg-accent-red/10 hover:text-accent-red group-hover:opacity-100"
+                            title="删除会话"
+                            aria-label="删除会话"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -302,11 +342,11 @@ export function Sidebar() {
       <div className="px-2 pt-2">
         <button
           onClick={() => setSettingsOpen(true)}
-          className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-[16px] text-[#302d28] transition-colors hover:bg-black/5"
+          className="kimix-settings-entry flex h-10 w-full items-center gap-3 rounded-xl text-[16px] text-[#302d28] transition-colors"
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.3.6</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.5.0</span>
         </button>
       </div>
     </aside>

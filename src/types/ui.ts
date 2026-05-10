@@ -34,6 +34,7 @@ export interface Session {
 
 export type TimelineEvent =
   | UserMessageEvent
+  | SteerMessageEvent
   | AssistantMessageEvent
   | ToolCallEvent
   | ToolResultEvent
@@ -50,6 +51,15 @@ export interface UserMessageEvent {
   type: "user_message";
   timestamp: number;
   content: string;
+}
+
+export interface SteerMessageEvent {
+  id: string;
+  type: "steer_message";
+  timestamp: number;
+  content: string;
+  status: "sending" | "sent" | "failed";
+  error?: string;
 }
 
 export interface AssistantMessageEvent {

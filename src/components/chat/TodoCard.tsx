@@ -8,24 +8,17 @@ interface TodoCardProps {
 export function TodoCard({ event }: TodoCardProps) {
   const doneCount = event.items.filter((i) => i.status === "done").length;
   const total = event.items.length;
-  const progress = total > 0 ? (doneCount / total) * 100 : 0;
 
   return (
-    <div className="flex justify-center">
-      <div className="max-w-[90%] w-full rounded-2xl border border-border-default bg-bg-secondary px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-text-primary">任务列表</span>
-          <span className="text-xs text-text-muted">{doneCount}/{total}</span>
+    <div className="flex justify-start">
+      <div className="w-full overflow-hidden rounded-[16px] border border-[#e1dcd3] bg-[#fbfaf7] text-[14.5px] shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+        <div className="flex items-center justify-between border-b border-[#eeeae3] text-[#7c756c]" style={{ paddingLeft: 24, paddingRight: 26, paddingTop: 12, paddingBottom: 12 }}>
+          <span className="font-medium">任务列表</span>
+          <span>{doneCount}/{total}</span>
         </div>
-        <div className="w-full h-1 bg-bg-hover rounded-full mb-3">
-          <div
-            className="h-full bg-accent-blue rounded-full transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <div className="space-y-2">
+        <div>
           {event.items.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 text-sm text-text-secondary">
+            <div key={item.id} className="flex min-w-0 items-center border-b border-[#f0ede7] text-[#5e5850] last:border-b-0" style={{ gap: 12, paddingLeft: 26, paddingRight: 26, paddingTop: 9, paddingBottom: 9 }}>
               {item.status === "done" ? (
                 <CheckCircle2 size={16} className="text-accent-green shrink-0" />
               ) : item.status === "in_progress" ? (
@@ -33,7 +26,7 @@ export function TodoCard({ event }: TodoCardProps) {
               ) : (
                 <Circle size={16} className="text-text-muted shrink-0" />
               )}
-              <span className={item.status === "done" ? "line-through text-text-muted" : ""}>{item.content}</span>
+              <span className={`min-w-0 flex-1 truncate ${item.status === "done" ? "line-through text-[#8f887e]" : ""}`}>{item.content}</span>
             </div>
           ))}
         </div>

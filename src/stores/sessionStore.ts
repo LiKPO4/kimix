@@ -21,6 +21,7 @@ interface SessionStore {
   updatePendingMessage: (id: string, content: string) => void;
   removePendingMessage: (id: string) => void;
   movePendingMessage: (id: string, direction: "up" | "down") => void;
+  reorderPendingMessage: (dragId: string, targetId: string) => void;
   promotePendingMessage: (id: string) => void;
   shiftPendingMessage: () => PendingMessage | undefined;
 }
@@ -91,6 +92,18 @@ export const useSessionStore = create<SessionStore>((set) => ({
       const pendingMessages = [...state.pendingMessages];
       const [item] = pendingMessages.splice(index, 1);
       pendingMessages.splice(nextIndex, 0, item);
+      return { pendingMessages };
+    }),
+
+  reorderPendingMessage: (dragId, targetId) =>
+    set((state) => {
+      if (dragId === targetId) return state;
+      const fromIndex = state.pendingMessages.findIndex((msg) => msg.id === dragId);
+      const toIndex = state.pendingMessages.findIndex((msg) => msg.id === targetId);
+      if (fromIndex < 0 || toIndex < 0) return state;
+      const pendingMessages = [...state.pendingMessages];
+      const [item] = pendingMessages.splice(fromIndex, 1);
+      pendingMessages.splice(toIndex, 0, item);
       return { pendingMessages };
     }),
 

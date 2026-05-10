@@ -5,7 +5,8 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
-import { mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
+import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
+import { deriveSessionTitle } from "@/utils/sessionTitle";
 
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
@@ -64,14 +65,15 @@ function App() {
           sessionId: latest.id,
         });
         if (!loaded.success) return;
+        const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
 
         const session = {
           id: startRes.data.sessionId,
-          title: latest.brief || "新会话",
+          title: deriveSessionTitle(events, latest.brief || "新会话"),
           projectPath: payload.project.path,
           createdAt: latest.updatedAt,
           updatedAt: latest.updatedAt,
-          events: (Array.isArray(loaded.data.events) ? loaded.data.events : []) as TimelineEvent[],
+          events,
           isLoading: false,
         };
 
@@ -133,9 +135,7 @@ function App() {
       if (mapped) {
         updateSession(payload.sessionId, (session) => {
           const events = mergeEvents(session.events, mapped);
-          const title = session.title === "新会话" && mapped.type === "user_message"
-            ? mapped.content.slice(0, 30) + (mapped.content.length > 30 ? "..." : "")
-            : session.title;
+          const title = deriveSessionTitle(events, session.title);
           return { ...session, events, title, updatedAt: Date.now() };
         });
       }
@@ -164,11 +164,18 @@ function App() {
       if (payload.status === "completed") {
         const next = useSessionStore.getState().shiftPendingMessage();
         if (next) {
+          const userEventId = Math.random().toString(36).substring(2, 11);
           const placeholderId = Math.random().toString(36).substring(2, 11);
           updateSession(payload.sessionId, (session) => ({
             ...session,
             events: [
               ...session.events,
+              {
+                id: userEventId,
+                type: "user_message" as const,
+                timestamp: Date.now(),
+                content: next.content,
+              },
               {
                 id: placeholderId,
                 type: "assistant_message" as const,
@@ -180,16 +187,20 @@ function App() {
             ],
             updatedAt: Date.now(),
           }));
+          setRunningSessionId(payload.sessionId);
           const timer = setTimeout(() => {
             window.api.sendPrompt({
               sessionId: payload.sessionId,
               content: next.content,
               thinking: defaultThinking,
               yoloMode: permissionMode === "yolo",
+            }).then((res) => {
+              if (res.success) return;
+              throw new Error(res.error);
             }).catch(() => {
               updateSession(payload.sessionId, (session) => ({
                 ...session,
-                events: session.events.filter((event) => event.id !== placeholderId),
+                events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
                 updatedAt: Date.now(),
               }));
               setRunningSessionId(null);
@@ -208,9 +219,10 @@ function App() {
 
       const isMod = e.metaKey || e.ctrlKey;
       if (e.key === "Escape") {
-        const cs = currentSessionRef.current;
-        if (cs) {
-          window.api.stopTurn({ sessionId: cs.id }).catch(() => {});
+        const sessionId = useAppStore.getState().runningSessionId ?? currentSessionRef.current?.id;
+        if (sessionId) {
+          setRunningSessionId(null);
+          window.api.stopTurn({ sessionId }).catch(() => {});
         }
         return;
       }

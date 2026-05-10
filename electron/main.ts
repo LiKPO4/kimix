@@ -10,6 +10,8 @@ import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import type { ContentPart } from "@moonshot-ai/kimi-agent-sdk";
 
+const GITHUB_REPO = "LiKPO4/kimix";
+
 function checkCommand(command: string): Promise<string | null> {
   const lookup = process.platform === "win32" ? "where" : "which";
   return new Promise((resolve) => {
@@ -102,20 +104,152 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
-export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+export const DEV_SERVER_URL = process.env["ELECTRON_RENDERER_URL"] ?? process.env["VITE_DEV_SERVER_URL"];
 const RENDERER_DIST = path.join(process.env.APP_ROOT, "..", "out", "renderer");
 
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
+process.env.VITE_PUBLIC = DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
 
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
+let rendererReloadedAfterBlank = false;
+
+const FILE_SEARCH_IGNORES = new Set([
+  ".git",
+  "node_modules",
+  "out",
+  "dist",
+  "build",
+  ".vite",
+  ".cache",
+  ".dart_tool",
+  ".gradle",
+]);
+
+function emitWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("window:maximized-change", { maximized: mainWindow.isMaximized() });
+}
+
+function verifyRendererContent() {
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  setTimeout(() => {
+    if (!win || win.isDestroyed()) return;
+    win.webContents.executeJavaScript(`
+      (() => {
+        const root = document.getElementById("root");
+        return {
+          bodyTextLength: document.body?.innerText?.trim().length ?? 0,
+          rootHtmlLength: root?.innerHTML?.trim().length ?? 0,
+          rootChildCount: root?.childElementCount ?? 0,
+        };
+      })()
+    `).then((result: { bodyTextLength: number; rootHtmlLength: number; rootChildCount: number }) => {
+      console.log(`[RENDERER] content check rootHtml=${result.rootHtmlLength} bodyText=${result.bodyTextLength} children=${result.rootChildCount}`);
+      if (result.rootHtmlLength === 0 && result.rootChildCount === 0 && !rendererReloadedAfterBlank) {
+        rendererReloadedAfterBlank = true;
+        console.warn("[RENDERER] blank root detected, reloading once");
+        win.webContents.reloadIgnoringCache();
+      }
+    }).catch((err) => {
+      console.error("[RENDERER] content check failed:", err);
+    });
+  }, 1800);
+}
 
 function ensureDirectoryExists(dir: string) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+function parseVersion(version: string): number[] {
+  return version.replace(/^v/i, "").split(".").map((part) => {
+    const parsed = Number.parseInt(part.replace(/\D.*/, ""), 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
+}
+
+function isVersionGreater(a: string, b: string): boolean {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  const length = Math.max(left.length, right.length);
+  for (let i = 0; i < length; i += 1) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    if (diff !== 0) return diff > 0;
+  }
+  return false;
+}
+
+async function fetchLatestRelease() {
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+    headers: {
+      "Accept": "application/vnd.github+json",
+      "User-Agent": "Kimix",
+    },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
+  const data = await res.json() as {
+    tag_name?: unknown;
+    name?: unknown;
+    body?: unknown;
+    published_at?: unknown;
+    html_url?: unknown;
+    assets?: unknown;
+  };
+  const assets = Array.isArray(data.assets) ? data.assets : [];
+  return {
+    tagName: typeof data.tag_name === "string" ? data.tag_name : "",
+    name: typeof data.name === "string" ? data.name : "",
+    body: typeof data.body === "string" ? data.body : "",
+    publishedAt: typeof data.published_at === "string" ? data.published_at : "",
+    htmlUrl: typeof data.html_url === "string" ? data.html_url : `https://github.com/${GITHUB_REPO}/releases`,
+    assets: assets
+      .filter((asset): asset is { name?: unknown; browser_download_url?: unknown } => typeof asset === "object" && asset !== null)
+      .map((asset) => ({
+        name: typeof asset.name === "string" ? asset.name : "下载文件",
+        downloadUrl: typeof asset.browser_download_url === "string" ? asset.browser_download_url : "",
+      }))
+      .filter((asset) => asset.downloadUrl.length > 0),
+  };
+}
+
+function searchProjectFiles(projectPath: string, query = "", limit = 40) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const maxResults = Math.max(1, Math.min(limit, 80));
+  const results: { path: string; name: string }[] = [];
+
+  function walk(dir: string, depth: number) {
+    if (results.length >= maxResults || depth > 8) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (results.length >= maxResults) return;
+      if (entry.name.startsWith(".") && entry.name !== ".env") continue;
+      if (FILE_SEARCH_IGNORES.has(entry.name)) continue;
+
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(projectPath, fullPath).replace(/\\/g, "/");
+      if (entry.isDirectory()) {
+        walk(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (normalizedQuery && !relativePath.toLowerCase().includes(normalizedQuery)) continue;
+      results.push({ path: relativePath, name: entry.name });
+    }
+  }
+
+  walk(projectPath, 0);
+  return results;
 }
 
 function getDefaultProject() {
@@ -149,14 +283,20 @@ function createWindow() {
 
   kimiBridge.setMainWindow(mainWindow);
 
-  if (VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(VITE_DEV_SERVER_URL);
+  if (DEV_SERVER_URL) {
+    mainWindow.loadURL(DEV_SERVER_URL);
   } else {
     mainWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[RENDERER] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
+  });
+
   mainWindow.webContents.once("did-finish-load", () => {
     void restoreLastContext();
+    emitWindowState();
+    verifyRendererContent();
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -183,7 +323,7 @@ function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
-          VITE_DEV_SERVER_URL
+          DEV_SERVER_URL
             ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*;"
             : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self';"
         ],
@@ -194,7 +334,7 @@ function createWindow() {
   // Renderer crash handler (production only)
   mainWindow.webContents.on("render-process-gone", (_event, details) => {
     console.error("Renderer process gone:", details.reason, details.exitCode);
-    if (VITE_DEV_SERVER_URL) {
+    if (DEV_SERVER_URL) {
       // Dev mode: just log, don't restart to avoid HMR loops
       return;
     }
@@ -210,6 +350,9 @@ function createWindow() {
     mainWindow = null;
     kimiBridge.setMainWindow(null);
   });
+  mainWindow.on("maximize", emitWindowState);
+  mainWindow.on("unmaximize", emitWindowState);
+  mainWindow.on("restore", emitWindowState);
 }
 
 async function restoreLastContext() {
@@ -345,6 +488,26 @@ ipcMain.handle("project:openTerminal", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as { projectPath?: unknown; query?: unknown; limit?: unknown };
+    if (typeof req.projectPath !== "string" || !req.projectPath) {
+      return { success: false, error: "Invalid project path" };
+    }
+    if (!fs.existsSync(req.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    const query = typeof req.query === "string" ? req.query : "";
+    const limit = typeof req.limit === "number" ? req.limit : 40;
+    return { success: true, data: searchProjectFiles(req.projectPath, query, limit) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 // Kimi IPC handlers
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
@@ -398,6 +561,15 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
   }
 });
 
+ipcMain.handle("kimi:listSlashCommands", async (_, request: { sessionId: string }) => {
+  try {
+    const commands = await kimiBridge.getSlashCommands(request.sessionId);
+    return { success: true, data: commands };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
   if (!request || typeof request !== "object") {
     return { success: false, error: "Invalid request" };
@@ -428,6 +600,39 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
   try {
     await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode });
     return { success: true, data: { sessionId } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:steerPrompt", async (_, request: unknown) => {
+  if (!request || typeof request !== "object") {
+    return { success: false, error: "Invalid request" };
+  }
+  const req = request as Record<string, unknown>;
+  const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+  const content = typeof req.content === "string" ? req.content : "";
+  const images = Array.isArray(req.images)
+    ? req.images.filter((item): item is { name: string; dataUrl: string } =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as { name?: unknown }).name === "string" &&
+        typeof (item as { dataUrl?: unknown }).dataUrl === "string" &&
+        (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
+      )
+    : [];
+  if (!sessionId || (!content && images.length === 0)) {
+    return { success: false, error: "Missing sessionId or content" };
+  }
+  const steerContent: string | ContentPart[] = images.length > 0
+    ? [
+        ...(content ? [{ type: "text" as const, text: content }] : []),
+        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl } })),
+      ]
+    : content;
+  try {
+    await kimiBridge.steerPrompt(sessionId, steerContent);
+    return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -481,6 +686,48 @@ ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; session
 // App IPC handlers
 ipcMain.handle("app:getSettings", async () => {
   return { success: true, data: settingsService.loadSettings() };
+});
+
+ipcMain.handle("app:getInfo", async () => {
+  return {
+    success: true,
+    data: {
+      name: "Kimix",
+      version: app.getVersion(),
+      author: "@linjianglu",
+      repository: `https://github.com/${GITHUB_REPO}`,
+    },
+  };
+});
+
+ipcMain.handle("app:checkForUpdates", async () => {
+  try {
+    const currentVersion = app.getVersion();
+    const latest = await fetchLatestRelease();
+    if (!latest || !latest.tagName) {
+      return {
+        success: true,
+        data: {
+          currentVersion,
+          latest: null,
+          hasUpdate: false,
+          message: "暂未找到 GitHub 发布版本",
+        },
+      };
+    }
+    const hasUpdate = isVersionGreater(latest.tagName, currentVersion);
+    return {
+      success: true,
+      data: {
+        currentVersion,
+        latest,
+        hasUpdate,
+        message: hasUpdate ? `发现新版本 ${latest.tagName}` : "当前已经是最新版本",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 const SettingsSchema = z.object({
@@ -540,8 +787,47 @@ ipcMain.handle("window:maximize", () => {
     } else {
       mainWindow.maximize();
     }
+    emitWindowState();
   }
   return { success: true };
+});
+
+ipcMain.handle("window:reload", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.reloadIgnoringCache();
+  }
+  return { success: true, data: undefined };
+});
+
+ipcMain.handle("window:setZoomLevel", (_, delta: unknown) => {
+  if (!mainWindow || mainWindow.isDestroyed() || typeof delta !== "number") {
+    return { success: false, error: "Window not available" };
+  }
+  const current = mainWindow.webContents.getZoomLevel();
+  const next = Math.max(-4, Math.min(4, current + delta));
+  mainWindow.webContents.setZoomLevel(next);
+  return { success: true, data: next };
+});
+
+ipcMain.handle("window:resetZoom", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false, error: "Window not available" };
+  }
+  mainWindow.webContents.setZoomLevel(0);
+  return { success: true, data: 0 };
+});
+
+ipcMain.handle("window:toggleFullScreen", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false, error: "Window not available" };
+  }
+  const next = !mainWindow.isFullScreen();
+  mainWindow.setFullScreen(next);
+  return { success: true, data: next };
+});
+
+ipcMain.handle("window:isMaximized", () => {
+  return { success: true, data: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMaximized()) };
 });
 
 ipcMain.handle("window:close", () => {

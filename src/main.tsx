@@ -3,8 +3,32 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-window.addEventListener('error', (e) => {
-  document.body.innerHTML += `<div style="position:fixed;top:0;left:0;z-index:9999;background:red;color:white;padding:20px">${e.message}<br/>${e.filename}:${e.lineno}</div>`;
+function showCenteredError(message: string, detail?: string) {
+  const existing = document.getElementById("kimix-runtime-error");
+  if (existing) existing.remove();
+  const container = document.createElement("div");
+  container.id = "kimix-runtime-error";
+  container.innerHTML = `
+    <div class="kimix-runtime-error-card">
+      <div class="kimix-runtime-error-title">界面遇到错误</div>
+      <div class="kimix-runtime-error-message"></div>
+      <div class="kimix-runtime-error-detail"></div>
+      <button class="kimix-runtime-error-button" type="button">重新载入</button>
+    </div>
+  `;
+  container.querySelector(".kimix-runtime-error-message")!.textContent = message;
+  container.querySelector(".kimix-runtime-error-detail")!.textContent = detail ?? "";
+  container.querySelector("button")?.addEventListener("click", () => window.location.reload());
+  document.body.appendChild(container);
+}
+
+window.addEventListener("error", (event) => {
+  showCenteredError(event.message, `${event.filename}:${event.lineno}`);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason instanceof Error ? event.reason.message : String(event.reason);
+  showCenteredError(reason);
 });
 
 const rootEl = document.getElementById("root");

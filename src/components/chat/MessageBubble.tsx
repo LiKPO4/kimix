@@ -6,7 +6,7 @@ import type { TimelineEvent } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface MessageBubbleProps {
-  event: Extract<TimelineEvent, { type: "user_message" | "assistant_message" }>;
+  event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
 }
 
 function useCopyTimeout() {
@@ -116,6 +116,33 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   );
 }
 
+function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "steer_message" }> }) {
+  const label = event.status === "sending"
+    ? "正在引导对话"
+    : event.status === "failed"
+      ? "引导失败"
+      : "已引导对话";
+
+  return (
+    <div className="group flex justify-end">
+      <div className="max-w-[58%]">
+        <div className="mb-1 flex justify-end">
+          <span className={`text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[#8a847a]"}`}>
+            {label}
+          </span>
+        </div>
+        <div
+          style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
+          className="rounded-[16px] bg-[#f3f3f3] text-[14.5px] leading-[1.45] text-[#24211d] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+        >
+          {event.content}
+        </div>
+        {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-red">{event.error}</div>}
+      </div>
+    </div>
+  );
+}
+
 function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "assistant_message" }> }) {
   const [showThinking, setShowThinking] = useState(false);
   const { copied, trigger } = useCopyTimeout();
@@ -128,9 +155,12 @@ function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { typ
 
   return (
     <div className="group flex justify-start">
-      <div className="w-full space-y-4">
+      <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {(event.isThinking || event.isComplete || !hasContent) && (
-          <div className="border-b border-[#ece8df] pb-3 text-[13px] text-[#8f887e]">
+          <div
+            className="border-b border-[#ece8df] text-[15px] leading-7 text-[#8a847a]"
+            style={{ paddingTop: 2, paddingBottom: 14 }}
+          >
             {event.isComplete
               ? `已处理 ${durationLabel}`
               : event.isThinking
@@ -143,14 +173,18 @@ function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { typ
           <div>
             <button
               onClick={() => setShowThinking(!showThinking)}
-              className="flex items-center gap-1 rounded-md px-1 py-1 text-[13px] text-[#8f887e] transition-colors hover:bg-[#f3f1ec] hover:text-[#625d55]"
+              className="flex h-8 items-center rounded-lg text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#625d55]"
+              style={{ gap: 7, paddingLeft: 4, paddingRight: 10 }}
             >
-              {showThinking ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              {showThinking ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               <span>{showThinking ? "收起思考" : "显示思考"}</span>
             </button>
             {showThinking && (
-              <div className="mt-2 rounded-xl border border-[#e5e1d8] bg-[#faf8f4] px-4 py-3 text-[13px] text-[#625d55]">
-                <pre className="whitespace-pre-wrap font-mono leading-relaxed">{event.thinking}</pre>
+              <div
+                className="mt-3 rounded-xl border border-[#e5e1d8] bg-[#faf8f4] text-[15px] text-[#706b63]"
+                style={{ paddingLeft: 36, paddingRight: 36, paddingTop: 24, paddingBottom: 24 }}
+              >
+                <pre className="min-w-0 whitespace-pre-wrap break-words font-mono leading-8">{event.thinking}</pre>
               </div>
             )}
           </div>
@@ -182,6 +216,9 @@ function AssistantMessageBubble({ event }: { event: Extract<TimelineEvent, { typ
 export function MessageBubble({ event }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
+  }
+  if (event.type === "steer_message") {
+    return <SteerMessageBubble event={event} />;
   }
   return <AssistantMessageBubble event={event} />;
 }

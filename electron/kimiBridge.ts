@@ -7,12 +7,18 @@
   type StreamEvent,
   type ApprovalResponse,
   type ContentPart,
+  type SlashCommandInfo,
 } from "@moonshot-ai/kimi-agent-sdk";
 import type { BrowserWindow } from "electron";
 
 const activeSessions = new Map<string, Session>();
 const activeTurns = new Map<string, Turn>();
 const sendingLocks = new Set<string>();
+const interruptedTurns = new WeakSet<Turn>();
+
+type WarmableSession = Session & {
+  getClientWithConfigCheck?: () => Promise<unknown>;
+};
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -38,13 +44,23 @@ function sendStatus(sessionId: string, status: "idle" | "running" | "error" | "i
   }
 }
 
+async function warmSessionMetadata(session: Session) {
+  const warmable = session as WarmableSession;
+  if (typeof warmable.getClientWithConfigCheck !== "function") return;
+  try {
+    await warmable.getClientWithConfigCheck();
+  } catch (err) {
+    console.error(`Failed to warm session metadata ${session.sessionId}:`, err);
+  }
+}
+
 export async function startSession(options: {
   workDir: string;
   sessionId?: string;
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
-}): Promise<{ sessionId: string; workDir: string }> {
+}): Promise<{ sessionId: string; workDir: string; slashCommands: SlashCommandInfo[] }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
   if (existing) {
     activeSessions.delete(options.sessionId!);
@@ -58,7 +74,8 @@ export async function startSession(options: {
   // Prevent concurrent creation of the same sessionId
   if (options.sessionId && activeSessions.has(options.sessionId)) {
     const session = activeSessions.get(options.sessionId)!;
-    return { sessionId: session.sessionId, workDir: session.workDir };
+    await warmSessionMetadata(session);
+    return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
   }
 
   const session = createSession({
@@ -70,7 +87,15 @@ export async function startSession(options: {
   });
 
   activeSessions.set(session.sessionId, session);
-  return { sessionId: session.sessionId, workDir: session.workDir };
+  await warmSessionMetadata(session);
+  return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
+}
+
+export async function getSlashCommands(sessionId: string): Promise<SlashCommandInfo[]> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error("Session not found");
+  await warmSessionMetadata(session);
+  return session.slashCommands;
 }
 
 export async function sendPrompt(sessionId: string, content: string | ContentPart[], options?: { thinking?: boolean; yoloMode?: boolean }) {
@@ -103,13 +128,26 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
   void (async () => {
     try {
       for await (const event of turn) {
+        if (interruptedTurns.has(turn)) break;
         sendEvent(sessionId, event);
       }
 
+      if (interruptedTurns.has(turn)) {
+        sendStatus(sessionId, "interrupted");
+        return;
+      }
       const result = await turn.result;
+      if (interruptedTurns.has(turn)) {
+        sendStatus(sessionId, "interrupted");
+        return;
+      }
       sendEvent(sessionId, { type: "TurnResult", payload: { result } });
       sendStatus(sessionId, "completed");
     } catch (err) {
+      if (interruptedTurns.has(turn)) {
+        sendStatus(sessionId, "interrupted");
+        return;
+      }
       const message = err instanceof Error ? err.message : String(err);
       try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
       try { sendStatus(sessionId, "error"); } catch {}
@@ -122,14 +160,24 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
 
 export async function stopTurn(sessionId: string) {
   const turn = activeTurns.get(sessionId);
-  if (!turn) return;
-  try {
-    await turn.interrupt();
-  } finally {
-    activeTurns.delete(sessionId);
+  if (!turn) {
     sendingLocks.delete(sessionId);
     sendStatus(sessionId, "interrupted");
+    return;
   }
+  interruptedTurns.add(turn);
+  activeTurns.delete(sessionId);
+  sendingLocks.delete(sessionId);
+  sendStatus(sessionId, "interrupted");
+  void turn.interrupt().catch((err) => {
+    console.error(`Failed to interrupt turn ${sessionId}:`, err);
+  });
+}
+
+export async function steerPrompt(sessionId: string, content: string | ContentPart[]) {
+  const turn = activeTurns.get(sessionId);
+  if (!turn) throw new Error("No active turn");
+  await turn.steer(content);
 }
 
 export async function approveRequest(
@@ -162,6 +210,7 @@ export async function closeSession(sessionId: string) {
   }
   const turn = activeTurns.get(sessionId);
   if (turn) {
+    interruptedTurns.add(turn);
     try { await turn.interrupt(); } catch {}
     activeTurns.delete(sessionId);
     sendingLocks.delete(sessionId);

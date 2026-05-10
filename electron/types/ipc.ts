@@ -39,7 +39,26 @@ export type StartSessionResponse = {
   data: {
     sessionId: string;
     workDir: string;
+    slashCommands?: SlashCommandInfo[];
   };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SlashCommandInfo = {
+  name: string;
+  description: string;
+  aliases: string[];
+}
+
+export type ListSlashCommandsRequest = {
+  sessionId: string;
+}
+
+export type ListSlashCommandsResponse = {
+  success: true;
+  data: SlashCommandInfo[];
 } | {
   success: false;
   error: string;
@@ -80,6 +99,23 @@ export type SendPromptResponse = {
   data: {
     turnId: string;
   };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SteerPromptRequest = {
+  sessionId: string;
+  content: string;
+  images?: {
+    name: string;
+    dataUrl: string;
+  }[];
+}
+
+export type SteerPromptResponse = {
+  success: true;
+  data: void;
 } | {
   success: false;
   error: string;
@@ -182,6 +218,63 @@ export type OpenEditorRequest = {
 export type OpenTerminalRequest = {
   path: string;
 }
+
+export type SearchProjectFilesRequest = {
+  projectPath: string;
+  query?: string;
+  limit?: number;
+}
+
+export type ProjectFileCandidate = {
+  path: string;
+  name: string;
+}
+
+export type SearchProjectFilesResponse = {
+  success: true;
+  data: ProjectFileCandidate[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type AppInfoResponse = {
+  success: true;
+  data: {
+    name: string;
+    version: string;
+    author: string;
+    repository: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type ReleaseInfo = {
+  tagName: string;
+  name: string;
+  body: string;
+  publishedAt: string;
+  htmlUrl: string;
+  assets: {
+    name: string;
+    downloadUrl: string;
+  }[];
+};
+
+export type CheckUpdateResponse = {
+  success: true;
+  data: {
+    currentVersion: string;
+    latest: ReleaseInfo | null;
+    hasUpdate: boolean;
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
 
 export type VoidResponse = {
   success: true;

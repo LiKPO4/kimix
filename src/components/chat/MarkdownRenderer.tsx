@@ -65,23 +65,25 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         <ol className="list-decimal pl-5 mb-3 space-y-1 text-text-primary">{children}</ol>
       ),
       li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
-      code: ({ inline, className: codeClassName, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) => {
-        if (inline) {
+      code: ({ className: codeClassName, children }: { className?: string; children?: React.ReactNode }) => {
+        const content = String(children ?? "");
+        const isBlock = Boolean(codeClassName) || content.includes("\n");
+        if (!isBlock) {
           return (
-            <code className="px-1.5 py-0.5 rounded-md bg-bg-tertiary text-accent-purple text-sm font-mono">
+            <code className="rounded-md bg-[#f2f0eb] px-1.5 py-0.5 font-mono text-[0.9em] text-[#37322c]">
               {children}
             </code>
           );
         }
         return (
-          <div className="relative my-3 rounded-xl overflow-hidden border border-border-default">
-            <div className="flex items-center justify-between px-3 py-2 bg-bg-tertiary border-b border-border-default">
-              <span className="text-xs text-text-muted font-mono">
+          <div className="relative my-3 overflow-hidden rounded-lg border border-[#e3ded5] bg-[#fbfaf7]">
+            <div className="flex items-center justify-between border-b border-[#e8e3da] bg-[#f2f0eb]" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 9, paddingBottom: 8 }}>
+              <span className="font-mono text-xs text-[#9a948b]">
                 {codeClassName?.replace("language-", "") || "code"}
               </span>
             </div>
-            <pre className="p-3 overflow-x-auto bg-bg-secondary">
-              <code className={`${codeClassName} text-sm font-mono`}>{children}</code>
+            <pre className="overflow-x-auto bg-[#fbfaf7]" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 14 }}>
+              <code className={`${codeClassName} block font-mono text-sm leading-6`}>{children}</code>
             </pre>
           </div>
         );

@@ -17,7 +17,7 @@ A Codex-style desktop UI for [Kimi Code CLI](https://github.com/moonshot-ai/kimi
 
 ## Download
 
-Get the latest release from [GitHub Releases](https://github.com/YOUR_USERNAME/kimix/releases).
+Get the latest release from [GitHub Releases](https://github.com/LiKPO4/kimix/releases).
 
 | Platform | Installer | Portable |
 |----------|-----------|----------|

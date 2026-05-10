@@ -24,11 +24,14 @@ function formatContext(event: Extract<TimelineEvent, { type: "status_update" }>,
 export function StatusCard({ event }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
   return (
-    <div className="flex justify-center">
-      <div className="inline-flex max-w-full items-center gap-2 truncate rounded-full bg-[#faf8f4] px-2.5 py-0.5 text-[12px] text-[#aaa49a]">
+    <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
+      <div
+        className="inline-flex max-w-full items-center rounded-full bg-[#faf8f4] text-[#aaa49a]"
+        style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6, fontSize: 13, lineHeight: "18px" }}
+      >
         {event.message && <span className="truncate">{event.message}</span>}
-        <span>Tokens: {event.tokenCount ?? 0}</span>
-        <span title={formatContext(event, true)}>Context: {formatContext(event, detailedContext)}</span>
+        <span className="shrink-0">Tokens: {event.tokenCount ?? 0}</span>
+        <span className="shrink-0" title={formatContext(event, true)}>Context: {formatContext(event, detailedContext)}</span>
       </div>
     </div>
   );
