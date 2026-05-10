@@ -58,13 +58,13 @@ export function TodoPanel({ events }: TodoPanelProps) {
   return (
     <div
       className="overflow-hidden rounded-[16px] border border-[#e1dcd3] bg-white/95 text-[14.5px] shadow-[0_3px_12px_rgba(25,23,20,0.05)]"
-      style={{ marginBottom: 10 }}
+      style={{ marginBottom: 8 }}
     >
       <button
         type="button"
         onClick={() => setCollapsed((value) => !value)}
-        className={`no-focus-outline flex w-full items-center border-[#eeeae3] text-left text-[#7c756c] transition-colors hover:bg-[#faf8f4] focus:outline-none focus-visible:outline-none ${collapsed ? "" : "border-b"}`}
-        style={{ gap: 11, paddingLeft: 24, paddingRight: 26, paddingTop: 12, paddingBottom: 12 }}
+        className={`no-focus-outline flex h-11 w-full items-center border-[#eeeae3] text-left text-[#7c756c] transition-colors hover:bg-[#faf8f4] focus:outline-none focus-visible:outline-none ${collapsed ? "" : "border-b"}`}
+        style={{ gap: 11, paddingLeft: 24, paddingRight: 26 }}
       >
         {collapsed ? <ChevronRight size={17} className="shrink-0" /> : <ChevronDown size={17} className="shrink-0" />}
         <ClipboardList size={17} className="shrink-0 text-[#8f887e]" />
@@ -77,8 +77,8 @@ export function TodoPanel({ events }: TodoPanelProps) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex min-w-0 items-center border-b border-[#f0ede7] text-[14.5px] leading-6 text-[#5e5850] last:border-b-0"
-              style={{ gap: 12, paddingLeft: 26, paddingRight: 26, paddingTop: 9, paddingBottom: 9 }}
+              className="flex min-h-[42px] min-w-0 items-center border-b border-[#f0ede7] text-[14.5px] leading-6 text-[#5e5850] last:border-b-0"
+              style={{ gap: 12, paddingLeft: 26, paddingRight: 26 }}
             >
               {item.status === "done" ? (
                 <CheckCircle2 size={17} className="shrink-0 text-[#2f8f46]" />

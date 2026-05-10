@@ -476,7 +476,7 @@ export function Composer() {
 
       {pendingMessages.length > 0 && (
         <div className="mb-2 overflow-hidden rounded-[15px] border border-[#e6e1d8] bg-white/95 text-[13px] shadow-[0_3px_12px_rgba(25,23,20,0.05)]">
-          <div className="flex h-10 items-center justify-between border-b border-[#eeeae3] text-[#7c756c]" style={{ paddingLeft: 20, paddingRight: 22 }}>
+          <div className="flex h-11 items-center justify-between border-b border-[#eeeae3] text-[14.5px] text-[#7c756c]" style={{ paddingLeft: 20, paddingRight: 22 }}>
             <span className="min-w-0 truncate">{pendingMessages.length} 条消息正在排队</span>
             {isCurrentSessionRunning && <span className="shrink-0 text-[#8f887e]">当前任务结束后继续</span>}
           </div>
@@ -498,7 +498,7 @@ export function Composer() {
                   if (dragId && dragId !== msg.id) reorderPendingMessage(dragId, msg.id);
                 }}
                 onDragEnd={() => setDraggingPendingId(null)}
-                className={`group flex min-w-0 items-center gap-2 border-b border-[#f0ede7] py-2.5 last:border-b-0 hover:bg-[#faf8f4] ${
+                className={`group flex min-h-[42px] min-w-0 items-center gap-2 border-b border-[#f0ede7] last:border-b-0 hover:bg-[#faf8f4] ${
                   draggingPendingId === msg.id ? "bg-[#f4f1eb] opacity-70" : ""
                 }`}
                 style={{ paddingLeft: 18, paddingRight: 18 }}
