@@ -4,6 +4,8 @@ import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { SearchOverlay } from "./SearchOverlay";
+import { SkillsPanel } from "./SkillsPanel";
 import {
   ArrowLeft,
   ArrowRight,
@@ -264,13 +266,19 @@ export function AppShell() {
   const currentSession = useAppStore((s) => s.currentSession);
   const currentProject = useAppStore((s) => s.currentProject);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
-  const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const searchOpen = useAppStore((s) => s.searchOpen);
+  const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+  const skillsOpen = useAppStore((s) => s.skillsOpen);
+  const setSkillsOpen = useAppStore((s) => s.setSkillsOpen);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
+  const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
   const addSession = useSessionStore((s) => s.addSession);
+  const updateSession = useSessionStore((s) => s.updateSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
   const sessions = useSessionStore((s) => s.sessions);
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
@@ -310,24 +318,44 @@ export function AppShell() {
 
   const createSessionForProject = async () => {
     if (!currentProject) return;
-    const sessionRes = await window.api.startSession({
-      workDir: currentProject.path,
-      model: "kimi-code/kimi-for-coding",
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-    });
-    if (!sessionRes.success) return;
-    const session = {
-      id: sessionRes.data.sessionId,
+    if (useAppStore.getState().creatingSessionProjectPath) return;
+    const project = currentProject;
+    const previousSession = useAppStore.getState().currentSession;
+    const placeholder = {
+      id: `creating-${crypto.randomUUID()}`,
       title: "新对话",
-      projectPath: currentProject.path,
+      projectPath: project.path,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       events: [],
-      isLoading: false,
+      isLoading: true,
     };
-    addSession(session);
-    setCurrentSession(session);
+    setCreatingSessionProjectPath(project.path);
+    addSession(placeholder);
+    setCurrentSession(placeholder);
+    try {
+      const sessionRes = await window.api.startSession({
+        workDir: project.path,
+        model: "kimi-code/kimi-for-coding",
+        thinking: defaultThinking,
+        yoloMode: permissionMode === "yolo",
+      });
+      if (!sessionRes.success) {
+        deleteSession(placeholder.id);
+        setCurrentSession(previousSession?.id === placeholder.id ? null : previousSession);
+        return;
+      }
+      const session = {
+        ...placeholder,
+        id: sessionRes.data.sessionId,
+        isLoading: false,
+        updatedAt: Date.now(),
+      };
+      updateSession(placeholder.id, () => session);
+      setCurrentSession(session);
+    } finally {
+      setCreatingSessionProjectPath(null);
+    }
   };
 
   const handleOpenProject = async () => {
@@ -414,7 +442,7 @@ export function AppShell() {
       if (typeof window.api.reloadWindow === "function") void window.api.reloadWindow();
       else window.location.reload();
     }
-    if (action === "find") triggerFocusInput();
+    if (action === "find") setSearchOpen(true);
     if (action === "previous-chat") moveChat("previous");
     if (action === "next-chat") moveChat("next");
     if (action === "back") window.history.back();
@@ -433,7 +461,8 @@ export function AppShell() {
     }
     if (action === "whats-new") setHelpDialog("updates");
     if (action === "keyboard-shortcuts") setHelpDialog("shortcuts");
-    if (["automations", "local-environments", "worktrees", "skills", "mcp", "troubleshooting", "performance-trace", "logout", "toggle-file-tree", "open-browser-tab", "toggle-diff-panel", "new-window"].includes(action)) {
+    if (action === "skills") setSkillsOpen(true);
+    if (["automations", "local-environments", "worktrees", "mcp", "troubleshooting", "performance-trace", "logout", "toggle-file-tree", "open-browser-tab", "toggle-diff-panel", "new-window"].includes(action)) {
       openInfoTopic(action);
     }
     setOpenMenu(null);
@@ -470,12 +499,12 @@ export function AppShell() {
             </button>
           </div>
 
-          <nav className="flex items-center gap-3 text-[14px] text-[#69645d]">
+          <nav className="flex items-center gap-1.5 text-[14px] text-[#69645d]">
             {Object.keys(MENU_ITEMS).map((menu) => (
               <div key={menu} className="relative" onMouseDown={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => setOpenMenu((current) => current === menu ? null : menu)}
-                  className={`rounded-lg px-4 py-2 transition-colors hover:bg-black/5 ${openMenu === menu ? "bg-black/5 text-[#1f1d1a]" : ""}`}
+                  className={`kimix-top-menu-trigger ${openMenu === menu ? "is-active" : ""}`}
                 >
                   {menu}
                 </button>
@@ -625,6 +654,8 @@ export function AppShell() {
       </div>
 
       <SettingsPanel />
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SkillsPanel open={skillsOpen} onClose={() => setSkillsOpen(false)} />
       {helpDialog && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-5" onMouseDown={() => setHelpDialog(null)}>
           <div className="w-full max-w-[560px] rounded-[18px] border border-[#dedad2] bg-white shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>
@@ -657,7 +688,7 @@ export function AppShell() {
                   <p>Kimix 是一个面向 Kimi Code CLI 的桌面客户端，目标是提供接近 Codex 的项目对话、队列、引导、工具调用和本地开发体验。</p>
                   <div className="rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ padding: 16 }}>
                     <div>开发者：{appInfo.author}</div>
-                    <button className="mt-2 inline-flex items-center gap-1.5 text-[#2f6fad] hover:underline" onClick={() => window.api.openExternal(appInfo.repository)}>
+                    <button className="kimix-icon-text-button is-compact mt-3 text-[#2f6fad] hover:bg-[#eef4fb]" onClick={() => window.api.openExternal(appInfo.repository)}>
                       打开 GitHub 仓库 <ExternalLink size={13} />
                     </button>
                   </div>
@@ -666,7 +697,7 @@ export function AppShell() {
 
               {helpDialog === "updates" && (
                 <div className="space-y-4 text-[14.5px] text-[#625d55]">
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ padding: 16 }}>
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                     <div className="min-w-0">
                       <div className="font-semibold text-[#24211d]">{updateState.message}</div>
                       {updateState.latest && <div className="mt-1 text-[13px] text-[#8a847a]">最新版本：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
@@ -674,7 +705,8 @@ export function AppShell() {
                     <button
                       onClick={handleCheckUpdates}
                       disabled={updateState.loading}
-                      className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[#24211d] px-3 text-[13px] text-white transition-colors hover:bg-black disabled:opacity-45"
+                      className="kimix-icon-text-button h-10 shrink-0 bg-[#24211d] text-white hover:bg-black disabled:opacity-45"
+                      style={{ paddingLeft: 16, paddingRight: 18 }}
                     >
                       <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
                       检查更新
@@ -684,7 +716,7 @@ export function AppShell() {
                     <div className="rounded-xl border border-[#e5e1d8]" style={{ padding: 16 }}>
                       <div className="font-semibold text-[#24211d]">{updateState.latest.name || updateState.latest.tagName}</div>
                       <p className="mt-2 whitespace-pre-wrap leading-6">{updateState.latest.body || "该版本没有填写更新说明。"}</p>
-                      <button className="mt-3 inline-flex items-center gap-1.5 text-[#2f6fad] hover:underline" onClick={() => window.api.openExternal(updateState.latest!.htmlUrl)}>
+                      <button className="kimix-icon-text-button is-compact mt-3 text-[#2f6fad] hover:bg-[#eef4fb]" onClick={() => window.api.openExternal(updateState.latest!.htmlUrl)}>
                         打开发布页面 <ExternalLink size={13} />
                       </button>
                     </div>
@@ -715,7 +747,7 @@ export function AppShell() {
                 <div className="space-y-4 text-[14.5px] leading-7 text-[#625d55]">
                   <p>{infoTopic.body}</p>
                   {infoTopic.url && (
-                    <button className="inline-flex items-center gap-1.5 text-[#2f6fad] hover:underline" onClick={() => window.api.openExternal(infoTopic.url!)}>
+                    <button className="kimix-icon-text-button is-compact text-[#2f6fad] hover:bg-[#eef4fb]" onClick={() => window.api.openExternal(infoTopic.url!)}>
                       打开相关页面 <ExternalLink size={13} />
                     </button>
                   )}

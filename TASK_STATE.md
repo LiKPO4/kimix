@@ -1,12 +1,67 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.5.0 补齐中文顶部菜单、关于/更新帮助页、GitHub Release 更新检查和发布安装包。
+v2.5.18 调整 assistant 元信息顺序，并支持预览图片右键复制。
 
 ## 当前版本
-**v2.5.0** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.5.18** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 已完成
+- v2.5.5：
+  - Slash 命令补全改用不重复斜杠的命令图标，避免图标和 `/init` 文案双斜杠。
+  - 发送前校验 `/xxx` 是否属于当前 Kimi SDK 会话返回的可用 slash 命令；明确拦截 `/status`、`/usage` 这类 Shell 层命令，提示使用底部“套餐用量”菜单，避免发送后出现 Unknown slash command。
+- v2.5.7：
+  - 图片和文字同在一条用户消息里时，图片缩略图区和文字气泡之间改用 inline `marginBottom: 12` 明确留白，避免 Tailwind spacing 缓存/JIT 导致看起来贴在一起。
+- v2.5.8：
+  - 修复重启后历史会话里残留未完成 assistant 思考块导致“正在思考”继续计时的问题：TurnEnd 会收口所有未完成 assistant，重启加载和本地保存时也会冻结非运行会话的未完成思考状态。
+- v2.5.9：
+  - 空状态建议列表行距放大到约 1.5 倍；点击建议后立即进入禁用/选中反馈，并用同步锁防止快速连点并发创建多个会话。
+  - 底部停止按钮除了全局运行态，也会在当前会话存在未完成 assistant 时显示；点击会立即冻结本地未完成状态并调用 SDK stopTurn，修复“仍在思考但无法停止”的兜底问题。
+- v2.5.10：
+  - 对话流自动跟随时，用户滚轮、触控或指针操作会立即暂停自动下滚，并取消待执行的 smooth scroll；只有点击“到底部”按钮才恢复跟随，避免流式回复和用户滚动对抗。
+- v2.5.11：
+  - 修复滚动自动跟随状态在高频 scroll/wheel 事件中重复 setState，可能触发 React `Maximum update depth exceeded` 的问题；滚动状态改为 ref 去重后才更新，并移除过宽的 pointerDown 打断监听。
+- v2.5.12：
+  - 左侧顶部导航项放大左右留白并加 hover 阴影，避免图标贴边或看起来超出 hover 背景。
+  - 新增 Codex 风格搜索浮层，可搜索当前项目会话标题、用户消息、助手回复、思考、工具、状态、Todo、错误和变更内容；官方 Kimi SDK 只提供 listSessions/parseSessionEvents，没有全文搜索 API，因此由 Kimix 本地索引补齐。
+  - 新增技能面板，先扫描本机 `.kimi/skills`、`.config/agents/skills`、`.codex/skills` 下的 `SKILL.md`；官方 SDK 目前只暴露 `skillsDir` 入参，没有 list/manage Skill API。
+- v2.5.13：
+  - Skill 面板支持勾选全局启用；Kimix 会复制选中 Skill 到 `~/.kimix/enabled-skills`，并在新建/恢复会话时通过官方 `--skills-dir` 传给 Kimi CLI。
+  - 明确 `/skill:xxx` 不是 Kimix 的 Skill 触发协议，只会作为普通用户文本发送；Skill 是否触发由 Kimi CLI 在启用目录和会话上下文中处理。
+  - 查明 Kimix 不会手动注入 `SKILL.md` 到 prompt；若 agent 提到系统上下文已有 Skill 文档，来自 Kimi CLI/SDK 的 skills 机制或会话历史，而不是 Kimix 壳层重复注入。
+  - 查明 Kimix 只在用户本轮附图时向 `sendPrompt` 传 `image_url`；同一 Kimi session 内早期图片仍可能被 CLI 历史上下文引用，这是会话延续语义，不是壳层再次发送。
+- v2.5.14：
+  - Skill 扫描改为递归查找 `SKILL.md`，恢复 `.codex/skills/.system/skill-creator` 等二级目录技能在面板中的显示和启用。
+- v2.5.15：
+  - 新建会话入口增加全局创建中状态、本地占位会话和按钮禁用反馈，避免 SDK 启动慢时多次点击创建多个会话。
+  - 技能面板两段提示改为短文案并补足上下间距；Skill 卡片右侧状态标签加大内边距，避免背景贴文字。
+- v2.5.16：
+  - 设置中新增消息信息显示策略，默认只在每轮对话末尾显示最后一条 Tokens/Context 状态胶囊，也可切换为实时多次显示。
+  - Kimi 轮次完成后基于 Git 工作区基线展示本轮更改文件摘要，提供“撤销”入口；暂不实现审核弹窗。
+  - 助手正文提到 `.md` 文件时补充文档元素块，点击“打开”优先跳转到 VS Code。
+- v2.5.17：
+  - 对话渲染改为按用户轮次收集工具命令，并把命令摘要挂到本轮 assistant 回复顶部；默认折叠，点击后展开命令列表，避免命令堆积在最终回复下方。
+- v2.5.18：
+  - assistant 回复顶部顺序调整为“已处理/思考/命令/正文”，避免命令摘要抢在处理状态前面。
+  - 图片预览大图支持右键复制到系统剪贴板。
+- v2.5.6：
+  - 用户消息操作按钮从气泡边缘下移，并加大复制/重新发送之间的间距，降低误点击。
+  - 图片消息改为结构化附件显示，用户气泡中直接展示图片缩略图并支持点击预览，不再只把图片写成正文占位。
+  - 发送图片时 SDK `TurnBegin` 回显里的 `[图片]` 会和本地乐观消息归一化去重，避免同一条图片消息显示两次。
+- v2.5.4：
+  - 集中筛查并修复图标+文字按钮拥挤问题：更新页检查按钮、设置检查按钮、底栏项目/套餐用量/导出、队列“引导”、审批卡片、变更卡片、侧栏项目菜单等统一放松按钮尺寸。
+  - 新增 `.kimix-icon-text-button` 和 `.kimix-top-menu-trigger`，统一图标文字按钮与顶部菜单文字触发区的最小高度、左右留白、间距和 hover 阴影。
+  - 顶部菜单“文件/编辑/查看/窗口/帮助” hover 背景不再贴文字，保留明确热区和轻微阴影。
+  - `AGENTS.md` 增补图标+文字按钮与顶部菜单 hover 热区规范。
+- v2.5.3：
+  - 套餐用量浮层加宽并放松纵向密度：外层 padding、标题区间距、条目间距、进度条高度和说明文字行高同步优化。
+  - `AGENTS.md` 增补小浮层/下拉菜单密度规范，避免后续菜单类 UI 再出现内容过度挤压。
+- v2.5.2：
+  - 底部状态栏移除“本地模式”，改为“套餐用量”按钮；菜单保留 5小时/本周/本月进度结构，并通过 Kimi Code 官方 `https://api.kimi.com/coding/v1/usages` 接口读取真实用量。
+  - 底部 git 分支只在当前项目真实可获取分支时显示；非 Git 项目不再 fallback 显示 `main`。
+- v2.5.1：
+  - 对话内容不在底部时，滚动区右侧显示轻量“到底部”按钮；点击后滚到底部并恢复 agent 流式回复自动跟随，用户手动滚离底部后解除自动跟随。
+  - 引导消息插入前会收口上一段未完成 assistant；后续 assistant 流只合并到最近引导之后的消息，避免引导后的回复显示在引导节点上方。
 - v2.0.0：即时计时、上下文百分比/详细显示、工具命令聚合、空会话输入自动建会话。
 - v2.1.0：
   - 移除 Kimi bridge 45 秒“无正文”中断，不再把慢响应判为错误，继续等待 SDK turn。

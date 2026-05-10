@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle, MessageSquare } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import type { Theme, PermissionMode } from "@/types/ui";
 
@@ -12,6 +12,8 @@ export function SettingsPanel() {
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const detailedContext = useAppStore((s) => s.detailedContext);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
+  const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
+  const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const [connection, setConnection] = useState<{
     loading: boolean;
     available: boolean | null;
@@ -152,7 +154,30 @@ export function SettingsPanel() {
             </button>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.5.0 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-section">
+            <div className="kimix-settings-section-title">
+              <MessageSquare size={16} className="text-[#8f887e]" />
+              <span>消息信息</span>
+            </div>
+            <div className="kimix-settings-permissions">
+              <button onClick={() => setStatusUpdateDisplay("turn_end")} className={`kimix-settings-permission ${statusUpdateDisplay === "turn_end" ? "is-active" : ""}`}>
+                <Circle size={18} className={`mt-0.5 shrink-0 ${statusUpdateDisplay === "turn_end" ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
+                <div className="kimix-settings-permission-copy">
+                  <div className="kimix-settings-permission-label">每轮末尾显示一次</div>
+                  <div className="kimix-settings-permission-desc">默认选项，只保留本轮最后一条 Tokens 和 Context 信息</div>
+                </div>
+              </button>
+              <button onClick={() => setStatusUpdateDisplay("each")} className={`kimix-settings-permission ${statusUpdateDisplay === "each" ? "is-active" : ""}`}>
+                <Circle size={18} className={`mt-0.5 shrink-0 ${statusUpdateDisplay === "each" ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
+                <div className="kimix-settings-permission-copy">
+                  <div className="kimix-settings-permission-label">实时显示每条消息信息</div>
+                  <div className="kimix-settings-permission-desc">适合调试上下文增长，会在对话中多次显示状态胶囊</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div className="kimix-settings-footer">Kimix v2.5.18 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

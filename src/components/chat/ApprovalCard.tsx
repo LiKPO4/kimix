@@ -71,24 +71,24 @@ export function ApprovalCard({ event }: ApprovalCardProps) {
         )}
 
         {isPending ? (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2.5">
             <button
               onClick={() => handleApprove("once")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-green text-white text-sm hover:opacity-90 transition-opacity"
+              className="kimix-icon-text-button bg-accent-green text-white text-sm hover:opacity-90"
             >
               <Check size={14} />
               <span>允许一次</span>
             </button>
             <button
               onClick={() => handleApprove("session")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-blue text-white text-sm hover:opacity-90 transition-opacity"
+              className="kimix-icon-text-button bg-accent-blue text-white text-sm hover:opacity-90"
             >
               <ShieldCheck size={14} />
               <span>本会话允许</span>
             </button>
             <button
               onClick={handleReject}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bg-hover text-text-primary text-sm hover:bg-bg-tertiary transition-colors"
+              className="kimix-icon-text-button bg-bg-hover text-text-primary text-sm hover:bg-bg-tertiary"
             >
               <X size={14} />
               <span>拒绝</span>

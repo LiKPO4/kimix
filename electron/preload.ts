@@ -24,13 +24,20 @@ import type {
   LoadSessionRequest,
   LoadSessionResponse,
   GitInfoResponse,
+  KimiUsageResponse,
+  OpenFileRequest,
   OpenEditorRequest,
   OpenPathRequest,
+  RevertFilesRequest,
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
+  ListSkillsResponse,
+  SaveEnabledSkillsRequest,
+  SaveEnabledSkillsResponse,
   OpenTerminalRequest,
   AppInfoResponse,
   CheckUpdateResponse,
+  CopyImageRequest,
   SettingsResponse,
   SaveSettingsRequest,
   KimiEventPayload,
@@ -53,12 +60,20 @@ const api = {
     ipcRenderer.invoke("project:getGitInfo", projectPath),
   openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openPath", req),
+  openFile: (req: OpenFileRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("project:openFile", req),
+  revertFiles: (req: RevertFilesRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("project:revertFiles", req),
   openProjectEditor: (req: OpenEditorRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openEditor", req),
   openProjectTerminal: (req: OpenTerminalRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openTerminal", req),
   searchProjectFiles: (req: SearchProjectFilesRequest): Promise<SearchProjectFilesResponse> =>
     ipcRenderer.invoke("project:searchFiles", req),
+  listSkills: (): Promise<ListSkillsResponse> =>
+    ipcRenderer.invoke("project:listSkills"),
+  saveEnabledSkills: (req: SaveEnabledSkillsRequest): Promise<SaveEnabledSkillsResponse> =>
+    ipcRenderer.invoke("project:saveEnabledSkills", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>
@@ -81,6 +96,8 @@ const api = {
     ipcRenderer.invoke("kimi:listSessions", req),
   loadSession: (req: LoadSessionRequest): Promise<LoadSessionResponse> =>
     ipcRenderer.invoke("kimi:loadSession", req),
+  getKimiUsage: (): Promise<KimiUsageResponse> =>
+    ipcRenderer.invoke("kimi:getUsage"),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {
@@ -102,6 +119,8 @@ const api = {
   checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("app:openExternal", url),
+  copyImage: (req: CopyImageRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:copyImage", req),
 
   // Bootstrap
   onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {

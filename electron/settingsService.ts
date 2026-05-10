@@ -16,9 +16,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   fontSize: 14,
   showThinking: true,
   detailedContext: false,
+  statusUpdateDisplay: "turn_end",
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
+  enabledSkillNames: [],
 };
 
 function ensureDir() {

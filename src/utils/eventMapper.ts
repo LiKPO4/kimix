@@ -14,6 +14,11 @@ function isNumber(v: unknown): v is number {
 
 const LATEST_TOOL_CALL = "__kimix_latest_tool_call__";
 
+type ExtractedUserMessage = {
+  content: string;
+  images: { name: string; dataUrl?: string }[];
+};
+
 function parseArguments(value: unknown): Record<string, unknown> {
   if (isRecord(value)) return value;
   if (!isString(value) || !value.trim()) return {};
@@ -41,17 +46,47 @@ function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | 
 }
 
 function extractUserInput(input: unknown): string {
-  if (isString(input)) return input;
-  if (!Array.isArray(input)) return "";
-  return input
-    .map((part) => {
-      if (!isRecord(part)) return "";
-      if (part.type === "text" && isString(part.text)) return part.text;
-      if (part.type === "image_url") return "[图片]";
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
+  return extractUserMessage(input).content;
+}
+
+function extractUserMessage(input: unknown): ExtractedUserMessage {
+  if (isString(input)) return { content: input, images: [] };
+  if (!Array.isArray(input)) return { content: "", images: [] };
+
+  const textParts: string[] = [];
+  const images: { name: string; dataUrl?: string }[] = [];
+  input.forEach((part, index) => {
+    if (!isRecord(part)) return;
+    if (part.type === "text" && isString(part.text)) {
+      textParts.push(part.text);
+      return;
+    }
+    if (part.type === "image_url") {
+      const imageUrl = isRecord(part.image_url) ? part.image_url : {};
+      const url = isString(imageUrl.url) ? imageUrl.url : undefined;
+      images.push({ name: `图片 ${index + 1}`, dataUrl: url });
+      if (!url) textParts.push("[图片]");
+    }
+  });
+  return {
+    content: textParts.filter(Boolean).join("\n"),
+    images,
+  };
+}
+
+function normalizeUserContent(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !/^\[图片(?::[^\]]*)?\]$/.test(line))
+    .join("\n")
+    .trim();
+}
+
+function getUserImageSignature(event: Extract<TimelineEvent, { type: "user_message" }>): string {
+  return (event.images ?? [])
+    .map((image) => image.dataUrl || image.name || "图片")
+    .join("|");
 }
 
 export function mapStreamEvent(event: unknown): TimelineEvent | null {
@@ -63,12 +98,13 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
 
   switch (type) {
     case "TurnBegin": {
-      const text = extractUserInput(payload.user_input);
+      const userMessage = extractUserMessage(payload.user_input);
       return {
         id: generateId(),
         type: "user_message",
         timestamp: Date.now(),
-        content: text,
+        content: userMessage.content,
+        images: userMessage.images,
       };
     }
 
@@ -223,6 +259,27 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
     }
 
+    case "TurnChanges": {
+      const files = Array.isArray(payload.files) ? payload.files.filter(isRecord) : [];
+      const mappedFiles = files
+        .map((file) => ({
+          path: isString(file.path) ? file.path : "",
+          additions: isNumber(file.additions) ? file.additions : 0,
+          deletions: isNumber(file.deletions) ? file.deletions : 0,
+        }))
+        .filter((file) => file.path.length > 0);
+      if (mappedFiles.length === 0) return null;
+      return {
+        id: generateId(),
+        type: "change_summary",
+        timestamp: Date.now(),
+        projectPath: isString(payload.project_path) ? payload.project_path : undefined,
+        files: mappedFiles,
+        additions: mappedFiles.reduce((sum, file) => sum + (file.additions ?? 0), 0),
+        deletions: mappedFiles.reduce((sum, file) => sum + (file.deletions ?? 0), 0),
+      };
+    }
+
     case "CompactionBegin":
       return {
         id: generateId(),
@@ -285,14 +342,41 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
     const hasDuplicate = existing.some(
-      (e) => e.type === "user_message" && e.content === incoming.content
+      (e) => {
+        if (e.type !== "user_message") return false;
+        const existingContent = normalizeUserContent(e.content);
+        const incomingContent = normalizeUserContent(incoming.content);
+        if (existingContent !== incomingContent) return false;
+        if (incomingContent.length > 0) return true;
+        return getUserImageSignature(e) === getUserImageSignature(incoming);
+      }
     );
     if (hasDuplicate) return existing;
   }
 
   // Merge streaming assistant messages
   if (incoming.type === "assistant_message") {
-    const lastIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
+    if (incoming.isComplete && !incoming.content && !incoming.thinking) {
+      const latestOpenIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
+      if (latestOpenIndex === -1) return existing;
+      return existing.flatMap((event, index) => {
+        if (event.type !== "assistant_message" || event.isComplete) return event;
+        const hasContent = event.content.trim().length > 0;
+        const hasThinking = Boolean(event.thinking?.trim());
+        if (!hasContent && !hasThinking && index !== latestOpenIndex) return [];
+        return {
+          ...event,
+          isThinking: false,
+          isComplete: true,
+          durationMs: Math.max(0, incoming.timestamp - (index === latestOpenIndex ? event.timestamp : incoming.timestamp)),
+        };
+      });
+    }
+
+    const latestSteerIndex = existing.findLastIndex((e) => e.type === "steer_message");
+    const lastIndex = existing.findLastIndex(
+      (e, index) => index > latestSteerIndex && e.type === "assistant_message" && !e.isComplete
+    );
     if (lastIndex !== -1) {
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
       const updated: typeof last = {
@@ -351,6 +435,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       } as TimelineEvent;
       return result;
     }
+    const result = existing.map((event) => event.type === "assistant_message" && !event.isComplete
+      ? { ...event, isComplete: true, isThinking: false }
+      : event
+    );
+    return [...result, incoming];
   }
 
   if (incoming.type === "tool_result") {
@@ -377,6 +466,16 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     if (last?.type === "status_update") {
       return [...existing.slice(0, -1), incoming];
     }
+  }
+
+  if (incoming.type === "change_summary") {
+    const result = [...existing];
+    const lastStatusIndex = result.findLastIndex((event) => event.type === "status_update");
+    if (lastStatusIndex !== -1) {
+      const [statusEvent] = result.splice(lastStatusIndex, 1);
+      result.push(statusEvent);
+    }
+    return [...result, incoming];
   }
 
   return [...existing, incoming];

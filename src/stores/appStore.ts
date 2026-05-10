@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay } from "@/types/ui";
 
 interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
@@ -7,8 +7,10 @@ interface AppStore extends AppState {
   setPermissionMode: (mode: PermissionMode) => void;
   setIsRunning: (running: boolean) => void;
   setRunningSessionId: (sessionId: string | null) => void;
+  setCreatingSessionProjectPath: (projectPath: string | null) => void;
   setDefaultThinking: (thinking: boolean) => void;
   setDetailedContext: (enabled: boolean) => void;
+  setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   settingsOpen: boolean;
@@ -17,6 +19,10 @@ interface AppStore extends AppState {
   triggerFocusInput: () => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  searchOpen: boolean;
+  setSearchOpen: (open: boolean) => void;
+  skillsOpen: boolean;
+  setSkillsOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -25,24 +31,32 @@ export const useAppStore = create<AppStore>((set) => ({
   permissionMode: "manual",
   isRunning: false,
   runningSessionId: null,
+  creatingSessionProjectPath: null,
   defaultThinking: true,
   detailedContext: false,
+  statusUpdateDisplay: "turn_end",
   sidebarOpen: true,
   theme: "light",
   settingsOpen: false,
   focusInputTrigger: 0,
   searchQuery: "",
+  searchOpen: false,
+  skillsOpen: false,
 
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
   setPermissionMode: (mode) => set({ permissionMode: mode }),
   setIsRunning: (running) => set({ isRunning: running }),
   setRunningSessionId: (sessionId) => set({ runningSessionId: sessionId, isRunning: Boolean(sessionId) }),
+  setCreatingSessionProjectPath: (projectPath) => set({ creatingSessionProjectPath: projectPath }),
   setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
   setDetailedContext: (enabled) => set({ detailedContext: enabled }),
+  setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
   setSearchQuery: (q) => set({ searchQuery: q }),
+  setSearchOpen: (open) => set({ searchOpen: open }),
+  setSkillsOpen: (open) => set({ skillsOpen: open }),
   setTheme: (theme) => set({ theme }),
 }));

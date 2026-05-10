@@ -10,6 +10,7 @@
   type SlashCommandInfo,
 } from "@moonshot-ai/kimi-agent-sdk";
 import type { BrowserWindow } from "electron";
+import * as projectService from "./projectService";
 
 const activeSessions = new Map<string, Session>();
 const activeTurns = new Map<string, Turn>();
@@ -44,6 +45,51 @@ function sendStatus(sessionId: string, status: "idle" | "running" | "error" | "i
   }
 }
 
+type TurnGitBaseline = {
+  files: projectService.GitStatusFile[];
+  stats: Record<string, { additions: number; deletions: number }>;
+};
+
+async function getTurnGitBaseline(workDir: string): Promise<TurnGitBaseline> {
+  try {
+    const files = await projectService.getGitStatusFiles(workDir);
+    const stats = await projectService.getGitLineStats(workDir, files.map((file) => file.path));
+    return { files, stats };
+  } catch {
+    return { files: [], stats: {} };
+  }
+}
+
+async function emitTurnChanges(sessionId: string, workDir: string, baseline: TurnGitBaseline) {
+  try {
+    const currentFiles = await projectService.getGitStatusFiles(workDir);
+    if (currentFiles.length === 0) return;
+    const currentStats = await projectService.getGitLineStats(workDir, currentFiles.map((file) => file.path));
+    const baselineByPath = new Map(baseline.files.map((file) => [file.path, file.status]));
+    const changedFiles = currentFiles.filter((file) => {
+      const previousStatus = baselineByPath.get(file.path);
+      if (previousStatus !== file.status) return true;
+      const previousStats = baseline.stats[file.path] ?? { additions: 0, deletions: 0 };
+      const nextStats = currentStats[file.path] ?? { additions: 0, deletions: 0 };
+      return previousStats.additions !== nextStats.additions || previousStats.deletions !== nextStats.deletions;
+    });
+    if (changedFiles.length === 0) return;
+    sendEvent(sessionId, {
+      type: "TurnChanges",
+      payload: {
+        project_path: workDir,
+        files: changedFiles.map((file) => ({
+          path: file.path,
+          additions: currentStats[file.path]?.additions ?? 0,
+          deletions: currentStats[file.path]?.deletions ?? 0,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("[kimiBridge] collect turn changes failed:", err);
+  }
+}
+
 async function warmSessionMetadata(session: Session) {
   const warmable = session as WarmableSession;
   if (typeof warmable.getClientWithConfigCheck !== "function") return;
@@ -60,6 +106,7 @@ export async function startSession(options: {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  skillsDir?: string;
 }): Promise<{ sessionId: string; workDir: string; slashCommands: SlashCommandInfo[] }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
   if (existing) {
@@ -81,9 +128,11 @@ export async function startSession(options: {
   const session = createSession({
     workDir: options.workDir,
     sessionId: options.sessionId,
+    model: options.model,
     thinking: options.thinking ?? true,
     yoloMode: options.yoloMode ?? false,
     executable: "kimi",
+    skillsDir: options.skillsDir,
   });
 
   activeSessions.set(session.sessionId, session);
@@ -113,6 +162,7 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
   if (typeof options?.yoloMode === "boolean") {
     session.yoloMode = options.yoloMode;
   }
+  const gitBaseline = await getTurnGitBaseline(session.workDir);
 
   let turn: Turn;
   try {
@@ -142,6 +192,7 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
         return;
       }
       sendEvent(sessionId, { type: "TurnResult", payload: { result } });
+      await emitTurnChanges(sessionId, session.workDir, gitBaseline);
       sendStatus(sessionId, "completed");
     } catch (err) {
       if (interruptedTurns.has(turn)) {

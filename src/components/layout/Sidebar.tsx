@@ -19,7 +19,7 @@ function formatRelativeTime(ts: number): string {
   return `${weeks} 周`;
 }
 
-const navItemClass = "flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[15px] text-[#302d28] transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40";
+const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-xl text-[15px] text-[#302d28] transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 export function Sidebar() {
   const currentProject = useAppStore((s) => s.currentProject);
@@ -27,11 +27,15 @@ export function Sidebar() {
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+  const setSkillsOpen = useAppStore((s) => s.setSkillsOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
 
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
@@ -56,26 +60,45 @@ export function Sidebar() {
   }, [currentProject]);
 
   const createSessionForProject = async (project: Project) => {
-    const sessionRes = await window.api.startSession({
-      workDir: project.path,
-      model: "kimi-code/kimi-for-coding",
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-    });
-    if (sessionRes.success) {
+    if (useAppStore.getState().creatingSessionProjectPath) return;
+    const previousSession = useAppStore.getState().currentSession;
+    const placeholder = {
+      id: `creating-${crypto.randomUUID()}`,
+      title: "正在创建新会话",
+      projectPath: project.path,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      events: [],
+      isLoading: true,
+    };
+    setCreatingSessionProjectPath(project.path);
+    addSession(placeholder);
+    setCurrentProject(project);
+    setCurrentSession(placeholder);
+    setExpandedProject(project.id);
+    try {
+      const sessionRes = await window.api.startSession({
+        workDir: project.path,
+        model: "kimi-code/kimi-for-coding",
+        thinking: defaultThinking,
+        yoloMode: permissionMode === "yolo",
+      });
+      if (!sessionRes.success) {
+        deleteSession(placeholder.id);
+        setCurrentSession(previousSession?.id === placeholder.id ? null : previousSession);
+        return;
+      }
       const session = {
+        ...placeholder,
         id: sessionRes.data.sessionId,
         title: "新会话",
-        projectPath: project.path,
-        createdAt: Date.now(),
         updatedAt: Date.now(),
-        events: [],
         isLoading: false,
       };
-      addSession(session);
-      setCurrentProject(project);
+      updateSession(placeholder.id, () => session);
       setCurrentSession(session);
-      setExpandedProject(project.id);
+    } finally {
+      setCreatingSessionProjectPath(null);
     }
   };
 
@@ -144,17 +167,17 @@ export function Sidebar() {
               await createSessionForProject(currentProject);
             }
           }}
-          disabled={!currentProject}
+          disabled={!currentProject || Boolean(creatingSessionProjectPath)}
           className={navItemClass}
         >
-          <SquarePen size={17} className="shrink-0 text-[#706b63]" />
-          <span>新对话</span>
+          {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin shrink-0 text-[#706b63]" /> : <SquarePen size={17} className="shrink-0 text-[#706b63]" />}
+          <span>{creatingSessionProjectPath ? "创建中" : "新对话"}</span>
         </button>
-        <button disabled className={navItemClass} title="搜索功能即将上线">
+        <button onClick={() => setSearchOpen(true)} className={navItemClass} title="搜索对话">
           <Search size={17} className="shrink-0 text-[#706b63]" />
           <span>搜索</span>
         </button>
-        <button disabled className={navItemClass} title="技能功能即将上线">
+        <button onClick={() => setSkillsOpen(true)} className={navItemClass} title="技能">
           <LayoutGrid size={17} className="shrink-0 text-[#706b63]" />
           <span>技能</span>
         </button>
@@ -204,7 +227,7 @@ export function Sidebar() {
                       setCurrentProject(project);
                       setExpandedProject(isExpanded ? null : project.id);
                       const hasSession = sessions.some((s) => s.projectPath === project.path);
-                      if (!hasSession) {
+                      if (!hasSession && !useAppStore.getState().creatingSessionProjectPath) {
                         await createSessionForProject(project);
                       }
                     }}
@@ -232,11 +255,12 @@ export function Sidebar() {
                         setExpandedProject(project.id);
                         await createSessionForProject(project);
                       }}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+                      disabled={Boolean(creatingSessionProjectPath)}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8a847a] transition-colors hover:bg-black/6 hover:text-[#26231f] disabled:cursor-wait disabled:opacity-60"
                       title="在该项目下新对话"
                       aria-label="在该项目下新对话"
                     >
-                      <SquarePen size={14} />
+                      {creatingSessionProjectPath === project.path ? <Loader2 size={15} className="kimix-spin" /> : <SquarePen size={15} />}
                     </button>
                   </div>
                   {openProjectMenu === project.id && (
@@ -244,27 +268,27 @@ export function Sidebar() {
                       className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-[#e5e1d8] bg-white py-1.5 text-[13px] text-[#3a362f] shadow-[0_16px_36px_rgba(25,23,20,0.16)]"
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <Pin size={14} className="text-[#706b63]" />
                         <span>置顶项目</span>
                       </button>
-                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <FolderSearch size={14} className="text-[#706b63]" />
                         <span>在资源管理器中打开</span>
                       </button>
-                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <GitBranch size={14} className="text-[#706b63]" />
                         <span>创建永久工作树</span>
                       </button>
-                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <SquarePen size={14} className="text-[#706b63]" />
                         <span>重命名项目</span>
                       </button>
-                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left transition-colors hover:bg-[#f3f1ec]">
+                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <Archive size={14} className="text-[#706b63]" />
                         <span>归档对话</span>
                       </button>
-                      <button className="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[#8b3d34] transition-colors hover:bg-[#f9ece9]">
+                      <button className="flex h-10 w-full items-center gap-3 text-left text-[#8b3d34] transition-colors hover:bg-[#f9ece9]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <X size={14} />
                         <span>移除</span>
                       </button>
@@ -346,7 +370,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.5.0</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.5.18</span>
         </button>
       </div>
     </aside>

@@ -86,3 +86,64 @@ export async function getGitStatus(projectPath: string): Promise<string> {
     return "";
   }
 }
+
+export type GitStatusFile = {
+  path: string;
+  status: string;
+};
+
+export function parseGitStatus(status: string): GitStatusFile[] {
+  return status
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map((line) => {
+      const rawPath = line.slice(3).trim();
+      const pathPart = rawPath.includes(" -> ") ? rawPath.split(" -> ").pop() ?? rawPath : rawPath;
+      return {
+        status: line.slice(0, 2).trim(),
+        path: pathPart.replace(/^"|"$/g, ""),
+      };
+    })
+    .filter((item) => item.path.length > 0);
+}
+
+export async function getGitStatusFiles(projectPath: string): Promise<GitStatusFile[]> {
+  return parseGitStatus(await getGitStatus(projectPath));
+}
+
+export async function getGitLineStats(projectPath: string, files: string[]): Promise<Record<string, { additions: number; deletions: number }>> {
+  const stats: Record<string, { additions: number; deletions: number }> = {};
+  if (files.length === 0) return stats;
+  try {
+    const { stdout } = await execAsync("git diff --numstat -- " + files.map((file) => `"${file.replace(/"/g, '\\"')}"`).join(" "), {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    stdout.split(/\r?\n/).filter(Boolean).forEach((line) => {
+      const parts = line.split(/\t/);
+      const additions = Number.parseInt(parts[0] ?? "0", 10);
+      const deletions = Number.parseInt(parts[1] ?? "0", 10);
+      const file = parts.slice(2).join("\t");
+      if (!file) return;
+      stats[file] = {
+        additions: Number.isFinite(additions) ? additions : 0,
+        deletions: Number.isFinite(deletions) ? deletions : 0,
+      };
+    });
+  } catch {
+    // Binary files or non-git projects can fail; callers still get file names.
+  }
+  return stats;
+}
+
+export async function revertGitFiles(projectPath: string, files: string[]): Promise<void> {
+  if (files.length === 0) return;
+  const command = "git checkout -- " + files.map((file) => `"${file.replace(/"/g, '\\"')}"`).join(" ");
+  await execAsync(command, {
+    cwd: projectPath,
+    encoding: "utf-8",
+    timeout: 10000,
+  });
+}

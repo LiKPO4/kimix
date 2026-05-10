@@ -1,156 +1,99 @@
-import { Undo2, ExternalLink, ChevronDown, FileCode, Plus, Minus } from "lucide-react";
-import { useState, useMemo } from "react";
+import { ChevronDown, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { useAppStore } from "@/stores/appStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import type { TimelineEvent } from "@/types/ui";
 
 interface Change {
   path: string;
   oldText?: string;
   newText?: string;
+  additions?: number;
+  deletions?: number;
 }
 
 interface ChangeCardProps {
-  changes: Change[];
+  changes?: Change[];
+  event?: Extract<TimelineEvent, { type: "change_summary" }>;
 }
 
-function DiffViewer({ oldText, newText }: { oldText?: string; newText?: string }) {
-  if (!oldText && !newText) return null;
+function countLines(value?: string) {
+  if (!value) return 0;
+  return value.split("\n").filter(Boolean).length;
+}
 
-  const diffLines = useMemo(() => {
-    const oldLines = (oldText ?? "").split("\n");
-    const newLines = (newText ?? "").split("\n");
-    const lines: { type: "same" | "removed" | "added"; oldLine?: string; newLine?: string }[] = [];
+export function ChangeCard({ changes, event }: ChangeCardProps) {
+  const currentSession = useAppStore((s) => s.currentSession);
+  const project = useAppStore((s) => s.currentProject);
+  const updateSession = useSessionStore((s) => s.updateSession);
+  const [reverting, setReverting] = useState(false);
+  const [error, setError] = useState("");
+  const files = event?.files ?? (changes ?? []).map((change) => ({
+    path: change.path,
+    additions: change.additions ?? Math.max(0, countLines(change.newText) - countLines(change.oldText)),
+    deletions: change.deletions ?? Math.max(0, countLines(change.oldText) - countLines(change.newText)),
+  }));
+  const additions = event?.additions ?? files.reduce((sum, file) => sum + (file.additions ?? 0), 0);
+  const deletions = event?.deletions ?? files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
+  const projectPath = event?.projectPath ?? project?.path;
 
-    let oldIdx = 0, newIdx = 0;
-    while (oldIdx < oldLines.length || newIdx < newLines.length) {
-      const o = oldLines[oldIdx];
-      const n = newLines[newIdx];
-      if (o === n) {
-        lines.push({ type: "same", oldLine: o, newLine: n });
-        oldIdx++;
-        newIdx++;
-      } else if (oldIdx < oldLines.length && (newIdx >= newLines.length || oldLines.slice(oldIdx).indexOf(n) === -1)) {
-        lines.push({ type: "removed", oldLine: o });
-        oldIdx++;
-      } else {
-        lines.push({ type: "added", newLine: n });
-        newIdx++;
-      }
+  const handleRevert = async () => {
+    if (!projectPath || files.length === 0 || reverting) return;
+    setReverting(true);
+    setError("");
+    const res = await window.api.revertFiles({ projectPath, files: files.map((file) => file.path) });
+    setReverting(false);
+    if (!res.success) {
+      setError(res.error);
+      return;
     }
-    return lines;
-  }, [oldText, newText]);
+    if (currentSession && event) {
+      updateSession(currentSession.id, (session) => ({
+        ...session,
+        events: session.events.filter((item) => item.id !== event.id),
+        updatedAt: Date.now(),
+      }));
+    }
+  };
 
   return (
-    <div className="mt-2 rounded-lg border border-border-default overflow-hidden bg-bg-primary">
-      <div className="flex text-xs">
-        <div className="flex-1 border-r border-border-default">
-          <div className="px-3 py-1.5 bg-bg-tertiary text-text-muted font-medium border-b border-border-default">旧版本</div>
-          <div className="font-mono text-xs leading-5">
-            {diffLines.map((line, i) => (
-              <div
-                key={`old-${i}`}
-                className={`px-3 ${line.type === "removed" ? "bg-accent-red/5 text-accent-red" : line.type === "same" ? "text-text-secondary" : "text-text-muted/30"}`}
-              >
-                {line.oldLine !== undefined ? line.oldLine : " "}
-              </div>
-            ))}
-          </div>
+    <div className="w-full overflow-hidden rounded-[14px] border border-[#e8e3da] bg-white">
+      <div className="flex min-h-12 items-center border-b border-[#eee9e1]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+        <div className="min-w-0 flex-1 text-[15px] leading-6 text-[#24211d]">
+          <span>{files.length} 个文件已更改</span>
+          <span className="ml-2 text-[#009a44]">+{additions}</span>
+          <span className="ml-1 text-[#d83b01]">-{deletions}</span>
         </div>
-        <div className="flex-1">
-          <div className="px-3 py-1.5 bg-bg-tertiary text-text-muted font-medium border-b border-border-default">新版本</div>
-          <div className="font-mono text-xs leading-5">
-            {diffLines.map((line, i) => (
-              <div
-                key={`new-${i}`}
-                className={`px-3 ${line.type === "added" ? "bg-accent-green/5 text-accent-green" : line.type === "same" ? "text-text-secondary" : "text-text-muted/30"}`}
-              >
-                {line.newLine !== undefined ? line.newLine : " "}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function ChangeCard({ changes }: ChangeCardProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [showDiff, setShowDiff] = useState<Record<number, boolean>>({});
-
-  const totalAdditions = changes.filter((c) => c.newText && (!c.oldText || c.newText.length > c.oldText.length)).length;
-  const totalDeletions = changes.filter((c) => c.oldText && (!c.newText || c.oldText.length > c.newText.length)).length;
-
-  return (
-    <div className="flex justify-center">
-      <div className="max-w-[95%] w-full rounded-xl border border-border-default bg-bg-secondary overflow-hidden">
-        {/* Header */}
-        <div
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-bg-tertiary/50 transition-colors cursor-pointer"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded); }}
+        <button
+          type="button"
+          onClick={handleRevert}
+          disabled={!projectPath || reverting}
+          className="flex h-8 shrink-0 items-center rounded-lg text-[13px] text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f] disabled:cursor-not-allowed disabled:opacity-45"
+          style={{ gap: 7, paddingLeft: 10, paddingRight: 12 }}
         >
-          <div className="flex items-center gap-2">
-            <FileCode size={16} className="text-accent-blue" />
-            <span className="text-sm font-medium text-text-primary">{changes.length} 个文件已更改</span>
-            <div className="flex items-center gap-1.5 text-xs">
-              {totalAdditions > 0 && (
-                <span className="flex items-center gap-0.5 text-accent-green">
-                  <Plus size={12} />{totalAdditions}
-                </span>
-              )}
-              {totalDeletions > 0 && (
-                <span className="flex items-center gap-0.5 text-accent-red">
-                  <Minus size={12} />{totalDeletions}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-bg-tertiary text-xs text-text-secondary transition-colors"
-            >
-              <Undo2 size={12} />
-              <span>撤销</span>
-            </button>
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-bg-tertiary text-xs text-text-secondary transition-colors"
-            >
-              <ExternalLink size={12} />
-              <span>审核</span>
-            </button>
-            <ChevronDown size={14} className={`text-text-muted transition-transform ${expanded ? "rotate-180" : ""}`} />
-          </div>
-        </div>
-
-        {/* File list */}
-        {expanded && (
-          <div className="px-4 pb-3 space-y-2">
-            {changes.map((change, i) => (
-              <div key={i} className="space-y-1">
-                <button
-                  onClick={() => setShowDiff((prev) => ({ ...prev, [i]: !prev[i] }))}
-                  className="w-full flex items-center justify-between py-1.5 text-xs hover:bg-bg-tertiary/30 rounded-lg px-2 transition-colors"
-                >
-                  <span className="text-text-secondary truncate font-mono">{change.path}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {change.newText && (!change.oldText || change.newText.length > (change.oldText?.length ?? 0)) && (
-                      <span className="text-accent-green font-medium">+{change.newText.split("\n").length}</span>
-                    )}
-                    {change.oldText && (!change.newText || (change.oldText?.length ?? 0) > change.newText.length) && (
-                      <span className="text-accent-red font-medium">-{change.oldText.split("\n").length}</span>
-                    )}
-                    <ChevronDown size={12} className={`text-text-muted transition-transform ${showDiff[i] ? "rotate-180" : ""}`} />
-                  </div>
-                </button>
-                {showDiff[i] && <DiffViewer oldText={change.oldText} newText={change.newText} />}
-              </div>
-            ))}
-          </div>
-        )}
+          <span>{reverting ? "撤销中" : "撤销"}</span>
+          <RotateCcw size={14} />
+        </button>
       </div>
+      <div>
+        {files.map((file) => (
+          <div
+            key={file.path}
+            className="flex min-h-11 items-center border-b border-[#f0ece5] last:border-b-0"
+            style={{ paddingLeft: 18, paddingRight: 18 }}
+          >
+            <span className="min-w-0 flex-1 truncate text-[14.5px] text-[#24211d]">{file.path}</span>
+            <span className="shrink-0 text-[14px] text-[#009a44]">+{file.additions ?? 0}</span>
+            <span className="ml-1 shrink-0 text-[14px] text-[#d83b01]">-{file.deletions ?? 0}</span>
+            <ChevronDown size={15} className="ml-4 shrink-0 text-[#8f887e]" />
+          </div>
+        ))}
+      </div>
+      {error && (
+        <div className="border-t border-[#f0ece5] text-[13px] leading-5 text-[#b42318]" style={{ padding: "10px 18px" }}>
+          撤销失败：{error}
+        </div>
+      )}
     </div>
   );
 }

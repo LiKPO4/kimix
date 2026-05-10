@@ -8,11 +8,15 @@ export interface AppState {
   permissionMode: PermissionMode;
   isRunning: boolean;
   runningSessionId: string | null;
+  creatingSessionProjectPath: string | null;
   defaultThinking: boolean;
   detailedContext: boolean;
+  statusUpdateDisplay: StatusUpdateDisplay;
   sidebarOpen: boolean;
   theme: Theme;
 }
+
+export type StatusUpdateDisplay = "each" | "turn_end";
 
 export interface Project {
   id: string;
@@ -40,6 +44,8 @@ export type TimelineEvent =
   | ToolResultEvent
   | ApprovalRequestEvent
   | StatusUpdateEvent
+  | FileArtifactEvent
+  | ChangeSummaryEvent
   | SubagentEvent
   | CompactionEvent
   | ErrorEvent
@@ -51,6 +57,13 @@ export interface UserMessageEvent {
   type: "user_message";
   timestamp: number;
   content: string;
+  images?: UserMessageImage[];
+}
+
+export interface UserMessageImage {
+  id?: string;
+  name: string;
+  dataUrl?: string;
 }
 
 export interface SteerMessageEvent {
@@ -136,6 +149,30 @@ export interface StatusUpdateEvent {
   contextSize?: number;
   contextLimit?: number;
   message?: string;
+}
+
+export interface FileArtifactEvent {
+  id: string;
+  type: "file_artifact";
+  timestamp: number;
+  filePath: string;
+  fileType?: string;
+}
+
+export interface ChangeSummaryFile {
+  path: string;
+  additions?: number;
+  deletions?: number;
+}
+
+export interface ChangeSummaryEvent {
+  id: string;
+  type: "change_summary";
+  timestamp: number;
+  projectPath?: string;
+  files: ChangeSummaryFile[];
+  additions: number;
+  deletions: number;
 }
 
 export interface SubagentEvent {

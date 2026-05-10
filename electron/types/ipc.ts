@@ -32,6 +32,7 @@ export type StartSessionRequest = {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  skillsDir?: string;
 }
 
 export type StartSessionResponse = {
@@ -198,8 +199,31 @@ export type LoadSessionResponse = {
 export type GitInfoResponse = {
   success: true;
   data: {
-    branch: string;
+    branch?: string;
     status: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type UsagePeriod = {
+  label: string;
+  used?: number;
+  limit?: number;
+  percent?: number;
+  available: boolean;
+  message?: string;
+};
+
+export type KimiUsageResponse = {
+  success: true;
+  data: {
+    available: boolean;
+    updatedAt: number;
+    source: string;
+    periods: UsagePeriod[];
+    message?: string;
   };
 } | {
   success: false;
@@ -208,6 +232,16 @@ export type GitInfoResponse = {
 
 export type OpenPathRequest = {
   path: string;
+}
+
+export type OpenFileRequest = {
+  projectPath: string;
+  filePath: string;
+}
+
+export type RevertFilesRequest = {
+  projectPath: string;
+  files: string[];
 }
 
 export type OpenEditorRequest = {
@@ -233,6 +267,41 @@ export type ProjectFileCandidate = {
 export type SearchProjectFilesResponse = {
   success: true;
   data: ProjectFileCandidate[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type SkillInfo = {
+  name: string;
+  description: string;
+  path: string;
+  source: string;
+  enabled: boolean;
+};
+
+export type ListSkillsResponse = {
+  success: true;
+  data: {
+    skills: SkillInfo[];
+    enabledNames: string[];
+    enabledDir: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SaveEnabledSkillsRequest = {
+  names: string[];
+};
+
+export type SaveEnabledSkillsResponse = {
+  success: true;
+  data: {
+    enabledNames: string[];
+    enabledDir: string;
+  };
 } | {
   success: false;
   error: string;
@@ -276,6 +345,10 @@ export type CheckUpdateResponse = {
   error: string;
 };
 
+export type CopyImageRequest = {
+  dataUrl: string;
+}
+
 export type VoidResponse = {
   success: true;
   data: void;
@@ -294,10 +367,13 @@ export type AppSettings = {
   fontSize: number;
   showThinking: boolean;
   detailedContext: boolean;
+  statusUpdateDisplay: "each" | "turn_end";
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   autoReadAgentsMd: boolean;
   autoShowGitStatus: boolean;
+  enabledSkillNames: string[];
+  enabledSkillsDir?: string;
 }
 
 export type SettingsResponse = {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bug, GitBranch, ListChecks, Sparkles } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -50,6 +50,8 @@ export function EmptyState() {
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
   const [savedSuggestions, setSavedSuggestions] = useState<string[]>([]);
+  const [pendingSuggestion, setPendingSuggestion] = useState<string | null>(null);
+  const suggestionLockRef = useRef(false);
 
   useEffect(() => {
     if (!project) {
@@ -107,39 +109,45 @@ export function EmptyState() {
   };
 
   const handleSuggestion = async (text: string) => {
-    const targetSession = await ensureSession();
-    if (!targetSession || runningSessionId === targetSession.id) return;
-
-    if (project) {
-      const nextSaved = Array.from(new Set([text, ...savedSuggestions])).slice(0, 4);
-      setSavedSuggestions(nextSaved);
-      saveProjectSuggestions(project.path, nextSaved);
-    }
-
-    const userEvent: TimelineEvent = {
-      id: genId(),
-      type: "user_message",
-      timestamp: Date.now(),
-      content: text,
-    };
-    const responsePlaceholder: TimelineEvent = {
-      id: genId(),
-      type: "assistant_message",
-      timestamp: Date.now(),
-      content: "",
-      isThinking: defaultThinking,
-      isComplete: false,
-    };
-
-    updateSession(targetSession.id, (session) => ({
-      ...session,
-      events: [...session.events, userEvent, responsePlaceholder],
-      title: session.title === "新会话" ? text.slice(0, 30) + (text.length > 30 ? "..." : "") : session.title,
-      updatedAt: Date.now(),
-    }));
-
-    setRunningSessionId(targetSession.id);
+    let targetSession: Session | null = null;
     try {
+      if (suggestionLockRef.current) return;
+      if (runningSessionId) return;
+      suggestionLockRef.current = true;
+      setPendingSuggestion(text);
+
+      targetSession = await ensureSession();
+      if (!targetSession || useAppStore.getState().runningSessionId) return;
+
+      if (project) {
+        const nextSaved = Array.from(new Set([text, ...savedSuggestions])).slice(0, 4);
+        setSavedSuggestions(nextSaved);
+        saveProjectSuggestions(project.path, nextSaved);
+      }
+
+      const userEvent: TimelineEvent = {
+        id: genId(),
+        type: "user_message",
+        timestamp: Date.now(),
+        content: text,
+      };
+      const responsePlaceholder: TimelineEvent = {
+        id: genId(),
+        type: "assistant_message",
+        timestamp: Date.now(),
+        content: "",
+        isThinking: defaultThinking,
+        isComplete: false,
+      };
+
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        events: [...session.events, userEvent, responsePlaceholder],
+        title: session.title === "新会话" ? text.slice(0, 30) + (text.length > 30 ? "..." : "") : session.title,
+        updatedAt: Date.now(),
+      }));
+
+      setRunningSessionId(targetSession.id);
       await window.api.sendPrompt({
         sessionId: targetSession.id,
         content: text,
@@ -149,11 +157,16 @@ export function EmptyState() {
     } catch (err) {
       console.error("Send failed:", err);
       setRunningSessionId(null);
-      updateSession(targetSession.id, (session) => ({
-        ...session,
-        events: session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)),
-        updatedAt: Date.now(),
-      }));
+      if (targetSession) {
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          events: session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)),
+          updatedAt: Date.now(),
+        }));
+      }
+    } finally {
+      suggestionLockRef.current = false;
+      setPendingSuggestion(null);
     }
   };
 
@@ -169,7 +182,7 @@ export function EmptyState() {
   }
 
   const titleProjectName = project.name || "当前项目";
-  const isSending = Boolean(currentSession && runningSessionId === currentSession.id);
+  const isSending = Boolean(runningSessionId || pendingSuggestion);
 
   return (
     <div className="kimix-content-x flex h-full w-full items-center justify-center">
@@ -178,13 +191,14 @@ export function EmptyState() {
           要在 {titleProjectName} 中构建什么？
         </h1>
 
-        <div className="w-full max-w-[460px] space-y-1">
+        <div className="flex w-full max-w-[460px] flex-col" style={{ gap: 6 }}>
           {derivedSuggestions.map((suggestion) => (
             <button
               key={suggestion.text}
               onClick={() => handleSuggestion(suggestion.text)}
               disabled={isSending}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-[15px] leading-6 text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              className={`flex w-full items-center rounded-lg text-left text-[15px] leading-6 transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed ${pendingSuggestion === suggestion.text ? "bg-[#f1eee8] text-text-primary opacity-100" : "text-text-secondary disabled:opacity-50"}`}
+              style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12 }}
             >
               <suggestion.icon size={18} className="shrink-0 text-text-muted" />
               <span className="min-w-0 flex-1">{suggestion.text}</span>

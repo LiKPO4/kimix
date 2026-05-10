@@ -1,5 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, shell } from "electron";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -11,6 +12,9 @@ import * as settingsService from "./settingsService";
 import type { ContentPart } from "@moonshot-ai/kimi-agent-sdk";
 
 const GITHUB_REPO = "LiKPO4/kimix";
+const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
+const KIMI_CODE_USAGE_URL = "https://api.kimi.com/coding/v1/usages";
+const KIMI_CODE_REFRESH_URL = "https://auth.kimi.com/api/oauth/token";
 
 function checkCommand(command: string): Promise<string | null> {
   const lookup = process.platform === "win32" ? "where" : "which";
@@ -79,6 +83,25 @@ async function openEditorAt(target: "vscode" | "trae" | "coder", dir: string) {
   spawnDetached(commandPath, [dir], dir);
 }
 
+async function openFileAt(filePath: string) {
+  const codePath = await checkCommand("code");
+  if (codePath) {
+    spawnDetached(codePath, ["-g", filePath], path.dirname(filePath));
+    return;
+  }
+  await shell.openPath(filePath);
+}
+
+function resolveProjectFile(projectPath: string, filePath: string) {
+  const resolvedProject = path.resolve(projectPath);
+  const resolvedFile = path.resolve(resolvedProject, filePath);
+  const relative = path.relative(resolvedProject, resolvedFile);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("File path escapes project");
+  }
+  return resolvedFile;
+}
+
 // Log unhandled errors to prevent silent crashes
 process.on("unhandledRejection", (reason) => {
   console.error("[MAIN] Unhandled Rejection:", reason);
@@ -125,6 +148,16 @@ const FILE_SEARCH_IGNORES = new Set([
   ".cache",
   ".dart_tool",
   ".gradle",
+]);
+
+const SKILL_SEARCH_IGNORES = new Set([
+  ".git",
+  "node_modules",
+  "out",
+  "dist",
+  "build",
+  ".vite",
+  ".cache",
 ]);
 
 function emitWindowState() {
@@ -250,6 +283,286 @@ function searchProjectFiles(projectPath: string, query = "", limit = 40) {
 
   walk(projectPath, 0);
   return results;
+}
+
+function parseSkillFrontmatter(content: string): { name?: string; description?: string } {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return {};
+  const fields: { name?: string; description?: string } = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const colon = line.indexOf(":");
+    if (colon === -1) continue;
+    const key = line.slice(0, colon).trim();
+    const value = line.slice(colon + 1).trim().replace(/^["']|["']$/g, "");
+    if (key === "name") fields.name = value;
+    if (key === "description") fields.description = value;
+  }
+  return fields;
+}
+
+function listLocalSkills() {
+  const roots = [
+    path.join(os.homedir(), ".kimi", "skills"),
+    path.join(os.homedir(), ".config", "agents", "skills"),
+    path.join(os.homedir(), ".codex", "skills"),
+  ];
+  const settings = settingsService.loadSettings();
+  const enabled = new Set(settings.enabledSkillNames ?? []);
+  const results: { name: string; description: string; path: string; source: string; enabled: boolean }[] = [];
+  const seen = new Set<string>();
+
+  function collectSkillFiles(root: string) {
+    const skillFiles: string[] = [];
+
+    function walk(dir: string, depth: number) {
+      if (depth > 5) return;
+      const skillPath = path.join(dir, "SKILL.md");
+      if (fs.existsSync(skillPath)) {
+        skillFiles.push(skillPath);
+        return;
+      }
+
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (SKILL_SEARCH_IGNORES.has(entry.name)) continue;
+        walk(path.join(dir, entry.name), depth + 1);
+      }
+    }
+
+    walk(root, 0);
+    return skillFiles;
+  }
+
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    for (const skillPath of collectSkillFiles(root)) {
+      const normalizedSkillPath = path.resolve(skillPath);
+      if (seen.has(normalizedSkillPath)) continue;
+      try {
+        const raw = fs.readFileSync(skillPath, "utf-8");
+        const meta = parseSkillFrontmatter(raw);
+        const skillDir = path.dirname(skillPath);
+        const fallbackName = path.basename(skillDir);
+        results.push({
+          name: meta.name || fallbackName,
+          description: meta.description || "本地 Skill",
+          path: skillPath,
+          source: root,
+          enabled: enabled.has(meta.name || fallbackName),
+        });
+        seen.add(normalizedSkillPath);
+      } catch {
+        // Ignore unreadable skill files.
+      }
+    }
+  }
+
+  return results.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function enabledSkillsDir() {
+  return path.join(os.homedir(), ".kimix", "enabled-skills");
+}
+
+function syncEnabledSkills(names: string[]) {
+  const uniqueNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+  const allSkills = listLocalSkills();
+  const byName = new Map(allSkills.map((skill) => [skill.name, skill]));
+  const targetDir = enabledSkillsDir();
+  fs.rmSync(targetDir, { recursive: true, force: true });
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const name of uniqueNames) {
+    const skill = byName.get(name);
+    if (!skill) continue;
+    const sourceDir = path.dirname(skill.path);
+    const targetSkillDir = path.join(targetDir, name.replace(/[<>:"/\\|?*]+/g, "_"));
+    fs.cpSync(sourceDir, targetSkillDir, { recursive: true });
+  }
+  settingsService.saveSettings({ enabledSkillNames: uniqueNames, enabledSkillsDir: targetDir });
+  return { enabledNames: uniqueNames, enabledDir: targetDir };
+}
+
+type KimiOAuthToken = {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  scope: string;
+  token_type: string;
+  expires_in?: number;
+};
+
+type KimiUsagePeriod = {
+  label: string;
+  used?: number;
+  limit?: number;
+  percent?: number;
+  available: boolean;
+  message?: string;
+};
+
+function kimiShareDir() {
+  return path.join(os.homedir(), ".kimi");
+}
+
+function kimiCredentialsPath() {
+  return path.join(kimiShareDir(), "credentials", "kimi-code.json");
+}
+
+function readKimiDeviceId() {
+  const devicePath = path.join(kimiShareDir(), "device_id");
+  try {
+    const existing = fs.readFileSync(devicePath, "utf-8").trim();
+    if (existing) return existing;
+  } catch {
+    // Generate below.
+  }
+  const deviceId = randomUUID().replace(/-/g, "");
+  ensureDirectoryExists(path.dirname(devicePath));
+  fs.writeFileSync(devicePath, deviceId, "utf-8");
+  return deviceId;
+}
+
+function kimiCommonHeaders() {
+  return {
+    "X-Msh-Platform": "kimi_cli",
+    "X-Msh-Version": app.getVersion(),
+    "X-Msh-Device-Name": os.hostname() || "unknown",
+    "X-Msh-Device-Model": `${os.type()} ${os.release()} ${os.arch()}`,
+    "X-Msh-Os-Version": os.version?.() ?? os.release(),
+    "X-Msh-Device-Id": readKimiDeviceId(),
+  };
+}
+
+function readKimiOAuthToken(): KimiOAuthToken {
+  const tokenPath = kimiCredentialsPath();
+  if (!fs.existsSync(tokenPath)) {
+    throw new Error("未找到 Kimi 登录凭证，请先在 Kimi Code CLI 中完成登录");
+  }
+  const raw = JSON.parse(fs.readFileSync(tokenPath, "utf-8")) as Partial<KimiOAuthToken>;
+  if (!raw.access_token || !raw.refresh_token) {
+    throw new Error("Kimi 登录凭证不完整，请重新登录 Kimi Code CLI");
+  }
+  return {
+    access_token: String(raw.access_token),
+    refresh_token: String(raw.refresh_token),
+    expires_at: Number(raw.expires_at || 0),
+    scope: String(raw.scope || ""),
+    token_type: String(raw.token_type || "Bearer"),
+    expires_in: Number(raw.expires_in || 0),
+  };
+}
+
+async function refreshKimiOAuthToken(token: KimiOAuthToken): Promise<KimiOAuthToken> {
+  const res = await fetch(KIMI_CODE_REFRESH_URL, {
+    method: "POST",
+    headers: {
+      ...kimiCommonHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      client_id: KIMI_CODE_CLIENT_ID,
+      grant_type: "refresh_token",
+      refresh_token: token.refresh_token,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Kimi 登录刷新失败：HTTP ${res.status}`);
+  }
+  const payload = await res.json() as {
+    access_token?: unknown;
+    refresh_token?: unknown;
+    expires_in?: unknown;
+    scope?: unknown;
+    token_type?: unknown;
+  };
+  const expiresIn = Number(payload.expires_in || 0);
+  const nextToken: KimiOAuthToken = {
+    access_token: String(payload.access_token || ""),
+    refresh_token: String(payload.refresh_token || token.refresh_token),
+    expires_at: Date.now() / 1000 + expiresIn,
+    scope: String(payload.scope || token.scope),
+    token_type: String(payload.token_type || token.token_type || "Bearer"),
+    expires_in: expiresIn,
+  };
+  if (!nextToken.access_token) {
+    throw new Error("Kimi 登录刷新返回为空");
+  }
+  fs.writeFileSync(kimiCredentialsPath(), `${JSON.stringify(nextToken, null, 2)}\n`, "utf-8");
+  return nextToken;
+}
+
+async function resolveKimiAccessToken() {
+  const token = readKimiOAuthToken();
+  const refreshThresholdSeconds = 300;
+  if (token.expires_at && token.expires_at - Date.now() / 1000 > refreshThresholdSeconds) {
+    return token.access_token;
+  }
+  return (await refreshKimiOAuthToken(token)).access_token;
+}
+
+function toNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function getRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | null): KimiUsagePeriod {
+  if (!detail) return { label, available: false, percent: 0, message: "暂无官方数据" };
+  const limit = toNumber(detail.limit);
+  const remaining = toNumber(detail.remaining);
+  let used = toNumber(detail.used);
+  if (used === undefined && limit !== undefined && remaining !== undefined) {
+    used = Math.max(0, limit - remaining);
+  }
+  if (limit === undefined || used === undefined || limit <= 0) {
+    return { label, available: false, percent: 0, message: "暂无官方数据" };
+  }
+  return {
+    label,
+    used,
+    limit,
+    percent: Math.max(0, Math.min(100, (used / limit) * 100)),
+    available: true,
+  };
+}
+
+function findWindowLimit(payload: Record<string, unknown>, duration: number, timeUnit: string) {
+  const limits = Array.isArray(payload.limits) ? payload.limits : [];
+  for (const item of limits) {
+    const itemRecord = getRecord(item);
+    if (!itemRecord) continue;
+    const window = getRecord(itemRecord.window);
+    const detail = getRecord(itemRecord.detail) ?? itemRecord;
+    const itemDuration = toNumber(window?.duration ?? itemRecord.duration ?? detail.duration);
+    const itemUnit = String(window?.timeUnit ?? itemRecord.timeUnit ?? detail.timeUnit ?? "");
+    if (itemDuration === duration && itemUnit.includes(timeUnit)) {
+      return detail;
+    }
+  }
+  return null;
+}
+
+function parseKimiUsagePayload(payload: Record<string, unknown>) {
+  const fiveHour = usagePeriodFromDetail("5小时", findWindowLimit(payload, 300, "MINUTE"));
+  const weekly = usagePeriodFromDetail("本周", getRecord(payload.usage));
+  const monthly = usagePeriodFromDetail("本月", getRecord(payload.totalQuota));
+  return {
+    available: [fiveHour, weekly, monthly].some((period) => period.available),
+    updatedAt: Date.now(),
+    source: "Kimi Code 官方用量接口",
+    periods: [fiveHour, weekly, monthly],
+  };
 }
 
 function getDefaultProject() {
@@ -427,7 +740,7 @@ ipcMain.handle("project:removeRecent", async (_, id: unknown) => {
 ipcMain.handle("project:getGitInfo", async (_, projectPath: string) => {
   const branch = await projectService.getGitBranch(projectPath);
   const status = await projectService.getGitStatus(projectPath);
-  return { success: true, data: { branch: branch ?? "main", status } };
+  return { success: true, data: { branch, status } };
 });
 
 ipcMain.handle("project:openPath", async (_, request: unknown) => {
@@ -488,6 +801,67 @@ ipcMain.handle("project:openTerminal", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:openFile", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as { projectPath?: unknown; filePath?: unknown };
+    if (typeof req.projectPath !== "string" || typeof req.filePath !== "string" || !req.projectPath || !req.filePath) {
+      return { success: false, error: "Invalid file request" };
+    }
+    const filePath = resolveProjectFile(req.projectPath, req.filePath);
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: "File does not exist" };
+    }
+    await openFileAt(filePath);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:revertFiles", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as { projectPath?: unknown; files?: unknown };
+    if (typeof req.projectPath !== "string" || !Array.isArray(req.files)) {
+      return { success: false, error: "Invalid revert request" };
+    }
+    if (!fs.existsSync(req.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    const files = req.files.filter((file): file is string => typeof file === "string" && file.trim().length > 0);
+    files.forEach((file) => resolveProjectFile(req.projectPath as string, file));
+    await projectService.revertGitFiles(req.projectPath, files);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:copyImage", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const dataUrl = (request as { dataUrl?: unknown }).dataUrl;
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+      return { success: false, error: "Invalid image data" };
+    }
+    const image = nativeImage.createFromDataURL(dataUrl);
+    if (image.isEmpty()) {
+      return { success: false, error: "Image is empty" };
+    }
+    clipboard.writeImage(image);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
   try {
     if (!request || typeof request !== "object") {
@@ -503,6 +877,33 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     const query = typeof req.query === "string" ? req.query : "";
     const limit = typeof req.limit === "number" ? req.limit : 40;
     return { success: true, data: searchProjectFiles(req.projectPath, query, limit) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:listSkills", async () => {
+  try {
+    const settings = settingsService.loadSettings();
+    return {
+      success: true,
+      data: {
+        skills: listLocalSkills(),
+        enabledNames: settings.enabledSkillNames ?? [],
+        enabledDir: settings.enabledSkillsDir || enabledSkillsDir(),
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:saveEnabledSkills", async (_, request: unknown) => {
+  try {
+    const names = request && typeof request === "object" && Array.isArray((request as { names?: unknown }).names)
+      ? (request as { names: unknown[] }).names.filter((item): item is string => typeof item === "string")
+      : [];
+    return { success: true, data: syncEnabledSkills(names) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -552,9 +953,11 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   }
 });
 
-ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean }) => {
+ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; skillsDir?: string }) => {
   try {
-    const result = await kimiBridge.startSession(request);
+    const settings = settingsService.loadSettings();
+    const skillsDir = request.skillsDir || ((settings.enabledSkillNames ?? []).length > 0 ? settings.enabledSkillsDir || enabledSkillsDir() : undefined);
+    const result = await kimiBridge.startSession({ ...request, skillsDir });
     return { success: true, data: result };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -674,6 +1077,30 @@ ipcMain.handle("kimi:listSessions", async (_, request: { workDir: string }) => {
   }
 });
 
+ipcMain.handle("kimi:getUsage", async () => {
+  try {
+    const accessToken = await resolveKimiAccessToken();
+    const res = await fetch(KIMI_CODE_USAGE_URL, {
+      method: "GET",
+      headers: {
+        ...kimiCommonHeaders(),
+        "Authorization": `Bearer ${accessToken}`,
+      },
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Kimi 授权失败，请重新登录 Kimi Code CLI");
+      }
+      throw new Error(`Kimi 用量接口返回 HTTP ${res.status}`);
+    }
+    const payload = getRecord(await res.json());
+    if (!payload) throw new Error("Kimi 用量接口返回格式异常");
+    return { success: true, data: parseKimiUsagePayload(payload) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; sessionId: string }) => {
   try {
     const events = await kimiBridge.getSessionHistory(request.workDir, request.sessionId);
@@ -740,6 +1167,7 @@ const SettingsSchema = z.object({
   fontSize: z.number().int().min(8).max(32).optional(),
   showThinking: z.boolean().optional(),
   detailedContext: z.boolean().optional(),
+  statusUpdateDisplay: z.enum(["each", "turn_end"]).optional(),
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   autoReadAgentsMd: z.boolean().optional(),

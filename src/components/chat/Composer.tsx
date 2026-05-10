@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, Slash, FileText, Bot, Puzzle } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent, PermissionMode } from "@/types/ui";
@@ -47,8 +47,16 @@ type CompletionItem = {
   label: string;
   detail?: string;
   insertText: string;
+  commandName?: string;
   kind: "agent" | "plugin" | "file" | "slash";
 };
+
+const unsupportedSlashHints: Record<string, string> = {
+  status: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时、本周和本月用量。",
+  usage: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时、本周和本月用量。",
+};
+
+const skillCommandPattern = /^\/skill:([^\s]+)(?:\s|$)/;
 
 const mentionBaseItems: CompletionItem[] = [
   { id: "agent-explorer", label: "Explorer Fast", detail: "快速探索代码库", insertText: "@Explorer Fast ", kind: "agent" },
@@ -108,7 +116,10 @@ export function Composer() {
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const thinkingBtnRef = useRef<HTMLDivElement>(null);
   const isCurrentSessionRunning = Boolean(currentSession && runningSessionId === currentSession.id);
+  const hasUnfinishedAssistant = Boolean(currentSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
+  const shouldShowStopButton = Boolean(isCurrentSessionRunning || hasUnfinishedAssistant);
   const canUseComposer = Boolean(currentSession || currentProject);
+  const allowedSlashNames = new Set(slashCommands.flatMap((item) => item.commandName ? [item.commandName] : []));
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -140,6 +151,7 @@ export function Composer() {
         label: `/${command.name}`,
         detail: command.description,
         insertText: `/${command.name} `,
+        commandName: command.name,
         kind: "slash",
       })));
     });
@@ -235,6 +247,14 @@ export function Composer() {
       yoloMode: permissionMode === "yolo",
     });
     if (!sessionRes.success) return null;
+    setSlashCommands((sessionRes.data.slashCommands ?? []).map((command) => ({
+      id: `slash-${command.name}`,
+      label: `/${command.name}`,
+      detail: command.description,
+      insertText: `/${command.name} `,
+      commandName: command.name,
+      kind: "slash",
+    })));
     const session = {
       id: sessionRes.data.sessionId,
       title: "新会话",
@@ -253,15 +273,13 @@ export function Composer() {
     const targetSession = await ensureSession();
     if (!targetSession) return;
     const images = options?.images ?? [];
-    const imageLabel = images.length > 0
-      ? `${content ? "\n" : ""}${images.map((image) => `[图片: ${image.name}]`).join("\n")}`
-      : "";
 
     const userEvent: TimelineEvent = {
       id: genId(),
       type: "user_message",
       timestamp: Date.now(),
-      content: content + imageLabel,
+      content,
+      images: images.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })),
     };
     const responsePlaceholder: TimelineEvent = {
       id: genId(),
@@ -302,6 +320,52 @@ export function Composer() {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
+    const skillMatch = trimmed.match(skillCommandPattern);
+    if (skillMatch) {
+      const targetSession = await ensureSession();
+      if (!targetSession) return;
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        events: [
+          ...session.events,
+          {
+            id: genId(),
+            type: "error",
+            timestamp: Date.now(),
+            message: `/skill:${skillMatch[1]} 已拦截：Kimix 不把这个写法当作 Skill 触发协议发送。请在左侧“技能”面板勾选启用；启用后新会话会通过 Kimi CLI 的 --skills-dir 使用 Skill。`,
+            source: "ui",
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+      return;
+    }
+    const slashMatch = trimmed.match(/^\/([^\s/]+)(?:\s|$)/);
+    if (slashMatch) {
+      const slashName = slashMatch[1];
+      const isKnown = allowedSlashNames.has(slashName);
+      const shouldBlock = unsupportedSlashHints[slashName] || (slashCommands.length > 0 && !isKnown);
+      if (shouldBlock) {
+        const targetSession = await ensureSession();
+        if (!targetSession) return;
+        const hint = unsupportedSlashHints[slashName] ?? "这个命令不是当前 Kimi SDK 会话可直接执行的原生命令，已拦截，避免发送后出现 Unknown slash command。";
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          events: [
+            ...session.events,
+            {
+              id: genId(),
+              type: "error",
+              timestamp: Date.now(),
+              message: `/${slashName} 暂不能在当前对话输入框中发送。${hint}`,
+              source: "ui",
+            },
+          ],
+          updatedAt: Date.now(),
+        }));
+        return;
+      }
+    }
 
     setInput("");
     setImageAttachments([]);
@@ -316,9 +380,19 @@ export function Composer() {
   };
 
   const handleStop = async () => {
-    const sessionId = runningSessionId ?? currentSession?.id;
+    const sessionId = hasUnfinishedAssistant && currentSession ? currentSession.id : runningSessionId ?? currentSession?.id;
     if (!sessionId) return;
-    setRunningSessionId(null);
+    if (runningSessionId === sessionId) setRunningSessionId(null);
+    if (currentSession?.id === sessionId) {
+      updateSession(sessionId, (session) => ({
+        ...session,
+        events: session.events.map((event) => event.type === "assistant_message" && !event.isComplete
+          ? { ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, Date.now() - event.timestamp) }
+          : event
+        ),
+        updatedAt: Date.now(),
+      }));
+    }
     try {
       const res = await window.api.stopTurn({ sessionId });
       if (!res.success) {
@@ -370,7 +444,10 @@ export function Composer() {
       updateSession(currentSession.id, (session) => ({
         ...session,
         events: [
-          ...session.events,
+          ...session.events.map((event) => event.type === "assistant_message" && !event.isComplete
+            ? { ...event, isComplete: true, isThinking: false }
+            : event
+          ),
           {
             id: steerEventId,
             type: "steer_message",
@@ -511,7 +588,7 @@ export function Composer() {
                 </div>
                 <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[#3a362f]">{msg.content}</div>
                 <div className="flex shrink-0 items-center gap-1 text-[#8f887e]">
-                  <button onClick={() => handleSendPendingNow(msg.id)} className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors hover:bg-black/5 hover:text-[#24211d]" title={isCurrentSessionRunning ? "引导当前任务" : "立即发送"}>
+                  <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button is-compact text-[13px] hover:bg-black/5 hover:text-[#24211d]" title={isCurrentSessionRunning ? "引导当前任务" : "立即发送"}>
                     <Send size={13} />
                     <span>引导</span>
                   </button>
@@ -618,7 +695,7 @@ export function Composer() {
                     className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-black/5 text-[#24211d]" : "text-[#4b4640] hover:bg-black/5"}`}
                     style={{ paddingLeft: 10, paddingRight: 12 }}
                   >
-                    <Slash size={15} className="shrink-0 text-[#7d7972]" />
+                    <TerminalSquare size={15} className="shrink-0 text-[#7d7972]" />
                     <span className="shrink-0">{item.label}</span>
                     {item.detail && <span className="min-w-0 truncate text-[#aaa49a]">{item.detail}</span>}
                   </button>
@@ -687,7 +764,7 @@ export function Composer() {
             </button>
 
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
-              <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="flex h-8 max-w-[170px] min-w-0 items-center gap-1.5 rounded-xl px-2.5 text-[13px] text-[#7c756c] transition-colors hover:bg-[#f1eee8] disabled:cursor-not-allowed disabled:opacity-35">
+              <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button is-compact max-w-[188px] min-w-0 text-[#7c756c] hover:bg-[#f1eee8] disabled:cursor-not-allowed disabled:opacity-35">
                 <AlertTriangle size={14} className="shrink-0 text-[#d97706]" />
                 <span className="truncate">{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
@@ -711,7 +788,7 @@ export function Composer() {
 
           <div className="flex shrink-0 items-center gap-1.5">
             <div ref={thinkingBtnRef} className="relative">
-              <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="flex h-8 min-w-[112px] items-center justify-center gap-2 rounded-xl px-2.5 text-[13px] text-[#625d55] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35">
+              <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="kimix-icon-text-button is-compact min-w-[126px] text-[#625d55] hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35">
                 <Brain size={14} className="shrink-0" />
                 <span>{defaultThinking ? "思考开启" : "思考关闭"}</span>
                 <ChevronDown size={12} className="shrink-0" />
@@ -732,7 +809,7 @@ export function Composer() {
               <Mic size={16} />
             </button>
 
-            {isCurrentSessionRunning ? (
+            {shouldShowStopButton ? (
               <button onClick={handleStop} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#171512] transition-colors hover:bg-black" title="停止" aria-label="停止">
                 <span className="h-2.5 w-2.5 rounded-[2px] bg-white" />
               </button>

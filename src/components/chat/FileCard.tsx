@@ -1,24 +1,43 @@
-import { FileText, ChevronDown } from "lucide-react";
+import { ChevronDown, FileText } from "lucide-react";
+import { useAppStore } from "@/stores/appStore";
+import type { TimelineEvent } from "@/types/ui";
 
 interface FileCardProps {
-  filePath: string;
+  event?: Extract<TimelineEvent, { type: "file_artifact" }>;
+  filePath?: string;
   fileType?: string;
 }
 
-export function FileCard({ filePath, fileType }: FileCardProps) {
-  const name = filePath.split(/[\\/]/).pop() ?? filePath;
+export function FileCard({ event, filePath, fileType }: FileCardProps) {
+  const project = useAppStore((s) => s.currentProject);
+  const path = event?.filePath ?? filePath ?? "";
+  const type = event?.fileType ?? fileType ?? "文档 · MD";
+  const name = path.split(/[\\/]/).pop() ?? path;
+
+  const handleOpen = async () => {
+    if (!project || !path) return;
+    await window.api.openFile({ projectPath: project.path, filePath: path });
+  };
 
   return (
-    <div className="flex justify-center">
-      <div className="max-w-[90%] w-full rounded-xl border border-border-default bg-bg-secondary px-4 py-3 flex items-center gap-3">
-        <FileText size={20} className="text-text-muted shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-text-primary truncate">{name}</div>
-          <div className="text-xs text-text-muted">{fileType ?? "文件"}</div>
+    <div className="w-full rounded-[14px] border border-[#e8e3da] bg-white" style={{ padding: "18px 22px" }}>
+      <div className="flex items-center" style={{ gap: 16 }}>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-[#f3f1ec] text-[#6f6a62]">
+          <FileText size={22} />
         </div>
-        <button className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-bg-tertiary text-xs text-text-secondary transition-colors">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-semibold leading-6 text-[#24211d]">{name}</div>
+          <div className="text-[13px] leading-5 text-[#8a847a]">{type}</div>
+        </div>
+        <button
+          type="button"
+          onClick={handleOpen}
+          disabled={!project || !path}
+          className="flex h-9 shrink-0 items-center rounded-xl border border-[#ebe6dd] bg-white text-[14px] text-[#3a362f] transition-colors hover:bg-[#faf8f4] disabled:cursor-not-allowed disabled:opacity-45"
+          style={{ gap: 8, paddingLeft: 14, paddingRight: 12 }}
+        >
           <span>打开</span>
-          <ChevronDown size={12} />
+          <ChevronDown size={14} className="text-[#8a847a]" />
         </button>
       </div>
     </div>

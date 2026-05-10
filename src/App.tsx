@@ -8,11 +8,22 @@ import type { TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 
+function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
+  return events.flatMap((event) => {
+    if (event.type !== "assistant_message" || event.isComplete) return [event];
+    const hasContent = event.content.trim().length > 0;
+    const hasThinking = Boolean(event.thinking?.trim());
+    if (!hasContent && !hasThinking) return [];
+    return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? 0 }];
+  });
+}
+
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
+  const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
@@ -33,6 +44,7 @@ function App() {
         setPermissionMode(res.data.defaultPermissionMode);
         setDefaultThinking(res.data.defaultThinking);
         setDetailedContext(res.data.detailedContext);
+        setStatusUpdateDisplay(res.data.statusUpdateDisplay);
       }
     }).catch(() => {});
 
@@ -65,7 +77,7 @@ function App() {
           sessionId: latest.id,
         });
         if (!loaded.success) return;
-        const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+        const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
 
         const session = {
           id: startRes.data.sessionId,
@@ -92,7 +104,13 @@ function App() {
       try {
         const parsed = JSON.parse(storedSessions);
         if (Array.isArray(parsed)) {
-          useSessionStore.setState({ sessions: parsed });
+          useSessionStore.setState({
+            sessions: parsed.map((session) => ({
+              ...session,
+              events: Array.isArray(session.events) ? settleInactiveEvents(session.events) : [],
+              isLoading: false,
+            })),
+          });
         }
       } catch {
         // ignore parse error
@@ -124,7 +142,12 @@ function App() {
 
     const handleBeforeUnload = () => {
       const state = useSessionStore.getState();
-      localStorage.setItem("kimix_sessions", JSON.stringify(state.sessions));
+      localStorage.setItem("kimix_sessions", JSON.stringify(state.sessions.map((session) => ({
+        ...session,
+        events: session.id === useAppStore.getState().runningSessionId
+          ? session.events
+          : settleInactiveEvents(session.events),
+      }))));
       localStorage.setItem("kimix_pending", JSON.stringify(state.pendingMessages));
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -162,6 +185,12 @@ function App() {
       }
 
       if (payload.status === "completed") {
+        updateSession(payload.sessionId, (session) => ({
+          ...session,
+          events: settleInactiveEvents(session.events),
+          updatedAt: Date.now(),
+        }));
+
         const next = useSessionStore.getState().shiftPendingMessage();
         if (next) {
           const userEventId = Math.random().toString(36).substring(2, 11);
@@ -239,12 +268,19 @@ function App() {
     document.addEventListener("keydown", handleKeyDown);
 
     const unsubSettings = useAppStore.subscribe((state, prev) => {
-      if (state.theme !== prev.theme || state.permissionMode !== prev.permissionMode || state.defaultThinking !== prev.defaultThinking || state.detailedContext !== prev.detailedContext) {
+      if (
+        state.theme !== prev.theme ||
+        state.permissionMode !== prev.permissionMode ||
+        state.defaultThinking !== prev.defaultThinking ||
+        state.detailedContext !== prev.detailedContext ||
+        state.statusUpdateDisplay !== prev.statusUpdateDisplay
+      ) {
         window.api.saveSettings({
           theme: state.theme,
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
           detailedContext: state.detailedContext,
+          statusUpdateDisplay: state.statusUpdateDisplay,
         }).catch(() => {});
       }
     });
@@ -259,7 +295,7 @@ function App() {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
+  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
 
   return (
     <ThemeProvider>

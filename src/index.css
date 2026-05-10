@@ -184,6 +184,51 @@ body {
   box-shadow: 0 18px 48px rgba(25, 23, 20, 0.18), 0 4px 14px rgba(25, 23, 20, 0.08);
 }
 
+.kimix-top-menu-trigger {
+  display: inline-flex;
+  min-width: 52px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  padding-left: 14px;
+  padding-right: 14px;
+  line-height: 1;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.kimix-top-menu-trigger:hover,
+.kimix-top-menu-trigger.is-active {
+  background: rgba(25, 23, 20, 0.06);
+  box-shadow: 0 8px 20px rgba(25, 23, 20, 0.08);
+  color: #1f1d1a;
+}
+
+.kimix-icon-text-button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.kimix-icon-text-button svg {
+  flex-shrink: 0;
+}
+
+.kimix-icon-text-button.is-compact {
+  min-height: 32px;
+  gap: 7px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
 @keyframes kimix-spin {
   to {
     transform: rotate(360deg);
@@ -213,6 +258,17 @@ body {
 .kimix-settings-entry:hover {
   background: rgba(0, 0, 0, 0.05);
   box-shadow: 0 10px 28px rgba(25, 23, 20, 0.09);
+}
+
+.kimix-sidebar-nav-item {
+  gap: 14px;
+  padding-left: 18px;
+  padding-right: 16px;
+}
+
+.kimix-sidebar-nav-item:hover {
+  background: rgba(25, 23, 20, 0.055);
+  box-shadow: 0 8px 20px rgba(25, 23, 20, 0.08);
 }
 
 .kimix-settings-header {
@@ -303,13 +359,15 @@ body {
 
 .kimix-settings-check-button {
   display: flex;
-  height: 32px;
+  min-height: 34px;
   align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  padding: 0 10px;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 0 14px;
   color: #625d55;
   font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
   transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
