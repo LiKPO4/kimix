@@ -124,20 +124,28 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
       : "已引导对话";
 
   return (
-    <div className="group flex justify-end">
-      <div className="max-w-[58%]">
-        <div className="mb-1 flex justify-end">
-          <span className={`text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[#8a847a]"}`}>
-            {label}
-          </span>
+    <div className="group w-full">
+      <div
+        className={`text-[15px] leading-7 ${event.status === "failed" ? "text-accent-red" : "text-[#8a847a]"}`}
+        style={{ paddingTop: 2, paddingBottom: 12 }}
+      >
+        {label}
+      </div>
+      <div className="flex justify-end">
+        <div className="max-w-[58%]">
+          <div className="mb-1 flex justify-end">
+            <span className={`text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[#8a847a]"}`}>
+              {label}
+            </span>
+          </div>
+          <div
+            style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
+            className="rounded-[16px] bg-[#f3f3f3] text-[14.5px] leading-[1.45] text-[#24211d] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+          >
+            {event.content}
+          </div>
+          {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-red">{event.error}</div>}
         </div>
-        <div
-          style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
-          className="rounded-[16px] bg-[#f3f3f3] text-[14.5px] leading-[1.45] text-[#24211d] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
-        >
-          {event.content}
-        </div>
-        {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-red">{event.error}</div>}
       </div>
     </div>
   );
