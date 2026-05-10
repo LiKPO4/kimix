@@ -11,6 +11,9 @@ interface AppStore extends AppState {
   setDefaultThinking: (thinking: boolean) => void;
   setDetailedContext: (enabled: boolean) => void;
   setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
+  setSessionRecommendationEnabled: (enabled: boolean) => void;
+  setSessionRecommendationTurnLimit: (limit: number) => void;
+  setHandoffSessionId: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   settingsOpen: boolean;
@@ -35,6 +38,9 @@ export const useAppStore = create<AppStore>((set) => ({
   defaultThinking: true,
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
+  sessionRecommendationEnabled: true,
+  sessionRecommendationTurnLimit: 10,
+  handoffSessionId: null,
   sidebarOpen: true,
   theme: "light",
   settingsOpen: false,
@@ -52,6 +58,9 @@ export const useAppStore = create<AppStore>((set) => ({
   setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
   setDetailedContext: (enabled) => set({ detailedContext: enabled }),
   setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),
+  setSessionRecommendationEnabled: (enabled) => set({ sessionRecommendationEnabled: enabled }),
+  setSessionRecommendationTurnLimit: (limit) => set({ sessionRecommendationTurnLimit: Math.max(1, Math.min(200, Math.round(limit))) }),
+  setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),

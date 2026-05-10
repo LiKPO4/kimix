@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, LayoutGrid, X } from "lucide-react";
+import { Check, LayoutGrid, Plus, Upload, X } from "lucide-react";
 
 type SkillInfo = {
   name: string;
@@ -15,6 +15,21 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
   const [enabledDir, setEnabledDir] = useState("");
   const [message, setMessage] = useState("正在扫描本地 Skills...");
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  const refreshSkills = async (nextMessage?: string) => {
+    setMessage("正在扫描本地 Skills...");
+    const res = await window.api.listSkills();
+    if (!res.success) {
+      setMessage(`扫描失败：${res.error}`);
+      return;
+    }
+    setSkills(res.data.skills);
+    setEnabledNames(res.data.enabledNames);
+    setEnabledDir(res.data.enabledDir);
+    setMessage(nextMessage ?? (res.data.skills.length > 0 ? `已发现 ${res.data.skills.length} 个本地 Skill` : "未发现本地 Skill"));
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -53,6 +68,44 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
     setMessage(`已启用 ${res.data.enabledNames.length} 个 Skill。新会话将通过 --skills-dir 使用这些 Skill。`);
   };
 
+  const importArchive = async (archivePath?: string) => {
+    setImporting(true);
+    setMessage("正在导入 Skill 压缩包...");
+    const res = await window.api.importSkillArchive(archivePath ? { archivePath } : undefined);
+    setImporting(false);
+    setDragActive(false);
+    if (!res.success) {
+      setMessage(`导入失败：${res.error}`);
+      return;
+    }
+    setSkills(res.data.skills);
+    const importedNames = res.data.imported.map((skill) => skill.name);
+    setMessage(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : "已取消导入");
+    void refreshSkills(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : undefined);
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragActive(false);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    const file = Array.from(event.dataTransfer.files).find((item) => item.name.toLowerCase().endsWith(".zip"));
+    const archivePath = file ? (file as unknown as { path?: string }).path : "";
+    if (!archivePath) {
+      setDragActive(false);
+      setMessage("请拖入本地 .zip Skill 压缩包");
+      return;
+    }
+    void importArchive(archivePath);
+  };
+
   const shortDescription = (description: string) => {
     const firstSentence = description.split(/(?<=[.!?。！？])\s+/)[0]?.trim() || description.trim();
     return firstSentence.length > 96 ? `${firstSentence.slice(0, 96)}...` : firstSentence;
@@ -62,15 +115,41 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/20 px-5" onMouseDown={onClose}>
-      <div className="w-full max-w-[640px] overflow-hidden rounded-[18px] border border-[#dedad2] bg-white shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(event) => event.stopPropagation()}>
+      <div
+        className={`relative w-full max-w-[640px] overflow-hidden rounded-[18px] border bg-white shadow-[0_28px_90px_rgba(25,23,20,0.24)] ${dragActive ? "border-[#339af0]" : "border-[#dedad2]"}`}
+        onMouseDown={(event) => event.stopPropagation()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {dragActive && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/82">
+            <div className="flex items-center rounded-xl border border-[#d8d2c8] bg-white text-[15px] text-[#3a362f] shadow-[0_12px_32px_rgba(25,23,20,0.14)]" style={{ gap: 10, padding: "14px 18px" }}>
+              <Upload size={17} />
+              <span>松开导入 Skill 压缩包</span>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between border-b border-[#eee9e1]" style={{ padding: "16px 20px" }}>
           <div className="flex items-center gap-2.5 text-[18px] font-semibold text-[#24211d]">
             <LayoutGrid size={18} />
             <span>技能</span>
           </div>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8a847a] hover:bg-[#f3f1ec]" onClick={onClose} aria-label="关闭技能面板">
-            <X size={16} />
-          </button>
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => void importArchive()}
+              disabled={importing}
+              className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f3f1ec] disabled:cursor-wait disabled:opacity-50"
+              title="导入 Skill 压缩包"
+            >
+              <Plus size={15} />
+              <span>{importing ? "导入中" : "添加"}</span>
+            </button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8a847a] hover:bg-[#f3f1ec]" onClick={onClose} aria-label="关闭技能面板">
+              <X size={16} />
+            </button>
+          </div>
         </div>
         <div className="max-h-[68vh] overflow-y-auto" style={{ padding: 20 }}>
           <div className="rounded-xl border border-[#e5e1d8] bg-[#faf8f4] text-[13.5px] leading-6 text-[#625d55]" style={{ padding: "12px 16px" }}>
@@ -79,7 +158,6 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
           <div className="rounded-xl bg-[#faf8f4] text-[13px] leading-6 text-[#8f887e]" style={{ marginTop: 12, padding: "12px 16px" }}>
             <div>{message}{saving ? "，正在保存..." : ""}</div>
             {enabledDir && <div className="truncate" title={enabledDir}>启用目录：{enabledDir}</div>}
-            <div>不要发送 `/skill:xxx`；它只是普通文本。</div>
           </div>
           <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
             {skills.map((skill) => (
@@ -99,7 +177,7 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
                     <span className="mt-1 block text-[13.5px] leading-5 text-[#625d55]" title={skill.description}>{shortDescription(skill.description)}</span>
                     <span className="mt-2 block truncate text-[12px] text-[#aaa49a]" title={skill.path}>{skill.path}</span>
                   </span>
-                  <span className="shrink-0 rounded-full bg-[#f3f1ec] text-[12px] text-[#8a847a]" style={{ padding: "4px 10px", marginRight: 2 }}>
+                  <span className={`shrink-0 rounded-full text-[12px] font-medium ${enabledNames.includes(skill.name) ? "bg-[#e8f5e9] text-[#2e7d32]" : "bg-[#f3f1ec] text-[#aaa49a]"}`} style={{ padding: "4px 10px", marginRight: 2 }}>
                     {enabledNames.includes(skill.name) ? "已启用" : "未启用"}
                   </span>
                 </div>

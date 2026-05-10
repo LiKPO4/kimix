@@ -14,6 +14,10 @@ export function SettingsPanel() {
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
+  const sessionRecommendationEnabled = useAppStore((s) => s.sessionRecommendationEnabled);
+  const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
+  const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
+  const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
   const [connection, setConnection] = useState<{
     loading: boolean;
     available: boolean | null;
@@ -177,7 +181,41 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.5.18 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-section">
+            <div className="kimix-settings-section-title">
+              <MessageSquare size={16} className="text-[#8f887e]" />
+              <span>新对话建议</span>
+            </div>
+            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+              <button
+                type="button"
+                onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
+                className="flex w-full items-start text-left"
+                style={{ gap: 12 }}
+              >
+                <Circle size={18} className={`mt-0.5 shrink-0 ${sessionRecommendationEnabled ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14.5px] font-medium text-[#302d28]">达到推荐轮数后提示开启新对话</div>
+                  <div className="mt-1 text-[13px] leading-5 text-[#7c756c]">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
+                </div>
+              </button>
+              <div className="mt-4 flex items-center justify-between" style={{ gap: 14 }}>
+                <label htmlFor="session-turn-limit" className="min-w-0 text-[14px] text-[#625d55]">推荐轮数上限</label>
+                <input
+                  id="session-turn-limit"
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={sessionRecommendationTurnLimit}
+                  disabled={!sessionRecommendationEnabled}
+                  onChange={(event) => setSessionRecommendationTurnLimit(Number(event.target.value || 1))}
+                  className="h-9 w-24 rounded-lg border border-[#ded8ce] bg-white text-center text-[14px] text-[#302d28] outline-none transition-colors focus:border-[#b9afa1] disabled:bg-[#f1eee8] disabled:text-[#aaa49a]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="kimix-settings-footer">Kimix v2.5.34 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

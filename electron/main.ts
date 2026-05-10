@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
+import AdmZip from "adm-zip";
 import { z } from "zod";
 import * as kimiBridge from "./kimiBridge";
 import * as projectService from "./projectService";
@@ -302,6 +303,7 @@ function parseSkillFrontmatter(content: string): { name?: string; description?: 
 
 function listLocalSkills() {
   const roots = [
+    path.join(os.homedir(), ".kimix", "skills"),
     path.join(os.homedir(), ".kimi", "skills"),
     path.join(os.homedir(), ".config", "agents", "skills"),
     path.join(os.homedir(), ".codex", "skills"),
@@ -369,6 +371,144 @@ function listLocalSkills() {
 
 function enabledSkillsDir() {
   return path.join(os.homedir(), ".kimix", "enabled-skills");
+}
+
+function importedSkillsDir() {
+  return path.join(os.homedir(), ".kimix", "skills");
+}
+
+function sanitizeSkillDirName(name: string) {
+  return (name || "imported-skill").replace(/[<>:"/\\|?*\x00-\x1f]+/g, "_").trim() || "imported-skill";
+}
+
+function uniqueTargetDir(baseDir: string, preferredName: string) {
+  const safeName = sanitizeSkillDirName(preferredName);
+  let target = path.join(baseDir, safeName);
+  let index = 2;
+  while (fs.existsSync(target)) {
+    target = path.join(baseDir, `${safeName}-${index}`);
+    index += 1;
+  }
+  return target;
+}
+
+function copyDirectorySafe(sourceDir: string, targetDir: string) {
+  const resolvedSource = path.resolve(sourceDir);
+  const resolvedTarget = path.resolve(targetDir);
+  fs.mkdirSync(resolvedTarget, { recursive: true });
+
+  function walk(dir: string) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const sourcePath = path.join(dir, entry.name);
+      const relative = path.relative(resolvedSource, sourcePath);
+      if (relative.startsWith("..") || path.isAbsolute(relative)) {
+        throw new Error("Skill path escapes source directory");
+      }
+      const targetPath = path.join(resolvedTarget, relative);
+      if (entry.isDirectory()) {
+        fs.mkdirSync(targetPath, { recursive: true });
+        walk(sourcePath);
+      } else if (entry.isFile()) {
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+        fs.copyFileSync(sourcePath, targetPath);
+      }
+    }
+  }
+
+  walk(resolvedSource);
+}
+
+function extractArchiveSafe(archivePath: string, targetDir: string) {
+  const zip = new AdmZip(archivePath);
+  const resolvedTarget = path.resolve(targetDir);
+  fs.mkdirSync(resolvedTarget, { recursive: true });
+
+  for (const entry of zip.getEntries()) {
+    const entryName = entry.entryName.replace(/\\/g, "/");
+    if (!entryName || entryName.startsWith("/") || /^[a-zA-Z]:\//.test(entryName)) {
+      throw new Error("压缩包包含不安全路径");
+    }
+    const targetPath = path.resolve(resolvedTarget, entryName);
+    const relative = path.relative(resolvedTarget, targetPath);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new Error("压缩包路径越界");
+    }
+    if (entry.isDirectory) {
+      fs.mkdirSync(targetPath, { recursive: true });
+      continue;
+    }
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, entry.getData());
+  }
+}
+
+function findSkillFiles(root: string) {
+  const skillFiles: string[] = [];
+
+  function walk(dir: string, depth: number) {
+    if (depth > 6) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isFile() && entry.name === "SKILL.md") {
+        skillFiles.push(fullPath);
+      } else if (entry.isDirectory() && !SKILL_SEARCH_IGNORES.has(entry.name)) {
+        walk(fullPath, depth + 1);
+      }
+    }
+  }
+
+  walk(root, 0);
+  return skillFiles;
+}
+
+function importSkillArchive(archivePath: string) {
+  if (!archivePath || !fs.existsSync(archivePath)) {
+    throw new Error("压缩包不存在");
+  }
+  if (path.extname(archivePath).toLowerCase() !== ".zip") {
+    throw new Error("目前仅支持 .zip 技能压缩包");
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-skill-"));
+  try {
+    extractArchiveSafe(archivePath, tempDir);
+    const skillFiles = findSkillFiles(tempDir);
+    if (skillFiles.length === 0) {
+      throw new Error("压缩包内未找到 SKILL.md");
+    }
+
+    const importedRoot = importedSkillsDir();
+    fs.mkdirSync(importedRoot, { recursive: true });
+    const imported: { name: string; description: string; path: string; source: string; enabled: boolean }[] = [];
+
+    for (const skillPath of skillFiles) {
+      const raw = fs.readFileSync(skillPath, "utf-8");
+      const meta = parseSkillFrontmatter(raw);
+      const sourceDir = path.dirname(skillPath);
+      const fallbackName = path.basename(sourceDir);
+      const skillName = meta.name || fallbackName;
+      const targetDir = uniqueTargetDir(importedRoot, skillName);
+      copyDirectorySafe(sourceDir, targetDir);
+      imported.push({
+        name: skillName,
+        description: meta.description || "导入的 Skill",
+        path: path.join(targetDir, "SKILL.md"),
+        source: importedRoot,
+        enabled: false,
+      });
+    }
+
+    return imported;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function syncEnabledSkills(names: string[]) {
@@ -909,6 +1049,30 @@ ipcMain.handle("project:saveEnabledSkills", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:importSkillArchive", async (_, request: unknown) => {
+  try {
+    const providedPath = request && typeof request === "object" && typeof (request as { archivePath?: unknown }).archivePath === "string"
+      ? (request as { archivePath: string }).archivePath
+      : "";
+    let archivePath = providedPath;
+    if (!archivePath) {
+      const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+        title: "选择 Skill 压缩包",
+        properties: ["openFile"],
+        filters: [{ name: "Skill 压缩包", extensions: ["zip"] }],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: true, data: { imported: [], skills: listLocalSkills() } };
+      }
+      archivePath = result.filePaths[0];
+    }
+    const imported = importSkillArchive(archivePath);
+    return { success: true, data: { imported, skills: listLocalSkills() } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 // Kimi IPC handlers
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
@@ -966,7 +1130,14 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
 
 ipcMain.handle("kimi:listSlashCommands", async (_, request: { sessionId: string }) => {
   try {
-    const commands = await kimiBridge.getSlashCommands(request.sessionId);
+    const sessionId = request && typeof request.sessionId === "string" ? request.sessionId : "";
+    if (!sessionId) {
+      return { success: false, error: "Missing sessionId" };
+    }
+    const commands = await Promise.race([
+      kimiBridge.getSlashCommands(sessionId),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("List slash commands timed out")), 6000)),
+    ]);
     return { success: true, data: commands };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -1168,6 +1339,8 @@ const SettingsSchema = z.object({
   showThinking: z.boolean().optional(),
   detailedContext: z.boolean().optional(),
   statusUpdateDisplay: z.enum(["each", "turn_end"]).optional(),
+  sessionRecommendationEnabled: z.boolean().optional(),
+  sessionRecommendationTurnLimit: z.number().int().min(1).max(200).optional(),
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   autoReadAgentsMd: z.boolean().optional(),

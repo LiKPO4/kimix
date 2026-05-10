@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, Copy, Check, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
+import { Brain, ChevronDown, ChevronRight, Copy, Check, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -9,6 +9,7 @@ import { FileCard } from "./FileCard";
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
+  changedFiles?: string[];
 }
 
 function useCopyTimeout() {
@@ -137,7 +138,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
         )}
         {hasText && (
           <div
-            style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
+            style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8, whiteSpace: "pre-wrap" }}
             className="rounded-[16px] bg-[#f3f3f3] text-[14.5px] leading-[1.45] text-[#24211d] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
           >
             {event.content}
@@ -233,52 +234,154 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
   );
 }
 
-function AssistantToolSummary({ tools }: { tools: Extract<TimelineEvent, { type: "tool_call" }>[] }) {
+type ToolEvent = Extract<TimelineEvent, { type: "tool_call" }>;
+type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
+
+type ThinkingBlock = {
+  id: string;
+  timestamp: number;
+  text: string;
+};
+
+type ProcessItem =
+  | { type: "thinking"; block: ThinkingBlock }
+  | { type: "tool"; tool: ToolEvent };
+
+function firstThinkingSentence(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const match = normalized.match(/^(.{1,160}?[。！？.!?])(?:\s|$)/);
+  const first = match?.[1] ?? normalized.slice(0, 120);
+  return normalized.length > first.length ? `${first}...` : first || "思考内容";
+}
+
+function describeTool(tool: ToolEvent) {
+  const command = typeof tool.arguments.command === "string"
+    ? tool.arguments.command
+    : typeof tool.arguments.cmd === "string"
+      ? tool.arguments.cmd
+      : tool.rawArguments || tool.toolName || "工具调用";
+  return command.replace(/\s+/g, " ").slice(0, 220);
+}
+
+function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
+  const paragraphs = text
+    .split(/\n\s*\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const source = paragraphs.length > 1 ? paragraphs : text.match(/[^。！？.!?]+[。！？.!?]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [text.trim()];
+  const blocks: ThinkingBlock[] = [];
+  let buffer = "";
+  source.forEach((part) => {
+    const next = buffer ? `${buffer}\n\n${part}` : part;
+    if (next.length < 520) {
+      buffer = next;
+      return;
+    }
+    if (buffer) blocks.push({ id: `thinking-${timestamp}-${blocks.length}`, timestamp: timestamp + blocks.length, text: buffer });
+    buffer = part;
+  });
+  if (buffer) blocks.push({ id: `thinking-${timestamp}-${blocks.length}`, timestamp: timestamp + blocks.length, text: buffer });
+  return blocks;
+}
+
+function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
+  const parts = event.thinkingParts?.filter((part) => part.text.trim()) ?? [];
+  if (parts.length === 0) return event.thinking ? splitLegacyThinking(event.thinking, event.timestamp) : [];
+
+  const blocks: ThinkingBlock[] = [];
+  let current = "";
+  let currentTimestamp = parts[0]?.timestamp ?? event.timestamp;
+  parts.forEach((part) => {
+    if (!current) currentTimestamp = part.timestamp;
+    current += part.text;
+    const shouldFlush = current.length > 620 || (current.length > 120 && /[。！？.!?]\s*$/.test(current));
+    if (shouldFlush) {
+      blocks.push({ id: `thinking-${part.id}`, timestamp: currentTimestamp, text: current.trim() });
+      current = "";
+    }
+  });
+  if (current.trim()) {
+    blocks.push({ id: `thinking-tail-${blocks.length}`, timestamp: currentTimestamp, text: current.trim() });
+  }
+  return blocks;
+}
+
+function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
-  if (tools.length === 0) return null;
-  const completed = tools.filter((tool) => tool.status === "success").length;
-  const running = tools.filter((tool) => tool.status === "running").length;
-  const failed = tools.filter((tool) => tool.status === "error").length;
-  const summary = [
-    completed > 0 ? `已运行 ${completed} 条命令` : "",
-    running > 0 ? `正在运行 ${running} 条命令` : "",
-    failed > 0 ? `${failed} 条失败` : "",
-  ].filter(Boolean).join("，") || `已运行 ${tools.length} 条命令`;
-
-  const describeTool = (tool: Extract<TimelineEvent, { type: "tool_call" }>) => {
-    const command = typeof tool.arguments.command === "string"
-      ? tool.arguments.command
-      : typeof tool.arguments.cmd === "string"
-        ? tool.arguments.cmd
-        : tool.rawArguments || tool.toolName || "工具调用";
-    return command.replace(/\s+/g, " ").slice(0, 220);
-  };
-
   return (
-    <div className="w-full border-b border-[#efebe3]" style={{ paddingBottom: expanded ? 10 : 12 }}>
+    <div className="rounded-xl border border-[#e8e3da] bg-[#fbfaf7]" style={{ padding: "10px 14px" }}>
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex h-8 items-center rounded-lg text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#625d55]"
-        style={{ gap: 8, paddingLeft: 4, paddingRight: 12 }}
+        className="flex w-full items-center rounded-lg text-left text-[14px] leading-6 text-[#706b63] transition-colors hover:bg-[#f3f1ec]"
+        style={{ gap: 8, padding: "4px 6px" }}
       >
-        {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
-        <SquareTerminal size={15} className="shrink-0" />
-        <span>{summary}</span>
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        </span>
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
+          <Brain size={15} />
+        </span>
+        <span className="min-w-0 flex-1">{firstThinkingSentence(block.text)}</span>
       </button>
       {expanded && (
-        <div className="mt-2 rounded-xl border border-[#e8e3da] bg-[#fbfaf7]" style={{ padding: 8 }}>
-          {tools.map((tool) => (
-            <div
-              key={tool.id}
-              className="flex min-h-9 items-center rounded-lg text-[13.5px] text-[#706b63]"
-              style={{ gap: 8, paddingLeft: 10, paddingRight: 10 }}
-            >
-              <SquareTerminal size={14} className="shrink-0 text-[#9a948b]" />
-              <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
-              {tool.durationMs !== undefined && <span className="shrink-0 text-[#aaa49a]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tool.status === "error" ? "bg-[#d83b01]" : tool.status === "running" ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
-            </div>
+        <pre className="mt-2 min-w-0 whitespace-pre-wrap break-words rounded-lg bg-[#f6f3ed] font-mono text-[13.5px] leading-7 text-[#625d55]" style={{ padding: "14px 16px" }}>
+          {block.text}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function ToolProcessItem({ tool }: { tool: ToolEvent }) {
+  return (
+    <div className="flex min-h-10 items-center rounded-xl border border-[#e8e3da] bg-white text-[13.5px] text-[#706b63]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
+      <SquareTerminal size={14} className="shrink-0 text-[#9a948b]" />
+      <span className="shrink-0 text-[#8a847a]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已运行"}</span>
+      <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
+      {tool.durationMs !== undefined && <span className="shrink-0 text-[#aaa49a]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tool.status === "error" ? "bg-[#d83b01]" : tool.status === "running" ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
+    </div>
+  );
+}
+
+function AssistantProcessSummary({ event, tools, label }: { event: AssistantEvent; tools: ToolEvent[]; label: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const thinkingBlocks = getThinkingBlocks(event);
+  const items: ProcessItem[] = [
+    ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
+    ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
+  ].sort((a, b) => (
+    (a.type === "thinking" ? a.block.timestamp : a.tool.timestamp) -
+    (b.type === "thinking" ? b.block.timestamp : b.tool.timestamp)
+  ));
+  const hasDetails = items.length > 0;
+
+  return (
+    <div className="w-full border-b border-[#ece8df]" style={{ paddingBottom: expanded && hasDetails ? 14 : 12 }}>
+      <button
+        type="button"
+        onClick={() => hasDetails && setExpanded((value) => !value)}
+        disabled={!hasDetails}
+        className="flex h-8 items-center rounded-lg text-[15px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#625d55] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[#8a847a]"
+        style={{ gap: 8, paddingLeft: 4, paddingRight: 12 }}
+      >
+        {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
+        <span>{label}</span>
+        {hasDetails && (
+          <span className="text-[13px] text-[#aaa49a]">
+            {thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段思考` : ""}
+            {thinkingBlocks.length > 0 && tools.length > 0 ? " · " : ""}
+            {tools.length > 0 ? `${tools.length} 条命令` : ""}
+          </span>
+        )}
+      </button>
+      {expanded && hasDetails && (
+        <div className="mt-2 flex flex-col rounded-xl border border-[#eee9e1] bg-[#fffdfa]" style={{ gap: 10, padding: "12px 14px" }}>
+          {items.map((item, index) => (
+            item.type === "thinking"
+              ? <ThinkingProcessItem key={item.block.id || `thinking-${index}`} block={item.block} />
+              : <ToolProcessItem key={item.tool.id} tool={item.tool} />
           ))}
         </div>
       )}
@@ -286,60 +389,32 @@ function AssistantToolSummary({ tools }: { tools: Extract<TimelineEvent, { type:
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[] }) {
-  const [showThinking, setShowThinking] = useState(false);
+function AssistantMessageBubble({ event, leadingTools = [], changedFiles = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; changedFiles?: string[] }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const hasContent = event.content.trim().length > 0;
-  const hasThinking = Boolean(event.thinking?.trim());
+  const changedSet = new Set(changedFiles.map((f) => f.toLowerCase()));
   const mdArtifacts = Array.from(new Set(
     event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
-  )).slice(0, 3);
+  )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
   const isActivelyThinking = Boolean(currentSession?.id && runningSessionId === currentSession.id && event.isThinking && !event.isComplete);
   const elapsed = useElapsed(event.timestamp, isActivelyThinking);
   const durationLabel = event.isComplete
     ? formatDuration(event.durationMs ?? elapsed)
     : formatDuration(elapsed);
+  const processLabel = event.isComplete
+    ? `已处理 ${durationLabel}`
+    : isActivelyThinking
+      ? `正在思考 ${durationLabel}`
+      : `已处理 ${durationLabel}`;
 
   return (
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {(event.isThinking || event.isComplete || !hasContent) && (
-          <div
-            className="border-b border-[#ece8df] text-[15px] leading-7 text-[#8a847a]"
-            style={{ paddingTop: 2, paddingBottom: 14 }}
-          >
-            {event.isComplete
-              ? `已处理 ${durationLabel}`
-              : isActivelyThinking
-                ? `正在思考 ${durationLabel}`
-                : `已处理 ${durationLabel}`}
-          </div>
+          <AssistantProcessSummary event={event} tools={leadingTools} label={processLabel} />
         )}
-
-        {hasThinking && (
-          <div>
-            <button
-              onClick={() => setShowThinking(!showThinking)}
-              className="flex h-8 items-center rounded-lg text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#625d55]"
-              style={{ gap: 7, paddingLeft: 4, paddingRight: 10 }}
-            >
-              {showThinking ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-              <span>{showThinking ? "收起思考" : "显示思考"}</span>
-            </button>
-            {showThinking && (
-              <div
-                className="mt-3 rounded-xl border border-[#e5e1d8] bg-[#faf8f4] text-[15px] text-[#706b63]"
-                style={{ paddingLeft: 36, paddingRight: 36, paddingTop: 24, paddingBottom: 24 }}
-              >
-                <pre className="min-w-0 whitespace-pre-wrap break-words font-mono leading-8">{event.thinking}</pre>
-              </div>
-            )}
-          </div>
-        )}
-
-        <AssistantToolSummary tools={leadingTools} />
 
         {hasContent && (
           <>
@@ -373,12 +448,12 @@ function AssistantMessageBubble({ event, leadingTools = [] }: { event: Extract<T
   );
 }
 
-export function MessageBubble({ event, leadingTools }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, changedFiles }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} changedFiles={changedFiles} />;
 }

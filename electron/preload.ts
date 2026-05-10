@@ -32,6 +32,8 @@ import type {
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
   ListSkillsResponse,
+  ImportSkillArchiveRequest,
+  ImportSkillArchiveResponse,
   SaveEnabledSkillsRequest,
   SaveEnabledSkillsResponse,
   OpenTerminalRequest,
@@ -74,6 +76,8 @@ const api = {
     ipcRenderer.invoke("project:listSkills"),
   saveEnabledSkills: (req: SaveEnabledSkillsRequest): Promise<SaveEnabledSkillsResponse> =>
     ipcRenderer.invoke("project:saveEnabledSkills", req),
+  importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
+    ipcRenderer.invoke("project:importSkillArchive", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>

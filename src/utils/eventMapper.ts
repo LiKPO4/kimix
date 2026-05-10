@@ -121,12 +121,15 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         };
       }
       if (partType === "think" && isString(payload.think)) {
+        const id = generateId();
+        const timestamp = Date.now();
         return {
-          id: generateId(),
+          id,
           type: "assistant_message",
-          timestamp: Date.now(),
+          timestamp,
           content: "",
           thinking: payload.think,
+          thinkingParts: [{ id: generateId(), timestamp, text: payload.think }],
           isThinking: true,
           isComplete: false,
         };
@@ -341,16 +344,21 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
-    const hasDuplicate = existing.some(
-      (e) => {
-        if (e.type !== "user_message") return false;
-        const existingContent = normalizeUserContent(e.content);
-        const incomingContent = normalizeUserContent(incoming.content);
-        if (existingContent !== incomingContent) return false;
-        if (incomingContent.length > 0) return true;
-        return getUserImageSignature(e) === getUserImageSignature(incoming);
-      }
+    const lastSubstantiveAssistantIndex = existing.findLastIndex(
+      (e) => e.type === "assistant_message" && (
+        e.isComplete ||
+        e.content.trim().length > 0 ||
+        Boolean(e.thinking?.trim())
+      )
     );
+    const hasDuplicate = existing.some((e, index) => {
+      if (index <= lastSubstantiveAssistantIndex || e.type !== "user_message") return false;
+      const existingContent = normalizeUserContent(e.content);
+      const incomingContent = normalizeUserContent(incoming.content);
+      if (existingContent !== incomingContent) return false;
+      if (incomingContent.length > 0) return true;
+      return getUserImageSignature(e) === getUserImageSignature(incoming);
+    });
     if (hasDuplicate) return existing;
   }
 
@@ -383,6 +391,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         ...last,
         content: last.content + incoming.content,
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
+        thinkingParts: incoming.thinkingParts
+          ? [...(last.thinkingParts ?? []), ...incoming.thinkingParts]
+          : last.thinkingParts,
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
         durationMs: incoming.isComplete ? Math.max(0, incoming.timestamp - last.timestamp) : last.durationMs,

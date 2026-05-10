@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.5.18",
+  "version": "2.5.34",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@moonshot-ai/kimi-agent-sdk": "latest",
+    "adm-zip": "^0.5.17",
     "electron-store": "^10.0.0",
     "highlight.js": "^11.11.1",
     "lucide-react": "latest",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

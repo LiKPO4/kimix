@@ -12,6 +12,9 @@ export interface AppState {
   defaultThinking: boolean;
   detailedContext: boolean;
   statusUpdateDisplay: StatusUpdateDisplay;
+  sessionRecommendationEnabled: boolean;
+  sessionRecommendationTurnLimit: number;
+  handoffSessionId: string | null;
   sidebarOpen: boolean;
   theme: Theme;
 }
@@ -46,6 +49,7 @@ export type TimelineEvent =
   | StatusUpdateEvent
   | FileArtifactEvent
   | ChangeSummaryEvent
+  | SessionRecommendationEvent
   | SubagentEvent
   | CompactionEvent
   | ErrorEvent
@@ -81,9 +85,16 @@ export interface AssistantMessageEvent {
   timestamp: number;
   content: string;
   thinking?: string;
+  thinkingParts?: ThinkingPart[];
   isThinking: boolean;
   isComplete: boolean;
   durationMs?: number;
+}
+
+export interface ThinkingPart {
+  id: string;
+  timestamp: number;
+  text: string;
 }
 
 export interface ToolCallEvent {
@@ -173,6 +184,17 @@ export interface ChangeSummaryEvent {
   files: ChangeSummaryFile[];
   additions: number;
   deletions: number;
+}
+
+export interface SessionRecommendationEvent {
+  id: string;
+  type: "session_recommendation";
+  timestamp: number;
+  reason: "turn_limit";
+  turnCount: number;
+  turnLimit: number;
+  handoffStatus?: "running" | "completed" | "error";
+  handoffError?: string;
 }
 
 export interface SubagentEvent {

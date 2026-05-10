@@ -1,4 +1,4 @@
-import { ChevronDown, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -28,6 +28,7 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
   const updateSession = useSessionStore((s) => s.updateSession);
   const [reverting, setReverting] = useState(false);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const files = event?.files ?? (changes ?? []).map((change) => ({
     path: change.path,
     additions: change.additions ?? Math.max(0, countLines(change.newText) - countLines(change.oldText)),
@@ -56,14 +57,34 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
     }
   };
 
+  const renderFileRow = (file: { path: string; additions?: number; deletions?: number }, showChevron = true) => (
+    <div
+      key={file.path}
+      className="flex min-h-11 items-center border-b border-[#f0ece5] last:border-b-0"
+      style={{ paddingLeft: 22, paddingRight: 30 }}
+    >
+      <span className="min-w-0 flex-1 truncate text-[14.5px] text-[#24211d]">{file.path}</span>
+      <span className="shrink-0 text-[14px] text-[#009a44]">+{file.additions ?? 0}</span>
+      <span className="shrink-0 text-[14px] text-[#d83b01]" style={{ marginLeft: 10 }}>-{file.deletions ?? 0}</span>
+      {showChevron && <ChevronDown size={15} className="shrink-0 text-[#8f887e]" style={{ marginLeft: 18 }} />}
+    </div>
+  );
+
   return (
     <div className="w-full overflow-hidden rounded-[14px] border border-[#e8e3da] bg-white">
-      <div className="flex min-h-12 items-center border-b border-[#eee9e1]" style={{ paddingLeft: 18, paddingRight: 18 }}>
-        <div className="min-w-0 flex-1 text-[15px] leading-6 text-[#24211d]">
+      <div className="flex min-h-12 items-center border-b border-[#eee9e1]" style={{ paddingLeft: 22, paddingRight: 30 }}>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex h-8 items-center rounded-lg text-[15px] leading-6 text-[#24211d] transition-colors hover:bg-[#f3f1ec]"
+          style={{ gap: 8, paddingLeft: 4, paddingRight: 8 }}
+        >
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           <span>{files.length} 个文件已更改</span>
-          <span className="ml-2 text-[#009a44]">+{additions}</span>
-          <span className="ml-1 text-[#d83b01]">-{deletions}</span>
-        </div>
+          <span className="text-[#009a44]">+{additions}</span>
+          <span className="text-[#d83b01]">-{deletions}</span>
+        </button>
+        <div className="min-w-0 flex-1" />
         <button
           type="button"
           onClick={handleRevert}
@@ -76,21 +97,24 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
         </button>
       </div>
       <div>
-        {files.map((file) => (
-          <div
-            key={file.path}
-            className="flex min-h-11 items-center border-b border-[#f0ece5] last:border-b-0"
-            style={{ paddingLeft: 18, paddingRight: 18 }}
-          >
-            <span className="min-w-0 flex-1 truncate text-[14.5px] text-[#24211d]">{file.path}</span>
-            <span className="shrink-0 text-[14px] text-[#009a44]">+{file.additions ?? 0}</span>
-            <span className="ml-1 shrink-0 text-[14px] text-[#d83b01]">-{file.deletions ?? 0}</span>
-            <ChevronDown size={15} className="ml-4 shrink-0 text-[#8f887e]" />
-          </div>
-        ))}
+        {expanded ? (
+          files.map((file) => renderFileRow(file))
+        ) : (
+          <>
+            {files.length > 0 && renderFileRow(files[0])}
+            {files.length > 1 && (
+              <div
+                className="flex min-h-11 items-center border-b border-[#f0ece5] last:border-b-0"
+                style={{ paddingLeft: 22, paddingRight: 30 }}
+              >
+                <span className="text-[14.5px] text-[#8a847a]">……</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
       {error && (
-        <div className="border-t border-[#f0ece5] text-[13px] leading-5 text-[#b42318]" style={{ padding: "10px 18px" }}>
+        <div className="border-t border-[#f0ece5] text-[13px] leading-5 text-[#b42318]" style={{ padding: "10px 22px" }}>
           撤销失败：{error}
         </div>
       )}

@@ -7,14 +7,158 @@ import type { PendingMessage } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
+
+const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent的提示词，注意回复内容中应该仅仅包含这段提示词。如果没有agent.md文档，请根据以下形式总结并给出提示词
+- 项目背景
+- 当前目标
+- 已完成
+- 未完成
+- 阻塞
+- 关键文件/命令
+- 下一步最小行动`;
+
+interface HandoffJob {
+  sourceSessionId: string;
+  projectPath: string;
+  recommendationEventId: string;
+  events: TimelineEvent[];
+}
+
+interface StartHandoffDetail {
+  sourceSessionId: string;
+  projectPath: string;
+  recommendationEventId: string;
+}
 
 function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
-  return events.flatMap((event) => {
+  const settled = events.flatMap((event) => {
     if (event.type !== "assistant_message" || event.isComplete) return [event];
     const hasContent = event.content.trim().length > 0;
     const hasThinking = Boolean(event.thinking?.trim());
     if (!hasContent && !hasThinking) return [];
     return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? 0 }];
+  });
+  return closeOpenCompaction(settled);
+}
+
+function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
+  const lastCompaction = [...events].reverse().find((event) => event.type === "compaction");
+  if (!lastCompaction || lastCompaction.type !== "compaction" || lastCompaction.phase !== "begin") {
+    return events;
+  }
+  return [
+    ...events,
+    {
+      id: Math.random().toString(36).substring(2, 11),
+      type: "compaction",
+      timestamp: Date.now(),
+      phase: "end",
+    },
+  ];
+}
+
+function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: boolean, turnLimit: number): TimelineEvent[] {
+  const sessionLike = {
+    id: "",
+    title: "",
+    projectPath: "",
+    createdAt: 0,
+    updatedAt: 0,
+    events,
+    isLoading: false,
+  };
+  if (!shouldRecommendNewSession(sessionLike, enabled, turnLimit)) return events;
+  const turnCount = countUserTurns(events);
+  const latest = events.at(-1);
+  if (
+    latest?.type === "session_recommendation" &&
+    latest.reason === "turn_limit" &&
+    latest.turnCount === turnCount &&
+    latest.turnLimit === turnLimit
+  ) {
+    return events;
+  }
+  return [
+    ...events,
+    {
+      id: crypto.randomUUID(),
+      type: "session_recommendation",
+      timestamp: Date.now(),
+      reason: "turn_limit",
+      turnCount,
+      turnLimit,
+    },
+  ];
+}
+
+function updateRecommendationEvent(sessionId: string, eventId: string, patch: Partial<Extract<TimelineEvent, { type: "session_recommendation" }>>) {
+  useSessionStore.getState().updateSession(sessionId, (session) => ({
+    ...session,
+    events: session.events.map((event) => (
+      event.type === "session_recommendation" && event.id === eventId
+        ? { ...event, ...patch }
+        : event
+    )),
+    updatedAt: Date.now(),
+  }));
+}
+
+function extractAssistantContent(events: TimelineEvent[]): string {
+  const assistant = [...settleInactiveEvents(events)]
+    .reverse()
+    .find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message" && event.content.trim().length > 0);
+  return assistant?.content.trim() ?? "";
+}
+
+async function createSessionAndSendPrompt(projectPath: string, content: string) {
+  const appState = useAppStore.getState();
+  const sessionStore = useSessionStore.getState();
+  const sessionRes = await window.api.startSession({
+    workDir: projectPath,
+    model: "kimi-code/kimi-for-coding",
+    thinking: appState.defaultThinking,
+    yoloMode: appState.permissionMode === "yolo",
+  });
+  if (!sessionRes.success) throw new Error(sessionRes.error);
+
+  const session = {
+    id: sessionRes.data.sessionId,
+    title: "交接新会话",
+    projectPath,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    events: [] as TimelineEvent[],
+    isLoading: false,
+  };
+  sessionStore.addSession(session);
+  appState.setCurrentSession(session);
+
+  const userEvent: TimelineEvent = {
+    id: crypto.randomUUID(),
+    type: "user_message",
+    timestamp: Date.now(),
+    content,
+  };
+  const responsePlaceholder: TimelineEvent = {
+    id: crypto.randomUUID(),
+    type: "assistant_message",
+    timestamp: Date.now(),
+    content: "",
+    isThinking: appState.defaultThinking,
+    isComplete: false,
+  };
+  useSessionStore.getState().updateSession(session.id, (current) => ({
+    ...current,
+    events: [userEvent, responsePlaceholder],
+    updatedAt: Date.now(),
+  }));
+  useAppStore.getState().setRunningSessionId(session.id);
+  await window.api.sendPrompt({
+    sessionId: session.id,
+    content,
+    thinking: appState.defaultThinking,
+    yoloMode: appState.permissionMode === "yolo",
   });
 }
 
@@ -24,6 +168,9 @@ function App() {
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
+  const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
+  const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
+  const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
@@ -36,6 +183,7 @@ function App() {
   currentSessionRef.current = currentSession;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bootstrapDoneRef = useRef(false);
+  const handoffJobRef = useRef<HandoffJob | null>(null);
 
   useEffect(() => {
     window.api.getSettings().then((res) => {
@@ -45,6 +193,8 @@ function App() {
         setDefaultThinking(res.data.defaultThinking);
         setDetailedContext(res.data.detailedContext);
         setStatusUpdateDisplay(res.data.statusUpdateDisplay);
+        setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
+        setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
       }
     }).catch(() => {});
 
@@ -152,10 +302,85 @@ function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
+    const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
+      handoffJobRef.current = null;
+      if (status !== "completed") {
+        setHandoffSessionId(null);
+        setRunningSessionId(null);
+        updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, {
+          handoffStatus: "error",
+          handoffError: status === "interrupted" ? "交接生成被中断" : "交接生成失败",
+        });
+        return;
+      }
+      const content = extractAssistantContent(job.events);
+      if (!content) {
+        setHandoffSessionId(null);
+        setRunningSessionId(null);
+        updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, {
+          handoffStatus: "error",
+          handoffError: "未生成可用交接内容",
+        });
+        return;
+      }
+      try {
+        await createSessionAndSendPrompt(job.projectPath, content);
+        setHandoffSessionId(null);
+        updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, { handoffStatus: "completed" });
+      } catch (err) {
+        setHandoffSessionId(null);
+        setRunningSessionId(null);
+        updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, {
+          handoffStatus: "error",
+          handoffError: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+
+    const handleStartHandoff = (event: Event) => {
+      const detail = (event as CustomEvent<StartHandoffDetail>).detail;
+      if (!detail?.sourceSessionId || !detail.projectPath || !detail.recommendationEventId) return;
+      if (handoffJobRef.current) return;
+      handoffJobRef.current = {
+        sourceSessionId: detail.sourceSessionId,
+        projectPath: detail.projectPath,
+        recommendationEventId: detail.recommendationEventId,
+        events: [],
+      };
+      setHandoffSessionId(detail.sourceSessionId);
+      setRunningSessionId(detail.sourceSessionId);
+      updateRecommendationEvent(detail.sourceSessionId, detail.recommendationEventId, {
+        handoffStatus: "running",
+        handoffError: undefined,
+      });
+      window.api.sendPrompt({
+        sessionId: detail.sourceSessionId,
+        content: HANDOFF_PROMPT,
+        thinking: useAppStore.getState().defaultThinking,
+        yoloMode: useAppStore.getState().permissionMode === "yolo",
+      }).catch((err) => {
+        const job = handoffJobRef.current;
+        if (!job) return;
+        handoffJobRef.current = null;
+        setHandoffSessionId(null);
+        setRunningSessionId(null);
+        updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, {
+          handoffStatus: "error",
+          handoffError: err instanceof Error ? err.message : String(err),
+        });
+      });
+    };
+    window.addEventListener("kimix:startHandoff", handleStartHandoff);
+
     const unsubscribeEvent = window.api.onKimiEvent((payload) => {
       if (!payload.event) return;
       const mapped = mapStreamEvent(payload.event);
       if (mapped) {
+        const handoffJob = handoffJobRef.current;
+        if (handoffJob?.sourceSessionId === payload.sessionId) {
+          handoffJob.events = mergeEvents(handoffJob.events, mapped);
+          return;
+        }
         updateSession(payload.sessionId, (session) => {
           const events = mergeEvents(session.events, mapped);
           const title = deriveSessionTitle(events, session.title);
@@ -165,6 +390,18 @@ function App() {
     });
 
     const unsubscribeStatus = window.api.onKimiStatus((payload) => {
+      const handoffJob = handoffJobRef.current;
+      if (handoffJob?.sourceSessionId === payload.sessionId) {
+        if (payload.status === "running") {
+          setRunningSessionId(payload.sessionId);
+          return;
+        }
+        if (["completed", "error", "interrupted"].includes(payload.status)) {
+          void finishHandoffJob(handoffJob, payload.status as "completed" | "error" | "interrupted");
+          return;
+        }
+      }
+
       if (payload.status === "running") {
         setRunningSessionId(payload.sessionId);
         return;
@@ -179,7 +416,7 @@ function App() {
       if (payload.status === "error" || payload.status === "interrupted") {
         updateSession(payload.sessionId, (session) => ({
           ...session,
-          events: session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)),
+          events: closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete))),
           updatedAt: Date.now(),
         }));
       }
@@ -187,7 +424,11 @@ function App() {
       if (payload.status === "completed") {
         updateSession(payload.sessionId, (session) => ({
           ...session,
-          events: settleInactiveEvents(session.events),
+          events: appendSessionRecommendationIfNeeded(
+            settleInactiveEvents(session.events),
+            useAppStore.getState().sessionRecommendationEnabled,
+            useAppStore.getState().sessionRecommendationTurnLimit,
+          ),
           updatedAt: Date.now(),
         }));
 
@@ -273,7 +514,9 @@ function App() {
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
         state.detailedContext !== prev.detailedContext ||
-        state.statusUpdateDisplay !== prev.statusUpdateDisplay
+        state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
+        state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
+        state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit
       ) {
         window.api.saveSettings({
           theme: state.theme,
@@ -281,6 +524,8 @@ function App() {
           defaultThinking: state.defaultThinking,
           detailedContext: state.detailedContext,
           statusUpdateDisplay: state.statusUpdateDisplay,
+          sessionRecommendationEnabled: state.sessionRecommendationEnabled,
+          sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
         }).catch(() => {});
       }
     });
@@ -289,13 +534,14 @@ function App() {
       unsubscribeEvent();
       unsubscribeStatus();
       unsubscribeBootstrap();
+      window.removeEventListener("kimix:startHandoff", handleStartHandoff);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       unsubSettings();
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
+  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
 
   return (
     <ThemeProvider>

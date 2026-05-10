@@ -17,6 +17,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showThinking: true,
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
+  sessionRecommendationEnabled: true,
+  sessionRecommendationTurnLimit: 10,
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,

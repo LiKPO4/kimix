@@ -307,6 +307,21 @@ export type SaveEnabledSkillsResponse = {
   error: string;
 };
 
+export type ImportSkillArchiveRequest = {
+  archivePath?: string;
+};
+
+export type ImportSkillArchiveResponse = {
+  success: true;
+  data: {
+    imported: SkillInfo[];
+    skills: SkillInfo[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type AppInfoResponse = {
   success: true;
   data: {
@@ -368,6 +383,8 @@ export type AppSettings = {
   showThinking: boolean;
   detailedContext: boolean;
   statusUpdateDisplay: "each" | "turn_end";
+  sessionRecommendationEnabled: boolean;
+  sessionRecommendationTurnLimit: number;
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   autoReadAgentsMd: boolean;

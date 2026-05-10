@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent, PermissionMode } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel } from "./TodoPanel";
+import { ContextRing } from "./ContextRing";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -56,7 +57,7 @@ const unsupportedSlashHints: Record<string, string> = {
   usage: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时、本周和本月用量。",
 };
 
-const skillCommandPattern = /^\/skill:([^\s]+)(?:\s|$)/;
+const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
 
 const mentionBaseItems: CompletionItem[] = [
   { id: "agent-explorer", label: "Explorer Fast", detail: "快速探索代码库", insertText: "@Explorer Fast ", kind: "agent" },
@@ -89,6 +90,7 @@ export function Composer() {
   const inputRef = useRef<ComposerInputHandle>(null);
 
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const handoffSessionId = useAppStore((s) => s.handoffSessionId);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
@@ -105,6 +107,7 @@ export function Composer() {
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const removePendingMessage = useSessionStore((s) => s.removePendingMessage);
   const reorderPendingMessage = useSessionStore((s) => s.reorderPendingMessage);
+  const liveSession = useSessionStore((s) => s.sessions.find((session) => session.id === currentSession?.id));
 
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
   const [showThinkingMenu, setShowThinkingMenu] = useState(false);
@@ -115,10 +118,12 @@ export function Composer() {
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const thinkingBtnRef = useRef<HTMLDivElement>(null);
-  const isCurrentSessionRunning = Boolean(currentSession && runningSessionId === currentSession.id);
-  const hasUnfinishedAssistant = Boolean(currentSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
+  const activeSession = liveSession ?? currentSession;
+  const isCurrentSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
+  const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
+  const hasUnfinishedAssistant = Boolean(activeSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
   const shouldShowStopButton = Boolean(isCurrentSessionRunning || hasUnfinishedAssistant);
-  const canUseComposer = Boolean(currentSession || currentProject);
+  const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
   const allowedSlashNames = new Set(slashCommands.flatMap((item) => item.commandName ? [item.commandName] : []));
 
   useEffect(() => {
@@ -145,7 +150,12 @@ export function Composer() {
     }
     let cancelled = false;
     void window.api.listSlashCommands({ sessionId: currentSession.id }).then((res) => {
-      if (cancelled || !res.success) return;
+      if (cancelled) return;
+      if (!res.success) {
+        console.warn("List slash commands failed:", res.error);
+        setSlashCommands([]);
+        return;
+      }
       setSlashCommands(res.data.map((command) => ({
         id: `slash-${command.name}`,
         label: `/${command.name}`,
@@ -154,6 +164,10 @@ export function Composer() {
         commandName: command.name,
         kind: "slash",
       })));
+    }).catch((err) => {
+      if (cancelled) return;
+      console.warn("List slash commands failed:", err);
+      setSlashCommands([]);
     });
     return () => {
       cancelled = true;
@@ -316,28 +330,121 @@ export function Composer() {
     }
   };
 
+  const appendLocalEvent = async (event: TimelineEvent) => {
+    const targetSession = await ensureSession();
+    if (!targetSession) return null;
+    updateSession(targetSession.id, (session) => ({
+      ...session,
+      events: [...session.events, event],
+      updatedAt: Date.now(),
+    }));
+    return targetSession;
+  };
+
+  const applySkillCommand = async (skillName: string) => {
+    const skillRes = await window.api.listSkills();
+    if (!skillRes.success) {
+      await appendLocalEvent({
+        id: genId(),
+        type: "error",
+        timestamp: Date.now(),
+        message: `启用 Skill 失败：${skillRes.error}`,
+        source: "ui",
+      });
+      return false;
+    }
+
+    const normalizedName = skillName.trim().toLowerCase();
+    const skill = skillRes.data.skills.find((item) => (
+      item.name.toLowerCase() === normalizedName ||
+      item.path.toLowerCase().includes(`\\${normalizedName}\\skill.md`) ||
+      item.path.toLowerCase().includes(`/${normalizedName}/skill.md`)
+    ));
+    if (!skill) {
+      await appendLocalEvent({
+        id: genId(),
+        type: "error",
+        timestamp: Date.now(),
+        message: `未找到 Skill：${skillName}。请在左侧“技能”面板确认名称后再发送。`,
+        source: "ui",
+      });
+      return false;
+    }
+
+    const nextNames = Array.from(new Set([...skillRes.data.enabledNames, skill.name]));
+    const saveRes = await window.api.saveEnabledSkills({ names: nextNames });
+    if (!saveRes.success) {
+      await appendLocalEvent({
+        id: genId(),
+        type: "error",
+        timestamp: Date.now(),
+        message: `启用 Skill 失败：${saveRes.error}`,
+        source: "ui",
+      });
+      return false;
+    }
+
+    const targetSession = await ensureSession();
+    if (!targetSession) return false;
+    const startRes = await window.api.startSession({
+      workDir: targetSession.projectPath,
+      sessionId: targetSession.id,
+      model: "kimi-code/kimi-for-coding",
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+      skillsDir: saveRes.data.enabledDir,
+    });
+    if (!startRes.success) {
+      await appendLocalEvent({
+        id: genId(),
+        type: "error",
+        timestamp: Date.now(),
+        message: `Skill 已保存，但刷新当前会话失败：${startRes.error}`,
+        source: "ui",
+      });
+      return false;
+    }
+
+    setSlashCommands((startRes.data.slashCommands ?? []).map((command) => ({
+      id: `slash-${command.name}`,
+      label: `/${command.name}`,
+      detail: command.description,
+      insertText: `/${command.name} `,
+      commandName: command.name,
+      kind: "slash",
+    })));
+    updateSession(targetSession.id, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        {
+          id: genId(),
+          type: "status_update",
+          timestamp: Date.now(),
+          message: `已启用 Skill：${skill.name}`,
+        },
+      ],
+      updatedAt: Date.now(),
+    }));
+    return true;
+  };
+
   const handleSend = async () => {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
     const skillMatch = trimmed.match(skillCommandPattern);
     if (skillMatch) {
-      const targetSession = await ensureSession();
-      if (!targetSession) return;
-      updateSession(targetSession.id, (session) => ({
-        ...session,
-        events: [
-          ...session.events,
-          {
-            id: genId(),
-            type: "error",
-            timestamp: Date.now(),
-            message: `/skill:${skillMatch[1]} 已拦截：Kimix 不把这个写法当作 Skill 触发协议发送。请在左侧“技能”面板勾选启用；启用后新会话会通过 Kimi CLI 的 --skills-dir 使用 Skill。`,
-            source: "ui",
-          },
-        ],
-        updatedAt: Date.now(),
-      }));
+      const skillName = skillMatch[1];
+      const restContent = (skillMatch[2] ?? "").trim();
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      const applied = await applySkillCommand(skillName);
+      if (applied && (restContent || imagesToSend.length > 0)) {
+        await sendPromptContent(restContent, { images: imagesToSend });
+      }
       return;
     }
     const slashMatch = trimmed.match(/^\/([^\s/]+)(?:\s|$)/);
@@ -380,10 +487,27 @@ export function Composer() {
   };
 
   const handleStop = async () => {
-    const sessionId = hasUnfinishedAssistant && currentSession ? currentSession.id : runningSessionId ?? currentSession?.id;
+    const stateRunningSessionId = useAppStore.getState().runningSessionId;
+    const sessionId = hasUnfinishedAssistant && activeSession ? activeSession.id : stateRunningSessionId ?? activeSession?.id;
     if (!sessionId) return;
-    if (runningSessionId === sessionId) setRunningSessionId(null);
-    if (currentSession?.id === sessionId) {
+    if (stateRunningSessionId === sessionId) setRunningSessionId(null);
+    updateSession(sessionId, (session) => ({
+      ...session,
+      events: session.events.map((event) => event.type === "assistant_message" && !event.isComplete
+        ? { ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, Date.now() - event.timestamp) }
+        : event
+      ),
+      updatedAt: Date.now(),
+    }));
+    if (activeSession?.id === sessionId) {
+      const updated = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+      if (updated) setCurrentSession(updated);
+    }
+    window.setTimeout(() => {
+      const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+      if (!latest) return;
+      const hasOpenAssistant = latest.events.some((event) => event.type === "assistant_message" && !event.isComplete);
+      if (!hasOpenAssistant) return;
       updateSession(sessionId, (session) => ({
         ...session,
         events: session.events.map((event) => event.type === "assistant_message" && !event.isComplete
@@ -392,7 +516,7 @@ export function Composer() {
         ),
         updatedAt: Date.now(),
       }));
-    }
+    }, 250);
     try {
       const res = await window.api.stopTurn({ sessionId });
       if (!res.success) {
@@ -539,7 +663,9 @@ export function Composer() {
 
   const placeholder = canUseComposer
     ? "向 Kimi 询问任何事。输入 @ 使用插件或提及文件"
-    : "请先选择项目";
+    : isCurrentSessionHandoff
+      ? "正在生成交接内容..."
+      : "请先选择项目";
 
   return (
     <div
@@ -787,6 +913,7 @@ export function Composer() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
+            <ContextRing />
             <div ref={thinkingBtnRef} className="relative">
               <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="kimix-icon-text-button is-compact min-w-[126px] text-[#625d55] hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35">
                 <Brain size={14} className="shrink-0" />
@@ -814,7 +941,7 @@ export function Composer() {
                 <span className="h-2.5 w-2.5 rounded-[2px] bg-white" />
               </button>
             ) : (
-              <button onClick={handleSend} disabled={(!input.trim() && imageAttachments.length === 0) || !canUseComposer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#9bd8ff] text-white transition-colors hover:bg-[#72c7ff] disabled:bg-[#ece9e3] disabled:text-[#aaa49a]" title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
+              <button onClick={handleSend} disabled={(!input.trim() && imageAttachments.length === 0) || !canUseComposer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#339af0] text-white transition-colors hover:bg-[#228be6] disabled:bg-[#ece9e3] disabled:text-[#aaa49a]" title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
                 <ArrowUp size={17} strokeWidth={2.5} />
               </button>
             )}

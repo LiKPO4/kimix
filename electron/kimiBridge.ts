@@ -21,6 +21,13 @@ type WarmableSession = Session & {
   getClientWithConfigCheck?: () => Promise<unknown>;
 };
 
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeoutError";
+  }
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 export function setMainWindow(win: BrowserWindow | null) {
@@ -94,7 +101,10 @@ async function warmSessionMetadata(session: Session) {
   const warmable = session as WarmableSession;
   if (typeof warmable.getClientWithConfigCheck !== "function") return;
   try {
-    await warmable.getClientWithConfigCheck();
+    await Promise.race([
+      warmable.getClientWithConfigCheck(),
+      new Promise((_, reject) => setTimeout(() => reject(new TimeoutError("Kimi session metadata warm timed out")), 5000)),
+    ]);
   } catch (err) {
     console.error(`Failed to warm session metadata ${session.sessionId}:`, err);
   }

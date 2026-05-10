@@ -33,9 +33,12 @@ function UsageProgress({ period }: { period: UsagePeriod }) {
   );
 }
 
+function showPendingToast() {
+  window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "待实现" }));
+}
+
 export function ContextBar() {
   const project = useAppStore((s) => s.currentProject);
-  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
   const [gitBranch, setGitBranch] = useState<string | null>(null);
@@ -43,13 +46,6 @@ export function ContextBar() {
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const usageMenuRef = useRef<HTMLDivElement>(null);
-
-  const handleOpenProject = async () => {
-    const res = await window.api.openProject({ defaultPath: project?.path });
-    if (res.success && res.data) {
-      setCurrentProject(res.data);
-    }
-  };
 
   const handleExport = () => {
     if (!session) return;
@@ -151,12 +147,15 @@ export function ContextBar() {
     <div className="flex h-[34px] w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[#7c756c]">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
-          onClick={handleOpenProject}
-          className="kimix-icon-text-button is-compact min-w-0 hover:bg-[#f1eee8] hover:text-[#3a362f]"
-          title={project?.path ?? "选择项目"}
+          type="button"
+          onClick={showPendingToast}
+          className="flex min-h-8 min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          style={{ gap: 8, paddingLeft: 12, paddingRight: 12 }}
+          title={project?.path ?? "当前项目"}
+          aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
         >
           <FolderOpen size={16} className="shrink-0" />
-          <span className="max-w-[220px] truncate">{project?.name ?? "选择项目"}</span>
+          <span className="max-w-[220px] truncate">{project?.name ?? "未选择项目"}</span>
         </button>
         <div ref={usageMenuRef} className="relative hidden min-w-0 sm:block">
           <button
@@ -206,10 +205,17 @@ export function ContextBar() {
           )}
         </div>
         {gitBranch && (
-          <div className="hidden min-w-0 items-center gap-1.5 md:flex" title={gitBranch}>
+          <button
+            type="button"
+            onClick={showPendingToast}
+            className="hidden min-h-8 min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f] md:flex"
+            style={{ gap: 8, paddingLeft: 12, paddingRight: 12 }}
+            title={gitBranch}
+            aria-label={`当前分支：${gitBranch}`}
+          >
             <GitBranch size={16} className="shrink-0" />
             <span className="max-w-[150px] truncate">{gitBranch}</span>
-          </div>
+          </button>
         )}
       </div>
 

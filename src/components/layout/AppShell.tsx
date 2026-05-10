@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
@@ -9,29 +9,41 @@ import { SkillsPanel } from "./SkillsPanel";
 import {
   ArrowLeft,
   ArrowRight,
+  Archive,
   BookOpen,
   ChevronDown,
   Code2,
   Copy,
+  Clipboard,
+  ClipboardCopy,
   Ellipsis,
   ExternalLink,
+  FileText,
   FolderOpen,
+  GitFork,
   GitBranch,
   HelpCircle,
   History,
   Info,
   Keyboard,
+  Laptop,
+  Link,
   Minus,
+  MessageSquarePlus,
   PanelLeft,
   PanelRight,
+  Pencil,
+  Pin,
   Play,
   RefreshCw,
   Square,
   SquareTerminal,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import type { Session, TimelineEvent } from "@/types/ui";
 
 type MenuAction =
   | "close-chat"
@@ -85,6 +97,10 @@ type MenuEntry =
   | { type?: "item"; label: string; hint?: string; action: MenuAction; disabled?: boolean; note?: string };
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
+
+type SessionMenuEntry =
+  | { type: "separator" }
+  | { type?: "item"; label: string; hint?: string; icon: LucideIcon; disabled?: boolean; action: () => void | Promise<void> };
 
 type ReleaseInfo = {
   tagName: string;
@@ -262,6 +278,39 @@ function formatReleaseDate(value: string): string {
   return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
+function formatEventAsMarkdown(event: TimelineEvent): string {
+  if (event.type === "user_message") {
+    const imageLines = event.images?.length
+      ? `\n\n${event.images.map((image) => `![${image.name}](${image.dataUrl ?? image.name})`).join("\n")}`
+      : "";
+    return `## 用户\n\n${event.content || "[图片]"}${imageLines}`;
+  }
+  if (event.type === "steer_message") return `## 用户引导\n\n${event.content}`;
+  if (event.type === "assistant_message") {
+    const thinking = event.thinking ? `\n\n<details>\n<summary>思考</summary>\n\n${event.thinking}\n\n</details>` : "";
+    return `## Kimi\n\n${event.content || ""}${thinking}`;
+  }
+  if (event.type === "tool_call") return `> 命令：${event.toolName}\n>\n> ${event.rawArguments ?? JSON.stringify(event.arguments)}`;
+  if (event.type === "status_update") return `> 状态：${event.message ?? "处理中"}`;
+  if (event.type === "change_summary") return `> 已更改 ${event.files.length} 个文件，+${event.additions} -${event.deletions}`;
+  if (event.type === "file_artifact") return `> 文件：${event.filePath}`;
+  if (event.type === "error") return `> 错误：${event.message}`;
+  if (event.type === "todo") return `> TodoList：${event.items.length} 项`;
+  if (event.type === "session_recommendation") return `> 会话建议：已进行 ${event.turnCount} 轮，推荐上限 ${event.turnLimit} 轮。`;
+  if (event.type === "compaction") return `> 上下文压缩${event.phase === "begin" ? "开始" : "完成"}`;
+  if (event.type === "diff") return `> Diff：${event.filePath}`;
+  if (event.type === "approval_request") return `> 审批请求：${event.description}`;
+  if (event.type === "tool_result") return `> 工具结果：${event.toolName}`;
+  if (event.type === "subagent") return `> 子任务：${event.agentName} ${event.status}`;
+  return "";
+}
+
+function sessionToMarkdown(session: Session): string {
+  const header = `# ${session.title}\n\n- 会话 ID：${session.id}\n- 工作目录：${session.projectPath}\n`;
+  const body = session.events.map(formatEventAsMarkdown).filter(Boolean).join("\n\n---\n\n");
+  return `${header}\n${body}\n`;
+}
+
 export function AppShell() {
   const currentSession = useAppStore((s) => s.currentSession);
   const currentProject = useAppStore((s) => s.currentProject);
@@ -284,6 +333,9 @@ export function AppShell() {
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const [helpDialog, setHelpDialog] = useState<HelpDialog | null>(null);
   const [infoTopic, setInfoTopic] = useState<{ title: string; body: string; url?: string } | null>(null);
@@ -299,9 +351,31 @@ export function AppShell() {
     const close = () => {
       setOpenMenu(null);
       setProjectMenuOpen(false);
+      setSessionMenuOpen(false);
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const showToast = (message = "待实现") => {
+    setToastMessage(message);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 1600);
+  };
+
+  useEffect(() => {
+    const handleToast = (event: Event) => {
+      const detail = event instanceof CustomEvent && typeof event.detail === "string" ? event.detail : "待实现";
+      showToast(detail);
+    };
+    window.addEventListener("kimix:toast", handleToast);
+    return () => {
+      window.removeEventListener("kimix:toast", handleToast);
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -468,8 +542,50 @@ export function AppShell() {
     setOpenMenu(null);
   };
 
-  const sessionTitle = currentSession?.title || "新对话";
+  const liveCurrentSession = useMemo(
+    () => sessions.find((session) => session.id === currentSession?.id) ?? currentSession,
+    [sessions, currentSession],
+  );
+  const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
+  const copyToClipboard = async (text: string, successMessage = "已复制") => {
+    await navigator.clipboard.writeText(text);
+    showToast(successMessage);
+  };
+  const renameCurrentSession = () => {
+    if (!liveCurrentSession) {
+      showToast("当前没有对话");
+      return;
+    }
+    const nextTitle = window.prompt("重命名对话", liveCurrentSession.title)?.trim();
+    if (!nextTitle || nextTitle === liveCurrentSession.title) return;
+    const updatedAt = Date.now();
+    updateSession(liveCurrentSession.id, (session) => ({ ...session, title: nextTitle, updatedAt }));
+    setCurrentSession({ ...liveCurrentSession, title: nextTitle, updatedAt });
+    showToast("已重命名");
+  };
+  const sessionMenuItems: SessionMenuEntry[] = [
+    { label: "置顶对话", hint: "Ctrl+Alt+P", icon: Pin, disabled: true, action: () => undefined },
+    { label: "重命名对话", hint: "Ctrl+Alt+R", icon: Pencil, action: renameCurrentSession },
+    { label: "归档对话", hint: "Ctrl+Shift+A", icon: Archive, disabled: true, action: () => undefined },
+    { type: "separator" },
+    { label: "复制工作目录", hint: "Ctrl+Shift+C", icon: ClipboardCopy, action: () => copyToClipboard(projectPath ?? liveCurrentSession?.projectPath ?? "", "已复制工作目录") },
+    { label: "复制会话 ID", hint: "Ctrl+Alt+C", icon: Clipboard, action: () => copyToClipboard(liveCurrentSession?.id ?? "", "已复制会话 ID") },
+    { label: "复制深度链接", hint: "Ctrl+Alt+L", icon: Link, action: () => copyToClipboard(`kimix://session/${liveCurrentSession?.id ?? ""}`, "已复制深度链接") },
+    { label: "复制为 Markdown", icon: FileText, action: () => liveCurrentSession ? copyToClipboard(sessionToMarkdown(liveCurrentSession), "已复制 Markdown") : showToast("当前没有对话") },
+    { type: "separator" },
+    { label: "打开侧边聊天", icon: MessageSquarePlus, disabled: true, action: () => undefined },
+    { label: "派生到本地", icon: Laptop, disabled: true, action: () => undefined },
+    { label: "派生到新工作树", icon: GitFork, disabled: true, action: () => undefined },
+    { label: "添加自动化...", icon: History, disabled: true, action: () => undefined },
+    { type: "separator" },
+    { label: "在新窗口中打开", icon: ExternalLink, disabled: true, action: () => undefined },
+  ];
+  const handleSessionMenuEntry = (entry: SessionMenuEntry) => {
+    if (entry.type === "separator" || entry.disabled) return;
+    void entry.action();
+    setSessionMenuOpen(false);
+  };
   const openProjectPath = () => {
     if (projectPath) void window.api.openProjectPath({ path: projectPath });
     setProjectMenuOpen(false);
@@ -555,17 +671,47 @@ export function AppShell() {
               <div className="max-w-[300px] truncate text-[14px] font-medium text-[#24211d]">
                 {sessionTitle}
               </div>
-              <button
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f]"
-                title="更多"
-                aria-label="更多"
-              >
-                <Ellipsis size={17} />
-              </button>
+              <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => setSessionMenuOpen((open) => !open)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f] ${sessionMenuOpen ? "bg-[#f3f1ec] text-[#3a362f]" : ""}`}
+                  title="更多"
+                  aria-label="更多"
+                >
+                  <Ellipsis size={17} />
+                </button>
+                {sessionMenuOpen && (
+                  <div className="kimix-floating-menu absolute left-0 top-full z-[65] mt-2 w-[332px] overflow-hidden rounded-[15px] border border-[#e5e1d8] bg-white py-3 text-[14px] text-[#2f2b26]">
+                    {sessionMenuItems.map((item, index) => (
+                      item.type === "separator" ? (
+                        <div key={`session-menu-separator-${index}`} className="my-2 border-t border-[#eee9e1]" />
+                      ) : (
+                        <button
+                          key={item.label}
+                          type="button"
+                          disabled={item.disabled}
+                          onClick={() => handleSessionMenuEntry(item)}
+                          className={`flex min-h-10 w-full items-center gap-3 text-left leading-none transition-colors ${
+                            item.disabled
+                              ? "cursor-not-allowed text-[#bbb4aa]"
+                              : "text-[#2f2b26] hover:bg-[#f3f1ec]"
+                          }`}
+                          style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 9, paddingBottom: 9 }}
+                        >
+                          <item.icon size={17} className="shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                          {item.hint && <span className="shrink-0 text-[13px] text-[#9a948b]">{item.hint}</span>}
+                        </button>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
               <button
+                onClick={() => showToast("待实现")}
                 className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f]"
                 title="运行"
                 aria-label="运行"
@@ -632,7 +778,7 @@ export function AppShell() {
                 <SquareTerminal size={15} />
               </button>
               <button
-                onClick={() => openInfoTopic("toggle-diff-panel")}
+                onClick={() => showToast("待实现")}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e5e1d8] text-[#8a847a] transition-colors hover:bg-[#f8f6f1]"
                 title="审查和差异"
                 aria-label="审查和差异"
@@ -656,6 +802,14 @@ export function AppShell() {
       <SettingsPanel />
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SkillsPanel open={skillsOpen} onClose={() => setSkillsOpen(false)} />
+      {toastMessage && (
+        <div
+          className="pointer-events-none fixed left-1/2 top-16 z-[120] -translate-x-1/2 rounded-full border border-[#ded9cf] bg-white text-[14px] font-medium leading-5 text-[#3a362f] shadow-[0_16px_40px_rgba(25,23,20,0.16)]"
+          style={{ padding: "9px 18px" }}
+        >
+          {toastMessage}
+        </div>
+      )}
       {helpDialog && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-5" onMouseDown={() => setHelpDialog(null)}>
           <div className="w-full max-w-[560px] rounded-[18px] border border-[#dedad2] bg-white shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>

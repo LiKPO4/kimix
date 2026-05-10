@@ -10,11 +10,44 @@ import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
 import { ApprovalCard } from "./ApprovalCard";
 import { ErrorCard } from "./ErrorCard";
+import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; changedFiles?: string[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] };
+
+function useAnimatedDots(active: boolean) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setCount(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setCount((value) => (value + 1) % 4);
+    }, 450);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  return ".".repeat(count);
+}
+
+const COMPACTION_STALE_MS = 5 * 60 * 1000;
+
+function CompactionLabel({ event }: { event: Extract<TimelineEvent, { type: "compaction" }> }) {
+  const isStale = event.phase === "begin" && Date.now() - event.timestamp >= COMPACTION_STALE_MS;
+  const dots = useAnimatedDots(event.phase === "begin" && !isStale);
+  if (isStale) return <>上下文压缩可能已超时，可重新尝试</>;
+  if (event.phase === "end") return <>上下文压缩完成</>;
+  return (
+    <>
+      上下文压缩中
+      <span className="inline-block w-[1.5em] text-left">{dots}</span>
+    </>
+  );
+}
 
 function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -47,13 +80,13 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
   );
 }
 
-function EventRenderer({ event, leadingTools }: { event: TimelineEvent; leadingTools?: ToolCallEvent[] }) {
+function EventRenderer({ event, leadingTools, changedFiles }: { event: TimelineEvent; leadingTools?: ToolCallEvent[]; changedFiles?: string[] }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
       return <MessageBubble event={event} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} />;
+      return <MessageBubble event={event} leadingTools={leadingTools} changedFiles={changedFiles} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -66,6 +99,8 @@ function EventRenderer({ event, leadingTools }: { event: TimelineEvent; leadingT
       return <FileCard event={event} />;
     case "change_summary":
       return <ChangeCard event={event} />;
+    case "session_recommendation":
+      return <SessionRecommendationCard event={event} />;
     case "todo":
       return null;
     case "diff":
@@ -77,7 +112,7 @@ function EventRenderer({ event, leadingTools }: { event: TimelineEvent; leadingT
       return (
         <div className="flex justify-center">
           <div className="rounded-full bg-bg-secondary px-4 py-1.5 text-[13px] text-text-muted">
-            {event.type === "subagent" ? `${event.agentName} ${event.status}` : event.phase === "begin" ? "上下文压缩中..." : "上下文压缩完成"}
+            {event.type === "subagent" ? `${event.agentName} ${event.status}` : <CompactionLabel event={event} />}
           </div>
         </div>
       );
@@ -96,6 +131,11 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
 
   const renderTurnBody = (turnEvents: TimelineEvent[]) => {
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
+    const changedFiles = new Set(
+      turnEvents
+        .filter((e): e is Extract<TimelineEvent, { type: "change_summary" }> => e.type === "change_summary")
+        .flatMap((e) => e.files.map((f) => f.path))
+    );
     let toolsAttached = false;
 
     for (const event of turnEvents) {
@@ -107,6 +147,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         type !== "status_update" &&
         type !== "file_artifact" &&
         type !== "change_summary" &&
+        type !== "session_recommendation" &&
         type !== "diff" &&
         type !== "error" &&
         type !== "subagent" &&
@@ -115,7 +156,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         continue;
       }
       if (type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools });
+        items.push({ type: "event", event, leadingTools: tools, changedFiles: Array.from(changedFiles) });
         toolsAttached = true;
         continue;
       }
@@ -162,6 +203,16 @@ function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_en
   });
 }
 
+function collapseCompletedCompactions(events: TimelineEvent[]): TimelineEvent[] {
+  return events.filter((event, index) => {
+    if (event.type !== "compaction" || event.phase !== "begin") return true;
+    const nextCompaction = events
+      .slice(index + 1)
+      .find((candidate) => candidate.type === "compaction");
+    return nextCompaction?.type !== "compaction" || nextCompaction.phase !== "end";
+  });
+}
+
 function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string): boolean {
   return events.some((event) => {
     const type = (event as { type?: unknown }).type;
@@ -193,6 +244,7 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
       type === "approval_request" ||
       type === "file_artifact" ||
       type === "change_summary" ||
+      type === "session_recommendation" ||
       type === "diff" ||
       type === "error" ||
       type === "subagent" ||
@@ -218,7 +270,10 @@ export function ChatThread() {
   const showScrollToBottomRef = useRef(false);
   const [isAutoFollow, setIsAutoFollow] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const visibleEvents = useMemo(() => filterStatusUpdates(session?.events ?? [], statusUpdateDisplay), [session?.events, statusUpdateDisplay]);
+  const visibleEvents = useMemo(
+    () => filterStatusUpdates(collapseCompletedCompactions(session?.events ?? []), statusUpdateDisplay),
+    [session?.events, statusUpdateDisplay]
+  );
   const renderItems = useMemo(() => buildRenderItems(visibleEvents), [visibleEvents]);
   const contentVersion = useMemo(() => {
     return (session?.events ?? []).map((event) => {
@@ -331,7 +386,7 @@ export function ChatThread() {
           {renderItems.map((item) => (
             item.type === "tool_group"
               ? <ToolGroup key={item.id} tools={item.tools} />
-              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} />
+              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} changedFiles={item.changedFiles} />
           ))}
         </div>
       </div>
