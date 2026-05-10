@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.5.34 补齐对话顶部三点菜单，并为暂未实现的快捷按钮增加明确反馈。
+v2.5.37 修正交接源会话自愈策略：保留可见会话 ID 和完整 UI 历史，只切换底层 Kimi runtime session。
 
 ## 当前版本
-**v2.5.34** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.5.37** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 已完成
 - v2.5.5：
@@ -70,6 +70,19 @@ v2.5.34 补齐对话顶部三点菜单，并为暂未实现的快捷按钮增加
   - 标注的运行、审查/差异、底部项目和分支入口点击后统一弹出“待实现”，避免无反馈。
   - 对话标题右侧三点菜单改为 Codex 风格列表；已接入重命名、复制工作目录、复制会话 ID、复制深度链接、复制为 Markdown。
   - 置顶、归档、打开侧边聊天、派生、本地自动化和新窗口打开等暂未实现能力先置灰不可点击。
+- v2.5.35：
+  - “携带交接内容”不再直接向原会话的真实 Kimi session 发送隐藏交接 prompt，避免污染原会话上下文。
+  - 交接生成改为启动隐藏临时 session，并把 Kimix 可见聊天记录拼入 prompt 让其离线总结；生成事件只进入 handoff job，不进入原会话 UI。
+  - 隐藏交接 sessionId 会记录到本地并在启动加载最新会话时过滤，同时完成后关闭活动 session，避免下次启动误打开交接生成会话。
+  - 对已经被旧逻辑污染过的原会话，用户后续发送消息时会一次性换到干净的 SDK sessionId，并保留 Kimix 可见历史，避免继续只思考不回复。
+- v2.5.36：
+  - 交接源会话如果已经卡在旧污染 SDK session 的运行态，不再等待下一次正常发送；Composer 会主动关闭旧 session、换干净 session，并补发最后一条用户消息。
+  - 自愈判断改为识别所有非 running 的交接建议卡片，不再只依赖 `handoffStatus === "completed"`，兼容旧历史里状态字段缺失的卡片。
+  - `ensureSession` 改为优先读取 `sessionStore` 最新快照，避免 appStore 当前会话快照过旧导致自愈条件判断不到。
+- v2.5.37：
+  - 撤销 v2.5.36 中“把可见会话 id 替换为新 SDK sessionId”的方案，避免刷新/重载后只剩最后一轮 SDK 原生历史。
+  - `Session` 新增 `runtimeSessionId`：UI 会话 id 和完整历史保持不变，所有 Kimi API 调用按需走 `runtimeSessionId`。
+  - App 事件/状态流会把 runtime sessionId 映射回原 UI sessionId，重启加载时也会识别 runtimeOwner，防止可见历史被底层新 session 覆盖。
 - v2.5.26：
   - 技能面板新增“添加”按钮，可选择本地 `.zip` Skill 压缩包导入；面板也支持直接拖放 `.zip` 导入。
   - 导入的 Skill 存放到 `~/.kimix/skills`，扫描范围同步包含该目录；压缩包解压时校验 `SKILL.md` 并防止路径越界。

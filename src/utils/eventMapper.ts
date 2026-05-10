@@ -389,7 +389,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
       const updated: typeof last = {
         ...last,
-        content: last.content + incoming.content,
+        content: last.content && incoming.content
+          ? `${last.content}\n\n${incoming.content}`
+          : last.content + incoming.content,
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
         thinkingParts: incoming.thinkingParts
           ? [...(last.thinkingParts ?? []), ...incoming.thinkingParts]
@@ -470,6 +472,15 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     }
     const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
     if (todoEvent) return [...existing, todoEvent];
+  }
+
+  if (incoming.type === "subagent") {
+    const lastSubagentIndex = existing.findLastIndex((e) => e.type === "subagent");
+    if (lastSubagentIndex !== -1) {
+      const result = [...existing];
+      result[lastSubagentIndex] = { ...result[lastSubagentIndex], ...incoming } as TimelineEvent;
+      return result;
+    }
   }
 
   if (incoming.type === "status_update") {

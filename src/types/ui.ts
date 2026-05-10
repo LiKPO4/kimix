@@ -31,6 +31,7 @@ export interface Project {
 
 export interface Session {
   id: string;
+  runtimeSessionId?: string;
   title: string;
   projectPath: string;
   createdAt: number;
@@ -195,6 +196,7 @@ export interface SessionRecommendationEvent {
   turnLimit: number;
   handoffStatus?: "running" | "completed" | "error";
   handoffError?: string;
+  handoffRecovered?: boolean;
 }
 
 export interface SubagentEvent {

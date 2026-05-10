@@ -30,8 +30,6 @@ export function StatusCard({ event }: StatusCardProps) {
         style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6, fontSize: 13, lineHeight: "18px" }}
       >
         {event.message && <span className="truncate">{event.message}</span>}
-        <span className="shrink-0">Tokens: {event.tokenCount ?? 0}</span>
-        <span className="shrink-0" title={formatContext(event, true)}>Context: {formatContext(event, detailedContext)}</span>
       </div>
     </div>
   );

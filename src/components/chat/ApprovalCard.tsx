@@ -15,7 +15,7 @@ export function ApprovalCard({ event }: ApprovalCardProps) {
     if (!currentSession) return;
     try {
       await window.api.approveRequest({
-        sessionId: currentSession.id,
+        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
         requestId: event.requestId,
         approved: true,
         scope,
@@ -37,7 +37,7 @@ export function ApprovalCard({ event }: ApprovalCardProps) {
     if (!currentSession) return;
     try {
       await window.api.approveRequest({
-        sessionId: currentSession.id,
+        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
         requestId: event.requestId,
         approved: false,
       });

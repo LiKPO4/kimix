@@ -80,7 +80,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
     setRunningSessionId(currentSession.id);
     try {
       await window.api.sendPrompt({
-        sessionId: currentSession.id,
+        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
         content: event.content,
         images: images
           .filter((image) => Boolean(image.dataUrl))

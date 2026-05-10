@@ -114,7 +114,7 @@ export function ContextRing() {
     if (!currentSession || isCurrentSessionRunning || isCompacting) return;
     try {
       await window.api.sendPrompt({
-        sessionId: currentSession.id,
+        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
         content: "/compact",
       });
     } catch (err) {

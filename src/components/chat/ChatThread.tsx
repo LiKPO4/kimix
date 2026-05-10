@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ChevronDown, ChevronRight, Wrench } from "lucide-react";
+import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { EmptyState } from "./EmptyState";
@@ -108,11 +108,21 @@ function EventRenderer({ event, leadingTools, changedFiles }: { event: TimelineE
     case "error":
       return <ErrorCard event={event} />;
     case "subagent":
+      return (
+        <div className="flex items-center gap-2 rounded-xl border border-[#e8e4db] bg-[#faf8f4] text-[14.5px] text-[#625d55]" style={{ paddingLeft: 14, paddingRight: 16, paddingTop: 10, paddingBottom: 10 }}>
+          {event.status === "running" ? (
+            <Loader2 size={16} className="shrink-0 animate-spin text-[#8f887e]" />
+          ) : (
+            <Bot size={16} className="shrink-0 text-[#8f887e]" />
+          )}
+          <span>{event.status === "running" ? "子代理运行中" : "子代理已完成任务"}</span>
+        </div>
+      );
     case "compaction":
       return (
         <div className="flex justify-center">
           <div className="rounded-full bg-bg-secondary px-4 py-1.5 text-[13px] text-text-muted">
-            {event.type === "subagent" ? `${event.agentName} ${event.status}` : <CompactionLabel event={event} />}
+            <CompactionLabel event={event} />
           </div>
         </div>
       );
@@ -138,9 +148,21 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     );
     let toolsAttached = false;
 
+    // 只保留最新的 subagent，过滤掉旧的
+    const lastSubagentIndex = turnEvents.findLastIndex((e) => e.type === "subagent");
+
+    // 先渲染 subagent（在 assistant 上方）
+    for (const event of turnEvents) {
+      if (event.type === "subagent" && turnEvents.indexOf(event) !== lastSubagentIndex) continue;
+      if (event.type === "subagent") {
+        items.push({ type: "event", event });
+      }
+    }
+
     for (const event of turnEvents) {
       const type = (event as { type?: unknown }).type;
       if (type === "tool_call" || type === "tool_result") continue;
+      if (type === "subagent") continue;
       if (
         type !== "assistant_message" &&
         type !== "approval_request" &&
@@ -150,7 +172,6 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         type !== "session_recommendation" &&
         type !== "diff" &&
         type !== "error" &&
-        type !== "subagent" &&
         type !== "compaction"
       ) {
         continue;

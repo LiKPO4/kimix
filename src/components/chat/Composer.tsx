@@ -2,7 +2,7 @@
 import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { TimelineEvent, PermissionMode } from "@/types/ui";
+import type { Session, TimelineEvent, PermissionMode } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
@@ -34,6 +34,28 @@ const THINKING_OPTIONS = [
 
 const iconButtonClass =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35";
+
+function shouldRecoverHandoffSourceSession(session: Session | null | undefined) {
+  return Boolean(session?.events.some((event) => (
+    event.type === "session_recommendation" &&
+    event.handoffStatus !== "running" &&
+    !event.handoffRecovered
+  )));
+}
+
+function findLastUserContentBeforeOpenAssistant(events: TimelineEvent[]): string | null {
+  const openAssistantIndex = events.findLastIndex((event) => event.type === "assistant_message" && !event.isComplete);
+  if (openAssistantIndex === -1) return null;
+  for (let index = openAssistantIndex - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "user_message" && event.content.trim()) return event.content.trim();
+  }
+  return null;
+}
+
+function getRuntimeSessionId(session: Session) {
+  return session.runtimeSessionId ?? session.id;
+}
 
 type ImageAttachment = {
   id: string;
@@ -118,6 +140,7 @@ export function Composer() {
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const thinkingBtnRef = useRef<HTMLDivElement>(null);
+  const recoveringSessionIdsRef = useRef<Set<string>>(new Set());
   const activeSession = liveSession ?? currentSession;
   const isCurrentSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
@@ -149,7 +172,7 @@ export function Composer() {
       return;
     }
     let cancelled = false;
-    void window.api.listSlashCommands({ sessionId: currentSession.id }).then((res) => {
+    void window.api.listSlashCommands({ sessionId: currentSession.runtimeSessionId ?? currentSession.id }).then((res) => {
       if (cancelled) return;
       if (!res.success) {
         console.warn("List slash commands failed:", res.error);
@@ -252,7 +275,9 @@ export function Composer() {
   };
 
   const ensureSession = async () => {
-    if (currentSession) return currentSession;
+    if (currentSession) {
+      return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
+    }
     if (!currentProject) return null;
     const sessionRes = await window.api.startSession({
       workDir: currentProject.path,
@@ -283,9 +308,71 @@ export function Composer() {
     return session;
   };
 
+  const recoverHandoffSourceSession = async (targetSession: Session, options?: { resendLastOpenUserMessage?: boolean }) => {
+    if (!shouldRecoverHandoffSourceSession(targetSession)) return targetSession;
+
+    await window.api.closeSession({ sessionId: getRuntimeSessionId(targetSession) }).catch(() => {});
+    const sessionRes = await window.api.startSession({
+      workDir: targetSession.projectPath,
+      model: "kimi-code/kimi-for-coding",
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+    });
+    if (!sessionRes.success) return targetSession;
+
+    const recoveredSession = {
+      ...targetSession,
+      runtimeSessionId: sessionRes.data.sessionId,
+      events: targetSession.events.map((event) => (
+        event.type === "session_recommendation" && event.handoffStatus !== "running"
+          ? { ...event, handoffRecovered: true }
+          : event
+      )),
+      updatedAt: Date.now(),
+    };
+    updateSession(targetSession.id, () => recoveredSession);
+    if (currentSession?.id === targetSession.id) {
+      setCurrentSession(recoveredSession);
+    }
+    setRunningSessionId(null);
+    const resendContent = options?.resendLastOpenUserMessage
+      ? findLastUserContentBeforeOpenAssistant(targetSession.events)
+      : null;
+    if (resendContent) {
+      window.setTimeout(() => {
+        setRunningSessionId(recoveredSession.id);
+        void window.api.sendPrompt({
+          sessionId: getRuntimeSessionId(recoveredSession),
+          content: resendContent,
+          thinking: defaultThinking,
+          yoloMode: permissionMode === "yolo",
+        }).then((res) => {
+          if (!res.success) throw new Error(res.error);
+        }).catch((err) => {
+          console.error("Recover resend failed:", err);
+          setRunningSessionId(null);
+        });
+      }, 120);
+    }
+    return recoveredSession;
+  };
+
+  useEffect(() => {
+    if (!activeSession || !shouldRecoverHandoffSourceSession(activeSession)) return;
+    const hasOpenAssistant = activeSession.events.some((event) => event.type === "assistant_message" && !event.isComplete);
+    const isRunningThisSession = runningSessionId === activeSession.id;
+    if (!hasOpenAssistant && !isRunningThisSession) return;
+    if (recoveringSessionIdsRef.current.has(activeSession.id)) return;
+    recoveringSessionIdsRef.current.add(activeSession.id);
+    void recoverHandoffSourceSession(activeSession, { resendLastOpenUserMessage: true }).finally(() => {
+      recoveringSessionIdsRef.current.delete(activeSession.id);
+    });
+  }, [activeSession?.id, activeSession?.events, runningSessionId]);
+
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[] }) => {
-    const targetSession = await ensureSession();
-    if (!targetSession) return;
+    const ensuredSession = await ensureSession();
+    if (!ensuredSession) return;
+    const targetSession = await recoverHandoffSourceSession(ensuredSession);
     const images = options?.images ?? [];
 
     const userEvent: TimelineEvent = {
@@ -318,7 +405,7 @@ export function Composer() {
     setRunningSessionId(targetSession.id);
     try {
       await window.api.sendPrompt({
-        sessionId: targetSession.id,
+        sessionId: getRuntimeSessionId(targetSession),
         content,
         images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
         thinking: defaultThinking,
@@ -388,7 +475,7 @@ export function Composer() {
     if (!targetSession) return false;
     const startRes = await window.api.startSession({
       workDir: targetSession.projectPath,
-      sessionId: targetSession.id,
+      sessionId: getRuntimeSessionId(targetSession),
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
@@ -518,7 +605,8 @@ export function Composer() {
       }));
     }, 250);
     try {
-      const res = await window.api.stopTurn({ sessionId });
+      const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+      const res = await window.api.stopTurn({ sessionId: latest ? getRuntimeSessionId(latest) : sessionId });
       if (!res.success) {
         console.error("Stop failed:", res.error);
       }
@@ -583,7 +671,7 @@ export function Composer() {
         updatedAt: Date.now(),
       }));
       const res = await window.api.steerPrompt({
-        sessionId: currentSession.id,
+        sessionId: getRuntimeSessionId(activeSession ?? currentSession),
         content: pending.content,
       });
       if (!res.success) {

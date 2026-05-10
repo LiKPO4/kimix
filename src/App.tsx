@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
-import type { TimelineEvent } from "@/types/ui";
+import type { Session, TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
@@ -20,6 +20,7 @@ const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent�
 
 interface HandoffJob {
   sourceSessionId: string;
+  runtimeSessionId: string;
   projectPath: string;
   recommendationEventId: string;
   events: TimelineEvent[];
@@ -33,6 +34,9 @@ interface StartHandoffDetail {
 
 function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
   const settled = events.flatMap((event) => {
+    if (event.type === "subagent") {
+      return event.status === "running" ? [{ ...event, status: "completed" as const }] : [event];
+    }
     if (event.type !== "assistant_message" || event.isComplete) return [event];
     const hasContent = event.content.trim().length > 0;
     const hasThinking = Boolean(event.thinking?.trim());
@@ -109,6 +113,63 @@ function extractAssistantContent(events: TimelineEvent[]): string {
     .reverse()
     .find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message" && event.content.trim().length > 0);
   return assistant?.content.trim() ?? "";
+}
+
+function getHiddenHandoffSessionIds(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("kimix_hidden_handoff_sessions") ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberHiddenHandoffSession(sessionId: string) {
+  const ids = Array.from(new Set([...getHiddenHandoffSessionIds(), sessionId]));
+  localStorage.setItem("kimix_hidden_handoff_sessions", JSON.stringify(ids.slice(-50)));
+}
+
+function eventToHandoffLine(event: TimelineEvent): string | null {
+  if (event.type === "user_message") return `用户：${event.content || "[图片]"}`;
+  if (event.type === "steer_message") return `用户引导：${event.content}`;
+  if (event.type === "assistant_message") return event.content.trim() ? `助手：${event.content.trim()}` : null;
+  if (event.type === "tool_call") return `执行命令：${event.toolName} ${event.rawArguments ?? JSON.stringify(event.arguments)}`;
+  if (event.type === "change_summary") {
+    const files = event.files.map((file) => `${file.path} (+${file.additions ?? 0}/-${file.deletions ?? 0})`).join("；");
+    return `文件变更：${files}`;
+  }
+  if (event.type === "file_artifact") return `文件：${event.filePath}`;
+  if (event.type === "todo") return `TodoList：${event.items.map((item) => `${item.status} ${item.content}`).join("；")}`;
+  if (event.type === "error") return `错误：${event.message}`;
+  return null;
+}
+
+function buildHandoffPrompt(sourceSession: Session | undefined): string {
+  const visibleHistory = sourceSession?.events
+    .map(eventToHandoffLine)
+    .filter((line): line is string => Boolean(line?.trim()))
+    .slice(-80)
+    .join("\n\n") || "当前没有可用的可见聊天记录。";
+  return `${HANDOFF_PROMPT}
+
+下面是 Kimix 当前窗口中可见的会话记录。请只基于这些记录生成交接提示词，不要把这次交接生成任务本身写进交接内容，不要输出解释。
+
+会话标题：${sourceSession?.title ?? "未知会话"}
+工作目录：${sourceSession?.projectPath ?? "未知目录"}
+
+--- 可见会话记录开始 ---
+${visibleHistory}
+--- 可见会话记录结束 ---`;
+}
+
+function resolveUiSessionId(sessionId: string): string {
+  const owner = useSessionStore.getState().sessions.find((session) => session.runtimeSessionId === sessionId);
+  return owner?.id ?? sessionId;
+}
+
+function resolveRuntimeSessionId(sessionId: string): string {
+  const owner = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+  return owner?.runtimeSessionId ?? sessionId;
 }
 
 async function createSessionAndSendPrompt(projectPath: string, content: string) {
@@ -213,7 +274,11 @@ function App() {
 
       window.api.listSessions({ workDir: payload.project.path }).then(async (res) => {
         if (!res.success) return;
-        const latest = res.data[0];
+        const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
+        const latest = res.data.find((session) => !hiddenHandoffSessionIds.has(session.id));
+        const runtimeOwner = latest
+          ? useSessionStore.getState().sessions.find((session) => session.runtimeSessionId === latest.id)
+          : undefined;
         const startRes = await window.api.startSession({
           workDir: payload.project.path,
           sessionId: latest?.id,
@@ -221,6 +286,15 @@ function App() {
           yoloMode: useAppStore.getState().permissionMode === "yolo",
         });
         if (!startRes.success || !latest) return;
+        if (runtimeOwner) {
+          const session = { ...runtimeOwner, runtimeSessionId: startRes.data.sessionId, isLoading: false };
+          useSessionStore.setState((state) => ({
+            sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
+          }));
+          useAppStore.setState({ currentSession: session });
+          setRunningSessionId(null);
+          return;
+        }
 
         const loaded = await window.api.loadSession({
           workDir: payload.project.path,
@@ -304,6 +378,7 @@ function App() {
 
     const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
       handoffJobRef.current = null;
+      void window.api.closeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
       if (status !== "completed") {
         setHandoffSessionId(null);
         setRunningSessionId(null);
@@ -341,30 +416,44 @@ function App() {
       const detail = (event as CustomEvent<StartHandoffDetail>).detail;
       if (!detail?.sourceSessionId || !detail.projectPath || !detail.recommendationEventId) return;
       if (handoffJobRef.current) return;
-      handoffJobRef.current = {
-        sourceSessionId: detail.sourceSessionId,
-        projectPath: detail.projectPath,
-        recommendationEventId: detail.recommendationEventId,
-        events: [],
-      };
       setHandoffSessionId(detail.sourceSessionId);
       setRunningSessionId(detail.sourceSessionId);
       updateRecommendationEvent(detail.sourceSessionId, detail.recommendationEventId, {
         handoffStatus: "running",
         handoffError: undefined,
       });
-      window.api.sendPrompt({
-        sessionId: detail.sourceSessionId,
-        content: HANDOFF_PROMPT,
-        thinking: useAppStore.getState().defaultThinking,
-        yoloMode: useAppStore.getState().permissionMode === "yolo",
-      }).catch((err) => {
+      const sourceSession = useSessionStore.getState().sessions.find((session) => session.id === detail.sourceSessionId);
+      void (async () => {
+        const startRes = await window.api.startSession({
+          workDir: detail.projectPath,
+          model: "kimi-code/kimi-for-coding",
+          thinking: useAppStore.getState().defaultThinking,
+          yoloMode: useAppStore.getState().permissionMode === "yolo",
+        });
+        if (!startRes.success) throw new Error(startRes.error);
+        rememberHiddenHandoffSession(startRes.data.sessionId);
+        handoffJobRef.current = {
+          sourceSessionId: detail.sourceSessionId,
+          runtimeSessionId: startRes.data.sessionId,
+          projectPath: detail.projectPath,
+          recommendationEventId: detail.recommendationEventId,
+          events: [],
+        };
+        const prompt = buildHandoffPrompt(sourceSession);
+        const sendRes = await window.api.sendPrompt({
+          sessionId: startRes.data.sessionId,
+          content: prompt,
+          thinking: useAppStore.getState().defaultThinking,
+          yoloMode: useAppStore.getState().permissionMode === "yolo",
+        });
+        if (!sendRes.success) throw new Error(sendRes.error);
+      })().catch((err) => {
         const job = handoffJobRef.current;
-        if (!job) return;
         handoffJobRef.current = null;
         setHandoffSessionId(null);
         setRunningSessionId(null);
-        updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, {
+        if (job?.runtimeSessionId) void window.api.closeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
+        updateRecommendationEvent(detail.sourceSessionId, detail.recommendationEventId, {
           handoffStatus: "error",
           handoffError: err instanceof Error ? err.message : String(err),
         });
@@ -377,11 +466,12 @@ function App() {
       const mapped = mapStreamEvent(payload.event);
       if (mapped) {
         const handoffJob = handoffJobRef.current;
-        if (handoffJob?.sourceSessionId === payload.sessionId) {
+        if (handoffJob?.runtimeSessionId === payload.sessionId) {
           handoffJob.events = mergeEvents(handoffJob.events, mapped);
           return;
         }
-        updateSession(payload.sessionId, (session) => {
+        const uiSessionId = resolveUiSessionId(payload.sessionId);
+        updateSession(uiSessionId, (session) => {
           const events = mergeEvents(session.events, mapped);
           const title = deriveSessionTitle(events, session.title);
           return { ...session, events, title, updatedAt: Date.now() };
@@ -391,9 +481,9 @@ function App() {
 
     const unsubscribeStatus = window.api.onKimiStatus((payload) => {
       const handoffJob = handoffJobRef.current;
-      if (handoffJob?.sourceSessionId === payload.sessionId) {
+      if (handoffJob?.runtimeSessionId === payload.sessionId) {
         if (payload.status === "running") {
-          setRunningSessionId(payload.sessionId);
+          setRunningSessionId(handoffJob.sourceSessionId);
           return;
         }
         if (["completed", "error", "interrupted"].includes(payload.status)) {
@@ -403,7 +493,7 @@ function App() {
       }
 
       if (payload.status === "running") {
-        setRunningSessionId(payload.sessionId);
+        setRunningSessionId(resolveUiSessionId(payload.sessionId));
         return;
       }
 
@@ -411,10 +501,11 @@ function App() {
         return;
       }
 
+      const uiSessionId = resolveUiSessionId(payload.sessionId);
       setRunningSessionId(null);
 
       if (payload.status === "error" || payload.status === "interrupted") {
-        updateSession(payload.sessionId, (session) => ({
+        updateSession(uiSessionId, (session) => ({
           ...session,
           events: closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete))),
           updatedAt: Date.now(),
@@ -422,7 +513,7 @@ function App() {
       }
 
       if (payload.status === "completed") {
-        updateSession(payload.sessionId, (session) => ({
+        updateSession(uiSessionId, (session) => ({
           ...session,
           events: appendSessionRecommendationIfNeeded(
             settleInactiveEvents(session.events),
@@ -436,7 +527,7 @@ function App() {
         if (next) {
           const userEventId = Math.random().toString(36).substring(2, 11);
           const placeholderId = Math.random().toString(36).substring(2, 11);
-          updateSession(payload.sessionId, (session) => ({
+          updateSession(uiSessionId, (session) => ({
             ...session,
             events: [
               ...session.events,
@@ -457,10 +548,11 @@ function App() {
             ],
             updatedAt: Date.now(),
           }));
-          setRunningSessionId(payload.sessionId);
+          setRunningSessionId(uiSessionId);
           const timer = setTimeout(() => {
+            const runtimeSessionId = resolveRuntimeSessionId(uiSessionId);
             window.api.sendPrompt({
-              sessionId: payload.sessionId,
+              sessionId: runtimeSessionId,
               content: next.content,
               thinking: defaultThinking,
               yoloMode: permissionMode === "yolo",
@@ -468,7 +560,7 @@ function App() {
               if (res.success) return;
               throw new Error(res.error);
             }).catch(() => {
-              updateSession(payload.sessionId, (session) => ({
+              updateSession(uiSessionId, (session) => ({
                 ...session,
                 events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
                 updatedAt: Date.now(),
@@ -492,7 +584,7 @@ function App() {
         const sessionId = useAppStore.getState().runningSessionId ?? currentSessionRef.current?.id;
         if (sessionId) {
           setRunningSessionId(null);
-          window.api.stopTurn({ sessionId }).catch(() => {});
+          window.api.stopTurn({ sessionId: resolveRuntimeSessionId(sessionId) }).catch(() => {});
         }
         return;
       }
