@@ -17,6 +17,9 @@ const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent�
 - 阻塞
 - 关键文件/命令
 - 下一步最小行动`;
+const LOCAL_SESSIONS_KEY = "kimix_sessions";
+const LOCAL_PENDING_KEY = "kimix_pending";
+const LOCAL_PERSIST_DEBOUNCE_MS = 180;
 
 interface HandoffJob {
   sourceSessionId: string;
@@ -60,6 +63,28 @@ function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
       phase: "end",
     },
   ];
+}
+
+function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string): Session | undefined {
+  const ids = new Set([historySessionId, runtimeSessionId].filter((id): id is string => Boolean(id)));
+  return useSessionStore.getState().sessions.find((session) => (
+    ids.has(session.id) || Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId))
+  ));
+}
+
+function persistLocalConversationState() {
+  try {
+    const state = useSessionStore.getState();
+    const runningSessionId = useAppStore.getState().runningSessionId;
+    localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(state.sessions.map((session) => ({
+      ...session,
+      events: session.id === runningSessionId ? session.events : settleInactiveEvents(session.events),
+      isLoading: false,
+    }))));
+    localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(state.pendingMessages));
+  } catch (err) {
+    console.warn("Persist local conversation state failed:", err);
+  }
 }
 
 function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: boolean, turnLimit: number): TimelineEvent[] {
@@ -245,6 +270,7 @@ function App() {
   const currentSessionRef = useRef(currentSession);
   currentSessionRef.current = currentSession;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bootstrapDoneRef = useRef(false);
   const handoffJobRef = useRef<HandoffJob | null>(null);
 
@@ -285,9 +311,6 @@ function App() {
         if (!res.success) return;
         const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
         const latest = res.data.find((session) => !hiddenHandoffSessionIds.has(session.id));
-        const runtimeOwner = latest
-          ? useSessionStore.getState().sessions.find((session) => session.runtimeSessionId === latest.id)
-          : undefined;
         const startRes = await window.api.startSession({
           workDir: payload.project.path,
           sessionId: latest?.id,
@@ -295,8 +318,14 @@ function App() {
           yoloMode: useAppStore.getState().permissionMode === "yolo",
         });
         if (!startRes.success || !latest) return;
-        if (runtimeOwner) {
-          const session = { ...runtimeOwner, runtimeSessionId: startRes.data.sessionId, isLoading: false };
+        const runtimeOwner = findLocalSessionForRuntime(latest.id, startRes.data.sessionId);
+        if (runtimeOwner && runtimeOwner.events.length > 0) {
+          const session = {
+            ...runtimeOwner,
+            runtimeSessionId: startRes.data.sessionId,
+            events: settleInactiveEvents(runtimeOwner.events),
+            isLoading: false,
+          };
           useSessionStore.setState((state) => ({
             sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
           }));
@@ -332,7 +361,7 @@ function App() {
       }).catch(() => {});
     });
 
-    const storedSessions = localStorage.getItem("kimix_sessions");
+    const storedSessions = localStorage.getItem(LOCAL_SESSIONS_KEY);
     if (storedSessions) {
       try {
         const parsed = JSON.parse(storedSessions);
@@ -350,7 +379,7 @@ function App() {
       }
     }
 
-    const storedPending = localStorage.getItem("kimix_pending");
+    const storedPending = localStorage.getItem(LOCAL_PENDING_KEY);
     if (storedPending) {
       try {
         const parsed = JSON.parse(storedPending);
@@ -373,16 +402,25 @@ function App() {
       }
     }
 
-    const handleBeforeUnload = () => {
-      const state = useSessionStore.getState();
-      localStorage.setItem("kimix_sessions", JSON.stringify(state.sessions.map((session) => ({
-        ...session,
-        events: session.id === useAppStore.getState().runningSessionId
-          ? session.events
-          : settleInactiveEvents(session.events),
-      }))));
-      localStorage.setItem("kimix_pending", JSON.stringify(state.pendingMessages));
+    const flushLocalConversationState = () => {
+      if (persistenceTimerRef.current) {
+        clearTimeout(persistenceTimerRef.current);
+        persistenceTimerRef.current = null;
+      }
+      persistLocalConversationState();
     };
+    const scheduleLocalConversationPersist = () => {
+      if (persistenceTimerRef.current) clearTimeout(persistenceTimerRef.current);
+      persistenceTimerRef.current = setTimeout(() => {
+        persistenceTimerRef.current = null;
+        persistLocalConversationState();
+      }, LOCAL_PERSIST_DEBOUNCE_MS);
+    };
+    const unsubscribeSessionPersistence = useSessionStore.subscribe((state, prev) => {
+      if (state.sessions === prev.sessions && state.pendingMessages === prev.pendingMessages) return;
+      scheduleLocalConversationPersist();
+    });
+    const handleBeforeUnload = flushLocalConversationState;
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
@@ -485,6 +523,9 @@ function App() {
           const title = deriveSessionTitle(events, session.title);
           return { ...session, events, title, updatedAt: Date.now() };
         });
+        if (mapped.type === "question_request") {
+          persistLocalConversationState();
+        }
       }
     });
 
@@ -639,10 +680,12 @@ function App() {
       unsubscribeEvent();
       unsubscribeStatus();
       unsubscribeBootstrap();
+      unsubscribeSessionPersistence();
       window.removeEventListener("kimix:startHandoff", handleStartHandoff);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       unsubSettings();
+      flushLocalConversationState();
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };

@@ -22,7 +22,7 @@ export function LongTasksPanel() {
       aria-labelledby="long-tasks-title"
     >
       <div className="w-full max-w-[560px] rounded-[18px] border border-[#dedad2] bg-white shadow-[0_28px_90px_rgba(25,23,20,0.22)]" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[#ebe7df]" style={{ padding: "16px 20px" }}>
+        <div className="flex items-center justify-between border-b border-[#ebe7df]" style={{ padding: "18px 22px" }}>
           <div className="flex min-w-0 items-center gap-2.5">
             <Clock size={18} className="shrink-0 text-[#8f887e]" />
             <h2 id="long-tasks-title" className="text-[18px] font-semibold leading-6 text-[#24211d]">长程任务</h2>
@@ -31,19 +31,19 @@ export function LongTasksPanel() {
             <X size={16} />
           </button>
         </div>
-        <div style={{ padding: 22 }}>
+        <div style={{ padding: 24 }}>
           <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7] text-[14.5px] leading-6 text-[#625d55]" style={{ padding: "14px 16px" }}>
             这里会用于配置长程任务执行方式。当前先作为入口占位，后续会接入后台运行、定时触发、任务模板和结果通知。
           </div>
-          <div className="mt-4 flex flex-col" style={{ gap: 12 }}>
+          <div className="mt-5 flex flex-col" style={{ gap: 14 }}>
             {futureItems.map((item) => (
-              <div key={item.title} className="flex rounded-xl border border-[#e7e2d8] bg-white" style={{ gap: 12, padding: "14px 16px" }}>
+              <div key={item.title} className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-start rounded-xl border border-[#e7e2d8] bg-white" style={{ columnGap: 14, rowGap: 8, padding: "16px 18px" }}>
                 <item.icon size={18} className="mt-0.5 shrink-0 text-[#8f887e]" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[14.5px] font-medium leading-5 text-[#302d28]">{item.title}</div>
                   <div className="mt-1 text-[13px] leading-5 text-[#7c756c]">{item.desc}</div>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#f1eee8] text-[12px] leading-5 text-[#9a948b]" style={{ padding: "2px 9px" }}>
+                <span className="shrink-0 self-center rounded-full bg-[#f1eee8] text-[12px] leading-5 text-[#9a948b]" style={{ padding: "4px 10px" }}>
                   待实现
                 </span>
               </div>

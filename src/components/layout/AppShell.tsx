@@ -608,10 +608,10 @@ export function AppShell() {
       <header className="z-50 flex h-12 w-full shrink-0 items-center justify-between px-3" style={{ WebkitAppRegion: "drag" as const }}>
         <div className="flex h-full items-center gap-7" style={{ WebkitAppRegion: "no-drag" as const }}>
           <div className="flex items-center gap-2 text-[#7d7972]">
-            <button onClick={toggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"} title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}>
+            <button onClick={toggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" style={{ marginLeft: 14 }} aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"} title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}>
               {sidebarOpen ? <PanelLeft size={17} /> : <PanelLeftOpen size={17} />}
             </button>
-            <button onClick={() => window.history.back()} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="后退">
+            <button onClick={() => window.history.back()} className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="后退">
               <ArrowLeft size={17} />
             </button>
             <button onClick={() => window.history.forward()} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="前进">
@@ -797,7 +797,9 @@ export function AppShell() {
           <div className="kimix-content-x shrink-0 bg-white" style={{ paddingTop: 8, paddingBottom: 10 }}>
             <div className="kimix-chat-column">
               <Composer />
-              <ContextBar />
+              <div style={{ marginTop: 10 }}>
+                <ContextBar />
+              </div>
             </div>
           </div>
         </main>

@@ -39,8 +39,8 @@ const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc
 ];
 
 const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
-  auto: "【Kimix 需求澄清工具：自动判断】\n请先判断用户需求是否足够明确。只有当关键信息缺失、误做成本较高，或会影响文件范围、命令执行、验收标准、风险边界时，才调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；如果信息已经足够，请不要解释本规则，直接继续完成任务。",
-  on: "【Kimix 需求澄清工具：开启】\n在开始执行前先做需求澄清检查。如存在任何会影响实现范围、文件改动、命令执行、验收标准或风险边界的不确定点，请优先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；如已经明确，请不要解释本规则，直接继续完成任务。",
+  auto: "【Kimix 需求澄清工具：自动判断】\n先判断用户需求是否足够明确。只要存在会改变执行方向、文件范围、命令/网络/写入操作、验收标准或风险边界的不确定点，就必须先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题。用户只说“浏览项目、推荐下一步、优化、调整、修复、处理一下”且目标不具体时，至少询问优先方向或期望产出。只有在信息已足够完成一个低风险最小增量时，才不要解释本规则并直接继续。",
+  on: "【Kimix 需求澄清工具：开启】\n在开始执行前先做需求澄清检查。只要存在任何会影响实现范围、文件改动、命令执行、验收标准或风险边界的不确定点，就优先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；如已经明确，请不要解释本规则，直接继续完成任务。",
 };
 
 function withClarificationBehavior(content: string, mode: ClarificationToolMode): string {

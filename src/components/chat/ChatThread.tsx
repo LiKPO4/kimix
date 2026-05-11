@@ -213,10 +213,11 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
   return items;
 }
 
-function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end"): TimelineEvent[] {
-  if (display === "each") return events;
+function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end", isRunning: boolean): TimelineEvent[] {
   return events.filter((event, index) => {
     if (event.type !== "status_update") return true;
+    if (isRunning) return false;
+    if (display === "each") return true;
     const nextTurnIndex = events.findIndex((candidate, candidateIndex) => (
       candidateIndex > index &&
       (candidate.type === "user_message" || candidate.type === "steer_message")
@@ -295,8 +296,12 @@ export function ChatThread() {
   const [isAutoFollow, setIsAutoFollow] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const visibleEvents = useMemo(
-    () => filterStatusUpdates(collapseCompletedCompactions(session?.events ?? []), statusUpdateDisplay),
-    [session?.events, statusUpdateDisplay]
+    () => filterStatusUpdates(
+      collapseCompletedCompactions(session?.events ?? []),
+      statusUpdateDisplay,
+      Boolean(session?.id && runningSessionId === session.id),
+    ),
+    [session?.events, session?.id, runningSessionId, statusUpdateDisplay]
   );
   const renderItems = useMemo(() => buildRenderItems(visibleEvents), [visibleEvents]);
   const contentVersion = useMemo(() => {

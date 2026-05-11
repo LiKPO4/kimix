@@ -144,13 +144,13 @@ export function ContextBar() {
   }, [usageOpen]);
 
   return (
-    <div className="flex h-[34px] w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[#7c756c]">
+    <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[#7c756c]" style={{ height: 36 }}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           type="button"
           onClick={showPendingToast}
-          className="flex min-h-8 min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
-          style={{ gap: 8, paddingLeft: 12, paddingRight: 12 }}
+          className="flex min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
           title={project?.path ?? "当前项目"}
           aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
         >
@@ -162,6 +162,7 @@ export function ContextBar() {
             type="button"
             onClick={toggleUsage}
             className="kimix-icon-text-button is-compact min-w-0 hover:bg-[#f1eee8] hover:text-[#3a362f]"
+            style={{ height: 36 }}
             title="套餐用量"
             aria-label="套餐用量"
           >
@@ -208,8 +209,8 @@ export function ContextBar() {
           <button
             type="button"
             onClick={showPendingToast}
-            className="hidden min-h-8 min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f] md:flex"
-            style={{ gap: 8, paddingLeft: 12, paddingRight: 12 }}
+            className="hidden min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f] md:flex"
+            style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
             title={gitBranch}
             aria-label={`当前分支：${gitBranch}`}
           >
@@ -223,6 +224,7 @@ export function ContextBar() {
         <button
           onClick={handleExport}
           className="kimix-icon-text-button is-compact shrink-0 hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          style={{ height: 36 }}
           title="导出聊天记录"
           aria-label="导出聊天记录"
         >

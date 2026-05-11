@@ -20,6 +20,7 @@ function formatRelativeTime(ts: number): string {
 }
 
 const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-xl text-[15px] text-[#302d28] transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f] disabled:cursor-not-allowed disabled:opacity-40";
 
 export function Sidebar() {
   const currentProject = useAppStore((s) => s.currentProject);
@@ -136,6 +137,18 @@ export function Sidebar() {
     toast("已置顶项目");
   };
 
+  const unpinProject = async (project: Project) => {
+    const nextProject = recentProjects.find((item) => item.path !== project.path);
+    setOpenProjectMenu(null);
+    if (!nextProject) {
+      toast("只有一个项目，无法取消置顶");
+      return;
+    }
+    await window.api.addRecentProject({ ...nextProject, lastOpenedAt: Date.now() });
+    await refreshRecentProjects();
+    toast("已取消置顶项目");
+  };
+
   const openProjectPath = async (project: Project) => {
     const res = await window.api.openProjectPath({ path: project.path });
     setOpenProjectMenu(null);
@@ -167,7 +180,7 @@ export function Sidebar() {
 
   if (!sidebarOpen) {
     return (
-      <aside className="flex w-[52px] shrink-0 flex-col items-center bg-[#f6f4ef]" style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 12, gap: 8 }}>
+      <aside className="flex w-[52px] shrink-0 flex-col items-start bg-[#f6f4ef]" style={{ paddingLeft: 12, paddingRight: 4, paddingTop: 12, gap: 8 }}>
         <button
           onClick={async () => {
             if (currentProject) {
@@ -175,7 +188,7 @@ export function Sidebar() {
             }
           }}
           disabled={!currentProject || Boolean(creatingSessionProjectPath)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f] disabled:cursor-not-allowed disabled:opacity-40"
+          className={collapsedNavItemClass}
           title={creatingSessionProjectPath ? "创建中" : "新对话"}
           aria-label={creatingSessionProjectPath ? "创建中" : "新对话"}
         >
@@ -183,7 +196,7 @@ export function Sidebar() {
         </button>
         <button
           onClick={() => setSearchOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+          className={collapsedNavItemClass}
           title="搜索"
           aria-label="搜索"
         >
@@ -191,7 +204,7 @@ export function Sidebar() {
         </button>
         <button
           onClick={() => setSkillsOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+          className={collapsedNavItemClass}
           title="技能"
           aria-label="技能"
         >
@@ -273,6 +286,7 @@ export function Sidebar() {
           {recentProjects.map((project) => {
             const isExpanded = expandedProject === project.id;
             const isActive = currentProject?.id === project.id;
+            const isPinned = recentProjects[0]?.path === project.path;
             const pSessions = projectSessions(project.path);
 
             return (
@@ -334,9 +348,9 @@ export function Sidebar() {
                       className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-[#e5e1d8] bg-white py-1.5 text-[13px] text-[#3a362f] shadow-[0_16px_36px_rgba(25,23,20,0.16)]"
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <button onClick={() => void pinProject(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <Pin size={14} className="text-[#706b63]" />
-                        <span>置顶项目</span>
+                        <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
                       </button>
                       <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <FolderSearch size={14} className="text-[#706b63]" />
@@ -429,14 +443,15 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="px-2 pt-2">
+      <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
         <button
           onClick={() => setSettingsOpen(true)}
-          className="kimix-settings-entry flex h-10 w-full items-center gap-3 rounded-xl text-[16px] text-[#302d28] transition-colors"
+          className="kimix-settings-entry flex w-full items-center gap-3 rounded-xl text-[16px] text-[#302d28] transition-colors"
+          style={{ height: 36 }}
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.5.45</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.6.8</span>
         </button>
       </div>
     </aside>

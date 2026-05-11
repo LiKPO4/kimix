@@ -1,12 +1,19 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.5.45 接入 Kimi 官方结构化需求澄清能力，并保持 Kimix 自有轻量 UI 风格。
+v2.6.8 压缩需求澄清卡片底部按钮区留白，准备发布 GitHub 更新和 Release。
 
 ## 当前版本
-**v2.5.45** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.6.8** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 已完成
+- v2.6.8：
+  - 压缩需求澄清卡片底部操作区高度：按钮行从 60px 收到 46px，卡片底部 padding 从 18px 收到 12px，提交/跳过按钮保持在操作区垂直居中。
+- v2.6.7：
+  - 会话和排队消息从仅 `beforeunload` 保存改为 Zustand 状态变化后防抖写入 `localStorage`，减少 dev 重载、强杀 Electron/Node 时丢失最新 UI 事件。
+  - `QuestionRequest` 澄清事件到达后立即额外落盘，降低刚弹出澄清卡就重启时卡片消失的风险。
+  - 启动恢复最新 Kimi 会话时，会用历史 session id 和 runtime session id 查找已有本地会话；命中本地会话且已有事件时优先保留本地 `question_request` 等 Kimix UI 事件，避免被 SDK 原生历史覆盖。
+  - 已保留上一轮自定义回答交互：输入框已有文字时点击/聚焦即可选中自定义答案；点击上方选项只切换高亮，不清除自定义文本。
 - v2.5.45：
   - 确认 Kimi Agent SDK 已在 Wire 初始化中声明 `supports_question: true`，官方 `AskUserQuestion` 能力可由 agent 触发。
   - 补齐 `QuestionRequest` 事件映射、Kimix 风格结构化问题卡片、用户回答回传 IPC 与 SDK `respondQuestion` 链路。
