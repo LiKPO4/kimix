@@ -1,8 +1,8 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Session, TimelineEvent, PermissionMode } from "@/types/ui";
+import type { Session, TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
@@ -31,6 +31,23 @@ const THINKING_OPTIONS = [
   { value: true, label: "思考开启" },
   { value: false, label: "思考关闭" },
 ];
+
+const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc: string }[] = [
+  { value: "auto", label: "自动判断", desc: "由 AI 判断是否需要先澄清" },
+  { value: "on", label: "开启", desc: "优先澄清不明确需求" },
+  { value: "off", label: "关闭", desc: "直接按原消息发送" },
+];
+
+const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
+  auto: "【Kimix 需求澄清工具：自动判断】\n请先判断用户需求是否足够明确。只有当关键信息缺失、误做成本较高，或会影响文件范围、命令执行、验收标准、风险边界时，才调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；如果信息已经足够，请不要解释本规则，直接继续完成任务。",
+  on: "【Kimix 需求澄清工具：开启】\n在开始执行前先做需求澄清检查。如存在任何会影响实现范围、文件改动、命令执行、验收标准或风险边界的不确定点，请优先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；如已经明确，请不要解释本规则，直接继续完成任务。",
+};
+
+function withClarificationBehavior(content: string, mode: ClarificationToolMode): string {
+  const trimmed = content.trim();
+  if (!trimmed || mode === "off") return content;
+  return `${CLARIFICATION_PROMPTS[mode]}\n\n用户原始需求：\n${content}`;
+}
 
 const iconButtonClass =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35";
@@ -122,6 +139,9 @@ export function Composer() {
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
+  const voiceShortcut = useAppStore((s) => s.voiceShortcut);
+  const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
+  const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const addSession = useSessionStore((s) => s.addSession);
@@ -133,6 +153,7 @@ export function Composer() {
 
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
   const [showThinkingMenu, setShowThinkingMenu] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
@@ -140,6 +161,7 @@ export function Composer() {
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const thinkingBtnRef = useRef<HTMLDivElement>(null);
+  const addBtnRef = useRef<HTMLDivElement>(null);
   const recoveringSessionIdsRef = useRef<Set<string>>(new Set());
   const activeSession = liveSession ?? currentSession;
   const isCurrentSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
@@ -156,6 +178,9 @@ export function Composer() {
       }
       if (thinkingBtnRef.current && !thinkingBtnRef.current.contains(e.target as Node)) {
         setShowThinkingMenu(false);
+      }
+      if (addBtnRef.current && !addBtnRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClick);
@@ -403,10 +428,11 @@ export function Composer() {
     }));
 
     setRunningSessionId(targetSession.id);
+    const outboundContent = withClarificationBehavior(content, clarificationToolMode);
     try {
       await window.api.sendPrompt({
         sessionId: getRuntimeSessionId(targetSession),
-        content,
+        content: outboundContent,
         images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
@@ -613,6 +639,21 @@ export function Composer() {
     } catch (err) {
       console.error("Stop failed:", err);
     }
+  };
+
+  const handleVoiceShortcut = async () => {
+    const shortcut = voiceShortcut.trim() || "Win+H";
+    const res = await window.api.triggerShortcut({ shortcut });
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: res.success ? `已触发语音快捷键：${shortcut}` : `语音快捷键失败：${res.error}`,
+    }));
+  };
+
+  const handleSetClarificationToolMode = (mode: ClarificationToolMode) => {
+    setClarificationToolMode(mode);
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: `需求澄清工具：${CLARIFICATION_OPTIONS.find((option) => option.value === mode)?.label ?? mode}`,
+    }));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -973,9 +1014,44 @@ export function Composer() {
                 取消修改
               </button>
             )}
-            <button disabled={!canUseComposer} className={iconButtonClass} title="附件" aria-label="附件">
-              <Plus size={18} />
-            </button>
+            <div ref={addBtnRef} className="relative">
+              <button disabled={!canUseComposer} onClick={() => setShowAddMenu((value) => !value)} className={iconButtonClass} title="更多工具" aria-label="更多工具">
+                <Plus size={18} />
+              </button>
+              {showAddMenu && (
+                <div className="absolute bottom-full left-0 z-30 mb-2 w-[276px] rounded-xl border border-[#e5e1d8] bg-white shadow-[0_14px_34px_rgba(25,23,20,0.14)]" style={{ padding: "10px 10px 9px" }}>
+                  <div className="flex items-center gap-2 text-[13.5px] font-medium text-[#302d28]" style={{ padding: "4px 6px 8px" }}>
+                    <CircleHelp size={15} className="shrink-0 text-[#706b63]" />
+                    <span>需求澄清工具</span>
+                  </div>
+                  <div className="flex flex-col" style={{ gap: 6 }}>
+                    {CLARIFICATION_OPTIONS.map((option) => {
+                      const active = clarificationToolMode === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleSetClarificationToolMode(option.value)}
+                          className={`flex min-h-11 w-full items-center rounded-xl text-left transition-colors ${active ? "bg-[#eef7ff] text-[#24211d]" : "text-[#4b4640] hover:bg-[#f3f1ec]"}`}
+                          style={{ gap: 10, paddingLeft: 12, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+                        >
+                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${active ? "border-[#339af0] bg-[#339af0] text-white" : "border-[#d8d2c8] text-transparent"}`}>
+                            <Check size={12} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13.5px] leading-5">{option.label}</span>
+                            <span className="block truncate text-[12px] leading-5 text-[#8f887e]">{option.desc}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-[#f0ece5] text-[12.5px] leading-5 text-[#8f887e]" style={{ marginTop: 8, padding: "9px 6px 2px" }}>
+                    默认自动判断；需要用户选择时会显示官方结构化问题。
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
               <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button is-compact max-w-[188px] min-w-0 text-[#7c756c] hover:bg-[#f1eee8] disabled:cursor-not-allowed disabled:opacity-35">
@@ -1020,7 +1096,7 @@ export function Composer() {
               )}
             </div>
 
-            <button disabled={!canUseComposer} className={iconButtonClass} title="语音" aria-label="语音">
+            <button disabled={!canUseComposer} onClick={() => void handleVoiceShortcut()} className={iconButtonClass} title={`语音快捷键：${voiceShortcut || "Win+H"}`} aria-label="语音">
               <Mic size={16} />
             </button>
 

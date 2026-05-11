@@ -550,7 +550,7 @@ body {
 .markdown-body th,
 .markdown-body td {
   padding: 0.5em 0.75em;
-  border: 1px solid var(--border-default);
+  border: 1px solid #e5e1d8;
   text-align: left;
 }
 

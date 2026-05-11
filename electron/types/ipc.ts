@@ -149,6 +149,21 @@ export type ApproveResponse = {
   error: string;
 };
 
+export type RespondQuestionRequest = {
+  sessionId: string;
+  rpcRequestId: string;
+  questionRequestId: string;
+  answers: Record<string, string>;
+}
+
+export type RespondQuestionResponse = {
+  success: true;
+  data: void;
+} | {
+  success: false;
+  error: string;
+};
+
 export type CloseSessionRequest = {
   sessionId: string;
 }
@@ -364,6 +379,10 @@ export type CopyImageRequest = {
   dataUrl: string;
 }
 
+export type TriggerShortcutRequest = {
+  shortcut: string;
+}
+
 export type VoidResponse = {
   success: true;
   data: void;
@@ -385,6 +404,8 @@ export type AppSettings = {
   statusUpdateDisplay: "each" | "turn_end";
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
+  voiceShortcut: string;
+  clarificationToolMode: "off" | "on" | "auto";
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   autoReadAgentsMd: boolean;

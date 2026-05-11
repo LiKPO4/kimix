@@ -15,6 +15,8 @@ import type {
   StopTurnResponse,
   ApproveRequest,
   ApproveResponse,
+  RespondQuestionRequest,
+  RespondQuestionResponse,
   CloseSessionRequest,
   CloseSessionResponse,
   ListSessionsRequest,
@@ -40,6 +42,7 @@ import type {
   AppInfoResponse,
   CheckUpdateResponse,
   CopyImageRequest,
+  TriggerShortcutRequest,
   SettingsResponse,
   SaveSettingsRequest,
   KimiEventPayload,
@@ -92,6 +95,8 @@ const api = {
     ipcRenderer.invoke("kimi:stopTurn", req),
   approveRequest: (req: ApproveRequest): Promise<ApproveResponse> =>
     ipcRenderer.invoke("kimi:approveRequest", req),
+  respondQuestion: (req: RespondQuestionRequest): Promise<RespondQuestionResponse> =>
+    ipcRenderer.invoke("kimi:respondQuestion", req),
   closeSession: (req: CloseSessionRequest): Promise<CloseSessionResponse> =>
     ipcRenderer.invoke("kimi:closeSession", req),
   listSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
@@ -125,6 +130,8 @@ const api = {
     ipcRenderer.invoke("app:openExternal", url),
   copyImage: (req: CopyImageRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:copyImage", req),
+  triggerShortcut: (req: TriggerShortcutRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:triggerShortcut", req),
 
   // Bootstrap
   onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {

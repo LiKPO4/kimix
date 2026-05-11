@@ -165,11 +165,11 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
                 key={skill.path}
                 type="button"
                 onClick={() => void toggleSkill(skill.name)}
-                className={`w-full rounded-xl border bg-white text-left transition-colors hover:bg-[#faf8f4] ${enabledNames.includes(skill.name) ? "border-[#cfc8bc]" : "border-[#e5e1d8]"}`}
+                className={`w-full rounded-xl border bg-white text-left transition-colors hover:bg-[#faf8f4] ${enabledNames.includes(skill.name) ? "border-[#339af0]" : "border-[#e5e1d8]"}`}
                 style={{ padding: "18px 22px" }}
               >
                 <div className="flex items-start" style={{ gap: 16 }}>
-                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabledNames.includes(skill.name) ? "border-[#24211d] bg-[#24211d] text-white" : "border-[#d8d2c8] text-transparent"}`}>
+                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabledNames.includes(skill.name) ? "border-[#339af0] bg-[#339af0] text-white" : "border-[#d8d2c8] text-transparent"}`}>
                     <Check size={13} />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -177,7 +177,7 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
                     <span className="mt-1 block text-[13.5px] leading-5 text-[#625d55]" title={skill.description}>{shortDescription(skill.description)}</span>
                     <span className="mt-2 block truncate text-[12px] text-[#aaa49a]" title={skill.path}>{skill.path}</span>
                   </span>
-                  <span className={`shrink-0 rounded-full text-[12px] font-medium ${enabledNames.includes(skill.name) ? "bg-[#e8f5e9] text-[#2e7d32]" : "bg-[#f3f1ec] text-[#aaa49a]"}`} style={{ padding: "4px 10px", marginRight: 2 }}>
+                  <span className={`shrink-0 rounded-full text-[12px] font-medium ${enabledNames.includes(skill.name) ? "bg-[#339af0] text-white" : "bg-[#f3f1ec] text-[#aaa49a]"}`} style={{ padding: "4px 10px", marginRight: 2 }}>
                     {enabledNames.includes(skill.name) ? "已启用" : "未启用"}
                   </span>
                 </div>

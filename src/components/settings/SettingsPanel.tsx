@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle, MessageSquare } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle, MessageSquare, Mic, Keyboard } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import type { Theme, PermissionMode } from "@/types/ui";
 
@@ -18,6 +18,8 @@ export function SettingsPanel() {
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
   const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
+  const voiceShortcut = useAppStore((s) => s.voiceShortcut);
+  const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const [connection, setConnection] = useState<{
     loading: boolean;
     available: boolean | null;
@@ -215,7 +217,35 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.5.38 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-section">
+            <div className="kimix-settings-section-title">
+              <Mic size={16} className="text-[#8f887e]" />
+              <span>语音输入</span>
+            </div>
+            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+              <div className="flex items-start" style={{ gap: 12 }}>
+                <Keyboard size={18} className="mt-0.5 shrink-0 text-[#8f887e]" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14.5px] font-medium text-[#302d28]">语音按钮触发快捷键</div>
+                  <div className="mt-1 text-[13px] leading-5 text-[#7c756c]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between" style={{ gap: 14 }}>
+                <label htmlFor="voice-shortcut" className="min-w-0 text-[14px] text-[#625d55]">快捷键</label>
+                <input
+                  id="voice-shortcut"
+                  type="text"
+                  value={voiceShortcut}
+                  onChange={(event) => setVoiceShortcut(event.target.value)}
+                  placeholder="Win+H"
+                  className="h-9 w-40 rounded-lg border border-[#ded8ce] bg-white text-center text-[14px] text-[#302d28] outline-none transition-colors focus:border-[#b9afa1]"
+                />
+              </div>
+              <div className="mt-2 text-right text-[12.5px] leading-5 text-[#9a948b]">示例：Win+H、Ctrl+Alt+V、F8</div>
+            </div>
+          </div>
+
+          <div className="kimix-settings-footer">Kimix v2.5.45 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

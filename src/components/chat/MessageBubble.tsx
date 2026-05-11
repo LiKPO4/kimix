@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Brain, ChevronDown, ChevronRight, Copy, Check, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -9,6 +9,7 @@ import { FileCard } from "./FileCard";
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
+  leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   changedFiles?: string[];
 }
 
@@ -235,6 +236,7 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
 }
 
 type ToolEvent = Extract<TimelineEvent, { type: "tool_call" }>;
+type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 
 type ThinkingBlock = {
@@ -245,7 +247,8 @@ type ThinkingBlock = {
 
 type ProcessItem =
   | { type: "thinking"; block: ThinkingBlock }
-  | { type: "tool"; tool: ToolEvent };
+  | { type: "tool"; tool: ToolEvent }
+  | { type: "subagent"; subagent: SubagentEvent };
 
 function firstThinkingSentence(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -345,17 +348,44 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
   );
 }
 
-function AssistantProcessSummary({ event, tools, label }: { event: AssistantEvent; tools: ToolEvent[]; label: string }) {
+function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
+  const isRunning = subagent.status === "running";
+  const isError = subagent.status === "error";
+  return (
+    <div className="flex min-h-10 items-center rounded-xl border border-[#e8e3da] bg-white text-[13.5px] text-[#706b63]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
+      {isRunning ? (
+        <Loader2 size={14} className="kimix-spin shrink-0 text-[#9a948b]" />
+      ) : (
+        <Bot size={14} className="shrink-0 text-[#9a948b]" />
+      )}
+      <span className="shrink-0 text-[#8a847a]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
+      <span className="min-w-0 flex-1 truncate">{subagent.agentName || "子代理"}</span>
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isError ? "bg-[#d83b01]" : isRunning ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
+    </div>
+  );
+}
+
+function joinSummaryParts(parts: string[]) {
+  return parts.filter(Boolean).join(" · ");
+}
+
+function AssistantProcessSummary({ event, tools, subagents, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; label: string }) {
   const [expanded, setExpanded] = useState(false);
   const thinkingBlocks = getThinkingBlocks(event);
   const items: ProcessItem[] = [
     ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
     ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
+    ...subagents.map((subagent): ProcessItem => ({ type: "subagent", subagent })),
   ].sort((a, b) => (
-    (a.type === "thinking" ? a.block.timestamp : a.tool.timestamp) -
-    (b.type === "thinking" ? b.block.timestamp : b.tool.timestamp)
+    (a.type === "thinking" ? a.block.timestamp : a.type === "tool" ? a.tool.timestamp : a.subagent.timestamp) -
+    (b.type === "thinking" ? b.block.timestamp : b.type === "tool" ? b.tool.timestamp : b.subagent.timestamp)
   ));
   const hasDetails = items.length > 0;
+  const summary = joinSummaryParts([
+    thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段思考` : "",
+    tools.length > 0 ? `${tools.length} 条命令` : "",
+    subagents.length > 0 ? `${subagents.length} 个子代理` : "",
+  ]);
 
   return (
     <div className="w-full border-b border-[#ece8df]" style={{ paddingBottom: expanded && hasDetails ? 14 : 12 }}>
@@ -370,9 +400,7 @@ function AssistantProcessSummary({ event, tools, label }: { event: AssistantEven
         <span>{label}</span>
         {hasDetails && (
           <span className="text-[13px] text-[#aaa49a]">
-            {thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段思考` : ""}
-            {thinkingBlocks.length > 0 && tools.length > 0 ? " · " : ""}
-            {tools.length > 0 ? `${tools.length} 条命令` : ""}
+            {summary}
           </span>
         )}
       </button>
@@ -381,7 +409,9 @@ function AssistantProcessSummary({ event, tools, label }: { event: AssistantEven
           {items.map((item, index) => (
             item.type === "thinking"
               ? <ThinkingProcessItem key={item.block.id || `thinking-${index}`} block={item.block} />
-              : <ToolProcessItem key={item.tool.id} tool={item.tool} />
+              : item.type === "tool"
+                ? <ToolProcessItem key={item.tool.id} tool={item.tool} />
+                : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />
           ))}
         </div>
       )}
@@ -389,7 +419,7 @@ function AssistantProcessSummary({ event, tools, label }: { event: AssistantEven
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], changedFiles = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; changedFiles?: string[] }) {
+function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], changedFiles = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -413,7 +443,7 @@ function AssistantMessageBubble({ event, leadingTools = [], changedFiles = [] }:
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {(event.isThinking || event.isComplete || !hasContent) && (
-          <AssistantProcessSummary event={event} tools={leadingTools} label={processLabel} />
+          <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={processLabel} />
         )}
 
         {hasContent && (
@@ -448,12 +478,12 @@ function AssistantMessageBubble({ event, leadingTools = [], changedFiles = [] }:
   );
 }
 
-export function MessageBubble({ event, leadingTools, changedFiles }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, leadingSubagents, changedFiles }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} changedFiles={changedFiles} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} />;
 }

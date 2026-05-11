@@ -231,6 +231,8 @@ function App() {
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
+  const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
+  const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
@@ -256,11 +258,18 @@ function App() {
         setStatusUpdateDisplay(res.data.statusUpdateDisplay);
         setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
         setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
+        setVoiceShortcut(res.data.voiceShortcut);
+        setClarificationToolMode(res.data.clarificationToolMode);
       }
     }).catch(() => {});
 
     window.api.listRecentProjects().then((res) => {
-      if (res.success) setRecentProjects(res.data);
+      if (res.success) {
+        setRecentProjects(res.data);
+        if (!useAppStore.getState().currentProject && res.data[0]) {
+          useAppStore.setState({ currentProject: res.data[0] });
+        }
+      }
     }).catch(() => {});
 
     const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
@@ -608,7 +617,9 @@ function App() {
         state.detailedContext !== prev.detailedContext ||
         state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
         state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
-        state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit
+        state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
+        state.voiceShortcut !== prev.voiceShortcut ||
+        state.clarificationToolMode !== prev.clarificationToolMode
       ) {
         window.api.saveSettings({
           theme: state.theme,
@@ -618,6 +629,8 @@ function App() {
           statusUpdateDisplay: state.statusUpdateDisplay,
           sessionRecommendationEnabled: state.sessionRecommendationEnabled,
           sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
+          voiceShortcut: state.voiceShortcut,
+          clarificationToolMode: state.clarificationToolMode,
         }).catch(() => {});
       }
     });
@@ -633,7 +646,7 @@ function App() {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
+  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
 
   return (
     <ThemeProvider>

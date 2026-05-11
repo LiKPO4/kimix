@@ -54,6 +54,95 @@ function spawnDetached(command: string, args: string[], cwd?: string) {
   child.unref();
 }
 
+function parseShortcut(shortcut: string): { modifiers: number[]; key: number } {
+  const parts = shortcut
+    .split("+")
+    .map((part) => part.trim().toUpperCase())
+    .filter(Boolean);
+  if (parts.length === 0) throw new Error("快捷键不能为空");
+
+  const modifierMap: Record<string, number> = {
+    CTRL: 0x11,
+    CONTROL: 0x11,
+    ALT: 0x12,
+    SHIFT: 0x10,
+    WIN: 0x5B,
+    WINDOWS: 0x5B,
+    META: 0x5B,
+    CMD: 0x5B,
+    COMMAND: 0x5B,
+  };
+  const keyMap: Record<string, number> = {
+    SPACE: 0x20,
+    ENTER: 0x0D,
+    RETURN: 0x0D,
+    ESC: 0x1B,
+    ESCAPE: 0x1B,
+    TAB: 0x09,
+    BACKSPACE: 0x08,
+    DELETE: 0x2E,
+    INSERT: 0x2D,
+    HOME: 0x24,
+    END: 0x23,
+    PAGEUP: 0x21,
+    PAGEDOWN: 0x22,
+    UP: 0x26,
+    DOWN: 0x28,
+    LEFT: 0x25,
+    RIGHT: 0x27,
+  };
+  for (let i = 1; i <= 24; i += 1) keyMap[`F${i}`] = 0x70 + i - 1;
+  for (let code = 65; code <= 90; code += 1) keyMap[String.fromCharCode(code)] = code;
+  for (let code = 48; code <= 57; code += 1) keyMap[String.fromCharCode(code)] = code;
+
+  const modifiers: number[] = [];
+  let key: number | null = null;
+  parts.forEach((part) => {
+    const modifier = modifierMap[part];
+    if (modifier) {
+      if (!modifiers.includes(modifier)) modifiers.push(modifier);
+      return;
+    }
+    const mappedKey = keyMap[part];
+    if (!mappedKey) throw new Error(`不支持的快捷键：${part}`);
+    key = mappedKey;
+  });
+  if (!key) throw new Error("快捷键必须包含一个主按键");
+  return { modifiers, key };
+}
+
+function triggerKeyboardShortcut(shortcut: string): Promise<void> {
+  const { modifiers, key } = parseShortcut(shortcut);
+  if (process.platform !== "win32") {
+    throw new Error("当前快捷键触发仅支持 Windows");
+  }
+  const pressOrder = [...modifiers, key];
+  const releaseOrder = [...pressOrder].reverse();
+  const script = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class KeyboardSender {
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+}
+"@
+$press = @(${pressOrder.join(",")})
+$release = @(${releaseOrder.join(",")})
+foreach ($key in $press) { [KeyboardSender]::keybd_event([byte]$key, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 24 }
+foreach ($key in $release) { [KeyboardSender]::keybd_event([byte]$key, 0, 2, [UIntPtr]::Zero); Start-Sleep -Milliseconds 24 }
+`;
+  return new Promise((resolve, reject) => {
+    execFile("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], { windowsHide: true, timeout: 3000 }, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 async function openTerminalAt(dir: string) {
   if (process.platform === "win32") {
     const wtPath = await checkCommand("wt");
@@ -706,12 +795,12 @@ function parseKimiUsagePayload(payload: Record<string, unknown>) {
 }
 
 function getDefaultProject() {
-  const workDir = settingsService.getDefaultWorkDir();
+  const workDir = path.join(app.getPath("userData"), "default-project");
   ensureDirectoryExists(workDir);
   return {
     id: "default-kimi-project",
     path: workDir,
-    name: path.basename(workDir) || "kimi",
+    name: "kimix",
     lastOpenedAt: Date.now(),
   };
 }
@@ -848,7 +937,12 @@ ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) => 
 });
 
 ipcMain.handle("project:listRecent", async () => {
-  const projects = projectService.getRecentProjects();
+  let projects = projectService.getRecentProjects();
+  if (projects.length === 0) {
+    const defaultProject = getDefaultProject();
+    projectService.addRecentProject(defaultProject);
+    projects = [defaultProject];
+  }
   return { success: true, data: projects };
 });
 
@@ -1230,6 +1324,28 @@ ipcMain.handle("kimi:approveRequest", async (_, request: { sessionId: string; re
   }
 });
 
+ipcMain.handle("kimi:respondQuestion", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as Record<string, unknown>;
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const rpcRequestId = typeof req.rpcRequestId === "string" ? req.rpcRequestId : "";
+    const questionRequestId = typeof req.questionRequestId === "string" ? req.questionRequestId : "";
+    const answers = req.answers && typeof req.answers === "object" && !Array.isArray(req.answers)
+      ? Object.fromEntries(Object.entries(req.answers as Record<string, unknown>).filter(([, value]) => typeof value === "string")) as Record<string, string>
+      : {};
+    if (!sessionId || !rpcRequestId || !questionRequestId) {
+      return { success: false, error: "Missing question response fields" };
+    }
+    await kimiBridge.respondQuestion(sessionId, rpcRequestId, questionRequestId, answers);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:closeSession", async (_, request: { sessionId: string }) => {
   try {
     await kimiBridge.closeSession(request.sessionId);
@@ -1341,6 +1457,9 @@ const SettingsSchema = z.object({
   statusUpdateDisplay: z.enum(["each", "turn_end"]).optional(),
   sessionRecommendationEnabled: z.boolean().optional(),
   sessionRecommendationTurnLimit: z.number().int().min(1).max(200).optional(),
+  voiceShortcut: z.string().min(1).max(80).optional(),
+  clarificationToolMode: z.enum(["off", "on", "auto"]).optional(),
+  clarificationToolEnabled: z.boolean().optional(),
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   autoReadAgentsMd: z.boolean().optional(),
@@ -1354,6 +1473,18 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
       return { success: false, error: "Invalid settings data" };
     }
     settingsService.saveSettings(parsed.data);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:triggerShortcut", async (_, request: unknown) => {
+  try {
+    const shortcut = request && typeof request === "object" && typeof (request as { shortcut?: unknown }).shortcut === "string"
+      ? (request as { shortcut: string }).shortcut
+      : "";
+    await triggerKeyboardShortcut(shortcut);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

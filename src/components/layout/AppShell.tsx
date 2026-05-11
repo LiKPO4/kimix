@@ -6,6 +6,7 @@ import { ContextBar } from "@/components/chat/ContextBar";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
+import { LongTasksPanel } from "./LongTasksPanel";
 import {
   ArrowLeft,
   ArrowRight,
@@ -31,6 +32,7 @@ import {
   Minus,
   MessageSquarePlus,
   PanelLeft,
+  PanelLeftOpen,
   PanelRight,
   Pencil,
   Pin,
@@ -300,6 +302,7 @@ function formatEventAsMarkdown(event: TimelineEvent): string {
   if (event.type === "compaction") return `> 上下文压缩${event.phase === "begin" ? "开始" : "完成"}`;
   if (event.type === "diff") return `> Diff：${event.filePath}`;
   if (event.type === "approval_request") return `> 审批请求：${event.description}`;
+  if (event.type === "question_request") return `> 需求澄清：${event.questions.map((question) => question.question).join(" / ")}`;
   if (event.type === "tool_result") return `> 工具结果：${event.toolName}`;
   if (event.type === "subagent") return `> 子任务：${event.agentName} ${event.status}`;
   return "";
@@ -314,6 +317,7 @@ function sessionToMarkdown(session: Session): string {
 export function AppShell() {
   const currentSession = useAppStore((s) => s.currentSession);
   const currentProject = useAppStore((s) => s.currentProject);
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const searchOpen = useAppStore((s) => s.searchOpen);
@@ -604,8 +608,8 @@ export function AppShell() {
       <header className="z-50 flex h-12 w-full shrink-0 items-center justify-between px-3" style={{ WebkitAppRegion: "drag" as const }}>
         <div className="flex h-full items-center gap-7" style={{ WebkitAppRegion: "no-drag" as const }}>
           <div className="flex items-center gap-2 text-[#7d7972]">
-            <button onClick={toggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="切换侧边栏" title="切换侧边栏">
-              <PanelLeft size={17} />
+            <button onClick={toggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"} title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}>
+              {sidebarOpen ? <PanelLeft size={17} /> : <PanelLeftOpen size={17} />}
             </button>
             <button onClick={() => window.history.back()} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="后退">
               <ArrowLeft size={17} />
@@ -802,6 +806,7 @@ export function AppShell() {
       <SettingsPanel />
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SkillsPanel open={skillsOpen} onClose={() => setSkillsOpen(false)} />
+      <LongTasksPanel />
       {toastMessage && (
         <div
           className="pointer-events-none fixed left-1/2 top-16 z-[120] -translate-x-1/2 rounded-full border border-[#ded9cf] bg-white text-[14px] font-medium leading-5 text-[#3a362f] shadow-[0_16px_40px_rgba(25,23,20,0.16)]"

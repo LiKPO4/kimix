@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, ChevronRight, Trash2, Search, LayoutGrid, Clock, PanelLeftOpen, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2 } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, ChevronRight, Trash2, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -32,7 +32,7 @@ export function Sidebar() {
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const setSkillsOpen = useAppStore((s) => s.setSkillsOpen);
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const setLongTasksOpen = useAppStore((s) => s.setLongTasksOpen);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
@@ -46,6 +46,10 @@ export function Sidebar() {
 
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
+
+  const toast = (message: string) => {
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: message }));
+  };
 
   useEffect(() => {
     const close = () => setOpenProjectMenu(null);
@@ -119,16 +123,79 @@ export function Sidebar() {
     }
   };
 
+  const refreshRecentProjects = async () => {
+    const recent = await window.api.listRecentProjects();
+    if (recent.success) setRecentProjects(recent.data);
+    return recent.success ? recent.data : recentProjects;
+  };
+
+  const pinProject = async (project: Project) => {
+    await window.api.addRecentProject({ ...project, lastOpenedAt: Date.now() });
+    await refreshRecentProjects();
+    setOpenProjectMenu(null);
+    toast("已置顶项目");
+  };
+
+  const openProjectPath = async (project: Project) => {
+    const res = await window.api.openProjectPath({ path: project.path });
+    setOpenProjectMenu(null);
+    toast(res.success ? "已在资源管理器中打开" : `打开失败：${res.error}`);
+  };
+
+  const archiveProjectSessions = (project: Project) => {
+    const targets = sessions.filter((session) => session.projectPath === project.path);
+    targets.forEach((session) => deleteSession(session.id));
+    if (currentSession && currentSession.projectPath === project.path) {
+      setCurrentSession(null);
+    }
+    setOpenProjectMenu(null);
+    toast(targets.length > 0 ? `已归档 ${targets.length} 个对话` : "没有可归档的对话");
+  };
+
+  const removeProject = async (project: Project) => {
+    await window.api.removeRecentProject(project.id);
+    const nextProjects = await refreshRecentProjects();
+    if (currentProject?.id === project.id) {
+      const nextProject = nextProjects.find((item) => item.id !== project.id) ?? null;
+      setCurrentProject(nextProject);
+      setCurrentSession(null);
+      setExpandedProject(nextProject?.id ?? null);
+    }
+    setOpenProjectMenu(null);
+    toast("已从侧栏移除项目");
+  };
+
   if (!sidebarOpen) {
     return (
-      <aside className="flex w-[52px] shrink-0 flex-col items-center bg-[#f6f4ef] px-1 py-1.5">
+      <aside className="flex w-[52px] shrink-0 flex-col items-center bg-[#f6f4ef]" style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 12, gap: 8 }}>
         <button
-          onClick={toggleSidebar}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f]"
-          title="展开侧边栏"
-          aria-label="展开侧边栏"
+          onClick={async () => {
+            if (currentProject) {
+              await createSessionForProject(currentProject);
+            }
+          }}
+          disabled={!currentProject || Boolean(creatingSessionProjectPath)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f] disabled:cursor-not-allowed disabled:opacity-40"
+          title={creatingSessionProjectPath ? "创建中" : "新对话"}
+          aria-label={creatingSessionProjectPath ? "创建中" : "新对话"}
         >
-          <PanelLeftOpen size={18} />
+          {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin" /> : <SquarePen size={17} />}
+        </button>
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+          title="搜索"
+          aria-label="搜索"
+        >
+          <Search size={17} />
+        </button>
+        <button
+          onClick={() => setSkillsOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+          title="技能"
+          aria-label="技能"
+        >
+          <LayoutGrid size={17} />
         </button>
       </aside>
     );
@@ -181,12 +248,11 @@ export function Sidebar() {
           <LayoutGrid size={17} className="shrink-0 text-[#706b63]" />
           <span>技能</span>
         </button>
-        <button disabled className={`${navItemClass} justify-between`} title="自动化功能即将上线">
+        <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
           <span className="flex items-center gap-3">
             <Clock size={17} className="shrink-0 text-[#706b63]" />
-            <span>自动化</span>
+            <span>长程任务</span>
           </span>
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[12px] text-[#8a847a]">1</span>
         </button>
       </div>
 
@@ -268,27 +334,27 @@ export function Sidebar() {
                       className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-[#e5e1d8] bg-white py-1.5 text-[13px] text-[#3a362f] shadow-[0_16px_36px_rgba(25,23,20,0.16)]"
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => void pinProject(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <Pin size={14} className="text-[#706b63]" />
                         <span>置顶项目</span>
                       </button>
-                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <FolderSearch size={14} className="text-[#706b63]" />
                         <span>在资源管理器中打开</span>
                       </button>
-                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <GitBranch size={14} className="text-[#706b63]" />
                         <span>创建永久工作树</span>
                       </button>
-                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <SquarePen size={14} className="text-[#706b63]" />
                         <span>重命名项目</span>
                       </button>
-                      <button className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <Archive size={14} className="text-[#706b63]" />
                         <span>归档对话</span>
                       </button>
-                      <button className="flex h-10 w-full items-center gap-3 text-left text-[#8b3d34] transition-colors hover:bg-[#f9ece9]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-[#8b3d34] transition-colors hover:bg-[#f9ece9]" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <X size={14} />
                         <span>移除</span>
                       </button>
@@ -370,7 +436,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.5.38</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.5.45</span>
         </button>
       </div>
     </aside>

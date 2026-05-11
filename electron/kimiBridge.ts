@@ -8,6 +8,8 @@
   type ApprovalResponse,
   type ContentPart,
   type SlashCommandInfo,
+  ProtocolClient,
+  parseRequestPayload,
 } from "@moonshot-ai/kimi-agent-sdk";
 import type { BrowserWindow } from "electron";
 import * as projectService from "./projectService";
@@ -16,6 +18,43 @@ const activeSessions = new Map<string, Session>();
 const activeTurns = new Map<string, Turn>();
 const sendingLocks = new Set<string>();
 const interruptedTurns = new WeakSet<Turn>();
+
+type PatchableProtocolClient = typeof ProtocolClient & {
+  prototype: {
+    __kimixQuestionRequestPatch?: boolean;
+    handleServerRequest?: (requestId: string, params: unknown) => void;
+    pushEvent?: (event: unknown) => void;
+    emitParseError?: (code: string, message: string, raw?: string) => void;
+  };
+};
+
+function installQuestionRequestPatch() {
+  const proto = (ProtocolClient as PatchableProtocolClient).prototype;
+  if (proto.__kimixQuestionRequestPatch || typeof proto.handleServerRequest !== "function") return;
+  const original = proto.handleServerRequest;
+  proto.handleServerRequest = function patchedQuestionRequest(this: PatchableProtocolClient["prototype"], requestId: string, params: unknown) {
+    const payload = params && typeof params === "object" ? params as { type?: unknown; payload?: unknown } : {};
+    if (payload.type === "QuestionRequest") {
+      const parsed = parseRequestPayload("QuestionRequest", payload.payload);
+      if (parsed.ok) {
+        this.pushEvent?.({
+          ...parsed.value,
+          payload: {
+            ...parsed.value.payload,
+            rpc_request_id: requestId,
+          },
+        });
+      } else {
+        this.emitParseError?.("UNKNOWN_REQUEST_TYPE", parsed.error);
+      }
+      return;
+    }
+    return original.call(this, requestId, params);
+  };
+  proto.__kimixQuestionRequestPatch = true;
+}
+
+installQuestionRequestPatch();
 
 type WarmableSession = Session & {
   getClientWithConfigCheck?: () => Promise<unknown>;
@@ -257,6 +296,17 @@ export async function approveRequest(
     : "reject";
 
   await turn.approve(requestId, response);
+}
+
+export async function respondQuestion(
+  sessionId: string,
+  rpcRequestId: string,
+  questionRequestId: string,
+  answers: Record<string, string>
+) {
+  const turn = activeTurns.get(sessionId);
+  if (!turn) throw new Error("No active turn");
+  await turn.respondQuestion(rpcRequestId, questionRequestId, answers);
 }
 
 export async function closeSession(sessionId: string) {

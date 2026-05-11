@@ -70,7 +70,17 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         const isBlock = Boolean(codeClassName) || content.includes("\n");
         if (!isBlock) {
           return (
-            <code className="rounded-md bg-[#f2f0eb] px-1.5 py-0.5 font-mono text-[0.9em] text-[#37322c]">
+            <code
+              className="rounded-md bg-[#f2f0eb] font-mono text-[0.9em] text-[#37322c]"
+              style={{
+                marginLeft: 2,
+                marginRight: 2,
+                padding: "2px 6px",
+                lineHeight: 1.55,
+                boxDecorationBreak: "clone",
+                WebkitBoxDecorationBreak: "clone",
+              }}
+            >
               {children}
             </code>
           );
@@ -111,13 +121,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         );
       },
       table: ({ children }: { children?: React.ReactNode }) => (
-        <div className="overflow-x-auto my-3 rounded-lg border border-border-default">
-          <table className="w-full text-sm text-text-primary">{children}</table>
+        <div className="my-3 overflow-x-auto rounded-lg" style={{ border: "1px solid #ded8ce" }}>
+          <table className="w-full text-sm text-text-primary" style={{ borderColor: "#e5e1d8" }}>{children}</table>
         </div>
       ),
       thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-bg-tertiary text-text-secondary font-medium">{children}</thead>,
-      th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 text-left border-b border-border-default">{children}</th>,
-      td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2 border-b border-border-subtle">{children}</td>,
+      th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 text-left" style={{ border: "1px solid #e5e1d8" }}>{children}</th>,
+      td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2" style={{ border: "1px solid #eee9e1" }}>{children}</td>,
       hr: () => <hr className="my-4 border-border-default" />,
     }),
     []

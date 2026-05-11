@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode } from "@/types/ui";
 
 interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
@@ -13,6 +13,9 @@ interface AppStore extends AppState {
   setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
   setSessionRecommendationEnabled: (enabled: boolean) => void;
   setSessionRecommendationTurnLimit: (limit: number) => void;
+  setVoiceShortcut: (shortcut: string) => void;
+  setClarificationToolMode: (mode: ClarificationToolMode) => void;
+  setLongTasksOpen: (open: boolean) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
@@ -40,6 +43,9 @@ export const useAppStore = create<AppStore>((set) => ({
   statusUpdateDisplay: "turn_end",
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
+  voiceShortcut: "Win+H",
+  clarificationToolMode: "auto",
+  longTasksOpen: false,
   handoffSessionId: null,
   sidebarOpen: true,
   theme: "light",
@@ -60,6 +66,9 @@ export const useAppStore = create<AppStore>((set) => ({
   setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),
   setSessionRecommendationEnabled: (enabled) => set({ sessionRecommendationEnabled: enabled }),
   setSessionRecommendationTurnLimit: (limit) => set({ sessionRecommendationTurnLimit: Math.max(1, Math.min(200, Math.round(limit))) }),
+  setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
+  setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
+  setLongTasksOpen: (open) => set({ longTasksOpen: open }),
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),

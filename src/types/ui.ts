@@ -1,6 +1,7 @@
 export type Theme = "dark" | "light" | "system";
 
 export type PermissionMode = "manual" | "approve_for_session" | "yolo";
+export type ClarificationToolMode = "off" | "on" | "auto";
 
 export interface AppState {
   currentProject: Project | null;
@@ -14,6 +15,9 @@ export interface AppState {
   statusUpdateDisplay: StatusUpdateDisplay;
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
+  voiceShortcut: string;
+  clarificationToolMode: ClarificationToolMode;
+  longTasksOpen: boolean;
   handoffSessionId: string | null;
   sidebarOpen: boolean;
   theme: Theme;
@@ -47,6 +51,7 @@ export type TimelineEvent =
   | ToolCallEvent
   | ToolResultEvent
   | ApprovalRequestEvent
+  | QuestionRequestEvent
   | StatusUpdateEvent
   | FileArtifactEvent
   | ChangeSummaryEvent
@@ -148,6 +153,30 @@ export interface ApprovalRequestEvent {
   details: string;
   riskLevel: "low" | "medium" | "high";
   status: "pending" | "approved" | "rejected";
+}
+
+export interface QuestionRequestEvent {
+  id: string;
+  type: "question_request";
+  timestamp: number;
+  requestId: string;
+  rpcRequestId: string;
+  toolCallId: string;
+  questions: QuestionRequestItem[];
+  status: "pending" | "answered" | "skipped";
+  answers?: Record<string, string>;
+}
+
+export interface QuestionRequestItem {
+  question: string;
+  header?: string;
+  multiSelect?: boolean;
+  options: QuestionRequestOption[];
+}
+
+export interface QuestionRequestOption {
+  label: string;
+  description?: string;
 }
 
 export interface StatusUpdateEvent {

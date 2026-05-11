@@ -9,12 +9,13 @@ import { ChangeCard } from "./ChangeCard";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
 import { ApprovalCard } from "./ApprovalCard";
+import { QuestionCard } from "./QuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; changedFiles?: string[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] };
 
 function useAnimatedDots(active: boolean) {
@@ -80,19 +81,21 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
   );
 }
 
-function EventRenderer({ event, leadingTools, changedFiles }: { event: TimelineEvent; leadingTools?: ToolCallEvent[]; changedFiles?: string[] }) {
+function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles }: { event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
       return <MessageBubble event={event} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} changedFiles={changedFiles} />;
+      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
       return null;
     case "approval_request":
       return <ApprovalCard event={event} />;
+    case "question_request":
+      return <QuestionCard event={event} />;
     case "status_update":
       return <StatusCard event={event} />;
     case "file_artifact":
@@ -148,25 +151,19 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     );
     let toolsAttached = false;
 
-    // 只保留最新的 subagent，过滤掉旧的
-    const lastSubagentIndex = turnEvents.findLastIndex((e) => e.type === "subagent");
-
-    // 先渲染 subagent（在 assistant 上方）
-    for (const event of turnEvents) {
-      if (event.type === "subagent" && turnEvents.indexOf(event) !== lastSubagentIndex) continue;
-      if (event.type === "subagent") {
-        items.push({ type: "event", event });
-      }
-    }
+    const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
+    const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
+    let assistantAttached = false;
 
     for (const event of turnEvents) {
       const type = (event as { type?: unknown }).type;
       if (type === "tool_call" || type === "tool_result") continue;
       if (type === "subagent") continue;
+      if (type === "status_update") continue;
       if (
         type !== "assistant_message" &&
         type !== "approval_request" &&
-        type !== "status_update" &&
+        type !== "question_request" &&
         type !== "file_artifact" &&
         type !== "change_summary" &&
         type !== "session_recommendation" &&
@@ -177,8 +174,9 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         continue;
       }
       if (type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools, changedFiles: Array.from(changedFiles) });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles) });
         toolsAttached = true;
+        assistantAttached = true;
         continue;
       }
       if (!toolsAttached && tools.length > 0) {
@@ -189,6 +187,10 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     }
 
     if (!toolsAttached) pushStandaloneTools(tools);
+    if (!assistantAttached) {
+      subagents.forEach((event) => items.push({ type: "event", event }));
+    }
+    statusEvents.forEach((event) => items.push({ type: "event", event }));
   };
 
   let turnBody: TimelineEvent[] = [];
@@ -263,6 +265,7 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
     if (
       type === "tool_call" ||
       type === "approval_request" ||
+      type === "question_request" ||
       type === "file_artifact" ||
       type === "change_summary" ||
       type === "session_recommendation" ||
@@ -407,7 +410,7 @@ export function ChatThread() {
           {renderItems.map((item) => (
             item.type === "tool_group"
               ? <ToolGroup key={item.id} tools={item.tools} />
-              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} changedFiles={item.changedFiles} />
+              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} />
           ))}
         </div>
       </div>

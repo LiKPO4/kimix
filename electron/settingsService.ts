@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   statusUpdateDisplay: "turn_end",
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
+  voiceShortcut: "Win+H",
+  clarificationToolMode: "auto",
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
@@ -42,7 +44,12 @@ export function loadSettings(): AppSettings {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return { ...DEFAULT_SETTINGS };
     }
-    return { ...DEFAULT_SETTINGS, ...(parsed as Partial<AppSettings>) };
+    const rawSettings = parsed as Partial<AppSettings> & { clarificationToolEnabled?: boolean };
+    const clarificationToolMode = rawSettings.clarificationToolMode ??
+      (rawSettings.clarificationToolEnabled === true ? "on" :
+        rawSettings.clarificationToolEnabled === false ? "off" :
+          DEFAULT_SETTINGS.clarificationToolMode);
+    return { ...DEFAULT_SETTINGS, ...rawSettings, clarificationToolMode };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

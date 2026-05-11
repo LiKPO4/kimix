@@ -13,6 +13,7 @@ function isNumber(v: unknown): v is number {
 }
 
 const LATEST_TOOL_CALL = "__kimix_latest_tool_call__";
+const CLARIFICATION_ORIGINAL_MARKER = "\n\n用户原始需求：\n";
 
 type ExtractedUserMessage = {
   content: string;
@@ -49,8 +50,15 @@ function extractUserInput(input: unknown): string {
   return extractUserMessage(input).content;
 }
 
+function stripKimixClarificationInstruction(content: string): string {
+  if (!content.startsWith("【Kimix 需求澄清工具：")) return content;
+  const markerIndex = content.indexOf(CLARIFICATION_ORIGINAL_MARKER);
+  if (markerIndex === -1) return content;
+  return content.slice(markerIndex + CLARIFICATION_ORIGINAL_MARKER.length);
+}
+
 function extractUserMessage(input: unknown): ExtractedUserMessage {
-  if (isString(input)) return { content: input, images: [] };
+  if (isString(input)) return { content: stripKimixClarificationInstruction(input), images: [] };
   if (!Array.isArray(input)) return { content: "", images: [] };
 
   const textParts: string[] = [];
@@ -69,7 +77,7 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
     }
   });
   return {
-    content: textParts.filter(Boolean).join("\n"),
+    content: stripKimixClarificationInstruction(textParts.filter(Boolean).join("\n")),
     images,
   };
 }
@@ -243,6 +251,28 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
     }
 
+    case "QuestionRequest": {
+      const questions = Array.isArray(payload.questions) ? payload.questions.filter(isRecord) : [];
+      return {
+        id: generateId(),
+        type: "question_request",
+        timestamp: Date.now(),
+        requestId: isString(payload.id) ? payload.id : "",
+        rpcRequestId: isString(payload.rpc_request_id) ? payload.rpc_request_id : (isString(payload.id) ? payload.id : ""),
+        toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : "",
+        questions: questions.map((question) => ({
+          question: isString(question.question) ? question.question : "请选择后续处理方式？",
+          header: isString(question.header) ? question.header : undefined,
+          multiSelect: typeof question.multi_select === "boolean" ? question.multi_select : false,
+          options: (Array.isArray(question.options) ? question.options.filter(isRecord) : []).map((option) => ({
+            label: isString(option.label) ? option.label : "选项",
+            description: isString(option.description) ? option.description : undefined,
+          })),
+        })),
+        status: "pending",
+      };
+    }
+
     case "StatusUpdate": {
       const tokenUsage = isRecord(payload.token_usage) ? payload.token_usage : {};
       const inputTokenCount =
@@ -300,12 +330,15 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
 
     case "SubagentEvent": {
+      const subagentStatus = isString(payload.status) && ["running", "completed", "error"].includes(payload.status)
+        ? payload.status
+        : "running";
       return {
         id: generateId(),
         type: "subagent",
         timestamp: Date.now(),
         agentName: isString(payload.agent_name) ? payload.agent_name : "subagent",
-        status: "running",
+        status: subagentStatus,
         events: [],
       };
     }
@@ -366,8 +399,22 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   if (incoming.type === "assistant_message") {
     if (incoming.isComplete && !incoming.content && !incoming.thinking) {
       const latestOpenIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
-      if (latestOpenIndex === -1) return existing;
-      return existing.flatMap((event, index) => {
+      const hasRunningSubagent = existing.some((e) => e.type === "subagent" && e.status === "running");
+
+      // TurnEnd 到达时，同时关闭 running 的 subagent 和未完成的 assistant_message
+      // 因为 TurnEnd 代表整个 turn 结束，不应让 subagent 的 TurnEnd 提前结束主对话
+      // 也不应让主对话完成后 subagent 还保持 running
+      let base = existing;
+      if (hasRunningSubagent) {
+        base = existing.map((event) =>
+          event.type === "subagent" && event.status === "running" ? { ...event, status: "completed" as const } : event
+        );
+      }
+
+      if (latestOpenIndex === -1) {
+        return base;
+      }
+      return base.flatMap((event, index) => {
         if (event.type !== "assistant_message" || event.isComplete) return event;
         const hasContent = event.content.trim().length > 0;
         const hasThinking = Boolean(event.thinking?.trim());
@@ -389,9 +436,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
       const updated: typeof last = {
         ...last,
-        content: last.content && incoming.content
-          ? `${last.content}\n\n${incoming.content}`
-          : last.content + incoming.content,
+        content: last.content + incoming.content,
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
         thinkingParts: incoming.thinkingParts
           ? [...(last.thinkingParts ?? []), ...incoming.thinkingParts]
@@ -475,10 +520,14 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   }
 
   if (incoming.type === "subagent") {
-    const lastSubagentIndex = existing.findLastIndex((e) => e.type === "subagent");
-    if (lastSubagentIndex !== -1) {
+    const matchingSubagentIndex = existing.findLastIndex((e) => (
+      e.type === "subagent" &&
+      e.agentName === incoming.agentName &&
+      e.status === "running"
+    ));
+    if (matchingSubagentIndex !== -1) {
       const result = [...existing];
-      result[lastSubagentIndex] = { ...result[lastSubagentIndex], ...incoming } as TimelineEvent;
+      result[matchingSubagentIndex] = { ...result[matchingSubagentIndex], ...incoming } as TimelineEvent;
       return result;
     }
   }
