@@ -1,12 +1,86 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.7.4 长程任务骨架接入主对话流，UI 留白与版本号收口；准备推 GitHub 并发 release。
+v2.7.15 修正长程任务执行进度识别：executor 输出 Step 执行结果后，Kimix 会同步推进顶部步骤/状态并触发 reviewer 接棒。
 
 ## 当前版本
-**v2.7.4** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.7.15** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+
+## 当前开发会话待办
+### 已完成
+- [x] 长程任务创建后复用主对话流，不在弹窗里继续聊天。
+- [x] 创建 `.kimix-long-tasks/<task-id>/` 基础骨架：`BIGPLAN.md`、`state.json`、executor/reviewer prompt、`reviews/REVIEW_QUEUE.md`。
+- [x] 顶部长程任务 banner、侧栏长程任务会话底色、右上 `PanelRight` 展开右侧栏。
+- [x] 右侧栏读取并展示真实 `BIGPLAN.md` 和 `REVIEW_QUEUE.md`。
+- [x] 右侧待审查项支持点击确认、划线、移动到“已审查”，并支持撤回。
+- [x] 澄清卡片支持折叠、已处理默认折叠、保留历史选项/输入、已处理不可再次点击。
+- [x] 本轮处理详情底部增加“收起本轮内容”；重启后不再把已处理时长写成 0 秒。
+- [x] 同一轮里需求澄清卡片按时间语义排在 assistant 正文下方。
+- [x] 状态回写 `state.json`：`stage`、`activeAgent`、`currentStep`、`targetStep`、人工审查确认状态。
+- [x] 审查 agent 接棒闭环：executor 明确交审后，由 Kimix 独立 reviewer session 输出，并可靠更新顶部 banner/右侧状态。
+
+### 待推进
+- [ ] reviewer 结果路由：通过 / 需修复 / 待人工审查后，决定交回 executor、等待用户或进入下一步。
+- [ ] 支持“执行到第 N 步”：用户设置目标步骤，调度器按 BIGPLAN 顺序推进。
+- [ ] 轮次记录：把每轮执行、审查、修复和验证结果写入 `rounds/`。
+- [ ] 自动修复闭环：审查发现问题后生成修复 prompt，executor 修复后再交 reviewer 复查。
+- [ ] 长程任务控制区：暂停、继续、切换当前 agent、设置目标步骤、查看下一步 prompt。
 
 ## 已完成
+- v2.7.15：
+  - executor 完成后会从最新输出识别 `Step N`、`当前步骤`、`rounds/stepN.md`、`待审查/交给审查 agent` 等执行证据。
+  - 识别到计划确认输出时，会把长程任务推进到 `ready` 并记录目标步骤；识别到执行输出时，会把 `stage` 推进到 `running`、更新 `currentStep` 并回写 `state.json`。
+  - reviewer 接棒判断改为基于“执行完成证据 + 交审意图”，避免只看旧 `state.json` 导致执行完成后不接棒。
+  - 启动后会扫描已恢复的长程任务历史；如果旧会话已经出现“执行完成 + 交审”但未触发 reviewer，会补偿派发审查 agent。
+  - 版本号三处同步到 v2.7.15。
+- v2.7.14：
+  - 审查 agent 自动接棒条件收紧为仅 `running` 执行阶段触发，drafting/planning/ready 阶段不会因“计划完成后审查”等文字误切 reviewer。
+  - drafting/planning/ready 阶段统一把用户输入路由到 executor，即使旧状态曾停在 reviewer/reviewing，也会在本地恢复为执行 agent。
+  - 长程任务创建提示、executor/reviewer 专属 prompt 和创建面板文案调整为“规划阶段不审查，执行阶段再审查”。
+  - 版本号三处同步到 v2.7.14。
+- v2.7.13：
+  - Kimix 自动发送给 reviewer 的内部审查 prompt 不再作为用户消息显示，主对话下一条可见输出保持为审查 agent 回复。
+  - 从长程任务列表重新打开任务时，会恢复 executor 与 reviewer 两段历史，并按 `activeAgent` 指向当前真实 session。
+  - reviewer 启动失败时会把长程任务状态回写为 reviewer/paused，避免顶部 banner 和 `state.json` 长时间停在“正在工作”的假状态。
+  - 当前开发会话待办中“审查 agent 接棒闭环”已标记完成。
+  - 版本号三处同步到 v2.7.13。
+- v2.7.12：
+  - 新增 `longTasks:updateState` IPC，用于把长程任务状态字段安全写回对应任务目录的 `state.json`。
+  - activeAgent/stage/currentStep/targetStep/reviewedReviewItems 会随运行状态变化和人工审查勾选同步持久化。
+  - 从任务列表打开长程任务主对话时，会从 `state.json` 恢复 `reviewedReviewItems`。
+  - 当前开发会话待办中“状态回写 state.json”已标记完成。
+  - 版本号三处同步到 v2.7.12。
+- v2.7.11：
+  - `TASK_STATE.md` 顶部“当前开发会话待办”按“已完成 / 待推进”拆分，匹配本轮协作计划。
+  - 搜索确认产品 UI 中没有“长程任务功能开发待办”或开发 roadmap 常量残留。
+  - 版本号三处同步到 v2.7.11。
+- v2.7.10：
+  - 撤回误加到产品右侧栏的“长程任务功能开发待办”UI，避免把协作看板混入正式功能界面。
+  - 在 `TASK_STATE.md` 顶部新增“当前开发会话待办”，作为本轮对话/协作进度看板。
+  - 版本号三处同步到 v2.7.10。
+- v2.7.9：
+  - 曾误把“当前开发会话待办”做进产品右侧栏；v2.7.10 已撤回。
+  - 版本号三处同步到 v2.7.9。
+- v2.7.8：
+  - 右侧长程任务“待审查”条目可点击确认，确认后从待审查列表移到“已审查”区。
+  - 已审查条目显示删除线，点击后可撤回到待审查列表。
+  - 人工审查确认状态保存到长程任务会话元数据中，不改写原始 `REVIEW_QUEUE.md`。
+  - 版本号三处同步到 v2.7.8。
+- v2.7.7：
+  - 同一轮中存在 assistant 正文时，`question_request` 需求澄清卡片会排在 assistant 正文之后，避免澄清块抢到最终回复文字上方。
+  - 版本号三处同步到 v2.7.7。
+- v2.7.6：
+  - executor 完成规划且无待处理结构化澄清时，Kimix 会主动把审查 prompt 发给长程任务 reviewer session，并把长程任务状态切到 reviewer/reviewing。
+  - 长程任务顶部 banner 在 reviewer 工作时改为淡黄色，执行 agent 保持淡蓝色。
+  - 执行 agent 专属提示词与创建后的启动 prompt 均补充规则：需要审查时不要自己调用 subagent/Reviewer 来模拟审查。
+  - 澄清卡片支持折叠；已回答/已跳过的卡片默认折叠，展开后保留曾经选择的选项或自定义回答。
+  - 本轮处理详情展开后底部增加“收起本轮内容”按钮。
+  - 重启收口未完成 assistant 时不再把缺失时长写成 0 秒。
+- v2.7.5：
+  - 新增 `longTasks:getDetail` IPC，从当前项目内安全读取长程任务 `BIGPLAN.md` 和 `reviews/REVIEW_QUEUE.md`。
+  - 右侧长程任务栏不再只显示占位说明，会解析展示目标、初始需求、Step 列表、当前步骤状态和待人工审查项。
+  - 待审查队列为空时显示“暂无待人工审查项”。
+  - 版本号三处同步到 v2.7.5。
 - v2.7.4：
   - 长程任务创建基础骨架已接入：`electron/longTaskService.ts` + `.kimix-long-tasks/<task-id>/` + `BIGPLAN.md` + `state.json` + executor/reviewer 双 agent prompt 文件 + `reviews/REVIEW_QUEUE.md`。
   - 创建长程任务后进入主 `ChatThread`，不在弹窗内继续聊天。

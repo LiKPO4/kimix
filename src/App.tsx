@@ -37,6 +37,7 @@ interface StartHandoffDetail {
 }
 
 function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
+  const settledAt = Date.now();
   const settled = events.flatMap((event) => {
     if (event.type === "subagent") {
       return event.status === "running" ? [{ ...event, status: "completed" as const }] : [event];
@@ -45,7 +46,7 @@ function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
     const hasContent = event.content.trim().length > 0;
     const hasThinking = Boolean(event.thinking?.trim());
     if (!hasContent && !hasThinking) return [];
-    return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? 0 }];
+    return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, settledAt - event.timestamp) }];
   });
   return closeOpenCompaction(settled);
 }
@@ -231,12 +232,180 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
       updatedAt: Date.now(),
     };
   });
+  const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+  if (latest?.longTask) {
+    void window.api.updateLongTaskState({
+      projectPath: latest.projectPath,
+      taskId: latest.longTask.taskId,
+      patch: {
+        activeAgent: latest.longTask.activeAgent,
+        stage: latest.longTask.stage,
+        currentStep: latest.longTask.currentStep,
+        targetStep: latest.longTask.targetStep,
+        reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
+      },
+    }).catch(() => {});
+  }
 
   const active = useAppStore.getState().currentSession;
   if (active?.id === uiSessionId) {
-    const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (latest) useAppStore.getState().setCurrentSession(latest);
   }
+}
+
+function hasPendingQuestion(events: TimelineEvent[]) {
+  return events.some((event) => event.type === "question_request" && event.status === "pending");
+}
+
+function latestAssistantContent(events: TimelineEvent[]) {
+  return [...events].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+    event.type === "assistant_message" && event.content.trim().length > 0
+  ))?.content.trim() ?? "";
+}
+
+function extractLongTaskStepNumbers(content: string) {
+  const numbers: number[] = [];
+  const patterns = [
+    /当前步骤[：:\s]*(\d+)/gi,
+    /Step\s*(\d+)/gi,
+    /step\s*(\d+)/gi,
+    /rounds\/step(\d+)\.md/gi,
+  ];
+  patterns.forEach((pattern) => {
+    for (const match of content.matchAll(pattern)) {
+      const value = Number(match[1]);
+      if (Number.isInteger(value) && value > 0) numbers.push(value);
+    }
+  });
+  return numbers;
+}
+
+function inferLongTaskProgressPatch(session: Session, runtimeSessionId: string) {
+  const meta = session.longTask;
+  if (!meta || meta.executorSessionId !== runtimeSessionId) return null;
+  const content = latestAssistantContent(session.events);
+  if (!content) return null;
+
+  const stepNumbers = extractLongTaskStepNumbers(content);
+  const maxStep = stepNumbers.length > 0 ? Math.max(...stepNumbers) : null;
+  const asksForPlanConfirmation = /请确认|是否同意|确认后.*开始执行|进入执行阶段|开始执行\s*Step/i.test(content) &&
+    /计划|BIGPLAN|Step\s*\d+/i.test(content);
+  const executionProgress = /执行完成|已写入执行记录|rounds\/step\d+\.md|待审查|交给审查\s*agent|当前步骤[：:\s]*\d+/i.test(content);
+
+  const patch: Partial<NonNullable<Session["longTask"]>> = {};
+  if (asksForPlanConfirmation) {
+    patch.stage = "ready";
+    if (maxStep && !meta.targetStep) patch.targetStep = maxStep;
+  }
+  if (executionProgress) {
+    patch.stage = "running";
+    if (maxStep) patch.currentStep = maxStep;
+    if (maxStep && !meta.targetStep) patch.targetStep = maxStep;
+  }
+
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function applyLongTaskProgressFromLatestOutput(uiSessionId: string, runtimeSessionId: string) {
+  const current = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+  if (!current?.longTask) return current;
+  const patch = inferLongTaskProgressPatch(current, runtimeSessionId);
+  if (!patch) return current;
+
+  useSessionStore.getState().updateSession(uiSessionId, (session) => {
+    if (!session.longTask) return session;
+    return {
+      ...session,
+      longTask: {
+        ...session.longTask,
+        ...patch,
+      },
+      updatedAt: Date.now(),
+    };
+  });
+
+  const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+  if (latest?.longTask) {
+    void window.api.updateLongTaskState({
+      projectPath: latest.projectPath,
+      taskId: latest.longTask.taskId,
+      patch: {
+        activeAgent: latest.longTask.activeAgent,
+        stage: latest.longTask.stage,
+        currentStep: latest.longTask.currentStep,
+        targetStep: latest.longTask.targetStep,
+        reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
+      },
+    }).catch(() => {});
+    const active = useAppStore.getState().currentSession;
+    if (active?.id === uiSessionId) useAppStore.getState().setCurrentSession(latest);
+  }
+  return latest ?? current;
+}
+
+function isExecutionReviewHandoff(content: string) {
+  const asksReview = /审查\s*agent|reviewer\s*agent|审查意见|交给.*审查/i.test(content);
+  const executionEvidence = /执行完成|已写入执行记录|rounds\/step\d+\.md|待审查|当前步骤[：:\s]*\d+|Step\s*\d+.*执行完成/i.test(content);
+  return asksReview && executionEvidence;
+}
+
+function normalizeLongTaskPlanningSession<T extends Session>(session: T): T {
+  if (!session.longTask || !["drafting", "planning", "ready"].includes(session.longTask.stage)) return session;
+  if (session.longTask.activeAgent === "executor" && session.runtimeSessionId === session.longTask.executorSessionId) return session;
+  return {
+    ...session,
+    runtimeSessionId: session.longTask.executorSessionId,
+    longTask: {
+      ...session.longTask,
+      activeAgent: "executor",
+    },
+  };
+}
+
+function hydrateLongTaskProgressFromHistory<T extends Session>(session: T): T {
+  const normalized = normalizeLongTaskPlanningSession(session);
+  if (!normalized.longTask) return normalized;
+  const patch = inferLongTaskProgressPatch(normalized, normalized.longTask.executorSessionId);
+  if (!patch) return normalized;
+  return {
+    ...normalized,
+    runtimeSessionId: patch.stage === "reviewing" ? normalized.longTask.reviewerSessionId : normalized.longTask.executorSessionId,
+    longTask: {
+      ...normalized.longTask,
+      ...patch,
+    },
+  };
+}
+
+function shouldStartLongTaskReview(session: Session, runtimeSessionId: string) {
+  if (!session.longTask) return false;
+  if (session.longTask.executorSessionId !== runtimeSessionId) return false;
+  if (session.longTask.stage === "reviewing" || session.longTask.activeAgent === "reviewer") return false;
+  if (session.longTask.stage !== "running") return false;
+  if (hasPendingQuestion(session.events)) return false;
+  const content = latestAssistantContent(session.events);
+  return isExecutionReviewHandoff(content);
+}
+
+function buildLongTaskReviewPrompt(session: Session) {
+  const meta = session.longTask;
+  if (!meta) return "";
+  const executorOutput = latestAssistantContent(session.events);
+  return `【Kimix 长程任务：请审查执行 agent 的本轮执行结果】
+你正在作为 Kimix 长程任务的审查 agent 工作。
+
+请先阅读：
+- ${meta.reviewQueuePath}
+- ${meta.bigPlanPath}
+
+审查目标：
+1. 检查本轮执行结果是否符合 BIGPLAN.md 中当前步骤的目标、范围和验收标准。
+2. 如果计划不可执行或步骤过大，请给出需修复的问题，后续由 Kimix 交回执行 agent 修复。
+3. 暂时无法自动确认的问题，请写入 ${meta.reviewQueuePath}。
+4. 不要直接执行代码修改；本轮只做执行结果审查。
+
+执行 agent 最近输出：
+${executorOutput || "暂无可用输出，请直接读取 BIGPLAN.md 审查。"}`;
 }
 
 async function createSessionAndSendPrompt(projectPath: string, content: string) {
@@ -315,6 +484,97 @@ function App() {
   const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bootstrapDoneRef = useRef(false);
   const handoffJobRef = useRef<HandoffJob | null>(null);
+  const longTaskReviewDispatchRef = useRef<Set<string>>(new Set());
+
+  const dispatchLongTaskReview = (uiSessionId: string, runtimeSessionId: string) => {
+    const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    const reviewKey = `${uiSessionId}:${runtimeSessionId}:${latestSession?.events.length ?? 0}`;
+    if (!latestSession?.longTask || !shouldStartLongTaskReview(latestSession, runtimeSessionId) || longTaskReviewDispatchRef.current.has(reviewKey)) {
+      return false;
+    }
+    longTaskReviewDispatchRef.current.add(reviewKey);
+    updateSession(uiSessionId, (session) => session.longTask ? {
+      ...session,
+      runtimeSessionId: session.longTask.reviewerSessionId,
+      longTask: {
+        ...session.longTask,
+        activeAgent: "reviewer",
+        stage: "reviewing",
+      },
+      events: [
+        ...session.events,
+        {
+          id: crypto.randomUUID(),
+          type: "assistant_message" as const,
+          timestamp: Date.now(),
+          content: "",
+          isThinking: true,
+          isComplete: false,
+        },
+      ],
+      updatedAt: Date.now(),
+    } : session);
+    const latestForPrompt = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId) ?? latestSession;
+    if (latestForPrompt.longTask) {
+      void window.api.updateLongTaskState({
+        projectPath: latestForPrompt.projectPath,
+        taskId: latestForPrompt.longTask.taskId,
+        patch: {
+          activeAgent: latestForPrompt.longTask.activeAgent,
+          stage: latestForPrompt.longTask.stage,
+          currentStep: latestForPrompt.longTask.currentStep,
+          targetStep: latestForPrompt.longTask.targetStep,
+          reviewedReviewItems: latestForPrompt.longTask.reviewedReviewItems ?? [],
+        },
+      }).catch(() => {});
+    }
+    setRunningSessionId(uiSessionId);
+    void window.api.sendPrompt({
+      sessionId: latestSession.longTask.reviewerSessionId,
+      content: buildLongTaskReviewPrompt(latestForPrompt),
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+    }).then((res) => {
+      if (res.success) return;
+      throw new Error(res.error);
+    }).catch((err: unknown) => {
+      let failedSession: Session | undefined;
+      updateSession(uiSessionId, (session) => ({
+        ...session,
+        longTask: session.longTask ? {
+          ...session.longTask,
+          activeAgent: "reviewer",
+          stage: "paused",
+        } : session.longTask,
+        events: [
+          ...session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete && !event.content.trim())),
+          {
+            id: crypto.randomUUID(),
+            type: "error" as const,
+            timestamp: Date.now(),
+            message: `启动审查 agent 失败：${err instanceof Error ? err.message : String(err)}`,
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+      failedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+      if (failedSession?.longTask) {
+        void window.api.updateLongTaskState({
+          projectPath: failedSession.projectPath,
+          taskId: failedSession.longTask.taskId,
+          patch: {
+            activeAgent: failedSession.longTask.activeAgent,
+            stage: failedSession.longTask.stage,
+            currentStep: failedSession.longTask.currentStep,
+            targetStep: failedSession.longTask.targetStep,
+            reviewedReviewItems: failedSession.longTask.reviewedReviewItems ?? [],
+          },
+        }).catch(() => {});
+      }
+      setRunningSessionId(null);
+    });
+    return true;
+  };
 
   useEffect(() => {
     window.api.getSettings().then((res) => {
@@ -362,12 +622,12 @@ function App() {
         if (!startRes.success || !latest) return;
         const runtimeOwner = findLocalSessionForRuntime(latest.id, startRes.data.sessionId);
         if (runtimeOwner && runtimeOwner.events.length > 0) {
-          const session = {
+          const session = hydrateLongTaskProgressFromHistory({
             ...runtimeOwner,
             runtimeSessionId: startRes.data.sessionId,
             events: settleInactiveEvents(runtimeOwner.events),
             isLoading: false,
-          };
+          });
           useSessionStore.setState((state) => ({
             sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
           }));
@@ -409,7 +669,7 @@ function App() {
         const parsed = JSON.parse(storedSessions);
         if (Array.isArray(parsed)) {
           useSessionStore.setState({
-            sessions: parsed.map((session) => ({
+            sessions: parsed.map((session) => hydrateLongTaskProgressFromHistory({
               ...session,
               events: Array.isArray(session.events) ? settleInactiveEvents(session.events) : [],
               isLoading: false,
@@ -622,6 +882,11 @@ function App() {
           updatedAt: Date.now(),
         }));
 
+        applyLongTaskProgressFromLatestOutput(uiSessionId, payload.sessionId);
+        if (dispatchLongTaskReview(uiSessionId, payload.sessionId)) {
+          return;
+        }
+
         const next = useSessionStore.getState().shiftPendingMessage();
         if (next) {
           const userEventId = Math.random().toString(36).substring(2, 11);
@@ -739,6 +1004,29 @@ function App() {
       timersRef.current = [];
     };
   }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (useAppStore.getState().runningSessionId) return;
+      const sessions = useSessionStore.getState().sessions;
+      for (const session of sessions) {
+        if (!session.longTask) continue;
+        const hydrated = hydrateLongTaskProgressFromHistory(session);
+        if (hydrated.longTask && (
+          hydrated.longTask.stage !== session.longTask.stage ||
+          hydrated.longTask.currentStep !== session.longTask.currentStep ||
+          hydrated.longTask.targetStep !== session.longTask.targetStep ||
+          hydrated.longTask.activeAgent !== session.longTask.activeAgent
+        )) {
+          updateSession(session.id, () => hydrated);
+          const active = useAppStore.getState().currentSession;
+          if (active?.id === session.id) useAppStore.getState().setCurrentSession(hydrated);
+        }
+        if (dispatchLongTaskReview(session.id, session.longTask.executorSessionId)) break;
+      }
+    }, 1400);
+    return () => clearTimeout(timer);
+  }, [defaultThinking, permissionMode, updateSession]);
 
   return (
     <ThemeProvider>

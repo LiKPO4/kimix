@@ -54,7 +54,7 @@ function extractUserInput(input: unknown): string {
 function stripKimixClarificationInstruction(content: string): string {
   if (content.startsWith("【Kimix 长程任务：")) {
     const markerIndex = content.indexOf(LONG_TASK_ORIGINAL_MARKER);
-    if (markerIndex === -1) return content;
+    if (markerIndex === -1) return "";
     return content.slice(markerIndex + LONG_TASK_ORIGINAL_MARKER.length);
   }
   if (!content.startsWith("【Kimix 需求澄清工具：")) return content;
@@ -113,6 +113,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
   switch (type) {
     case "TurnBegin": {
       const userMessage = extractUserMessage(payload.user_input);
+      if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
       return {
         id: generateId(),
         type: "user_message",
@@ -504,6 +505,26 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       : event
     );
     return [...result, incoming];
+  }
+
+  if (incoming.type === "question_request") {
+    const matchingQuestionIndex = existing.findLastIndex((event) => (
+      event.type === "question_request" &&
+      Boolean(event.requestId) &&
+      event.requestId === incoming.requestId
+    ));
+    if (matchingQuestionIndex !== -1) {
+      const current = existing[matchingQuestionIndex] as Extract<TimelineEvent, { type: "question_request" }>;
+      const result = [...existing];
+      result[matchingQuestionIndex] = {
+        ...incoming,
+        id: current.id,
+        timestamp: current.timestamp,
+        status: current.status,
+        answers: current.answers,
+      };
+      return result;
+    }
   }
 
   if (incoming.type === "tool_result") {

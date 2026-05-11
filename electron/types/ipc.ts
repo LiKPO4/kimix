@@ -37,6 +37,7 @@ export type LongTaskSummary = {
   activeAgent: LongTaskAgentRole;
   currentStep: number;
   targetStep: number | null;
+  reviewedReviewItems?: string[];
   createdAt: number;
   updatedAt: number;
   initialRequest: string;
@@ -63,6 +64,38 @@ export type CreateLongTaskRequest = {
 }
 
 export type CreateLongTaskResponse = {
+  success: true;
+  data: LongTaskSummary;
+} | {
+  success: false;
+  error: string;
+};
+
+export type GetLongTaskDetailRequest = {
+  projectPath: string;
+  taskId: string;
+}
+
+export type LongTaskDetail = LongTaskSummary & {
+  bigPlanContent: string;
+  reviewQueueContent: string;
+}
+
+export type GetLongTaskDetailResponse = {
+  success: true;
+  data: LongTaskDetail;
+} | {
+  success: false;
+  error: string;
+};
+
+export type UpdateLongTaskStateRequest = {
+  projectPath: string;
+  taskId: string;
+  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems">>;
+}
+
+export type UpdateLongTaskStateResponse = {
   success: true;
   data: LongTaskSummary;
 } | {

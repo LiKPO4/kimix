@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -419,6 +419,15 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
                 ? <ToolProcessItem key={item.tool.id} tool={item.tool} />
                 : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />
           ))}
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="kimix-icon-text-button is-compact self-end text-[#706b63] hover:bg-[#f3f1ec]"
+            style={{ paddingLeft: 12, paddingRight: 12 }}
+          >
+            <ChevronUp size={14} />
+            <span>收起本轮内容</span>
+          </button>
         </div>
       )}
     </div>
@@ -437,7 +446,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const isActivelyThinking = Boolean(currentSession?.id && runningSessionId === currentSession.id && event.isThinking && !event.isComplete);
   const elapsed = useElapsed(event.timestamp, isActivelyThinking);
   const durationLabel = event.isComplete
-    ? formatDuration(event.durationMs ?? elapsed)
+    ? formatDuration(event.durationMs && event.durationMs > 0 ? event.durationMs : elapsed)
     : formatDuration(elapsed);
   const processLabel = event.isComplete
     ? `已处理 ${durationLabel}`

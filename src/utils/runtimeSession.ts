@@ -5,6 +5,9 @@ type LongTaskAgentRole = LongTaskSessionMeta["activeAgent"];
 export function getRuntimeSessionId(session: Session | null | undefined): string | null {
   if (!session) return null;
   if (session.longTask) {
+    if (["drafting", "planning", "ready"].includes(session.longTask.stage)) {
+      return session.longTask.executorSessionId;
+    }
     return session.longTask.activeAgent === "reviewer"
       ? session.longTask.reviewerSessionId
       : session.longTask.executorSessionId;

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { LongTaskAgentRole, LongTaskStage, LongTaskSummary, Project } from "./types/ipc";
+import type { LongTaskAgentRole, LongTaskDetail, LongTaskStage, LongTaskSummary, Project } from "./types/ipc";
 
 export type CreateLongTaskData = {
   project: Project;
@@ -79,7 +79,8 @@ ${task.initialRequest}
 - 长程任务和普通聊天隔离，不复用已有聊天会话。
 - 执行 agent 与审查 agent 使用两个真实 Kimi session，各自维护上下文。
 - 每个计划步骤必须控制为一轮可完成的工作。
-- 规划完成后必须先由审查 agent 审查计划，再交给用户确认。
+- 规划阶段不启动审查 agent；执行 agent 必须先和用户完成澄清、形成完整 BIGPLAN.md，并等待用户确认进入执行阶段。
+- 审查 agent 只在执行阶段接棒，审查每轮执行产出和验证结果。
 
 ## 分步计划
 > 规划阶段由执行 agent 和用户多轮澄清后填写。每个 Step 只放一轮能完成的工作。
@@ -108,6 +109,8 @@ function buildExecutorPrompt(projectAgent: string, taskDir: string) {
 - 规划阶段需要和用户多轮澄清，直到计划足够具体、可执行、可审查。
 - 每个计划步骤必须是一轮可以完成的工作，不要把过多任务塞进同一个步骤。
 - 用户设置执行到第 N 步时，只按 BIGPLAN.md 顺序推进到目标步骤。
+- 规划阶段只和用户澄清并维护 BIGPLAN.md，不要宣布交给审查 agent，也不要启动或模拟审查。
+- 执行阶段每轮产出完成后，如需审查，只说明“交给审查 agent 审查”，不要自己调用 subagent、Reviewer、reviewer strict 或其它子代理来模拟审查。
 - 每轮结束后，把产出、验证证据、风险和后续建议写入 rounds/ 对应记录。
 - 如果你意识到自己的执行规则可以改进，只更新本文件，不要修改项目根 AGENTS.md。
 - 审查 agent 发现问题后，先修复问题，再等待审查 agent 重新确认。
@@ -125,10 +128,9 @@ ${projectAgent || "当前项目根目录未找到 AGENTS.md。"}
 function buildReviewerPrompt(taskDir: string) {
   return `# 长程任务审查 Agent
 
-你是 Kimix 长程任务的审查 agent。你和执行 agent 是两个独立真实 session，你的职责是审查计划、审查每轮产出、发现风险，并在通过后生成下一轮执行提示词。
+你是 Kimix 长程任务的审查 agent。你和执行 agent 是两个独立真实 session，你的职责是审查每轮执行产出、发现风险，并在通过后生成下一轮执行提示词。
 
 ## 审查职责
-- 规划阶段先审查 BIGPLAN.md：步骤是否过大、验收标准是否明确、风险边界是否清楚。
 - 每轮执行完成后，检查是否符合本步骤目标、范围和验收标准。
 - 发现问题时，必须先反馈给执行 agent 修复，不直接进入下一步。
 - 暂时无法自动审查或测试的内容，写入 reviews/REVIEW_QUEUE.md，留给用户最终处理。
@@ -178,6 +180,12 @@ function readStateFile(statePath: string): LongTaskSummary | null {
   try {
     const parsed = JSON.parse(fs.readFileSync(statePath, "utf-8")) as Partial<LongTaskState>;
     if (!parsed.id || !parsed.projectPath || !parsed.taskDir || !parsed.title) return null;
+    if (["drafting", "planning", "ready"].includes(parsed.stage ?? "") && parsed.activeAgent === "reviewer") {
+      return {
+        ...(parsed as LongTaskSummary),
+        activeAgent: "executor",
+      };
+    }
     return parsed as LongTaskSummary;
   } catch {
     return null;
@@ -192,6 +200,56 @@ export function listLongTasks(projectPath: string): LongTaskSummary[] {
     .map((entry) => readStateFile(path.join(root, entry.name, STATE_FILE)))
     .filter((task): task is LongTaskSummary => Boolean(task))
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function readTextInsideProject(projectPath: string, relativePath: string) {
+  const targetPath = path.join(projectPath, relativePath);
+  assertInsideProject(projectPath, targetPath);
+  return fs.existsSync(targetPath) ? fs.readFileSync(targetPath, "utf-8") : "";
+}
+
+export function getLongTaskDetail(projectPath: string, taskId: string): LongTaskDetail {
+  const task = listLongTasks(projectPath).find((item) => item.id === taskId);
+  if (!task) {
+    throw new Error("Long task not found");
+  }
+  return {
+    ...task,
+    bigPlanContent: readTextInsideProject(projectPath, task.bigPlanPath),
+    reviewQueueContent: readTextInsideProject(projectPath, task.reviewQueuePath),
+  };
+}
+
+function findLongTaskStatePath(projectPath: string, taskId: string) {
+  const root = longTasksRoot(projectPath);
+  if (!fs.existsSync(root)) return null;
+  const entry = fs.readdirSync(root, { withFileTypes: true })
+    .find((item) => item.isDirectory() && item.name.startsWith(`${taskId}-`));
+  return entry ? path.join(root, entry.name, STATE_FILE) : null;
+}
+
+export function updateLongTaskState(
+  projectPath: string,
+  taskId: string,
+  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems">>,
+): LongTaskSummary {
+  const statePath = findLongTaskStatePath(projectPath, taskId);
+  if (!statePath) {
+    throw new Error("Long task not found");
+  }
+  assertInsideProject(projectPath, statePath);
+  const current = readStateFile(statePath);
+  if (!current) {
+    throw new Error("Invalid long task state");
+  }
+  const updated: LongTaskState = {
+    ...(current as LongTaskState),
+    ...patch,
+    updatedAt: Date.now(),
+    schemaVersion: 1,
+  };
+  fs.writeFileSync(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf-8");
+  return updated;
 }
 
 export function createLongTask(data: CreateLongTaskData): LongTaskSummary {
@@ -234,6 +292,7 @@ export function createLongTask(data: CreateLongTaskData): LongTaskSummary {
     activeAgent: "executor" satisfies LongTaskAgentRole,
     currentStep: 0,
     targetStep: null,
+    reviewedReviewItems: [],
     createdAt: now,
     updatedAt: now,
     initialRequest: data.initialRequest,

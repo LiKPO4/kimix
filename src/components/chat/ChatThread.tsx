@@ -97,8 +97,16 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
 }
 
 function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; projectPath: string }) {
+  const isReviewer = meta.activeAgent === "reviewer";
   return (
-    <div className="rounded-2xl border border-[#cfe4fb] bg-[#f4f9ff] text-[#302d28] shadow-[0_10px_26px_rgba(74,132,190,0.10)]" style={{ padding: "14px 18px" }}>
+    <div
+      className="rounded-2xl text-[#302d28] shadow-[0_10px_26px_rgba(74,132,190,0.10)]"
+      style={{
+        padding: "14px 18px",
+        border: `1px solid ${isReviewer ? "#f1ddb0" : "#cfe4fb"}`,
+        background: isReviewer ? "#fff8e8" : "#f4f9ff",
+      }}
+    >
       <div className="flex flex-wrap items-center justify-between" style={{ gap: 10 }}>
         <div className="min-w-0">
           <div className="truncate text-[15px] font-medium leading-6">长程任务：{meta.title}</div>
@@ -109,14 +117,14 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
         <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
           <button
             type="button"
-            className="kimix-icon-text-button is-compact bg-white text-[#2f6fad] hover:bg-[#eef7ff]"
+            className={`kimix-icon-text-button is-compact bg-white ${isReviewer ? "text-[#9a6a12] hover:bg-[#fff1cf]" : "text-[#2f6fad] hover:bg-[#eef7ff]"}`}
             onClick={() => {
               void window.api.openFile({ projectPath, filePath: meta.bigPlanPath });
             }}
           >
             BIGPLAN
           </button>
-          <span className="rounded-full bg-white text-[12px] leading-5 text-[#2f83cc]" style={{ padding: "4px 10px" }}>
+          <span className={`rounded-full bg-white text-[12px] leading-5 ${isReviewer ? "text-[#9a6a12]" : "text-[#2f83cc]"}`} style={{ padding: "4px 10px" }}>
             {longTaskAgentLabels[meta.activeAgent]}
           </span>
         </div>
@@ -188,6 +196,9 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
 
   const renderTurnBody = (turnEvents: TimelineEvent[]) => {
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
+    const primaryAssistant = turnEvents.find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+      event.type === "assistant_message" && event.content.trim().length > 0
+    ));
     const changedFiles = new Set(
       turnEvents
         .filter((e): e is Extract<TimelineEvent, { type: "change_summary" }> => e.type === "change_summary")
@@ -204,6 +215,12 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       if (type === "tool_call" || type === "tool_result") continue;
       if (type === "subagent") continue;
       if (type === "status_update") continue;
+      if (event === primaryAssistant) {
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles) });
+        toolsAttached = true;
+        assistantAttached = true;
+        continue;
+      }
       if (
         type !== "assistant_message" &&
         type !== "approval_request" &&
@@ -217,6 +234,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       ) {
         continue;
       }
+      if (primaryAssistant && type === "question_request") continue;
       if (type === "assistant_message" && !toolsAttached) {
         items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles) });
         toolsAttached = true;
@@ -231,6 +249,11 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     }
 
     if (!toolsAttached) pushStandaloneTools(tools);
+    if (primaryAssistant) {
+      turnEvents
+        .filter((event) => event.type === "question_request")
+        .forEach((event) => items.push({ type: "event", event }));
+    }
     if (!assistantAttached) {
       subagents.forEach((event) => items.push({ type: "event", event }));
     }

@@ -7,6 +7,10 @@ import type {
   ListLongTasksResponse,
   CreateLongTaskRequest,
   CreateLongTaskResponse,
+  GetLongTaskDetailRequest,
+  GetLongTaskDetailResponse,
+  UpdateLongTaskStateRequest,
+  UpdateLongTaskStateResponse,
   StartSessionRequest,
   StartSessionResponse,
   CheckKimiCliRequest,
@@ -91,6 +95,10 @@ const api = {
     ipcRenderer.invoke("longTasks:list", req),
   createLongTask: (req: CreateLongTaskRequest): Promise<CreateLongTaskResponse> =>
     ipcRenderer.invoke("longTasks:create", req),
+  getLongTaskDetail: (req: GetLongTaskDetailRequest): Promise<GetLongTaskDetailResponse> =>
+    ipcRenderer.invoke("longTasks:getDetail", req),
+  updateLongTaskState: (req: UpdateLongTaskStateRequest): Promise<UpdateLongTaskStateResponse> =>
+    ipcRenderer.invoke("longTasks:updateState", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>

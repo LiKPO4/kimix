@@ -969,6 +969,23 @@ const ListLongTasksSchema = z.object({
   projectPath: z.string().min(1).max(4096),
 });
 
+const GetLongTaskDetailSchema = z.object({
+  projectPath: z.string().min(1).max(4096),
+  taskId: z.string().min(1).max(160),
+});
+
+const UpdateLongTaskStateSchema = z.object({
+  projectPath: z.string().min(1).max(4096),
+  taskId: z.string().min(1).max(160),
+  patch: z.object({
+    stage: z.enum(["drafting", "planning", "ready", "running", "reviewing", "paused", "completed"]).optional(),
+    activeAgent: z.enum(["executor", "reviewer"]).optional(),
+    currentStep: z.number().int().min(0).optional(),
+    targetStep: z.number().int().min(0).nullable().optional(),
+    reviewedReviewItems: z.array(z.string().max(20000)).max(500).optional(),
+  }).strict(),
+});
+
 const CreateLongTaskSchema = z.object({
   project: ProjectSchema,
   title: z.string().max(160).optional(),
@@ -1004,6 +1021,39 @@ ipcMain.handle("longTasks:list", async (_, request: unknown) => {
       return { success: false, error: "Project path does not exist" };
     }
     return { success: true, data: longTaskService.listLongTasks(parsed.data.projectPath) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("longTasks:getDetail", async (_, request: unknown) => {
+  try {
+    const parsed = GetLongTaskDetailSchema.safeParse(request);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid long task detail request" };
+    }
+    if (!fs.existsSync(parsed.data.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    return { success: true, data: longTaskService.getLongTaskDetail(parsed.data.projectPath, parsed.data.taskId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("longTasks:updateState", async (_, request: unknown) => {
+  try {
+    const parsed = UpdateLongTaskStateSchema.safeParse(request);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid long task update request" };
+    }
+    if (!fs.existsSync(parsed.data.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    return {
+      success: true,
+      data: longTaskService.updateLongTaskState(parsed.data.projectPath, parsed.data.taskId, parsed.data.patch),
+    };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

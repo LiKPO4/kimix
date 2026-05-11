@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Check, CircleHelp, SendHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronDown, ChevronRight, CircleHelp, SendHorizontal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -17,19 +17,46 @@ function optionKey(question: string, label: string) {
 
 export function QuestionCard({ event }: QuestionCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const initialAnswers = useMemo<LocalAnswers>(() => {
     const next: LocalAnswers = {};
     event.questions.forEach((question) => {
-      const first = question.options[0]?.label;
+      const saved = event.answers?.[question.question]?.trim();
+      if (saved) {
+        const labels = question.options.map((option) => option.label);
+        next[question.question] = question.multiSelect
+          ? saved.split(/\s*,\s*/).filter((item) => labels.includes(item))
+          : labels.includes(saved) ? [saved] : [];
+        return;
+      }
+      const first = event.status === "pending" ? question.options[0]?.label : undefined;
       next[question.question] = first ? [first] : [];
     });
     return next;
-  }, [event.questions]);
+  }, [event.answers, event.questions, event.status]);
+  const initialCustomAnswers = useMemo<Record<string, string>>(() => {
+    const next: Record<string, string> = {};
+    event.questions.forEach((question) => {
+      const saved = event.answers?.[question.question]?.trim();
+      if (!saved) return;
+      const labels = question.options.map((option) => option.label);
+      if (!labels.includes(saved)) next[question.question] = saved;
+    });
+    return next;
+  }, [event.answers, event.questions]);
   const [answers, setAnswers] = useState<LocalAnswers>(initialAnswers);
-  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
-  const [customSelected, setCustomSelected] = useState<Record<string, boolean>>({});
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>(initialCustomAnswers);
+  const [customSelected, setCustomSelected] = useState<Record<string, boolean>>(() => Object.fromEntries(Object.keys(initialCustomAnswers).map((key) => [key, true])));
+  const [collapsed, setCollapsed] = useState(event.status !== "pending");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setAnswers(initialAnswers);
+    setCustomAnswers(initialCustomAnswers);
+    setCustomSelected(Object.fromEntries(Object.keys(initialCustomAnswers).map((key) => [key, true])));
+    setCollapsed(event.status !== "pending");
+  }, [event.id, event.status, initialAnswers, initialCustomAnswers]);
 
   const setQuestionAnswer = (question: string, label: string, multiSelect?: boolean) => {
     setCustomSelected((prev) => ({ ...prev, [question]: false }));
@@ -72,7 +99,9 @@ export function QuestionCard({ event }: QuestionCardProps) {
 
   const markSettled = (status: "answered" | "skipped", answerPayload?: Record<string, string>) => {
     if (!currentSession) return;
-    updateSession(currentSession.id, (session) => ({
+    let updatedSession = currentSession;
+    updateSession(currentSession.id, (session) => {
+      updatedSession = {
       ...session,
       events: session.events.map((item) => (
         item.id === event.id && item.type === "question_request"
@@ -80,7 +109,10 @@ export function QuestionCard({ event }: QuestionCardProps) {
           : item
       )),
       updatedAt: Date.now(),
-    }));
+      };
+      return updatedSession;
+    });
+    setCurrentSession(updatedSession);
   };
 
   const submitAnswers = async (skip = false) => {
@@ -98,6 +130,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
       });
       if (!res.success) throw new Error(res.error);
       markSettled(skip ? "skipped" : "answered", answerPayload);
+      setCollapsed(true);
     } catch (err) {
       console.error("Respond question failed:", err);
     } finally {
@@ -106,21 +139,40 @@ export function QuestionCard({ event }: QuestionCardProps) {
   };
 
   const isPending = event.status === "pending";
+  const summary = event.status === "answered"
+    ? `已提交：${Object.values(event.answers ?? {}).filter(Boolean).join(" / ") || "已回答"}`
+    : event.status === "skipped"
+      ? "已跳过澄清"
+      : "等待选择后继续执行";
 
   return (
     <div className="flex justify-center">
       <div
         className="w-full max-w-[96%] rounded-2xl border border-[#cfe4fb] bg-[#f4f9ff] text-[#24211d]"
-        style={{ padding: "20px 22px 12px" }}
+        style={{ padding: collapsed ? "12px 16px" : "20px 22px 12px" }}
       >
-        <div className="flex items-center" style={{ gap: 14, minHeight: 52, marginBottom: 18 }}>
+        <button
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          className="flex w-full items-center rounded-xl text-left transition-colors hover:bg-white/60"
+          style={{ gap: 12, minHeight: 48, paddingLeft: collapsed ? 6 : 0, paddingRight: collapsed ? 8 : 0 }}
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center text-[#6f87a1]">
+            {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+          </span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#339af0] shadow-[0_1px_2px_rgba(25,23,20,0.08)]">
             <CircleHelp size={16} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-medium leading-6">需要你确认一下</div>
-            <div className="mt-0.5 text-[13px] leading-5 text-[#706b63]">Kimi 官方结构化提问会在你选择后继续执行。</div>
+            <div className="mt-0.5 truncate text-[13px] leading-5 text-[#706b63]">{summary}</div>
           </div>
+        </button>
+
+        {!collapsed && (
+          <>
+        <div className="text-[13px] leading-5 text-[#706b63]" style={{ marginTop: 8, marginBottom: 18, paddingLeft: 48 }}>
+          Kimi 官方结构化提问会在你选择后继续执行。
         </div>
 
         <div className="flex flex-col" style={{ gap: 18 }}>
@@ -162,7 +214,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
                     );
                   })}
                 </div>
-                {isPending && (
+                {(isPending || customValue) && (
                   <input
                     value={customValue}
                     onChange={(inputEvent) => setQuestionCustomAnswer(question.question, inputEvent.target.value)}
@@ -205,6 +257,8 @@ export function QuestionCard({ event }: QuestionCardProps) {
           <div className="flex items-center text-[13px] leading-5 text-[#706b63]" style={{ minHeight: 50, marginTop: 10 }}>
             {event.status === "answered" ? "已提交回答，Kimi 会继续执行。" : "已跳过澄清，Kimi 会按当前信息继续。"}
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

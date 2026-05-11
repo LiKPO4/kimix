@@ -44,6 +44,7 @@ function buildPlanningKickoffPrompt(task: LongTaskSummary) {
 - ${task.bigPlanPath}
 
 然后基于用户初始需求开始澄清与规划阶段。你需要先判断是否还需要澄清；如果需要，请向用户提出 1-3 个关键问题。不要直接开始执行代码。
+规划阶段只和用户澄清并完善 BIGPLAN，不要交给审查 agent。进入执行阶段后，每轮执行完成需要审查时，只说明交给审查 agent 审查；不要自己调用 subagent、Reviewer 或其它子代理来模拟审查，Kimix 会用独立 reviewer session 接棒。
 
 用户初始需求：
 ${task.initialRequest}`;
@@ -59,18 +60,20 @@ function projectFromTask(task: LongTaskSummary): Project {
 }
 
 function sessionFromTask(task: LongTaskSummary, events: TimelineEvent[]): Session {
+  const planningStage = ["drafting", "planning", "ready"].includes(task.stage);
   return {
     id: task.id,
-    runtimeSessionId: task.executorSessionId,
+    runtimeSessionId: planningStage || task.activeAgent === "executor" ? task.executorSessionId : task.reviewerSessionId,
     longTask: {
       taskId: task.id,
       title: task.title,
       stage: task.stage,
-      activeAgent: task.activeAgent,
+      activeAgent: planningStage ? "executor" : task.activeAgent,
       executorSessionId: task.executorSessionId,
       reviewerSessionId: task.reviewerSessionId,
       bigPlanPath: task.bigPlanPath,
       reviewQueuePath: task.reviewQueuePath,
+      reviewedReviewItems: task.reviewedReviewItems ?? [],
       currentStep: task.currentStep,
       targetStep: task.targetStep,
     },
@@ -238,13 +241,21 @@ export function LongTasksPanel() {
         yoloMode: permissionMode === "yolo",
       });
       if (!reviewer.success) throw new Error(reviewer.error);
-      const loaded = await window.api.loadSession({
+      const loadedExecutor = await window.api.loadSession({
         workDir: task.projectPath,
         sessionId: task.executorSessionId,
       });
-      const events = loaded.success
-        ? mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : [])
+      const loadedReviewer = await window.api.loadSession({
+        workDir: task.projectPath,
+        sessionId: task.reviewerSessionId,
+      });
+      const executorEvents = loadedExecutor.success
+        ? mapHistoryEvents(Array.isArray(loadedExecutor.data.events) ? loadedExecutor.data.events : [])
         : [];
+      const reviewerEvents = loadedReviewer.success
+        ? mapHistoryEvents(Array.isArray(loadedReviewer.data.events) ? loadedReviewer.data.events : [])
+        : [];
+      const events = [...executorEvents, ...reviewerEvents];
       const visibleEvents = events.length > 0 ? events : [initialUserEvent(task)];
       const session = sessionFromTask(task, visibleEvents);
       addSession(session);
@@ -330,7 +341,7 @@ export function LongTasksPanel() {
             <textarea
               value={initialRequest}
               onChange={(event) => setInitialRequest(event.target.value)}
-              placeholder="输入长程任务的初始需求，后续会进入多轮澄清和计划审查"
+              placeholder="输入长程任务的初始需求，后续会进入多轮澄清和计划设计"
               className="mt-3 min-h-[112px] w-full resize-none rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] leading-6 outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
               style={{ padding: "12px 14px" }}
             />

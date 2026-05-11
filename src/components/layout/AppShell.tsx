@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Archive,
   BookOpen,
+  CheckCircle2,
   ChevronDown,
   Code2,
   Copy,
@@ -38,6 +39,7 @@ import {
   Pin,
   Play,
   RefreshCw,
+  RotateCcw,
   Square,
   SquareTerminal,
   X,
@@ -46,6 +48,7 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
+import type { LongTaskDetail } from "@electron/types/ipc";
 
 type MenuAction =
   | "close-chat"
@@ -112,6 +115,77 @@ type ReleaseInfo = {
   htmlUrl: string;
   assets: { name: string; downloadUrl: string }[];
 };
+
+type ParsedBigPlanStep = {
+  index: number;
+  title: string;
+  goal: string;
+  scope: string;
+  acceptance: string;
+  status: string;
+};
+
+type ParsedLongTaskDetail = {
+  goal: string;
+  initialRequest: string;
+  steps: ParsedBigPlanStep[];
+  reviewItems: string[];
+};
+
+function extractMarkdownSection(content: string, heading: string) {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = content.match(new RegExp(`^##\\s+${escaped}\\s*\\r?\\n([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, "m"));
+  return match?.[1]?.trim() ?? "";
+}
+
+function extractField(block: string, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = block.match(new RegExp(`^${escaped}：\\s*(.*)$`, "m"));
+  return match?.[1]?.trim() ?? "";
+}
+
+function parseBigPlanSteps(content: string): ParsedBigPlanStep[] {
+  const steps: ParsedBigPlanStep[] = [];
+  const stepRegex = /^###\s+Step\s+(\d+)([^\r\n]*)\r?\n([\s\S]*?)(?=^###\s+Step\s+\d+|^##\s+|(?![\s\S]))/gm;
+  for (const match of content.matchAll(stepRegex)) {
+    const index = Number(match[1]);
+    const suffix = match[2]?.trim();
+    const block = match[3] ?? "";
+    steps.push({
+      index,
+      title: suffix || `Step ${index}`,
+      goal: extractField(block, "目标"),
+      scope: extractField(block, "范围"),
+      acceptance: extractField(block, "验收标准"),
+      status: extractField(block, "状态") || "未标记",
+    });
+  }
+  return steps;
+}
+
+function parseReviewItems(content: string) {
+  const pending = extractMarkdownSection(content, "待处理") || content;
+  return pending
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+/.test(line))
+    .map((line) => line.replace(/^[-*]\s+/, "").trim())
+    .filter((line) => line && line !== "暂无");
+}
+
+function parseLongTaskDetail(detail: LongTaskDetail | null): ParsedLongTaskDetail | null {
+  if (!detail) return null;
+  return {
+    goal: extractMarkdownSection(detail.bigPlanContent, "目标") || detail.title,
+    initialRequest: extractMarkdownSection(detail.bigPlanContent, "初始需求") || detail.initialRequest,
+    steps: parseBigPlanSteps(detail.bigPlanContent),
+    reviewItems: parseReviewItems(detail.reviewQueueContent),
+  };
+}
+
+function normalizeReviewItem(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
 
 const MENU_ITEMS: Record<string, MenuEntry[]> = {
   文件: [
@@ -352,6 +426,9 @@ export function AppShell() {
     latest: null,
     hasUpdate: false,
   });
+  const [longTaskDetail, setLongTaskDetail] = useState<LongTaskDetail | null>(null);
+  const [longTaskDetailLoading, setLongTaskDetailLoading] = useState(false);
+  const [longTaskDetailError, setLongTaskDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     const close = () => {
@@ -553,8 +630,87 @@ export function AppShell() {
     [sessions, currentSession],
   );
   const longTaskMeta = liveCurrentSession?.longTask;
+  const parsedLongTaskDetail = useMemo(() => parseLongTaskDetail(longTaskDetail), [longTaskDetail]);
+  const reviewedReviewItems = useMemo(() => new Set((longTaskMeta?.reviewedReviewItems ?? []).map(normalizeReviewItem)), [longTaskMeta?.reviewedReviewItems]);
+  const pendingReviewItems = useMemo(
+    () => (parsedLongTaskDetail?.reviewItems ?? []).filter((item) => !reviewedReviewItems.has(normalizeReviewItem(item))),
+    [parsedLongTaskDetail?.reviewItems, reviewedReviewItems],
+  );
+  const completedReviewItems = useMemo(
+    () => (parsedLongTaskDetail?.reviewItems ?? []).filter((item) => reviewedReviewItems.has(normalizeReviewItem(item))),
+    [parsedLongTaskDetail?.reviewItems, reviewedReviewItems],
+  );
   const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
+
+  const setReviewItemChecked = (item: string, checked: boolean) => {
+    if (!liveCurrentSession?.longTask) return;
+    const normalized = normalizeReviewItem(item);
+    let latestSession = liveCurrentSession;
+    updateSession(liveCurrentSession.id, (session) => {
+      if (!session.longTask) return session;
+      const current = session.longTask.reviewedReviewItems ?? [];
+      const currentSet = new Set(current.map(normalizeReviewItem));
+      if (checked) currentSet.add(normalized);
+      else currentSet.delete(normalized);
+      latestSession = {
+        ...session,
+        longTask: {
+          ...session.longTask,
+          reviewedReviewItems: Array.from(currentSet),
+        },
+        updatedAt: Date.now(),
+      };
+      return latestSession;
+    });
+    setCurrentSession(latestSession);
+    if (latestSession.longTask) {
+      void window.api.updateLongTaskState({
+        projectPath: latestSession.projectPath,
+        taskId: latestSession.longTask.taskId,
+        patch: {
+          stage: latestSession.longTask.stage,
+          activeAgent: latestSession.longTask.activeAgent,
+          currentStep: latestSession.longTask.currentStep,
+          targetStep: latestSession.longTask.targetStep,
+          reviewedReviewItems: latestSession.longTask.reviewedReviewItems ?? [],
+        },
+      }).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) {
+      setLongTaskDetail(null);
+      setLongTaskDetailError(null);
+      setLongTaskDetailLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const { taskId } = liveCurrentSession.longTask;
+    setLongTaskDetailLoading(true);
+    setLongTaskDetailError(null);
+    void window.api.getLongTaskDetail({ projectPath: liveCurrentSession.projectPath, taskId }).then((res) => {
+      if (cancelled) return;
+      if (res.success) {
+        setLongTaskDetail(res.data);
+      } else {
+        setLongTaskDetail(null);
+        setLongTaskDetailError(res.error);
+      }
+    }).catch((err: unknown) => {
+      if (cancelled) return;
+      setLongTaskDetail(null);
+      setLongTaskDetailError(err instanceof Error ? err.message : String(err));
+    }).finally(() => {
+      if (!cancelled) setLongTaskDetailLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
+
   const copyToClipboard = async (text: string, successMessage = "已复制") => {
     await navigator.clipboard.writeText(text);
     showToast(successMessage);
@@ -857,9 +1013,59 @@ export function AppShell() {
                         打开
                       </button>
                     </div>
-                    <div className="mt-3 rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "11px 12px" }}>
-                      可视化计划树后续会在这里展示：目标、阶段、步骤、当前进度和每轮验收状态。
-                    </div>
+                    {longTaskDetailLoading ? (
+                      <div className="mt-3 rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "11px 12px" }}>
+                        正在读取 BIGPLAN...
+                      </div>
+                    ) : longTaskDetailError ? (
+                      <div className="mt-3 rounded-lg bg-[#fff4f0] text-[13px] leading-6 text-[#9b4b34]" style={{ padding: "11px 12px" }}>
+                        读取失败：{longTaskDetailError}
+                      </div>
+                    ) : parsedLongTaskDetail ? (
+                      <div className="mt-3 flex flex-col" style={{ gap: 10 }}>
+                        <div className="rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#24415f]" style={{ padding: "11px 12px" }}>
+                          <div className="font-medium text-[#2f6fad]">目标</div>
+                          <div className="mt-1 line-clamp-3 text-[#4f6f8f]">{parsedLongTaskDetail.goal}</div>
+                          <div className="mt-2 font-medium text-[#2f6fad]">初始需求</div>
+                          <div className="mt-1 line-clamp-3 text-[#4f6f8f]">{parsedLongTaskDetail.initialRequest}</div>
+                        </div>
+                        <div className="flex flex-col" style={{ gap: 8 }}>
+                          {parsedLongTaskDetail.steps.map((step) => {
+                            const isCurrent = step.index === longTaskMeta.currentStep;
+                            return (
+                              <div
+                                key={step.index}
+                                className={`rounded-lg border ${isCurrent ? "border-[#b7d9f7] bg-[#f4f9ff]" : "border-[#e2edf8] bg-white"}`}
+                                style={{ padding: "10px 12px" }}
+                              >
+                                <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                                  <div className="min-w-0 truncate text-[13.5px] font-medium leading-5 text-[#24415f]">
+                                    Step {step.index}
+                                  </div>
+                                  <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                                    {step.status}
+                                  </span>
+                                </div>
+                                <div className="mt-2 text-[13px] leading-5 text-[#5e7894]">
+                                  {step.goal || step.title || "暂未填写目标"}
+                                </div>
+                                {(step.scope || step.acceptance) && (
+                                  <div className="mt-2 text-[12.5px] leading-5 text-[#7b91a7]">
+                                    {step.scope && <div className="line-clamp-2">范围：{step.scope}</div>}
+                                    {step.acceptance && <div className="line-clamp-2">验收：{step.acceptance}</div>}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {parsedLongTaskDetail.steps.length === 0 && (
+                            <div className="rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "11px 12px" }}>
+                              BIGPLAN 还没有解析到 Step，等待执行 agent 完成规划。
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </section>
                   <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
                     <div className="flex items-center justify-between" style={{ gap: 10 }}>
@@ -877,10 +1083,68 @@ export function AppShell() {
                         打开
                       </button>
                     </div>
-                    <div className="mt-3 rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "11px 12px" }}>
-                      后续这里会显示 reviewer 暂时无法自动确认、需要用户处理的检查项。
-                    </div>
+                    {longTaskDetailLoading ? (
+                      <div className="mt-3 rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "11px 12px" }}>
+                        正在读取待审查队列...
+                      </div>
+                    ) : parsedLongTaskDetail && parsedLongTaskDetail.reviewItems.length > 0 ? (
+                      <div className="mt-3 flex flex-col" style={{ gap: 8 }}>
+                        {pendingReviewItems.map((item, index) => (
+                          <button
+                            key={`${index}-${item}`}
+                            type="button"
+                            onClick={() => setReviewItemChecked(item, true)}
+                            className="flex w-full items-start rounded-lg border border-[#efe1bf] bg-[#fffdf7] text-left text-[13px] leading-5 text-[#7b6d4a] transition-colors hover:bg-[#fff8e8]"
+                            style={{ gap: 9, padding: "10px 12px" }}
+                            title="点击标记为已审查"
+                          >
+                            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#e2c884] text-transparent">
+                              <CheckCircle2 size={12} />
+                            </span>
+                            <span className="min-w-0 flex-1">{item}</span>
+                          </button>
+                        ))}
+                        {pendingReviewItems.length === 0 && (
+                          <div className="rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "11px 12px" }}>
+                            待审查项都已确认。
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "11px 12px" }}>
+                        暂无待人工审查项。
+                      </div>
+                    )}
                   </section>
+                  {completedReviewItems.length > 0 && (
+                    <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">已审查</div>
+                          <div className="mt-1 text-[13px] leading-5 text-[#8aa0b5]">点击条目可撤回到待审查</div>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          {completedReviewItems.length}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-col" style={{ gap: 8 }}>
+                        {completedReviewItems.map((item, index) => (
+                          <button
+                            key={`${index}-${item}`}
+                            type="button"
+                            onClick={() => setReviewItemChecked(item, false)}
+                            className="flex w-full items-start rounded-lg border border-[#d8e8d8] bg-[#f7fbf7] text-left text-[13px] leading-5 text-[#6f806f] transition-colors hover:bg-[#edf7ed]"
+                            style={{ gap: 9, padding: "10px 12px" }}
+                            title="点击撤回到待审查"
+                          >
+                            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#4d9f55]" />
+                            <span className="min-w-0 flex-1 line-through decoration-[#7d937d] decoration-1">{item}</span>
+                            <RotateCcw size={13} className="mt-1 shrink-0 text-[#89a089]" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-[#dbeafa] bg-white text-[13.5px] leading-6 text-[#6f87a1]" style={{ padding: "18px 16px" }}>

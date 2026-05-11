@@ -55,6 +55,7 @@ export interface LongTaskSessionMeta {
   reviewerSessionId: string;
   bigPlanPath: string;
   reviewQueuePath: string;
+  reviewedReviewItems?: string[];
   currentStep: number;
   targetStep: number | null;
 }
