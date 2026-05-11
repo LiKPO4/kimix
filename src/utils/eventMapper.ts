@@ -14,6 +14,7 @@ function isNumber(v: unknown): v is number {
 
 const LATEST_TOOL_CALL = "__kimix_latest_tool_call__";
 const CLARIFICATION_ORIGINAL_MARKER = "\n\n用户原始需求：\n";
+const LONG_TASK_ORIGINAL_MARKER = "\n\n用户初始需求：\n";
 
 type ExtractedUserMessage = {
   content: string;
@@ -51,6 +52,11 @@ function extractUserInput(input: unknown): string {
 }
 
 function stripKimixClarificationInstruction(content: string): string {
+  if (content.startsWith("【Kimix 长程任务：")) {
+    const markerIndex = content.indexOf(LONG_TASK_ORIGINAL_MARKER);
+    if (markerIndex === -1) return content;
+    return content.slice(markerIndex + LONG_TASK_ORIGINAL_MARKER.length);
+  }
   if (!content.startsWith("【Kimix 需求澄清工具：")) return content;
   const markerIndex = content.indexOf(CLARIFICATION_ORIGINAL_MARKER);
   if (markerIndex === -1) return content;

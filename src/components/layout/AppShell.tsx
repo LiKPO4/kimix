@@ -324,6 +324,8 @@ export function AppShell() {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const skillsOpen = useAppStore((s) => s.skillsOpen);
   const setSkillsOpen = useAppStore((s) => s.setSkillsOpen);
+  const longTaskInspectorOpen = useAppStore((s) => s.longTaskInspectorOpen);
+  const setLongTaskInspectorOpen = useAppStore((s) => s.setLongTaskInspectorOpen);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
@@ -550,6 +552,7 @@ export function AppShell() {
     () => sessions.find((session) => session.id === currentSession?.id) ?? currentSession,
     [sessions, currentSession],
   );
+  const longTaskMeta = liveCurrentSession?.longTask;
   const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
   const copyToClipboard = async (text: string, successMessage = "已复制") => {
@@ -667,7 +670,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <div style={{ paddingBottom: 0, paddingRight: 0 }} className="flex min-h-0 flex-1 gap-2">
+      <div style={{ paddingBottom: 0, paddingRight: 0, gap: 10 }} className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[#e5e1d8] bg-white shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#efebe3] bg-white" style={{ paddingLeft: 30, paddingRight: 30 }}>
@@ -782,10 +785,14 @@ export function AppShell() {
                 <SquareTerminal size={15} />
               </button>
               <button
-                onClick={() => showToast("待实现")}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e5e1d8] text-[#8a847a] transition-colors hover:bg-[#f8f6f1]"
-                title="审查和差异"
-                aria-label="审查和差异"
+                onClick={() => setLongTaskInspectorOpen(!longTaskInspectorOpen)}
+                className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+                  longTaskInspectorOpen
+                    ? "border-[#cfe4fb] bg-[#eef7ff] text-[#2f6fad]"
+                    : "border-[#e5e1d8] text-[#8a847a] hover:bg-[#f8f6f1]"
+                }`}
+                title="长程任务侧栏"
+                aria-label="长程任务侧栏"
               >
                 <PanelRight size={15} />
               </button>
@@ -794,7 +801,7 @@ export function AppShell() {
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <ChatThread />
           </div>
-          <div className="kimix-content-x shrink-0 bg-white" style={{ paddingTop: 8, paddingBottom: 10 }}>
+          <div className="kimix-content-x shrink-0 bg-white" style={{ paddingTop: 10, paddingBottom: 10 }}>
             <div className="kimix-chat-column">
               <Composer />
               <div style={{ marginTop: 10 }}>
@@ -803,6 +810,86 @@ export function AppShell() {
             </div>
           </div>
         </main>
+        {longTaskInspectorOpen && (
+          <aside className="flex h-full w-[320px] shrink-0 flex-col overflow-hidden rounded-[18px] border border-[#dbeafa] bg-[#f8fbff] shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#dbeafa]" style={{ paddingLeft: 18, paddingRight: 14 }}>
+              <div className="min-w-0">
+                <div className="text-[15px] font-semibold leading-5 text-[#24415f]">长程任务</div>
+                <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[#6f87a1]">
+                  {longTaskMeta ? longTaskMeta.title : "当前对话未关联长程任务"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLongTaskInspectorOpen(false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#6f87a1] transition-colors hover:bg-[#eaf4ff] hover:text-[#24415f]"
+                aria-label="关闭长程任务侧栏"
+                title="关闭"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 10, paddingBottom: 18 }}>
+              {longTaskMeta ? (
+                <div className="flex flex-col" style={{ gap: 14 }}>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
+                    <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">当前状态</div>
+                    <div className="mt-2 text-[14px] leading-6 text-[#24415f]">
+                      {longTaskMeta.activeAgent === "reviewer" ? "审查 agent" : "执行 agent"} · {longTaskMeta.stage}
+                    </div>
+                    <div className="mt-1 text-[13px] leading-5 text-[#6f87a1]">
+                      步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
+                    </div>
+                  </section>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
+                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">BIGPLAN</div>
+                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">{longTaskMeta.bigPlanPath}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: longTaskMeta.bigPlanPath });
+                        }}
+                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff]"
+                      >
+                        打开
+                      </button>
+                    </div>
+                    <div className="mt-3 rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "11px 12px" }}>
+                      可视化计划树后续会在这里展示：目标、阶段、步骤、当前进度和每轮验收状态。
+                    </div>
+                  </section>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
+                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">待审查</div>
+                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">{longTaskMeta.reviewQueuePath}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: longTaskMeta.reviewQueuePath });
+                        }}
+                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff]"
+                      >
+                        打开
+                      </button>
+                    </div>
+                    <div className="mt-3 rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "11px 12px" }}>
+                      后续这里会显示 reviewer 暂时无法自动确认、需要用户处理的检查项。
+                    </div>
+                  </section>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-[#dbeafa] bg-white text-[13.5px] leading-6 text-[#6f87a1]" style={{ padding: "18px 16px" }}>
+                  选择一个长程任务对话后，这里会显示 BIGPLAN 可视化和待审查内容。
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
       </div>
 
       <SettingsPanel />

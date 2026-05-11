@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function formatK(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;
@@ -112,9 +113,11 @@ export function ContextRing() {
 
   const handleCompact = async () => {
     if (!currentSession || isCurrentSessionRunning || isCompacting) return;
+    const runtimeSessionId = getRuntimeSessionId(currentSession);
+    if (!runtimeSessionId) return;
     try {
       await window.api.sendPrompt({
-        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
+        sessionId: runtimeSessionId,
         content: "/compact",
       });
     } catch (err) {

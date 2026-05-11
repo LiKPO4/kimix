@@ -6,6 +6,7 @@ import type { Session, TimelineEvent, PermissionMode, ClarificationToolMode } fr
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -68,10 +69,6 @@ function findLastUserContentBeforeOpenAssistant(events: TimelineEvent[]): string
     if (event.type === "user_message" && event.content.trim()) return event.content.trim();
   }
   return null;
-}
-
-function getRuntimeSessionId(session: Session) {
-  return session.runtimeSessionId ?? session.id;
 }
 
 type ImageAttachment = {
@@ -197,7 +194,12 @@ export function Composer() {
       return;
     }
     let cancelled = false;
-    void window.api.listSlashCommands({ sessionId: currentSession.runtimeSessionId ?? currentSession.id }).then((res) => {
+    const runtimeSessionId = getRuntimeSessionId(currentSession);
+    if (!runtimeSessionId) {
+      setSlashCommands([]);
+      return;
+    }
+    void window.api.listSlashCommands({ sessionId: runtimeSessionId }).then((res) => {
       if (cancelled) return;
       if (!res.success) {
         console.warn("List slash commands failed:", res.error);
@@ -220,7 +222,7 @@ export function Composer() {
     return () => {
       cancelled = true;
     };
-  }, [currentSession?.id]);
+  }, [currentSession?.id, currentSession?.longTask?.activeAgent]);
 
   const activeCompletion = getActiveCompletion(input);
   const filteredSlashItems = activeCompletion?.mode === "slash"
@@ -336,7 +338,7 @@ export function Composer() {
   const recoverHandoffSourceSession = async (targetSession: Session, options?: { resendLastOpenUserMessage?: boolean }) => {
     if (!shouldRecoverHandoffSourceSession(targetSession)) return targetSession;
 
-    await window.api.closeSession({ sessionId: getRuntimeSessionId(targetSession) }).catch(() => {});
+    await window.api.closeSession({ sessionId: getRuntimeSessionId(targetSession) ?? targetSession.id }).catch(() => {});
     const sessionRes = await window.api.startSession({
       workDir: targetSession.projectPath,
       model: "kimi-code/kimi-for-coding",
@@ -367,7 +369,7 @@ export function Composer() {
       window.setTimeout(() => {
         setRunningSessionId(recoveredSession.id);
         void window.api.sendPrompt({
-          sessionId: getRuntimeSessionId(recoveredSession),
+          sessionId: getRuntimeSessionId(recoveredSession) ?? recoveredSession.id,
           content: resendContent,
           thinking: defaultThinking,
           yoloMode: permissionMode === "yolo",
@@ -428,10 +430,15 @@ export function Composer() {
     }));
 
     setRunningSessionId(targetSession.id);
-    const outboundContent = withClarificationBehavior(content, clarificationToolMode);
+    const outboundContent = targetSession.longTask ? content : withClarificationBehavior(content, clarificationToolMode);
+    const runtimeSessionId = getRuntimeSessionId(targetSession);
+    if (!runtimeSessionId) {
+      setRunningSessionId(null);
+      return;
+    }
     try {
       await window.api.sendPrompt({
-        sessionId: getRuntimeSessionId(targetSession),
+        sessionId: runtimeSessionId,
         content: outboundContent,
         images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
         thinking: defaultThinking,
@@ -501,7 +508,7 @@ export function Composer() {
     if (!targetSession) return false;
     const startRes = await window.api.startSession({
       workDir: targetSession.projectPath,
-      sessionId: getRuntimeSessionId(targetSession),
+      sessionId: getRuntimeSessionId(targetSession) ?? targetSession.id,
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
@@ -632,7 +639,8 @@ export function Composer() {
     }, 250);
     try {
       const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
-      const res = await window.api.stopTurn({ sessionId: latest ? getRuntimeSessionId(latest) : sessionId });
+      const runtimeSessionId = latest ? getRuntimeSessionId(latest) : sessionId;
+      const res = await window.api.stopTurn({ sessionId: runtimeSessionId ?? sessionId });
       if (!res.success) {
         console.error("Stop failed:", res.error);
       }
@@ -711,8 +719,10 @@ export function Composer() {
         ],
         updatedAt: Date.now(),
       }));
+      const runtimeSessionId = getRuntimeSessionId(activeSession ?? currentSession);
+      if (!runtimeSessionId) return;
       const res = await window.api.steerPrompt({
-        sessionId: getRuntimeSessionId(activeSession ?? currentSession),
+        sessionId: runtimeSessionId,
         content: pending.content,
       });
       if (!res.success) {

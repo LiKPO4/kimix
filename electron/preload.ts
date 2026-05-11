@@ -3,6 +3,10 @@ import type {
   OpenProjectRequest,
   OpenProjectResponse,
   ListRecentResponse,
+  ListLongTasksRequest,
+  ListLongTasksResponse,
+  CreateLongTaskRequest,
+  CreateLongTaskResponse,
   StartSessionRequest,
   StartSessionResponse,
   CheckKimiCliRequest,
@@ -81,6 +85,12 @@ const api = {
     ipcRenderer.invoke("project:saveEnabledSkills", req),
   importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
     ipcRenderer.invoke("project:importSkillArchive", req),
+
+  // Long tasks
+  listLongTasks: (req: ListLongTasksRequest): Promise<ListLongTasksResponse> =>
+    ipcRenderer.invoke("longTasks:list", req),
+  createLongTask: (req: CreateLongTaskRequest): Promise<CreateLongTaskResponse> =>
+    ipcRenderer.invoke("longTasks:create", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>

@@ -2,6 +2,7 @@ import { AlertTriangle, Check, X, ShieldCheck } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 interface ApprovalCardProps {
   event: Extract<TimelineEvent, { type: "approval_request" }>;
@@ -13,9 +14,11 @@ export function ApprovalCard({ event }: ApprovalCardProps) {
 
   const handleApprove = async (scope?: "once" | "session") => {
     if (!currentSession) return;
+    const runtimeSessionId = getRuntimeSessionId(currentSession);
+    if (!runtimeSessionId) return;
     try {
       await window.api.approveRequest({
-        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
+        sessionId: runtimeSessionId,
         requestId: event.requestId,
         approved: true,
         scope,
@@ -35,9 +38,11 @@ export function ApprovalCard({ event }: ApprovalCardProps) {
 
   const handleReject = async () => {
     if (!currentSession) return;
+    const runtimeSessionId = getRuntimeSessionId(currentSession);
+    if (!runtimeSessionId) return;
     try {
       await window.api.approveRequest({
-        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
+        sessionId: runtimeSessionId,
         requestId: event.requestId,
         approved: false,
       });

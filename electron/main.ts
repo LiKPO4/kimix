@@ -10,6 +10,7 @@ import { z } from "zod";
 import * as kimiBridge from "./kimiBridge";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
+import * as longTaskService from "./longTaskService";
 import type { ContentPart } from "@moonshot-ai/kimi-agent-sdk";
 
 const GITHUB_REPO = "LiKPO4/kimix";
@@ -44,14 +45,20 @@ function runCommand(command: string, args: string[]): Promise<string> {
   });
 }
 
-function spawnDetached(command: string, args: string[], cwd?: string) {
-  const child = spawn(command, args, {
-    cwd,
-    detached: true,
-    stdio: "ignore",
-    windowsHide: false,
+function spawnDetached(command: string, args: string[], cwd?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: false,
+    });
+    child.once("error", reject);
+    child.once("spawn", () => {
+      child.unref();
+      resolve();
+    });
   });
-  child.unref();
 }
 
 function parseShortcut(shortcut: string): { modifiers: number[]; key: number } {
@@ -147,16 +154,16 @@ async function openTerminalAt(dir: string) {
   if (process.platform === "win32") {
     const wtPath = await checkCommand("wt");
     if (wtPath) {
-      spawnDetached(wtPath, ["-d", dir], dir);
+      await spawnDetached(wtPath, ["-d", dir], dir);
       return;
     }
-    spawnDetached("powershell.exe", ["-NoExit", "-NoLogo", "-Command", "Set-Location -LiteralPath $args[0]", dir], dir);
+    await spawnDetached("powershell.exe", ["-NoExit", "-NoLogo", "-Command", "Set-Location -LiteralPath $args[0]", dir], dir);
     return;
   }
 
   const terminal = await checkCommand("x-terminal-emulator") ?? await checkCommand("gnome-terminal") ?? await checkCommand("konsole");
   if (terminal) {
-    spawnDetached(terminal, [], dir);
+    await spawnDetached(terminal, [], dir);
     return;
   }
 
@@ -170,14 +177,18 @@ async function openEditorAt(target: "vscode" | "trae" | "coder", dir: string) {
     const label = target === "vscode" ? "VS Code" : target;
     throw new Error(`未找到 ${label} 命令`);
   }
-  spawnDetached(commandPath, [dir], dir);
+  await spawnDetached(commandPath, [dir], dir);
 }
 
 async function openFileAt(filePath: string) {
   const codePath = await checkCommand("code");
   if (codePath) {
-    spawnDetached(codePath, ["-g", filePath], path.dirname(filePath));
-    return;
+    try {
+      await spawnDetached(codePath, ["-g", filePath], path.dirname(filePath));
+      return;
+    } catch (err) {
+      console.warn("Failed to open file with VS Code, falling back to shell.openPath:", err);
+    }
   }
   await shell.openPath(filePath);
 }
@@ -954,6 +965,18 @@ const ProjectSchema = z.object({
   gitBranch: z.string().optional(),
 });
 
+const ListLongTasksSchema = z.object({
+  projectPath: z.string().min(1).max(4096),
+});
+
+const CreateLongTaskSchema = z.object({
+  project: ProjectSchema,
+  title: z.string().max(160).optional(),
+  initialRequest: z.string().min(1).max(20000),
+  thinking: z.boolean().optional(),
+  yoloMode: z.boolean().optional(),
+});
+
 ipcMain.handle("project:addRecent", async (_, project: unknown) => {
   const parsed = ProjectSchema.safeParse(project);
   if (!parsed.success) {
@@ -969,6 +992,69 @@ ipcMain.handle("project:removeRecent", async (_, id: unknown) => {
   }
   projectService.removeRecentProject(id);
   return { success: true, data: undefined };
+});
+
+ipcMain.handle("longTasks:list", async (_, request: unknown) => {
+  try {
+    const parsed = ListLongTasksSchema.safeParse(request);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid long task list request" };
+    }
+    if (!fs.existsSync(parsed.data.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    return { success: true, data: longTaskService.listLongTasks(parsed.data.projectPath) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("longTasks:create", async (_, request: unknown) => {
+  let executorSessionId: string | null = null;
+  let reviewerSessionId: string | null = null;
+  try {
+    const parsed = CreateLongTaskSchema.safeParse(request);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid long task create request" };
+    }
+    const { project, initialRequest } = parsed.data;
+    if (!fs.existsSync(project.path)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    projectService.addRecentProject({ ...project, lastOpenedAt: Date.now() });
+    const title = (parsed.data.title?.trim() || initialRequest.trim().split(/\r?\n/)[0] || "长程任务").slice(0, 80);
+    const thinking = parsed.data.thinking ?? true;
+    const yoloMode = parsed.data.yoloMode ?? false;
+
+    const executor = await kimiBridge.startSession({
+      workDir: project.path,
+      model: "kimi-code/kimi-for-coding",
+      thinking,
+      yoloMode,
+    });
+    executorSessionId = executor.sessionId;
+
+    const reviewer = await kimiBridge.startSession({
+      workDir: project.path,
+      model: "kimi-code/kimi-for-coding",
+      thinking,
+      yoloMode,
+    });
+    reviewerSessionId = reviewer.sessionId;
+
+    const task = longTaskService.createLongTask({
+      project,
+      title,
+      initialRequest,
+      executorSessionId,
+      reviewerSessionId,
+    });
+    return { success: true, data: task };
+  } catch (err) {
+    if (executorSessionId) await kimiBridge.closeSession(executorSessionId).catch(() => {});
+    if (reviewerSessionId) await kimiBridge.closeSession(reviewerSessionId).catch(() => {});
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("project:getGitInfo", async (_, projectPath: string) => {

@@ -18,6 +18,58 @@ export type Project = {
   gitBranch?: string;
 }
 
+export type LongTaskStage = "drafting" | "planning" | "ready" | "running" | "reviewing" | "paused" | "completed";
+export type LongTaskAgentRole = "executor" | "reviewer";
+
+export type LongTaskSummary = {
+  id: string;
+  title: string;
+  projectPath: string;
+  projectName: string;
+  taskDir: string;
+  bigPlanPath: string;
+  executorPromptPath: string;
+  reviewerPromptPath: string;
+  reviewQueuePath: string;
+  executorSessionId: string;
+  reviewerSessionId: string;
+  stage: LongTaskStage;
+  activeAgent: LongTaskAgentRole;
+  currentStep: number;
+  targetStep: number | null;
+  createdAt: number;
+  updatedAt: number;
+  initialRequest: string;
+}
+
+export type ListLongTasksRequest = {
+  projectPath: string;
+}
+
+export type ListLongTasksResponse = {
+  success: true;
+  data: LongTaskSummary[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type CreateLongTaskRequest = {
+  project: Project;
+  title?: string;
+  initialRequest: string;
+  thinking?: boolean;
+  yoloMode?: boolean;
+}
+
+export type CreateLongTaskResponse = {
+  success: true;
+  data: LongTaskSummary;
+} | {
+  success: false;
+  error: string;
+};
+
 export type ListRecentResponse = {
   success: true;
   data: Project[];

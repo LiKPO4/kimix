@@ -16,6 +16,7 @@ interface AppStore extends AppState {
   setVoiceShortcut: (shortcut: string) => void;
   setClarificationToolMode: (mode: ClarificationToolMode) => void;
   setLongTasksOpen: (open: boolean) => void;
+  setLongTaskInspectorOpen: (open: boolean) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
@@ -46,6 +47,7 @@ export const useAppStore = create<AppStore>((set) => ({
   voiceShortcut: "Win+H",
   clarificationToolMode: "auto",
   longTasksOpen: false,
+  longTaskInspectorOpen: false,
   handoffSessionId: null,
   sidebarOpen: true,
   theme: "light",
@@ -69,6 +71,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
   setLongTasksOpen: (open) => set({ longTasksOpen: open }),
+  setLongTaskInspectorOpen: (open) => set({ longTaskInspectorOpen: open }),
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),

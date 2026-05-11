@@ -18,6 +18,7 @@ export interface AppState {
   voiceShortcut: string;
   clarificationToolMode: ClarificationToolMode;
   longTasksOpen: boolean;
+  longTaskInspectorOpen: boolean;
   handoffSessionId: string | null;
   sidebarOpen: boolean;
   theme: Theme;
@@ -36,12 +37,26 @@ export interface Project {
 export interface Session {
   id: string;
   runtimeSessionId?: string;
+  longTask?: LongTaskSessionMeta;
   title: string;
   projectPath: string;
   createdAt: number;
   updatedAt: number;
   events: TimelineEvent[];
   isLoading: boolean;
+}
+
+export interface LongTaskSessionMeta {
+  taskId: string;
+  title: string;
+  stage: "drafting" | "planning" | "ready" | "running" | "reviewing" | "paused" | "completed";
+  activeAgent: "executor" | "reviewer";
+  executorSessionId: string;
+  reviewerSessionId: string;
+  bigPlanPath: string;
+  reviewQueuePath: string;
+  currentStep: number;
+  targetStep: number | null;
 }
 
 export type TimelineEvent =

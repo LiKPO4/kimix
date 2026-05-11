@@ -3,6 +3,7 @@ import { Check, CircleHelp, SendHorizontal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 interface QuestionCardProps {
   event: Extract<TimelineEvent, { type: "question_request" }>;
@@ -87,8 +88,10 @@ export function QuestionCard({ event }: QuestionCardProps) {
     setIsSubmitting(true);
     const answerPayload = skip ? {} : buildAnswerPayload();
     try {
+      const runtimeSessionId = getRuntimeSessionId(currentSession);
+      if (!runtimeSessionId) return;
       const res = await window.api.respondQuestion({
-        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
+        sessionId: runtimeSessionId,
         rpcRequestId: event.rpcRequestId,
         questionRequestId: event.requestId,
         answers: answerPayload,

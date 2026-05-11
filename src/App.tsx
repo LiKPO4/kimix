@@ -8,6 +8,7 @@ import type { Session, TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
+import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 
 const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent的提示词，注意回复内容中应该仅仅包含这段提示词。如果没有agent.md文档，请根据以下形式总结并给出提示词
 - 项目背景
@@ -68,7 +69,10 @@ function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
 function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string): Session | undefined {
   const ids = new Set([historySessionId, runtimeSessionId].filter((id): id is string => Boolean(id)));
   return useSessionStore.getState().sessions.find((session) => (
-    ids.has(session.id) || Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId))
+    ids.has(session.id) ||
+    Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId)) ||
+    Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
+    Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
   ));
 }
 
@@ -188,13 +192,51 @@ ${visibleHistory}
 }
 
 function resolveUiSessionId(sessionId: string): string {
-  const owner = useSessionStore.getState().sessions.find((session) => session.runtimeSessionId === sessionId);
+  const owner = useSessionStore.getState().sessions.find((session) => (
+    session.runtimeSessionId === sessionId ||
+    session.longTask?.executorSessionId === sessionId ||
+    session.longTask?.reviewerSessionId === sessionId
+  ));
   return owner?.id ?? sessionId;
 }
 
 function resolveRuntimeSessionId(sessionId: string): string {
   const owner = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
-  return owner?.runtimeSessionId ?? sessionId;
+  return getRuntimeSessionId(owner) ?? sessionId;
+}
+
+function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: string, status?: "running" | "error" | "interrupted" | "completed") {
+  const store = useSessionStore.getState();
+  const target = store.sessions.find((session) => session.id === uiSessionId);
+  const role = getLongTaskRoleForRuntime(target, runtimeSessionId);
+  if (!target?.longTask || !role) return;
+
+  store.updateSession(uiSessionId, (session) => {
+    if (!session.longTask) return session;
+    let stage = session.longTask.stage;
+    if (status === "interrupted" || status === "error") {
+      stage = "paused";
+    } else if (status === "running" && role === "reviewer") {
+      stage = "reviewing";
+    } else if (status === "running" && role === "executor" && stage === "reviewing") {
+      stage = "running";
+    }
+    return {
+      ...session,
+      longTask: {
+        ...session.longTask,
+        activeAgent: role,
+        stage,
+      },
+      updatedAt: Date.now(),
+    };
+  });
+
+  const active = useAppStore.getState().currentSession;
+  if (active?.id === uiSessionId) {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (latest) useAppStore.getState().setCurrentSession(latest);
+  }
 }
 
 async function createSessionAndSendPrompt(projectPath: string, content: string) {
@@ -518,6 +560,7 @@ function App() {
           return;
         }
         const uiSessionId = resolveUiSessionId(payload.sessionId);
+        markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
         updateSession(uiSessionId, (session) => {
           const events = mergeEvents(session.events, mapped);
           const title = deriveSessionTitle(events, session.title);
@@ -543,7 +586,9 @@ function App() {
       }
 
       if (payload.status === "running") {
-        setRunningSessionId(resolveUiSessionId(payload.sessionId));
+        const uiSessionId = resolveUiSessionId(payload.sessionId);
+        markLongTaskRuntimeActivity(uiSessionId, payload.sessionId, "running");
+        setRunningSessionId(uiSessionId);
         return;
       }
 
@@ -552,7 +597,11 @@ function App() {
       }
 
       const uiSessionId = resolveUiSessionId(payload.sessionId);
-      setRunningSessionId(null);
+      const terminalStatus = payload.status as "completed" | "error" | "interrupted";
+      markLongTaskRuntimeActivity(uiSessionId, payload.sessionId, terminalStatus);
+      if (useAppStore.getState().runningSessionId === uiSessionId) {
+        setRunningSessionId(null);
+      }
 
       if (payload.status === "error" || payload.status === "interrupted") {
         updateSession(uiSessionId, (session) => ({

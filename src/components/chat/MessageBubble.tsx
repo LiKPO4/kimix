@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -79,9 +80,14 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
       updatedAt: Date.now(),
     }));
     setRunningSessionId(currentSession.id);
+    const runtimeSessionId = getRuntimeSessionId(currentSession);
+    if (!runtimeSessionId) {
+      setRunningSessionId(null);
+      return;
+    }
     try {
       await window.api.sendPrompt({
-        sessionId: currentSession.runtimeSessionId ?? currentSession.id,
+        sessionId: runtimeSessionId,
         content: event.content,
         images: images
           .filter((image) => Boolean(image.dataUrl))

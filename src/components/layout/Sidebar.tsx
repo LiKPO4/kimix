@@ -388,6 +388,7 @@ export function Sidebar() {
                   >
                     {pSessions.map((s) => {
                       const isSessionBusy = runningSessionId === s.id || s.isLoading;
+                      const isLongTaskSession = Boolean(s.longTask);
 
                       return (
                         <div
@@ -395,8 +396,12 @@ export function Sidebar() {
                           style={{ paddingLeft: 16, paddingRight: 10 }}
                           className={`group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
                             currentSession?.id === s.id
-                              ? "bg-black/6 text-[#24211d]"
-                              : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
+                              ? isLongTaskSession
+                                ? "bg-[#dff0ff] text-[#1f4f7a]"
+                                : "bg-black/6 text-[#24211d]"
+                              : isLongTaskSession
+                                ? "bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff] hover:text-[#1f4f7a]"
+                                : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
                           }`}
                         >
                           <button
@@ -451,7 +456,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.6.8</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.4</span>
         </button>
       </div>
     </aside>

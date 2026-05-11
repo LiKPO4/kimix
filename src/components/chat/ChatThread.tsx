@@ -12,7 +12,7 @@ import { ApprovalCard } from "./ApprovalCard";
 import { QuestionCard } from "./QuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import { SessionRecommendationCard } from "./SessionRecommendationCard";
-import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
+import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
   | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }
@@ -36,6 +36,21 @@ function useAnimatedDots(active: boolean) {
 }
 
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
+
+const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
+  drafting: "需求澄清",
+  planning: "计划设计",
+  ready: "等待执行",
+  running: "执行中",
+  reviewing: "审查中",
+  paused: "已暂停",
+  completed: "已完成",
+};
+
+const longTaskAgentLabels: Record<LongTaskSessionMeta["activeAgent"], string> = {
+  executor: "执行 agent",
+  reviewer: "审查 agent",
+};
 
 function CompactionLabel({ event }: { event: Extract<TimelineEvent, { type: "compaction" }> }) {
   const isStale = event.phase === "begin" && Date.now() - event.timestamp >= COMPACTION_STALE_MS;
@@ -77,6 +92,35 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; projectPath: string }) {
+  return (
+    <div className="rounded-2xl border border-[#cfe4fb] bg-[#f4f9ff] text-[#302d28] shadow-[0_10px_26px_rgba(74,132,190,0.10)]" style={{ padding: "14px 18px" }}>
+      <div className="flex flex-wrap items-center justify-between" style={{ gap: 10 }}>
+        <div className="min-w-0">
+          <div className="truncate text-[15px] font-medium leading-6">长程任务：{meta.title}</div>
+          <div className="mt-0.5 text-[13px] leading-5 text-[#706b63]">
+            当前工作：{longTaskAgentLabels[meta.activeAgent]} · {longTaskStageLabels[meta.stage]} · 步骤 {meta.currentStep}{meta.targetStep ? ` / ${meta.targetStep}` : " / 未设置"}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className="kimix-icon-text-button is-compact bg-white text-[#2f6fad] hover:bg-[#eef7ff]"
+            onClick={() => {
+              void window.api.openFile({ projectPath, filePath: meta.bigPlanPath });
+            }}
+          >
+            BIGPLAN
+          </button>
+          <span className="rounded-full bg-white text-[12px] leading-5 text-[#2f83cc]" style={{ padding: "4px 10px" }}>
+            {longTaskAgentLabels[meta.activeAgent]}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -403,10 +447,17 @@ export function ChatThread() {
 
   return (
     <div className="relative h-full">
+      {session.longTask && (
+        <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
+          <div className="kimix-chat-column pointer-events-auto">
+            <LongTaskBanner meta={session.longTask} projectPath={session.projectPath} />
+          </div>
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="kimix-content-x h-full overflow-y-auto"
-        style={{ paddingTop: 42, paddingBottom: 42 }}
+        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 42 }}
         onScroll={handleScroll}
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
