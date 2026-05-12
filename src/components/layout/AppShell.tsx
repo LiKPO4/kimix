@@ -32,6 +32,7 @@ import {
   Link,
   Minus,
   MessageSquarePlus,
+  Monitor,
   PanelLeft,
   PanelLeftOpen,
   PanelRight,
@@ -117,6 +118,17 @@ type ReleaseInfo = {
   htmlUrl: string;
   assets: { name: string; downloadUrl: string }[];
 };
+
+type KimiCliOnboardingState = {
+  loading: boolean;
+  available: boolean | null;
+  message: string;
+  path?: string;
+  output?: string;
+};
+
+const KIMI_CLI_DOCS_URL = "https://platform.moonshot.cn/docs/guide/kimi-code";
+const KIMI_CLI_WINDOWS_INSTALL_COMMAND = "uv tool install --python 3.13 kimi-cli";
 
 type ParsedBigPlanStep = {
   index: number;
@@ -497,8 +509,9 @@ export function AppShell() {
   const [helpDialog, setHelpDialog] = useState<HelpDialog | null>(null);
   const [infoTopic, setInfoTopic] = useState<{ title: string; body: string; url?: string } | null>(null);
   const [appInfo, setAppInfo] = useState({ name: "Kimix", version: "2.5.0", author: "@linjianglu", repository: "https://github.com/LiKPO4/kimix" });
-  const [updateState, setUpdateState] = useState<{ loading: boolean; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
+  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
     loading: false,
+    downloading: false,
     message: "尚未检查更新",
     latest: null,
     hasUpdate: false,
@@ -509,6 +522,29 @@ export function AppShell() {
   const [targetStepDraft, setTargetStepDraft] = useState("");
   const [targetStepBusy, setTargetStepBusy] = useState(false);
   const [longTaskControlBusy, setLongTaskControlBusy] = useState(false);
+  const [kimiOnboarding, setKimiOnboarding] = useState<KimiCliOnboardingState>({
+    loading: true,
+    available: null,
+    message: "正在检测 Kimi CLI",
+  });
+  const [kimiOnboardingDismissed, setKimiOnboardingDismissed] = useState(false);
+
+  const checkKimiForOnboarding = async () => {
+    setKimiOnboarding((state) => ({ ...state, loading: true, message: "正在检测 Kimi CLI" }));
+    const res = await window.api.checkKimiCli({ verify: false });
+    if (res.success) {
+      setKimiOnboarding({
+        loading: false,
+        available: res.data.available,
+        message: res.data.message,
+        path: res.data.path,
+        output: res.data.output,
+      });
+      if (res.data.available) setKimiOnboardingDismissed(true);
+      return;
+    }
+    setKimiOnboarding({ loading: false, available: false, message: res.error });
+  };
 
   useEffect(() => {
     const close = () => {
@@ -550,6 +586,7 @@ export function AppShell() {
         if (res.success) setAppInfo(res.data);
       });
     }
+    void checkKimiForOnboarding();
     return window.api.onWindowMaximizedChange((payload) => setIsMaximized(payload.maximized));
   }, []);
 
@@ -625,21 +662,41 @@ export function AppShell() {
   const handleCheckUpdates = async () => {
     setUpdateState((state) => ({ ...state, loading: true, message: "正在检查 GitHub 发布版本..." }));
     if (typeof window.api.checkForUpdates !== "function") {
-      setUpdateState({ loading: false, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
       return;
     }
     const res = await window.api.checkForUpdates();
     if (!res.success) {
-      setUpdateState({ loading: false, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
       return;
     }
-    setUpdateState({
+    setUpdateState((state) => ({
+      ...state,
       loading: false,
       message: res.data.message,
       latest: res.data.latest,
       hasUpdate: res.data.hasUpdate,
-    });
+    }));
   };
+
+  const handleDownloadUpdate = async () => {
+    setUpdateState((state) => ({ ...state, downloading: true, message: "正在下载匹配当前包体的升级包..." }));
+    if (typeof window.api.downloadUpdate !== "function") {
+      setUpdateState((state) => ({ ...state, downloading: false, message: "升级接口尚未载入，请重启应用后再试" }));
+      return;
+    }
+    const res = await window.api.downloadUpdate();
+    if (!res.success) {
+      setUpdateState((state) => ({ ...state, downloading: false, message: `升级失败：${res.error}` }));
+      return;
+    }
+    setUpdateState((state) => ({ ...state, downloading: false, message: res.data.message }));
+    showToast(res.data.message);
+  };
+
+  useEffect(() => {
+    void handleCheckUpdates();
+  }, []);
 
   const openInfoTopic = (action: MenuAction) => {
     const topic = HELP_TOPICS[action];
@@ -1040,6 +1097,7 @@ export function AppShell() {
     if (projectPath) void window.api.openProjectTerminal({ path: projectPath });
     setProjectMenuOpen(false);
   };
+  const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && kimiOnboarding.available === false;
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-[#f6f4ef] text-[15px] text-text-primary">
@@ -1634,6 +1692,90 @@ export function AppShell() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SkillsPanel open={skillsOpen} onClose={() => setSkillsOpen(false)} />
       <LongTasksPanel />
+      {showKimiOnboarding && (
+        <div className="fixed inset-0 z-[118] flex items-center justify-center bg-[rgba(246,244,239,0.74)] backdrop-blur-sm" style={{ padding: 24 }}>
+          <div className="w-full max-w-[560px] rounded-[18px] border border-[#e5dfd3] bg-white shadow-[0_26px_80px_rgba(35,31,25,0.18)]" style={{ padding: "22px 24px" }}>
+            <div className="flex items-start justify-between" style={{ gap: 16 }}>
+              <div className="flex min-w-0 items-start" style={{ gap: 14 }}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef7ff] text-[#2f6fad]">
+                  <SquareTerminal size={20} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[18px] font-semibold leading-7 text-[#24211d]">需要先配置 Kimi CLI</div>
+                  <div className="mt-1 text-[14px] leading-6 text-[#706b63]">
+                    Kimix 通过本机的 <span className="font-medium text-[#3a362f]">kimi</span> 命令启动对话。当前没有在 PATH 中找到 Kimi CLI，配置完成后才能正常发送消息。
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setKimiOnboardingDismissed(true)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8a847a] hover:bg-[#f3f1ec]"
+                aria-label="稍后配置"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-[#eee8dc] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+              <div className="text-[13px] font-medium leading-5 text-[#625d55]">推荐步骤</div>
+              <div className="mt-2 grid gap-2 text-[13.5px] leading-6 text-[#6f685f]">
+                <div>1. 按官方说明安装 Kimi CLI。</div>
+                <div>2. 在系统终端运行 <span className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[12.5px] text-[#3a362f]">kimi</span>，按提示登录。</div>
+                <div>3. 重启 Kimix 或点击“重新检测”。</div>
+              </div>
+              <div className="mt-3 rounded-lg border border-[#e6dfd2] bg-white font-mono text-[12.5px] leading-5 text-[#3a362f]" style={{ padding: "10px 12px" }}>
+                {KIMI_CLI_WINDOWS_INSTALL_COMMAND}
+              </div>
+              <div className="mt-2 text-[12.5px] leading-5 text-[#9a948b]">
+                检测结果：{kimiOnboarding.message}
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between" style={{ gap: 10 }}>
+              <div className="flex flex-wrap items-center" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => window.api.openExternal(KIMI_CLI_DOCS_URL)}
+                  className="kimix-icon-text-button is-compact bg-[#339af0] text-white hover:bg-[#228be6]"
+                >
+                  <ExternalLink size={14} />
+                  <span>打开官方说明</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyToClipboard(KIMI_CLI_WINDOWS_INSTALL_COMMAND, "已复制安装命令")}
+                  className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]"
+                >
+                  <Copy size={14} />
+                  <span>复制安装命令</span>
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKimiOnboardingDismissed(true);
+                    setSettingsOpen(true);
+                  }}
+                  className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]"
+                >
+                  <Monitor size={14} />
+                  <span>打开设置</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void checkKimiForOnboarding()}
+                  className="kimix-icon-text-button is-compact text-[#2f6fad] hover:bg-[#eef7ff]"
+                >
+                  <RefreshCw size={14} />
+                  <span>重新检测</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {toastMessage && (
         <div
           className="pointer-events-none fixed left-1/2 top-16 z-[120] -translate-x-1/2 rounded-full border border-[#ded9cf] bg-white text-[14px] font-medium leading-5 text-[#3a362f] shadow-[0_16px_40px_rgba(25,23,20,0.16)]"
@@ -1688,15 +1830,28 @@ export function AppShell() {
                       <div className="font-semibold text-[#24211d]">{updateState.message}</div>
                       {updateState.latest && <div className="mt-1 text-[13px] text-[#8a847a]">最新版本：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
                     </div>
-                    <button
-                      onClick={handleCheckUpdates}
-                      disabled={updateState.loading}
-                      className="kimix-icon-text-button h-10 shrink-0 bg-[#24211d] text-white hover:bg-black disabled:opacity-45"
-                      style={{ paddingLeft: 16, paddingRight: 18 }}
-                    >
-                      <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
-                      检查更新
-                    </button>
+                    <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                      {updateState.hasUpdate && (
+                        <button
+                          onClick={handleDownloadUpdate}
+                          disabled={updateState.downloading || updateState.loading}
+                          className="kimix-icon-text-button h-10 shrink-0 bg-[#339af0] text-white hover:bg-[#228be6] disabled:opacity-45"
+                          style={{ paddingLeft: 16, paddingRight: 18 }}
+                        >
+                          <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
+                          {updateState.downloading ? "下载中" : "升级"}
+                        </button>
+                      )}
+                      <button
+                        onClick={handleCheckUpdates}
+                        disabled={updateState.loading || updateState.downloading}
+                        className="kimix-icon-text-button h-10 shrink-0 bg-[#24211d] text-white hover:bg-black disabled:opacity-45"
+                        style={{ paddingLeft: 16, paddingRight: 18 }}
+                      >
+                        <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
+                        检查更新
+                      </button>
+                    </div>
                   </div>
                   {updateState.latest && (
                     <div className="rounded-xl border border-[#e5e1d8]" style={{ padding: 16 }}>

@@ -354,6 +354,55 @@ async function fetchLatestRelease() {
   };
 }
 
+type ReleaseAssetInfo = {
+  name: string;
+  downloadUrl: string;
+};
+
+function isPortableRuntime() {
+  if (process.platform !== "win32") return false;
+  const exeName = path.basename(process.execPath).toLowerCase();
+  return /^kimix\s+\d/.test(exeName) || exeName.includes("portable");
+}
+
+function pickUpdateAsset(assets: ReleaseAssetInfo[]) {
+  const names = assets.map((asset) => ({ ...asset, lowerName: asset.name.toLowerCase() }));
+  if (process.platform === "win32") {
+    const portable = isPortableRuntime();
+    const preferred = portable
+      ? names.find((asset) => asset.lowerName.endsWith(".exe") && !asset.lowerName.includes("setup"))
+      : names.find((asset) => asset.lowerName.includes("setup") && asset.lowerName.endsWith(".exe"));
+    return preferred ?? names.find((asset) => asset.lowerName.endsWith(".exe")) ?? null;
+  }
+  if (process.platform === "darwin") {
+    return names.find((asset) => asset.lowerName.endsWith(".dmg")) ??
+      names.find((asset) => asset.lowerName.endsWith(".zip")) ??
+      null;
+  }
+  return names.find((asset) => asset.lowerName.endsWith(".appimage")) ??
+    names.find((asset) => asset.lowerName.endsWith(".deb")) ??
+    null;
+}
+
+function sanitizeDownloadName(name: string) {
+  return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim() || "Kimix-update";
+}
+
+async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
+  const res = await fetch(asset.downloadUrl, {
+    headers: {
+      "User-Agent": "Kimix",
+    },
+  });
+  if (!res.ok) throw new Error(`下载失败：GitHub 返回 ${res.status}`);
+  const bytes = Buffer.from(await res.arrayBuffer());
+  const updateDir = path.join(app.getPath("downloads"), "Kimix Updates", sanitizeDownloadName(tagName || "latest"));
+  ensureDir(updateDir);
+  const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));
+  fs.writeFileSync(targetPath, bytes);
+  return targetPath;
+}
+
 function searchProjectFiles(projectPath: string, query = "", limit = 40) {
   const normalizedQuery = query.trim().toLowerCase();
   const maxResults = Math.max(1, Math.min(limit, 80));
@@ -1603,6 +1652,46 @@ ipcMain.handle("app:checkForUpdates", async () => {
         latest,
         hasUpdate,
         message: hasUpdate ? `发现新版本 ${latest.tagName}` : "当前已经是最新版本",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:downloadUpdate", async () => {
+  try {
+    const currentVersion = app.getVersion();
+    const latest = await fetchLatestRelease();
+    if (!latest || !latest.tagName) {
+      return { success: false, error: "暂未找到 GitHub 发布版本" };
+    }
+    if (!isVersionGreater(latest.tagName, currentVersion)) {
+      return { success: false, error: "当前已经是最新版本" };
+    }
+    const asset = pickUpdateAsset(latest.assets);
+    if (!asset) {
+      return { success: false, error: "未找到适合当前系统的升级包" };
+    }
+    const filePath = await downloadUpdateAsset(asset, latest.tagName);
+    const openError = await shell.openPath(filePath);
+    if (openError) {
+      await shell.showItemInFolder(filePath);
+      return {
+        success: true,
+        data: {
+          filePath,
+          assetName: asset.name,
+          message: `升级包已下载，请手动打开：${openError}`,
+        },
+      };
+    }
+    return {
+      success: true,
+      data: {
+        filePath,
+        assetName: asset.name,
+        message: "升级包已下载并启动",
       },
     };
   } catch (err) {

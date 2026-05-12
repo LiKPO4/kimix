@@ -40,7 +40,12 @@ function mergeArguments(rawArguments: string, fallback: Record<string, unknown>)
 function appendAssistantContent(existingContent: string, incomingContent: string, paragraphBreak: boolean): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
-  if (!paragraphBreak || existingContent.endsWith("\n") || incomingContent.startsWith("\n")) {
+  if (
+    !paragraphBreak ||
+    existingContent.endsWith("\n") ||
+    incomingContent.startsWith("\n") ||
+    incomingContent.trim().length < 8
+  ) {
     return existingContent + incomingContent;
   }
   return `${existingContent}\n\n${incomingContent}`;
@@ -450,9 +455,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     );
     if (lastIndex !== -1) {
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
-      const shouldBreakParagraph = existing
-        .slice(lastIndex + 1)
-        .some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
+      const eventsAfterOpenAssistant = existing.slice(lastIndex + 1);
+      const shouldBreakParagraph = !last.content.trim() &&
+        eventsAfterOpenAssistant.some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
       const updated: typeof last = {
         ...last,
         content: appendAssistantContent(last.content, incoming.content, shouldBreakParagraph),

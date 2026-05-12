@@ -111,3 +111,28 @@
 - 阻塞
 - 关键文件/命令
 - 下一步最小行动
+
+## 发布流程
+
+> 由 GitHub Actions 自动构建，**不要手动构建和上传产物**。
+
+### 错误教训（2026-05-12）
+
+- **问题**：agent 在本地执行 `pnpm dist` 构建并手动上传 exe 到 GitHub Release。
+- **后果**：本地构建环境与 GitHub Actions 不一致，可能导致产物差异；手动上传覆盖 Actions 输出，造成 Release 混乱。
+- **正确做法**：只推送标签触发 GitHub Actions，让 CI 统一构建和发布。
+
+### 正确流程
+
+1. 确保版本号三处同步：`package.json` + `Sidebar.tsx` + `SettingsPanel.tsx`
+2. 提交并推送代码到 `master`
+3. 推送标签：`git tag vX.Y.Z && git push origin vX.Y.Z`
+4. GitHub Actions 会自动构建 Windows/Mac/Linux 并发布到 Release
+5. 构建状态查看：https://github.com/LiKPO4/kimix/actions
+
+### GitHub Token
+
+用于 API 调用（如紧急手动创建 Release）：
+- Token：在 https://github.com/settings/tokens/new 创建，权限选 `repo`
+- 权限：`repo`（完整仓库访问）
+- 获取地址：https://github.com/settings/tokens/new

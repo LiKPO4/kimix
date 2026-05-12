@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.7.32 修正项目只剩归档会话时的打开行为：应新建会话，不应把已归档会话重新拉出。
+v2.7.36 修复安装包启动白屏：补齐 Kimi CLI 引导卡片使用的 `Monitor` 图标 import，避免渲染时报 `Monitor is not defined`。
 
 ## 当前版本
-**v2.7.32** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.7.36** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
@@ -35,6 +35,24 @@ v2.7.32 修正项目只剩归档会话时的打开行为：应新建会话，不
 - [x] 卡死诊断入口补到设置页，可查看最近 `kimix_freeze_reports`。
 
 ## 已完成
+- v2.7.36：
+  - 修复 v2.7.35 安装包启动后 `Monitor is not defined` 的渲染错误。
+  - 补齐 `src/components/layout/AppShell.tsx` 中 Kimi CLI 引导卡片使用的 lucide `Monitor` 图标 import。
+  - 版本号三处同步到 v2.7.36。
+- v2.7.35：
+  - 应用启动后会自动调用 GitHub Release 更新检查，更新记录弹窗不再需要用户先手动检查。
+  - 发现新版本时，更新记录顶部显示蓝色“升级”按钮。
+  - 新增 `app:downloadUpdate` IPC：按当前平台和包体类型选择 Release asset，下载到用户下载目录 `Kimix Updates/`，下载完成后启动升级包。
+  - 版本号三处同步到 v2.7.35。
+- v2.7.34：
+  - 修正 assistant 流式文本合并逻辑，工具调用后只在下一段非空内容开始时补一次段落间隔。
+  - 短流式碎片不再触发额外段落断开，避免回复被拆成单字/短词纵向排列。
+  - 版本号三处同步到 v2.7.34。
+- v2.7.33：
+  - 应用启动后会检测 Kimi CLI；如果 PATH 中找不到 `kimi` 命令，会显示居中的新手配置引导。
+  - 引导卡片提供官方说明入口、复制安装命令、打开设置、重新检测和稍后配置。
+  - 已安装 Kimi CLI 的用户不会看到该引导。
+  - 版本号三处同步到 v2.7.33。
 - v2.7.32：
   - 侧栏项目点击时，“是否已有会话”改为只判断未归档会话。
   - 当某项目只剩归档会话时，再次打开会直接新建会话，不会把已归档会话重新拉出。

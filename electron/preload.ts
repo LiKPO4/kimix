@@ -51,6 +51,7 @@ import type {
   OpenTerminalRequest,
   AppInfoResponse,
   CheckUpdateResponse,
+  DownloadUpdateResponse,
   CopyImageRequest,
   TriggerShortcutRequest,
   SettingsResponse,
@@ -148,6 +149,7 @@ const api = {
     ipcRenderer.invoke("app:saveSettings", settings),
   getAppInfo: (): Promise<AppInfoResponse> => ipcRenderer.invoke("app:getInfo"),
   checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),
+  downloadUpdate: (): Promise<DownloadUpdateResponse> => ipcRenderer.invoke("app:downloadUpdate"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("app:openExternal", url),
   copyImage: (req: CopyImageRequest): Promise<VoidResponse> =>

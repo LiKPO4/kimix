@@ -488,6 +488,18 @@ export type CheckUpdateResponse = {
   error: string;
 };
 
+export type DownloadUpdateResponse = {
+  success: true;
+  data: {
+    filePath: string;
+    assetName: string;
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type CopyImageRequest = {
   dataUrl: string;
 }
