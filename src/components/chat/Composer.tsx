@@ -124,6 +124,8 @@ export function Composer() {
   const [fileItems, setFileItems] = useState<CompletionItem[]>([]);
   const [activeCompletionIndex, setActiveCompletionIndex] = useState(0);
   const inputRef = useRef<ComposerInputHandle>(null);
+  const completionListRef = useRef<HTMLDivElement>(null);
+  const completionItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
@@ -246,6 +248,13 @@ export function Composer() {
   useEffect(() => {
     setActiveCompletionIndex(0);
   }, [activeCompletion?.mode, activeCompletion?.query]);
+
+  useEffect(() => {
+    if (!activeCompletion || completionItems.length === 0) return;
+    const activeItem = completionItems[activeCompletionIndex] ?? completionItems[0];
+    const activeNode = activeItem ? completionItemRefs.current[activeItem.id] : null;
+    activeNode?.scrollIntoView({ block: "nearest" });
+  }, [activeCompletion, activeCompletionIndex, completionItems]);
 
   useEffect(() => {
     if (activeCompletion?.mode !== "mention" || !currentProject) {
@@ -890,6 +899,7 @@ export function Composer() {
         )}
         {activeCompletion && (
           <div
+            ref={completionListRef}
             className="mb-3 max-h-[276px] overflow-y-auto rounded-[16px] border border-[#ebe6dd] bg-white/95 text-[14px] shadow-[0_16px_42px_rgba(25,23,20,0.12)]"
             style={{ padding: 10 }}
             onMouseDown={(event) => event.preventDefault()}
@@ -901,6 +911,7 @@ export function Composer() {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
                   return (
                     <button
+                      ref={(node) => { completionItemRefs.current[item.id] = node; }}
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
@@ -918,6 +929,7 @@ export function Composer() {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
                   return (
                     <button
+                      ref={(node) => { completionItemRefs.current[item.id] = node; }}
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
@@ -935,6 +947,7 @@ export function Composer() {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
                   return (
                     <button
+                      ref={(node) => { completionItemRefs.current[item.id] = node; }}
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
@@ -954,6 +967,7 @@ export function Composer() {
                 <div className="px-2 pb-1.5 text-[13px] text-[#9a948b]">命令</div>
                 {completionItems.length > 0 ? completionItems.map((item, index) => (
                   <button
+                    ref={(node) => { completionItemRefs.current[item.id] = node; }}
                     key={item.id}
                     type="button"
                     onClick={() => applyCompletion(item)}

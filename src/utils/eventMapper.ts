@@ -37,6 +37,15 @@ function mergeArguments(rawArguments: string, fallback: Record<string, unknown>)
   return Object.keys(parsed).length > 0 ? parsed : fallback;
 }
 
+function appendAssistantContent(existingContent: string, incomingContent: string, paragraphBreak: boolean): string {
+  if (!incomingContent) return existingContent;
+  if (!existingContent) return incomingContent;
+  if (!paragraphBreak || existingContent.endsWith("\n") || incomingContent.startsWith("\n")) {
+    return existingContent + incomingContent;
+  }
+  return `${existingContent}\n\n${incomingContent}`;
+}
+
 function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | null {
   if (items.length === 0) return null;
   return {
@@ -441,9 +450,12 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     );
     if (lastIndex !== -1) {
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
+      const shouldBreakParagraph = existing
+        .slice(lastIndex + 1)
+        .some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
       const updated: typeof last = {
         ...last,
-        content: last.content + incoming.content,
+        content: appendAssistantContent(last.content, incoming.content, shouldBreakParagraph),
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
         thinkingParts: incoming.thinkingParts
           ? [...(last.thinkingParts ?? []), ...incoming.thinkingParts]

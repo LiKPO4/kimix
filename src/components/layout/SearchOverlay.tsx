@@ -103,7 +103,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   const projectSessions = useMemo(() => {
     return sessions
-      .filter((session) => !currentProject || session.projectPath === currentProject.path)
+      .filter((session) => !session.archivedAt && (!currentProject || session.projectPath === currentProject.path))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [sessions, currentProject]);
 

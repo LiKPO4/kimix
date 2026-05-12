@@ -1,7 +1,44 @@
 ﻿import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle, MessageSquare, Mic, Keyboard } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle, MessageSquare, Mic, Keyboard, Archive, RotateCcw, Trash2, Check } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode } from "@/types/ui";
+
+type FreezeReport = {
+  at: string;
+  lagMs: number;
+  sessionId: string | null;
+  runningSessionId: string | null;
+};
+
+const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
+
+function formatFreezeTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function SelectionIndicator({ selected }: { selected: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
+        selected
+          ? "border-[#0078d4] bg-[#0078d4] text-white"
+          : "border-[#cfc8bc] bg-white text-transparent"
+      }`}
+    >
+      {selected ? <Check size={11} strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-transparent" />}
+    </span>
+  );
+}
 
 export function SettingsPanel() {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
@@ -20,6 +57,10 @@ export function SettingsPanel() {
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const sessions = useSessionStore((s) => s.sessions);
+  const restoreSession = useSessionStore((s) => s.restoreSession);
+  const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [connection, setConnection] = useState<{
     loading: boolean;
     available: boolean | null;
@@ -50,8 +91,35 @@ export function SettingsPanel() {
     setConnection({ loading: false, available: false, verified: false, message: res.error });
   };
 
+  const loadFreezeReports = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(FREEZE_REPORTS_KEY) ?? "[]");
+      const reports = Array.isArray(parsed)
+        ? parsed.filter((item): item is FreezeReport => (
+          item &&
+          typeof item === "object" &&
+          typeof item.at === "string" &&
+          typeof item.lagMs === "number" &&
+          ("sessionId" in item) &&
+          ("runningSessionId" in item)
+        ))
+        : [];
+      setFreezeReports(reports.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 20));
+    } catch {
+      setFreezeReports([]);
+    }
+  };
+
+  const clearFreezeReports = () => {
+    localStorage.removeItem(FREEZE_REPORTS_KEY);
+    setFreezeReports([]);
+  };
+
   useEffect(() => {
-    if (settingsOpen) void checkConnection(false);
+    if (settingsOpen) {
+      void checkConnection(false);
+      loadFreezeReports();
+    }
   }, [settingsOpen]);
 
   if (!settingsOpen) return null;
@@ -67,6 +135,15 @@ export function SettingsPanel() {
     { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动批准同类请求", icon: Zap },
     { value: "yolo", label: "完全访问", desc: "自动批准所有工具请求（谨慎使用）", icon: GitBranch },
   ];
+  const archivedSessions = sessions
+    .filter((session) => session.archivedAt)
+    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
+
+  const handleRestoreSession = (sessionId: string) => {
+    restoreSession(sessionId);
+    const restored = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+    if (restored) setCurrentSession({ ...restored, archivedAt: undefined });
+  };
 
   return (
     <div
@@ -140,6 +217,7 @@ export function SettingsPanel() {
             <div className="kimix-settings-permissions">
               {permissions.map((p) => (
                 <button key={p.value} onClick={() => setPermissionMode(p.value)} className={`kimix-settings-permission ${permissionMode === p.value ? "is-active" : ""}`}>
+                  <SelectionIndicator selected={permissionMode === p.value} />
                   <p.icon size={18} className={`mt-0.5 shrink-0 ${permissionMode === p.value ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
                   <div className="kimix-settings-permission-copy">
                     <div className="kimix-settings-permission-label">{p.label}</div>
@@ -152,6 +230,7 @@ export function SettingsPanel() {
 
           <div className="kimix-settings-section">
             <button onClick={() => setDetailedContext(!detailedContext)} className={`kimix-settings-permission ${detailedContext ? "is-active" : ""}`}>
+              <SelectionIndicator selected={detailedContext} />
               <Terminal size={18} className={`mt-0.5 shrink-0 ${detailedContext ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
               <div className="kimix-settings-permission-copy">
                 <div className="kimix-settings-permission-label">上下文详细显示</div>
@@ -167,14 +246,14 @@ export function SettingsPanel() {
             </div>
             <div className="kimix-settings-permissions">
               <button onClick={() => setStatusUpdateDisplay("turn_end")} className={`kimix-settings-permission ${statusUpdateDisplay === "turn_end" ? "is-active" : ""}`}>
-                <Circle size={18} className={`mt-0.5 shrink-0 ${statusUpdateDisplay === "turn_end" ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
+                <SelectionIndicator selected={statusUpdateDisplay === "turn_end"} />
                 <div className="kimix-settings-permission-copy">
                   <div className="kimix-settings-permission-label">每轮末尾显示一次</div>
                   <div className="kimix-settings-permission-desc">默认选项，只保留本轮最后一条 Tokens 和 Context 信息</div>
                 </div>
               </button>
               <button onClick={() => setStatusUpdateDisplay("each")} className={`kimix-settings-permission ${statusUpdateDisplay === "each" ? "is-active" : ""}`}>
-                <Circle size={18} className={`mt-0.5 shrink-0 ${statusUpdateDisplay === "each" ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
+                <SelectionIndicator selected={statusUpdateDisplay === "each"} />
                 <div className="kimix-settings-permission-copy">
                   <div className="kimix-settings-permission-label">实时显示每条消息信息</div>
                   <div className="kimix-settings-permission-desc">适合调试上下文增长，会在对话中多次显示状态胶囊</div>
@@ -195,7 +274,7 @@ export function SettingsPanel() {
                 className="flex w-full items-start text-left"
                 style={{ gap: 12 }}
               >
-                <Circle size={18} className={`mt-0.5 shrink-0 ${sessionRecommendationEnabled ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
+                <SelectionIndicator selected={sessionRecommendationEnabled} />
                 <div className="min-w-0 flex-1">
                   <div className="text-[14.5px] font-medium text-[#302d28]">达到推荐轮数后提示开启新对话</div>
                   <div className="mt-1 text-[13px] leading-5 text-[#7c756c]">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
@@ -245,7 +324,91 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.7.15 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-section">
+            <div className="kimix-settings-row-title">
+              <div className="kimix-settings-section-title">
+                <Archive size={16} className="text-[#8f887e]" />
+                <span>归档对话</span>
+              </div>
+              <span className="rounded-full bg-[#f1eee8] text-[12.5px] leading-5 text-[#7c756c]" style={{ paddingLeft: 10, paddingRight: 10 }}>
+                {archivedSessions.length}
+              </span>
+            </div>
+            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+              {archivedSessions.length > 0 ? (
+                <div className="flex flex-col" style={{ gap: 9 }}>
+                  {archivedSessions.slice(0, 8).map((session) => (
+                    <div key={session.id} className="flex min-w-0 items-center rounded-lg bg-white" style={{ gap: 10, padding: "9px 11px" }}>
+                      <MessageSquare size={15} className="shrink-0 text-[#8f887e]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[14px] font-medium leading-5 text-[#302d28]">{session.title}</div>
+                        <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[#8f887e]">{session.projectPath}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreSession(session.id)}
+                        className="kimix-icon-text-button is-compact shrink-0 text-[#625d55] hover:bg-[#f1eee8]"
+                      >
+                        <RotateCcw size={13} />
+                        恢复
+                      </button>
+                    </div>
+                  ))}
+                  {archivedSessions.length > 8 && (
+                    <div className="text-[12.5px] leading-5 text-[#9a948b]">仅显示最近 8 个归档对话。</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[13.5px] leading-6 text-[#7c756c]">暂无归档对话。</div>
+              )}
+            </div>
+          </div>
+
+          <div className="kimix-settings-section">
+            <div className="kimix-settings-row-title">
+              <div className="kimix-settings-section-title">
+                <AlertCircle size={16} className="text-[#8f887e]" />
+                <span>卡死诊断</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 8 }}>
+                <span className="rounded-full bg-[#f1eee8] text-[12.5px] leading-5 text-[#7c756c]" style={{ paddingLeft: 10, paddingRight: 10 }}>
+                  {freezeReports.length}
+                </span>
+                <button type="button" onClick={loadFreezeReports} className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]">
+                  <RefreshCw size={13} />
+                  刷新
+                </button>
+                <button type="button" onClick={clearFreezeReports} className="kimix-icon-text-button is-compact text-[#8b3d34] hover:bg-[#f8ece8]">
+                  <Trash2 size={13} />
+                  清空
+                </button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+              {freezeReports.length > 0 ? (
+                <div className="flex flex-col" style={{ gap: 9 }}>
+                  {freezeReports.map((report, index) => (
+                    <div key={`${report.at}-${index}`} className="rounded-lg bg-white" style={{ padding: "10px 12px" }}>
+                      <div className="flex min-w-0 items-center justify-between" style={{ gap: 10 }}>
+                        <div className="truncate text-[14px] font-medium leading-5 text-[#302d28]">{formatFreezeTime(report.at)}</div>
+                        <span className="shrink-0 rounded-full bg-[#fff4f0] text-[12.5px] leading-5 text-[#8b3d34]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          {report.lagMs} ms
+                        </span>
+                      </div>
+                      <div className="mt-2 text-[12.5px] leading-5 text-[#7c756c]">
+                        <div className="truncate">当前会话：{report.sessionId ?? "无"}</div>
+                        <div className="mt-1 truncate">运行会话：{report.runningSessionId ?? "无"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[13.5px] leading-6 text-[#7c756c]">暂无卡死诊断记录。</div>
+              )}
+            </div>
+          </div>
+
+          <div className="kimix-settings-footer">Kimix v2.7.32 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

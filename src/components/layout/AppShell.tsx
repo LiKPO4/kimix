@@ -38,6 +38,7 @@ import {
   Pencil,
   Pin,
   Play,
+  Pause,
   RefreshCw,
   RotateCcw,
   Square,
@@ -49,6 +50,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import type { LongTaskDetail } from "@electron/types/ipc";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 type MenuAction =
   | "close-chat"
@@ -130,6 +132,37 @@ type ParsedLongTaskDetail = {
   initialRequest: string;
   steps: ParsedBigPlanStep[];
   reviewItems: string[];
+  rounds: ParsedLongTaskRound[];
+};
+
+type ParsedLongTaskRoundEntry = {
+  title: string;
+  phase: string;
+  role: string;
+  conclusion: string;
+  content: string;
+};
+
+type ParsedLongTaskRound = {
+  step: number;
+  filePath: string;
+  updatedAt: number;
+  entries: ParsedLongTaskRoundEntry[];
+};
+
+const longTaskStageLabels: Record<NonNullable<Session["longTask"]>["stage"], string> = {
+  drafting: "澄清中",
+  planning: "规划中",
+  ready: "待执行",
+  running: "执行中",
+  reviewing: "审查中",
+  paused: "已暂停",
+  completed: "已完成",
+};
+
+const longTaskAgentLabels: Record<NonNullable<Session["longTask"]>["activeAgent"], string> = {
+  executor: "执行",
+  reviewer: "审查",
 };
 
 function extractMarkdownSection(content: string, heading: string) {
@@ -173,6 +206,46 @@ function parseReviewItems(content: string) {
     .filter((line) => line && line !== "暂无");
 }
 
+function extractBulletField(block: string, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = block.match(new RegExp(`^-\\s+${escaped}：\\s*(.*)$`, "m"));
+  return match?.[1]?.trim() ?? "";
+}
+
+function parseRoundEntries(content: string): ParsedLongTaskRoundEntry[] {
+  const entries: ParsedLongTaskRoundEntry[] = [];
+  const entryRegex = /^##\s+([^\r\n]+)\r?\n([\s\S]*?)(?=^##\s+|(?![\s\S]))/gm;
+  for (const match of content.matchAll(entryRegex)) {
+    const block = match[2] ?? "";
+    const recordMatch = block.match(/^###\s+记录\s*\r?\n([\s\S]*)$/m);
+    entries.push({
+      title: match[1]?.trim() || "轮次记录",
+      phase: extractBulletField(block, "阶段"),
+      role: extractBulletField(block, "角色"),
+      conclusion: extractBulletField(block, "结论"),
+      content: (recordMatch?.[1] ?? block).trim(),
+    });
+  }
+  if (entries.length > 0) return entries;
+  const fallback = content.replace(/^#\s+[^\r\n]+\r?\n+/, "").trim();
+  return fallback ? [{
+    title: "轮次记录",
+    phase: "",
+    role: "",
+    conclusion: "",
+    content: fallback,
+  }] : [];
+}
+
+function parseLongTaskRounds(detail: LongTaskDetail) {
+  return detail.rounds.map((round) => ({
+    step: round.step,
+    filePath: round.filePath,
+    updatedAt: round.updatedAt,
+    entries: parseRoundEntries(round.content),
+  }));
+}
+
 function parseLongTaskDetail(detail: LongTaskDetail | null): ParsedLongTaskDetail | null {
   if (!detail) return null;
   return {
@@ -180,6 +253,7 @@ function parseLongTaskDetail(detail: LongTaskDetail | null): ParsedLongTaskDetai
     initialRequest: extractMarkdownSection(detail.bigPlanContent, "初始需求") || detail.initialRequest,
     steps: parseBigPlanSteps(detail.bigPlanContent),
     reviewItems: parseReviewItems(detail.reviewQueueContent),
+    rounds: parseLongTaskRounds(detail),
   };
 }
 
@@ -401,6 +475,8 @@ export function AppShell() {
   const longTaskInspectorOpen = useAppStore((s) => s.longTaskInspectorOpen);
   const setLongTaskInspectorOpen = useAppStore((s) => s.setLongTaskInspectorOpen);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
@@ -408,6 +484,7 @@ export function AppShell() {
   const addSession = useSessionStore((s) => s.addSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
+  const archiveSession = useSessionStore((s) => s.archiveSession);
   const sessions = useSessionStore((s) => s.sessions);
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
@@ -429,6 +506,9 @@ export function AppShell() {
   const [longTaskDetail, setLongTaskDetail] = useState<LongTaskDetail | null>(null);
   const [longTaskDetailLoading, setLongTaskDetailLoading] = useState(false);
   const [longTaskDetailError, setLongTaskDetailError] = useState<string | null>(null);
+  const [targetStepDraft, setTargetStepDraft] = useState("");
+  const [targetStepBusy, setTargetStepBusy] = useState(false);
+  const [longTaskControlBusy, setLongTaskControlBusy] = useState(false);
 
   useEffect(() => {
     const close = () => {
@@ -529,7 +609,7 @@ export function AppShell() {
   };
 
   const sortedSessions = useMemo(
-    () => sessions.filter((session) => !currentProject || session.projectPath === currentProject.path),
+    () => sessions.filter((session) => !session.archivedAt && (!currentProject || session.projectPath === currentProject.path)),
     [sessions, currentProject],
   );
 
@@ -640,8 +720,12 @@ export function AppShell() {
     () => (parsedLongTaskDetail?.reviewItems ?? []).filter((item) => reviewedReviewItems.has(normalizeReviewItem(item))),
     [parsedLongTaskDetail?.reviewItems, reviewedReviewItems],
   );
+  const totalLongTaskSteps = parsedLongTaskDetail?.steps.length ?? 0;
+  const longTaskEventCount = liveCurrentSession?.events.length ?? 0;
   const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
+  const isCurrentSessionRunning = Boolean(liveCurrentSession && runningSessionId === liveCurrentSession.id);
+  const longTaskStatusTone = longTaskMeta?.activeAgent === "reviewer" || longTaskMeta?.stage === "reviewing" ? "reviewer" : "executor";
 
   const setReviewItemChecked = (item: string, checked: boolean) => {
     if (!liveCurrentSession?.longTask) return;
@@ -679,7 +763,176 @@ export function AppShell() {
     }
   };
 
-  useEffect(() => {
+  const persistLongTaskTarget = async (session: Session) => {
+    if (!session.longTask) return;
+    await window.api.updateLongTaskState({
+      projectPath: session.projectPath,
+      taskId: session.longTask.taskId,
+      patch: {
+        stage: session.longTask.stage,
+        activeAgent: session.longTask.activeAgent,
+        currentStep: session.longTask.currentStep,
+        targetStep: session.longTask.targetStep,
+        reviewedReviewItems: session.longTask.reviewedReviewItems ?? [],
+      },
+    });
+  };
+
+  const persistLongTaskSession = async (session: Session) => {
+    if (!session.longTask) return;
+    await window.api.updateLongTaskState({
+      projectPath: session.projectPath,
+      taskId: session.longTask.taskId,
+      patch: {
+        stage: session.longTask.stage,
+        activeAgent: session.longTask.activeAgent,
+        currentStep: session.longTask.currentStep,
+        targetStep: session.longTask.targetStep,
+        reviewedReviewItems: session.longTask.reviewedReviewItems ?? [],
+      },
+    });
+  };
+
+  const patchLongTaskMeta = async (
+    patch: Partial<NonNullable<Session["longTask"]>>,
+    options?: { stopRunning?: boolean; message?: string },
+  ) => {
+    if (!liveCurrentSession?.longTask || longTaskControlBusy) return;
+    setLongTaskControlBusy(true);
+    let latestSession = liveCurrentSession;
+    try {
+      if (options?.stopRunning) {
+        const runtimeSessionId = getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id;
+        await window.api.stopTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
+      }
+      updateSession(liveCurrentSession.id, (session) => {
+        if (!session.longTask) return session;
+        const nextMeta = { ...session.longTask, ...patch };
+        const runtimeSessionId = nextMeta.activeAgent === "reviewer" ? nextMeta.reviewerSessionId : nextMeta.executorSessionId;
+        latestSession = {
+          ...session,
+          runtimeSessionId,
+          longTask: nextMeta,
+          updatedAt: Date.now(),
+        };
+        return latestSession;
+      });
+      setCurrentSession(latestSession);
+      await persistLongTaskSession(latestSession);
+      if (options?.stopRunning && runningSessionId === liveCurrentSession.id) {
+        setRunningSessionId(null);
+      }
+      showToast(options?.message ?? "已更新长程任务状态");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLongTaskControlBusy(false);
+    }
+  };
+
+  const buildNextLongTaskPrompt = () => {
+    if (!longTaskMeta) return "";
+    const nextStep = Math.max(longTaskMeta.currentStep || 1, 1);
+    const target = longTaskMeta.targetStep ?? nextStep;
+    if (longTaskMeta.activeAgent === "reviewer" || longTaskMeta.stage === "reviewing") {
+      return `请作为审查 agent，阅读 ${longTaskMeta.bigPlanPath} 和 ${longTaskMeta.reviewQueuePath}，审查 Step ${nextStep} 的执行结果。输出必须包含“结论：通过 / 需修复 / 待人工审查”，并说明发现的问题、缺失验证和下一轮建议。`;
+    }
+    return `请作为执行 agent，阅读 ${longTaskMeta.bigPlanPath}，从 Step ${nextStep} 开始执行。本次目标是执行到 Step ${target}，一轮只执行一个 Step。完成后写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。`;
+  };
+
+  const copyNextLongTaskPrompt = async () => {
+    const prompt = buildNextLongTaskPrompt();
+    if (!prompt) {
+      showToast("当前没有可复制的长程任务提示词");
+      return;
+    }
+    await copyToClipboard(prompt, "已复制下一步 prompt");
+  };
+
+  const applyTargetStep = async (startNow: boolean) => {
+    if (!liveCurrentSession?.longTask || targetStepBusy) return;
+    const target = Number(targetStepDraft);
+    if (!Number.isInteger(target) || target < 1) {
+      showToast("请输入有效步骤");
+      return;
+    }
+    if (totalLongTaskSteps > 0 && target > totalLongTaskSteps) {
+      showToast(`最多到 Step ${totalLongTaskSteps}`);
+      return;
+    }
+    if (target < liveCurrentSession.longTask.currentStep) {
+      showToast("目标步骤不能小于当前步骤");
+      return;
+    }
+
+    setTargetStepBusy(true);
+    let latestSession = liveCurrentSession;
+    try {
+      updateSession(liveCurrentSession.id, (session) => {
+        if (!session.longTask) return session;
+        const stage = startNow && ["drafting", "planning", "ready", "paused"].includes(session.longTask.stage)
+          ? "running"
+          : session.longTask.stage;
+        latestSession = {
+          ...session,
+          runtimeSessionId: session.longTask.executorSessionId,
+          longTask: {
+            ...session.longTask,
+            activeAgent: "executor",
+            stage,
+            targetStep: target,
+          },
+          updatedAt: Date.now(),
+        };
+        return latestSession;
+      });
+      setCurrentSession(latestSession);
+      await persistLongTaskTarget(latestSession);
+
+      if (!startNow) {
+        showToast(`已设置执行到 Step ${target}`);
+        return;
+      }
+      if (runningSessionId) {
+        showToast("已有任务运行中，已先保存目标步骤");
+        return;
+      }
+
+      const nextStep = Math.max(latestSession.longTask?.currentStep ?? 1, 1);
+      const prompt = `【Kimix 长程任务：执行到 Step ${target}】\n请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}，然后从 Step ${nextStep} 开始，按 BIGPLAN 顺序一轮只执行一个 Step。本次目标是执行到 Step ${target}。\n\n如果当前还没有完成规划，请先完善 BIGPLAN 并向用户确认；如果已经可以执行，请只执行 Step ${nextStep}。完成本轮后写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。`;
+      updateSession(latestSession.id, (session) => ({
+        ...session,
+        events: [
+          ...session.events,
+          {
+            id: crypto.randomUUID(),
+            type: "assistant_message" as const,
+            timestamp: Date.now(),
+            content: "",
+            isThinking: defaultThinking,
+            isComplete: false,
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+      setCurrentSession(useSessionStore.getState().sessions.find((session) => session.id === latestSession.id) ?? latestSession);
+      setRunningSessionId(latestSession.id);
+      const res = await window.api.sendPrompt({
+        sessionId: latestSession.longTask?.executorSessionId ?? latestSession.runtimeSessionId ?? latestSession.id,
+        content: prompt,
+        thinking: defaultThinking,
+        yoloMode: permissionMode === "yolo",
+      });
+      if (!res.success) throw new Error(res.error);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err));
+      setRunningSessionId(null);
+    } finally {
+      setTargetStepBusy(false);
+    }
+  };
+
+  const refreshLongTaskDetail = (options?: { silent?: boolean }) => {
     if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) {
       setLongTaskDetail(null);
       setLongTaskDetailError(null);
@@ -687,12 +940,10 @@ export function AppShell() {
       return;
     }
 
-    let cancelled = false;
     const { taskId } = liveCurrentSession.longTask;
-    setLongTaskDetailLoading(true);
+    if (!options?.silent) setLongTaskDetailLoading(true);
     setLongTaskDetailError(null);
     void window.api.getLongTaskDetail({ projectPath: liveCurrentSession.projectPath, taskId }).then((res) => {
-      if (cancelled) return;
       if (res.success) {
         setLongTaskDetail(res.data);
       } else {
@@ -700,16 +951,35 @@ export function AppShell() {
         setLongTaskDetailError(res.error);
       }
     }).catch((err: unknown) => {
-      if (cancelled) return;
       setLongTaskDetail(null);
       setLongTaskDetailError(err instanceof Error ? err.message : String(err));
     }).finally(() => {
-      if (!cancelled) setLongTaskDetailLoading(false);
+      if (!options?.silent) setLongTaskDetailLoading(false);
     });
-    return () => {
-      cancelled = true;
-    };
+  };
+
+  useEffect(() => {
+    refreshLongTaskDetail();
   }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
+
+  useEffect(() => {
+    if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) return;
+    refreshLongTaskDetail({ silent: true });
+  }, [longTaskInspectorOpen, liveCurrentSession?.longTask?.taskId, longTaskEventCount]);
+
+  useEffect(() => {
+    if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) return;
+    const timer = window.setInterval(() => refreshLongTaskDetail({ silent: true }), 3000);
+    return () => window.clearInterval(timer);
+  }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
+
+  useEffect(() => {
+    if (!liveCurrentSession?.longTask) {
+      setTargetStepDraft("");
+      return;
+    }
+    setTargetStepDraft(liveCurrentSession.longTask.targetStep ? String(liveCurrentSession.longTask.targetStep) : "");
+  }, [liveCurrentSession?.longTask?.taskId, liveCurrentSession?.longTask?.targetStep]);
 
   const copyToClipboard = async (text: string, successMessage = "已复制") => {
     await navigator.clipboard.writeText(text);
@@ -727,10 +997,19 @@ export function AppShell() {
     setCurrentSession({ ...liveCurrentSession, title: nextTitle, updatedAt });
     showToast("已重命名");
   };
+  const archiveCurrentSession = () => {
+    if (!liveCurrentSession) {
+      showToast("当前没有对话");
+      return;
+    }
+    archiveSession(liveCurrentSession.id);
+    setCurrentSession(null);
+    showToast("已归档对话");
+  };
   const sessionMenuItems: SessionMenuEntry[] = [
     { label: "置顶对话", hint: "Ctrl+Alt+P", icon: Pin, disabled: true, action: () => undefined },
     { label: "重命名对话", hint: "Ctrl+Alt+R", icon: Pencil, action: renameCurrentSession },
-    { label: "归档对话", hint: "Ctrl+Shift+A", icon: Archive, disabled: true, action: () => undefined },
+    { label: "归档对话", hint: "Ctrl+Shift+A", icon: Archive, action: archiveCurrentSession },
     { type: "separator" },
     { label: "复制工作目录", hint: "Ctrl+Shift+C", icon: ClipboardCopy, action: () => copyToClipboard(projectPath ?? liveCurrentSession?.projectPath ?? "", "已复制工作目录") },
     { label: "复制会话 ID", hint: "Ctrl+Alt+C", icon: Clipboard, action: () => copyToClipboard(liveCurrentSession?.id ?? "", "已复制会话 ID") },
@@ -873,14 +1152,45 @@ export function AppShell() {
             </div>
 
             <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
-              <button
-                onClick={() => showToast("待实现")}
-                className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f]"
-                title="运行"
-                aria-label="运行"
-              >
-                <Play size={15} />
-              </button>
+              {longTaskMeta ? (
+                <button
+                  type="button"
+                  onClick={() => setLongTaskInspectorOpen(true)}
+                  className={`flex h-9 min-w-[148px] items-center rounded-xl border bg-white text-left transition-colors ${
+                    longTaskStatusTone === "reviewer"
+                      ? "border-[#f1ddb0] text-[#8a6a1f] hover:bg-[#fff8e8]"
+                      : "border-[#cfe4fb] text-[#2f6fad] hover:bg-[#f4f9ff]"
+                  }`}
+                  style={{ gap: 9, paddingLeft: 13, paddingRight: 14 }}
+                  title="查看长程任务状态"
+                  aria-label="查看长程任务状态"
+                >
+                  {longTaskMeta.stage === "completed" ? (
+                    <CheckCircle2 size={15} className="shrink-0" />
+                  ) : isCurrentSessionRunning ? (
+                    <Square size={13} className="shrink-0 fill-current" />
+                  ) : longTaskMeta.stage === "paused" ? (
+                    <Pause size={15} className="shrink-0" />
+                  ) : (
+                    <Play size={15} className="shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-[13px] leading-5">
+                    {longTaskAgentLabels[longTaskMeta.activeAgent]} · {longTaskStageLabels[longTaskMeta.stage]}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-white/75 text-[12px] leading-5" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                    {longTaskMeta.currentStep}{longTaskMeta.targetStep ? `/${longTaskMeta.targetStep}` : ""}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => showToast("当前对话不是长程任务")}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f]"
+                  title="运行"
+                  aria-label="运行"
+                >
+                  <Play size={15} />
+                </button>
+              )}
               <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
                 <div className={`flex h-9 min-w-[72px] items-center rounded-xl border border-[#e5e1d8] bg-white transition-colors hover:bg-[#f8f6f1] hover:text-[#3a362f] ${!projectPath ? "opacity-45" : ""}`}>
                   <button
@@ -996,6 +1306,103 @@ export function AppShell() {
                     <div className="mt-1 text-[13px] leading-5 text-[#6f87a1]">
                       步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
                     </div>
+                    <div className="mt-3 flex flex-col rounded-lg bg-[#f4f9ff]" style={{ gap: 10, padding: "11px 12px" }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                        <span className="shrink-0 text-[13px] font-medium leading-5 text-[#2f6fad]">工作 agent</span>
+                        <div className="flex min-w-0 items-center rounded-lg bg-white" style={{ gap: 4, padding: 4 }}>
+                          <button
+                            type="button"
+                            disabled={longTaskControlBusy}
+                            onClick={() => void patchLongTaskMeta({ activeAgent: "executor", stage: longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage }, { message: "已切换到执行 agent" })}
+                            className={`h-7 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-[#dff0ff] text-[#2f6fad]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
+                            style={{ paddingLeft: 10, paddingRight: 10 }}
+                          >
+                            执行
+                          </button>
+                          <button
+                            type="button"
+                            disabled={longTaskControlBusy}
+                            onClick={() => void patchLongTaskMeta({ activeAgent: "reviewer", stage: longTaskMeta.stage === "running" ? "paused" : longTaskMeta.stage }, { message: "已切换到审查 agent" })}
+                            className={`h-7 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-[#fff3d6] text-[#8a6a1f]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
+                            style={{ paddingLeft: 10, paddingRight: 10 }}
+                          >
+                            审查
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center" style={{ gap: 8 }}>
+                        <button
+                          type="button"
+                          disabled={longTaskControlBusy || longTaskMeta.stage === "paused" || longTaskMeta.stage === "completed"}
+                          onClick={() => void patchLongTaskMeta({ stage: "paused" }, { stopRunning: true, message: "已暂停长程任务" })}
+                          className="kimix-icon-text-button is-compact flex-1 justify-center bg-white text-[#6f87a1] hover:bg-[#eef7ff] disabled:cursor-not-allowed disabled:opacity-55"
+                        >
+                          <Pause size={14} />
+                          暂停
+                        </button>
+                        <button
+                          type="button"
+                          disabled={longTaskControlBusy || Boolean(runningSessionId) || longTaskMeta.stage === "completed"}
+                          onClick={() => void applyTargetStep(true)}
+                          className="kimix-icon-text-button is-compact flex-1 justify-center bg-white text-[#2f6fad] hover:bg-[#eef7ff] disabled:cursor-not-allowed disabled:opacity-55"
+                        >
+                          <Play size={14} />
+                          继续
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-lg bg-[#f4f9ff]" style={{ padding: "10px 12px" }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                        <label className="shrink-0 text-[13px] font-medium leading-5 text-[#2f6fad]" htmlFor="long-task-target-step">
+                          执行到
+                        </label>
+                        <input
+                          id="long-task-target-step"
+                          type="number"
+                          min={1}
+                          max={totalLongTaskSteps || undefined}
+                          value={targetStepDraft}
+                          onChange={(event) => setTargetStepDraft(event.target.value)}
+                          className="h-8 min-w-0 flex-1 rounded-lg border border-[#cfe4fb] bg-white text-[13px] text-[#24415f] outline-none focus:border-[#90c4f2]"
+                          style={{ paddingLeft: 10, paddingRight: 10 }}
+                          placeholder={totalLongTaskSteps ? `1-${totalLongTaskSteps}` : "Step"}
+                        />
+                      </div>
+                      <div className="mt-3 flex items-center" style={{ gap: 8 }}>
+                        <button
+                          type="button"
+                          disabled={targetStepBusy}
+                          onClick={() => void applyTargetStep(false)}
+                          className="kimix-icon-text-button is-compact flex-1 justify-center bg-white text-[#2f6fad] hover:bg-[#eef7ff] disabled:cursor-wait disabled:opacity-60"
+                        >
+                          保存目标
+                        </button>
+                        <button
+                          type="button"
+                          disabled={targetStepBusy || Boolean(runningSessionId)}
+                          onClick={() => void applyTargetStep(true)}
+                          className="kimix-icon-text-button is-compact flex-1 justify-center bg-[#339af0] text-white hover:bg-[#228be6] disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {runningSessionId ? "运行中" : "开始执行"}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-lg bg-[#f8fbff] text-[13px] leading-5 text-[#5e7894]" style={{ padding: "11px 12px" }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                        <span className="font-medium text-[#2f6fad]">下一步 prompt</span>
+                        <button
+                          type="button"
+                          onClick={() => void copyNextLongTaskPrompt()}
+                          className="kimix-icon-text-button is-compact shrink-0 bg-white text-[#2f6fad] hover:bg-[#eef7ff]"
+                        >
+                          <ClipboardCopy size={13} />
+                          复制
+                        </button>
+                      </div>
+                      <div className="mt-2 line-clamp-4 whitespace-pre-wrap text-[#6f87a1]">
+                        {buildNextLongTaskPrompt()}
+                      </div>
+                    </div>
                   </section>
                   <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
                     <div className="flex items-center justify-between" style={{ gap: 10 }}>
@@ -1066,6 +1473,73 @@ export function AppShell() {
                         </div>
                       </div>
                     ) : null}
+                  </section>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
+                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">轮次记录</div>
+                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">rounds/step-XXX.md</div>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                        {parsedLongTaskDetail?.rounds.length ?? 0}
+                      </span>
+                    </div>
+                    {longTaskDetailLoading ? (
+                      <div className="mt-3 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "11px 12px" }}>
+                        正在读取轮次记录...
+                      </div>
+                    ) : parsedLongTaskDetail && parsedLongTaskDetail.rounds.length > 0 ? (
+                      <div className="mt-3 flex flex-col" style={{ gap: 9 }}>
+                        {parsedLongTaskDetail.rounds.map((round) => (
+                          <div key={round.filePath} className="rounded-lg border border-[#e2edf8] bg-[#fbfdff]" style={{ padding: "10px 12px" }}>
+                            <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                              <div className="flex min-w-0 items-center" style={{ gap: 7 }}>
+                                <FileText size={14} className="shrink-0 text-[#6f87a1]" />
+                                <span className="truncate text-[13.5px] font-medium leading-5 text-[#24415f]">Step {round.step}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: round.filePath });
+                                }}
+                                className="kimix-icon-text-button is-compact shrink-0 bg-white text-[#2f6fad] hover:bg-[#eef7ff]"
+                              >
+                                打开
+                              </button>
+                            </div>
+                            <div className="mt-2 flex flex-col" style={{ gap: 8 }}>
+                              {round.entries.map((entry, index) => (
+                                <div key={`${round.filePath}-${index}`} className="rounded-lg bg-white text-[13px] leading-5 text-[#5e7894]" style={{ padding: "9px 10px" }}>
+                                  <div className="flex items-center justify-between" style={{ gap: 8 }}>
+                                    <div className="min-w-0 truncate font-medium text-[#2f6fad]">{entry.title}</div>
+                                    {(entry.phase || entry.role) && (
+                                      <span className="shrink-0 rounded-full bg-[#f4f9ff] text-[12px] leading-5 text-[#6f87a1]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                        {[entry.phase, entry.role].filter(Boolean).join(" · ")}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {entry.conclusion && (
+                                    <div className="mt-1 text-[12.5px] leading-5 text-[#7b91a7]">结论：{entry.conclusion}</div>
+                                  )}
+                                  <div className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-[#5e7894]">
+                                    {entry.content || "暂无正文。"}
+                                  </div>
+                                </div>
+                              ))}
+                              {round.entries.length === 0 && (
+                                <div className="rounded-lg bg-white text-[13px] leading-6 text-[#7b91a7]" style={{ padding: "9px 10px" }}>
+                                  这个 Step 记录暂时为空。
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "11px 12px" }}>
+                        暂无 Step 轮次记录。
+                      </div>
+                    )}
                   </section>
                   <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "14px 16px" }}>
                     <div className="flex items-center justify-between" style={{ gap: 10 }}>

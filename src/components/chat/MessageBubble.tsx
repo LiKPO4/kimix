@@ -60,6 +60,8 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const updateSession = useSessionStore((s) => s.updateSession);
+  const isLatestUserMessage = Boolean(currentSession && currentSession.events.findLast((e) => e.type === "user_message")?.id === event.id);
+  const isLongTaskMessage = Boolean(currentSession?.longTask);
   const images = event.images ?? [];
   const hasText = event.content.trim().length > 0;
   const copyText = hasText ? event.content : images.map((image) => `[图片: ${image.name}]`).join("\n");
@@ -162,7 +164,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
           </button>
           <button
             onClick={handleResend}
-            disabled={currentSession ? runningSessionId === currentSession.id : false}
+            disabled={currentSession ? runningSessionId === currentSession.id || (isLongTaskMessage && !isLatestUserMessage) : false}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg-hover disabled:opacity-30"
             title="重新发送"
             aria-label="重新发送"
@@ -317,21 +319,25 @@ function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
 
 function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
+  const canExpand = block.text.trim().length > 140 || /\n/.test(block.text);
   return (
     <div className="rounded-xl border border-[#e8e3da] bg-[#fbfaf7]" style={{ padding: "10px 14px" }}>
       <button
         type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center rounded-lg text-left text-[14px] leading-6 text-[#706b63] transition-colors hover:bg-[#f3f1ec]"
+        onClick={() => canExpand && setExpanded((value) => !value)}
+        disabled={!canExpand}
+        className="flex w-full items-center rounded-lg text-left text-[14px] leading-6 text-[#706b63] transition-colors hover:bg-[#f3f1ec] disabled:cursor-default disabled:hover:bg-transparent"
         style={{ gap: 8, padding: "4px 6px" }}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
-          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-        </span>
         <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
           <Brain size={15} />
         </span>
         <span className="min-w-0 flex-1">{firstThinkingSentence(block.text)}</span>
+        {canExpand && (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </span>
+        )}
       </button>
       {expanded && (
         <pre className="mt-2 min-w-0 whitespace-pre-wrap break-words rounded-lg bg-[#f6f3ed] font-mono text-[13.5px] leading-7 text-[#625d55]" style={{ padding: "14px 16px" }}>

@@ -102,18 +102,70 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: rgba(246, 244, 239, 0.92);
+  padding: 32px;
+  background: rgba(246, 244, 239, 0.88);
+  backdrop-filter: blur(6px);
 }
 
 .kimix-runtime-error-card {
+  position: relative;
   width: min(520px, 100%);
-  border: 1px solid #ead3cf;
-  border-radius: 18px;
+  border: 1px solid #eadbd8;
+  border-radius: 16px;
   background: #ffffff;
   box-shadow: 0 28px 90px rgba(25, 23, 20, 0.18);
-  padding: 24px;
+  padding: 24px 24px 22px;
   color: #3a362f;
+}
+
+.kimix-runtime-error-close {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  display: flex;
+  height: 32px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: #8f887e;
+  font-size: 22px;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.kimix-runtime-error-close:hover {
+  background: #f3f1ec;
+  color: #3a362f;
+}
+
+.kimix-runtime-error-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 42px;
+}
+
+.kimix-runtime-error-icon {
+  display: flex;
+  height: 34px;
+  width: 34px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #fff4f0;
+  color: #b55242;
+}
+
+.kimix-runtime-error-icon svg {
+  height: 18px;
+  width: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .kimix-runtime-error-title {
@@ -123,28 +175,40 @@ body {
 }
 
 .kimix-runtime-error-message {
-  margin-top: 10px;
+  margin-top: 18px;
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
 .kimix-runtime-error-detail {
-  margin-top: 10px;
+  margin-top: 12px;
+  border-radius: 10px;
+  background: #fbfaf7;
   color: #8f887e;
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+  padding: 10px 12px;
+}
+
+.kimix-runtime-error-detail:empty {
+  display: none;
 }
 
 .kimix-runtime-error-button {
-  margin-top: 18px;
+  margin-top: 20px;
   height: 34px;
-  border-radius: 9px;
-  background: #24211d;
+  border-radius: 8px;
+  background: #8b3d34;
   padding: 0 14px;
   color: #ffffff;
   font-size: 13px;
+  transition: background 0.15s ease;
+}
+
+.kimix-runtime-error-button:hover {
+  background: #74332c;
 }
 
 .kimix-composer-surface:focus,

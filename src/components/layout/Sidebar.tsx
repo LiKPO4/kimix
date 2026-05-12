@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, ChevronRight, Trash2, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2 } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, ChevronRight, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -43,6 +43,7 @@ export function Sidebar() {
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
   const deleteSession = useSessionStore((s) => s.deleteSession);
+  const archiveSession = useSessionStore((s) => s.archiveSession);
   const updateSession = useSessionStore((s) => s.updateSession);
 
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
@@ -156,8 +157,8 @@ export function Sidebar() {
   };
 
   const archiveProjectSessions = (project: Project) => {
-    const targets = sessions.filter((session) => session.projectPath === project.path);
-    targets.forEach((session) => deleteSession(session.id));
+    const targets = sessions.filter((session) => session.projectPath === project.path && !session.archivedAt);
+    targets.forEach((session) => archiveSession(session.id));
     if (currentSession && currentSession.projectPath === project.path) {
       setCurrentSession(null);
     }
@@ -215,7 +216,7 @@ export function Sidebar() {
   }
 
   const projectSessions = (projectPath: string) =>
-    sessions.filter((s) => s.projectPath === projectPath);
+    sessions.filter((s) => s.projectPath === projectPath && !s.archivedAt);
 
   const selectSession = async (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId);
@@ -306,7 +307,7 @@ export function Sidebar() {
                     onClick={async () => {
                       setCurrentProject(project);
                       setExpandedProject(isExpanded ? null : project.id);
-                      const hasSession = sessions.some((s) => s.projectPath === project.path);
+                      const hasSession = sessions.some((s) => s.projectPath === project.path && !s.archivedAt);
                       if (!hasSession && !useAppStore.getState().creatingSessionProjectPath) {
                         await createSessionForProject(project);
                       }
@@ -420,16 +421,16 @@ export function Sidebar() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteSession(s.id);
+                              archiveSession(s.id);
                               if (currentSession?.id === s.id) {
                                 setCurrentSession(null);
                               }
                             }}
                             className="rounded p-0.5 text-[#9a948b] opacity-0 transition-all hover:bg-accent-red/10 hover:text-accent-red group-hover:opacity-100"
-                            title="删除会话"
-                            aria-label="删除会话"
+                            title="归档会话"
+                            aria-label="归档会话"
                           >
-                            <Trash2 size={11} />
+                            <Archive size={11} />
                           </button>
                         </div>
                       );
@@ -456,7 +457,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.15</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.32</span>
         </button>
       </div>
     </aside>

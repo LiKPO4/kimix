@@ -263,7 +263,10 @@ const SKILL_SEARCH_IGNORES = new Set([
 
 function emitWindowState() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send("window:maximized-change", { maximized: mainWindow.isMaximized() });
+  mainWindow.webContents.send("window:maximized-change", {
+    maximized: mainWindow.isMaximized(),
+    fullscreen: mainWindow.isFullScreen(),
+  });
 }
 
 function verifyRendererContent() {
@@ -906,6 +909,8 @@ function createWindow() {
   mainWindow.on("maximize", emitWindowState);
   mainWindow.on("unmaximize", emitWindowState);
   mainWindow.on("restore", emitWindowState);
+  mainWindow.on("enter-full-screen", emitWindowState);
+  mainWindow.on("leave-full-screen", emitWindowState);
 }
 
 async function restoreLastContext() {
@@ -986,6 +991,16 @@ const UpdateLongTaskStateSchema = z.object({
   }).strict(),
 });
 
+const AppendLongTaskRoundSchema = z.object({
+  projectPath: z.string().min(1).max(4096),
+  taskId: z.string().min(1).max(160),
+  step: z.number().int().min(0),
+  role: z.enum(["executor", "reviewer"]),
+  phase: z.enum(["execution", "review", "fix", "handoff", "complete"]),
+  conclusion: z.string().max(1000).optional(),
+  content: z.string().max(50000),
+});
+
 const CreateLongTaskSchema = z.object({
   project: ProjectSchema,
   title: z.string().max(160).optional(),
@@ -1054,6 +1069,21 @@ ipcMain.handle("longTasks:updateState", async (_, request: unknown) => {
       success: true,
       data: longTaskService.updateLongTaskState(parsed.data.projectPath, parsed.data.taskId, parsed.data.patch),
     };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("longTasks:appendRound", async (_, request: unknown) => {
+  try {
+    const parsed = AppendLongTaskRoundSchema.safeParse(request);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid long task round request" };
+    }
+    if (!fs.existsSync(parsed.data.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    return { success: true, data: longTaskService.appendLongTaskRound(parsed.data) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -1691,11 +1721,15 @@ ipcMain.handle("window:toggleFullScreen", () => {
   }
   const next = !mainWindow.isFullScreen();
   mainWindow.setFullScreen(next);
+  emitWindowState();
   return { success: true, data: next };
 });
 
 ipcMain.handle("window:isMaximized", () => {
-  return { success: true, data: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMaximized()) };
+  return {
+    success: true,
+    data: Boolean(mainWindow && !mainWindow.isDestroyed() && (mainWindow.isMaximized() || mainWindow.isFullScreen())),
+  };
 });
 
 ipcMain.handle("window:close", () => {

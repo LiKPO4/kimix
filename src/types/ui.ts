@@ -42,6 +42,7 @@ export interface Session {
   projectPath: string;
   createdAt: number;
   updatedAt: number;
+  archivedAt?: number;
   events: TimelineEvent[];
   isLoading: boolean;
 }

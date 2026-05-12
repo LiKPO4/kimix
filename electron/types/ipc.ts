@@ -76,9 +76,17 @@ export type GetLongTaskDetailRequest = {
   taskId: string;
 }
 
+export type LongTaskRoundRecord = {
+  step: number;
+  filePath: string;
+  content: string;
+  updatedAt: number;
+}
+
 export type LongTaskDetail = LongTaskSummary & {
   bigPlanContent: string;
   reviewQueueContent: string;
+  rounds: LongTaskRoundRecord[];
 }
 
 export type GetLongTaskDetailResponse = {
@@ -98,6 +106,26 @@ export type UpdateLongTaskStateRequest = {
 export type UpdateLongTaskStateResponse = {
   success: true;
   data: LongTaskSummary;
+} | {
+  success: false;
+  error: string;
+};
+
+export type AppendLongTaskRoundRequest = {
+  projectPath: string;
+  taskId: string;
+  step: number;
+  role: LongTaskAgentRole;
+  phase: "execution" | "review" | "fix" | "handoff" | "complete";
+  conclusion?: string;
+  content: string;
+}
+
+export type AppendLongTaskRoundResponse = {
+  success: true;
+  data: {
+    filePath: string;
+  };
 } | {
   success: false;
   error: string;

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { LongTaskAgentRole, LongTaskDetail, LongTaskStage, LongTaskSummary, Project } from "./types/ipc";
+import type { AppendLongTaskRoundRequest, LongTaskAgentRole, LongTaskDetail, LongTaskRoundRecord, LongTaskStage, LongTaskSummary, Project } from "./types/ipc";
 
 export type CreateLongTaskData = {
   project: Project;
@@ -208,6 +208,13 @@ function readTextInsideProject(projectPath: string, relativePath: string) {
   return fs.existsSync(targetPath) ? fs.readFileSync(targetPath, "utf-8") : "";
 }
 
+function readStateByTaskId(projectPath: string, taskId: string) {
+  const statePath = findLongTaskStatePath(projectPath, taskId);
+  if (!statePath) return null;
+  assertInsideProject(projectPath, statePath);
+  return readStateFile(statePath);
+}
+
 export function getLongTaskDetail(projectPath: string, taskId: string): LongTaskDetail {
   const task = listLongTasks(projectPath).find((item) => item.id === taskId);
   if (!task) {
@@ -217,15 +224,44 @@ export function getLongTaskDetail(projectPath: string, taskId: string): LongTask
     ...task,
     bigPlanContent: readTextInsideProject(projectPath, task.bigPlanPath),
     reviewQueueContent: readTextInsideProject(projectPath, task.reviewQueuePath),
+    rounds: readLongTaskRounds(projectPath, task),
   };
+}
+
+function readLongTaskRounds(projectPath: string, task: LongTaskSummary): LongTaskRoundRecord[] {
+  const roundsDir = path.join(task.taskDir, "rounds");
+  assertInsideProject(projectPath, roundsDir);
+  if (!fs.existsSync(roundsDir)) return [];
+
+  return fs.readdirSync(roundsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => {
+      const match = entry.name.match(/^step-(\d+)\.md$/i);
+      if (!match) return null;
+      const filePath = path.join(roundsDir, entry.name);
+      assertInsideProject(projectPath, filePath);
+      const stat = fs.statSync(filePath);
+      return {
+        step: Number(match[1]),
+        filePath: relativeToProject(projectPath, filePath),
+        content: fs.readFileSync(filePath, "utf-8"),
+        updatedAt: stat.mtimeMs,
+      };
+    })
+    .filter((round): round is LongTaskRoundRecord => Boolean(round))
+    .sort((a, b) => a.step - b.step || a.updatedAt - b.updatedAt);
 }
 
 function findLongTaskStatePath(projectPath: string, taskId: string) {
   const root = longTasksRoot(projectPath);
   if (!fs.existsSync(root)) return null;
-  const entry = fs.readdirSync(root, { withFileTypes: true })
-    .find((item) => item.isDirectory() && item.name.startsWith(`${taskId}-`));
-  return entry ? path.join(root, entry.name, STATE_FILE) : null;
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const statePath = path.join(root, entry.name, STATE_FILE);
+    const task = readStateFile(statePath);
+    if (task?.id === taskId) return statePath;
+  }
+  return null;
 }
 
 export function updateLongTaskState(
@@ -250,6 +286,56 @@ export function updateLongTaskState(
   };
   fs.writeFileSync(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf-8");
   return updated;
+}
+
+function roundRoleLabel(role: LongTaskAgentRole) {
+  return role === "reviewer" ? "审查 agent" : "执行 agent";
+}
+
+function roundPhaseLabel(phase: AppendLongTaskRoundRequest["phase"]) {
+  const labels: Record<AppendLongTaskRoundRequest["phase"], string> = {
+    execution: "执行",
+    review: "审查",
+    fix: "修复",
+    handoff: "接棒",
+    complete: "完成",
+  };
+  return labels[phase];
+}
+
+function sanitizeRoundContent(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) return "无正文。";
+  return trimmed.length > 30000 ? `${trimmed.slice(0, 30000)}\n\n...内容过长，已截断记录。` : trimmed;
+}
+
+export function appendLongTaskRound(request: AppendLongTaskRoundRequest): { filePath: string } {
+  const task = readStateByTaskId(request.projectPath, request.taskId);
+  if (!task) {
+    throw new Error("Long task not found");
+  }
+
+  const roundsDir = path.join(task.taskDir, "rounds");
+  assertInsideProject(request.projectPath, roundsDir);
+  ensureDirectory(roundsDir);
+
+  const step = Math.max(0, Math.floor(request.step));
+  const filePath = path.join(roundsDir, `step-${String(step).padStart(3, "0")}.md`);
+  assertInsideProject(request.projectPath, filePath);
+
+  const exists = fs.existsSync(filePath);
+  const header = exists ? "" : `# Step ${step}\n\n任务：${task.title}\n\n`;
+  const conclusion = request.conclusion ? `- 结论：${request.conclusion}\n` : "";
+  const entry = `## ${new Date().toISOString()} · ${roundPhaseLabel(request.phase)} · ${roundRoleLabel(request.role)}
+
+- 阶段：${request.phase}
+- 角色：${request.role}
+${conclusion}### 记录
+${sanitizeRoundContent(request.content)}
+
+`;
+  fs.appendFileSync(filePath, `${header}${entry}`, "utf-8");
+  return { filePath: relativeToProject(request.projectPath, filePath) };
 }
 
 export function createLongTask(data: CreateLongTaskData): LongTaskSummary {

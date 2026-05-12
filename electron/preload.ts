@@ -11,6 +11,8 @@ import type {
   GetLongTaskDetailResponse,
   UpdateLongTaskStateRequest,
   UpdateLongTaskStateResponse,
+  AppendLongTaskRoundRequest,
+  AppendLongTaskRoundResponse,
   StartSessionRequest,
   StartSessionResponse,
   CheckKimiCliRequest,
@@ -99,6 +101,8 @@ const api = {
     ipcRenderer.invoke("longTasks:getDetail", req),
   updateLongTaskState: (req: UpdateLongTaskStateRequest): Promise<UpdateLongTaskStateResponse> =>
     ipcRenderer.invoke("longTasks:updateState", req),
+  appendLongTaskRound: (req: AppendLongTaskRoundRequest): Promise<AppendLongTaskRoundResponse> =>
+    ipcRenderer.invoke("longTasks:appendRound", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>
@@ -166,8 +170,8 @@ const api = {
   resetZoom: (): Promise<{ success: boolean; data: number }> => ipcRenderer.invoke("window:resetZoom"),
   toggleFullScreen: (): Promise<{ success: boolean; data: boolean }> => ipcRenderer.invoke("window:toggleFullScreen"),
   isWindowMaximized: (): Promise<{ success: boolean; data: boolean }> => ipcRenderer.invoke("window:isMaximized"),
-  onWindowMaximizedChange: (callback: (payload: { maximized: boolean }) => void) => {
-    const handler = (_: unknown, payload: { maximized: boolean }) => callback(payload);
+  onWindowMaximizedChange: (callback: (payload: { maximized: boolean; fullscreen?: boolean }) => void) => {
+    const handler = (_: unknown, payload: { maximized: boolean; fullscreen?: boolean }) => callback(payload);
     ipcRenderer.on("window:maximized-change", handler);
     return () => ipcRenderer.off("window:maximized-change", handler);
   },
