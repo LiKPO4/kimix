@@ -126,7 +126,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
                   key={image.id ?? `${image.name}-${index}`}
                   type="button"
                   onClick={() => setPreviewImage(image)}
-                  className="h-24 w-24 overflow-hidden rounded-[14px] border border-[#ded8cf] bg-[#f7f5f1] shadow-[0_1px_3px_rgba(25,23,20,0.06)] transition-colors hover:border-[#cfc8bc]"
+                  className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[14px] shadow-[0_1px_3px_rgba(25,23,20,0.06)] transition-colors"
                   title="点击查看图片"
                   aria-label={`查看图片 ${image.name}`}
                 >
@@ -135,7 +135,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
               ) : (
                 <div
                   key={image.id ?? `${image.name}-${index}`}
-                  className="flex h-24 w-24 flex-col items-center justify-center rounded-[14px] border border-[#ded8cf] bg-[#f7f5f1] text-[#8f887e]"
+                  className="kimix-media-thumb flex h-24 w-24 flex-col items-center justify-center rounded-[14px] text-[var(--kimix-panel-text-muted)]"
                   style={{ gap: 7, paddingLeft: 10, paddingRight: 10 }}
                 >
                   <ImageIcon size={20} />
@@ -148,7 +148,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
         {hasText && (
           <div
             style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8, whiteSpace: "pre-wrap" }}
-            className="rounded-[16px] bg-[#f3f3f3] text-[14.5px] leading-[1.45] text-[#24211d] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+            className="kimix-user-bubble rounded-[16px] text-[14.5px] leading-[1.45] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
           >
             {event.content}
           </div>
@@ -175,7 +175,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
       </div>
       {previewImage?.dataUrl && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/72"
+          className="kimix-preview-overlay fixed inset-0 z-[80] flex items-center justify-center"
           onClick={() => setPreviewImage(null)}
           role="dialog"
           aria-modal="true"
@@ -184,7 +184,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
           <button
             type="button"
             onClick={() => setPreviewImage(null)}
-            className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#24211d] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors hover:bg-[#f3f1ec]"
+            className="kimix-preview-close absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors"
             title="关闭"
             aria-label="关闭图片预览"
           >
@@ -193,12 +193,12 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
           <img
             src={previewImage.dataUrl}
             alt={previewImage.name}
-            className="max-h-[82vh] max-w-[86vw] rounded-xl bg-white object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+            className="kimix-preview-image max-h-[82vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
             onClick={(clickEvent) => clickEvent.stopPropagation()}
             onContextMenu={(contextEvent) => previewImage.dataUrl && void handleCopyPreviewImage(contextEvent, previewImage.dataUrl)}
           />
           {imageCopied && (
-            <div className="absolute bottom-8 rounded-full bg-white text-[14px] text-[#24211d] shadow-[0_8px_24px_rgba(0,0,0,0.2)]" style={{ padding: "8px 16px" }}>
+            <div className="kimix-preview-toast absolute bottom-8 rounded-full text-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.2)]" style={{ padding: "8px 16px" }}>
               已复制图片
             </div>
           )}
@@ -218,7 +218,7 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
   return (
     <div className="group w-full">
       <div
-        className={`text-[15px] leading-7 ${event.status === "failed" ? "text-accent-red" : "text-[#8a847a]"}`}
+        className={`text-[15px] leading-7 ${event.status === "failed" ? "text-accent-red" : "text-[var(--kimix-panel-text-secondary)]"}`}
         style={{ paddingTop: 2, paddingBottom: 12 }}
       >
         {label}
@@ -226,13 +226,13 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
       <div className="flex justify-end">
         <div className="max-w-[58%]">
           <div className="mb-1 flex justify-end">
-            <span className={`text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[#8a847a]"}`}>
+            <span className={`text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[var(--kimix-panel-text-secondary)]"}`}>
               {label}
             </span>
           </div>
           <div
             style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
-            className="rounded-[16px] bg-[#f3f3f3] text-[14.5px] leading-[1.45] text-[#24211d] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+            className="kimix-user-bubble rounded-[16px] text-[14.5px] leading-[1.45] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
           >
             {event.content}
           </div>
@@ -321,26 +321,26 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = block.text.trim().length > 140 || /\n/.test(block.text);
   return (
-    <div className="rounded-xl border border-[#e8e3da] bg-[#fbfaf7]" style={{ padding: "10px 14px" }}>
+    <div className="kimix-soft-card rounded-xl" style={{ padding: "12px 14px" }}>
       <button
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="flex w-full items-center rounded-lg text-left text-[14px] leading-6 text-[#706b63] transition-colors hover:bg-[#f3f1ec] disabled:cursor-default disabled:hover:bg-transparent"
+        className="flex w-full items-center rounded-lg text-left text-[14px] leading-6 text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
         style={{ gap: 8, padding: "4px 6px" }}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Brain size={15} />
         </span>
         <span className="min-w-0 flex-1">{firstThinkingSentence(block.text)}</span>
         {canExpand && (
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[#9a948b]">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </span>
         )}
       </button>
       {expanded && (
-        <pre className="mt-2 min-w-0 whitespace-pre-wrap break-words rounded-lg bg-[#f6f3ed] font-mono text-[13.5px] leading-7 text-[#625d55]" style={{ padding: "14px 16px" }}>
+        <pre className="kimix-soft-card-strong mt-3 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
           {block.text}
         </pre>
       )}
@@ -350,11 +350,11 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
 
 function ToolProcessItem({ tool }: { tool: ToolEvent }) {
   return (
-    <div className="flex min-h-10 items-center rounded-xl border border-[#e8e3da] bg-white text-[13.5px] text-[#706b63]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
-      <SquareTerminal size={14} className="shrink-0 text-[#9a948b]" />
-      <span className="shrink-0 text-[#8a847a]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已运行"}</span>
+    <div className="kimix-soft-card flex min-h-10 items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
+      <SquareTerminal size={14} className="shrink-0 text-[var(--kimix-process-muted)]" />
+      <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已运行"}</span>
       <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
-      {tool.durationMs !== undefined && <span className="shrink-0 text-[#aaa49a]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
+      {tool.durationMs !== undefined && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tool.status === "error" ? "bg-[#d83b01]" : tool.status === "running" ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
     </div>
   );
@@ -364,13 +364,13 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
   const isRunning = subagent.status === "running";
   const isError = subagent.status === "error";
   return (
-    <div className="flex min-h-10 items-center rounded-xl border border-[#e8e3da] bg-white text-[13.5px] text-[#706b63]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
+    <div className="kimix-soft-card flex min-h-10 items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
       {isRunning ? (
-        <Loader2 size={14} className="kimix-spin shrink-0 text-[#9a948b]" />
+        <Loader2 size={14} className="kimix-spin shrink-0 text-[var(--kimix-process-muted)]" />
       ) : (
-        <Bot size={14} className="shrink-0 text-[#9a948b]" />
+        <Bot size={14} className="shrink-0 text-[var(--kimix-process-muted)]" />
       )}
-      <span className="shrink-0 text-[#8a847a]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
+      <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
       <span className="min-w-0 flex-1 truncate">{subagent.agentName || "子代理"}</span>
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isError ? "bg-[#d83b01]" : isRunning ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
     </div>
@@ -400,24 +400,24 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   ]);
 
   return (
-    <div className="w-full border-b border-[#ece8df]" style={{ paddingBottom: expanded && hasDetails ? 14 : 12 }}>
+    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: expanded && hasDetails ? 14 : 12 }}>
       <button
         type="button"
         onClick={() => hasDetails && setExpanded((value) => !value)}
         disabled={!hasDetails}
-        className="flex h-8 items-center rounded-lg text-[15px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#625d55] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[#8a847a]"
+        className="flex h-8 items-center rounded-lg text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
         style={{ gap: 8, paddingLeft: 4, paddingRight: 12 }}
       >
         {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
         <span>{label}</span>
         {hasDetails && (
-          <span className="text-[13px] text-[#aaa49a]">
+          <span className="text-[13px] text-[var(--kimix-panel-text-muted)]">
             {summary}
           </span>
         )}
       </button>
       {expanded && hasDetails && (
-        <div className="mt-2 flex flex-col rounded-xl border border-[#eee9e1] bg-[#fffdfa]" style={{ gap: 10, padding: "12px 14px" }}>
+        <div className="kimix-soft-card mt-3 flex flex-col rounded-xl" style={{ gap: 12, padding: "14px 14px" }}>
           {items.map((item, index) => (
             item.type === "thinking"
               ? <ThinkingProcessItem key={item.block.id || `thinking-${index}`} block={item.block} />
@@ -428,8 +428,8 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="kimix-icon-text-button is-compact self-end text-[#706b63] hover:bg-[#f3f1ec]"
-            style={{ paddingLeft: 12, paddingRight: 12 }}
+            className="kimix-icon-text-button kimix-muted-action is-compact self-end"
+            style={{ marginTop: 2, paddingLeft: 12, paddingRight: 12 }}
           >
             <ChevronUp size={14} />
             <span>收起本轮内容</span>
@@ -469,7 +469,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
 
         {hasContent && (
           <>
-            <div className="relative w-full text-[15px] leading-[1.68] text-[#24211d]">
+            <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
               <MarkdownRenderer content={event.content} />
             </div>
             {mdArtifacts.length > 0 && (

@@ -51,7 +51,7 @@ function withClarificationBehavior(content: string, mode: ClarificationToolMode)
 }
 
 const iconButtonClass =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35";
+  "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35";
 
 function shouldRecoverHandoffSourceSession(session: Session | null | undefined) {
   return Boolean(session?.events.some((event) => (
@@ -827,12 +827,12 @@ export function Composer() {
 
       {pendingMessages.length > 0 && (
         <div
-          className="overflow-hidden rounded-[15px] border border-[#e6e1d8] bg-white/95 text-[13px] shadow-[0_3px_12px_rgba(25,23,20,0.05)]"
+          className="kimix-floating-panel overflow-hidden rounded-[15px] text-[13px]"
           style={{ marginBottom: 8 }}
         >
-          <div className="flex h-11 items-center justify-between border-b border-[#eeeae3] text-[14.5px] text-[#7c756c]" style={{ paddingLeft: 20, paddingRight: 22 }}>
+          <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ paddingLeft: 20, paddingRight: 22 }}>
             <span className="min-w-0 truncate">{pendingMessages.length} 条消息正在排队</span>
-            {isCurrentSessionRunning && <span className="shrink-0 text-[#8f887e]">当前任务结束后继续</span>}
+            {isCurrentSessionRunning && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">当前任务结束后继续</span>}
           </div>
           <div className="max-h-40 overflow-y-auto">
             {pendingMessages.map((msg) => (
@@ -852,27 +852,27 @@ export function Composer() {
                   if (dragId && dragId !== msg.id) reorderPendingMessage(dragId, msg.id);
                 }}
                 onDragEnd={() => setDraggingPendingId(null)}
-                className={`group flex min-h-[42px] min-w-0 items-center gap-2 border-b border-[#f0ede7] last:border-b-0 hover:bg-[#faf8f4] ${
-                  draggingPendingId === msg.id ? "bg-[#f4f1eb] opacity-70" : ""
+                className={`group flex min-h-[42px] min-w-0 items-center gap-2 border-b border-[var(--kimix-panel-divider)] last:border-b-0 hover:bg-[var(--kimix-panel-soft-bg)] ${
+                  draggingPendingId === msg.id ? "bg-[var(--kimix-panel-hover)] opacity-70" : ""
                 }`}
                 style={{ paddingLeft: 18, paddingRight: 18 }}
               >
-                <div className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-[#aaa49a] active:cursor-grabbing">
+                <div className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)] active:cursor-grabbing">
                   <GripVertical size={15} />
                 </div>
-                <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[#3a362f]">{msg.content}</div>
-                <div className="flex shrink-0 items-center gap-1 text-[#8f887e]">
-                  <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button is-compact text-[13px] hover:bg-black/5 hover:text-[#24211d]" title={isCurrentSessionRunning ? "引导当前任务" : "立即发送"}>
+                <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">{msg.content}</div>
+                <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
+                  <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title={isCurrentSessionRunning ? "引导当前任务" : "立即发送"}>
                     <Send size={13} />
                     <span>引导</span>
                   </button>
-                  <button onClick={() => handleEditPending(msg.id)} className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 hover:text-[#24211d]" title="撤回到输入框修改" aria-label="撤回到输入框修改">
+                  <button onClick={() => handleEditPending(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="撤回到输入框修改" aria-label="撤回到输入框修改">
                     <Edit2 size={13} />
                   </button>
                   <button onClick={() => removePendingMessage(msg.id)} className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-accent-red/10 hover:text-accent-red" title="删除" aria-label="删除">
                     <Trash2 size={13} />
                   </button>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 hover:text-[#24211d]" title="更多" aria-label="更多">
+                  <button className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="更多" aria-label="更多">
                     <MoreHorizontal size={14} />
                   </button>
                 </div>
@@ -884,12 +884,12 @@ export function Composer() {
 
       <div
         style={{ paddingLeft: 17, paddingRight: 17, paddingTop: 14, paddingBottom: 10 }}
-        className={`kimix-composer-surface relative flex min-w-0 flex-col overflow-visible rounded-[19px] border bg-white transition-colors ${
+        className={`kimix-composer-surface kimix-composer-card relative flex min-w-0 flex-col overflow-visible rounded-[19px] border transition-colors ${
           isDragging
             ? "border-accent-blue"
             : isFocused
-              ? "border-[#d4cfc5] shadow-[0_0_0_1px_rgba(0,0,0,0.02)]"
-              : "border-[#dfdbd2] shadow-[0_1px_2px_rgba(25,23,20,0.06)]"
+              ? "is-focused"
+              : ""
         } ${!canUseComposer ? "opacity-60" : ""}`}
       >
         {isDragging && (
@@ -900,13 +900,13 @@ export function Composer() {
         {activeCompletion && (
           <div
             ref={completionListRef}
-            className="mb-3 max-h-[276px] overflow-y-auto rounded-[16px] border border-[#ebe6dd] bg-white/95 text-[14px] shadow-[0_16px_42px_rgba(25,23,20,0.12)]"
+            className="kimix-floating-panel mb-3 max-h-[276px] overflow-y-auto rounded-[16px] text-[14px]"
             style={{ padding: 10 }}
             onMouseDown={(event) => event.preventDefault()}
           >
             {activeCompletion.mode === "mention" ? (
               <>
-                <div className="px-2 pb-1.5 text-[13px] text-[#9a948b]">智能体</div>
+                <div className="px-2 pb-1.5 text-[13px] text-[var(--kimix-panel-text-muted)]">智能体</div>
                 {filteredMentionBaseItems.filter((item) => item.kind === "agent").map((item) => {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
                   return (
@@ -915,16 +915,16 @@ export function Composer() {
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-black/5 text-[#24211d]" : "text-[#4b4640] hover:bg-black/5"}`}
+                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                       style={{ paddingLeft: 10, paddingRight: 12 }}
                     >
-                      <Bot size={15} className="shrink-0 text-[#7d7972]" />
+                      <Bot size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
                       <span className="shrink-0">{item.label}</span>
-                      {item.detail && <span className="min-w-0 truncate text-[#aaa49a]">{item.detail}</span>}
+                      {item.detail && <span className="min-w-0 truncate text-[var(--kimix-panel-text-muted)]">{item.detail}</span>}
                     </button>
                   );
                 })}
-                <div className="px-2 pb-1.5 pt-2 text-[13px] text-[#9a948b]">插件</div>
+                <div className="px-2 pb-1.5 pt-2 text-[13px] text-[var(--kimix-panel-text-muted)]">插件</div>
                 {filteredMentionBaseItems.filter((item) => item.kind === "plugin").map((item) => {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
                   return (
@@ -933,16 +933,16 @@ export function Composer() {
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-black/5 text-[#24211d]" : "text-[#4b4640] hover:bg-black/5"}`}
+                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                       style={{ paddingLeft: 10, paddingRight: 12 }}
                     >
-                      <Puzzle size={15} className="shrink-0 text-[#7d7972]" />
+                      <Puzzle size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
                       <span className="shrink-0">{item.label}</span>
-                      {item.detail && <span className="min-w-0 truncate text-[#aaa49a]">{item.detail}</span>}
+                      {item.detail && <span className="min-w-0 truncate text-[var(--kimix-panel-text-muted)]">{item.detail}</span>}
                     </button>
                   );
                 })}
-                <div className="px-2 pb-1.5 pt-2 text-[13px] text-[#9a948b]">文件</div>
+                <div className="px-2 pb-1.5 pt-2 text-[13px] text-[var(--kimix-panel-text-muted)]">文件</div>
                 {fileItems.length > 0 ? fileItems.map((item) => {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
                   return (
@@ -951,35 +951,35 @@ export function Composer() {
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-black/5 text-[#24211d]" : "text-[#4b4640] hover:bg-black/5"}`}
+                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                       style={{ paddingLeft: 10, paddingRight: 12 }}
                     >
-                      <FileText size={15} className="shrink-0 text-[#7d7972]" />
+                      <FileText size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
                       <span className="min-w-0 flex-1 truncate">{item.detail}</span>
                     </button>
                   );
                 }) : (
-                  <div className="px-2 py-1.5 text-[#aaa49a]">输入内容搜索文件</div>
+                  <div className="px-2 py-1.5 text-[var(--kimix-panel-text-muted)]">输入内容搜索文件</div>
                 )}
               </>
             ) : (
               <>
-                <div className="px-2 pb-1.5 text-[13px] text-[#9a948b]">命令</div>
+                <div className="px-2 pb-1.5 text-[13px] text-[var(--kimix-panel-text-muted)]">命令</div>
                 {completionItems.length > 0 ? completionItems.map((item, index) => (
                   <button
                     ref={(node) => { completionItemRefs.current[item.id] = node; }}
                     key={item.id}
                     type="button"
                     onClick={() => applyCompletion(item)}
-                    className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-black/5 text-[#24211d]" : "text-[#4b4640] hover:bg-black/5"}`}
+                    className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                     style={{ paddingLeft: 10, paddingRight: 12 }}
                   >
-                    <TerminalSquare size={15} className="shrink-0 text-[#7d7972]" />
+                    <TerminalSquare size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
                     <span className="shrink-0">{item.label}</span>
-                    {item.detail && <span className="min-w-0 truncate text-[#aaa49a]">{item.detail}</span>}
+                    {item.detail && <span className="min-w-0 truncate text-[var(--kimix-panel-text-muted)]">{item.detail}</span>}
                   </button>
                 )) : (
-                  <div className="flex items-center gap-2 px-2 py-1.5 text-[#aaa49a]">
+                  <div className="flex items-center gap-2 px-2 py-1.5 text-[var(--kimix-panel-text-muted)]">
                     <AtSign size={14} />
                     <span>正在从 Kimi 加载命令，或当前会话未返回 slash_commands</span>
                   </div>
@@ -995,7 +995,7 @@ export function Composer() {
                 key={image.id}
                 type="button"
                 onClick={() => setPreviewImage(image)}
-                className="group relative h-20 w-20 overflow-hidden rounded-xl border border-[#ded8cf] bg-[#f7f5f1] text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors hover:border-[#cfc8bc]"
+                className="kimix-media-thumb group relative h-20 w-20 overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors"
                 title="点击查看图片"
                 aria-label={`查看图片 ${image.name}`}
               >
@@ -1034,7 +1034,7 @@ export function Composer() {
         <div className="mt-2 flex h-9 min-w-0 flex-nowrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-1" style={{ marginLeft: -6 }}>
             {editingPendingId && (
-              <button onClick={handleCancelPendingEdit} className="shrink-0 rounded-xl px-2.5 py-1 text-[13px] text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d]">
+              <button onClick={handleCancelPendingEdit} className="kimix-muted-action shrink-0 rounded-xl px-2.5 py-1 text-[13px]">
                 取消修改
               </button>
             )}
@@ -1043,12 +1043,12 @@ export function Composer() {
                 <Plus size={18} />
               </button>
               {showAddMenu && (
-                <div className="absolute bottom-full left-0 z-30 mb-2 w-[276px] rounded-xl border border-[#e5e1d8] bg-white shadow-[0_14px_34px_rgba(25,23,20,0.14)]" style={{ padding: "10px 10px 9px" }}>
-                  <div className="flex items-center gap-2 text-[13.5px] font-medium text-[#302d28]" style={{ padding: "4px 6px 8px" }}>
-                    <CircleHelp size={15} className="shrink-0 text-[#706b63]" />
+                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[276px] rounded-xl" style={{ padding: "12px 12px 11px" }}>
+                  <div className="flex items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]" style={{ padding: "4px 6px 10px" }}>
+                    <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                     <span>需求澄清工具</span>
                   </div>
-                  <div className="flex flex-col" style={{ gap: 6 }}>
+                  <div className="flex flex-col" style={{ gap: 8 }}>
                     {CLARIFICATION_OPTIONS.map((option) => {
                       const active = clarificationToolMode === option.value;
                       return (
@@ -1056,7 +1056,7 @@ export function Composer() {
                           key={option.value}
                           type="button"
                           onClick={() => handleSetClarificationToolMode(option.value)}
-                          className={`flex min-h-11 w-full items-center rounded-xl text-left transition-colors ${active ? "bg-[#eef7ff] text-[#24211d]" : "text-[#4b4640] hover:bg-[#f3f1ec]"}`}
+                          className={`flex min-h-11 w-full items-center rounded-xl text-left transition-colors ${active ? "bg-[#eef7ff] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                           style={{ gap: 10, paddingLeft: 12, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
                         >
                           <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${active ? "border-[#339af0] bg-[#339af0] text-white" : "border-[#d8d2c8] text-transparent"}`}>
@@ -1064,13 +1064,13 @@ export function Composer() {
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block text-[13.5px] leading-5">{option.label}</span>
-                            <span className="block truncate text-[12px] leading-5 text-[#8f887e]">{option.desc}</span>
+                            <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{option.desc}</span>
                           </span>
                         </button>
                       );
                     })}
                   </div>
-                  <div className="border-t border-[#f0ece5] text-[12.5px] leading-5 text-[#8f887e]" style={{ marginTop: 8, padding: "9px 6px 2px" }}>
+                  <div className="border-t border-[var(--kimix-panel-divider)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 10, padding: "11px 6px 2px" }}>
                     默认自动判断；需要用户选择时会显示官方结构化问题。
                   </div>
                 </div>
@@ -1078,20 +1078,20 @@ export function Composer() {
             </div>
 
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
-              <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button is-compact max-w-[188px] min-w-0 text-[#7c756c] hover:bg-[#f1eee8] disabled:cursor-not-allowed disabled:opacity-35">
+              <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35">
                 <AlertTriangle size={14} className="shrink-0 text-[#d97706]" />
                 <span className="truncate">{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (
-                <div className="absolute bottom-full left-0 z-30 mb-2 w-[216px] rounded-xl border border-[#e5e1d8] bg-white py-2.5 shadow-[0_14px_34px_rgba(25,23,20,0.14)]">
+                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[216px] rounded-xl" style={{ paddingTop: 12, paddingBottom: 12 }}>
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} onClick={() => { setPermissionMode(opt.value); setShowPermissionMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 12, paddingBottom: 12 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[#f3f1ec] ${permissionMode === opt.value ? "text-[#24211d]" : "text-[#26231f]"}`}>
-                        <Icon size={13} className="shrink-0 text-[#7c756c]" />
+                      <button key={opt.value} onClick={() => { setPermissionMode(opt.value); setShowPermissionMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${permissionMode === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                        <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
-                        {permissionMode === opt.value && <Check size={13} className="mr-1 shrink-0 text-[#24211d]" />}
+                        {permissionMode === opt.value && <Check size={13} className="mr-1 shrink-0 text-[var(--kimix-panel-text)]" />}
                       </button>
                     );
                   })}
@@ -1103,15 +1103,15 @@ export function Composer() {
           <div className="flex shrink-0 items-center gap-1.5">
             <ContextRing />
             <div ref={thinkingBtnRef} className="relative">
-              <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="kimix-icon-text-button is-compact min-w-[126px] text-[#625d55] hover:bg-[#f1eee8] hover:text-[#24211d] disabled:cursor-not-allowed disabled:opacity-35">
+              <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact min-w-[126px] disabled:cursor-not-allowed disabled:opacity-35">
                 <Brain size={14} className="shrink-0" />
                 <span>{defaultThinking ? "思考开启" : "思考关闭"}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showThinkingMenu && (
-                <div className="absolute bottom-full right-0 z-20 mb-2 w-[188px] rounded-xl border border-[#e5e1d8] bg-white py-2.5 shadow-[0_14px_36px_rgba(25,23,20,0.14)]">
+                <div className="kimix-floating-panel absolute bottom-full right-0 z-20 mb-2 w-[188px] rounded-xl" style={{ paddingTop: 12, paddingBottom: 12 }}>
                   {THINKING_OPTIONS.map((option) => (
-                    <button key={String(option.value)} onClick={() => { setDefaultThinking(option.value); setShowThinkingMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 12, paddingBottom: 12 }} className={`flex w-full items-center justify-between gap-4 text-left text-[14px] leading-none hover:bg-[#f3f1ec] ${defaultThinking === option.value ? "text-accent-blue" : "text-[#26231f]"}`}>
+                    <button key={String(option.value)} onClick={() => { setDefaultThinking(option.value); setShowThinkingMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center justify-between gap-4 text-left text-[14px] leading-none hover:bg-[var(--kimix-panel-hover)] ${defaultThinking === option.value ? "text-accent-blue" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                       {option.label}
                       {defaultThinking === option.value && <Check size={14} />}
                     </button>
@@ -1125,8 +1125,8 @@ export function Composer() {
             </button>
 
             {shouldShowStopButton ? (
-              <button onClick={handleStop} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#171512] transition-colors hover:bg-black" title="停止" aria-label="停止">
-                <span className="h-2.5 w-2.5 rounded-[2px] bg-white" />
+              <button onClick={handleStop} className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:opacity-90" title="停止" aria-label="停止">
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
               </button>
             ) : (
               <button onClick={handleSend} disabled={(!input.trim() && imageAttachments.length === 0) || !canUseComposer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#339af0] text-white transition-colors hover:bg-[#228be6] disabled:bg-[#ece9e3] disabled:text-[#aaa49a]" title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
@@ -1139,7 +1139,7 @@ export function Composer() {
 
       {previewImage && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/72"
+          className="kimix-preview-overlay fixed inset-0 z-[80] flex items-center justify-center"
           onClick={() => setPreviewImage(null)}
           role="dialog"
           aria-modal="true"
@@ -1149,7 +1149,7 @@ export function Composer() {
             <button
               type="button"
               onClick={() => setPreviewImage(null)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#24211d] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors hover:bg-[#f3f1ec]"
+              className="kimix-preview-close flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors"
               title="关闭"
               aria-label="关闭图片预览"
             >
@@ -1159,7 +1159,7 @@ export function Composer() {
           <img
             src={previewImage.dataUrl}
             alt={previewImage.name}
-            className="max-h-[82vh] max-w-[86vw] rounded-xl bg-white object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+            className="kimix-preview-image max-h-[82vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
             onClick={(event) => event.stopPropagation()}
           />
         </div>

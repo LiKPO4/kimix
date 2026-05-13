@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.7.36 修复安装包启动白屏：补齐 Kimi CLI 引导卡片使用的 `Monitor` 图标 import，避免渲染时报 `Monitor is not defined`。
+v2.7.49 继续补齐高频聊天区深色模式，接入最小可用 diff 面板，并复核 pnpm dev 稳定性。
 
 ## 当前版本
-**v2.7.36** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.7.49** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
@@ -35,6 +35,52 @@ v2.7.36 修复安装包启动白屏：补齐 Kimi CLI 引导卡片使用的 `Mon
 - [x] 卡死诊断入口补到设置页，可查看最近 `kimix_freeze_reports`。
 
 ## 已完成
+- v2.7.49：
+  - 继续把 `Composer`、`MessageBubble`、`ContextBar`、`SkillsPanel`、`ChatThread` 等高频区域切到统一主题 token，补齐深色模式下的输入区、思考卡、用量浮层、技能面板、图片预览和长程任务 banner。
+  - 将工具返回的结构化 diff 映射为独立 `diff` 事件，并在主界面接入最小可用“差异面板”，可按时间查看最近变更并打开对应文件。
+  - 版本号三处同步到 v2.7.49。
+- v2.7.48：
+  - 修复深色模式下设置面板、主壳层、侧栏、长程任务检查器、帮助/引导弹层等一级容器仍大面积保持浅色的问题。
+  - 浏览器预览模式补齐 `getSettings` / `saveSettings` 本地持久化，主题切换后不再在下次打开时丢失。
+  - 版本号三处同步到 v2.7.48。
+- v2.7.47：
+  - 继续收口设置页“新对话建议 / 语音输入 / 归档对话 / 卡死诊断”等卡片内边距和列表说明间距。
+  - 收口长程任务右侧窄栏里的“已审查”区块、Kimi CLI onboarding 卡片，以及 Composer / ContextBar / 思考过程卡片等常用浮层与边框块的留白。
+  - 版本号三处同步到 v2.7.47。
+- v2.7.46：
+  - 收口关于/更新弹窗中的说明卡、更新时间线卡和操作按钮间距，避免按钮与正文、卡片边界贴得过近。
+  - 收口长程任务头部 banner、消息里的思考详情面板、Skills 面板顶部说明区的 sibling gap 与内边距。
+  - 版本号三处同步到 v2.7.46。
+- v2.7.45：
+  - 设置页“连接情况”里，`已找到 Kimi CLI` / `Kimi CLI 连接正常` 的左侧标记统一改成和其他已选项一致的蓝色圆形勾选指示器。
+  - 版本号三处同步到 v2.7.45。
+- v2.7.44：
+  - 为设置页标题行补上通用规则：`kimix-settings-section-title` / `kimix-settings-row-title` 后的内容块默认增加 12px 顶部间距，避免模块标题和内容直接贴在一起。
+  - 版本号三处同步到 v2.7.44。
+- v2.7.43：
+  - 设置页为“上下文详细显示”补上独立模块标题“上下文显示”，不再视觉上挂靠在“权限模式”下面。
+  - 版本号三处同步到 v2.7.43。
+- v2.7.42：
+  - 继续收口右侧长程任务栏的 BIGPLAN / 轮次记录 / 待审查等卡片，统一 section 内部的 sibling gap、块间距和说明块 padding。
+  - 收紧 `ContextBar` 套餐浮层、`Composer` 权限/思考菜单、`SettingsPanel` 归档对话/卡死诊断/输入配置卡片的留白，减少“块贴块”和“内容挤在一起”的风险。
+  - 版本号三处同步到 v2.7.42。
+- v2.7.41：
+  - 右侧长程任务状态栏的“工作 agent / 执行到 / 下一步 prompt”三块改成统一的纵向 stack 和显式 gap，避免紧挨在一起。
+  - `AGENTS.md` 的“UI 留白防回归”重写为“硬规则 / 高风险区域 / 提交前留白验收清单”三段式，新增“独立区块之间最小间距”和“必须检查 sibling gap”硬约束。
+  - 版本号三处同步到 v2.7.41。
+- v2.7.39：
+  - `src/main.tsx` 新增浏览器预览模式的 `window.api` 兜底实现；非 Electron 环境下会自动注入同签名 API，避免 `getSettings` 等调用在首屏直接报错。
+  - 预览模式下提供只读/空实现：基础设置、应用信息、外链打开、窗口控制和事件订阅都有安全降级；需要原生能力的操作会返回明确提示，不再以未定义 API 方式崩溃。
+  - 版本号三处同步到 v2.7.39。
+- v2.7.38：
+  - 长程任务创建弹窗的项目卡、创建卡、输入框和底部说明区补齐上下留白，避免标题、输入框和边框贴得过紧。
+  - 右侧长程任务状态栏的“当前状态”“执行到 Step”控制区补齐卡片内边距与段间距，按钮区不再挤在一起。
+  - 版本号三处同步到 v2.7.38。
+- v2.7.37：
+  - 新手引导新增“一键安装 Kimi CLI”，Windows 下直接执行官方 `install.ps1`，不再要求用户先手动安装 `uv`。
+  - `kimi:checkCli` 会补查常见安装路径，并把命令目录临时补进当前进程 PATH，降低首次安装后仍识别不到 CLI 的概率。
+  - 官方说明链接改为稳定可打开的 Kimi CLI 中文入门文档地址，避免点击后跳到空白页。
+  - 版本号三处同步到 v2.7.37。
 - v2.7.36：
   - 修复 v2.7.35 安装包启动后 `Monitor is not defined` 的渲染错误。
   - 补齐 `src/components/layout/AppShell.tsx` 中 Kimi CLI 引导卡片使用的 lucide `Monitor` 图标 import。

@@ -549,6 +549,17 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const callIndex = result.findLastIndex(
       (e) => e.type === "tool_call" && e.toolCallId === incoming.toolCallId
     );
+    const diffEvent = incoming.display?.diff
+      ? {
+          id: generateId(),
+          type: "diff" as const,
+          timestamp: incoming.timestamp,
+          filePath: incoming.display.diff.path,
+          oldText: incoming.display.diff.oldText,
+          newText: incoming.display.diff.newText,
+        }
+      : null;
+    const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
     if (callIndex !== -1) {
       const call = result[callIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
       result[callIndex] = {
@@ -556,11 +567,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         status: "success",
         durationMs: Math.max(0, incoming.timestamp - call.timestamp),
       };
-      const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
-      return todoEvent ? [...result, todoEvent] : result;
+      return [...result, ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
     }
-    const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
-    if (todoEvent) return [...existing, todoEvent];
+    if (diffEvent || todoEvent) return [...existing, ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
   }
 
   if (incoming.type === "subagent") {

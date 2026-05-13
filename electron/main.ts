@@ -17,6 +17,51 @@ const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
 const KIMI_CODE_USAGE_URL = "https://api.kimi.com/coding/v1/usages";
 const KIMI_CODE_REFRESH_URL = "https://auth.kimi.com/api/oauth/token";
+const KIMI_CLI_INSTALL_PS1_URL = "https://code.kimi.com/install.ps1";
+const KIMI_CLI_INSTALL_SH_URL = "https://code.kimi.com/install.sh";
+
+function prependProcessPath(dir: string) {
+  if (!dir) return;
+  const delimiter = process.platform === "win32" ? ";" : ":";
+  const current = process.env.PATH ?? "";
+  const normalized = path.resolve(dir);
+  const hasDir = current
+    .split(delimiter)
+    .filter(Boolean)
+    .some((entry) => path.resolve(entry) === normalized);
+  if (!hasDir) {
+    process.env.PATH = current ? `${dir}${delimiter}${current}` : dir;
+  }
+}
+
+function commandHintPaths(command: string) {
+  const ext = process.platform === "win32" ? ".exe" : "";
+  const fileName = command.endsWith(ext) ? command : `${command}${ext}`;
+  const home = os.homedir();
+  const hints = [
+    path.join(home, ".local", "bin", fileName),
+  ];
+  if (process.platform === "win32") {
+    hints.push(path.join(home, "AppData", "Roaming", "Python", "Scripts", fileName));
+  } else {
+    hints.push(path.join(home, ".cargo", "bin", fileName));
+  }
+  return hints;
+}
+
+async function resolveCommand(command: string): Promise<string | null> {
+  const fromPath = await checkCommand(command);
+  if (fromPath) {
+    prependProcessPath(path.dirname(fromPath));
+    return fromPath;
+  }
+  const hinted = commandHintPaths(command).find((candidate) => fs.existsSync(candidate));
+  if (hinted) {
+    prependProcessPath(path.dirname(hinted));
+    return hinted;
+  }
+  return null;
+}
 
 function checkCommand(command: string): Promise<string | null> {
   const lookup = process.platform === "win32" ? "where" : "which";
@@ -34,7 +79,7 @@ function checkCommand(command: string): Promise<string | null> {
 
 function runCommand(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(command, args, { windowsHide: true, timeout: 5000 }, (error, stdout, stderr) => {
+    const child = execFile(command, args, { windowsHide: true, timeout: 5000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         reject(error);
         return;
@@ -43,6 +88,44 @@ function runCommand(command: string, args: string[]): Promise<string> {
     });
     child.on("error", reject);
   });
+}
+
+function runLongCommand(command: string, args: string[], timeoutMs = 10 * 60 * 1000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(command, args, { windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const output = [stdout, stderr].filter(Boolean).join("\n").trim();
+      if (error) {
+        reject(new Error(output || error.message));
+        return;
+      }
+      resolve(output);
+    });
+    child.on("error", reject);
+  });
+}
+
+async function installKimiCli() {
+  if (process.platform === "win32") {
+    const output = await runLongCommand("powershell.exe", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      `Invoke-RestMethod ${KIMI_CLI_INSTALL_PS1_URL} | Invoke-Expression`,
+    ]);
+    const kimiPath = await resolveCommand("kimi");
+    if (!kimiPath) throw new Error("安装完成后仍未找到 kimi 命令，请重新打开 Kimix 后再试");
+    const version = await runCommand(kimiPath, ["--version"]).catch(() => output);
+    return { path: kimiPath, output: version, message: "Kimi CLI 安装完成" };
+  }
+
+  const shellPath = await resolveCommand("bash");
+  if (!shellPath) throw new Error("未找到 bash，无法执行 Kimi CLI 安装脚本");
+  const output = await runLongCommand(shellPath, ["-lc", `curl -LsSf ${KIMI_CLI_INSTALL_SH_URL} | bash`]);
+  const kimiPath = await resolveCommand("kimi");
+  if (!kimiPath) throw new Error("安装完成后仍未找到 kimi 命令，请重新打开 Kimix 后再试");
+  const version = await runCommand(kimiPath, ["--version"]).catch(() => output);
+  return { path: kimiPath, output: version, message: "Kimi CLI 安装完成" };
 }
 
 function spawnDetached(command: string, args: string[], cwd?: string): Promise<void> {
@@ -1385,7 +1468,7 @@ ipcMain.handle("project:importSkillArchive", async (_, request: unknown) => {
 // Kimi IPC handlers
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
-    const kimiPath = await checkCommand("kimi");
+    const kimiPath = await resolveCommand("kimi");
     if (!kimiPath) {
       return {
         success: true,
@@ -1421,6 +1504,15 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
         message: "已找到 kimi CLI，点击检查验证响应",
       },
     };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:installCli", async () => {
+  try {
+    const result = await installKimiCli();
+    return { success: true, data: result };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

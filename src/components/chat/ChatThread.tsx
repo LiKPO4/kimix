@@ -78,7 +78,7 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
     <div className="w-full">
       <button
         onClick={() => setExpanded((value) => !value)}
-        className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec]"
+        className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
         style={{ gap: 8, paddingLeft: 4, paddingRight: 10 }}
       >
         {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
@@ -100,31 +100,27 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   const isReviewer = meta.activeAgent === "reviewer";
   return (
     <div
-      className="rounded-2xl text-[#302d28] shadow-[0_10px_26px_rgba(74,132,190,0.10)]"
-      style={{
-        padding: "14px 18px",
-        border: `1px solid ${isReviewer ? "#f1ddb0" : "#cfe4fb"}`,
-        background: isReviewer ? "#fff8e8" : "#f4f9ff",
-      }}
+      className={`kimix-chat-banner rounded-2xl shadow-[0_10px_26px_rgba(74,132,190,0.10)] ${isReviewer ? "is-reviewer" : ""}`}
+      style={{ padding: "16px 18px" }}
     >
-      <div className="flex flex-wrap items-center justify-between" style={{ gap: 10 }}>
+      <div className="flex flex-wrap items-center justify-between" style={{ gap: 12 }}>
         <div className="min-w-0">
           <div className="truncate text-[15px] font-medium leading-6">长程任务：{meta.title}</div>
-          <div className="mt-0.5 text-[13px] leading-5 text-[#706b63]">
+          <div className="kimix-chat-banner-muted mt-1.5 text-[13px] leading-5">
             当前工作：{longTaskAgentLabels[meta.activeAgent]} · {longTaskStageLabels[meta.stage]} · 步骤 {meta.currentStep}{meta.targetStep ? ` / ${meta.targetStep}` : " / 未设置"}
           </div>
         </div>
         <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
           <button
             type="button"
-            className={`kimix-icon-text-button is-compact bg-white ${isReviewer ? "text-[#9a6a12] hover:bg-[#fff1cf]" : "text-[#2f6fad] hover:bg-[#eef7ff]"}`}
+            className={`kimix-chat-banner-button kimix-icon-text-button is-compact hover:opacity-90 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`}
             onClick={() => {
               void window.api.openFile({ projectPath, filePath: meta.bigPlanPath });
             }}
           >
             BIGPLAN
           </button>
-          <span className={`rounded-full bg-white text-[12px] leading-5 ${isReviewer ? "text-[#9a6a12]" : "text-[#2f83cc]"}`} style={{ padding: "4px 10px" }}>
+          <span className={`kimix-chat-banner-badge rounded-full text-[12px] leading-5 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`} style={{ padding: "5px 10px" }}>
             {longTaskAgentLabels[meta.activeAgent]}
           </span>
         </div>
@@ -164,11 +160,11 @@ function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles }: 
       return <ErrorCard event={event} />;
     case "subagent":
       return (
-        <div className="flex items-center gap-2 rounded-xl border border-[#e8e4db] bg-[#faf8f4] text-[14.5px] text-[#625d55]" style={{ paddingLeft: 14, paddingRight: 16, paddingTop: 10, paddingBottom: 10 }}>
+        <div className="kimix-soft-card flex items-center gap-2 rounded-xl text-[14.5px]" style={{ paddingLeft: 14, paddingRight: 16, paddingTop: 10, paddingBottom: 10 }}>
           {event.status === "running" ? (
-            <Loader2 size={16} className="shrink-0 animate-spin text-[#8f887e]" />
+            <Loader2 size={16} className="shrink-0 animate-spin text-[var(--kimix-panel-text-muted)]" />
           ) : (
-            <Bot size={16} className="shrink-0 text-[#8f887e]" />
+            <Bot size={16} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
           )}
           <span>{event.status === "running" ? "子代理运行中" : "子代理已完成任务"}</span>
         </div>
@@ -501,7 +497,7 @@ export function ChatThread() {
               aria-label="滚动到底部"
               title="滚动到底部"
               onClick={enableAutoFollow}
-              className="pointer-events-auto flex items-center justify-center rounded-full border border-[#dedad2] bg-white text-[#6f6a62] shadow-[0_8px_22px_rgba(15,15,15,0.10)] transition-colors hover:bg-[#f6f4ef] hover:text-[#2f2d29]"
+              className="pointer-events-auto flex items-center justify-center rounded-full border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)] shadow-[0_8px_22px_rgba(15,15,15,0.10)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text)]"
               style={{ width: 38, height: 38 }}
             >
               <ArrowDown size={17} />

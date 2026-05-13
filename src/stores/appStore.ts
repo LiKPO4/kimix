@@ -17,6 +17,7 @@ interface AppStore extends AppState {
   setClarificationToolMode: (mode: ClarificationToolMode) => void;
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
+  setDiffPanelOpen: (open: boolean) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
@@ -48,6 +49,7 @@ export const useAppStore = create<AppStore>((set) => ({
   clarificationToolMode: "auto",
   longTasksOpen: false,
   longTaskInspectorOpen: false,
+  diffPanelOpen: false,
   handoffSessionId: null,
   sidebarOpen: true,
   theme: "light",
@@ -72,6 +74,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
   setLongTasksOpen: (open) => set({ longTasksOpen: open }),
   setLongTaskInspectorOpen: (open) => set({ longTaskInspectorOpen: open }),
+  setDiffPanelOpen: (open) => set({ diffPanelOpen: open }),
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),

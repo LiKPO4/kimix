@@ -19,16 +19,16 @@ function UsageProgress({ period }: { period: UsagePeriod }) {
   return (
     <div style={{ paddingTop: 2, paddingBottom: 3 }}>
       <div className="flex items-center justify-between gap-5 text-[14px] leading-5">
-        <span className="font-medium text-[#5f5a52]">{period.label}</span>
-        <span className="shrink-0 text-[#9a948b]">{period.available ? `已用 ${percent.toFixed(0)}%` : "0%"}</span>
+        <span className="font-medium text-[var(--kimix-panel-text-secondary)]">{period.label}</span>
+        <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">{period.available ? `已用 ${percent.toFixed(0)}%` : "0%"}</span>
       </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#ece8df]">
+      <div className="kimix-progress-track mt-2 h-2 overflow-hidden rounded-full">
         <div
-          className="h-full rounded-full bg-[#8f887d]"
+          className="kimix-progress-fill h-full rounded-full"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="mt-2 text-[13px] leading-5 text-[#aaa49a]">{formatUsage(period)}</div>
+      <div className="mt-2 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">{formatUsage(period)}</div>
     </div>
   );
 }
@@ -144,12 +144,12 @@ export function ContextBar() {
   }, [usageOpen]);
 
   return (
-    <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[#7c756c]" style={{ height: 36 }}>
+    <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[var(--kimix-panel-text-secondary)]" style={{ height: 36 }}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           type="button"
           onClick={showPendingToast}
-          className="flex min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          className="kimix-muted-action flex min-w-0 items-center rounded-lg"
           style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
           title={project?.path ?? "当前项目"}
           aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
@@ -161,29 +161,29 @@ export function ContextBar() {
           <button
             type="button"
             onClick={toggleUsage}
-            className="kimix-icon-text-button is-compact min-w-0 hover:bg-[#f1eee8] hover:text-[#3a362f]"
+            className="kimix-icon-text-button kimix-muted-action is-compact min-w-0"
             style={{ height: 36 }}
             title="套餐用量"
             aria-label="套餐用量"
           >
             <BarChart3 size={16} className="shrink-0" />
             <span className="truncate">套餐用量</span>
-            <ChevronDown size={14} className="shrink-0 text-[#aaa49a]" />
+            <ChevronDown size={14} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
           </button>
           {usageOpen && (
             <div
-              className="absolute bottom-10 left-0 z-40 w-[330px] rounded-xl border border-[#ded9cf] bg-white shadow-[0_16px_36px_rgba(38,34,28,0.14)]"
+              className="kimix-floating-panel absolute bottom-10 left-0 z-40 w-[330px] rounded-xl"
               style={{ paddingLeft: 22, paddingRight: 22, paddingTop: 20, paddingBottom: 21 }}
             >
               <div className="flex items-start justify-between gap-4" style={{ marginBottom: 18 }}>
                 <div className="min-w-0">
-                  <div className="text-[16px] font-medium leading-5 text-[#3a362f]">套餐用量</div>
-                  <div className="mt-1.5 text-[13px] leading-5 text-[#aaa49a]">{usageData?.source ?? "Kimi Code 官方用量接口"}</div>
+                  <div className="text-[16px] font-medium leading-5 text-[var(--kimix-panel-text)]">套餐用量</div>
+                  <div className="mt-1.5 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">{usageData?.source ?? "Kimi Code 官方用量接口"}</div>
                 </div>
                 <button
                   type="button"
                   onClick={loadUsage}
-                  className="kimix-icon-text-button is-compact shrink-0 text-[#7c756c] hover:bg-[#f1eee8] hover:text-[#3a362f]"
+                  className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
                 >
                   {usageLoading ? <Loader2 size={14} className="animate-spin" /> : "刷新"}
                 </button>
@@ -198,7 +198,7 @@ export function ContextBar() {
                 ))}
               </div>
               {usageData?.message && (
-                <div className="mt-3 rounded-lg bg-[#f6f4ef] text-[12.5px] leading-relaxed text-[#8a847a]" style={{ padding: 10 }}>
+                <div className="kimix-soft-card mt-5 rounded-lg text-[12.5px] leading-relaxed" style={{ padding: "13px 12px" }}>
                   {usageData.message}
                 </div>
               )}
@@ -209,7 +209,7 @@ export function ContextBar() {
           <button
             type="button"
             onClick={showPendingToast}
-            className="hidden min-w-0 items-center rounded-lg text-[#7c756c] transition-colors hover:bg-[#f1eee8] hover:text-[#3a362f] md:flex"
+            className="kimix-muted-action hidden min-w-0 items-center rounded-lg md:flex"
             style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
             title={gitBranch}
             aria-label={`当前分支：${gitBranch}`}
@@ -223,7 +223,7 @@ export function ContextBar() {
       {session && (
         <button
           onClick={handleExport}
-          className="kimix-icon-text-button is-compact shrink-0 hover:bg-[#f1eee8] hover:text-[#3a362f]"
+          className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
           style={{ height: 36 }}
           title="导出聊天记录"
           aria-label="导出聊天记录"

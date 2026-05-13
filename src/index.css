@@ -23,6 +23,58 @@
   --accent-red: #d13438;
   --accent-orange: #d83b01;
   --accent-purple: #8764b8;
+  --kimix-shell-bg: #f6f4ef;
+  --kimix-sidebar-bg: #f6f4ef;
+  --kimix-main-bg: #ffffff;
+  --kimix-main-border: #e5e1d8;
+  --kimix-main-border-soft: #efebe3;
+  --kimix-panel-bg: #ffffff;
+  --kimix-panel-border: #dedad2;
+  --kimix-panel-border-soft: #e5e1d8;
+  --kimix-panel-divider: #ebe7df;
+  --kimix-panel-soft-bg: #faf8f4;
+  --kimix-panel-subtle-bg: #fbfaf7;
+  --kimix-panel-hover: #f1eee8;
+  --kimix-panel-text: #24211d;
+  --kimix-panel-text-secondary: #625d55;
+  --kimix-panel-text-muted: #8f887e;
+  --kimix-panel-badge-bg: #f1eee8;
+  --kimix-panel-badge-text: #7c756c;
+  --kimix-overlay-bg: rgba(246, 244, 239, 0.74);
+  --kimix-selection-idle-bg: #ffffff;
+  --kimix-selection-idle-border: #cfc8bc;
+  --kimix-composer-bg: #ffffff;
+  --kimix-composer-border: #dfdbd2;
+  --kimix-composer-border-focus: #d4cfc5;
+  --kimix-composer-shadow: 0 1px 2px rgba(25, 23, 20, 0.06);
+  --kimix-float-shadow: 0 16px 42px rgba(25, 23, 20, 0.12);
+  --kimix-overlay-strong: rgba(12, 12, 14, 0.72);
+  --kimix-process-bg: #fbfaf7;
+  --kimix-process-bg-strong: #f6f3ed;
+  --kimix-process-border: #e8e3da;
+  --kimix-process-text: #706b63;
+  --kimix-process-muted: #9a948b;
+  --kimix-info-bg: #f4f9ff;
+  --kimix-info-bg-soft: #f8fbff;
+  --kimix-info-border: #dbeafa;
+  --kimix-info-text: #24415f;
+  --kimix-info-text-secondary: #6f87a1;
+  --kimix-warning-bg: #fff8e8;
+  --kimix-warning-border: #f1ddb0;
+  --kimix-warning-text: #8a6a1f;
+  --kimix-warning-text-secondary: #7b6d4a;
+  --kimix-success-bg: #f7fbf7;
+  --kimix-success-border: #d8e8d8;
+  --kimix-success-text: #6f806f;
+  --kimix-progress-track: #ece8df;
+  --kimix-progress-fill: #8f887d;
+  --kimix-user-bubble-bg: #f3f3f3;
+  --kimix-user-bubble-text: #24211d;
+  --kimix-media-thumb-bg: #f7f5f1;
+  --kimix-media-thumb-border: #ded8cf;
+  --kimix-media-thumb-border-hover: #cfc8bc;
+  --kimix-strong-button-bg: #171512;
+  --kimix-strong-button-text: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -45,6 +97,58 @@
   --accent-red: #f48771;
   --accent-orange: #ce9178;
   --accent-purple: #c586c0;
+  --kimix-shell-bg: #101317;
+  --kimix-sidebar-bg: #15191e;
+  --kimix-main-bg: #1a1f26;
+  --kimix-main-border: #323943;
+  --kimix-main-border-soft: #2a3039;
+  --kimix-panel-bg: #20252c;
+  --kimix-panel-border: #38404b;
+  --kimix-panel-border-soft: #343b46;
+  --kimix-panel-divider: #313843;
+  --kimix-panel-soft-bg: #252b33;
+  --kimix-panel-subtle-bg: #2a3038;
+  --kimix-panel-hover: #303743;
+  --kimix-panel-text: #ece7dd;
+  --kimix-panel-text-secondary: #c7c0b5;
+  --kimix-panel-text-muted: #9d968b;
+  --kimix-panel-badge-bg: #2d3440;
+  --kimix-panel-badge-text: #b7c7d8;
+  --kimix-overlay-bg: rgba(12, 14, 18, 0.72);
+  --kimix-selection-idle-bg: #252b33;
+  --kimix-selection-idle-border: #4a5361;
+  --kimix-composer-bg: #20252c;
+  --kimix-composer-border: #38404b;
+  --kimix-composer-border-focus: #4a5361;
+  --kimix-composer-shadow: 0 1px 2px rgba(5, 8, 11, 0.28);
+  --kimix-float-shadow: 0 16px 42px rgba(3, 5, 8, 0.3);
+  --kimix-overlay-strong: rgba(5, 7, 10, 0.78);
+  --kimix-process-bg: #252b33;
+  --kimix-process-bg-strong: #1f252d;
+  --kimix-process-border: #38404b;
+  --kimix-process-text: #c7c0b5;
+  --kimix-process-muted: #9d968b;
+  --kimix-info-bg: #222b35;
+  --kimix-info-bg-soft: #1f2730;
+  --kimix-info-border: #364453;
+  --kimix-info-text: #d9e5f0;
+  --kimix-info-text-secondary: #9fb4c8;
+  --kimix-warning-bg: #362d20;
+  --kimix-warning-border: #665235;
+  --kimix-warning-text: #f2d49f;
+  --kimix-warning-text-secondary: #d4b783;
+  --kimix-success-bg: #233127;
+  --kimix-success-border: #3b5742;
+  --kimix-success-text: #b8d8bf;
+  --kimix-progress-track: #2b333d;
+  --kimix-progress-fill: #8ea8c0;
+  --kimix-user-bubble-bg: #2a3038;
+  --kimix-user-bubble-text: #ece7dd;
+  --kimix-media-thumb-bg: #252b33;
+  --kimix-media-thumb-border: #404955;
+  --kimix-media-thumb-border-hover: #586271;
+  --kimix-strong-button-bg: #e7ecf2;
+  --kimix-strong-button-text: #18202a;
 }
 
 * {
@@ -307,10 +411,11 @@ body {
   width: min(448px, calc(100vw - 40px));
   max-height: 78vh;
   overflow: hidden;
-  border: 1px solid #dedad2;
+  border: 1px solid var(--kimix-panel-border);
   border-radius: 18px;
-  background: #ffffff;
+  background: var(--kimix-panel-bg);
   box-shadow: 0 24px 70px rgba(25, 23, 20, 0.22);
+  color: var(--kimix-panel-text);
 }
 
 .kimix-settings-entry {
@@ -324,15 +429,56 @@ body {
   box-shadow: 0 10px 28px rgba(25, 23, 20, 0.09);
 }
 
+.kimix-sidebar {
+  background: var(--kimix-sidebar-bg);
+  color: var(--kimix-panel-text);
+}
+
 .kimix-sidebar-nav-item {
   gap: 14px;
   padding-left: 18px;
   padding-right: 16px;
+  color: var(--kimix-panel-text);
 }
 
 .kimix-sidebar-nav-item:hover {
-  background: rgba(25, 23, 20, 0.055);
+  background: var(--kimix-panel-hover);
   box-shadow: 0 8px 20px rgba(25, 23, 20, 0.08);
+}
+
+.kimix-app-shell {
+  background: var(--kimix-shell-bg);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-app-shell-main {
+  border-color: var(--kimix-main-border);
+  background: var(--kimix-main-bg);
+}
+
+.kimix-app-shell-toolbar,
+.kimix-app-shell-footer {
+  border-color: var(--kimix-main-border-soft);
+  background: var(--kimix-main-bg);
+}
+
+.kimix-longtask-inspector,
+.kimix-modal-card,
+.kimix-onboarding-card {
+  border-color: var(--kimix-panel-border);
+  background: var(--kimix-panel-bg);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-onboarding-overlay {
+  background: var(--kimix-overlay-bg);
+}
+
+.kimix-top-menu,
+.kimix-floating-menu {
+  background: var(--kimix-panel-bg);
+  border-color: var(--kimix-panel-border-soft);
+  color: var(--kimix-panel-text-secondary);
 }
 
 .kimix-settings-header {
@@ -340,14 +486,14 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid #ebe7df;
+  border-bottom: 1px solid var(--kimix-panel-divider);
 }
 
 .kimix-settings-title {
   font-size: 18px;
   line-height: 1.2;
   font-weight: 650;
-  color: #24211d;
+  color: var(--kimix-panel-text);
 }
 
 .kimix-settings-icon-button {
@@ -357,13 +503,13 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  color: #8f887e;
+  color: var(--kimix-panel-text-muted);
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .kimix-settings-icon-button:hover {
-  background: #f1eee8;
-  color: #24211d;
+  background: var(--kimix-panel-hover);
+  color: var(--kimix-panel-text);
 }
 
 .kimix-settings-body {
@@ -381,13 +527,18 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #3a362f;
+  color: var(--kimix-panel-text);
   font-size: 14px;
   font-weight: 600;
 }
 
 .kimix-settings-row-title {
   justify-content: space-between;
+}
+
+.kimix-settings-section-title + *,
+.kimix-settings-row-title + * {
+  margin-top: 12px;
 }
 
 .kimix-settings-theme-grid {
@@ -404,15 +555,16 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid #e5e1d8;
+  border: 1px solid var(--kimix-panel-border-soft);
   border-radius: 12px;
-  color: #625d55;
+  background: var(--kimix-panel-bg);
+  color: var(--kimix-panel-text-secondary);
   font-size: 13px;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .kimix-settings-theme:hover {
-  background: #faf8f4;
+  background: var(--kimix-panel-soft-bg);
 }
 
 .kimix-settings-theme.is-active {
@@ -428,7 +580,7 @@ body {
   gap: 8px;
   border-radius: 10px;
   padding: 0 14px;
-  color: #625d55;
+  color: var(--kimix-panel-text-secondary);
   font-size: 13px;
   line-height: 1;
   white-space: nowrap;
@@ -436,8 +588,8 @@ body {
 }
 
 .kimix-settings-check-button:hover:not(:disabled) {
-  background: #f1eee8;
-  color: #24211d;
+  background: var(--kimix-panel-hover);
+  color: var(--kimix-panel-text);
 }
 
 .kimix-settings-check-button:disabled {
@@ -447,10 +599,10 @@ body {
 
 .kimix-settings-connection {
   margin-top: 12px;
-  border: 1px solid #e5e1d8;
+  border: 1px solid var(--kimix-panel-border-soft);
   border-radius: 12px;
   padding: 12px 16px;
-  background: #faf8f4;
+  background: var(--kimix-panel-soft-bg);
 }
 
 .kimix-settings-connection.is-verified {
@@ -476,7 +628,7 @@ body {
 
 .kimix-settings-connection-label,
 .kimix-settings-permission-label {
-  color: #24211d;
+  color: var(--kimix-panel-text);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
@@ -485,7 +637,7 @@ body {
 .kimix-settings-connection-detail,
 .kimix-settings-permission-desc {
   margin-top: 3px;
-  color: #8f887e;
+  color: var(--kimix-panel-text-muted);
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -503,15 +655,16 @@ body {
   width: 100%;
   align-items: flex-start;
   gap: 12px;
-  border: 1px solid #e5e1d8;
+  border: 1px solid var(--kimix-panel-border-soft);
   border-radius: 12px;
   padding: 12px 16px;
+  background: var(--kimix-panel-bg);
   text-align: left;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .kimix-settings-permission:hover {
-  background: #faf8f4;
+  background: var(--kimix-panel-soft-bg);
 }
 
 .kimix-settings-permission.is-active {
@@ -526,10 +679,173 @@ body {
 .kimix-settings-footer {
   margin-top: 18px;
   padding-top: 12px;
-  border-top: 1px solid #ebe7df;
-  color: #aaa49a;
+  border-top: 1px solid var(--kimix-panel-divider);
+  color: var(--kimix-panel-text-muted);
   text-align: center;
   font-size: 13px;
+}
+
+.kimix-settings-card {
+  border: 1px solid var(--kimix-panel-border-soft);
+  border-radius: 12px;
+  background: var(--kimix-panel-subtle-bg);
+}
+
+.kimix-settings-list-item {
+  border-radius: 10px;
+  background: var(--kimix-panel-bg);
+}
+
+.kimix-settings-badge {
+  border-radius: 999px;
+  background: var(--kimix-panel-badge-bg);
+  color: var(--kimix-panel-badge-text);
+}
+
+.kimix-settings-input {
+  border: 1px solid var(--kimix-panel-border);
+  background: var(--kimix-panel-bg);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-settings-input::placeholder {
+  color: var(--kimix-panel-text-muted);
+}
+
+.kimix-settings-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.kimix-settings-input:disabled {
+  background: var(--kimix-panel-soft-bg);
+  color: var(--kimix-panel-text-muted);
+}
+
+.kimix-settings-hint {
+  color: var(--kimix-panel-text-muted);
+}
+
+.kimix-selection-indicator {
+  border-color: var(--kimix-selection-idle-border);
+  background: var(--kimix-selection-idle-bg);
+}
+
+.kimix-composer-card {
+  border-color: var(--kimix-composer-border);
+  background: var(--kimix-composer-bg);
+  color: var(--kimix-panel-text);
+  box-shadow: var(--kimix-composer-shadow);
+}
+
+.kimix-composer-card.is-focused {
+  border-color: var(--kimix-composer-border-focus);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kimix-composer-border-focus) 45%, transparent);
+}
+
+.kimix-floating-panel {
+  border: 1px solid var(--kimix-panel-border-soft);
+  background: color-mix(in srgb, var(--kimix-panel-bg) 94%, transparent);
+  color: var(--kimix-panel-text);
+  box-shadow: var(--kimix-float-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.kimix-muted-action {
+  color: var(--kimix-panel-text-muted);
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.kimix-muted-action:hover {
+  background: var(--kimix-panel-hover);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-soft-card {
+  border: 1px solid var(--kimix-process-border);
+  background: var(--kimix-process-bg);
+  color: var(--kimix-process-text);
+}
+
+.kimix-soft-card-strong {
+  border: 1px solid var(--kimix-process-border);
+  background: var(--kimix-process-bg-strong);
+  color: var(--kimix-process-text);
+}
+
+.kimix-media-thumb {
+  border: 1px solid var(--kimix-media-thumb-border);
+  background: var(--kimix-media-thumb-bg);
+}
+
+.kimix-media-thumb:hover {
+  border-color: var(--kimix-media-thumb-border-hover);
+}
+
+.kimix-preview-overlay {
+  background: var(--kimix-overlay-strong);
+}
+
+.kimix-preview-close,
+.kimix-preview-toast {
+  background: var(--kimix-panel-bg);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-preview-close:hover {
+  background: var(--kimix-panel-hover);
+}
+
+.kimix-preview-image {
+  background: var(--kimix-panel-bg);
+}
+
+.kimix-chat-banner {
+  border: 1px solid var(--kimix-info-border);
+  background: var(--kimix-info-bg);
+  color: var(--kimix-info-text);
+}
+
+.kimix-chat-banner.is-reviewer {
+  border-color: var(--kimix-warning-border);
+  background: var(--kimix-warning-bg);
+  color: var(--kimix-warning-text);
+}
+
+.kimix-chat-banner-muted {
+  color: var(--kimix-info-text-secondary);
+}
+
+.kimix-chat-banner.is-reviewer .kimix-chat-banner-muted {
+  color: var(--kimix-warning-text-secondary);
+}
+
+.kimix-chat-banner-button,
+.kimix-chat-banner-badge {
+  background: var(--kimix-panel-bg);
+}
+
+.kimix-progress-track {
+  background: var(--kimix-progress-track);
+}
+
+.kimix-progress-fill {
+  background: var(--kimix-progress-fill);
+}
+
+.kimix-diff-panel {
+  border-color: var(--kimix-panel-border);
+  background: var(--kimix-panel-bg);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-user-bubble {
+  background: var(--kimix-user-bubble-bg);
+  color: var(--kimix-user-bubble-text);
+}
+
+.kimix-strong-action {
+  background: var(--kimix-strong-button-bg);
+  color: var(--kimix-strong-button-text);
 }
 
 /* Selection */

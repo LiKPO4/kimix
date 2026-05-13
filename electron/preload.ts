@@ -17,6 +17,7 @@ import type {
   StartSessionResponse,
   CheckKimiCliRequest,
   CheckKimiCliResponse,
+  InstallKimiCliResponse,
   SendPromptRequest,
   SendPromptResponse,
   SteerPromptRequest,
@@ -110,6 +111,8 @@ const api = {
     ipcRenderer.invoke("kimi:startSession", req),
   checkKimiCli: (req?: CheckKimiCliRequest): Promise<CheckKimiCliResponse> =>
     ipcRenderer.invoke("kimi:checkCli", req),
+  installKimiCli: (): Promise<InstallKimiCliResponse> =>
+    ipcRenderer.invoke("kimi:installCli"),
   sendPrompt: (req: SendPromptRequest): Promise<SendPromptResponse> =>
     ipcRenderer.invoke("kimi:sendPrompt", req),
   steerPrompt: (req: SteerPromptRequest): Promise<SteerPromptResponse> =>
@@ -150,7 +153,7 @@ const api = {
   getAppInfo: (): Promise<AppInfoResponse> => ipcRenderer.invoke("app:getInfo"),
   checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),
   downloadUpdate: (): Promise<DownloadUpdateResponse> => ipcRenderer.invoke("app:downloadUpdate"),
-  openExternal: (url: string): Promise<void> =>
+  openExternal: (url: string): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:openExternal", url),
   copyImage: (req: CopyImageRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:copyImage", req),

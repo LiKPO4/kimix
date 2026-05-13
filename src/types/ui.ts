@@ -19,6 +19,7 @@ export interface AppState {
   clarificationToolMode: ClarificationToolMode;
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
+  diffPanelOpen: boolean;
   handoffSessionId: string | null;
   sidebarOpen: boolean;
   theme: Theme;

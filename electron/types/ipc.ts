@@ -197,6 +197,18 @@ export type CheckKimiCliRequest = {
   verify?: boolean;
 };
 
+export type InstallKimiCliResponse = {
+  success: true;
+  data: {
+    path?: string;
+    output?: string;
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type SendPromptRequest = {
   sessionId: string;
   content: string;

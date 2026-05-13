@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, CheckCircle2, AlertCircle, RefreshCw, Circle, MessageSquare, Mic, Keyboard, Archive, RotateCcw, Trash2, Check } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Mic, Keyboard, Archive, RotateCcw, Trash2, Check } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode } from "@/types/ui";
@@ -29,10 +29,10 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
+      className={`kimix-selection-indicator mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
         selected
           ? "border-[#0078d4] bg-[#0078d4] text-white"
-          : "border-[#cfc8bc] bg-white text-transparent"
+          : "text-transparent"
       }`}
     >
       {selected ? <Check size={11} strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-transparent" />}
@@ -193,9 +193,9 @@ export function SettingsPanel() {
                 {connection.loading ? (
                   <RefreshCw size={18} className="kimix-spin mt-0.5 shrink-0 text-[#8f887e]" />
                 ) : connection.verified ? (
-                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-[#107c10]" />
+                  <SelectionIndicator selected />
                 ) : connection.available ? (
-                  <Circle size={18} className="mt-0.5 shrink-0 text-[#8f887e]" />
+                  <SelectionIndicator selected />
                 ) : (
                   <AlertCircle size={18} className="mt-0.5 shrink-0 text-[#d97706]" />
                 )}
@@ -229,6 +229,10 @@ export function SettingsPanel() {
           </div>
 
           <div className="kimix-settings-section">
+            <div className="kimix-settings-section-title">
+              <Terminal size={16} className="text-[#8f887e]" />
+              <span>上下文显示</span>
+            </div>
             <button onClick={() => setDetailedContext(!detailedContext)} className={`kimix-settings-permission ${detailedContext ? "is-active" : ""}`}>
               <SelectionIndicator selected={detailedContext} />
               <Terminal size={18} className={`mt-0.5 shrink-0 ${detailedContext ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
@@ -267,7 +271,7 @@ export function SettingsPanel() {
               <MessageSquare size={16} className="text-[#8f887e]" />
               <span>新对话建议</span>
             </div>
-            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+            <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
               <button
                 type="button"
                 onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
@@ -276,12 +280,12 @@ export function SettingsPanel() {
               >
                 <SelectionIndicator selected={sessionRecommendationEnabled} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[14.5px] font-medium text-[#302d28]">达到推荐轮数后提示开启新对话</div>
-                  <div className="mt-1 text-[13px] leading-5 text-[#7c756c]">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
+                  <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">达到推荐轮数后提示开启新对话</div>
+                  <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
                 </div>
               </button>
-              <div className="mt-4 flex items-center justify-between" style={{ gap: 14 }}>
-                <label htmlFor="session-turn-limit" className="min-w-0 text-[14px] text-[#625d55]">推荐轮数上限</label>
+              <div className="mt-5 flex items-center justify-between" style={{ gap: 14 }}>
+                <label htmlFor="session-turn-limit" className="min-w-0 text-[14px] text-[var(--kimix-panel-text-secondary)]">推荐轮数上限</label>
                 <input
                   id="session-turn-limit"
                   type="number"
@@ -290,7 +294,7 @@ export function SettingsPanel() {
                   value={sessionRecommendationTurnLimit}
                   disabled={!sessionRecommendationEnabled}
                   onChange={(event) => setSessionRecommendationTurnLimit(Number(event.target.value || 1))}
-                  className="h-9 w-24 rounded-lg border border-[#ded8ce] bg-white text-center text-[14px] text-[#302d28] outline-none transition-colors focus:border-[#b9afa1] disabled:bg-[#f1eee8] disabled:text-[#aaa49a]"
+                  className="kimix-settings-input h-9 w-24 rounded-lg text-center text-[14px] outline-none transition-colors"
                 />
               </div>
             </div>
@@ -301,26 +305,26 @@ export function SettingsPanel() {
               <Mic size={16} className="text-[#8f887e]" />
               <span>语音输入</span>
             </div>
-            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+            <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
               <div className="flex items-start" style={{ gap: 12 }}>
                 <Keyboard size={18} className="mt-0.5 shrink-0 text-[#8f887e]" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[14.5px] font-medium text-[#302d28]">语音按钮触发快捷键</div>
-                  <div className="mt-1 text-[13px] leading-5 text-[#7c756c]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
+                  <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">语音按钮触发快捷键</div>
+                  <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-between" style={{ gap: 14 }}>
-                <label htmlFor="voice-shortcut" className="min-w-0 text-[14px] text-[#625d55]">快捷键</label>
+              <div className="mt-5 flex items-center justify-between" style={{ gap: 14 }}>
+                <label htmlFor="voice-shortcut" className="min-w-0 text-[14px] text-[var(--kimix-panel-text-secondary)]">快捷键</label>
                 <input
                   id="voice-shortcut"
                   type="text"
                   value={voiceShortcut}
                   onChange={(event) => setVoiceShortcut(event.target.value)}
                   placeholder="Win+H"
-                  className="h-9 w-40 rounded-lg border border-[#ded8ce] bg-white text-center text-[14px] text-[#302d28] outline-none transition-colors focus:border-[#b9afa1]"
+                  className="kimix-settings-input h-9 w-40 rounded-lg text-center text-[14px] outline-none transition-colors"
                 />
               </div>
-              <div className="mt-2 text-right text-[12.5px] leading-5 text-[#9a948b]">示例：Win+H、Ctrl+Alt+V、F8</div>
+              <div className="kimix-settings-hint mt-3 text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V、F8</div>
             </div>
           </div>
 
@@ -330,19 +334,19 @@ export function SettingsPanel() {
                 <Archive size={16} className="text-[#8f887e]" />
                 <span>归档对话</span>
               </div>
-              <span className="rounded-full bg-[#f1eee8] text-[12.5px] leading-5 text-[#7c756c]" style={{ paddingLeft: 10, paddingRight: 10 }}>
+              <span className="kimix-settings-badge text-[12.5px] leading-5" style={{ paddingLeft: 10, paddingRight: 10 }}>
                 {archivedSessions.length}
               </span>
             </div>
-            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+            <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
               {archivedSessions.length > 0 ? (
-                <div className="flex flex-col" style={{ gap: 9 }}>
+                <div className="flex flex-col" style={{ gap: 10 }}>
                   {archivedSessions.slice(0, 8).map((session) => (
-                    <div key={session.id} className="flex min-w-0 items-center rounded-lg bg-white" style={{ gap: 10, padding: "9px 11px" }}>
+                    <div key={session.id} className="kimix-settings-list-item flex min-w-0 items-center" style={{ gap: 10, padding: "11px 11px" }}>
                       <MessageSquare size={15} className="shrink-0 text-[#8f887e]" />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[14px] font-medium leading-5 text-[#302d28]">{session.title}</div>
-                        <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[#8f887e]">{session.projectPath}</div>
+                        <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{session.title}</div>
+                        <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{session.projectPath}</div>
                       </div>
                       <button
                         type="button"
@@ -355,11 +359,11 @@ export function SettingsPanel() {
                     </div>
                   ))}
                   {archivedSessions.length > 8 && (
-                    <div className="text-[12.5px] leading-5 text-[#9a948b]">仅显示最近 8 个归档对话。</div>
+                    <div className="pt-1 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">仅显示最近 8 个归档对话。</div>
                   )}
                 </div>
               ) : (
-                <div className="text-[13.5px] leading-6 text-[#7c756c]">暂无归档对话。</div>
+                <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">暂无归档对话。</div>
               )}
             </div>
           </div>
@@ -371,7 +375,7 @@ export function SettingsPanel() {
                 <span>卡死诊断</span>
               </div>
               <div className="flex items-center" style={{ gap: 8 }}>
-                <span className="rounded-full bg-[#f1eee8] text-[12.5px] leading-5 text-[#7c756c]" style={{ paddingLeft: 10, paddingRight: 10 }}>
+                <span className="kimix-settings-badge text-[12.5px] leading-5" style={{ paddingLeft: 10, paddingRight: 10 }}>
                   {freezeReports.length}
                 </span>
                 <button type="button" onClick={loadFreezeReports} className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]">
@@ -384,18 +388,18 @@ export function SettingsPanel() {
                 </button>
               </div>
             </div>
-            <div className="rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ padding: "14px 16px" }}>
+            <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
               {freezeReports.length > 0 ? (
-                <div className="flex flex-col" style={{ gap: 9 }}>
+                <div className="flex flex-col" style={{ gap: 10 }}>
                   {freezeReports.map((report, index) => (
-                    <div key={`${report.at}-${index}`} className="rounded-lg bg-white" style={{ padding: "10px 12px" }}>
+                    <div key={`${report.at}-${index}`} className="kimix-settings-list-item" style={{ padding: "12px 12px" }}>
                       <div className="flex min-w-0 items-center justify-between" style={{ gap: 10 }}>
-                        <div className="truncate text-[14px] font-medium leading-5 text-[#302d28]">{formatFreezeTime(report.at)}</div>
+                        <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{formatFreezeTime(report.at)}</div>
                         <span className="shrink-0 rounded-full bg-[#fff4f0] text-[12.5px] leading-5 text-[#8b3d34]" style={{ paddingLeft: 9, paddingRight: 9 }}>
                           {report.lagMs} ms
                         </span>
                       </div>
-                      <div className="mt-2 text-[12.5px] leading-5 text-[#7c756c]">
+                      <div className="mt-2 text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
                         <div className="truncate">当前会话：{report.sessionId ?? "无"}</div>
                         <div className="mt-1 truncate">运行会话：{report.runningSessionId ?? "无"}</div>
                       </div>
@@ -403,12 +407,12 @@ export function SettingsPanel() {
                   ))}
                 </div>
               ) : (
-                <div className="text-[13.5px] leading-6 text-[#7c756c]">暂无卡死诊断记录。</div>
+                <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">暂无卡死诊断记录。</div>
               )}
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.7.36 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.7.49 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

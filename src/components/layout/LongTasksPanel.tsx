@@ -188,8 +188,8 @@ export function LongTasksPanel() {
           </button>
         </div>
 
-        <div className="min-h-0 overflow-y-auto" style={{ padding: 24 }}>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ gap: 16, padding: "16px 18px" }}>
+        <div className="min-h-0 overflow-y-auto" style={{ padding: 28 }}>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ gap: 16, padding: "18px 18px" }}>
             <div className="min-w-0">
               <div className="text-[14.5px] font-medium leading-5 text-[#302d28]">项目</div>
               <div className="mt-1 truncate text-[13px] leading-5 text-[#7c756c]">{selectedProject?.path ?? "选择一个项目来创建长程任务"}</div>
@@ -208,7 +208,7 @@ export function LongTasksPanel() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-[#e7e2d8] bg-white" style={{ padding: "20px 20px 18px" }}>
+          <div className="rounded-xl border border-[#e7e2d8] bg-white" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
             <div className="flex items-center gap-2 text-[15px] font-medium leading-6 text-[#302d28]">
               <MessageSquareText size={16} className="text-[#706b63]" />
               <span>创建长程任务</span>
@@ -217,17 +217,17 @@ export function LongTasksPanel() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="任务标题（可选）"
-              className="mt-4 h-10 w-full rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
-              style={{ paddingLeft: 16, paddingRight: 16 }}
+              className="h-10 w-full rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
+              style={{ marginTop: 20, paddingLeft: 16, paddingRight: 16 }}
             />
             <textarea
               value={initialRequest}
               onChange={(event) => setInitialRequest(event.target.value)}
               placeholder="输入长程任务的初始需求，后续会进入多轮澄清和计划设计"
-              className="mt-3 min-h-[112px] w-full resize-none rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] leading-6 outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
-              style={{ padding: "13px 16px" }}
+              className="min-h-[120px] w-full resize-none rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] leading-6 outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
+              style={{ marginTop: 16, padding: "14px 16px" }}
             />
-            <div className="mt-4 flex flex-wrap items-center justify-between" style={{ gap: 12 }}>
+            <div className="flex flex-wrap items-center justify-between" style={{ marginTop: 20, gap: 14 }}>
               <div className="flex min-w-0 items-center gap-2 text-[13px] leading-5 text-[#8f887e]">
                 <Bot size={14} />
                 <span className="truncate">创建后会启动执行 agent 和审查 agent 两个独立 session</span>

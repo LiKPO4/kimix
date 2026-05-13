@@ -114,24 +114,24 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/20 px-5" onMouseDown={onClose}>
+    <div className="kimix-onboarding-overlay fixed inset-0 z-[85] flex items-center justify-center px-5" onMouseDown={onClose}>
       <div
-        className={`relative w-full max-w-[640px] overflow-hidden rounded-[18px] border bg-white shadow-[0_28px_90px_rgba(25,23,20,0.24)] ${dragActive ? "border-[#339af0]" : "border-[#dedad2]"}`}
+        className={`kimix-modal-card relative w-full max-w-[640px] overflow-hidden rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)] ${dragActive ? "border-[var(--accent-blue)]" : ""}`}
         onMouseDown={(event) => event.stopPropagation()}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         {dragActive && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/82">
-            <div className="flex items-center rounded-xl border border-[#d8d2c8] bg-white text-[15px] text-[#3a362f] shadow-[0_12px_32px_rgba(25,23,20,0.14)]" style={{ gap: 10, padding: "14px 18px" }}>
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[color:var(--kimix-overlay-bg)]">
+            <div className="kimix-floating-panel flex items-center rounded-xl text-[15px]" style={{ gap: 10, padding: "14px 18px" }}>
               <Upload size={17} />
               <span>松开导入 Skill 压缩包</span>
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between border-b border-[#eee9e1]" style={{ padding: "16px 20px" }}>
-          <div className="flex items-center gap-2.5 text-[18px] font-semibold text-[#24211d]">
+        <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "16px 20px" }}>
+          <div className="flex items-center gap-2.5 text-[18px] font-semibold text-[var(--kimix-panel-text)]">
             <LayoutGrid size={18} />
             <span>技能</span>
           </div>
@@ -140,44 +140,49 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
               type="button"
               onClick={() => void importArchive()}
               disabled={importing}
-              className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f3f1ec] disabled:cursor-wait disabled:opacity-50"
+              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
               title="导入 Skill 压缩包"
             >
               <Plus size={15} />
               <span>{importing ? "导入中" : "添加"}</span>
             </button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8a847a] hover:bg-[#f3f1ec]" onClick={onClose} aria-label="关闭技能面板">
+            <button className="kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg" onClick={onClose} aria-label="关闭技能面板">
               <X size={16} />
             </button>
           </div>
         </div>
         <div className="max-h-[68vh] overflow-y-auto" style={{ padding: 20 }}>
-          <div className="rounded-xl border border-[#e5e1d8] bg-[#faf8f4] text-[13.5px] leading-6 text-[#625d55]" style={{ padding: "12px 16px" }}>
+          <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6" style={{ padding: "14px 16px" }}>
             勾选后全局启用 Skill；新建/恢复会话时通过官方 `--skills-dir` 传给 CLI。
           </div>
-          <div className="rounded-xl bg-[#faf8f4] text-[13px] leading-6 text-[#8f887e]" style={{ marginTop: 12, padding: "12px 16px" }}>
+          <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ marginTop: 14, padding: "14px 16px" }}>
             <div>{message}{saving ? "，正在保存..." : ""}</div>
-            {enabledDir && <div className="truncate" title={enabledDir}>启用目录：{enabledDir}</div>}
+            {enabledDir && <div className="mt-1 truncate" title={enabledDir}>启用目录：{enabledDir}</div>}
           </div>
-          <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
+          <div className="flex flex-col" style={{ gap: 12, marginTop: 16 }}>
             {skills.map((skill) => (
               <button
                 key={skill.path}
                 type="button"
                 onClick={() => void toggleSkill(skill.name)}
-                className={`w-full rounded-xl border bg-white text-left transition-colors hover:bg-[#faf8f4] ${enabledNames.includes(skill.name) ? "border-[#339af0]" : "border-[#e5e1d8]"}`}
-                style={{ padding: "18px 22px" }}
+                className={`w-full rounded-xl border text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] ${enabledNames.includes(skill.name) ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"}`}
+                style={{
+                  padding: "18px 22px",
+                  background: enabledNames.includes(skill.name)
+                    ? "color-mix(in srgb, var(--accent-blue) 8%, var(--kimix-panel-bg))"
+                    : undefined,
+                }}
               >
                 <div className="flex items-start" style={{ gap: 16 }}>
-                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabledNames.includes(skill.name) ? "border-[#339af0] bg-[#339af0] text-white" : "border-[#d8d2c8] text-transparent"}`}>
+                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabledNames.includes(skill.name) ? "border-[var(--accent-blue)] bg-[var(--accent-blue)] text-white" : "border-[var(--kimix-selection-idle-border)] text-transparent"}`}>
                     <Check size={13} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold text-[#24211d]">{skill.name}</span>
-                    <span className="mt-1 block text-[13.5px] leading-5 text-[#625d55]" title={skill.description}>{shortDescription(skill.description)}</span>
-                    <span className="mt-2 block truncate text-[12px] text-[#aaa49a]" title={skill.path}>{skill.path}</span>
+                    <span className="block text-[15px] font-semibold text-[var(--kimix-panel-text)]">{skill.name}</span>
+                    <span className="mt-1 block text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={skill.description}>{shortDescription(skill.description)}</span>
+                    <span className="mt-2 block truncate text-[12px] text-[var(--kimix-panel-text-muted)]" title={skill.path}>{skill.path}</span>
                   </span>
-                  <span className={`shrink-0 rounded-full text-[12px] font-medium ${enabledNames.includes(skill.name) ? "bg-[#339af0] text-white" : "bg-[#f3f1ec] text-[#aaa49a]"}`} style={{ padding: "4px 10px", marginRight: 2 }}>
+                  <span className={`shrink-0 rounded-full text-[12px] font-medium ${enabledNames.includes(skill.name) ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ padding: "4px 10px", marginRight: 2 }}>
                     {enabledNames.includes(skill.name) ? "已启用" : "未启用"}
                   </span>
                 </div>
