@@ -38,23 +38,46 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
   const deletions = event?.deletions ?? files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
   const projectPath = event?.projectPath ?? project?.path;
 
-  const handleRevert = async () => {
-    if (!projectPath || files.length === 0 || reverting) return;
+  const removeRevertedFiles = (paths: string[]) => {
+    if (!currentSession || !event) return;
+    const reverted = new Set(paths);
+    updateSession(currentSession.id, (session) => ({
+      ...session,
+      events: session.events.flatMap((item) => {
+        if (item.type !== "change_summary") return [item];
+        const eventIds = event.id.split(":");
+        if (!eventIds.includes(item.id)) return [item];
+        const nextFiles = item.files.filter((file) => !reverted.has(file.path));
+        if (nextFiles.length === 0) return [];
+        return [{
+          ...item,
+          files: nextFiles,
+          additions: nextFiles.reduce((sum, file) => sum + (file.additions ?? 0), 0),
+          deletions: nextFiles.reduce((sum, file) => sum + (file.deletions ?? 0), 0),
+        }];
+      }),
+      updatedAt: Date.now(),
+    }));
+  };
+
+  const handleRevert = async (targetFiles = files) => {
+    if (!projectPath || targetFiles.length === 0 || reverting) return;
     setReverting(true);
     setError("");
-    const res = await window.api.revertFiles({ projectPath, files: files.map((file) => file.path) });
+    const res = await window.api.revertFiles({
+      projectPath,
+      files: targetFiles.map((file) => ({
+        path: file.path,
+        additions: file.additions,
+        deletions: file.deletions,
+      })),
+    });
     setReverting(false);
     if (!res.success) {
       setError(res.error);
       return;
     }
-    if (currentSession && event) {
-      updateSession(currentSession.id, (session) => ({
-        ...session,
-        events: session.events.filter((item) => item.id !== event.id),
-        updatedAt: Date.now(),
-      }));
-    }
+    removeRevertedFiles(targetFiles.map((file) => file.path));
   };
 
   const renderFileRow = (file: { path: string; additions?: number; deletions?: number }, showChevron = true) => (
@@ -66,6 +89,17 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
       <span className="min-w-0 flex-1 truncate text-[14.5px] text-[#24211d]">{file.path}</span>
       <span className="shrink-0 text-[14px] text-[#009a44]">+{file.additions ?? 0}</span>
       <span className="shrink-0 text-[14px] text-[#d83b01]" style={{ marginLeft: 10 }}>-{file.deletions ?? 0}</span>
+      <button
+        type="button"
+        onClick={() => void handleRevert([file])}
+        disabled={!projectPath || reverting}
+        className="flex h-7 shrink-0 items-center rounded-md text-[12.5px] text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f] disabled:cursor-not-allowed disabled:opacity-45"
+        style={{ gap: 6, marginLeft: 18, paddingLeft: 8, paddingRight: 9 }}
+        title="撤销此文件"
+      >
+        <span>{reverting ? "撤销中" : "撤销"}</span>
+        <RotateCcw size={13} />
+      </button>
       {showChevron && <ChevronDown size={15} className="shrink-0 text-[#8f887e]" style={{ marginLeft: 18 }} />}
     </div>
   );
@@ -85,16 +119,6 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
           <span className="text-[#d83b01]">-{deletions}</span>
         </button>
         <div className="min-w-0 flex-1" />
-        <button
-          type="button"
-          onClick={handleRevert}
-          disabled={!projectPath || reverting}
-          className="flex h-8 shrink-0 items-center rounded-lg text-[13px] text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f] disabled:cursor-not-allowed disabled:opacity-45"
-          style={{ gap: 7, paddingLeft: 10, paddingRight: 12 }}
-        >
-          <span>{reverting ? "撤销中" : "撤销"}</span>
-          <RotateCcw size={14} />
-        </button>
       </div>
       <div>
         {expanded ? (

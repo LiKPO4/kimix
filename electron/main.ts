@@ -1120,6 +1120,8 @@ const UpdateLongTaskStateSchema = z.object({
     currentStep: z.number().int().min(0).optional(),
     targetStep: z.number().int().min(0).nullable().optional(),
     reviewedReviewItems: z.array(z.string().max(20000)).max(500).optional(),
+    executorSessionId: z.string().min(1).max(160).optional(),
+    reviewerSessionId: z.string().min(1).max(160).optional(),
   }).strict(),
 });
 
@@ -1365,8 +1367,24 @@ ipcMain.handle("project:revertFiles", async (_, request: unknown) => {
     if (!fs.existsSync(req.projectPath)) {
       return { success: false, error: "Project path does not exist" };
     }
-    const files = req.files.filter((file): file is string => typeof file === "string" && file.trim().length > 0);
-    files.forEach((file) => resolveProjectFile(req.projectPath as string, file));
+    const files = req.files
+      .map((file) => {
+        if (typeof file === "string" && file.trim().length > 0) {
+          return { path: file };
+        }
+        if (file && typeof file === "object" && typeof (file as { path?: unknown }).path === "string" && (file as { path: string }).path.trim().length > 0) {
+          const additions = (file as { additions?: unknown }).additions;
+          const deletions = (file as { deletions?: unknown }).deletions;
+          return {
+            path: (file as { path: string }).path,
+            additions: typeof additions === "number" ? additions : undefined,
+            deletions: typeof deletions === "number" ? deletions : undefined,
+          };
+        }
+        return null;
+      })
+      .filter((file): file is projectService.RevertFileTarget => file !== null);
+    files.forEach((file) => resolveProjectFile(req.projectPath as string, file.path));
     await projectService.revertGitFiles(req.projectPath, files);
     return { success: true, data: undefined };
   } catch (err) {

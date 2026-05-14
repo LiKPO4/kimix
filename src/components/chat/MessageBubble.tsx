@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
+import { StatusCard } from "./StatusCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 interface MessageBubbleProps {
@@ -12,6 +13,7 @@ interface MessageBubbleProps {
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   changedFiles?: string[];
+  trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
 }
 
 function useCopyTimeout() {
@@ -103,9 +105,9 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
     }
   };
 
-  const handleCopyPreviewImage = async (event: React.MouseEvent, dataUrl: string) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleCopyPreviewImage = async (clickEvent: React.MouseEvent, dataUrl: string) => {
+    clickEvent.preventDefault();
+    clickEvent.stopPropagation();
     const res = await window.api.copyImage({ dataUrl });
     if (!res.success) return;
     setImageCopied(true);
@@ -260,7 +262,7 @@ type ProcessItem =
 
 function firstThinkingSentence(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
-  const match = normalized.match(/^(.{1,160}?[。！？.!?])(?:\s|$)/);
+  const match = normalized.match(/^(.{1,160}?[。！？?!])(?:\s|$)/);
   const first = match?.[1] ?? normalized.slice(0, 120);
   return normalized.length > first.length ? `${first}...` : first || "思考内容";
 }
@@ -279,7 +281,7 @@ function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
     .split(/\n\s*\n+/)
     .map((part) => part.trim())
     .filter(Boolean);
-  const source = paragraphs.length > 1 ? paragraphs : text.match(/[^。！？.!?]+[。！？.!?]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [text.trim()];
+  const source = paragraphs.length > 1 ? paragraphs : text.match(/[^。！？?!]+[。！？?!]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [text.trim()];
   const blocks: ThinkingBlock[] = [];
   let buffer = "";
   source.forEach((part) => {
@@ -305,7 +307,7 @@ function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
   parts.forEach((part) => {
     if (!current) currentTimestamp = part.timestamp;
     current += part.text;
-    const shouldFlush = current.length > 620 || (current.length > 120 && /[。！？.!?]\s*$/.test(current));
+    const shouldFlush = current.length > 620 || (current.length > 120 && /[。！？?!]\s*$/.test(current));
     if (shouldFlush) {
       blocks.push({ id: `thinking-${part.id}`, timestamp: currentTimestamp, text: current.trim() });
       current = "";
@@ -352,7 +354,7 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
   return (
     <div className="kimix-soft-card flex min-h-10 items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
       <SquareTerminal size={14} className="shrink-0 text-[var(--kimix-process-muted)]" />
-      <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已运行"}</span>
+      <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
       <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
       {tool.durationMs !== undefined && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tool.status === "error" ? "bg-[#d83b01]" : tool.status === "running" ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
@@ -381,6 +383,12 @@ function joinSummaryParts(parts: string[]) {
   return parts.filter(Boolean).join(" · ");
 }
 
+function formatAgentRole(role?: "executor" | "reviewer") {
+  if (role === "executor") return "执行";
+  if (role === "reviewer") return "审核";
+  return null;
+}
+
 function AssistantProcessSummary({ event, tools, subagents, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; label: string }) {
   const [expanded, setExpanded] = useState(false);
   const thinkingBlocks = getThinkingBlocks(event);
@@ -393,8 +401,9 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
     (b.type === "thinking" ? b.block.timestamp : b.type === "tool" ? b.tool.timestamp : b.subagent.timestamp)
   ));
   const hasDetails = items.length > 0;
+  const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = joinSummaryParts([
-    thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段思考` : "",
+    thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段${detailUnit}` : "",
     tools.length > 0 ? `${tools.length} 条命令` : "",
     subagents.length > 0 ? `${subagents.length} 个子代理` : "",
   ]);
@@ -440,7 +449,7 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], changedFiles = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }) {
+function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], changedFiles = [], trailingStatuses = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -454,17 +463,18 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const durationLabel = event.isComplete
     ? formatDuration(event.durationMs && event.durationMs > 0 ? event.durationMs : elapsed)
     : formatDuration(elapsed);
-  const processLabel = event.isComplete
-    ? `已处理 ${durationLabel}`
+  const roleLabel = formatAgentRole(event.agentRole);
+  const displayProcessLabel = event.isComplete
+    ? `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
     : isActivelyThinking
-      ? `正在思考 ${durationLabel}`
-      : `已处理 ${durationLabel}`;
+      ? `正在思考${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
+      : `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`;
 
   return (
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {(event.isThinking || event.isComplete || !hasContent) && (
-          <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={processLabel} />
+          <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={displayProcessLabel} />
         )}
 
         {hasContent && (
@@ -480,6 +490,14 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
               </div>
             )}
           </>
+        )}
+
+        {trailingStatuses.length > 0 && (
+          <div className="flex flex-col" style={{ gap: 8 }}>
+            {trailingStatuses.map((status) => (
+              <StatusCard key={status.id} event={status} />
+            ))}
+          </div>
         )}
 
         {hasContent && (
@@ -499,12 +517,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   );
 }
 
-export function MessageBubble({ event, leadingTools, leadingSubagents, changedFiles }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, leadingSubagents, changedFiles, trailingStatuses }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} />;
 }

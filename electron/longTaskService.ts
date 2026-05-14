@@ -267,7 +267,7 @@ function findLongTaskStatePath(projectPath: string, taskId: string) {
 export function updateLongTaskState(
   projectPath: string,
   taskId: string,
-  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems">>,
+  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems" | "executorSessionId" | "reviewerSessionId">>,
 ): LongTaskSummary {
   const statePath = findLongTaskStatePath(projectPath, taskId);
   if (!statePath) {

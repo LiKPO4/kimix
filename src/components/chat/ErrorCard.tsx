@@ -12,21 +12,39 @@ export function ErrorCard({ event }: ErrorCardProps) {
 
   return (
     <div className="flex justify-center">
-      <div className="max-w-[90%] w-full rounded-2xl border border-accent-red/20 bg-accent-red/5 px-4 py-3">
-        <div className="flex items-start gap-3">
-          <AlertCircle size={18} className="text-accent-red shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-accent-red">出错了</span>
-              <button
-                onClick={() => setDismissed(true)}
-                className="p-1 rounded-lg hover:bg-accent-red/10 text-text-muted hover:text-accent-red transition-colors"
-                aria-label="关闭"
-              >
-                <X size={14} />
-              </button>
+      <div
+        className="w-full rounded-xl border text-[var(--kimix-panel-text)] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+        style={{
+          borderColor: "rgba(216,59,1,0.18)",
+          background: "rgba(216,59,1,0.04)",
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 12,
+          paddingBottom: 12,
+        }}
+      >
+        <div className="flex items-start" style={{ gap: 12 }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff2ef] text-[#d83b01]">
+            <AlertCircle size={16} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between" style={{ gap: 12 }}>
+              <div className="min-w-0 flex-1">
+                <div className="text-[14.5px] font-medium leading-6 text-[#c43e12]">出错了</div>
+                <p className="mt-1 text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">{event.message}</p>
+              </div>
+              {event.canDismiss !== false && (
+                <button
+                  type="button"
+                  onClick={() => setDismissed(true)}
+                  className="kimix-icon-text-button is-compact shrink-0 text-[var(--kimix-panel-text-muted)] hover:bg-[rgba(216,59,1,0.08)] hover:text-[#c43e12]"
+                  style={{ minWidth: 32, paddingLeft: 8, paddingRight: 8 }}
+                  aria-label="关闭错误提示"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
-            <p className="mt-1 text-sm text-text-secondary leading-relaxed">{event.message}</p>
           </div>
         </div>
       </div>

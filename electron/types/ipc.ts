@@ -100,7 +100,7 @@ export type GetLongTaskDetailResponse = {
 export type UpdateLongTaskStateRequest = {
   projectPath: string;
   taskId: string;
-  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems">>;
+  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems" | "executorSessionId" | "reviewerSessionId">>;
 }
 
 export type UpdateLongTaskStateResponse = {
@@ -381,7 +381,11 @@ export type OpenFileRequest = {
 
 export type RevertFilesRequest = {
   projectPath: string;
-  files: string[];
+  files: Array<string | {
+    path: string;
+    additions?: number;
+    deletions?: number;
+  }>;
 }
 
 export type OpenEditorRequest = {

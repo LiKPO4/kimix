@@ -107,6 +107,7 @@ export interface AssistantMessageEvent {
   id: string;
   type: "assistant_message";
   timestamp: number;
+  agentRole?: "executor" | "reviewer";
   content: string;
   thinking?: string;
   thinkingParts?: ThinkingPart[];
@@ -201,6 +202,7 @@ export interface StatusUpdateEvent {
   id: string;
   type: "status_update";
   timestamp: number;
+  agentRole?: "executor" | "reviewer";
   step?: number;
   totalSteps?: number;
   tokenCount?: number;
@@ -268,6 +270,7 @@ export interface ErrorEvent {
   timestamp: number;
   message: string;
   source?: "sdk" | "ipc" | "ui";
+  canDismiss?: boolean;
 }
 
 export interface DiffEvent {

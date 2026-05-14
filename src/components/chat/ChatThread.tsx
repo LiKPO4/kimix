@@ -15,7 +15,7 @@ import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] };
 
 function useAnimatedDots(active: boolean) {
@@ -129,13 +129,13 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles }: { event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[] }) {
+function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles, trailingStatuses }: { event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
       return <MessageBubble event={event} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} />;
+      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -182,6 +182,31 @@ function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles }: 
   }
 }
 
+function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change_summary" }>[]): Extract<TimelineEvent, { type: "change_summary" }> | null {
+  if (events.length === 0) return null;
+  const filesByPath = new Map<string, { path: string; additions?: number; deletions?: number }>();
+  for (const event of events) {
+    for (const file of event.files) {
+      const existing = filesByPath.get(file.path);
+      filesByPath.set(file.path, {
+        path: file.path,
+        additions: (existing?.additions ?? 0) + (file.additions ?? 0),
+        deletions: (existing?.deletions ?? 0) + (file.deletions ?? 0),
+      });
+    }
+  }
+  const files = Array.from(filesByPath.values());
+  return {
+    id: events.map((event) => event.id).join(":"),
+    type: "change_summary",
+    timestamp: events.at(-1)?.timestamp ?? Date.now(),
+    projectPath: events.find((event) => event.projectPath)?.projectPath,
+    files,
+    additions: files.reduce((sum, file) => sum + (file.additions ?? 0), 0),
+    deletions: files.reduce((sum, file) => sum + (file.deletions ?? 0), 0),
+  };
+}
+
 function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
   const items: RenderItem[] = [];
 
@@ -204,15 +229,18 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
+    const mergedChangeSummary = mergeChangeSummaryEvents(turnEvents.filter((event): event is Extract<TimelineEvent, { type: "change_summary" }> => event.type === "change_summary"));
     let assistantAttached = false;
+    const trailingStatuses = statusEvents;
 
     for (const event of turnEvents) {
       const type = (event as { type?: unknown }).type;
       if (type === "tool_call" || type === "tool_result") continue;
       if (type === "subagent") continue;
       if (type === "status_update") continue;
+      if (type === "change_summary") continue;
       if (event === primaryAssistant) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles) });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
         toolsAttached = true;
         assistantAttached = true;
         continue;
@@ -232,7 +260,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       }
       if (primaryAssistant && type === "question_request") continue;
       if (type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles) });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
         toolsAttached = true;
         assistantAttached = true;
         continue;
@@ -250,10 +278,11 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         .filter((event) => event.type === "question_request")
         .forEach((event) => items.push({ type: "event", event }));
     }
+    if (mergedChangeSummary) items.push({ type: "event", event: mergedChangeSummary });
     if (!assistantAttached) {
       subagents.forEach((event) => items.push({ type: "event", event }));
+      statusEvents.forEach((event) => items.push({ type: "event", event }));
     }
-    statusEvents.forEach((event) => items.push({ type: "event", event }));
   };
 
   let turnBody: TimelineEvent[] = [];
@@ -481,11 +510,11 @@ export function ChatThread() {
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div className="kimix-chat-column flex w-full flex-col" style={{ gap: 18 }}>
+        <div className="kimix-chat-column flex w-full flex-col" style={{ gap: 22 }}>
           {renderItems.map((item) => (
             item.type === "tool_group"
               ? <ToolGroup key={item.id} tools={item.tools} />
-              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} />
+              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} />
           ))}
         </div>
       </div>

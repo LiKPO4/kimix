@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.7.49 继续补齐高频聊天区深色模式，接入最小可用 diff 面板，并复核 pnpm dev 稳定性。
+v2.7.58 收敛长程任务执行-审查链路：审核气泡可展开、审核通过后自动进入下一步，并修正顶部按钮/右侧栏间距。
 
 ## 当前版本
-**v2.7.49** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.7.58** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
@@ -35,6 +35,25 @@ v2.7.49 继续补齐高频聊天区深色模式，接入最小可用 diff 面板
 - [x] 卡死诊断入口补到设置页，可查看最近 `kimix_freeze_reports`。
 
 ## 已完成
+- v2.7.58：
+  - 顶部工具栏的终端按钮统一为与差异面板、长程任务侧栏按钮一致的 36px 方形圆角边框样式。
+  - 长程任务右侧栏的“工作 agent”和“执行到”控制块改为竖向布局，增加块内 gap 和输入框高度，减少窄栏挤压。
+  - reviewer 完成时不再先结算空白代理气泡；调度解析到审核输出后，会带详情内容一次性结算“已处理（审核）”，后续可展开查看。
+  - 审核通过识别补充“符合预期/执行吧/继续执行/无阻塞/未发现问题”等常见表达；自动发送给执行 agent 的下一步 prompt 明确这是内部调度，不再询问用户是否继续。
+  - 版本号三处同步到 v2.7.58。
+- v2.7.57：
+  - reviewer 完成后会把隐藏收集到的审核输出写入“已处理（审核）”代理气泡详情，后续可展开查看。
+  - 代理气泡详情摘要从“段思考”调整为“段内容”，避免把审核/执行输出误标成思考。
+  - 版本号三处同步到 v2.7.57。
+- v2.7.56：
+  - 同一轮内多个 `change_summary` 事件会合并为一张“文件已更改”卡片，避免连续出现多张单文件变更卡。
+  - 变更卡每个文件行右侧新增独立撤销按钮；撤销成功后只移除对应文件行，并移除卡片头部的全局撤销入口，避免非 Git 项目部分撤销后仍报错。
+  - 撤销后端改为按文件所属 Git 根执行，并对非 Git 项目的 `.kimix-long-tasks` 生成文件提供受限兜底；普通非 Git 文件无法安全恢复时返回明确中文错误。
+  - 版本号三处同步到 v2.7.56。
+- v2.7.55：
+  - 将 `electron/kimiBridge.ts` 的 session metadata 预热从 `startSession` 关键路径移到后台执行，避免长程任务创建 executor/reviewer 两个 session 时串行等待 5-10 秒。
+  - metadata 预热超时改为明确 warning，不再打印整段 TimeoutError 栈；会话启动继续返回，真实可用性仍以后续 sendPrompt/status 为准。
+  - 版本号三处同步到 v2.7.55。
 - v2.7.49：
   - 继续把 `Composer`、`MessageBubble`、`ContextBar`、`SkillsPanel`、`ChatThread` 等高频区域切到统一主题 token，补齐深色模式下的输入区、思考卡、用量浮层、技能面板、图片预览和长程任务 banner。
   - 将工具返回的结构化 diff 映射为独立 `diff` 事件，并在主界面接入最小可用“差异面板”，可按时间查看最近变更并打开对应文件。

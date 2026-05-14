@@ -117,12 +117,34 @@ function getUserImageSignature(event: Extract<TimelineEvent, { type: "user_messa
     .join("|");
 }
 
+function readTimestampCandidate(value: unknown): number | null {
+  if (isNumber(value) && Number.isFinite(value) && value > 0) return value;
+  if (!isString(value) || !value.trim()) return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveEventTimestamp(...sources: Array<unknown>): number {
+  for (const source of sources) {
+    if (!isRecord(source)) continue;
+    const candidates = [source.timestamp, source.createdAt, source.created_at, source.time, source.at];
+    for (const candidate of candidates) {
+      const resolved = readTimestampCandidate(candidate);
+      if (resolved !== null) return resolved;
+    }
+  }
+  return Date.now();
+}
+
 export function mapStreamEvent(event: unknown): TimelineEvent | null {
   if (!isRecord(event)) return null;
   const source = isRecord(event.message) ? event.message : event;
   const type = source.type;
   if (!isString(type)) return null;
   const payload = isRecord(source.payload) ? source.payload : {};
+  const eventTimestamp = resolveEventTimestamp(source, payload);
 
   switch (type) {
     case "TurnBegin": {
@@ -131,7 +153,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "user_message",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         content: userMessage.content,
         images: userMessage.images,
       };
@@ -143,7 +165,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         return {
           id: generateId(),
           type: "assistant_message",
-          timestamp: Date.now(),
+          timestamp: eventTimestamp,
           content: payload.text,
           isThinking: false,
           isComplete: false,
@@ -151,7 +173,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       }
       if (partType === "think" && isString(payload.think)) {
         const id = generateId();
-        const timestamp = Date.now();
+        const timestamp = eventTimestamp;
         return {
           id,
           type: "assistant_message",
@@ -172,7 +194,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "tool_call",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         toolCallId: isString(payload.id) ? payload.id : generateId(),
         toolName: isString(func.name) ? func.name : "unknown",
         status: "running",
@@ -187,7 +209,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "steer_message",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         content: text,
         status: "sent",
       };
@@ -202,7 +224,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "tool_call",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : isString(payload.id) ? payload.id : LATEST_TOOL_CALL,
         toolName: "unknown",
         status: "running",
@@ -250,7 +272,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "tool_result",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : "",
         toolName: "unknown",
         result: returnValue.output ?? "",
@@ -262,7 +284,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "approval_request",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         requestId: isString(payload.id) ? payload.id : "",
         toolName: isString(payload.sender) ? payload.sender : "unknown",
         description: isString(payload.description) ? payload.description : "需要审批",
@@ -277,7 +299,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "question_request",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         requestId: isString(payload.id) ? payload.id : "",
         rpcRequestId: isString(payload.rpc_request_id) ? payload.rpc_request_id : (isString(payload.id) ? payload.id : ""),
         toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : "",
@@ -304,7 +326,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "status_update",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         tokenCount: isNumber(tokenUsage.output) ? tokenUsage.output : 0,
         inputTokenCount,
         contextSize,
@@ -326,7 +348,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "change_summary",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         projectPath: isString(payload.project_path) ? payload.project_path : undefined,
         files: mappedFiles,
         additions: mappedFiles.reduce((sum, file) => sum + (file.additions ?? 0), 0),
@@ -338,7 +360,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "compaction",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         phase: "begin",
       };
 
@@ -346,7 +368,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "compaction",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         phase: "end",
       };
 
@@ -357,7 +379,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "subagent",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         agentName: isString(payload.agent_name) ? payload.agent_name : "subagent",
         status: subagentStatus,
         events: [],
@@ -368,7 +390,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "assistant_message",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         content: "",
         isThinking: false,
         isComplete: true,
@@ -384,7 +406,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       return {
         id: generateId(),
         type: "error",
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
         message: isString(payload.message) ? payload.message : "未知错误",
         source: "sdk",
       };
@@ -460,6 +482,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         eventsAfterOpenAssistant.some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
       const updated: typeof last = {
         ...last,
+        agentRole: incoming.agentRole ?? last.agentRole,
         content: appendAssistantContent(last.content, incoming.content, shouldBreakParagraph),
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
         thinkingParts: incoming.thinkingParts

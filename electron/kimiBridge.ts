@@ -145,8 +145,16 @@ async function warmSessionMetadata(session: Session) {
       new Promise((_, reject) => setTimeout(() => reject(new TimeoutError("Kimi session metadata warm timed out")), 5000)),
     ]);
   } catch (err) {
+    if (err instanceof TimeoutError) {
+      console.warn(`[kimiBridge] Session metadata warm timed out ${session.sessionId}; continuing without blocking startup.`);
+      return;
+    }
     console.error(`Failed to warm session metadata ${session.sessionId}:`, err);
   }
+}
+
+function warmSessionMetadataInBackground(session: Session) {
+  void warmSessionMetadata(session);
 }
 
 export async function startSession(options: {
@@ -170,7 +178,7 @@ export async function startSession(options: {
   // Prevent concurrent creation of the same sessionId
   if (options.sessionId && activeSessions.has(options.sessionId)) {
     const session = activeSessions.get(options.sessionId)!;
-    await warmSessionMetadata(session);
+    warmSessionMetadataInBackground(session);
     return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
   }
 
@@ -185,7 +193,7 @@ export async function startSession(options: {
   });
 
   activeSessions.set(session.sessionId, session);
-  await warmSessionMetadata(session);
+  warmSessionMetadataInBackground(session);
   return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
 }
 

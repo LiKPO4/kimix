@@ -1026,7 +1026,7 @@ export function AppShell() {
       }
 
       const nextStep = Math.max(latestSession.longTask?.currentStep ?? 1, 1);
-      const prompt = `【Kimix 长程任务：执行到 Step ${target}】\n请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}，然后从 Step ${nextStep} 开始，按 BIGPLAN 顺序一轮只执行一个 Step。本次目标是执行到 Step ${target}。\n\n如果当前还没有完成规划，请先完善 BIGPLAN 并向用户确认；如果已经可以执行，请只执行 Step ${nextStep}。完成本轮后写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。`;
+      const prompt = `【Kimix 长程任务：执行到 Step ${target}】\n这是 Kimix 内部调度指令。请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}，然后从 Step ${nextStep} 开始，按 BIGPLAN 顺序一轮只执行一个 Step。本次目标是执行到 Step ${target}。\n\n如果当前还没有完成规划，请先完善 BIGPLAN 并向用户确认；如果已经可以执行，请不要询问用户是否继续，直接执行 Step ${nextStep}。完成本轮后写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。`;
       updateSession(latestSession.id, (session) => ({
         ...session,
         events: [
@@ -1312,7 +1312,7 @@ export function AppShell() {
               ) : (
                 <button
                   onClick={() => showToast("当前对话不是长程任务")}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f]"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"
                   title="运行"
                   aria-label="运行"
                 >
@@ -1372,7 +1372,7 @@ export function AppShell() {
               <button
                 onClick={openProjectTerminal}
                 disabled={!projectPath}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--kimix-panel-border-soft)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
                 title="终端"
                 aria-label="终端"
               >
@@ -1452,16 +1452,16 @@ export function AppShell() {
                     <div className="mt-1 text-[13px] leading-5 text-[#6f87a1]">
                       步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
                     </div>
-                    <div className="mt-4 flex flex-col" style={{ gap: 14 }}>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "14px 12px" }}>
-                        <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                          <span className="shrink-0 text-[13px] font-medium leading-5 text-[#2f6fad]">工作 agent</span>
-                          <div className="flex min-w-0 items-center rounded-lg bg-white" style={{ gap: 4, padding: 4 }}>
+                    <div className="mt-4 flex flex-col" style={{ gap: 16 }}>
+                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "16px 14px" }}>
+                        <div className="flex flex-col" style={{ gap: 12 }}>
+                          <span className="text-[13px] font-medium leading-5 text-[#2f6fad]">工作 agent</span>
+                          <div className="flex w-full items-center rounded-lg bg-white" style={{ gap: 6, padding: 5 }}>
                             <button
                               type="button"
                               disabled={longTaskControlBusy}
                               onClick={() => void patchLongTaskMeta({ activeAgent: "executor", stage: longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage }, { message: "已切换到执行 agent" })}
-                              className={`h-7 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-[#dff0ff] text-[#2f6fad]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
+                              className={`h-8 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-[#dff0ff] text-[#2f6fad]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
                               style={{ paddingLeft: 10, paddingRight: 10 }}
                             >
                               执行
@@ -1470,14 +1470,14 @@ export function AppShell() {
                               type="button"
                               disabled={longTaskControlBusy}
                               onClick={() => void patchLongTaskMeta({ activeAgent: "reviewer", stage: longTaskMeta.stage === "running" ? "paused" : longTaskMeta.stage }, { message: "已切换到审查 agent" })}
-                              className={`h-7 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-[#fff3d6] text-[#8a6a1f]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
+                              className={`h-8 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-[#fff3d6] text-[#8a6a1f]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
                               style={{ paddingLeft: 10, paddingRight: 10 }}
                             >
                               审查
                             </button>
                           </div>
                         </div>
-                        <div className="mt-3 flex items-center" style={{ gap: 8 }}>
+                        <div className="mt-4 flex items-center" style={{ gap: 10 }}>
                           <button
                             type="button"
                             disabled={longTaskControlBusy || longTaskMeta.stage === "paused" || longTaskMeta.stage === "completed"}
@@ -1498,9 +1498,9 @@ export function AppShell() {
                           </button>
                         </div>
                       </div>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "15px 12px 14px" }}>
-                        <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                          <label className="shrink-0 text-[13px] font-medium leading-5 text-[#2f6fad]" htmlFor="long-task-target-step">
+                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "16px 14px" }}>
+                        <div className="flex flex-col" style={{ gap: 10 }}>
+                          <label className="text-[13px] font-medium leading-5 text-[#2f6fad]" htmlFor="long-task-target-step">
                             执行到
                           </label>
                           <input
@@ -1510,7 +1510,7 @@ export function AppShell() {
                             max={totalLongTaskSteps || undefined}
                             value={targetStepDraft}
                             onChange={(event) => setTargetStepDraft(event.target.value)}
-                            className="h-8 min-w-0 flex-1 rounded-lg border border-[#cfe4fb] bg-white text-[13px] text-[#24415f] outline-none focus:border-[#90c4f2]"
+                            className="h-9 w-full min-w-0 rounded-lg border border-[#cfe4fb] bg-white text-[13px] text-[#24415f] outline-none focus:border-[#90c4f2]"
                             style={{ paddingLeft: 10, paddingRight: 10 }}
                             placeholder={totalLongTaskSteps ? `1-${totalLongTaskSteps}` : "Step"}
                           />
