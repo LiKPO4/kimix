@@ -458,8 +458,9 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const mdArtifacts = Array.from(new Set(
     event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
   )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
-  const isActivelyThinking = Boolean(currentSession?.id && runningSessionId === currentSession.id && event.isThinking && !event.isComplete);
-  const elapsed = useElapsed(event.timestamp, isActivelyThinking);
+  const isActiveAssistant = Boolean(currentSession?.id && runningSessionId === currentSession.id && !event.isComplete);
+  const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
+  const elapsed = useElapsed(event.timestamp, isActiveAssistant);
   const durationLabel = event.isComplete
     ? formatDuration(event.durationMs && event.durationMs > 0 ? event.durationMs : elapsed)
     : formatDuration(elapsed);
@@ -468,7 +469,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
     ? `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
     : isActivelyThinking
       ? `正在思考${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
-      : `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`;
+      : `执行中${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`;
 
   return (
     <div className="group flex justify-start">

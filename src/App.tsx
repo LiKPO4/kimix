@@ -283,8 +283,24 @@ function latestAssistantContent(events: TimelineEvent[]) {
   ))?.content.trim() ?? "";
 }
 
+function latestAssistantVisibleOrThinkingContent(events: TimelineEvent[]) {
+  const content = latestAssistantContent(events);
+  if (content) return content;
+  const assistant = [...settleInactiveEvents(events)].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+    event.type === "assistant_message" &&
+    (Boolean(event.thinking?.trim()) || Boolean(event.thinkingParts?.some((part) => part.text.trim().length > 0)))
+  ));
+  if (!assistant) return "";
+  const parts = assistant.thinkingParts?.map((part) => part.text).join("").trim();
+  return parts || assistant.thinking?.trim() || "";
+}
+
 function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSessionId: string) {
   return Boolean(session?.longTask && session.longTask.reviewerSessionId === runtimeSessionId);
+}
+
+function shouldMirrorHiddenLongTaskEvent(event: TimelineEvent) {
+  return !["user_message", "steer_message", "question_request"].includes(event.type);
 }
 
 function attachLongTaskAgentRole(event: TimelineEvent, role: "executor" | "reviewer" | null): TimelineEvent {
@@ -481,6 +497,7 @@ function buildLongTaskReviewPrompt(session: Session) {
 3. 暂时无法自动确认的问题，请写入 ${meta.reviewQueuePath}。
 4. 不要直接执行代码修改；本轮只做执行结果审查。
 5. 不要询问用户是否继续下一步；如本轮可继续，请明确写出“结论：通过”，Kimix 会自动调度执行 agent 进入下一步。
+6. 你的最终正文第一行必须是“结论：通过”或“结论：需修复”或“结论：待人工审查”，不要只把结论写在思考过程里。
 
 执行 agent 最近输出：
 ${executorOutput || "暂无可用输出，请直接读取 BIGPLAN.md 审查。"}`;
@@ -493,7 +510,7 @@ function inferLongTaskReviewConclusion(content: string): LongTaskReviewConclusio
   const target = conclusionLine || content.slice(0, 1200);
   if (/需修复|需要修复|不通过|未通过|阻塞|问题必须先修复/i.test(target)) return "needs_fix";
   if (/待人工审查|人工审查|需要用户|无法自动确认|无法自动审查/i.test(target)) return "manual_review";
-  if (/通过|审查通过|可以继续|进入下一步|符合预期|执行吧|继续执行|无阻塞|未发现问题|没有发现问题/i.test(target)) return "pass";
+  if (/通过|审查通过|审核通过|可以继续|可继续|进入下一步|下一步|符合预期|执行吧|继续执行|继续\s*Step|继续\s*执行|无阻塞|未发现问题|没有发现问题/i.test(target)) return "pass";
   return "unknown";
 }
 
@@ -536,7 +553,7 @@ ${reviewLabel} Step ${step}。现在请继续执行 Step ${nextStep}。
 请你作为执行 agent：
 1. 这是 Kimix 内部调度指令，不要询问用户是否继续；除非缺少执行 Step ${nextStep} 的必要信息或遇到阻塞，否则直接开始执行。
 2. 先阅读 ${meta.bigPlanPath}，只执行 Step ${nextStep} 这一轮。
-3. 不要把后续多个 Step 合并执行。
+3. 不要把后续多个 Step 合并执行；完成 Step ${nextStep} 后必须停止本轮，不能自行继续 Step ${nextStep + 1}。
 4. 完成后更新必要文件，并把本轮产出、验证证据、残余风险写入 rounds/ 对应记录。
 5. 结束时明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
 
@@ -709,12 +726,13 @@ function App() {
   ) => {
     updateSession(uiSessionId, (session) => {
       const events = [...session.events];
-      const latestProxyIndex = events.findLastIndex((event) => (
-        event.type === "assistant_message" &&
-        event.agentRole === role &&
-        !event.content.trim() &&
-        (detailContent?.trim() ? true : !event.thinking?.trim())
-      ));
+      const detail = detailContent?.trim();
+      const latestProxyIndex = events.findLastIndex((event) => {
+        if (event.type !== "assistant_message" || event.agentRole !== role) return false;
+        if (status === "running") return !event.isComplete;
+        if (detail) return true;
+        return !event.content.trim() && !event.thinking?.trim();
+      });
 
       if (status === "running") {
         const existing = latestProxyIndex >= 0 ? events[latestProxyIndex] : null;
@@ -739,13 +757,33 @@ function App() {
         };
       }
 
-      if (latestProxyIndex === -1) return session;
+      if (latestProxyIndex === -1) {
+        if (!detail || status === "running") return session;
+        return {
+          ...session,
+          events: [
+            ...events,
+            {
+              id: crypto.randomUUID(),
+              type: "assistant_message" as const,
+              timestamp: Date.now(),
+              agentRole: role,
+              content: detail,
+              isThinking: false,
+              isComplete: true,
+            },
+          ],
+          updatedAt: Date.now(),
+        };
+      }
       const latestProxy = events[latestProxyIndex];
       if (latestProxy.type !== "assistant_message") return session;
       if (latestProxy.isComplete && !detailContent?.trim()) return session;
       events[latestProxyIndex] = {
         ...latestProxy,
-        thinking: detailContent?.trim() || latestProxy.thinking,
+        content: detail || latestProxy.content,
+        thinking: detail ? undefined : latestProxy.thinking,
+        thinkingParts: detail ? undefined : latestProxy.thinkingParts,
         isThinking: false,
         isComplete: true,
         durationMs: latestProxy.durationMs ?? Math.max(0, Date.now() - latestProxy.timestamp),
@@ -826,7 +864,7 @@ function App() {
   };
 
   const getHiddenLongTaskAssistantContent = (runtimeSessionId: string) => {
-    return latestAssistantContent(hiddenLongTaskEventsRef.current.get(runtimeSessionId) ?? []);
+    return latestAssistantVisibleOrThinkingContent(hiddenLongTaskEventsRef.current.get(runtimeSessionId) ?? []);
   };
 
   const dispatchLongTaskReview = (uiSessionId: string, runtimeSessionId: string) => {
@@ -1339,8 +1377,10 @@ function App() {
         markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
         if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
           mergeHiddenLongTaskEvent(payload.sessionId, mappedWithRole);
-          if (mappedWithRole.type === "error") {
+          if (shouldMirrorHiddenLongTaskEvent(mappedWithRole)) {
             enqueueStreamEvent(uiSessionId, mappedWithRole);
+          }
+          if (mappedWithRole.type === "error" || mappedWithRole.type === "question_request") {
             flushStreamEvents();
             persistLocalConversationState();
           }

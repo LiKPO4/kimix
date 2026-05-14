@@ -1026,7 +1026,7 @@ export function AppShell() {
       }
 
       const nextStep = Math.max(latestSession.longTask?.currentStep ?? 1, 1);
-      const prompt = `【Kimix 长程任务：执行到 Step ${target}】\n这是 Kimix 内部调度指令。请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}，然后从 Step ${nextStep} 开始，按 BIGPLAN 顺序一轮只执行一个 Step。本次目标是执行到 Step ${target}。\n\n如果当前还没有完成规划，请先完善 BIGPLAN 并向用户确认；如果已经可以执行，请不要询问用户是否继续，直接执行 Step ${nextStep}。完成本轮后写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。`;
+      const prompt = `【Kimix 长程任务：执行到 Step ${target}】\n这是 Kimix 内部调度指令。请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}，然后从 Step ${nextStep} 开始。本次整体目标是最终执行到 Step ${target}，但本轮只允许执行 Step ${nextStep}。\n\n如果当前还没有完成规划，请先完善 BIGPLAN 并向用户确认；如果已经可以执行，请不要询问用户是否继续，直接执行 Step ${nextStep}。\n\n硬性停止条件：完成 Step ${nextStep} 后必须立刻停止本轮输出，写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。即使 Step ${target} 还未达到，也不能自行继续执行 Step ${nextStep + 1}，必须等待 Kimix 启动审查 agent 审查通过后再接下一轮。`;
       updateSession(latestSession.id, (session) => ({
         ...session,
         events: [

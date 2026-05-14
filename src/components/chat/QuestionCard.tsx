@@ -155,11 +155,8 @@ export function QuestionCard({ event }: QuestionCardProps) {
           type="button"
           onClick={() => setCollapsed((value) => !value)}
           className="flex w-full items-center rounded-xl text-left transition-colors hover:bg-white/60"
-          style={{ gap: 12, minHeight: 48, paddingLeft: collapsed ? 6 : 0, paddingRight: collapsed ? 8 : 0 }}
+          style={{ gap: 14, minHeight: 48, paddingLeft: collapsed ? 8 : 0, paddingRight: collapsed ? 10 : 0 }}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center text-[#6f87a1]">
-            {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-          </span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#339af0] shadow-[0_1px_2px_rgba(25,23,20,0.08)]">
             <CircleHelp size={16} />
           </span>
@@ -167,6 +164,9 @@ export function QuestionCard({ event }: QuestionCardProps) {
             <div className="text-[15px] font-medium leading-6">需要你确认一下</div>
             <div className="mt-0.5 truncate text-[13px] leading-5 text-[#706b63]">{summary}</div>
           </div>
+          <span className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#6f87a1]">
+            {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+          </span>
         </button>
 
         {!collapsed && (

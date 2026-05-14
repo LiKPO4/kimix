@@ -457,7 +457,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.58</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.63</span>
         </button>
       </div>
     </aside>

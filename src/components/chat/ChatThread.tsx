@@ -217,9 +217,12 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
 
   const renderTurnBody = (turnEvents: TimelineEvent[]) => {
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
-    const primaryAssistant = turnEvents.find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+    const primaryAssistantIndex = turnEvents.findIndex((event) => (
       event.type === "assistant_message" && event.content.trim().length > 0
     ));
+    const primaryAssistant = primaryAssistantIndex >= 0
+      ? turnEvents[primaryAssistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>
+      : undefined;
     const changedFiles = new Set(
       turnEvents
         .filter((e): e is Extract<TimelineEvent, { type: "change_summary" }> => e.type === "change_summary")
@@ -233,7 +236,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     let assistantAttached = false;
     const trailingStatuses = statusEvents;
 
-    for (const event of turnEvents) {
+    for (const [eventIndex, event] of turnEvents.entries()) {
       const type = (event as { type?: unknown }).type;
       if (type === "tool_call" || type === "tool_result") continue;
       if (type === "subagent") continue;
@@ -258,7 +261,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       ) {
         continue;
       }
-      if (primaryAssistant && type === "question_request") continue;
+      if (primaryAssistant && type === "question_request" && eventIndex > primaryAssistantIndex) continue;
       if (type === "assistant_message" && !toolsAttached) {
         items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
         toolsAttached = true;
@@ -275,7 +278,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     if (!toolsAttached) pushStandaloneTools(tools);
     if (primaryAssistant) {
       turnEvents
-        .filter((event) => event.type === "question_request")
+        .filter((event, eventIndex) => event.type === "question_request" && eventIndex > primaryAssistantIndex)
         .forEach((event) => items.push({ type: "event", event }));
     }
     if (mergedChangeSummary) items.push({ type: "event", event: mergedChangeSummary });
