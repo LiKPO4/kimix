@@ -331,6 +331,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         inputTokenCount,
         contextSize,
         contextLimit: 256000,
+        planMode: typeof payload.plan_mode === "boolean" ? payload.plan_mode : undefined,
         message: isNumber(payload.message_id) || isString(payload.message_id) ? `消息 ${payload.message_id}` : undefined,
       };
     }
@@ -478,6 +479,17 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     if (lastIndex !== -1) {
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
       const eventsAfterOpenAssistant = existing.slice(lastIndex + 1);
+      const hasQuestionBoundary = eventsAfterOpenAssistant.some((event) => event.type === "question_request");
+      if (hasQuestionBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
+        const result = [...existing];
+        result[lastIndex] = {
+          ...last,
+          isThinking: false,
+          isComplete: true,
+          durationMs: last.durationMs ?? Math.max(0, incoming.timestamp - last.timestamp),
+        };
+        return [...result, incoming];
+      }
       const shouldBreakParagraph = !last.content.trim() &&
         eventsAfterOpenAssistant.some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
       const updated: typeof last = {

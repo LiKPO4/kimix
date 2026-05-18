@@ -61,6 +61,7 @@ export type CreateLongTaskRequest = {
   initialRequest: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  afkMode?: boolean;
 }
 
 export type CreateLongTaskResponse = {
@@ -145,7 +146,10 @@ export type StartSessionRequest = {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  planMode?: boolean;
+  afkMode?: boolean;
   skillsDir?: string;
+  additionalWorkDirs?: string[];
 }
 
 export type StartSessionResponse = {
@@ -209,6 +213,33 @@ export type InstallKimiCliResponse = {
   error: string;
 };
 
+export type KimiCliUpdateInfo = {
+  available: boolean;
+  currentVersion: string | null;
+  latestVersion: string | null;
+  hasUpdate: boolean;
+  path?: string;
+  message: string;
+};
+
+export type CheckKimiCliUpdateResponse = {
+  success: true;
+  data: KimiCliUpdateInfo;
+} | {
+  success: false;
+  error: string;
+};
+
+export type UpdateKimiCliResponse = {
+  success: true;
+  data: KimiCliUpdateInfo & {
+    output?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type SendPromptRequest = {
   sessionId: string;
   content: string;
@@ -218,12 +249,29 @@ export type SendPromptRequest = {
   }[];
   thinking?: boolean;
   yoloMode?: boolean;
+  planMode?: boolean;
+  afkMode?: boolean;
 }
 
 export type SendPromptResponse = {
   success: true;
   data: {
     turnId: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SetPlanModeRequest = {
+  sessionId: string;
+  enabled: boolean;
+}
+
+export type SetPlanModeResponse = {
+  success: true;
+  data: {
+    enabled: boolean;
   };
 } | {
   success: false;
@@ -353,6 +401,7 @@ export type UsagePeriod = {
   limit?: number;
   percent?: number;
   available: boolean;
+  refreshAt?: number;
   message?: string;
 };
 
@@ -373,6 +422,23 @@ export type KimiUsageResponse = {
 export type OpenPathRequest = {
   path: string;
 }
+
+export type ReadTextFileRequest = {
+  path: string;
+  projectPath?: string;
+}
+
+export type ReadTextFileResponse = {
+  success: true;
+  data: {
+    path: string;
+    content: string;
+    updatedAt: number;
+  };
+} | {
+  success: false;
+  error: string;
+};
 
 export type OpenFileRequest = {
   projectPath: string;
@@ -524,6 +590,11 @@ export type TriggerShortcutRequest = {
   shortcut: string;
 }
 
+export type ScheduleShutdownRequest = {
+  delaySeconds: number;
+  reason?: string;
+}
+
 export type VoidResponse = {
   success: true;
   data: void;
@@ -535,6 +606,8 @@ export type VoidResponse = {
 export type AppSettings = {
   defaultModel: string;
   defaultThinking: boolean;
+  defaultPlanMode: boolean;
+  defaultAfkMode: boolean;
   maxTurns: number;
   enableCompaction: boolean;
   defaultPermissionMode: "manual" | "approve_for_session" | "yolo";
@@ -549,10 +622,12 @@ export type AppSettings = {
   clarificationToolMode: "off" | "on" | "auto";
   expandToolCalls: boolean;
   defaultOpenDir?: string;
+  selectedExecutablePath?: string;
   autoReadAgentsMd: boolean;
   autoShowGitStatus: boolean;
   enabledSkillNames: string[];
   enabledSkillsDir?: string;
+  additionalWorkDirs?: string[];
 }
 
 export type SettingsResponse = {

@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
@@ -16,10 +16,10 @@ function hasDraggedFiles(event: React.DragEvent): boolean {
   return Array.from(event.dataTransfer.types).includes("Files");
 }
 
-const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string }[] = [
-  { value: "manual", label: "手动审批", desc: "每次操作都需要确认" },
-  { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动允许" },
-  { value: "yolo", label: "完全访问权限", desc: "无需确认，直接执行" },
+const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; tooltip: string }[] = [
+  { value: "manual", label: "手动审批", desc: "每次操作都需要确认", tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
+  { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动允许", tooltip: "本会话允许：同类工具请求在当前会话内自动批准，减少重复确认。" },
+  { value: "yolo", label: "完全访问权限", desc: "无需确认，直接执行", tooltip: "完全访问权限：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
 ];
 
 const permissionMenuIcons = {
@@ -29,14 +29,14 @@ const permissionMenuIcons = {
 };
 
 const THINKING_OPTIONS = [
-  { value: true, label: "思考开启" },
-  { value: false, label: "思考关闭" },
+  { value: true, label: "思考开启", tooltip: "思考开启：允许 Kimi 展示并使用思考过程，适合复杂任务。" },
+  { value: false, label: "思考关闭", tooltip: "思考关闭：减少思考过程输出，适合简单问答或快速执行。" },
 ];
 
 const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc: string }[] = [
-  { value: "auto", label: "自动判断", desc: "由 AI 判断是否需要先澄清" },
   { value: "on", label: "开启", desc: "优先澄清不明确需求" },
-  { value: "off", label: "关闭", desc: "直接按原消息发送" },
+  { value: "off", label: "关闭", desc: "直接发送原消息" },
+  { value: "auto", label: "自动", desc: "由 AI 判断是否需要澄清" },
 ];
 
 const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
@@ -52,24 +52,6 @@ function withClarificationBehavior(content: string, mode: ClarificationToolMode)
 
 const iconButtonClass =
   "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35";
-
-function shouldRecoverHandoffSourceSession(session: Session | null | undefined) {
-  return Boolean(session?.events.some((event) => (
-    event.type === "session_recommendation" &&
-    event.handoffStatus !== "running" &&
-    !event.handoffRecovered
-  )));
-}
-
-function findLastUserContentBeforeOpenAssistant(events: TimelineEvent[]): string | null {
-  const openAssistantIndex = events.findLastIndex((event) => event.type === "assistant_message" && !event.isComplete);
-  if (openAssistantIndex === -1) return null;
-  for (let index = openAssistantIndex - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.type === "user_message" && event.content.trim()) return event.content.trim();
-  }
-  return null;
-}
 
 type ImageAttachment = {
   id: string;
@@ -89,8 +71,8 @@ type CompletionItem = {
 };
 
 const unsupportedSlashHints: Record<string, string> = {
-  status: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时、本周和本月用量。",
-  usage: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时、本周和本月用量。",
+  status: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时和本周用量。",
+  usage: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时和本周用量。",
 };
 
 const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
@@ -136,6 +118,14 @@ export function Composer() {
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
+  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
+  const setDefaultAfkMode = useAppStore((s) => s.setDefaultAfkMode);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
+  const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
+  const hiddenComposerCards = useAppStore((s) => s.hiddenComposerCards);
+  const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
@@ -161,13 +151,13 @@ export function Composer() {
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const thinkingBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
-  const recoveringSessionIdsRef = useRef<Set<string>>(new Set());
   const activeSession = liveSession ?? currentSession;
   const isCurrentSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const hasUnfinishedAssistant = Boolean(activeSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
   const shouldShowStopButton = Boolean(isCurrentSessionRunning || hasUnfinishedAssistant);
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
+  const canTogglePlanMode = canUseComposer && !isCurrentSessionRunning && !hasUnfinishedAssistant;
   const allowedSlashNames = new Set(slashCommands.flatMap((item) => item.commandName ? [item.commandName] : []));
 
   useEffect(() => {
@@ -320,6 +310,8 @@ export function Composer() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      planMode: defaultPlanMode,
+      afkMode: defaultAfkMode,
     });
     if (!sessionRes.success) return null;
     setSlashCommands((sessionRes.data.slashCommands ?? []).map((command) => ({
@@ -344,71 +336,10 @@ export function Composer() {
     return session;
   };
 
-  const recoverHandoffSourceSession = async (targetSession: Session, options?: { resendLastOpenUserMessage?: boolean }) => {
-    if (!shouldRecoverHandoffSourceSession(targetSession)) return targetSession;
-
-    await window.api.closeSession({ sessionId: getRuntimeSessionId(targetSession) ?? targetSession.id }).catch(() => {});
-    const sessionRes = await window.api.startSession({
-      workDir: targetSession.projectPath,
-      model: "kimi-code/kimi-for-coding",
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-    });
-    if (!sessionRes.success) return targetSession;
-
-    const recoveredSession = {
-      ...targetSession,
-      runtimeSessionId: sessionRes.data.sessionId,
-      events: targetSession.events.map((event) => (
-        event.type === "session_recommendation" && event.handoffStatus !== "running"
-          ? { ...event, handoffRecovered: true }
-          : event
-      )),
-      updatedAt: Date.now(),
-    };
-    updateSession(targetSession.id, () => recoveredSession);
-    if (currentSession?.id === targetSession.id) {
-      setCurrentSession(recoveredSession);
-    }
-    setRunningSessionId(null);
-    const resendContent = options?.resendLastOpenUserMessage
-      ? findLastUserContentBeforeOpenAssistant(targetSession.events)
-      : null;
-    if (resendContent) {
-      window.setTimeout(() => {
-        setRunningSessionId(recoveredSession.id);
-        void window.api.sendPrompt({
-          sessionId: getRuntimeSessionId(recoveredSession) ?? recoveredSession.id,
-          content: resendContent,
-          thinking: defaultThinking,
-          yoloMode: permissionMode === "yolo",
-        }).then((res) => {
-          if (!res.success) throw new Error(res.error);
-        }).catch((err) => {
-          console.error("Recover resend failed:", err);
-          setRunningSessionId(null);
-        });
-      }, 120);
-    }
-    return recoveredSession;
-  };
-
-  useEffect(() => {
-    if (!activeSession || !shouldRecoverHandoffSourceSession(activeSession)) return;
-    const hasOpenAssistant = activeSession.events.some((event) => event.type === "assistant_message" && !event.isComplete);
-    const isRunningThisSession = runningSessionId === activeSession.id;
-    if (!hasOpenAssistant && !isRunningThisSession) return;
-    if (recoveringSessionIdsRef.current.has(activeSession.id)) return;
-    recoveringSessionIdsRef.current.add(activeSession.id);
-    void recoverHandoffSourceSession(activeSession, { resendLastOpenUserMessage: true }).finally(() => {
-      recoveringSessionIdsRef.current.delete(activeSession.id);
-    });
-  }, [activeSession?.id, activeSession?.events, runningSessionId]);
-
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[] }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return;
-    const targetSession = await recoverHandoffSourceSession(ensuredSession);
+    let targetSession = ensuredSession;
     const images = options?.images ?? [];
 
     const userEvent: TimelineEvent = {
@@ -440,22 +371,61 @@ export function Composer() {
 
     setRunningSessionId(targetSession.id);
     const outboundContent = targetSession.longTask ? content : withClarificationBehavior(content, clarificationToolMode);
-    const runtimeSessionId = getRuntimeSessionId(targetSession);
+    let runtimeSessionId = getRuntimeSessionId(targetSession);
     if (!runtimeSessionId) {
       setRunningSessionId(null);
       return;
     }
+    const sendToRuntime = (sessionId: string) => window.api.sendPrompt({
+      sessionId,
+      content: outboundContent,
+      images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+      planMode: defaultPlanMode,
+      afkMode: defaultAfkMode,
+    });
     try {
-      await window.api.sendPrompt({
-        sessionId: runtimeSessionId,
-        content: outboundContent,
-        images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-      });
+      let res = await sendToRuntime(runtimeSessionId);
+      if (!res.success && /session not found/i.test(res.error)) {
+        const startRes = await window.api.startSession({
+          workDir: targetSession.projectPath,
+          sessionId: targetSession.id,
+          model: "kimi-code/kimi-for-coding",
+          thinking: defaultThinking,
+          yoloMode: permissionMode === "yolo",
+          planMode: defaultPlanMode,
+          afkMode: defaultAfkMode,
+        });
+        if (!startRes.success) throw new Error(startRes.error);
+        runtimeSessionId = startRes.data.sessionId;
+        targetSession = { ...targetSession, runtimeSessionId };
+        updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId }));
+        if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+        res = await sendToRuntime(runtimeSessionId);
+      }
+      if (!res.success) throw new Error(res.error);
     } catch (err) {
       console.error("Send failed:", err);
       setRunningSessionId(null);
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        events: [
+          ...session.events.map((event) => event.type === "assistant_message" && !event.isComplete
+            ? { ...event, isComplete: true, isThinking: false }
+            : event
+          ),
+          {
+            id: genId(),
+            type: "error",
+            timestamp: Date.now(),
+            message: err instanceof Error ? err.message : String(err),
+            source: "ipc",
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+      return;
     }
   };
 
@@ -521,6 +491,8 @@ export function Composer() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      planMode: defaultPlanMode,
+      afkMode: defaultAfkMode,
       skillsDir: saveRes.data.enabledDir,
     });
     if (!startRes.success) {
@@ -673,6 +645,53 @@ export function Composer() {
     }));
   };
 
+  const handleTogglePlanMode = async () => {
+    if (!canTogglePlanMode) return;
+    const next = !defaultPlanMode;
+    setDefaultPlanMode(next);
+    const runtimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
+    if (!runtimeSessionId) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: next ? "Plan 模式已开启" : "Plan 模式已关闭",
+      }));
+      return;
+    }
+    const res = await window.api.setPlanMode({ sessionId: runtimeSessionId, enabled: next });
+    if (!res.success) {
+      setDefaultPlanMode(!next);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `Plan 模式切换失败：${res.error}`,
+      }));
+      return;
+    }
+    setDefaultPlanMode(next);
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: next ? "Plan 模式已开启" : "Plan 模式已关闭",
+    }));
+  };
+
+  const handleToggleAfkMode = () => {
+    const next = !defaultAfkMode;
+    setDefaultAfkMode(next);
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: next ? "自动模式已开启" : "自动模式已关闭",
+    }));
+  };
+
+  const handleAddWorkDir = () => {
+    setAdditionalWorkDirs([...additionalWorkDirs, ""]);
+  };
+
+  const handleChangeWorkDir = (index: number, value: string) => {
+    const next = [...additionalWorkDirs];
+    next[index] = value;
+    setAdditionalWorkDirs(next);
+  };
+
+  const handleRemoveWorkDir = (index: number) => {
+    setAdditionalWorkDirs(additionalWorkDirs.filter((_, itemIndex) => itemIndex !== index));
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     if (!hasDraggedFiles(e)) return;
     e.preventDefault();
@@ -814,6 +833,14 @@ export function Composer() {
     : isCurrentSessionHandoff
       ? "正在生成交接内容..."
       : "请先选择项目";
+  const composerCardSessionId = currentSession?.id ?? "__global__";
+  const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
+  const todoHidden = hiddenCards.includes("todo");
+  const pendingHidden = hiddenCards.includes("pending");
+  const hideComposerCard = (card: "todo" | "pending", label: string) => {
+    setComposerCardHidden(composerCardSessionId, card, true);
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
+  };
 
   return (
     <div
@@ -823,16 +850,30 @@ export function Composer() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {currentSession && <TodoPanel events={currentSession.events} />}
+      {currentSession && !todoHidden && (
+        <TodoPanel
+          events={currentSession.events}
+          onDismiss={() => hideComposerCard("todo", "TodoList")}
+        />
+      )}
 
-      {pendingMessages.length > 0 && (
+      {pendingMessages.length > 0 && !pendingHidden && (
         <div
           className="kimix-floating-panel overflow-hidden rounded-[15px] text-[13px]"
           style={{ marginBottom: 8 }}
         >
-          <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ paddingLeft: 20, paddingRight: 22 }}>
+          <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 12, paddingLeft: 20, paddingRight: 14 }}>
             <span className="min-w-0 truncate">{pendingMessages.length} 条消息正在排队</span>
             {isCurrentSessionRunning && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">当前任务结束后继续</span>}
+            <button
+              type="button"
+              onClick={() => hideComposerCard("pending", "排队消息")}
+              className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+              title="收起到侧栏"
+              aria-label="收起排队消息"
+            >
+              <X size={13} />
+            </button>
           </div>
           <div className="max-h-40 overflow-y-auto">
             {pendingMessages.map((msg) => (
@@ -1043,35 +1084,112 @@ export function Composer() {
                 <Plus size={18} />
               </button>
               {showAddMenu && (
-                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[276px] rounded-xl" style={{ padding: "12px 12px 11px" }}>
-                  <div className="flex items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]" style={{ padding: "4px 6px 10px" }}>
-                    <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-                    <span>需求澄清工具</span>
-                  </div>
-                  <div className="flex flex-col" style={{ gap: 8 }}>
-                    {CLARIFICATION_OPTIONS.map((option) => {
-                      const active = clarificationToolMode === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => handleSetClarificationToolMode(option.value)}
-                          className={`flex min-h-11 w-full items-center rounded-xl text-left transition-colors ${active ? "bg-[#eef7ff] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
-                          style={{ gap: 10, paddingLeft: 12, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[372px] rounded-xl" style={{ padding: "16px 16px 15px" }}>
+                  <div className="flex flex-col" style={{ gap: 14 }}>
+                    <section>
+                      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                        <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
+                          <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                          <span>需求澄清</span>
+                        </div>
+                        <div className="flex w-[158px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ gap: 4, padding: 4 }}>
+                          {CLARIFICATION_OPTIONS.map((option) => {
+                            const active = clarificationToolMode === option.value;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                title={option.desc}
+                                onClick={() => handleSetClarificationToolMode(option.value)}
+                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-white text-[#1769aa] shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-white/70"}`}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
+                      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                        <div
+                          className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]"
+                          title="自动模式会按 AFK 行为自动跳过用户提问并自动批准工具调用。"
                         >
-                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${active ? "border-[#339af0] bg-[#339af0] text-white" : "border-[#d8d2c8] text-transparent"}`}>
-                            <Check size={12} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[13.5px] leading-5">{option.label}</span>
-                            <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{option.desc}</span>
-                          </span>
+                          <Bot size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                          <span>自动模式</span>
+                        </div>
+                        <div
+                          className="flex w-[158px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]"
+                          style={{ gap: 4, padding: 4 }}
+                          title="自动模式会按 AFK 行为自动跳过用户提问并自动批准工具调用。"
+                        >
+                          {[
+                            { value: false, label: "关闭" },
+                            { value: true, label: "开启" },
+                          ].map((option) => {
+                            const active = defaultAfkMode === option.value;
+                            return (
+                              <button
+                                key={String(option.value)}
+                                type="button"
+                                onClick={() => {
+                                  if (defaultAfkMode !== option.value) handleToggleAfkMode();
+                                }}
+                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-white text-[#1769aa] shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-white/70"}`}
+                                aria-pressed={active}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
+                      <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 10 }}>
+                        <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
+                          <TerminalSquare size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                          <span>额外工作目录</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddWorkDir}
+                          className="kimix-icon-text-button is-compact shrink-0 text-[#625d55] hover:bg-[var(--kimix-panel-hover)]"
+                        >
+                          <Plus size={13} />
+                          添加
                         </button>
-                      );
-                    })}
-                  </div>
-                  <div className="border-t border-[var(--kimix-panel-divider)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 10, padding: "11px 6px 2px" }}>
-                    默认自动判断；需要用户选择时会显示官方结构化问题。
+                      </div>
+                      <div className="flex flex-col" style={{ gap: 8 }}>
+                        {additionalWorkDirs.length === 0 ? (
+                          <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "10px 11px" }}>
+                            暂无额外目录。添加后会通过 Kimi CLI --add-dir 纳入工作区范围。
+                          </div>
+                        ) : additionalWorkDirs.map((dir, index) => (
+                          <div key={`${index}-${dir}`} className="flex items-center" style={{ gap: 8 }}>
+                            <input
+                              type="text"
+                              value={dir}
+                              onChange={(event) => handleChangeWorkDir(index, event.target.value)}
+                              placeholder="例如 D:\\Projects\\shared-lib"
+                              className="kimix-settings-input h-9 min-w-0 flex-1 rounded-lg px-3 text-[13px] outline-none transition-colors"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveWorkDir(index)}
+                              className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8b3d34]"
+                              title="删除目录"
+                              aria-label="删除目录"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   </div>
                 </div>
               )}
@@ -1088,7 +1206,7 @@ export function Composer() {
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} onClick={() => { setPermissionMode(opt.value); setShowPermissionMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${permissionMode === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                      <button key={opt.value} title={opt.tooltip} onClick={() => { setPermissionMode(opt.value); setShowPermissionMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${permissionMode === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                         <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
                         {permissionMode === opt.value && <Check size={13} className="mr-1 shrink-0 text-[var(--kimix-panel-text)]" />}
@@ -1101,7 +1219,22 @@ export function Composer() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
-            <ContextRing />
+            <button
+              disabled={!canTogglePlanMode}
+              onClick={() => void handleTogglePlanMode()}
+              className="kimix-icon-text-button kimix-muted-action is-compact min-w-[92px] border disabled:cursor-not-allowed disabled:opacity-35"
+              style={{
+                borderColor: defaultPlanMode ? "#8cc7f7" : "transparent",
+                backgroundColor: defaultPlanMode ? "#e7f4ff" : "transparent",
+                color: defaultPlanMode ? "#1769aa" : undefined,
+                boxShadow: defaultPlanMode ? "inset 0 0 0 1px rgba(51, 154, 240, 0.16)" : undefined,
+              }}
+              title={defaultPlanMode ? "关闭 Plan 模式。Plan 模式会先生成计划，等待确认后再执行。" : "开启 Plan 模式。Plan 模式会先生成计划，等待确认后再执行。"}
+              aria-pressed={defaultPlanMode}
+            >
+              <ClipboardList size={14} className="shrink-0" />
+              <span>{defaultPlanMode ? "Plan 开" : "Plan 关"}</span>
+            </button>
             <div ref={thinkingBtnRef} className="relative">
               <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact min-w-[126px] disabled:cursor-not-allowed disabled:opacity-35">
                 <Brain size={14} className="shrink-0" />
@@ -1111,7 +1244,7 @@ export function Composer() {
               {showThinkingMenu && (
                 <div className="kimix-floating-panel absolute bottom-full right-0 z-20 mb-2 w-[188px] rounded-xl" style={{ paddingTop: 12, paddingBottom: 12 }}>
                   {THINKING_OPTIONS.map((option) => (
-                    <button key={String(option.value)} onClick={() => { setDefaultThinking(option.value); setShowThinkingMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center justify-between gap-4 text-left text-[14px] leading-none hover:bg-[var(--kimix-panel-hover)] ${defaultThinking === option.value ? "text-accent-blue" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                    <button key={String(option.value)} title={option.tooltip} onClick={() => { setDefaultThinking(option.value); setShowThinkingMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center justify-between gap-4 text-left text-[14px] leading-none hover:bg-[var(--kimix-panel-hover)] ${defaultThinking === option.value ? "text-accent-blue" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                       {option.label}
                       {defaultThinking === option.value && <Check size={14} />}
                     </button>
@@ -1120,6 +1253,7 @@ export function Composer() {
               )}
             </div>
 
+            <ContextRing />
             <button disabled={!canUseComposer} onClick={() => void handleVoiceShortcut()} className={iconButtonClass} title={`语音快捷键：${voiceShortcut || "Win+H"}`} aria-label="语音">
               <Mic size={16} />
             </button>

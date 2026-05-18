@@ -59,6 +59,8 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -90,7 +92,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
       return;
     }
     try {
-      await window.api.sendPrompt({
+      const res = await window.api.sendPrompt({
         sessionId: runtimeSessionId,
         content: event.content,
         images: images
@@ -98,7 +100,10 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
           .map((image) => ({ name: image.name, dataUrl: image.dataUrl as string })),
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        planMode: defaultPlanMode,
+        afkMode: defaultAfkMode,
       });
+      if (!res.success) throw new Error(res.error);
     } catch (err) {
       console.error("Resend failed:", err);
       setRunningSessionId(null);
@@ -323,20 +328,20 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = block.text.trim().length > 140 || /\n/.test(block.text);
   return (
-    <div className="kimix-soft-card rounded-xl" style={{ padding: "12px 14px" }}>
+    <div className="kimix-soft-card overflow-hidden rounded-xl">
       <button
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="flex w-full items-center rounded-lg text-left text-[14px] leading-6 text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 8, padding: "4px 6px" }}
+        className="grid min-h-10 w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] leading-6 text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 8, paddingBottom: 8 }}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Brain size={15} />
         </span>
         <span className="min-w-0 flex-1">{firstThinkingSentence(block.text)}</span>
         {canExpand && (
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </span>
         )}
@@ -352,8 +357,10 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
 
 function ToolProcessItem({ tool }: { tool: ToolEvent }) {
   return (
-    <div className="kimix-soft-card flex min-h-10 items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
-      <SquareTerminal size={14} className="shrink-0 text-[var(--kimix-process-muted)]" />
+    <div className="kimix-soft-card grid min-h-10 grid-cols-[18px_auto_minmax(0,1fr)_auto_8px] items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
+      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+        <SquareTerminal size={14} />
+      </span>
       <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
       <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
       {tool.durationMs !== undefined && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
@@ -366,12 +373,14 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
   const isRunning = subagent.status === "running";
   const isError = subagent.status === "error";
   return (
-    <div className="kimix-soft-card flex min-h-10 items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
-      {isRunning ? (
-        <Loader2 size={14} className="kimix-spin shrink-0 text-[var(--kimix-process-muted)]" />
-      ) : (
-        <Bot size={14} className="shrink-0 text-[var(--kimix-process-muted)]" />
-      )}
+    <div className="kimix-soft-card grid min-h-10 grid-cols-[18px_auto_minmax(0,1fr)_8px] items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
+      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+        {isRunning ? (
+          <Loader2 size={14} className="kimix-spin" />
+        ) : (
+          <Bot size={14} />
+        )}
+      </span>
       <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
       <span className="min-w-0 flex-1 truncate">{subagent.agentName || "子代理"}</span>
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isError ? "bg-[#d83b01]" : isRunning ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
@@ -461,9 +470,13 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const isActiveAssistant = Boolean(currentSession?.id && runningSessionId === currentSession.id && !event.isComplete);
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
+  const hasProcessDetails = Boolean(event.thinking?.trim() || leadingTools.length > 0 || leadingSubagents.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
+  const shouldShowNoContentHint = !hasContent && !hasProcessDetails && (event.isComplete || (isActiveAssistant && elapsed >= 8000));
   const durationLabel = event.isComplete
     ? formatDuration(event.durationMs && event.durationMs > 0 ? event.durationMs : elapsed)
-    : formatDuration(elapsed);
+    : isActiveAssistant && elapsed >= 1000
+      ? formatDuration(elapsed)
+      : "";
   const roleLabel = formatAgentRole(event.agentRole);
   const displayProcessLabel = event.isComplete
     ? `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
@@ -476,6 +489,17 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {(event.isThinking || event.isComplete || !hasContent) && (
           <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={displayProcessLabel} />
+        )}
+
+        {shouldShowNoContentHint && (
+          <div
+            className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+            style={{ padding: "12px 14px" }}
+          >
+            {event.isComplete
+              ? "本轮没有生成正文内容，Kimi 只返回了思考过程、命令执行或文件变更。"
+              : "Kimi 还没有生成正文内容，当前仍在思考或执行命令。"}
+          </div>
         )}
 
         {hasContent && (

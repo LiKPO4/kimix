@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, ComposerDockCard } from "@/types/ui";
 
 interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
@@ -9,6 +9,9 @@ interface AppStore extends AppState {
   setRunningSessionId: (sessionId: string | null) => void;
   setCreatingSessionProjectPath: (projectPath: string | null) => void;
   setDefaultThinking: (thinking: boolean) => void;
+  setDefaultPlanMode: (enabled: boolean) => void;
+  setDefaultAfkMode: (enabled: boolean) => void;
+  setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (enabled: boolean) => void;
   setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
   setSessionRecommendationEnabled: (enabled: boolean) => void;
@@ -18,6 +21,7 @@ interface AppStore extends AppState {
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
   setDiffPanelOpen: (open: boolean) => void;
+  setComposerCardHidden: (sessionId: string, card: ComposerDockCard, hidden: boolean) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
@@ -41,6 +45,9 @@ export const useAppStore = create<AppStore>((set) => ({
   runningSessionId: null,
   creatingSessionProjectPath: null,
   defaultThinking: true,
+  defaultPlanMode: false,
+  defaultAfkMode: false,
+  additionalWorkDirs: [],
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
   sessionRecommendationEnabled: true,
@@ -50,6 +57,7 @@ export const useAppStore = create<AppStore>((set) => ({
   longTasksOpen: false,
   longTaskInspectorOpen: false,
   diffPanelOpen: false,
+  hiddenComposerCards: {},
   handoffSessionId: null,
   sidebarOpen: true,
   theme: "light",
@@ -66,6 +74,9 @@ export const useAppStore = create<AppStore>((set) => ({
   setRunningSessionId: (sessionId) => set({ runningSessionId: sessionId, isRunning: Boolean(sessionId) }),
   setCreatingSessionProjectPath: (projectPath) => set({ creatingSessionProjectPath: projectPath }),
   setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
+  setDefaultPlanMode: (enabled) => set({ defaultPlanMode: enabled }),
+  setDefaultAfkMode: (enabled) => set({ defaultAfkMode: enabled }),
+  setAdditionalWorkDirs: (dirs) => set({ additionalWorkDirs: dirs }),
   setDetailedContext: (enabled) => set({ detailedContext: enabled }),
   setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),
   setSessionRecommendationEnabled: (enabled) => set({ sessionRecommendationEnabled: enabled }),
@@ -75,6 +86,18 @@ export const useAppStore = create<AppStore>((set) => ({
   setLongTasksOpen: (open) => set({ longTasksOpen: open }),
   setLongTaskInspectorOpen: (open) => set({ longTaskInspectorOpen: open }),
   setDiffPanelOpen: (open) => set({ diffPanelOpen: open }),
+  setComposerCardHidden: (sessionId, card, hidden) => set((state) => {
+    const current = state.hiddenComposerCards[sessionId] ?? [];
+    const next = hidden
+      ? Array.from(new Set([...current, card]))
+      : current.filter((item) => item !== card);
+    return {
+      hiddenComposerCards: {
+        ...state.hiddenComposerCards,
+        [sessionId]: next,
+      },
+    };
+  }),
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),

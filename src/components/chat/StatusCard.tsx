@@ -37,6 +37,7 @@ function formatTimestamp(timestamp: number): string {
 export function StatusCard({ event }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
   const details = [
+    event.planMode === true ? "Plan" : "",
     event.message ? event.message : "",
     formatTimestamp(event.timestamp),
     event.tokenCount !== undefined ? `Tokens: ${formatK(event.tokenCount)}` : "",

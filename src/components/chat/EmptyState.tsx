@@ -43,6 +43,8 @@ export function EmptyState() {
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -91,6 +93,8 @@ export function EmptyState() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      planMode: defaultPlanMode,
+      afkMode: defaultAfkMode,
     });
     if (!sessionRes.success) return null;
 
@@ -148,12 +152,15 @@ export function EmptyState() {
       }));
 
       setRunningSessionId(targetSession.id);
-      await window.api.sendPrompt({
+      const sendRes = await window.api.sendPrompt({
         sessionId: targetSession.id,
         content: text,
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        planMode: defaultPlanMode,
+        afkMode: defaultAfkMode,
       });
+      if (!sendRes.success) throw new Error(sendRes.error);
     } catch (err) {
       console.error("Send failed:", err);
       setRunningSessionId(null);
@@ -186,19 +193,19 @@ export function EmptyState() {
 
   return (
     <div className="kimix-content-x flex h-full w-full items-center justify-center">
-      <div className="flex w-full flex-col items-center" style={{ gap: 28 }}>
+      <div className="flex w-full flex-col items-center" style={{ gap: 14 }}>
         <h1 className="text-center text-[28px] font-normal leading-tight text-text-primary">
           要在 {titleProjectName} 中构建什么？
         </h1>
 
-        <div className="flex w-full max-w-[460px] flex-col" style={{ gap: 6 }}>
+        <div className="flex w-full max-w-[460px] flex-col" style={{ gap: 3 }}>
           {derivedSuggestions.map((suggestion) => (
             <button
               key={suggestion.text}
               onClick={() => handleSuggestion(suggestion.text)}
               disabled={isSending}
               className={`flex w-full items-center rounded-lg text-left text-[15px] leading-6 transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed ${pendingSuggestion === suggestion.text ? "bg-[#f1eee8] text-text-primary opacity-100" : "text-text-secondary disabled:opacity-50"}`}
-              style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12 }}
+              style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6 }}
             >
               <suggestion.icon size={18} className="shrink-0 text-text-muted" />
               <span className="min-w-0 flex-1">{suggestion.text}</span>

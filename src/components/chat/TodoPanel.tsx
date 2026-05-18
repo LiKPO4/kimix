@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardList, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardList, Loader2, X } from "lucide-react";
 import type { TimelineEvent, TodoItem } from "@/types/ui";
 
 interface TodoPanelProps {
   events: TimelineEvent[];
+  onDismiss?: () => void;
 }
 
 function isTodoStatus(value: unknown): value is TodoItem["status"] {
@@ -35,7 +36,7 @@ function todoItemsFromTool(event: Extract<TimelineEvent, { type: "tool_call" }>)
   });
 }
 
-function getLatestTodos(events: TimelineEvent[]): TodoItem[] {
+export function getLatestTodos(events: TimelineEvent[]): TodoItem[] {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
     if (event.type === "todo" && event.items.length > 0) return event.items;
@@ -47,8 +48,8 @@ function getLatestTodos(events: TimelineEvent[]): TodoItem[] {
   return [];
 }
 
-export function TodoPanel({ events }: TodoPanelProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function TodoPanel({ events, onDismiss }: TodoPanelProps) {
+  const [collapsed, setCollapsed] = useState(true);
   const items = useMemo(() => getLatestTodos(events), [events]);
   if (items.length === 0) return null;
 
@@ -60,18 +61,31 @@ export function TodoPanel({ events }: TodoPanelProps) {
       className="overflow-hidden rounded-[16px] border border-[#e1dcd3] bg-white/95 text-[14.5px] shadow-[0_3px_12px_rgba(25,23,20,0.05)]"
       style={{ marginBottom: 8 }}
     >
-      <button
-        type="button"
-        onClick={() => setCollapsed((value) => !value)}
-        className={`no-focus-outline flex h-11 w-full items-center border-[#eeeae3] text-left text-[#7c756c] transition-colors hover:bg-[#faf8f4] focus:outline-none focus-visible:outline-none ${collapsed ? "" : "border-b"}`}
-        style={{ gap: 11, paddingLeft: 24, paddingRight: 26 }}
-      >
-        {collapsed ? <ChevronRight size={17} className="shrink-0" /> : <ChevronDown size={17} className="shrink-0" />}
-        <ClipboardList size={17} className="shrink-0 text-[#8f887e]" />
-        <span className="min-w-0 flex-1 truncate">TodoList</span>
-        {activeCount > 0 && <span className="shrink-0 text-[#8f887e]">{activeCount} 项进行中</span>}
-        <span className="shrink-0 text-[#8f887e]">{doneCount}/{items.length}</span>
-      </button>
+      <div className={`flex h-11 items-center border-[#eeeae3] text-[#7c756c] ${collapsed ? "" : "border-b"}`} style={{ paddingLeft: 24, paddingRight: 12 }}>
+        <button
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          className="no-focus-outline flex h-full min-w-0 flex-1 items-center text-left transition-colors hover:text-[#4f4941] focus:outline-none focus-visible:outline-none"
+          style={{ gap: 11, paddingRight: 10 }}
+        >
+          {collapsed ? <ChevronRight size={17} className="shrink-0" /> : <ChevronDown size={17} className="shrink-0" />}
+          <ClipboardList size={17} className="shrink-0 text-[#8f887e]" />
+          <span className="min-w-0 flex-1 truncate">TodoList</span>
+          {activeCount > 0 && <span className="shrink-0 text-[#8f887e]">{activeCount} 项进行中</span>}
+          <span className="shrink-0 text-[#8f887e]">{doneCount}/{items.length}</span>
+        </button>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+            title="收起到侧栏"
+            aria-label="收起 TodoList"
+          >
+            <X size={13} />
+          </button>
+        )}
+      </div>
       {!collapsed && (
         <div className="max-h-44 overflow-y-auto">
           {items.map((item) => (

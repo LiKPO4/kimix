@@ -29,7 +29,7 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className={`kimix-selection-indicator mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
+      className={`kimix-selection-indicator mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${selected ? "is-selected" : ""} ${
         selected
           ? "border-[#0078d4] bg-[#0078d4] text-white"
           : "text-transparent"
@@ -130,10 +130,10 @@ export function SettingsPanel() {
     { value: "system", label: "跟随系统", icon: Monitor },
   ];
 
-  const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield }[] = [
-    { value: "manual", label: "手动审批", desc: "每次工具调用都需要确认", icon: Shield },
-    { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动批准同类请求", icon: Zap },
-    { value: "yolo", label: "完全访问", desc: "自动批准所有工具请求（谨慎使用）", icon: GitBranch },
+  const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
+    { value: "manual", label: "手动审批", desc: "每次工具调用都需要确认", icon: Shield, tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
+    { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动批准同类请求", icon: Zap, tooltip: "本会话允许：同类工具请求在当前会话内自动批准，减少重复确认。" },
+    { value: "yolo", label: "完全访问", desc: "自动批准所有工具请求（谨慎使用）", icon: GitBranch, tooltip: "完全访问：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
   ];
   const archivedSessions = sessions
     .filter((session) => session.archivedAt)
@@ -216,7 +216,7 @@ export function SettingsPanel() {
             </div>
             <div className="kimix-settings-permissions">
               {permissions.map((p) => (
-                <button key={p.value} onClick={() => setPermissionMode(p.value)} className={`kimix-settings-permission ${permissionMode === p.value ? "is-active" : ""}`}>
+                <button key={p.value} title={p.tooltip} onClick={() => setPermissionMode(p.value)} className={`kimix-settings-permission ${permissionMode === p.value ? "is-active" : ""}`}>
                   <SelectionIndicator selected={permissionMode === p.value} />
                   <p.icon size={18} className={`mt-0.5 shrink-0 ${permissionMode === p.value ? "text-[#0078d4]" : "text-[#8f887e]"}`} />
                   <div className="kimix-settings-permission-copy">
@@ -412,7 +412,7 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.7.63 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.7.100 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

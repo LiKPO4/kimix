@@ -7,6 +7,7 @@ import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 
 interface MarkdownRendererProps {
   content: string;
+  wrapLongLines?: boolean;
 }
 
 // Module-level ref-counted theme link
@@ -24,7 +25,7 @@ function updateHljsTheme() {
   hljsLinkEl.href = isDark ? githubDarkCssUrl : githubCssUrl;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRendererProps) {
   useEffect(() => {
     hljsLinkRefCount++;
     updateHljsTheme();
@@ -77,6 +78,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 marginRight: 2,
                 padding: "2px 6px",
                 lineHeight: 1.55,
+                overflowWrap: wrapLongLines ? "anywhere" : undefined,
+                wordBreak: wrapLongLines ? "break-word" : undefined,
                 boxDecorationBreak: "clone",
                 WebkitBoxDecorationBreak: "clone",
               }}
@@ -92,8 +95,28 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 {codeClassName?.replace("language-", "") || "code"}
               </span>
             </div>
-            <pre className="overflow-x-auto bg-[#fbfaf7]" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 14 }}>
-              <code className={`${codeClassName} block font-mono text-sm leading-6`}>{children}</code>
+            <pre
+              className={`${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"} bg-[#fbfaf7]`}
+              style={{
+                paddingLeft: 18,
+                paddingRight: 18,
+                paddingTop: 14,
+                paddingBottom: 14,
+                whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
+                overflowWrap: wrapLongLines ? "anywhere" : undefined,
+                wordBreak: wrapLongLines ? "break-word" : undefined,
+              }}
+            >
+              <code
+                className={`${codeClassName ?? ""} block font-mono text-sm leading-6`}
+                style={{
+                  whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
+                  overflowWrap: wrapLongLines ? "anywhere" : undefined,
+                  wordBreak: wrapLongLines ? "break-word" : undefined,
+                }}
+              >
+                {children}
+              </code>
             </pre>
           </div>
         );
@@ -121,8 +144,18 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         );
       },
       table: ({ children }: { children?: React.ReactNode }) => (
-        <div className="my-3 overflow-x-auto rounded-lg" style={{ border: "1px solid #ded8ce" }}>
-          <table className="w-full text-sm text-text-primary" style={{ borderColor: "#e5e1d8" }}>{children}</table>
+        <div className={`my-3 rounded-lg ${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"}`} style={{ border: "1px solid #ded8ce" }}>
+          <table
+            className="w-full text-sm text-text-primary"
+            style={{
+              borderColor: "#e5e1d8",
+              tableLayout: wrapLongLines ? "fixed" : undefined,
+              overflowWrap: wrapLongLines ? "anywhere" : undefined,
+              wordBreak: wrapLongLines ? "break-word" : undefined,
+            }}
+          >
+            {children}
+          </table>
         </div>
       ),
       thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-bg-tertiary text-text-secondary font-medium">{children}</thead>,
@@ -130,14 +163,14 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2" style={{ border: "1px solid #eee9e1" }}>{children}</td>,
       hr: () => <hr className="my-4 border-border-default" />,
     }),
-    []
+    [wrapLongLines]
   );
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(() => [rehypeHighlight], []);
 
   return (
-    <div className="markdown-body">
+    <div className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}>
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
         {content}
       </ReactMarkdown>

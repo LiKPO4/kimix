@@ -176,8 +176,8 @@ body {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -186,7 +186,9 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 2px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -449,11 +451,44 @@ body {
 .kimix-app-shell {
   background: var(--kimix-shell-bg);
   color: var(--kimix-panel-text);
+  padding-right: 8px;
 }
 
 .kimix-app-shell-main {
   border-color: var(--kimix-main-border);
   background: var(--kimix-main-bg);
+}
+
+.kimix-layout-resizer {
+  position: relative;
+  width: 12px;
+  flex: 0 0 12px;
+  cursor: col-resize;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.kimix-layout-spacer {
+  width: 12px;
+  flex: 0 0 12px;
+}
+
+.kimix-layout-resizer::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 5px;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.kimix-layout-resizer:hover::after,
+.kimix-layout-resizer:active::after {
+  background: rgba(47, 111, 173, 0.38);
+  box-shadow: 0 0 0 3px rgba(47, 111, 173, 0.08);
 }
 
 .kimix-app-shell-toolbar,
@@ -730,6 +765,12 @@ body {
   background: var(--kimix-selection-idle-bg);
 }
 
+.kimix-selection-indicator.is-selected {
+  border-color: #0078d4;
+  background: #0078d4;
+  color: #ffffff;
+}
+
 .kimix-composer-card {
   border-color: var(--kimix-composer-border);
   background: var(--kimix-composer-bg);
@@ -859,6 +900,19 @@ body {
   font-size: 15px;
   line-height: 1.68;
   color: var(--text-primary);
+  min-width: 0;
+}
+
+.kimix-markdown-wrap-long-lines {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.kimix-markdown-wrap-long-lines pre,
+.kimix-markdown-wrap-long-lines code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-body p {

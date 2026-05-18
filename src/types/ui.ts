@@ -2,6 +2,7 @@ export type Theme = "dark" | "light" | "system";
 
 export type PermissionMode = "manual" | "approve_for_session" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
+export type ComposerDockCard = "todo" | "pending";
 
 export interface AppState {
   currentProject: Project | null;
@@ -11,6 +12,9 @@ export interface AppState {
   runningSessionId: string | null;
   creatingSessionProjectPath: string | null;
   defaultThinking: boolean;
+  defaultPlanMode: boolean;
+  defaultAfkMode: boolean;
+  additionalWorkDirs: string[];
   detailedContext: boolean;
   statusUpdateDisplay: StatusUpdateDisplay;
   sessionRecommendationEnabled: boolean;
@@ -20,6 +24,7 @@ export interface AppState {
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
   diffPanelOpen: boolean;
+  hiddenComposerCards: Record<string, ComposerDockCard[]>;
   handoffSessionId: string | null;
   sidebarOpen: boolean;
   theme: Theme;
@@ -209,6 +214,7 @@ export interface StatusUpdateEvent {
   inputTokenCount?: number;
   contextSize?: number;
   contextLimit?: number;
+  planMode?: boolean;
   message?: string;
 }
 

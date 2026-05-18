@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot } from "lucide-react";
+import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { EmptyState } from "./EmptyState";
@@ -12,11 +12,14 @@ import { ApprovalCard } from "./ApprovalCard";
 import { QuestionCard } from "./QuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import { SessionRecommendationCard } from "./SessionRecommendationCard";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
   | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }
-  | { type: "tool_group"; id: string; tools: ToolCallEvent[] };
+  | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
+  | { type: "plan_preview"; id: string; path: string; projectPath?: string }
+  | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
 
 function useAnimatedDots(active: boolean) {
   const [count, setCount] = useState(0);
@@ -51,6 +54,78 @@ const longTaskAgentLabels: Record<LongTaskSessionMeta["activeAgent"], string> = 
   executor: "执行 agent",
   reviewer: "审查 agent",
 };
+
+const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi\/plans\/[^\s"'<>|]+\.md|\.kimi[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/i;
+
+function cleanPlanPath(pathValue: string) {
+  return pathValue.trim().replace(/[),.;，。；）]+$/u, "");
+}
+
+function findPlanPathInChangeSummary(event?: Extract<TimelineEvent, { type: "change_summary" }> | null) {
+  return event?.files.map((file) => file.path.match(KIMI_PLAN_PATH_PATTERN)?.[0]).filter(Boolean).map((path) => cleanPlanPath(path as string))[0] ?? null;
+}
+
+function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: string }) {
+  const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadPlan = () => {
+    setLoading(true);
+    setError("");
+    void window.api.readTextFile({ path, projectPath }).then((res) => {
+      if (res.success) {
+        setContent(res.data.content);
+      } else {
+        setContent("");
+        setError(res.error);
+      }
+    }).catch((err: unknown) => {
+      setContent("");
+      setError(err instanceof Error ? err.message : String(err));
+    }).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadPlan();
+  }, [path, projectPath]);
+
+  return (
+    <div className="w-full overflow-hidden rounded-[14px] border border-[#cfe4fb] bg-[#f8fbff]">
+      <div className="flex min-h-14 items-center border-b border-[#dbeafa]" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
+        <FileText size={16} className="shrink-0 text-[#2f6fad]" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[14.5px] font-medium leading-5 text-[#24415f]">待确认的 Plan</div>
+          <div className="mt-1 truncate text-[12.5px] leading-5 text-[#6f87a1]">{path}</div>
+        </div>
+        <button
+          type="button"
+          onClick={loadPlan}
+          disabled={loading}
+          className="kimix-icon-text-button is-compact shrink-0 bg-white text-[#2f6fad] hover:bg-[#eef7ff] disabled:cursor-wait disabled:opacity-60"
+        >
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          刷新
+        </button>
+      </div>
+      <div style={{ padding: "16px 18px 18px" }}>
+        {loading ? (
+          <div className="rounded-lg bg-white text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 14px" }}>
+            正在读取 Plan 内容...
+          </div>
+        ) : error ? (
+          <div className="rounded-lg bg-[#fff4f0] text-[13px] leading-6 text-[#9b4b34]" style={{ padding: "13px 14px" }}>
+            读取 Plan 失败：{error}
+          </div>
+        ) : (
+          <div className="max-h-[520px] overflow-y-auto rounded-lg bg-white text-[14px] leading-6 text-[#24415f]" style={{ padding: "16px 16px" }}>
+            <MarkdownRenderer content={content || "Plan 文件为空。"} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function CompactionLabel({ event }: { event: Extract<TimelineEvent, { type: "compaction" }> }) {
   const isStale = event.phase === "begin" && Date.now() - event.timestamp >= COMPACTION_STALE_MS;
@@ -215,14 +290,33 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     items.push({ type: "tool_group", id: tools[0].id, tools });
   };
 
+  const mergeAssistantProcessEvents = (assistantEvents: Extract<TimelineEvent, { type: "assistant_message" }>[]) => {
+    const visible = assistantEvents.filter((event) => event.content.trim().length > 0 || event.thinking?.trim() || !event.isComplete);
+    if (visible.length === 0) return undefined;
+    const first = visible[0];
+    const last = visible[visible.length - 1];
+    return {
+      ...first,
+      id: visible.map((event) => event.id).join(":"),
+      timestamp: first.timestamp,
+      content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
+      thinking: visible.map((event) => event.thinking ?? "").filter((thinking) => thinking.trim()).join(""),
+      thinkingParts: visible.flatMap((event) => event.thinkingParts ?? []),
+      isThinking: visible.some((event) => event.isThinking && !event.isComplete),
+      isComplete: visible.every((event) => event.isComplete),
+      durationMs: last.durationMs ?? Math.max(0, last.timestamp - first.timestamp),
+    } satisfies Extract<TimelineEvent, { type: "assistant_message" }>;
+  };
+
   const renderTurnBody = (turnEvents: TimelineEvent[]) => {
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
+    const assistantEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
     const primaryAssistantIndex = turnEvents.findIndex((event) => (
       event.type === "assistant_message" && event.content.trim().length > 0
     ));
     const primaryAssistant = primaryAssistantIndex >= 0
       ? turnEvents[primaryAssistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>
-      : undefined;
+      : mergeAssistantProcessEvents(assistantEvents);
     const changedFiles = new Set(
       turnEvents
         .filter((e): e is Extract<TimelineEvent, { type: "change_summary" }> => e.type === "change_summary")
@@ -232,8 +326,18 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
+    const diffEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff");
     const mergedChangeSummary = mergeChangeSummaryEvents(turnEvents.filter((event): event is Extract<TimelineEvent, { type: "change_summary" }> => event.type === "change_summary"));
+    const summaryPathSet = new Set((mergedChangeSummary?.files ?? []).map((file) => file.path.replace(/\\/g, "/").toLowerCase()));
+    const standaloneDiffEvents = diffEvents.filter((diff) => {
+      const normalized = diff.filePath.replace(/\\/g, "/").toLowerCase();
+      return !summaryPathSet.has(normalized) && !Array.from(summaryPathSet).some((path) => path.endsWith(`/${normalized}`) || normalized.endsWith(`/${path}`));
+    });
+    const planPath = findPlanPathInChangeSummary(mergedChangeSummary);
     let assistantAttached = false;
+    let changeSummaryAttached = false;
+    let diffGroupAttached = false;
+    let planPreviewAttached = false;
     const trailingStatuses = statusEvents;
 
     for (const [eventIndex, event] of turnEvents.entries()) {
@@ -242,12 +346,14 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       if (type === "subagent") continue;
       if (type === "status_update") continue;
       if (type === "change_summary") continue;
+      if (type === "diff") continue;
       if (event === primaryAssistant) {
         items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
         toolsAttached = true;
         assistantAttached = true;
         continue;
       }
+      if (type === "assistant_message") continue;
       if (
         type !== "assistant_message" &&
         type !== "approval_request" &&
@@ -261,27 +367,62 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       ) {
         continue;
       }
-      if (primaryAssistant && type === "question_request" && eventIndex > primaryAssistantIndex) continue;
       if (type === "assistant_message" && !toolsAttached) {
         items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
         toolsAttached = true;
         assistantAttached = true;
         continue;
       }
-      if (!toolsAttached && tools.length > 0) {
-        pushStandaloneTools(tools);
-        toolsAttached = true;
+      if (!toolsAttached) {
+        if (primaryAssistant && !assistantAttached) {
+          items.push({ type: "event", event: primaryAssistant, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
+          assistantAttached = true;
+          toolsAttached = true;
+        } else if (tools.length > 0) {
+          pushStandaloneTools(tools);
+          toolsAttached = true;
+        }
+      }
+      if ((type === "question_request" || type === "approval_request") && mergedChangeSummary && !changeSummaryAttached) {
+        items.push({ type: "event", event: mergedChangeSummary });
+        changeSummaryAttached = true;
+      }
+      if ((type === "question_request" || type === "approval_request") && standaloneDiffEvents.length > 0 && !diffGroupAttached) {
+        items.push({
+          type: "change_group",
+          id: `diff-group-${standaloneDiffEvents.map((diff) => diff.id).join(":")}`,
+          changes: standaloneDiffEvents.map((diff) => ({ path: diff.filePath, oldText: diff.oldText, newText: diff.newText })),
+        });
+        diffGroupAttached = true;
+      }
+      if ((type === "question_request" || type === "approval_request") && planPath && !planPreviewAttached) {
+        items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
+        planPreviewAttached = true;
       }
       items.push({ type: "event", event });
     }
 
-    if (!toolsAttached) pushStandaloneTools(tools);
-    if (primaryAssistant) {
-      turnEvents
-        .filter((event, eventIndex) => event.type === "question_request" && eventIndex > primaryAssistantIndex)
-        .forEach((event) => items.push({ type: "event", event }));
+    if (primaryAssistant && !assistantAttached) {
+      items.push({ type: "event", event: primaryAssistant, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
+      toolsAttached = true;
+      assistantAttached = true;
     }
-    if (mergedChangeSummary) items.push({ type: "event", event: mergedChangeSummary });
+    if (!toolsAttached) pushStandaloneTools(tools);
+    if (mergedChangeSummary && !changeSummaryAttached) {
+      items.push({ type: "event", event: mergedChangeSummary });
+      changeSummaryAttached = true;
+    }
+    if (standaloneDiffEvents.length > 0 && !diffGroupAttached) {
+      items.push({
+        type: "change_group",
+        id: `diff-group-${standaloneDiffEvents.map((diff) => diff.id).join(":")}`,
+        changes: standaloneDiffEvents.map((diff) => ({ path: diff.filePath, oldText: diff.oldText, newText: diff.newText })),
+      });
+      diffGroupAttached = true;
+    }
+    if (planPath && !planPreviewAttached) {
+      items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
+    }
     if (!assistantAttached) {
       subagents.forEach((event) => items.push({ type: "event", event }));
       statusEvents.forEach((event) => items.push({ type: "event", event }));
@@ -517,7 +658,11 @@ export function ChatThread() {
           {renderItems.map((item) => (
             item.type === "tool_group"
               ? <ToolGroup key={item.id} tools={item.tools} />
-              : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} />
+              : item.type === "plan_preview"
+                ? <PlanPreviewCard key={item.id} path={item.path} projectPath={item.projectPath} />
+                : item.type === "change_group"
+                  ? <ChangeCard key={item.id} changes={item.changes} />
+                : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} />
           ))}
         </div>
       </div>

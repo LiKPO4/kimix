@@ -4,6 +4,7 @@ import type { WindowAPI } from "../electron/preload";
 import type {
   AppInfoResponse,
   CheckKimiCliResponse,
+  CheckKimiCliUpdateResponse,
   CheckUpdateResponse,
   GitInfoResponse,
   KimiUsageResponse,
@@ -14,10 +15,12 @@ import type {
   ListSlashCommandsResponse,
   LoadSessionResponse,
   OpenProjectResponse,
+  ReadTextFileResponse,
   SaveEnabledSkillsResponse,
   SearchProjectFilesResponse,
   SettingsResponse,
   StartSessionResponse,
+  UpdateKimiCliResponse,
   VoidResponse,
 } from "../electron/types/ipc";
 import App from "./App";
@@ -28,6 +31,8 @@ const BROWSER_PREVIEW_SETTINGS_KEY = "kimix_browser_preview_settings";
 const defaultBrowserPreviewSettings = {
   defaultModel: "",
   defaultThinking: true,
+  defaultPlanMode: false,
+  defaultAfkMode: false,
   maxTurns: 50,
   enableCompaction: true,
   defaultPermissionMode: "manual",
@@ -44,6 +49,7 @@ const defaultBrowserPreviewSettings = {
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   enabledSkillNames: [],
+  additionalWorkDirs: [],
 };
 
 function readBrowserPreviewSettings(): SettingsResponse {
@@ -90,6 +96,7 @@ function installBrowserPreviewApi() {
     removeRecentProject: () => Promise.resolve(),
     getGitInfo: (): Promise<GitInfoResponse> => Promise.resolve({ success: true, data: { status: "浏览器预览模式", branch: undefined } }),
     openProjectPath: () => fail<VoidResponse>("打开项目目录"),
+    readTextFile: (): Promise<ReadTextFileResponse> => fail("读取文本文件"),
     openFile: () => fail<VoidResponse>("打开文件"),
     revertFiles: () => fail<VoidResponse>("回退文件"),
     openProjectEditor: () => fail<VoidResponse>("打开编辑器"),
@@ -117,7 +124,19 @@ function installBrowserPreviewApi() {
       },
     }),
     installKimiCli: () => fail("安装 Kimi CLI"),
+    checkKimiCliUpdate: (): Promise<CheckKimiCliUpdateResponse> => Promise.resolve({
+      success: true,
+      data: {
+        available: false,
+        currentVersion: null,
+        latestVersion: null,
+        hasUpdate: false,
+        message: unsupported("检查 Kimi CLI 更新"),
+      },
+    }),
+    updateKimiCli: (): Promise<UpdateKimiCliResponse> => fail("更新 Kimi CLI"),
     sendPrompt: () => fail("发送消息"),
+    setPlanMode: () => fail("切换 Plan 模式"),
     steerPrompt: () => fail("继续编辑消息"),
     stopTurn: () => fail("停止当前轮"),
     approveRequest: () => fail("审批操作"),
@@ -169,7 +188,11 @@ function installBrowserPreviewApi() {
       return { success: true, data: undefined };
     },
     copyImage: () => fail("复制图片"),
+    chooseExecutable: () => fail("选择启动文件"),
+    launchExecutable: () => fail("启动文件"),
     triggerShortcut: () => okVoid(),
+    scheduleShutdown: () => fail("延迟关机"),
+    cancelShutdown: () => fail("取消关机"),
 
     onBootstrap: () => () => {},
 
@@ -185,6 +208,16 @@ function installBrowserPreviewApi() {
   };
 
   window.api = previewApi;
+}
+
+function reloadKimixWindow() {
+  const api = window.api;
+  if (api && typeof api.reloadWindow === "function") {
+    void api.reloadWindow().catch(() => window.location.reload());
+    window.setTimeout(() => window.location.reload(), 700);
+    return;
+  }
+  window.location.reload();
 }
 
 function showCenteredError(message: string, detail?: string) {
@@ -215,7 +248,7 @@ function showCenteredError(message: string, detail?: string) {
   container.querySelector(".kimix-runtime-error-message")!.textContent = message;
   container.querySelector(".kimix-runtime-error-detail")!.textContent = detail ?? "";
   container.querySelector(".kimix-runtime-error-close")?.addEventListener("click", () => container.remove());
-  container.querySelector(".kimix-runtime-error-button")?.addEventListener("click", () => window.location.reload());
+  container.querySelector(".kimix-runtime-error-button")?.addEventListener("click", reloadKimixWindow);
   document.body.appendChild(container);
 }
 

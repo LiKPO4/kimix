@@ -14,7 +14,26 @@ function formatUsage(period: UsagePeriod) {
   return `已用 ${period.used}/${period.limit}，剩余 ${remaining}`;
 }
 
-function UsageProgress({ period }: { period: UsagePeriod }) {
+function formatDuration(ms: number) {
+  const totalMinutes = Math.max(1, Math.ceil(ms / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return hours > 0 ? `${days}天${hours}小时` : `${days}天`;
+  if (hours > 0) return minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`;
+  return `${minutes}分钟`;
+}
+
+function formatRefreshTime(value: number | undefined, now: number) {
+  if (!value) return "刷新时间未知";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "刷新时间未知";
+  const remaining = value - now;
+  if (remaining <= 0) return "即将刷新";
+  return `将于 ${formatDuration(remaining)}后刷新`;
+}
+
+function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
   const percent = Math.max(0, Math.min(100, period.percent ?? 0));
   return (
     <div style={{ paddingTop: 2, paddingBottom: 3 }}>
@@ -28,7 +47,10 @@ function UsageProgress({ period }: { period: UsagePeriod }) {
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="mt-2 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">{formatUsage(period)}</div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">
+        <span className="min-w-0 truncate">{formatUsage(period)}</span>
+        <span className="shrink-0">{formatRefreshTime(period.refreshAt, now)}</span>
+      </div>
     </div>
   );
 }
@@ -45,6 +67,7 @@ export function ContextBar() {
   const [usageOpen, setUsageOpen] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [now, setNow] = useState(Date.now());
   const usageMenuRef = useRef<HTMLDivElement>(null);
 
   const handleExport = () => {
@@ -88,7 +111,6 @@ export function ContextBar() {
           periods: [
             { label: "5小时", available: false, percent: 0, message: "获取失败" },
             { label: "本周", available: false, percent: 0, message: "获取失败" },
-            { label: "本月", available: false, percent: 0, message: "获取失败" },
           ],
         });
       }
@@ -101,7 +123,6 @@ export function ContextBar() {
         periods: [
           { label: "5小时", available: false, percent: 0, message: "获取失败" },
           { label: "本周", available: false, percent: 0, message: "获取失败" },
-          { label: "本月", available: false, percent: 0, message: "获取失败" },
         ],
       });
     } finally {
@@ -134,13 +155,18 @@ export function ContextBar() {
 
   useEffect(() => {
     if (!usageOpen) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 60000);
     const handlePointerDown = (event: PointerEvent) => {
       if (!usageMenuRef.current?.contains(event.target as Node)) {
         setUsageOpen(false);
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
   }, [usageOpen]);
 
   return (
@@ -192,9 +218,8 @@ export function ContextBar() {
                 {(usageData?.periods ?? [
                   { label: "5小时", available: false, percent: 0, message: "正在获取" },
                   { label: "本周", available: false, percent: 0, message: "正在获取" },
-                  { label: "本月", available: false, percent: 0, message: "正在获取" },
                 ]).map((period) => (
-                  <UsageProgress key={period.label} period={period} />
+                  <UsageProgress key={period.label} period={period} now={now} />
                 ))}
               </div>
               {usageData?.message && (

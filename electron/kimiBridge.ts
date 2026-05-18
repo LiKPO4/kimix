@@ -13,6 +13,7 @@
 } from "@moonshot-ai/kimi-agent-sdk";
 import type { BrowserWindow } from "electron";
 import * as projectService from "./projectService";
+import * as settingsService from "./settingsService";
 
 const activeSessions = new Map<string, Session>();
 const activeTurns = new Map<string, Turn>();
@@ -22,6 +23,9 @@ const interruptedTurns = new WeakSet<Turn>();
 type PatchableProtocolClient = typeof ProtocolClient & {
   prototype: {
     __kimixQuestionRequestPatch?: boolean;
+    __kimixAfkModePatch?: boolean;
+    __kimixAddDirPatch?: boolean;
+    buildArgs?: (options: { environmentVariables?: Record<string, string> }) => string[];
     handleServerRequest?: (requestId: string, params: unknown) => void;
     pushEvent?: (event: unknown) => void;
     emitParseError?: (code: string, message: string, raw?: string) => void;
@@ -55,6 +59,54 @@ function installQuestionRequestPatch() {
 }
 
 installQuestionRequestPatch();
+
+function installAfkModePatch() {
+  const proto = (ProtocolClient as PatchableProtocolClient).prototype;
+  if (proto.__kimixAfkModePatch || typeof proto.buildArgs !== "function") return;
+  const original = proto.buildArgs;
+  proto.buildArgs = function patchedBuildArgs(this: PatchableProtocolClient["prototype"], options: { environmentVariables?: Record<string, string> }) {
+    const args = original.call(this, options);
+    if (options.environmentVariables?.KIMIX_KIMI_AFK === "1" && !args.includes("--afk")) {
+      const wireIndex = args.indexOf("--wire");
+      if (wireIndex >= 0) {
+        args.splice(wireIndex, 0, "--afk");
+      } else {
+        args.push("--afk");
+      }
+    }
+    return args;
+  };
+  proto.__kimixAfkModePatch = true;
+}
+
+installAfkModePatch();
+
+function installAddDirPatch() {
+  const proto = (ProtocolClient as PatchableProtocolClient).prototype;
+  if (proto.__kimixAddDirPatch || typeof proto.buildArgs !== "function") return;
+  const original = proto.buildArgs;
+  proto.buildArgs = function patchedBuildArgs(this: PatchableProtocolClient["prototype"], options: { environmentVariables?: Record<string, string> }) {
+    const args = original.call(this, options);
+    const raw = options.environmentVariables?.KIMIX_KIMI_ADD_DIRS;
+    if (raw) {
+      const dirs = Array.from(new Set(raw.split("\n").map((dir) => dir.trim()).filter(Boolean)));
+      for (const dir of dirs) {
+        if (!args.includes("--add-dir") || !args.includes(dir)) {
+          const wireIndex = args.indexOf("--wire");
+          if (wireIndex >= 0) {
+            args.splice(wireIndex, 0, "--add-dir", dir);
+          } else {
+            args.push("--add-dir", dir);
+          }
+        }
+      }
+    }
+    return args;
+  };
+  proto.__kimixAddDirPatch = true;
+}
+
+installAddDirPatch();
 
 type WarmableSession = Session & {
   getClientWithConfigCheck?: () => Promise<unknown>;
@@ -163,7 +215,10 @@ export async function startSession(options: {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  planMode?: boolean;
+  afkMode?: boolean;
   skillsDir?: string;
+  additionalWorkDirs?: string[];
 }): Promise<{ sessionId: string; workDir: string; slashCommands: SlashCommandInfo[] }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
   if (existing) {
@@ -182,6 +237,17 @@ export async function startSession(options: {
     return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
   }
 
+  const env: Record<string, string> = {};
+  if (options.afkMode) {
+    env.KIMIX_KIMI_AFK = "1";
+  }
+  const dirs = Array.from(new Set((options.additionalWorkDirs ?? settingsService.loadSettings().additionalWorkDirs ?? [])
+    .map((dir) => dir.trim())
+    .filter(Boolean)));
+  if (dirs.length > 0) {
+    env.KIMIX_KIMI_ADD_DIRS = dirs.join("\n");
+  }
+
   const session = createSession({
     workDir: options.workDir,
     sessionId: options.sessionId,
@@ -189,12 +255,25 @@ export async function startSession(options: {
     thinking: options.thinking ?? true,
     yoloMode: options.yoloMode ?? false,
     executable: "kimi",
+    env: Object.keys(env).length > 0 ? env : {},
     skillsDir: options.skillsDir,
   });
 
   activeSessions.set(session.sessionId, session);
+  if (typeof options.planMode === "boolean") {
+    await warmSessionMetadata(session);
+    await session.setPlanMode(options.planMode).catch((err) => {
+      console.error(`Failed to set plan mode for session ${session.sessionId}:`, err);
+    });
+  }
   warmSessionMetadataInBackground(session);
   return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
+}
+
+export async function setPlanMode(sessionId: string, enabled: boolean): Promise<boolean> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error("Session not found");
+  return session.setPlanMode(enabled);
 }
 
 export async function getSlashCommands(sessionId: string): Promise<SlashCommandInfo[]> {
@@ -204,7 +283,7 @@ export async function getSlashCommands(sessionId: string): Promise<SlashCommandI
   return session.slashCommands;
 }
 
-export async function sendPrompt(sessionId: string, content: string | ContentPart[], options?: { thinking?: boolean; yoloMode?: boolean }) {
+export async function sendPrompt(sessionId: string, content: string | ContentPart[], options?: { thinking?: boolean; yoloMode?: boolean; planMode?: boolean; afkMode?: boolean }) {
   if (sendingLocks.has(sessionId)) throw new Error("Turn already in progress");
   sendingLocks.add(sessionId);
 
@@ -218,6 +297,13 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
   }
   if (typeof options?.yoloMode === "boolean") {
     session.yoloMode = options.yoloMode;
+  }
+  if (typeof options?.afkMode === "boolean") {
+    session.env = options.afkMode ? { ...session.env, KIMIX_KIMI_AFK: "1" } : Object.fromEntries(Object.entries(session.env).filter(([key]) => key !== "KIMIX_KIMI_AFK"));
+  }
+  if (typeof options?.planMode === "boolean" && session.planMode !== options.planMode) {
+    await warmSessionMetadata(session);
+    await session.setPlanMode(options.planMode);
   }
   const gitBaseline = await getTurnGitBaseline(session.workDir);
 

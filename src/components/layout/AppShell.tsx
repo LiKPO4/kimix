@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
+import { getLatestTodos } from "@/components/chat/TodoPanel";
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
@@ -17,6 +19,7 @@ import {
   Code2,
   Copy,
   Clipboard,
+  ClipboardList,
   ClipboardCopy,
   Ellipsis,
   ExternalLink,
@@ -50,8 +53,13 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
-import type { LongTaskDetail } from "@electron/types/ipc";
+import type { KimiCliUpdateInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+
+const SIDEBAR_MIN_WIDTH = 240;
+const SIDEBAR_MAX_WIDTH = 440;
+const RIGHT_PANEL_MIN_WIDTH = 280;
+const RIGHT_PANEL_MAX_WIDTH = 560;
 
 type MenuAction =
   | "close-chat"
@@ -504,6 +512,74 @@ function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[] {
     .sort((a, b) => b.timestamp - a.timestamp);
 }
 
+type SessionPlanState = {
+  loading: boolean;
+  path: string | null;
+  content: string;
+  updatedAt: number | null;
+  error: string | null;
+};
+
+const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi\/plans\/[^\s"'<>|]+\.md|\.kimi[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
+
+function cleanPlanPath(pathValue: string) {
+  return pathValue.trim().replace(/[),.;，。；）]+$/u, "");
+}
+
+function extractPlanPathFromText(text: string) {
+  const matches = text.match(KIMI_PLAN_PATH_PATTERN);
+  return matches?.map(cleanPlanPath).find(Boolean) ?? null;
+}
+
+function findSessionPlanPath(events: TimelineEvent[]) {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "change_summary") {
+      for (let fileIndex = event.files.length - 1; fileIndex >= 0; fileIndex -= 1) {
+        const planPath = extractPlanPathFromText(event.files[fileIndex].path);
+        if (planPath) return planPath;
+      }
+    }
+    if (event.type === "assistant_message" || event.type === "user_message" || event.type === "steer_message") {
+      const planPath = extractPlanPathFromText(event.content);
+      if (planPath) return planPath;
+    }
+    if (event.type === "question_request") {
+      for (const question of event.questions) {
+        const planPath = extractPlanPathFromText([
+          question.header,
+          question.question,
+          ...question.options.flatMap((option) => [option.label, option.description]),
+        ].filter(Boolean).join("\n"));
+        if (planPath) return planPath;
+      }
+    }
+  }
+  return null;
+}
+
+function hasSessionPlanSignal(events: TimelineEvent[]) {
+  return events.some((event) => {
+    if (event.type === "question_request") {
+      return event.questions.some((question) => (
+        /plan/i.test(question.header ?? "") ||
+        /approve this plan|reject and exit/i.test([
+          question.question,
+          ...question.options.flatMap((option) => [option.label, option.description ?? ""]),
+        ].join("\n"))
+      ));
+    }
+    if (event.type === "change_summary") {
+      return event.files.some((file) => /[\\/]?\.kimi[\\/]plans[\\/].+\.md/i.test(file.path));
+    }
+    return false;
+  });
+}
+
+function clampWidth(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function AppShell() {
   const currentSession = useAppStore((s) => s.currentSession);
   const currentProject = useAppStore((s) => s.currentProject);
@@ -518,10 +594,14 @@ export function AppShell() {
   const setLongTaskInspectorOpen = useAppStore((s) => s.setLongTaskInspectorOpen);
   const diffPanelOpen = useAppStore((s) => s.diffPanelOpen);
   const setDiffPanelOpen = useAppStore((s) => s.setDiffPanelOpen);
+  const hiddenComposerCards = useAppStore((s) => s.hiddenComposerCards);
+  const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
@@ -532,9 +612,12 @@ export function AppShell() {
   const sessions = useSessionStore((s) => s.sessions);
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
+  const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -548,12 +631,24 @@ export function AppShell() {
     latest: null,
     hasUpdate: false,
   });
+  const [cliUpdateState, setCliUpdateState] = useState<{ loading: boolean; updating: boolean; message: string; info: KimiCliUpdateInfo | null; hasUpdate: boolean }>({
+    loading: false,
+    updating: false,
+    message: "尚未检查 Kimi CLI 更新",
+    info: null,
+    hasUpdate: false,
+  });
   const [longTaskDetail, setLongTaskDetail] = useState<LongTaskDetail | null>(null);
   const [longTaskDetailLoading, setLongTaskDetailLoading] = useState(false);
   const [longTaskDetailError, setLongTaskDetailError] = useState<string | null>(null);
   const [targetStepDraft, setTargetStepDraft] = useState("");
   const [targetStepBusy, setTargetStepBusy] = useState(false);
   const [longTaskControlBusy, setLongTaskControlBusy] = useState(false);
+  const [sessionLongTasks, setSessionLongTasks] = useState<LongTaskSummary[]>([]);
+  const [sessionLongTasksLoading, setSessionLongTasksLoading] = useState(false);
+  const [shutdownAfterLongTaskId, setShutdownAfterLongTaskId] = useState<string | null>(null);
+  const [shutdownDialog, setShutdownDialog] = useState<{ taskId: string; taskTitle: string; remainingSeconds: number } | null>(null);
+  const scheduledShutdownTaskRef = useRef<string | null>(null);
   const [kimiOnboarding, setKimiOnboarding] = useState<KimiCliOnboardingState>({
     loading: true,
     available: null,
@@ -561,6 +656,67 @@ export function AppShell() {
   });
   const [kimiOnboardingDismissed, setKimiOnboardingDismissed] = useState(false);
   const [kimiInstallBusy, setKimiInstallBusy] = useState(false);
+  const [sessionPlanState, setSessionPlanState] = useState<SessionPlanState>({
+    loading: false,
+    path: null,
+    content: "",
+    updatedAt: null,
+    error: null,
+  });
+
+  const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = sidebarWidth;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const nextWidth = clampWidth(startWidth + moveEvent.clientX - startX, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH);
+      setSidebarWidth(nextWidth);
+    };
+    const stopResize = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+    };
+
+    handlePointerMove(event.nativeEvent);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
+  }, [sidebarWidth]);
+
+  const startRightPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = rightPanelWidth;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const nextWidth = clampWidth(startWidth + startX - moveEvent.clientX, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH);
+      setRightPanelWidth(nextWidth);
+    };
+    const stopResize = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+    };
+
+    handlePointerMove(event.nativeEvent);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
+  }, [rightPanelWidth]);
 
   const checkKimiForOnboarding = async () => {
     setKimiOnboarding((state) => ({ ...state, loading: true, message: "正在检测 Kimi CLI" }));
@@ -675,6 +831,8 @@ export function AppShell() {
         model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        planMode: defaultPlanMode,
+        afkMode: defaultAfkMode,
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -756,8 +914,86 @@ export function AppShell() {
     showToast(res.data.message);
   };
 
+  const handleCheckCliUpdate = async () => {
+    setCliUpdateState((state) => ({ ...state, loading: true, message: "正在检查 Kimi CLI 最新版本..." }));
+    if (typeof window.api.checkKimiCliUpdate !== "function") {
+      setCliUpdateState({ loading: false, updating: false, message: "CLI 更新检查接口尚未载入，请重启应用后再试", info: null, hasUpdate: false });
+      return;
+    }
+    const res = await window.api.checkKimiCliUpdate();
+    if (!res.success) {
+      setCliUpdateState({ loading: false, updating: false, message: `CLI 检查失败：${res.error}`, info: null, hasUpdate: false });
+      return;
+    }
+    setCliUpdateState((state) => ({
+      ...state,
+      loading: false,
+      message: res.data.message,
+      info: res.data,
+      hasUpdate: res.data.hasUpdate,
+    }));
+  };
+
+  const handleUpdateKimiCli = async () => {
+    setCliUpdateState((state) => ({ ...state, updating: true, message: "正在更新 Kimi CLI..." }));
+    if (typeof window.api.updateKimiCli !== "function") {
+      setCliUpdateState((state) => ({ ...state, updating: false, message: "CLI 更新接口尚未载入，请重启应用后再试" }));
+      return;
+    }
+    const res = await window.api.updateKimiCli();
+    if (!res.success) {
+      setCliUpdateState((state) => ({ ...state, updating: false, message: `CLI 更新失败：${res.error}` }));
+      return;
+    }
+    setCliUpdateState({
+      loading: false,
+      updating: false,
+      message: res.data.message,
+      info: res.data,
+      hasUpdate: res.data.hasUpdate,
+    });
+    setKimiOnboarding((state) => ({
+      ...state,
+      available: true,
+      path: res.data.path ?? state.path,
+      output: res.data.currentVersion ? `kimi, version ${res.data.currentVersion}` : state.output,
+      message: res.data.message,
+    }));
+    setKimiOnboardingDismissed(true);
+    showToast(res.data.message);
+  };
+
   useEffect(() => {
-    void handleCheckUpdates();
+    void (async () => {
+      const [appRes, cliRes] = await Promise.all([
+        window.api.checkForUpdates?.(),
+        window.api.checkKimiCliUpdate?.(),
+      ]);
+      if (appRes?.success) {
+        setUpdateState((state) => ({
+          ...state,
+          loading: false,
+          message: appRes.data.message,
+          latest: appRes.data.latest,
+          hasUpdate: appRes.data.hasUpdate,
+        }));
+      } else if (appRes && !appRes.success) {
+        setUpdateState({ loading: false, downloading: false, message: `检查失败：${appRes.error}`, latest: null, hasUpdate: false });
+      }
+      if (cliRes?.success) {
+        setCliUpdateState((state) => ({
+          ...state,
+          loading: false,
+          message: cliRes.data.message,
+          info: cliRes.data,
+          hasUpdate: cliRes.data.hasUpdate,
+        }));
+      } else if (cliRes && !cliRes.success) {
+        setCliUpdateState({ loading: false, updating: false, message: `CLI 检查失败：${cliRes.error}`, info: null, hasUpdate: false });
+      }
+      if (appRes?.success && appRes.data.hasUpdate) showToast(appRes.data.message);
+      if (cliRes?.success && cliRes.data.hasUpdate) showToast(cliRes.data.message);
+    })();
   }, []);
 
   const openInfoTopic = (action: MenuAction) => {
@@ -833,6 +1069,8 @@ export function AppShell() {
     [sessions, currentSession],
   );
   const longTaskMeta = liveCurrentSession?.longTask;
+  const hasLongTaskMeta = Boolean(longTaskMeta);
+  const liveCurrentSessionProjectPath = liveCurrentSession?.projectPath;
   const parsedLongTaskDetail = useMemo(() => parseLongTaskDetail(longTaskDetail), [longTaskDetail]);
   const reviewedReviewItems = useMemo(() => new Set((longTaskMeta?.reviewedReviewItems ?? []).map(normalizeReviewItem)), [longTaskMeta?.reviewedReviewItems]);
   const pendingReviewItems = useMemo(
@@ -853,6 +1091,55 @@ export function AppShell() {
     () => collectSessionDiffs(liveCurrentSession?.events ?? []),
     [liveCurrentSession?.events],
   );
+  const latestTodos = useMemo(() => getLatestTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
+  const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
+  const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
+  const hiddenComposerCardEntries = [
+    hiddenComposerCardList.includes("todo") && latestTodos.length > 0
+      ? {
+          key: "todo" as const,
+          title: "TodoList",
+          desc: `${latestTodos.filter((item) => item.status === "done").length}/${latestTodos.length} 已完成`,
+          icon: ClipboardList,
+        }
+      : null,
+    hiddenComposerCardList.includes("pending") && pendingMessages.length > 0
+      ? {
+          key: "pending" as const,
+          title: "排队消息",
+          desc: `${pendingMessages.length} 条消息正在排队`,
+          icon: MessageSquarePlus,
+        }
+      : null,
+  ].filter((item): item is { key: "todo" | "pending"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
+  const visibleSessionLongTasks = useMemo(() => {
+    const archivedTaskIds = new Set(
+      sessions
+        .filter((session) => session.archivedAt && session.longTask)
+        .map((session) => session.longTask?.taskId)
+        .filter((taskId): taskId is string => Boolean(taskId)),
+    );
+    const activeTaskIds = new Set(
+      sessions
+        .filter((session) => !session.archivedAt && session.longTask)
+        .map((session) => session.longTask?.taskId)
+        .filter((taskId): taskId is string => Boolean(taskId)),
+    );
+    return sessionLongTasks.filter((task) => !archivedTaskIds.has(task.id) || activeTaskIds.has(task.id));
+  }, [sessionLongTasks, sessions]);
+  const sessionPlanPath = useMemo(
+    () => {
+      const events = liveCurrentSession?.events ?? [];
+      return findSessionPlanPath(events) ?? (hasSessionPlanSignal(events) ? "__latest_kimi_plan__" : null);
+    },
+    [liveCurrentSession?.events],
+  );
+  const rightPanelTitle = longTaskMeta ? "长程任务" : "会话侧栏";
+  const rightPanelSubtitle = longTaskMeta
+    ? longTaskMeta.title
+    : sessionPlanPath
+      ? "已捕获当前会话 Plan"
+      : "Plan、变更和会话信息";
 
   const setReviewItemChecked = (item: string, checked: boolean) => {
     if (!liveCurrentSession?.longTask) return;
@@ -1049,6 +1336,7 @@ export function AppShell() {
         content: prompt,
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        afkMode: defaultAfkMode,
       });
       if (!res.success) throw new Error(res.error);
     } catch (err) {
@@ -1085,9 +1373,64 @@ export function AppShell() {
     });
   };
 
+  const refreshSessionPlan = useCallback((options?: { silent?: boolean }) => {
+    if (!longTaskInspectorOpen || hasLongTaskMeta || !liveCurrentSessionProjectPath) {
+      setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null });
+      return;
+    }
+    const pathToRead = sessionPlanPath ?? "__latest_kimi_plan__";
+    if (!options?.silent) {
+      setSessionPlanState((state) => ({ ...state, loading: true, path: sessionPlanPath, error: null }));
+    }
+    void window.api.readTextFile({ projectPath: liveCurrentSessionProjectPath, path: pathToRead }).then((res) => {
+      if (res.success) {
+        setSessionPlanState({
+          loading: false,
+          path: res.data.path,
+          content: res.data.content,
+          updatedAt: res.data.updatedAt,
+          error: null,
+        });
+      } else {
+        setSessionPlanState({ loading: false, path: sessionPlanPath, content: "", updatedAt: null, error: res.error });
+      }
+    }).catch((err: unknown) => {
+      setSessionPlanState({
+        loading: false,
+        path: sessionPlanPath,
+        content: "",
+        updatedAt: null,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }, [hasLongTaskMeta, liveCurrentSessionProjectPath, longTaskInspectorOpen, sessionPlanPath]);
+
+  const refreshSessionLongTasks = useCallback((options?: { silent?: boolean }) => {
+    const pathForTasks = liveCurrentSession?.projectPath ?? currentProject?.path;
+    if (!longTaskInspectorOpen || longTaskMeta || !pathForTasks) {
+      setSessionLongTasks([]);
+      setSessionLongTasksLoading(false);
+      return;
+    }
+    if (!options?.silent) setSessionLongTasksLoading(true);
+    void window.api.listLongTasks({ projectPath: pathForTasks }).then((res) => {
+      setSessionLongTasks(res.success ? res.data : []);
+    }).catch(() => setSessionLongTasks([])).finally(() => {
+      if (!options?.silent) setSessionLongTasksLoading(false);
+    });
+  }, [currentProject?.path, liveCurrentSession?.projectPath, longTaskInspectorOpen, longTaskMeta]);
+
   useEffect(() => {
     refreshLongTaskDetail();
   }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
+
+  useEffect(() => {
+    refreshSessionPlan();
+  }, [refreshSessionPlan]);
+
+  useEffect(() => {
+    refreshSessionLongTasks();
+  }, [refreshSessionLongTasks]);
 
   useEffect(() => {
     if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) return;
@@ -1107,6 +1450,48 @@ export function AppShell() {
     }
     setTargetStepDraft(liveCurrentSession.longTask.targetStep ? String(liveCurrentSession.longTask.targetStep) : "");
   }, [liveCurrentSession?.longTask?.taskId, liveCurrentSession?.longTask?.targetStep]);
+
+  useEffect(() => {
+    const task = liveCurrentSession?.longTask;
+    if (!task || shutdownAfterLongTaskId !== task.taskId) return;
+    if (task.stage !== "completed") return;
+    if (scheduledShutdownTaskRef.current === task.taskId) return;
+    scheduledShutdownTaskRef.current = task.taskId;
+    setShutdownDialog({ taskId: task.taskId, taskTitle: task.title, remainingSeconds: 180 });
+    void window.api.scheduleShutdown({
+      delaySeconds: 180,
+      reason: `Kimix 长程任务「${task.title}」执行完成`,
+    }).then((res) => {
+      if (!res.success) {
+        setShutdownDialog(null);
+        scheduledShutdownTaskRef.current = null;
+        showToast(res.error);
+      }
+    });
+  }, [liveCurrentSession?.longTask?.taskId, liveCurrentSession?.longTask?.stage, shutdownAfterLongTaskId]);
+
+  useEffect(() => {
+    if (!shutdownDialog) return;
+    const timer = window.setInterval(() => {
+      setShutdownDialog((current) => {
+        if (!current) return current;
+        return { ...current, remainingSeconds: Math.max(0, current.remainingSeconds - 1) };
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [shutdownDialog?.taskId]);
+
+  const cancelScheduledShutdown = async () => {
+    const res = await window.api.cancelShutdown();
+    if (!res.success) {
+      showToast(res.error);
+      return;
+    }
+    setShutdownDialog(null);
+    scheduledShutdownTaskRef.current = null;
+    setShutdownAfterLongTaskId(null);
+    showToast("已取消关机");
+  };
 
   const copyToClipboard = async (text: string, successMessage = "已复制") => {
     await navigator.clipboard.writeText(text);
@@ -1166,6 +1551,16 @@ export function AppShell() {
   const openProjectTerminal = () => {
     if (projectPath) void window.api.openProjectTerminal({ path: projectPath });
     setProjectMenuOpen(false);
+  };
+  const launchExecutable = async () => {
+    const res = await window.api.launchExecutable();
+    if (!res.success) {
+      showToast(`启动失败：${res.error}`);
+    }
+  };
+  const chooseExecutable = async () => {
+    const res = await window.api.chooseExecutable();
+    showToast(res.success ? "已更新启动文件" : `选择失败：${res.error}`);
   };
   const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && kimiOnboarding.available === false;
 
@@ -1233,10 +1628,21 @@ export function AppShell() {
         </div>
       </header>
 
-      <div style={{ paddingBottom: 0, paddingRight: 0, gap: 10 }} className="flex min-h-0 flex-1">
-        <Sidebar />
+      <div style={{ paddingBottom: 0, paddingRight: 0, gap: 0 }} className="flex min-h-0 flex-1">
+        <Sidebar width={sidebarWidth} />
+        {sidebarOpen ? (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整左侧栏宽度"
+            className="kimix-layout-resizer"
+            onPointerDown={startSidebarResize}
+          />
+        ) : (
+          <div className="kimix-layout-spacer" />
+        )}
         <main className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
-          <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 30 }}>
+          <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 12 }}>
             <div className="flex min-w-0 items-center gap-2.5">
               <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
                 {sessionTitle}
@@ -1311,10 +1717,14 @@ export function AppShell() {
                 </button>
               ) : (
                 <button
-                  onClick={() => showToast("当前对话不是长程任务")}
+                  onClick={() => void launchExecutable()}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    void chooseExecutable();
+                  }}
                   className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"
-                  title="运行"
-                  aria-label="运行"
+                  title="左键启动文件，右键重新选择"
+                  aria-label="启动文件"
                 >
                   <Play size={15} />
                 </button>
@@ -1403,8 +1813,8 @@ export function AppShell() {
                     ? "border-[var(--accent-blue)] bg-[#eef7ff] text-[var(--accent-blue)]"
                     : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
                 }`}
-                title="长程任务侧栏"
-                aria-label="长程任务侧栏"
+                title="会话侧栏"
+                aria-label="会话侧栏"
               >
                 <PanelRight size={15} />
               </button>
@@ -1422,29 +1832,38 @@ export function AppShell() {
             </div>
           </div>
         </main>
+        {(longTaskInspectorOpen || diffPanelOpen) && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整右侧栏宽度"
+            className="kimix-layout-resizer"
+            onPointerDown={startRightPanelResize}
+          />
+        )}
         {longTaskInspectorOpen && (
-          <aside className="kimix-longtask-inspector flex h-full w-[320px] shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+          <aside style={{ width: rightPanelWidth }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#dbeafa]" style={{ paddingLeft: 18, paddingRight: 14 }}>
               <div className="min-w-0">
-                <div className="text-[15px] font-semibold leading-5 text-[#24415f]">长程任务</div>
+                <div className="text-[15px] font-semibold leading-5 text-[#24415f]">{rightPanelTitle}</div>
                 <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[#6f87a1]">
-                  {longTaskMeta ? longTaskMeta.title : "当前对话未关联长程任务"}
+                  {rightPanelSubtitle}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setLongTaskInspectorOpen(false)}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#6f87a1] transition-colors hover:bg-[#eaf4ff] hover:text-[#24415f]"
-                aria-label="关闭长程任务侧栏"
+                aria-label="关闭会话侧栏"
                 title="关闭"
               >
                 <X size={15} />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 10, paddingBottom: 18 }}>
+            <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
               {longTaskMeta ? (
-                <div className="flex flex-col" style={{ gap: 14 }}>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "16px 16px 18px" }}>
+                  <div className="flex flex-col" style={{ gap: 16 }}>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "18px 16px 20px" }}>
                     <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">当前状态</div>
                     <div className="mt-2 text-[14px] leading-6 text-[#24415f]">
                       {longTaskMeta.activeAgent === "reviewer" ? "审查 agent" : "执行 agent"} · {longTaskMeta.stage}
@@ -1452,17 +1871,17 @@ export function AppShell() {
                     <div className="mt-1 text-[13px] leading-5 text-[#6f87a1]">
                       步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
                     </div>
-                    <div className="mt-4 flex flex-col" style={{ gap: 16 }}>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "16px 14px" }}>
-                        <div className="flex flex-col" style={{ gap: 12 }}>
+                    <div className="flex flex-col" style={{ gap: 18, marginTop: 22 }}>
+                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "20px 16px 18px" }}>
+                        <div className="flex flex-col" style={{ gap: 16 }}>
                           <span className="text-[13px] font-medium leading-5 text-[#2f6fad]">工作 agent</span>
-                          <div className="flex w-full items-center rounded-lg bg-white" style={{ gap: 6, padding: 5 }}>
+                          <div className="flex w-full items-center rounded-lg bg-white" style={{ gap: 10, padding: 7 }}>
                             <button
                               type="button"
                               disabled={longTaskControlBusy}
                               onClick={() => void patchLongTaskMeta({ activeAgent: "executor", stage: longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage }, { message: "已切换到执行 agent" })}
-                              className={`h-8 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-[#dff0ff] text-[#2f6fad]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
-                              style={{ paddingLeft: 10, paddingRight: 10 }}
+                              className={`h-9 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-[#dff0ff] text-[#2f6fad]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
+                              style={{ paddingLeft: 14, paddingRight: 14 }}
                             >
                               执行
                             </button>
@@ -1470,14 +1889,14 @@ export function AppShell() {
                               type="button"
                               disabled={longTaskControlBusy}
                               onClick={() => void patchLongTaskMeta({ activeAgent: "reviewer", stage: longTaskMeta.stage === "running" ? "paused" : longTaskMeta.stage }, { message: "已切换到审查 agent" })}
-                              className={`h-8 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-[#fff3d6] text-[#8a6a1f]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
-                              style={{ paddingLeft: 10, paddingRight: 10 }}
+                              className={`h-9 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-[#fff3d6] text-[#8a6a1f]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
+                              style={{ paddingLeft: 14, paddingRight: 14 }}
                             >
                               审查
                             </button>
                           </div>
                         </div>
-                        <div className="mt-4 flex items-center" style={{ gap: 10 }}>
+                        <div className="flex items-center" style={{ gap: 14, marginTop: 22 }}>
                           <button
                             type="button"
                             disabled={longTaskControlBusy || longTaskMeta.stage === "paused" || longTaskMeta.stage === "completed"}
@@ -1498,8 +1917,8 @@ export function AppShell() {
                           </button>
                         </div>
                       </div>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "16px 14px" }}>
-                        <div className="flex flex-col" style={{ gap: 10 }}>
+                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "20px 16px 18px" }}>
+                        <div className="flex flex-col" style={{ gap: 14 }}>
                           <label className="text-[13px] font-medium leading-5 text-[#2f6fad]" htmlFor="long-task-target-step">
                             执行到
                           </label>
@@ -1515,7 +1934,16 @@ export function AppShell() {
                             placeholder={totalLongTaskSteps ? `1-${totalLongTaskSteps}` : "Step"}
                           />
                         </div>
-                        <div className="mt-4 flex items-center" style={{ gap: 10 }}>
+                        <label className="flex items-center justify-between rounded-lg bg-white text-[13px] leading-5 text-[#24415f]" style={{ gap: 14, marginTop: 18, padding: "13px 14px" }}>
+                          <span className="min-w-0">执行完成后关机</span>
+                          <input
+                            type="checkbox"
+                            checked={shutdownAfterLongTaskId === longTaskMeta.taskId}
+                            onChange={(event) => setShutdownAfterLongTaskId(event.target.checked ? longTaskMeta.taskId : null)}
+                            className="h-4 w-4 shrink-0 accent-[#339af0]"
+                          />
+                        </label>
+                        <div className="flex items-center" style={{ gap: 14, marginTop: 20 }}>
                           <button
                             type="button"
                             disabled={targetStepBusy}
@@ -1552,7 +1980,7 @@ export function AppShell() {
                       </div>
                     </div>
                   </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "16px 16px 18px" }}>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 2, padding: "16px 16px 18px" }}>
                     <div className="flex items-center justify-between" style={{ gap: 10 }}>
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">BIGPLAN</div>
@@ -1622,7 +2050,7 @@ export function AppShell() {
                       </div>
                     ) : null}
                   </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "16px 16px 18px" }}>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 3, padding: "16px 16px 18px" }}>
                     <div className="flex items-center justify-between" style={{ gap: 10 }}>
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">轮次记录</div>
@@ -1689,7 +2117,7 @@ export function AppShell() {
                       </div>
                     )}
                   </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "16px 16px 18px" }}>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 1, padding: "16px 16px 18px" }}>
                     <div className="flex items-center justify-between" style={{ gap: 10 }}>
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">待审查</div>
@@ -1739,7 +2167,7 @@ export function AppShell() {
                     )}
                   </section>
                   {completedReviewItems.length > 0 && (
-                    <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "16px 16px 18px" }}>
+                    <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 4, padding: "16px 16px 18px" }}>
                       <div className="flex items-center justify-between" style={{ gap: 10 }}>
                         <div className="min-w-0">
                           <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">已审查</div>
@@ -1769,15 +2197,193 @@ export function AppShell() {
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-[#dbeafa] bg-white text-[13.5px] leading-6 text-[#6f87a1]" style={{ padding: "18px 16px" }}>
-                  选择一个长程任务对话后，这里会显示 BIGPLAN 可视化和待审查内容。
+                <div className="flex flex-col" style={{ gap: 14 }}>
+                  {hiddenComposerCardEntries.length > 0 && (
+                    <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 0, padding: "16px 16px 18px" }}>
+                      <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">已收起卡片</div>
+                          <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">可恢复到输入框上方</div>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          {hiddenComposerCardEntries.length}
+                        </span>
+                      </div>
+                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                        {hiddenComposerCardEntries.map((entry) => (
+                          <button
+                            key={entry.key}
+                            type="button"
+                            onClick={() => {
+                              setComposerCardHidden(composerCardSessionId, entry.key, false);
+                              showToast(`${entry.title}已恢复到输入框上方`);
+                            }}
+                            className="flex w-full items-center rounded-lg border border-[#e2edf8] bg-[#fbfdff] text-left transition-colors hover:bg-[#f4f9ff]"
+                            style={{ gap: 10, padding: "12px 12px" }}
+                          >
+                            <entry.icon size={16} className="shrink-0 text-[#6f87a1]" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13.5px] font-medium leading-5 text-[#24415f]">{entry.title}</span>
+                              <span className="block truncate text-[12.5px] leading-5 text-[#6f87a1]">{entry.desc}</span>
+                            </span>
+                            <span className="shrink-0 rounded-full bg-white text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                              显示
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 4, padding: "16px 16px 18px" }}>
+                    <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">长程任务</div>
+                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">
+                          {visibleSessionLongTasks.length > 0 ? `${visibleSessionLongTasks.length} 个任务` : "当前项目暂无任务"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={sessionLongTasksLoading || !(liveCurrentSession?.projectPath ?? currentProject?.path)}
+                        onClick={() => refreshSessionLongTasks()}
+                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff] disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        <RefreshCw size={13} className={sessionLongTasksLoading ? "animate-spin" : ""} />
+                        刷新
+                      </button>
+                    </div>
+                    {visibleSessionLongTasks.length > 0 ? (
+                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                        {visibleSessionLongTasks.slice(0, 3).map((task) => (
+                          <div key={task.id} className="rounded-lg border border-[#e2edf8] bg-[#fbfdff]" style={{ padding: "12px 12px" }}>
+                            <div className="truncate text-[13.5px] font-medium leading-5 text-[#24415f]">{task.title}</div>
+                            <div className="mt-1 text-[12.5px] leading-5 text-[#6f87a1]">
+                              Step {task.currentStep}{task.targetStep ? ` / ${task.targetStep}` : ""} · {task.stage}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
+                        如果这个对话已经关联长程任务，刷新后这里会显示任务卡片。
+                      </div>
+                    )}
+                  </section>
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 1, padding: "16px 16px 18px" }}>
+                    <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">Plan</div>
+                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">
+                          {sessionPlanState.path || (sessionPlanPath === "__latest_kimi_plan__" ? "最近官方 Plan 文件" : sessionPlanPath) || "当前会话还没有捕获到官方 Plan 文件"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!liveCurrentSession || sessionPlanState.loading}
+                        onClick={() => refreshSessionPlan()}
+                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff] disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        <RefreshCw size={13} className={sessionPlanState.loading ? "animate-spin" : ""} />
+                        刷新
+                      </button>
+                    </div>
+                    {sessionPlanState.loading ? (
+                      <div className="mt-4 rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
+                        正在读取 Plan 内容...
+                      </div>
+                    ) : sessionPlanState.error ? (
+                      <div className="mt-4 rounded-lg bg-[#fff4f0] text-[13px] leading-6 text-[#9b4b34]" style={{ padding: "13px 12px" }}>
+                        读取失败：{sessionPlanState.error}
+                      </div>
+                    ) : sessionPlanState.content ? (
+                      <div className="mt-4 rounded-lg border border-[#e2edf8] bg-[#fbfdff]" style={{ padding: "14px 13px" }}>
+                        <div className="max-h-[460px] min-w-0 overflow-x-hidden overflow-y-auto text-[13px] leading-6 text-[#3f5f80]">
+                          <MarkdownRenderer content={sessionPlanState.content} wrapLongLines />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between text-[12px] leading-5 text-[#8aa0b5]" style={{ gap: 10 }}>
+                          <span className="truncate">
+                            {sessionPlanState.updatedAt ? `更新于 ${formatReleaseDate(new Date(sessionPlanState.updatedAt).toISOString())}` : "已读取官方 Plan 文件"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void copyToClipboard(sessionPlanState.content, "已复制 Plan 内容")}
+                            className="kimix-icon-text-button is-compact shrink-0 text-[#2f6fad] hover:bg-[#eef7ff]"
+                          >
+                            <Copy size={13} />
+                            复制
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
+                        开启 Plan 模式并让 Kimi 生成计划后，这里会显示官方写入的 markdown 内容。
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 2, padding: "16px 16px 18px" }}>
+                    <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">会话信息</div>
+                    <div className="mt-3 flex flex-col text-[13px] leading-5 text-[#5e7894]" style={{ gap: 10 }}>
+                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "11px 12px" }}>
+                        <div className="font-medium text-[#2f6fad]">Session</div>
+                        <div className="mt-1 break-all">{liveCurrentSession?.id ?? "未选择会话"}</div>
+                      </div>
+                      <div className="rounded-lg bg-[#f8fbff]" style={{ padding: "11px 12px" }}>
+                        <div className="font-medium text-[#2f6fad]">工作目录</div>
+                        <div className="mt-1 break-all">{liveCurrentSession?.projectPath ?? currentProject?.path ?? "未选择项目"}</div>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-[#f8fbff]" style={{ gap: 12, padding: "11px 12px" }}>
+                        <span className="font-medium text-[#2f6fad]">Plan 模式</span>
+                        <span className="rounded-full bg-white text-[12px] leading-5 text-[#5e7894]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          {defaultPlanMode ? "已开启" : "已关闭"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-[#f8fbff]" style={{ gap: 12, padding: "11px 12px" }}>
+                        <span className="font-medium text-[#2f6fad]">自动模式</span>
+                        <span className="rounded-full bg-white text-[12px] leading-5 text-[#5e7894]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          {defaultAfkMode ? "已开启" : "已关闭"}
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 3, padding: "16px 16px 18px" }}>
+                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                      <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">最近变更</div>
+                      <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                        {sessionDiffs.length}
+                      </span>
+                    </div>
+                    {sessionDiffs.length > 0 ? (
+                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                        {sessionDiffs.slice(0, 4).map((diff) => (
+                          <button
+                            key={diff.id}
+                            type="button"
+                            onClick={() => {
+                              if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: diff.filePath });
+                            }}
+                            className="w-full rounded-lg border border-[#e2edf8] bg-[#fbfdff] text-left transition-colors hover:bg-[#f4f9ff]"
+                            style={{ padding: "12px 12px" }}
+                          >
+                            <div className="truncate text-[13px] font-medium leading-5 text-[#24415f]">{diff.filePath}</div>
+                            <div className="mt-1 text-[12px] leading-5 text-[#7b91a7]">+{diff.additions} / -{diff.deletions}</div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
+                        当前会话还没有 diff 记录。
+                      </div>
+                    )}
+                  </section>
                 </div>
               )}
             </div>
           </aside>
         )}
         {diffPanelOpen && (
-          <aside className="kimix-diff-panel flex h-full w-[360px] shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+          <aside style={{ width: rightPanelWidth }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ paddingLeft: 18, paddingRight: 14 }}>
               <div className="min-w-0">
                 <div className="text-[15px] font-semibold leading-5 text-[var(--kimix-panel-text)]">差异面板</div>
@@ -1950,6 +2556,32 @@ export function AppShell() {
           {toastMessage}
         </div>
       )}
+      {shutdownDialog && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/25 px-5">
+          <div className="kimix-modal-card w-full max-w-[460px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" style={{ padding: "22px 24px" }}>
+            <div className="text-[18px] font-semibold leading-6 text-[#24211d]">长程任务已完成</div>
+            <div className="mt-3 text-[14px] leading-6 text-[#625d55]">
+              「{shutdownDialog.taskTitle}」已执行完成。已按你的设置安排关机。
+            </div>
+            <div className="mt-5 rounded-xl border border-[#e5e1d8] bg-[#faf8f4] text-center" style={{ padding: "18px 16px" }}>
+              <div className="text-[13px] leading-5 text-[#8f887e]">距离关机还有</div>
+              <div className="mt-1 font-mono text-[34px] font-semibold leading-[1.2] text-[#24211d]">
+                {Math.floor(shutdownDialog.remainingSeconds / 60)}:{String(shutdownDialog.remainingSeconds % 60).padStart(2, "0")}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end" style={{ gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => void cancelScheduledShutdown()}
+                className="kimix-icon-text-button bg-[#339af0] text-white hover:bg-[#228be6]"
+                style={{ paddingLeft: 18, paddingRight: 18 }}
+              >
+                取消关机
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {helpDialog && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-5" onMouseDown={() => setHelpDialog(null)}>
           <div className="kimix-modal-card w-full max-w-[560px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>
@@ -1993,6 +2625,7 @@ export function AppShell() {
                 <div className="space-y-4 text-[14.5px] text-[#625d55]">
                   <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                     <div className="min-w-0">
+                      <div className="mb-1 text-[12px] font-semibold text-[#9a9287]">Kimix 本体</div>
                       <div className="font-semibold text-[#24211d]">{updateState.message}</div>
                       {updateState.latest && <div className="mt-1 text-[13px] text-[#8a847a]">最新版本：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
                     </div>
@@ -2015,7 +2648,41 @@ export function AppShell() {
                         style={{ paddingLeft: 16, paddingRight: 18 }}
                       >
                         <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
-                        检查更新
+                        检查本体
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
+                    <div className="min-w-0">
+                      <div className="mb-1 text-[12px] font-semibold text-[#9a9287]">Kimi CLI</div>
+                      <div className="font-semibold text-[#24211d]">{cliUpdateState.message}</div>
+                      {cliUpdateState.info && (
+                        <div className="mt-1 text-[13px] text-[#8a847a]">
+                          当前：{cliUpdateState.info.currentVersion ?? "未安装"} · 最新：{cliUpdateState.info.latestVersion ?? "未知"}
+                        </div>
+                      )}
+                      {cliUpdateState.info?.path && <div className="mt-1 truncate text-[12px] text-[#aaa49a]" title={cliUpdateState.info.path}>{cliUpdateState.info.path}</div>}
+                    </div>
+                    <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                      {cliUpdateState.hasUpdate && (
+                        <button
+                          onClick={handleUpdateKimiCli}
+                          disabled={cliUpdateState.updating || cliUpdateState.loading}
+                          className="kimix-icon-text-button h-10 shrink-0 bg-[#339af0] text-white hover:bg-[#228be6] disabled:opacity-45"
+                          style={{ paddingLeft: 16, paddingRight: 18 }}
+                        >
+                          <RefreshCw size={14} className={cliUpdateState.updating ? "kimix-spin" : ""} />
+                          {cliUpdateState.updating ? "更新中" : "一键更新"}
+                        </button>
+                      )}
+                      <button
+                        onClick={handleCheckCliUpdate}
+                        disabled={cliUpdateState.loading || cliUpdateState.updating}
+                        className="kimix-icon-text-button h-10 shrink-0 bg-[#24211d] text-white hover:bg-black disabled:opacity-45"
+                        style={{ paddingLeft: 16, paddingRight: 18 }}
+                      >
+                        <RefreshCw size={14} className={cliUpdateState.loading ? "kimix-spin" : ""} />
+                        检查 CLI
                       </button>
                     </div>
                   </div>

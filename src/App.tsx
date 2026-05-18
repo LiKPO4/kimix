@@ -569,6 +569,8 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     model: "kimi-code/kimi-for-coding",
     thinking: appState.defaultThinking,
     yoloMode: appState.permissionMode === "yolo",
+    planMode: appState.defaultPlanMode,
+    afkMode: appState.defaultAfkMode,
   });
   if (!sessionRes.success) throw new Error(sessionRes.error);
 
@@ -609,6 +611,8 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     content,
     thinking: appState.defaultThinking,
     yoloMode: appState.permissionMode === "yolo",
+    planMode: appState.defaultPlanMode,
+    afkMode: appState.defaultAfkMode,
   });
 }
 
@@ -616,6 +620,10 @@ function App() {
   const setTheme = useAppStore((s) => s.setTheme);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
+  const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
+  const setDefaultAfkMode = useAppStore((s) => s.setDefaultAfkMode);
+  const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
@@ -625,6 +633,8 @@ function App() {
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
@@ -638,6 +648,7 @@ function App() {
   const streamBatchRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bootstrapDoneRef = useRef(false);
+  const settingsHydratedRef = useRef(false);
   const handoffJobRef = useRef<HandoffJob | null>(null);
   const longTaskReviewDispatchRef = useRef<Set<string>>(new Set());
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
@@ -683,6 +694,7 @@ function App() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      afkMode: defaultAfkMode,
     });
     if (!startRes.success) throw new Error(startRes.error);
 
@@ -714,6 +726,7 @@ function App() {
       content: prompt,
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      afkMode: defaultAfkMode,
     });
     if (!sendRes.success) throw new Error(sendRes.error);
   };
@@ -769,6 +782,13 @@ function App() {
               timestamp: Date.now(),
               agentRole: role,
               content: detail,
+              thinkingParts: [
+                {
+                  id: crypto.randomUUID(),
+                  timestamp: Date.now(),
+                  text: detail,
+                },
+              ],
               isThinking: false,
               isComplete: true,
             },
@@ -779,11 +799,17 @@ function App() {
       const latestProxy = events[latestProxyIndex];
       if (latestProxy.type !== "assistant_message") return session;
       if (latestProxy.isComplete && !detailContent?.trim()) return session;
+      const detailPart = detail
+        ? {
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+            text: detail,
+          }
+        : null;
       events[latestProxyIndex] = {
         ...latestProxy,
         content: detail || latestProxy.content,
-        thinking: detail ? undefined : latestProxy.thinking,
-        thinkingParts: detail ? undefined : latestProxy.thinkingParts,
+        thinkingParts: detailPart ? [detailPart] : latestProxy.thinkingParts,
         isThinking: false,
         isComplete: true,
         durationMs: latestProxy.durationMs ?? Math.max(0, Date.now() - latestProxy.timestamp),
@@ -913,6 +939,7 @@ function App() {
       content: buildLongTaskReviewPrompt(latestForPrompt),
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      afkMode: defaultAfkMode,
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -1052,6 +1079,7 @@ function App() {
       content: prompt,
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      afkMode: defaultAfkMode,
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -1090,19 +1118,25 @@ function App() {
       if (lagMs > 2500) recordRendererLag(lagMs);
     }, 1000);
 
-    window.api.getSettings().then((res) => {
-      if (res.success) {
-        setTheme(res.data.theme);
-        setPermissionMode(res.data.defaultPermissionMode);
-        setDefaultThinking(res.data.defaultThinking);
-        setDetailedContext(res.data.detailedContext);
-        setStatusUpdateDisplay(res.data.statusUpdateDisplay);
-        setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
-        setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
-        setVoiceShortcut(res.data.voiceShortcut);
-        setClarificationToolMode(res.data.clarificationToolMode);
-      }
-    }).catch(() => {});
+    if (!settingsHydratedRef.current) {
+      settingsHydratedRef.current = true;
+      window.api.getSettings().then((res) => {
+        if (res.success) {
+          setTheme(res.data.theme);
+          setPermissionMode(res.data.defaultPermissionMode);
+          setDefaultThinking(res.data.defaultThinking);
+          setDefaultPlanMode(res.data.defaultPlanMode);
+          setDefaultAfkMode(res.data.defaultAfkMode);
+          setAdditionalWorkDirs(res.data.additionalWorkDirs ?? []);
+          setDetailedContext(res.data.detailedContext);
+          setStatusUpdateDisplay(res.data.statusUpdateDisplay);
+          setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
+          setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
+          setVoiceShortcut(res.data.voiceShortcut);
+          setClarificationToolMode(res.data.clarificationToolMode);
+        }
+      }).catch(() => {});
+    }
 
     window.api.listRecentProjects().then((res) => {
       if (res.success) {
@@ -1131,6 +1165,8 @@ function App() {
           sessionId: latest?.id,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
+          planMode: useAppStore.getState().defaultPlanMode,
+          afkMode: useAppStore.getState().defaultAfkMode,
         });
         if (!startRes.success || !latest) return;
         const runtimeOwner = findLocalSessionForRuntime(latest.id, startRes.data.sessionId);
@@ -1329,6 +1365,7 @@ function App() {
           model: "kimi-code/kimi-for-coding",
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
+          afkMode: useAppStore.getState().defaultAfkMode,
         });
         if (!startRes.success) throw new Error(startRes.error);
         rememberHiddenHandoffSession(startRes.data.sessionId);
@@ -1345,6 +1382,7 @@ function App() {
           content: prompt,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
+          afkMode: useAppStore.getState().defaultAfkMode,
         });
         if (!sendRes.success) throw new Error(sendRes.error);
       })().catch((err) => {
@@ -1491,7 +1529,7 @@ function App() {
                 type: "assistant_message" as const,
                 timestamp: Date.now(),
                 content: "",
-                isThinking: defaultThinking,
+                isThinking: useAppStore.getState().defaultThinking,
                 isComplete: false,
               },
             ],
@@ -1503,8 +1541,10 @@ function App() {
             window.api.sendPrompt({
               sessionId: runtimeSessionId,
               content: next.content,
-              thinking: defaultThinking,
-              yoloMode: permissionMode === "yolo",
+              thinking: useAppStore.getState().defaultThinking,
+              yoloMode: useAppStore.getState().permissionMode === "yolo",
+              planMode: useAppStore.getState().defaultPlanMode,
+              afkMode: useAppStore.getState().defaultAfkMode,
             }).then((res) => {
               if (res.success) return;
               throw new Error(res.error);
@@ -1554,6 +1594,9 @@ function App() {
         state.theme !== prev.theme ||
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
+        state.defaultPlanMode !== prev.defaultPlanMode ||
+        state.defaultAfkMode !== prev.defaultAfkMode ||
+        state.additionalWorkDirs !== prev.additionalWorkDirs ||
         state.detailedContext !== prev.detailedContext ||
         state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
         state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
@@ -1565,6 +1608,9 @@ function App() {
           theme: state.theme,
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
+          defaultPlanMode: state.defaultPlanMode,
+          defaultAfkMode: state.defaultAfkMode,
+          additionalWorkDirs: state.additionalWorkDirs,
           detailedContext: state.detailedContext,
           statusUpdateDisplay: state.statusUpdateDisplay,
           sessionRecommendationEnabled: state.sessionRecommendationEnabled,
@@ -1594,7 +1640,7 @@ function App() {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setDefaultThinking, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, permissionMode]);
+  }, [setTheme, setPermissionMode, setDefaultThinking, setDefaultPlanMode, setDefaultAfkMode, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1618,7 +1664,7 @@ function App() {
       }
     }, 1400);
     return () => clearTimeout(timer);
-  }, [defaultThinking, permissionMode, updateSession]);
+  }, [defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode, updateSession]);
 
   return (
     <ThemeProvider>

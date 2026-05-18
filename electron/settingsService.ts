@@ -9,6 +9,8 @@ const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
 const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: "kimi-code/kimi-for-coding",
   defaultThinking: true,
+  defaultPlanMode: false,
+  defaultAfkMode: false,
   maxTurns: 50,
   enableCompaction: true,
   defaultPermissionMode: "manual",
@@ -25,6 +27,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   enabledSkillNames: [],
+  additionalWorkDirs: [],
 };
 
 function ensureDir() {

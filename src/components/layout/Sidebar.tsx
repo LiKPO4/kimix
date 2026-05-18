@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, ChevronRight, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2 } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -22,10 +22,16 @@ function formatRelativeTime(ts: number): string {
 const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-xl text-[15px] text-[#302d28] transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f] disabled:cursor-not-allowed disabled:opacity-40";
 
-export function Sidebar() {
+interface SidebarProps {
+  width?: number;
+}
+
+export function Sidebar({ width = 320 }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
@@ -88,6 +94,8 @@ export function Sidebar() {
         model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        planMode: defaultPlanMode,
+        afkMode: defaultAfkMode,
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -240,7 +248,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside style={{ paddingLeft: 12, paddingRight: 10 }} className="kimix-sidebar flex h-full w-[320px] shrink-0 select-none flex-col pb-2">
+    <aside style={{ width, paddingLeft: 12, paddingRight: 10 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col pb-2">
       <div className="no-drag space-y-1 px-2 pb-2">
         <button
           onClick={async () => {
@@ -279,7 +287,7 @@ export function Sidebar() {
             title="打开项目"
             aria-label="打开项目"
           >
-            <ChevronRight size={14} />
+            <Plus size={14} />
           </button>
         </div>
 
@@ -457,7 +465,7 @@ export function Sidebar() {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.63</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.100</span>
         </button>
       </div>
     </aside>

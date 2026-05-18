@@ -19,6 +19,7 @@ const KIMI_CODE_USAGE_URL = "https://api.kimi.com/coding/v1/usages";
 const KIMI_CODE_REFRESH_URL = "https://auth.kimi.com/api/oauth/token";
 const KIMI_CLI_INSTALL_PS1_URL = "https://code.kimi.com/install.ps1";
 const KIMI_CLI_INSTALL_SH_URL = "https://code.kimi.com/install.sh";
+const KIMI_CLI_PYPI_URL = "https://pypi.org/pypi/kimi-cli/json";
 
 function prependProcessPath(dir: string) {
   if (!dir) return;
@@ -102,6 +103,109 @@ function runLongCommand(command: string, args: string[], timeoutMs = 10 * 60 * 1
     });
     child.on("error", reject);
   });
+}
+
+function extractKimiCliVersion(output: string): string | null {
+  const match = output.match(/(?:kimi-cli version:|kimi,\s*version)\s*v?([0-9]+(?:\.[0-9]+){1,3})/i);
+  return match?.[1] ?? null;
+}
+
+async function getInstalledKimiCliInfo() {
+  const kimiPath = await resolveCommand("kimi");
+  if (!kimiPath) {
+    return {
+      available: false,
+      path: undefined,
+      version: null,
+      output: "",
+    };
+  }
+  const output = await runCommand(kimiPath, ["--version"]).catch(() => "");
+  return {
+    available: true,
+    path: kimiPath,
+    version: extractKimiCliVersion(output),
+    output,
+  };
+}
+
+async function fetchLatestKimiCliVersion() {
+  const res = await fetch(KIMI_CLI_PYPI_URL, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "Kimix",
+    },
+  });
+  if (!res.ok) throw new Error(`PyPI 返回 ${res.status}`);
+  const data = await res.json() as { info?: { version?: unknown } };
+  const version = data.info && typeof data.info.version === "string" ? data.info.version : "";
+  if (!version) throw new Error("PyPI 未返回 Kimi CLI 最新版本");
+  return version;
+}
+
+async function checkKimiCliUpdate() {
+  const [installed, latestVersion] = await Promise.all([
+    getInstalledKimiCliInfo(),
+    fetchLatestKimiCliVersion(),
+  ]);
+  if (!installed.available) {
+    return {
+      available: false,
+      currentVersion: null,
+      latestVersion,
+      hasUpdate: true,
+      path: undefined,
+      message: `未找到 Kimi CLI，可安装最新版本 ${latestVersion}`,
+    };
+  }
+  const currentVersion = installed.version;
+  const hasUpdate = currentVersion ? isVersionGreater(latestVersion, currentVersion) : true;
+  return {
+    available: true,
+    currentVersion,
+    latestVersion,
+    hasUpdate,
+    path: installed.path,
+    message: hasUpdate
+      ? `发现 Kimi CLI 新版本 ${latestVersion}`
+      : `Kimi CLI 已是最新版本 ${currentVersion ?? latestVersion}`,
+  };
+}
+
+async function updateKimiCli() {
+  const latestVersion = await fetchLatestKimiCliVersion();
+  const uvPath = await resolveCommand("uv");
+  let output = "";
+  let upgradeError = "";
+  if (uvPath) {
+    try {
+      output = await runLongCommand(uvPath, ["tool", "upgrade", "kimi-cli"]);
+    } catch (err) {
+      upgradeError = err instanceof Error ? err.message : String(err);
+    }
+  } else {
+    try {
+      const result = await installKimiCli();
+      output = result.output || result.message;
+    } catch (err) {
+      upgradeError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  const checked = await checkKimiCliUpdate();
+  if (checked.currentVersion && !isVersionGreater(latestVersion, checked.currentVersion)) {
+    return {
+      ...checked,
+      latestVersion,
+      hasUpdate: false,
+      output: output || upgradeError,
+      message: upgradeError
+        ? `Kimi CLI 已更新到 ${checked.currentVersion}，但安装器提示：${upgradeError}`
+        : `Kimi CLI 已更新到 ${checked.currentVersion}`,
+    };
+  }
+
+  throw new Error(upgradeError || `Kimi CLI 更新后仍未达到最新版本 ${latestVersion}`);
 }
 
 async function installKimiCli() {
@@ -276,6 +380,28 @@ async function openFileAt(filePath: string) {
   await shell.openPath(filePath);
 }
 
+async function launchExecutableFile(filePath: string) {
+  if (!fs.existsSync(filePath)) throw new Error("文件不存在");
+  const ext = path.extname(filePath).toLowerCase();
+  const cwd = path.dirname(filePath);
+  if (process.platform === "win32") {
+    if (ext === ".bat" || ext === ".cmd") {
+      await spawnDetached("cmd.exe", ["/c", "start", "", filePath], cwd);
+      return;
+    }
+    if (ext === ".ps1") {
+      await spawnDetached("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", filePath], cwd);
+      return;
+    }
+  }
+  try {
+    await spawnDetached(filePath, [], cwd);
+  } catch {
+    const openError = await shell.openPath(filePath);
+    if (openError) throw new Error(openError);
+  }
+}
+
 function resolveProjectFile(projectPath: string, filePath: string) {
   const resolvedProject = path.resolve(projectPath);
   const resolvedFile = path.resolve(resolvedProject, filePath);
@@ -284,6 +410,58 @@ function resolveProjectFile(projectPath: string, filePath: string) {
     throw new Error("File path escapes project");
   }
   return resolvedFile;
+}
+
+function isPathInside(parent: string, child: string) {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function resolveReadableTextFile(requestPath: string, projectPath?: string) {
+  const trimmedPath = requestPath.trim();
+  if (!trimmedPath) throw new Error("Missing file path");
+
+  const kimiPlansDir = path.join(os.homedir(), ".kimi", "plans");
+  if (trimmedPath === "__latest_kimi_plan__") {
+    const latest = fs.readdirSync(kimiPlansDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"))
+      .map((entry) => {
+        const filePath = path.join(kimiPlansDir, entry.name);
+        const stat = fs.statSync(filePath);
+        return { filePath, mtimeMs: stat.mtimeMs };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+    if (!latest) throw new Error("No Kimi plan file found");
+    const stat = fs.statSync(latest.filePath);
+    if (stat.size > 1024 * 1024) throw new Error("Text file is too large");
+    return { resolvedFile: latest.filePath, updatedAt: stat.mtimeMs };
+  }
+  const normalizedRequest = trimmedPath.replace(/\\/g, "/");
+  const isKimiPlanRelative = normalizedRequest.startsWith(".kimi/plans/");
+  const resolvedFile = isKimiPlanRelative
+    ? path.resolve(os.homedir(), trimmedPath)
+    : path.isAbsolute(trimmedPath)
+      ? path.resolve(trimmedPath)
+      : projectPath
+        ? resolveProjectFile(projectPath, trimmedPath)
+        : path.resolve(trimmedPath);
+
+  const allowedProjectFile = Boolean(projectPath && isPathInside(projectPath, resolvedFile));
+  const allowedKimiPlan = isPathInside(kimiPlansDir, resolvedFile) && path.extname(resolvedFile).toLowerCase() === ".md";
+  if (!allowedProjectFile && !allowedKimiPlan) {
+    throw new Error("File path is not allowed");
+  }
+
+  const ext = path.extname(resolvedFile).toLowerCase();
+  const allowedExts = new Set([".md", ".txt", ".json", ".log", ".yaml", ".yml"]);
+  if (!allowedExts.has(ext)) {
+    throw new Error("Only text files can be read");
+  }
+
+  const stat = fs.statSync(resolvedFile);
+  if (!stat.isFile()) throw new Error("Path is not a file");
+  if (stat.size > 1024 * 1024) throw new Error("Text file is too large");
+  return { resolvedFile, updatedAt: stat.mtimeMs };
 }
 
 // Log unhandled errors to prevent silent crashes
@@ -779,6 +957,7 @@ type KimiUsagePeriod = {
   limit?: number;
   percent?: number;
   available: boolean;
+  refreshAt?: number;
   message?: string;
 };
 
@@ -892,16 +1071,58 @@ function getRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | null): KimiUsagePeriod {
-  if (!detail) return { label, available: false, percent: 0, message: "暂无官方数据" };
+function toTimestamp(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "number") {
+    const normalized = value > 0 && value < 10_000_000_000 ? value * 1000 : value;
+    return Number.isFinite(normalized) ? normalized : undefined;
+  }
+  if (typeof value === "string") {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return toTimestamp(numeric);
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function findRefreshTimestamp(detail: Record<string, unknown> | null, fallback: number): number {
+  const keys = [
+    "refreshAt",
+    "resetTime",
+    "refreshTime",
+    "resetAt",
+    "resetsAt",
+    "nextRefreshAt",
+    "nextResetAt",
+    "nextRefreshTime",
+    "nextResetTime",
+    "next_reset_time",
+    "reset_time",
+    "expireAt",
+    "expiresAt",
+  ];
+  for (const source of [detail, getRecord(detail?.window)]) {
+    if (!source) continue;
+    for (const key of keys) {
+      const timestamp = toTimestamp(source[key]);
+      if (timestamp !== undefined) return timestamp;
+    }
+  }
+  return fallback;
+}
+
+function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | null, fallbackRefreshAt: number): KimiUsagePeriod {
+  if (!detail) return { label, available: false, percent: 0, refreshAt: fallbackRefreshAt, message: "暂无官方数据" };
   const limit = toNumber(detail.limit);
   const remaining = toNumber(detail.remaining);
   let used = toNumber(detail.used);
   if (used === undefined && limit !== undefined && remaining !== undefined) {
     used = Math.max(0, limit - remaining);
   }
+  const refreshAt = findRefreshTimestamp(detail, fallbackRefreshAt);
   if (limit === undefined || used === undefined || limit <= 0) {
-    return { label, available: false, percent: 0, message: "暂无官方数据" };
+    return { label, available: false, percent: 0, refreshAt, message: "暂无官方数据" };
   }
   return {
     label,
@@ -909,6 +1130,7 @@ function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | 
     limit,
     percent: Math.max(0, Math.min(100, (used / limit) * 100)),
     available: true,
+    refreshAt,
   };
 }
 
@@ -922,21 +1144,30 @@ function findWindowLimit(payload: Record<string, unknown>, duration: number, tim
     const itemDuration = toNumber(window?.duration ?? itemRecord.duration ?? detail.duration);
     const itemUnit = String(window?.timeUnit ?? itemRecord.timeUnit ?? detail.timeUnit ?? "");
     if (itemDuration === duration && itemUnit.includes(timeUnit)) {
-      return detail;
+      return { ...detail, window };
     }
   }
   return null;
 }
 
+function nextWeekRefreshAt(now: number) {
+  const date = new Date(now);
+  const day = date.getDay();
+  const daysUntilMonday = day === 0 ? 1 : 8 - day;
+  date.setDate(date.getDate() + daysUntilMonday);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
 function parseKimiUsagePayload(payload: Record<string, unknown>) {
-  const fiveHour = usagePeriodFromDetail("5小时", findWindowLimit(payload, 300, "MINUTE"));
-  const weekly = usagePeriodFromDetail("本周", getRecord(payload.usage));
-  const monthly = usagePeriodFromDetail("本月", getRecord(payload.totalQuota));
+  const updatedAt = Date.now();
+  const fiveHour = usagePeriodFromDetail("5小时", findWindowLimit(payload, 300, "MINUTE"), updatedAt + 5 * 60 * 60 * 1000);
+  const weekly = usagePeriodFromDetail("本周", getRecord(payload.usage), nextWeekRefreshAt(updatedAt));
   return {
-    available: [fiveHour, weekly, monthly].some((period) => period.available),
-    updatedAt: Date.now(),
+    available: [fiveHour, weekly].some((period) => period.available),
+    updatedAt,
     source: "Kimi Code 官方用量接口",
-    periods: [fiveHour, weekly, monthly],
+    periods: [fiveHour, weekly],
   };
 }
 
@@ -1141,6 +1372,7 @@ const CreateLongTaskSchema = z.object({
   initialRequest: z.string().min(1).max(20000),
   thinking: z.boolean().optional(),
   yoloMode: z.boolean().optional(),
+  afkMode: z.boolean().optional(),
 });
 
 ipcMain.handle("project:addRecent", async (_, project: unknown) => {
@@ -1239,12 +1471,14 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     const title = (parsed.data.title?.trim() || initialRequest.trim().split(/\r?\n/)[0] || "长程任务").slice(0, 80);
     const thinking = parsed.data.thinking ?? true;
     const yoloMode = parsed.data.yoloMode ?? false;
+    const afkMode = parsed.data.afkMode ?? false;
 
     const executor = await kimiBridge.startSession({
       workDir: project.path,
       model: "kimi-code/kimi-for-coding",
       thinking,
       yoloMode,
+      afkMode,
     });
     executorSessionId = executor.sessionId;
 
@@ -1253,6 +1487,7 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
       model: "kimi-code/kimi-for-coding",
       thinking,
       yoloMode,
+      afkMode,
     });
     reviewerSessionId = reviewer.sessionId;
 
@@ -1329,6 +1564,61 @@ ipcMain.handle("project:openTerminal", async (_, request: unknown) => {
       return { success: false, error: "Path does not exist" };
     }
     await openTerminalAt(dir);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:chooseExecutable", async () => {
+  try {
+    const settings = settingsService.loadSettings();
+    const defaultPath = settings.selectedExecutablePath && fs.existsSync(settings.selectedExecutablePath)
+      ? path.dirname(settings.selectedExecutablePath)
+      : settings.defaultOpenDir;
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      title: "选择要启动的文件",
+      defaultPath,
+      properties: ["openFile"],
+      filters: process.platform === "win32"
+        ? [
+            { name: "Windows 可执行文件", extensions: ["exe", "bat", "cmd", "ps1", "com", "msi", "lnk"] },
+            { name: "所有文件", extensions: ["*"] },
+          ]
+        : [{ name: "所有文件", extensions: ["*"] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, data: undefined };
+    }
+    const filePath = result.filePaths[0];
+    settingsService.saveSettings({ selectedExecutablePath: filePath });
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:launchExecutable", async () => {
+  try {
+    let filePath = settingsService.loadSettings().selectedExecutablePath;
+    if (!filePath || !fs.existsSync(filePath)) {
+      const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+        title: "选择要启动的文件",
+        properties: ["openFile"],
+        filters: process.platform === "win32"
+          ? [
+              { name: "Windows 可执行文件", extensions: ["exe", "bat", "cmd", "ps1", "com", "msi", "lnk"] },
+              { name: "所有文件", extensions: ["*"] },
+            ]
+          : [{ name: "所有文件", extensions: ["*"] }],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: true, data: undefined };
+      }
+      filePath = result.filePaths[0];
+      settingsService.saveSettings({ selectedExecutablePath: filePath });
+    }
+    await launchExecutableFile(filePath);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -1483,6 +1773,29 @@ ipcMain.handle("project:importSkillArchive", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as Record<string, unknown>;
+    const requestPath = typeof req.path === "string" ? req.path : "";
+    const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
+    const { resolvedFile, updatedAt } = resolveReadableTextFile(requestPath, projectPath);
+    const content = await fs.promises.readFile(resolvedFile, "utf8");
+    return {
+      success: true,
+      data: {
+        path: resolvedFile,
+        content,
+        updatedAt,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 // Kimi IPC handlers
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
@@ -1536,7 +1849,23 @@ ipcMain.handle("kimi:installCli", async () => {
   }
 });
 
-ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; skillsDir?: string }) => {
+ipcMain.handle("kimi:checkCliUpdate", async () => {
+  try {
+    return { success: true, data: await checkKimiCliUpdate() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:updateCli", async () => {
+  try {
+    return { success: true, data: await updateKimiCli() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; planMode?: boolean; afkMode?: boolean; skillsDir?: string }) => {
   try {
     const settings = settingsService.loadSettings();
     const skillsDir = request.skillsDir || ((settings.enabledSkillNames ?? []).length > 0 ? settings.enabledSkillsDir || enabledSkillsDir() : undefined);
@@ -1563,6 +1892,24 @@ ipcMain.handle("kimi:listSlashCommands", async (_, request: { sessionId: string 
   }
 });
 
+ipcMain.handle("kimi:setPlanMode", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as Record<string, unknown>;
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const enabled = typeof req.enabled === "boolean" ? req.enabled : null;
+    if (!sessionId || enabled === null) {
+      return { success: false, error: "Missing sessionId or enabled" };
+    }
+    await kimiBridge.setPlanMode(sessionId, enabled);
+    return { success: true, data: { enabled } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
   if (!request || typeof request !== "object") {
     return { success: false, error: "Invalid request" };
@@ -1581,6 +1928,8 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
     : [];
   const thinking = typeof req.thinking === "boolean" ? req.thinking : undefined;
   const yoloMode = typeof req.yoloMode === "boolean" ? req.yoloMode : undefined;
+  const planMode = typeof req.planMode === "boolean" ? req.planMode : undefined;
+  const afkMode = typeof req.afkMode === "boolean" ? req.afkMode : undefined;
   if (!sessionId || (!content && images.length === 0)) {
     return { success: false, error: "Missing sessionId or content" };
   }
@@ -1591,7 +1940,7 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
       ]
     : content;
   try {
-    await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode });
+    await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode, planMode, afkMode });
     return { success: true, data: { sessionId } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -1812,6 +2161,8 @@ ipcMain.handle("app:downloadUpdate", async () => {
 const SettingsSchema = z.object({
   defaultModel: z.string().optional(),
   defaultThinking: z.boolean().optional(),
+  defaultPlanMode: z.boolean().optional(),
+  defaultAfkMode: z.boolean().optional(),
   maxTurns: z.number().int().min(1).max(1000).optional(),
   enableCompaction: z.boolean().optional(),
   defaultPermissionMode: z.enum(["manual", "approve_for_session", "yolo"]).optional(),
@@ -1827,6 +2178,8 @@ const SettingsSchema = z.object({
   clarificationToolEnabled: z.boolean().optional(),
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
+  selectedExecutablePath: z.string().optional(),
+  additionalWorkDirs: z.array(z.string()).optional(),
   autoReadAgentsMd: z.boolean().optional(),
   autoShowGitStatus: z.boolean().optional(),
 });
@@ -1850,6 +2203,36 @@ ipcMain.handle("app:triggerShortcut", async (_, request: unknown) => {
       ? (request as { shortcut: string }).shortcut
       : "";
     await triggerKeyboardShortcut(shortcut);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:scheduleShutdown", async (_, request: unknown) => {
+  try {
+    if (process.platform !== "win32") {
+      return { success: false, error: "当前仅支持 Windows 延迟关机" };
+    }
+    const delaySeconds = request && typeof request === "object" && typeof (request as { delaySeconds?: unknown }).delaySeconds === "number"
+      ? Math.max(0, Math.min(600, Math.round((request as { delaySeconds: number }).delaySeconds)))
+      : 180;
+    const reason = request && typeof request === "object" && typeof (request as { reason?: unknown }).reason === "string"
+      ? (request as { reason: string }).reason.slice(0, 120)
+      : "Kimix 长程任务执行完成";
+    await runLongCommand("shutdown.exe", ["/s", "/t", String(delaySeconds), "/c", reason], 5000);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:cancelShutdown", async () => {
+  try {
+    if (process.platform !== "win32") {
+      return { success: false, error: "当前仅支持 Windows 取消关机" };
+    }
+    await runLongCommand("shutdown.exe", ["/a"], 5000);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

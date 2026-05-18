@@ -18,8 +18,12 @@ import type {
   CheckKimiCliRequest,
   CheckKimiCliResponse,
   InstallKimiCliResponse,
+  CheckKimiCliUpdateResponse,
+  UpdateKimiCliResponse,
   SendPromptRequest,
   SendPromptResponse,
+  SetPlanModeRequest,
+  SetPlanModeResponse,
   SteerPromptRequest,
   SteerPromptResponse,
   StopTurnRequest,
@@ -41,6 +45,8 @@ import type {
   OpenFileRequest,
   OpenEditorRequest,
   OpenPathRequest,
+  ReadTextFileRequest,
+  ReadTextFileResponse,
   RevertFilesRequest,
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
@@ -55,6 +61,7 @@ import type {
   DownloadUpdateResponse,
   CopyImageRequest,
   TriggerShortcutRequest,
+  ScheduleShutdownRequest,
   SettingsResponse,
   SaveSettingsRequest,
   KimiEventPayload,
@@ -77,6 +84,8 @@ const api = {
     ipcRenderer.invoke("project:getGitInfo", projectPath),
   openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openPath", req),
+  readTextFile: (req: ReadTextFileRequest): Promise<ReadTextFileResponse> =>
+    ipcRenderer.invoke("project:readTextFile", req),
   openFile: (req: OpenFileRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openFile", req),
   revertFiles: (req: RevertFilesRequest): Promise<VoidResponse> =>
@@ -113,8 +122,14 @@ const api = {
     ipcRenderer.invoke("kimi:checkCli", req),
   installKimiCli: (): Promise<InstallKimiCliResponse> =>
     ipcRenderer.invoke("kimi:installCli"),
+  checkKimiCliUpdate: (): Promise<CheckKimiCliUpdateResponse> =>
+    ipcRenderer.invoke("kimi:checkCliUpdate"),
+  updateKimiCli: (): Promise<UpdateKimiCliResponse> =>
+    ipcRenderer.invoke("kimi:updateCli"),
   sendPrompt: (req: SendPromptRequest): Promise<SendPromptResponse> =>
     ipcRenderer.invoke("kimi:sendPrompt", req),
+  setPlanMode: (req: SetPlanModeRequest): Promise<SetPlanModeResponse> =>
+    ipcRenderer.invoke("kimi:setPlanMode", req),
   steerPrompt: (req: SteerPromptRequest): Promise<SteerPromptResponse> =>
     ipcRenderer.invoke("kimi:steerPrompt", req),
   stopTurn: (req: StopTurnRequest): Promise<StopTurnResponse> =>
@@ -155,10 +170,18 @@ const api = {
   downloadUpdate: (): Promise<DownloadUpdateResponse> => ipcRenderer.invoke("app:downloadUpdate"),
   openExternal: (url: string): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:openExternal", url),
+  chooseExecutable: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:chooseExecutable"),
+  launchExecutable: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:launchExecutable"),
   copyImage: (req: CopyImageRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:copyImage", req),
   triggerShortcut: (req: TriggerShortcutRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:triggerShortcut", req),
+  scheduleShutdown: (req: ScheduleShutdownRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:scheduleShutdown", req),
+  cancelShutdown: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:cancelShutdown"),
 
   // Bootstrap
   onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {
