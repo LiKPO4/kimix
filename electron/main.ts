@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, Notification, shell } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -496,9 +496,15 @@ process.env.VITE_PUBLIC = DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
 
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.kimix.app");
+}
+
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 let rendererReloadedAfterBlank = false;
+let taskbarAttentionActive = false;
+let taskbarOverlayIcon: Electron.NativeImage | null = null;
 
 const FILE_SEARCH_IGNORES = new Set([
   ".git",
@@ -528,6 +534,58 @@ function emitWindowState() {
     maximized: mainWindow.isMaximized(),
     fullscreen: mainWindow.isFullScreen(),
   });
+}
+
+function getTaskbarOverlayIcon() {
+  if (taskbarOverlayIcon) return taskbarOverlayIcon;
+  taskbarOverlayIcon = nativeImage.createFromDataURL("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAJ5SURBVFhH1VevTxxBFEZWIpH9E4oCRSpwGOQpgiE52aDOgcGRNMEUhSJBIAiqKCorECQYcJS2lKa99soBgQv0veabnRnefrvc3V7nBF/ymdl9v+e9tzsy8lwhIpOq+tqS30kKVR0TkbqIvNcuEJGPqtpQ1ZesYyCo6qiqLovILRvrBRF5B8dZZ99AWkWkxYqBu6MjvT04yLEMcFxEaqy7J1R1nqOG0ebSkn6emtJP4+MFnk1M6M9GQ2/2961YwDLbeBIwbiUfmk39sbhYMNiN3xcWtHNyYtUgG2/ZVgE+7TFyRP1lerpgoB8iI9d7e+xEnW1G+Jsea466stJBaJ3wwb1i2w5IUXjx/vx84MiZyIQth4jssO0QfUx91Zr34rdaLTrgkc+CHx4OqVLPvNrdjdYxI3IO+AnmgFZi4RS8mJuzDlzY6DHtsgedjqsZC6ci7pZBVga/WBzQdiyUktQR2YRU1dlwiCnGQil5ublpHXgTMlAPh+3t7YJQSrbW16MDcTwjFeEEKWKhlPyzsWEdaIQS4IPCYVgtGGhbETsnODAWTv622wWhlKSJOOkb0ZXhNDzAJmPBFPw6M2ONY+q+sA7EPTCsi9haW7MO5PcBhkJ8qupmNyv4H2KxYcgZzOYcAOBVeJr6MtIeOGTbDpwFDA1WNAh/r65atUAx+gC7FQH0LSuswl8rK1ZdcQuWQUS2rBDKUfXjBB+uuMwWfuM+3vyngJfYCVwgZAOtxMYs4ShSjnmSk8+Mj7KtrsCszmnxwDCBM5jrltikZfA/KL0jL4P/Sv7ASvuBiBx3vXBVAEUoC/+slMH/P2ZzfhjwywvdghJZ4rxSqv8B8Jd6o0/rE/wAAAAASUVORK5CYII=");
+  return taskbarOverlayIcon;
+}
+
+function setTaskbarAttention() {
+  taskbarAttentionActive = true;
+  if (process.platform === "darwin") {
+    app.setBadgeCount(1);
+    return;
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (process.platform === "win32") {
+    mainWindow.setOverlayIcon(getTaskbarOverlayIcon(), "Kimix 有已完成的轮次");
+  } else {
+    app.setBadgeCount(1);
+  }
+}
+
+function clearTaskbarAttention() {
+  if (!taskbarAttentionActive) return;
+  taskbarAttentionActive = false;
+  if (process.platform === "darwin") {
+    app.setBadgeCount(0);
+    return;
+  }
+  if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setOverlayIcon(null, "");
+    return;
+  }
+  app.setBadgeCount(0);
+}
+
+function showTurnCompleteNotification(title: string, body: string) {
+  setTaskbarAttention();
+  if (!Notification.isSupported()) return;
+  const notification = new Notification({
+    title: title.trim() || "Kimix 本轮已完成",
+    body: body.trim() || "当前轮次处理已完成，可以回来查看结果。",
+    silent: false,
+  });
+  notification.on("click", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    clearTaskbarAttention();
+  });
+  notification.show();
 }
 
 function verifyRendererContent() {
@@ -1217,6 +1275,8 @@ function createWindow() {
     emitWindowState();
     verifyRendererContent();
   });
+
+  mainWindow.on("focus", clearTaskbarAttention);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
@@ -2207,6 +2267,23 @@ ipcMain.handle("app:triggerShortcut", async (_, request: unknown) => {
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
+});
+
+ipcMain.handle("app:notifyTurnComplete", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const title = typeof payload.title === "string" ? payload.title.slice(0, 80) : "Kimix 本轮已完成";
+    const body = typeof payload.body === "string" ? payload.body.slice(0, 180) : "当前轮次处理已完成，可以回来查看结果。";
+    showTurnCompleteNotification(title, body);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:clearTaskbarAttention", async () => {
+  clearTaskbarAttention();
+  return { success: true, data: undefined };
 });
 
 ipcMain.handle("app:scheduleShutdown", async (_, request: unknown) => {

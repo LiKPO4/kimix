@@ -65,6 +65,10 @@ function findPlanPathInChangeSummary(event?: Extract<TimelineEvent, { type: "cha
   return event?.files.map((file) => file.path.match(KIMI_PLAN_PATH_PATTERN)?.[0]).filter(Boolean).map((path) => cleanPlanPath(path as string))[0] ?? null;
 }
 
+function normalizeFilePath(value: string) {
+  return value.replace(/\\/g, "/").toLowerCase();
+}
+
 function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: string }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -262,9 +266,10 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   const filesByPath = new Map<string, { path: string; additions?: number; deletions?: number }>();
   for (const event of events) {
     for (const file of event.files) {
-      const existing = filesByPath.get(file.path);
-      filesByPath.set(file.path, {
-        path: file.path,
+      const key = normalizeFilePath(file.path);
+      const existing = filesByPath.get(key);
+      filesByPath.set(key, {
+        path: existing?.path ?? file.path,
         additions: (existing?.additions ?? 0) + (file.additions ?? 0),
         deletions: (existing?.deletions ?? 0) + (file.deletions ?? 0),
       });
@@ -328,9 +333,9 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
     const diffEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff");
     const mergedChangeSummary = mergeChangeSummaryEvents(turnEvents.filter((event): event is Extract<TimelineEvent, { type: "change_summary" }> => event.type === "change_summary"));
-    const summaryPathSet = new Set((mergedChangeSummary?.files ?? []).map((file) => file.path.replace(/\\/g, "/").toLowerCase()));
+    const summaryPathSet = new Set((mergedChangeSummary?.files ?? []).map((file) => normalizeFilePath(file.path)));
     const standaloneDiffEvents = diffEvents.filter((diff) => {
-      const normalized = diff.filePath.replace(/\\/g, "/").toLowerCase();
+      const normalized = normalizeFilePath(diff.filePath);
       return !summaryPathSet.has(normalized) && !Array.from(summaryPathSet).some((path) => path.endsWith(`/${normalized}`) || normalized.endsWith(`/${path}`));
     });
     const planPath = findPlanPathInChangeSummary(mergedChangeSummary);

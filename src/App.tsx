@@ -146,6 +146,27 @@ function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: b
   ];
 }
 
+function settlePendingSteerMessages(events: TimelineEvent[], status: "sent" | "failed", error?: string): TimelineEvent[] {
+  if (!events.some((event) => event.type === "steer_message" && event.status === "sending")) return events;
+  return events.map((event) => (
+    event.type === "steer_message" && event.status === "sending"
+      ? { ...event, status, error: status === "failed" ? error : undefined }
+      : event
+  ));
+}
+
+function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label?: string) {
+  const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+  const sessionTitle = session?.title?.trim() || "当前会话";
+  const suffix = label ? `（${label}）` : "";
+  void window.api.notifyTurnComplete({
+    title: `Kimix 本轮已完成${suffix}`,
+    body: `「${sessionTitle}」已处理完成，可以回来查看结果。`,
+  }).catch((err) => {
+    console.warn("Notify turn complete failed:", err, { uiSessionId, runtimeSessionId });
+  });
+}
+
 function updateRecommendationEvent(sessionId: string, eventId: string, patch: Partial<Extract<TimelineEvent, { type: "session_recommendation" }>>) {
   useSessionStore.getState().updateSession(sessionId, (session) => ({
     ...session,
@@ -1338,6 +1359,7 @@ function App() {
         await createSessionAndSendPrompt(job.projectPath, content);
         setHandoffSessionId(null);
         updateRecommendationEvent(job.sourceSessionId, job.recommendationEventId, { handoffStatus: "completed" });
+        notifyTurnComplete(job.sourceSessionId, job.runtimeSessionId, "交接");
       } catch (err) {
         setHandoffSessionId(null);
         setRunningSessionId(null);
@@ -1476,7 +1498,11 @@ function App() {
       if (payload.status === "error" || payload.status === "interrupted") {
         updateSession(uiSessionId, (session) => ({
           ...session,
-          events: closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete))),
+          events: settlePendingSteerMessages(
+            closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete))),
+            "failed",
+            payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
+          ),
           updatedAt: Date.now(),
         }));
       }
@@ -1485,12 +1511,17 @@ function App() {
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: appendSessionRecommendationIfNeeded(
-            settleInactiveEvents(session.events),
+            settlePendingSteerMessages(settleInactiveEvents(session.events), "sent"),
             useAppStore.getState().sessionRecommendationEnabled,
             useAppStore.getState().sessionRecommendationTurnLimit,
           ),
           updatedAt: Date.now(),
         }));
+        const completedRole = getLongTaskRoleForRuntime(
+          useSessionStore.getState().sessions.find((session) => session.id === uiSessionId),
+          payload.sessionId,
+        );
+        notifyTurnComplete(uiSessionId, payload.sessionId, completedRole === "executor" ? "执行" : completedRole === "reviewer" ? "审核" : undefined);
 
         applyLongTaskProgressFromLatestOutput(uiSessionId, payload.sessionId);
         if (dispatchLongTaskReview(uiSessionId, payload.sessionId)) {

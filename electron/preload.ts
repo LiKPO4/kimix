@@ -61,6 +61,7 @@ import type {
   DownloadUpdateResponse,
   CopyImageRequest,
   TriggerShortcutRequest,
+  TurnCompleteNotificationRequest,
   ScheduleShutdownRequest,
   SettingsResponse,
   SaveSettingsRequest,
@@ -178,6 +179,10 @@ const api = {
     ipcRenderer.invoke("app:copyImage", req),
   triggerShortcut: (req: TriggerShortcutRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:triggerShortcut", req),
+  notifyTurnComplete: (req: TurnCompleteNotificationRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:notifyTurnComplete", req),
+  clearTaskbarAttention: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:clearTaskbarAttention"),
   scheduleShutdown: (req: ScheduleShutdownRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:scheduleShutdown", req),
   cancelShutdown: (): Promise<VoidResponse> =>

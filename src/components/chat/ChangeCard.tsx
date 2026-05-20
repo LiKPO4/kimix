@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -17,6 +17,14 @@ interface ChangeCardProps {
   event?: Extract<TimelineEvent, { type: "change_summary" }>;
 }
 
+type ChangeRow = {
+  path: string;
+  oldText?: string;
+  newText?: string;
+  additions?: number;
+  deletions?: number;
+};
+
 function countLines(value?: string) {
   if (!value) return 0;
   return value.split("\n").filter(Boolean).length;
@@ -24,6 +32,22 @@ function countLines(value?: string) {
 
 function normalizePath(value: string) {
   return value.replace(/\\/g, "/").toLowerCase();
+}
+
+function mergeChangeRows(rows: ChangeRow[]) {
+  const byPath = new Map<string, ChangeRow>();
+  rows.forEach((row) => {
+    const key = normalizePath(row.path);
+    const existing = byPath.get(key);
+    byPath.set(key, {
+      path: existing?.path ?? row.path,
+      oldText: existing?.oldText ?? row.oldText,
+      newText: row.newText ?? existing?.newText,
+      additions: (existing?.additions ?? 0) + (row.additions ?? 0),
+      deletions: (existing?.deletions ?? 0) + (row.deletions ?? 0),
+    });
+  });
+  return Array.from(byPath.values());
 }
 
 function findDiffForPath(events: TimelineEvent[], filePath: string) {
@@ -124,33 +148,40 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [expandedDiffs, setExpandedDiffs] = useState<Record<string, boolean>>({});
-  const files = event?.files ?? (changes ?? []).map((change) => ({
+  const files = useMemo(() => mergeChangeRows(event?.files ?? (changes ?? []).map((change) => ({
     path: change.path,
+    oldText: change.oldText,
+    newText: change.newText,
     additions: change.additions ?? Math.max(0, countLines(change.newText) - countLines(change.oldText)),
     deletions: change.deletions ?? Math.max(0, countLines(change.oldText) - countLines(change.newText)),
-  }));
-  const additions = event?.additions ?? files.reduce((sum, file) => sum + (file.additions ?? 0), 0);
-  const deletions = event?.deletions ?? files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
+  }))), [changes, event?.files]);
+  const additions = files.reduce((sum, file) => sum + (file.additions ?? 0), 0);
+  const deletions = files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
   const projectPath = event?.projectPath ?? project?.path;
   const canExpand = files.length > 3;
   const visibleFiles = expanded ? files : files.slice(0, 3);
   const hiddenFileCount = Math.max(0, files.length - visibleFiles.length);
+  const collapsibleFileCount = Math.max(0, files.length - 3);
   const changesByPath = useMemo(() => {
     const map = new Map<string, Change>();
-    (changes ?? []).forEach((change) => map.set(normalizePath(change.path), change));
+    files.forEach((change) => {
+      if (change.oldText !== undefined || change.newText !== undefined) {
+        map.set(normalizePath(change.path), change);
+      }
+    });
     return map;
-  }, [changes]);
+  }, [files]);
 
   const removeRevertedFiles = (paths: string[]) => {
     if (!currentSession || !event) return;
-    const reverted = new Set(paths);
+    const reverted = new Set(paths.map((path) => normalizePath(path)));
     updateSession(currentSession.id, (session) => ({
       ...session,
       events: session.events.flatMap((item) => {
         if (item.type !== "change_summary") return [item];
         const eventIds = event.id.split(":");
         if (!eventIds.includes(item.id)) return [item];
-        const nextFiles = item.files.filter((file) => !reverted.has(file.path));
+        const nextFiles = item.files.filter((file) => !reverted.has(normalizePath(file.path)));
         if (nextFiles.length === 0) return [];
         return [{
           ...item,
@@ -300,6 +331,17 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
           >
             <ChevronDown size={14} />
             <span>再显示 {hiddenFileCount} 个文件</span>
+          </button>
+        )}
+        {expanded && canExpand && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="flex min-h-10 w-full items-center text-left text-[13.5px] text-[#706b63] transition-colors hover:bg-[#faf8f4]"
+            style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
+          >
+            <ChevronUp size={14} />
+            <span>收起 {collapsibleFileCount} 个文件</span>
           </button>
         )}
       </div>

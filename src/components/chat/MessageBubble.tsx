@@ -224,24 +224,16 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
 
   return (
     <div className="group w-full">
-      <div
-        className={`text-[15px] leading-7 ${event.status === "failed" ? "text-accent-red" : "text-[var(--kimix-panel-text-secondary)]"}`}
-        style={{ paddingTop: 2, paddingBottom: 12 }}
-      >
-        {label}
-      </div>
       <div className="flex justify-end">
         <div className="max-w-[58%]">
-          <div className="mb-1 flex justify-end">
-            <span className={`text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[var(--kimix-panel-text-secondary)]"}`}>
-              {label}
-            </span>
-          </div>
           <div
             style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
             className="kimix-user-bubble rounded-[16px] text-[14.5px] leading-[1.45] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
           >
             {event.content}
+          </div>
+          <div className={`mt-1.5 text-right text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+            {label}
           </div>
           {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-red">{event.error}</div>}
         </div>

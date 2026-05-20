@@ -55,6 +55,7 @@ coverage
 
 # Kimi / Trae IDE artifacts
 .kimi/
+.codex/
 
 # Reference images (too large)
 codex参考图*.png

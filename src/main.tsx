@@ -191,6 +191,8 @@ function installBrowserPreviewApi() {
     chooseExecutable: () => fail("选择启动文件"),
     launchExecutable: () => fail("启动文件"),
     triggerShortcut: () => okVoid(),
+    notifyTurnComplete: () => okVoid(),
+    clearTaskbarAttention: () => okVoid(),
     scheduleShutdown: () => fail("延迟关机"),
     cancelShutdown: () => fail("取消关机"),
 

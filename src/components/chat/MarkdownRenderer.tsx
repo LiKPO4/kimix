@@ -1,7 +1,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { useEffect, useMemo } from "react";
+import { Check, Copy } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 
@@ -23,6 +24,67 @@ function updateHljsTheme() {
     document.head.appendChild(hljsLinkEl);
   }
   hljsLinkEl.href = isDark ? githubDarkCssUrl : githubCssUrl;
+}
+
+function CodeBlock({ className, children, wrapLongLines }: { className?: string; children?: React.ReactNode; wrapLongLines: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const codeText = String(children ?? "").replace(/\n$/, "");
+
+  useEffect(() => () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+  }, []);
+
+  const copyCode = async () => {
+    await navigator.clipboard.writeText(codeText);
+    setCopied(true);
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setCopied(false), 1400);
+  };
+
+  return (
+    <div className="relative my-3 overflow-hidden rounded-lg border border-[#e3ded5] bg-[#fbfaf7]">
+      <div className="flex items-center justify-between border-b border-[#e8e3da] bg-[#f2f0eb]" style={{ gap: 12, paddingLeft: 18, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}>
+        <span className="min-w-0 truncate font-mono text-xs text-[#9a948b]">
+          {className?.replace("language-", "") || "code"}
+        </span>
+        <button
+          type="button"
+          onClick={() => void copyCode()}
+          className="kimix-icon-text-button is-compact shrink-0 text-[#9a948b] hover:bg-[#e9e5de] hover:text-[#706b63]"
+          style={{ minHeight: 30, paddingLeft: 11, paddingRight: 12 }}
+          title="复制代码"
+          aria-label="复制代码"
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          <span>{copied ? "已复制" : "复制"}</span>
+        </button>
+      </div>
+      <pre
+        className={`${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"} bg-[#fbfaf7]`}
+        style={{
+          paddingLeft: 18,
+          paddingRight: 18,
+          paddingTop: 14,
+          paddingBottom: 14,
+          whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
+          overflowWrap: wrapLongLines ? "anywhere" : undefined,
+          wordBreak: wrapLongLines ? "break-word" : undefined,
+        }}
+      >
+        <code
+          className={`${className ?? ""} block font-mono text-sm leading-6`}
+          style={{
+            whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
+            overflowWrap: wrapLongLines ? "anywhere" : undefined,
+            wordBreak: wrapLongLines ? "break-word" : undefined,
+          }}
+        >
+          {children}
+        </code>
+      </pre>
+    </div>
+  );
 }
 
 export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRendererProps) {
@@ -88,38 +150,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
             </code>
           );
         }
-        return (
-          <div className="relative my-3 overflow-hidden rounded-lg border border-[#e3ded5] bg-[#fbfaf7]">
-            <div className="flex items-center justify-between border-b border-[#e8e3da] bg-[#f2f0eb]" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 9, paddingBottom: 8 }}>
-              <span className="font-mono text-xs text-[#9a948b]">
-                {codeClassName?.replace("language-", "") || "code"}
-              </span>
-            </div>
-            <pre
-              className={`${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"} bg-[#fbfaf7]`}
-              style={{
-                paddingLeft: 18,
-                paddingRight: 18,
-                paddingTop: 14,
-                paddingBottom: 14,
-                whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
-                overflowWrap: wrapLongLines ? "anywhere" : undefined,
-                wordBreak: wrapLongLines ? "break-word" : undefined,
-              }}
-            >
-              <code
-                className={`${codeClassName ?? ""} block font-mono text-sm leading-6`}
-                style={{
-                  whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
-                  overflowWrap: wrapLongLines ? "anywhere" : undefined,
-                  wordBreak: wrapLongLines ? "break-word" : undefined,
-                }}
-              >
-                {children}
-              </code>
-            </pre>
-          </div>
-        );
+        return <CodeBlock className={codeClassName} wrapLongLines={wrapLongLines}>{children}</CodeBlock>;
       },
       pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
       blockquote: ({ children }: { children?: React.ReactNode }) => (

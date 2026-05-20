@@ -590,6 +590,11 @@ export type TriggerShortcutRequest = {
   shortcut: string;
 }
 
+export type TurnCompleteNotificationRequest = {
+  title?: string;
+  body?: string;
+}
+
 export type ScheduleShutdownRequest = {
   delaySeconds: number;
   reason?: string;

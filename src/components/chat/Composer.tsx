@@ -748,7 +748,17 @@ export function Composer() {
         updatedAt: Date.now(),
       }));
       const runtimeSessionId = getRuntimeSessionId(activeSession ?? currentSession);
-      if (!runtimeSessionId) return;
+      if (!runtimeSessionId) {
+        updateSession(currentSession.id, (session) => ({
+          ...session,
+          events: session.events.map((event) => event.id === steerEventId
+            ? { ...event, status: "failed" as const, error: "当前运行会话不存在，无法引导。" }
+            : event),
+          updatedAt: Date.now(),
+        }));
+        addPendingMessage(pending.content);
+        return;
+      }
       const res = await window.api.steerPrompt({
         sessionId: runtimeSessionId,
         content: pending.content,
@@ -763,14 +773,6 @@ export function Composer() {
           updatedAt: Date.now(),
         }));
         addPendingMessage(pending.content);
-      } else {
-        updateSession(currentSession.id, (session) => ({
-          ...session,
-          events: session.events.map((event) => event.id === steerEventId
-            ? { ...event, status: "sent" as const }
-            : event),
-          updatedAt: Date.now(),
-        }));
       }
       return;
     }
