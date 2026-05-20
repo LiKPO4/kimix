@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, Notification, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, shell } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -721,13 +721,27 @@ function sanitizeDownloadName(name: string) {
 }
 
 async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
-  const res = await fetch(asset.downloadUrl, {
-    headers: {
-      "User-Agent": "Kimix",
-    },
-  });
-  if (!res.ok) throw new Error(`下载失败：GitHub 返回 ${res.status}`);
-  const bytes = Buffer.from(await res.arrayBuffer());
+  let response: Response;
+  try {
+    response = await fetch(asset.downloadUrl, {
+      headers: {
+        "User-Agent": "Kimix",
+      },
+    });
+  } catch (fetchError) {
+    try {
+      response = await net.fetch(asset.downloadUrl, {
+        headers: {
+          "User-Agent": "Kimix",
+        },
+      });
+    } catch (netError) {
+      const detail = netError instanceof Error ? netError.message : fetchError instanceof Error ? fetchError.message : String(netError);
+      throw new Error(`下载失败：${detail}`);
+    }
+  }
+  if (!response.ok) throw new Error(`下载失败：GitHub 返回 ${response.status}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
   const updateDir = path.join(app.getPath("downloads"), "Kimix Updates", sanitizeDownloadName(tagName || "latest"));
   ensureDir(updateDir);
   const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));
@@ -2256,7 +2270,12 @@ ipcMain.handle("app:downloadUpdate", async () => {
       },
     };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    const latest = await fetchLatestRelease().catch(() => null);
+    if (latest?.htmlUrl) {
+      await shell.openExternal(latest.htmlUrl).catch(() => {});
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    return { success: false, error: latest?.htmlUrl ? `${detail}；已打开发布页面，请手动下载。` : detail };
   }
 });
 

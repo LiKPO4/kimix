@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.7.107 待验收：修复设置启动命令 prompt 崩溃，顶部启动/文件按钮继续收窄，并在有更新时显示蓝色更新箭头入口。
+v2.7.112 待验收：release workflow 自动 publish draft，更新下载增加 net.fetch 兜底并在失败时打开发布页；修正兜底逻辑落点。
 
 ## 当前版本
-**v2.7.107** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.7.112** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
@@ -955,3 +955,12 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 版本号三处同步到 v2.7.107。
 ## 下一步
 等待 v2.7.107 实例验收；确认设置启动命令不再崩溃、两个按钮更轻，以及有更新时蓝色箭头可进入更新窗口。
+
+# 2026-05-20 release 自动发布与旧版更新兜底
+## 已完成
+- release workflow 增加收尾 publish job，等待三平台构建完成后自动执行 `gh release edit "$GITHUB_REF_NAME" --draft=false --latest`。
+- 更新下载从单纯 `fetch` 改为 `fetch -> net.fetch` 双层兜底；如果仍失败，会自动打开发布页并提示手动下载。
+- 下载失败打开发布页的兜底逻辑只保留在 `app:downloadUpdate`，避免误伤“启动命令”。
+- 版本号三处同步到 v2.7.112。
+## 下一步
+等待 v2.7.112 实例验收；确认旧版本更新时不再只报 `fetch failed`，以及每次标签发布会自动变成正式 release。

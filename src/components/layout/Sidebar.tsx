@@ -465,7 +465,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.107</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.7.112</span>
         </button>
       </div>
     </aside>
