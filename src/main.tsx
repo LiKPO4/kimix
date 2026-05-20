@@ -190,6 +190,8 @@ function installBrowserPreviewApi() {
     copyImage: () => fail("复制图片"),
     chooseExecutable: () => fail("选择启动文件"),
     launchExecutable: () => fail("启动文件"),
+    setLaunchCommand: () => fail("设置启动命令"),
+    launchCommand: () => fail("启动命令"),
     triggerShortcut: () => okVoid(),
     notifyTurnComplete: () => okVoid(),
     clearTaskbarAttention: () => okVoid(),

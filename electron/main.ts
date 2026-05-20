@@ -402,6 +402,19 @@ async function launchExecutableFile(filePath: string) {
   }
 }
 
+async function launchShellCommand(command: string, cwd?: string) {
+  const trimmed = command.trim();
+  if (!trimmed) throw new Error("启动命令为空");
+  const resolvedCwd = cwd && fs.existsSync(cwd) && fs.statSync(cwd).isDirectory() ? cwd : settingsService.getDefaultWorkDir();
+  if (process.platform === "win32") {
+    await spawnDetached("powershell.exe", ["-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", trimmed], resolvedCwd);
+    return;
+  }
+  const shellPath = process.env.SHELL || (await resolveCommand("bash")) || (await resolveCommand("sh"));
+  if (!shellPath) throw new Error("未找到可用 shell");
+  await spawnDetached(shellPath, ["-lc", trimmed], resolvedCwd);
+}
+
 function resolveProjectFile(projectPath: string, filePath: string) {
   const resolvedProject = path.resolve(projectPath);
   const resolvedFile = path.resolve(resolvedProject, filePath);
@@ -1685,6 +1698,35 @@ ipcMain.handle("app:launchExecutable", async () => {
   }
 });
 
+ipcMain.handle("app:setLaunchCommand", async (_, request: unknown) => {
+  try {
+    const command = request && typeof request === "object" && typeof (request as { command?: unknown }).command === "string"
+      ? (request as { command: string }).command.trim()
+      : "";
+    if (!command) return { success: false, error: "启动命令为空" };
+    settingsService.saveSettings({ selectedLaunchCommand: command });
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:launchCommand", async (_, request: unknown) => {
+  try {
+    const settings = settingsService.loadSettings();
+    const requestObject = request && typeof request === "object" ? request as { command?: unknown; cwd?: unknown } : {};
+    const command = typeof requestObject.command === "string" && requestObject.command.trim()
+      ? requestObject.command.trim()
+      : settings.selectedLaunchCommand?.trim();
+    const cwd = typeof requestObject.cwd === "string" ? requestObject.cwd : undefined;
+    if (!command) return { success: false, error: "还没有设置启动命令" };
+    await launchShellCommand(command, cwd);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:openFile", async (_, request: unknown) => {
   try {
     if (!request || typeof request !== "object") {
@@ -2239,6 +2281,7 @@ const SettingsSchema = z.object({
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),
+  selectedLaunchCommand: z.string().optional(),
   additionalWorkDirs: z.array(z.string()).optional(),
   autoReadAgentsMd: z.boolean().optional(),
   autoShowGitStatus: z.boolean().optional(),

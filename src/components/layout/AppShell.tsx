@@ -12,6 +12,7 @@ import { LongTasksPanel } from "./LongTasksPanel";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   Archive,
   BookOpen,
   CheckCircle2,
@@ -614,6 +615,9 @@ export function AppShell() {
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
+  const [launchCommandDialogOpen, setLaunchCommandDialogOpen] = useState(false);
+  const [launchCommandDraft, setLaunchCommandDraft] = useState("");
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -767,6 +771,7 @@ export function AppShell() {
   useEffect(() => {
     const close = () => {
       setOpenMenu(null);
+      setLaunchMenuOpen(false);
       setProjectMenuOpen(false);
       setSessionMenuOpen(false);
     };
@@ -1561,6 +1566,29 @@ export function AppShell() {
   const chooseExecutable = async () => {
     const res = await window.api.chooseExecutable();
     showToast(res.success ? "已更新启动文件" : `选择失败：${res.error}`);
+    setLaunchMenuOpen(false);
+  };
+  const launchSavedCommand = async () => {
+    const res = await window.api.launchCommand({ cwd: projectPath ?? undefined });
+    if (!res.success) {
+      showToast(`启动失败：${res.error}`);
+    }
+  };
+  const setLaunchCommand = async () => {
+    const current = await window.api.getSettings();
+    setLaunchCommandDraft(current.success ? current.data.selectedLaunchCommand ?? "" : "");
+    setLaunchMenuOpen(false);
+    setLaunchCommandDialogOpen(true);
+  };
+  const saveLaunchCommand = async () => {
+    const command = launchCommandDraft.trim();
+    if (!command) {
+      showToast("启动命令不能为空");
+      return;
+    }
+    const res = await window.api.setLaunchCommand({ command });
+    showToast(res.success ? "已更新启动命令" : `设置失败：${res.error}`);
+    if (res.success) setLaunchCommandDialogOpen(false);
   };
   const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && kimiOnboarding.available === false;
 
@@ -1686,6 +1714,17 @@ export function AppShell() {
             </div>
 
             <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
+              {updateState.hasUpdate && (
+                <button
+                  type="button"
+                  onClick={() => setHelpDialog("updates")}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#b9daf9] bg-[#eef7ff] text-[#2f6fad] shadow-[0_6px_18px_rgba(51,154,240,0.14)] transition-colors hover:bg-[#dff0ff] hover:text-[#1f6fb2]"
+                  title={updateState.message || "有新版本可用"}
+                  aria-label="打开更新窗口"
+                >
+                  <ArrowUp size={15} />
+                </button>
+              )}
               {longTaskMeta ? (
                 <button
                   type="button"
@@ -1716,29 +1755,86 @@ export function AppShell() {
                   </span>
                 </button>
               ) : (
-                <button
-                  onClick={() => void launchExecutable()}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    void chooseExecutable();
-                  }}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"
-                  title="左键启动文件，右键重新选择"
-                  aria-label="启动文件"
-                >
-                  <Play size={15} />
-                </button>
+                <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="flex h-8 w-14 items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]">
+                    <button
+                      onClick={() => void launchExecutable()}
+                      className="flex h-full flex-1 items-center justify-center"
+                      style={{ paddingLeft: 9, paddingRight: 4 }}
+                      title="启动当前启动文件"
+                      aria-label="启动"
+                    >
+                      <Play size={14} className="shrink-0" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLaunchMenuOpen((value) => !value);
+                      }}
+                      className="mr-0.5 flex h-7 w-6 items-center justify-center rounded-lg transition-colors hover:bg-black/5"
+                      title="启动方式"
+                      aria-label="启动方式"
+                    >
+                      <ChevronDown size={13} />
+                    </button>
+                  </div>
+                  {launchMenuOpen && (
+                    <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[224px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
+                      <button
+                        onClick={() => {
+                          setLaunchMenuOpen(false);
+                          void launchExecutable();
+                        }}
+                        style={{ paddingLeft: 18, paddingRight: 16 }}
+                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                      >
+                        <Play size={15} className="w-6 shrink-0 text-[#7b756d]" />
+                        <span className="min-w-0 flex-1 truncate">启动文件</span>
+                      </button>
+                      <button
+                        onClick={() => void chooseExecutable()}
+                        style={{ paddingLeft: 18, paddingRight: 16 }}
+                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                      >
+                        <FolderOpen size={15} className="w-6 shrink-0 text-[#d19a32]" />
+                        <span className="min-w-0 flex-1 truncate">选择启动文件...</span>
+                      </button>
+                      <div className="my-1.5 border-t border-[var(--kimix-panel-divider)]" />
+                      <button
+                        onClick={() => {
+                          setLaunchMenuOpen(false);
+                          void launchSavedCommand();
+                        }}
+                        style={{ paddingLeft: 18, paddingRight: 16 }}
+                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                      >
+                        <SquareTerminal size={15} className="w-6 shrink-0 text-[#777168]" />
+                        <span className="min-w-0 flex-1 truncate">启动命令</span>
+                      </button>
+                      <button
+                        onClick={() => void setLaunchCommand()}
+                        style={{ paddingLeft: 18, paddingRight: 16 }}
+                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                      >
+                        <Pencil size={15} className="w-6 shrink-0 text-[#8f887e]" />
+                        <span className="min-w-0 flex-1 truncate">设置启动命令...</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-                <div className={`flex h-9 min-w-[72px] items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] ${!projectPath ? "opacity-45" : ""}`}>
+                <div className={`flex h-8 w-14 items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] ${!projectPath ? "opacity-45" : ""}`}>
                   <button
                     onClick={openProjectPath}
                     disabled={!projectPath}
-                    className="flex h-full flex-1 items-center justify-center gap-2 pl-4 pr-1 disabled:cursor-not-allowed"
+                    className="flex h-full flex-1 items-center justify-center disabled:cursor-not-allowed"
+                    style={{ paddingLeft: 8, paddingRight: 3 }}
                     title={currentProject?.path ?? "工作区"}
                     aria-label="在文件资源管理器中打开项目"
                   >
-                    <FolderOpen size={17} className="shrink-0 text-[#d19a32]" />
+                    <FolderOpen size={16} className="shrink-0 text-[#d19a32]" />
                   </button>
                   <button
                     type="button"
@@ -1747,34 +1843,34 @@ export function AppShell() {
                       setProjectMenuOpen((value) => !value);
                     }}
                     disabled={!projectPath}
-                    className="mr-1 flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 disabled:cursor-not-allowed"
+                    className="mr-0.5 flex h-7 w-6 items-center justify-center rounded-lg transition-colors hover:bg-black/5 disabled:cursor-not-allowed"
                     title="打开方式"
                     aria-label="打开方式"
                   >
-                    <ChevronDown size={14} />
+                    <ChevronDown size={13} />
                   </button>
                 </div>
                 {projectMenuOpen && (
-                  <div className="kimix-floating-menu absolute right-6 top-full z-40 mt-3 w-[288px] overflow-hidden rounded-[15px] py-3.5 text-[14px] text-[var(--kimix-panel-text)]">
-                    <button onClick={() => openProjectEditor("vscode")} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <Code2 size={17} className="w-6 shrink-0 text-[#3483eb]" />
-                      <span>使用 VS Code 打开</span>
+                  <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[236px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
+                    <button onClick={() => openProjectEditor("vscode")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+                      <Code2 size={15} className="w-6 shrink-0 text-[#3483eb]" />
+                      <span className="min-w-0 flex-1 truncate">使用 VS Code 打开</span>
                     </button>
-                    <button onClick={openProjectPath} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <FolderOpen size={17} className="w-6 shrink-0 text-[#d19a32]" />
-                      <span>在文件资源管理器中打开</span>
+                    <button onClick={openProjectPath} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+                      <FolderOpen size={15} className="w-6 shrink-0 text-[#d19a32]" />
+                      <span className="min-w-0 flex-1 truncate">在文件资源管理器中打开</span>
                     </button>
-                    <button onClick={openProjectTerminal} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <SquareTerminal size={17} className="w-6 shrink-0 text-[#777168]" />
-                      <span>打开终端</span>
+                    <button onClick={openProjectTerminal} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+                      <SquareTerminal size={15} className="w-6 shrink-0 text-[#777168]" />
+                      <span className="min-w-0 flex-1 truncate">打开终端</span>
                     </button>
-                    <button onClick={() => openProjectEditor("trae")} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <GitBranch size={17} className="w-6 shrink-0 text-[#9a948b]" />
-                      <span>使用 Trae 打开</span>
+                    <button onClick={() => openProjectEditor("trae")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+                      <GitBranch size={15} className="w-6 shrink-0 text-[#9a948b]" />
+                      <span className="min-w-0 flex-1 truncate">使用 Trae 打开</span>
                     </button>
-                    <button onClick={() => openProjectEditor("coder")} style={{ paddingLeft: 28, paddingRight: 24 }} className="flex h-12 w-full items-center gap-3 text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <Code2 size={17} className="w-6 shrink-0 text-[#9a948b]" />
-                      <span>使用 Coder 打开</span>
+                    <button onClick={() => openProjectEditor("coder")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+                      <Code2 size={15} className="w-6 shrink-0 text-[#9a948b]" />
+                      <span className="min-w-0 flex-1 truncate">使用 Coder 打开</span>
                     </button>
                   </div>
                 )}
@@ -2554,6 +2650,54 @@ export function AppShell() {
           style={{ padding: "9px 18px" }}
         >
           {toastMessage}
+        </div>
+      )}
+      {launchCommandDialogOpen && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/20 px-5" onMouseDown={() => setLaunchCommandDialogOpen(false)}>
+          <div
+            className="kimix-modal-card w-full max-w-[520px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]"
+            style={{ padding: "22px 24px 24px" }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between" style={{ gap: 16 }}>
+              <div className="min-w-0">
+                <div className="text-[18px] font-semibold leading-6 text-[#24211d]">设置启动命令</div>
+                <div className="mt-2 text-[13.5px] leading-6 text-[#706b63]">命令会在当前项目目录中打开终端执行。</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLaunchCommandDialogOpen(false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8f887e] hover:bg-[#f1eee8] hover:text-[#24211d]"
+                aria-label="关闭"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <textarea
+              value={launchCommandDraft}
+              onChange={(event) => setLaunchCommandDraft(event.target.value)}
+              className="mt-5 min-h-[96px] w-full resize-y rounded-xl border border-[#ded9cf] bg-white text-[14px] leading-6 text-[#24211d] outline-none focus:border-[#b9d7f4]"
+              style={{ padding: "12px 14px" }}
+              placeholder="例如：pnpm dev"
+              autoFocus
+            />
+            <div className="mt-5 flex justify-end" style={{ gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setLaunchCommandDialogOpen(false)}
+                className="kimix-icon-text-button bg-[#f5f3ef] text-[#625d55] hover:bg-[#ece8df]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveLaunchCommand()}
+                className="kimix-icon-text-button bg-[#24211d] text-white hover:bg-black"
+              >
+                保存命令
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {shutdownDialog && (

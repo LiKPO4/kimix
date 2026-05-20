@@ -60,6 +60,7 @@ import type {
   CheckUpdateResponse,
   DownloadUpdateResponse,
   CopyImageRequest,
+  LaunchCommandRequest,
   TriggerShortcutRequest,
   TurnCompleteNotificationRequest,
   ScheduleShutdownRequest,
@@ -175,6 +176,10 @@ const api = {
     ipcRenderer.invoke("app:chooseExecutable"),
   launchExecutable: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:launchExecutable"),
+  setLaunchCommand: (req: LaunchCommandRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:setLaunchCommand", req),
+  launchCommand: (req?: LaunchCommandRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("app:launchCommand", req),
   copyImage: (req: CopyImageRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:copyImage", req),
   triggerShortcut: (req: TriggerShortcutRequest): Promise<VoidResponse> =>

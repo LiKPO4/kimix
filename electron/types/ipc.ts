@@ -600,6 +600,11 @@ export type ScheduleShutdownRequest = {
   reason?: string;
 }
 
+export type LaunchCommandRequest = {
+  command?: string;
+  cwd?: string;
+}
+
 export type VoidResponse = {
   success: true;
   data: void;
@@ -628,6 +633,7 @@ export type AppSettings = {
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;
+  selectedLaunchCommand?: string;
   autoReadAgentsMd: boolean;
   autoShowGitStatus: boolean;
   enabledSkillNames: string[];
