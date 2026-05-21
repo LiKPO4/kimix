@@ -208,7 +208,7 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles, trailingStatuses }: { event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
+function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, changedFiles, trailingStatuses }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
@@ -230,7 +230,7 @@ function EventRenderer({ event, leadingTools, leadingSubagents, changedFiles, tr
     case "change_summary":
       return <ChangeCard event={event} />;
     case "session_recommendation":
-      return <SessionRecommendationCard event={event} />;
+      return <SessionRecommendationCard event={event} sourceSessionId={sessionId} projectPath={projectPath} />;
     case "todo":
       return null;
     case "diff":
@@ -667,7 +667,7 @@ export function ChatThread() {
                 ? <PlanPreviewCard key={item.id} path={item.path} projectPath={item.projectPath} />
                 : item.type === "change_group"
                   ? <ChangeCard key={item.id} changes={item.changes} />
-                : <EventRenderer key={item.event.id} event={item.event} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} />
+                : <EventRenderer key={item.event.id} event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} />
           ))}
         </div>
       </div>

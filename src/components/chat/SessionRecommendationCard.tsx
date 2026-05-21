@@ -4,6 +4,10 @@ import { useCreateProjectSession } from "@/hooks/useCreateProjectSession";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 
+function projectNameFromPath(projectPath: string): string {
+  return projectPath.split(/[\\/]/).filter(Boolean).at(-1) || "项目";
+}
+
 function useAnimatedDots(active: boolean) {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -17,23 +21,32 @@ function useAnimatedDots(active: boolean) {
   return ".".repeat(count);
 }
 
-export function SessionRecommendationCard({ event }: { event: Extract<TimelineEvent, { type: "session_recommendation" }> }) {
+export function SessionRecommendationCard({ event, sourceSessionId, projectPath }: { event: Extract<TimelineEvent, { type: "session_recommendation" }>; sourceSessionId: string; projectPath: string }) {
   const { createSession, creating } = useCreateProjectSession();
-  const currentSession = useAppStore((s) => s.currentSession);
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
-  const isHandoffRunning = event.handoffStatus === "running" || Boolean(currentSession?.id && handoffSessionId === currentSession.id);
+  const isHandoffRunning = event.handoffStatus === "running" || handoffSessionId === sourceSessionId;
   const dots = useAnimatedDots(isHandoffRunning);
-  const disabled = creating || isHandoffRunning;
+  const disabled = creating || isHandoffRunning || !sourceSessionId || !projectPath;
 
   const startHandoff = () => {
-    if (!currentSession || disabled) return;
+    if (disabled) return;
     window.dispatchEvent(new CustomEvent("kimix:startHandoff", {
       detail: {
-        sourceSessionId: currentSession.id,
-        projectPath: currentSession.projectPath,
+        sourceSessionId,
+        projectPath,
         recommendationEventId: event.id,
       },
     }));
+  };
+
+  const startFreshSession = () => {
+    if (disabled) return;
+    void createSession({
+      id: crypto.randomUUID(),
+      name: projectNameFromPath(projectPath),
+      path: projectPath,
+      lastOpenedAt: Date.now(),
+    });
   };
 
   return (
@@ -57,7 +70,7 @@ export function SessionRecommendationCard({ event }: { event: Extract<TimelineEv
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => void createSession()}
+                onClick={startFreshSession}
                 className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-[#1f73c9] transition-colors hover:bg-[#e8f2fd] disabled:cursor-wait disabled:text-[#8aa9c8]"
                 style={{ gap: 6, paddingLeft: 10, paddingRight: 12 }}
               >

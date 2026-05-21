@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.9 本地待发布：修复引导状态过早标记，改为等待官方 SteerInput 事件后再显示已引导。
+v2.8.10 本地待发布：修复新对话建议卡交接目标绑定，避免携带交接内容发到旧会话。
 
 ## 当前版本
-**v2.8.9** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.10** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
