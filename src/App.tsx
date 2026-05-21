@@ -162,6 +162,7 @@ function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label
   void window.api.notifyTurnComplete({
     title: `Kimix 本轮已完成${suffix}`,
     body: `「${sessionTitle}」已处理完成，可以回来查看结果。`,
+    windowFocused: document.hasFocus(),
   }).catch((err) => {
     console.warn("Notify turn complete failed:", err, { uiSessionId, runtimeSessionId });
   });

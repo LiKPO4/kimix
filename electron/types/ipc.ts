@@ -593,6 +593,7 @@ export type TriggerShortcutRequest = {
 export type TurnCompleteNotificationRequest = {
   title?: string;
   body?: string;
+  windowFocused?: boolean;
 }
 
 export type ScheduleShutdownRequest = {
