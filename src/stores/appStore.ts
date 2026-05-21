@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, ComposerDockCard } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard } from "@/types/ui";
 
 interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
@@ -17,6 +17,7 @@ interface AppStore extends AppState {
   setSessionRecommendationEnabled: (enabled: boolean) => void;
   setSessionRecommendationTurnLimit: (limit: number) => void;
   setVoiceShortcut: (shortcut: string) => void;
+  setNotificationMode: (mode: NotificationMode) => void;
   setClarificationToolMode: (mode: ClarificationToolMode) => void;
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
@@ -53,6 +54,7 @@ export const useAppStore = create<AppStore>((set) => ({
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
   voiceShortcut: "Win+H",
+  notificationMode: "unfocused",
   clarificationToolMode: "auto",
   longTasksOpen: false,
   longTaskInspectorOpen: false,
@@ -82,6 +84,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setSessionRecommendationEnabled: (enabled) => set({ sessionRecommendationEnabled: enabled }),
   setSessionRecommendationTurnLimit: (limit) => set({ sessionRecommendationTurnLimit: Math.max(1, Math.min(200, Math.round(limit))) }),
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
+  setNotificationMode: (mode) => set({ notificationMode: mode }),
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
   setLongTasksOpen: (open) => set({ longTasksOpen: open }),
   setLongTaskInspectorOpen: (open) => set({ longTaskInspectorOpen: open }),

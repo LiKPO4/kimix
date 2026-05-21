@@ -584,7 +584,12 @@ function clearTaskbarAttention() {
 }
 
 function showTurnCompleteNotification(title: string, body: string) {
-  setTaskbarAttention();
+  const settings = settingsService.loadSettings();
+  const notificationMode = settings.notificationMode ?? "unfocused";
+  const windowFocused = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
+  if (notificationMode === "never") return;
+  if (notificationMode === "unfocused" && windowFocused) return;
+  if (!windowFocused) setTaskbarAttention();
   if (!Notification.isSupported()) return;
   const notification = new Notification({
     title: title.trim() || "Kimix 本轮已完成",

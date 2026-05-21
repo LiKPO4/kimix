@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Mic, Keyboard, Archive, RotateCcw, Trash2, Check } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Theme, PermissionMode } from "@/types/ui";
+import type { Theme, PermissionMode, NotificationMode } from "@/types/ui";
 
 type FreezeReport = {
   at: string;
@@ -57,6 +57,8 @@ export function SettingsPanel() {
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
+  const notificationMode = useAppStore((s) => s.notificationMode);
+  const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const sessions = useSessionStore((s) => s.sessions);
   const restoreSession = useSessionStore((s) => s.restoreSession);
@@ -134,6 +136,11 @@ export function SettingsPanel() {
     { value: "manual", label: "手动审批", desc: "每次工具调用都需要确认", icon: Shield, tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
     { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动批准同类请求", icon: Zap, tooltip: "本会话允许：同类工具请求在当前会话内自动批准，减少重复确认。" },
     { value: "yolo", label: "完全访问", desc: "自动批准所有工具请求（谨慎使用）", icon: GitBranch, tooltip: "完全访问：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
+  ];
+  const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [
+    { value: "never", label: "永不弹出", desc: "不显示系统通知，也不显示任务栏红点" },
+    { value: "unfocused", label: "无焦点时", desc: "仅 Kimix 窗口没有焦点时提醒" },
+    { value: "always", label: "任何时候", desc: "每轮完成都弹出系统通知；红点仍只在无焦点时显示" },
   ];
   const archivedSessions = sessions
     .filter((session) => session.archivedAt)
@@ -263,6 +270,29 @@ export function SettingsPanel() {
                   <div className="kimix-settings-permission-desc">适合调试上下文增长，会在对话中多次显示状态胶囊</div>
                 </div>
               </button>
+            </div>
+          </div>
+
+          <div className="kimix-settings-section">
+            <div className="kimix-settings-section-title">
+              <Bell size={16} className="text-[#8f887e]" />
+              <span>完成通知</span>
+            </div>
+            <div className="kimix-settings-permissions">
+              {notificationModes.map((mode) => (
+                <button
+                  key={mode.value}
+                  type="button"
+                  onClick={() => setNotificationMode(mode.value)}
+                  className={`kimix-settings-permission ${notificationMode === mode.value ? "is-active" : ""}`}
+                >
+                  <SelectionIndicator selected={notificationMode === mode.value} />
+                  <div className="kimix-settings-permission-copy">
+                    <div className="kimix-settings-permission-label">{mode.label}</div>
+                    <div className="kimix-settings-permission-desc">{mode.desc}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -412,7 +442,7 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.2 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.3 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>

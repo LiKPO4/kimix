@@ -629,6 +629,7 @@ export type AppSettings = {
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;
+  notificationMode: "never" | "unfocused" | "always";
   clarificationToolMode: "off" | "on" | "auto";
   expandToolCalls: boolean;
   defaultOpenDir?: string;

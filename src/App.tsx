@@ -659,6 +659,7 @@ function App() {
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
+  const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -1163,6 +1164,7 @@ function App() {
           setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
           setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
           setVoiceShortcut(res.data.voiceShortcut);
+          setNotificationMode(res.data.notificationMode);
           setClarificationToolMode(res.data.clarificationToolMode);
         }
       }).catch(() => {});
@@ -1648,6 +1650,7 @@ function App() {
         state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
         state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
         state.voiceShortcut !== prev.voiceShortcut ||
+        state.notificationMode !== prev.notificationMode ||
         state.clarificationToolMode !== prev.clarificationToolMode
       ) {
         window.api.saveSettings({
@@ -1662,6 +1665,7 @@ function App() {
           sessionRecommendationEnabled: state.sessionRecommendationEnabled,
           sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
           voiceShortcut: state.voiceShortcut,
+          notificationMode: state.notificationMode,
           clarificationToolMode: state.clarificationToolMode,
         }).catch(() => {});
       }
@@ -1686,7 +1690,7 @@ function App() {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setDefaultThinking, setDefaultPlanMode, setDefaultAfkMode, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode]);
+  }, [setTheme, setPermissionMode, setDefaultThinking, setDefaultPlanMode, setDefaultAfkMode, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setNotificationMode, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

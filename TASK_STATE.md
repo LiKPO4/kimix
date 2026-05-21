@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.2 本地待发布：修复基于原图打开画板时 CSS 比例仍按 1:1 显示导致图像被压缩的问题。
+v2.8.3 本地待发布：增加完成通知弹出策略，并确保窗口有焦点时不显示任务栏红点。
 
 ## 当前版本
-**v2.8.2** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.3** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成

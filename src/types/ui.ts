@@ -2,6 +2,7 @@ export type Theme = "dark" | "light" | "system";
 
 export type PermissionMode = "manual" | "approve_for_session" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
+export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending";
 
 export interface AppState {
@@ -20,6 +21,7 @@ export interface AppState {
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;
+  notificationMode: NotificationMode;
   clarificationToolMode: ClarificationToolMode;
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;

@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
   voiceShortcut: "Win+H",
+  notificationMode: "unfocused",
   clarificationToolMode: "auto",
   expandToolCalls: false,
   autoReadAgentsMd: true,
