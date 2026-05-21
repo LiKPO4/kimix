@@ -183,6 +183,7 @@ function installBrowserPreviewApi() {
       },
     }),
     downloadUpdate: () => fail("下载更新"),
+    onDownloadUpdateProgress: () => () => {},
     openExternal: async (url: string): Promise<VoidResponse> => {
       window.open(url, "_blank", "noopener,noreferrer");
       return { success: true, data: undefined };

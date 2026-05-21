@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import { getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
+import { getSessionRecommendationMetrics, getLatestMeaningfulStatus } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function formatK(tokens: number): string {
@@ -70,9 +70,7 @@ export function ContextRing() {
   const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
 
-  const latestStatus = session?.events
-    .filter((e): e is Extract<typeof e & { type: "status_update" }, { type: "status_update" }> => e.type === "status_update")
-    .at(-1);
+  const latestStatus = getLatestMeaningfulStatus(session?.events ?? []);
 
   // 从事件流中判断是否在压缩中：最近一个 compaction 事件是 begin 且后面没有 end
   const isCompacting = useMemo(() => {

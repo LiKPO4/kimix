@@ -685,10 +685,11 @@ async function fetchLatestRelease() {
     publishedAt: typeof data.published_at === "string" ? data.published_at : "",
     htmlUrl: typeof data.html_url === "string" ? data.html_url : `https://github.com/${GITHUB_REPO}/releases`,
     assets: assets
-      .filter((asset): asset is { name?: unknown; browser_download_url?: unknown } => typeof asset === "object" && asset !== null)
+      .filter((asset): asset is { name?: unknown; browser_download_url?: unknown; size?: unknown } => typeof asset === "object" && asset !== null)
       .map((asset) => ({
         name: typeof asset.name === "string" ? asset.name : "下载文件",
         downloadUrl: typeof asset.browser_download_url === "string" ? asset.browser_download_url : "",
+        size: typeof asset.size === "number" && Number.isFinite(asset.size) ? asset.size : undefined,
       }))
       .filter((asset) => asset.downloadUrl.length > 0),
   };
@@ -697,7 +698,20 @@ async function fetchLatestRelease() {
 type ReleaseAssetInfo = {
   name: string;
   downloadUrl: string;
+  size?: number;
 };
+
+function emitDownloadUpdateProgress(receivedBytes: number, totalBytes?: number) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const percent = totalBytes && totalBytes > 0
+    ? Math.max(0, Math.min(100, (receivedBytes / totalBytes) * 100))
+    : 0;
+  mainWindow.webContents.send("app:downloadUpdateProgress", {
+    percent,
+    receivedBytes,
+    totalBytes,
+  });
+}
 
 function isPortableRuntime() {
   if (process.platform !== "win32") return false;
@@ -749,7 +763,33 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
     }
   }
   if (!response.ok) throw new Error(`下载失败：GitHub 返回 ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const totalBytesHeader = response.headers.get("content-length");
+  const parsedTotalBytes = totalBytesHeader ? Number.parseInt(totalBytesHeader, 10) : undefined;
+  const totalBytes = Number.isFinite(parsedTotalBytes) && parsedTotalBytes && parsedTotalBytes > 0
+    ? parsedTotalBytes
+    : asset.size;
+  const chunks: Buffer[] = [];
+  let receivedBytes = 0;
+  emitDownloadUpdateProgress(0, Number.isFinite(totalBytes) ? totalBytes : undefined);
+  if (response.body) {
+    const reader = response.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const chunk = Buffer.from(value);
+      chunks.push(chunk);
+      receivedBytes += chunk.length;
+      emitDownloadUpdateProgress(receivedBytes, Number.isFinite(totalBytes) ? totalBytes : undefined);
+    }
+  } else {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    chunks.push(bytes);
+    receivedBytes = bytes.length;
+    emitDownloadUpdateProgress(receivedBytes, receivedBytes);
+  }
+  emitDownloadUpdateProgress(receivedBytes, Number.isFinite(totalBytes) ? totalBytes : receivedBytes);
+  const bytes = Buffer.concat(chunks);
   const updateDir = path.join(app.getPath("downloads"), "Kimix Updates", sanitizeDownloadName(tagName || "latest"));
   ensureDirectoryExists(updateDir);
   const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));

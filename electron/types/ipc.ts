@@ -582,6 +582,12 @@ export type DownloadUpdateResponse = {
   error: string;
 };
 
+export type DownloadUpdateProgress = {
+  percent: number;
+  receivedBytes: number;
+  totalBytes?: number;
+};
+
 export type CopyImageRequest = {
   dataUrl: string;
 }

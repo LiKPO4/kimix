@@ -58,6 +58,7 @@ import type {
   OpenTerminalRequest,
   AppInfoResponse,
   CheckUpdateResponse,
+  DownloadUpdateProgress,
   DownloadUpdateResponse,
   CopyImageRequest,
   LaunchCommandRequest,
@@ -170,6 +171,11 @@ const api = {
   getAppInfo: (): Promise<AppInfoResponse> => ipcRenderer.invoke("app:getInfo"),
   checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),
   downloadUpdate: (): Promise<DownloadUpdateResponse> => ipcRenderer.invoke("app:downloadUpdate"),
+  onDownloadUpdateProgress: (callback: (payload: DownloadUpdateProgress) => void) => {
+    const handler = (_: unknown, payload: DownloadUpdateProgress) => callback(payload);
+    ipcRenderer.on("app:downloadUpdateProgress", handler);
+    return () => ipcRenderer.off("app:downloadUpdateProgress", handler);
+  },
   openExternal: (url: string): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:openExternal", url),
   chooseExecutable: (): Promise<VoidResponse> =>

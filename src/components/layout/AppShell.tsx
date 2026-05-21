@@ -628,9 +628,10 @@ export function AppShell() {
   const [helpDialog, setHelpDialog] = useState<HelpDialog | null>(null);
   const [infoTopic, setInfoTopic] = useState<{ title: string; body: string; url?: string } | null>(null);
   const [appInfo, setAppInfo] = useState({ name: "Kimix", version: "2.5.0", author: "@linjianglu", repository: "https://github.com/LiKPO4/kimix" });
-  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
+  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; downloadPercent: number | null; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
     loading: false,
     downloading: false,
+    downloadPercent: null,
     message: "尚未检查更新",
     latest: null,
     hasUpdate: false,
@@ -813,6 +814,20 @@ export function AppShell() {
     return window.api.onWindowMaximizedChange((payload) => setIsMaximized(payload.maximized));
   }, []);
 
+  useEffect(() => {
+    if (typeof window.api.onDownloadUpdateProgress !== "function") return;
+    return window.api.onDownloadUpdateProgress((payload) => {
+      setUpdateState((state) => {
+        if (!state.downloading) return state;
+        const percent = Math.max(0, Math.min(100, payload.percent));
+        return {
+          ...state,
+          downloadPercent: Number.isFinite(percent) ? percent : state.downloadPercent,
+        };
+      });
+    });
+  }, []);
+
   const createSessionForProject = async () => {
     if (!currentProject) return;
     if (useAppStore.getState().creatingSessionProjectPath) return;
@@ -887,17 +902,18 @@ export function AppShell() {
   const handleCheckUpdates = async () => {
     setUpdateState((state) => ({ ...state, loading: true, message: "正在检查 GitHub 发布版本..." }));
     if (typeof window.api.checkForUpdates !== "function") {
-      setUpdateState({ loading: false, downloading: false, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, downloadPercent: null, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
       return;
     }
     const res = await window.api.checkForUpdates();
     if (!res.success) {
-      setUpdateState({ loading: false, downloading: false, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, downloadPercent: null, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
       return;
     }
     setUpdateState((state) => ({
       ...state,
       loading: false,
+      downloadPercent: null,
       message: res.data.message,
       latest: res.data.latest,
       hasUpdate: res.data.hasUpdate,
@@ -905,17 +921,17 @@ export function AppShell() {
   };
 
   const handleDownloadUpdate = async () => {
-    setUpdateState((state) => ({ ...state, downloading: true, message: "正在下载匹配当前包体的升级包..." }));
+    setUpdateState((state) => ({ ...state, downloading: true, downloadPercent: 0, message: "正在下载匹配当前包体的升级包..." }));
     if (typeof window.api.downloadUpdate !== "function") {
-      setUpdateState((state) => ({ ...state, downloading: false, message: "升级接口尚未载入，请重启应用后再试" }));
+      setUpdateState((state) => ({ ...state, downloading: false, downloadPercent: null, message: "升级接口尚未载入，请重启应用后再试" }));
       return;
     }
     const res = await window.api.downloadUpdate();
     if (!res.success) {
-      setUpdateState((state) => ({ ...state, downloading: false, message: `升级失败：${res.error}` }));
+      setUpdateState((state) => ({ ...state, downloading: false, downloadPercent: null, message: `升级失败：${res.error}` }));
       return;
     }
-    setUpdateState((state) => ({ ...state, downloading: false, message: res.data.message }));
+    setUpdateState((state) => ({ ...state, downloading: false, downloadPercent: 100, message: res.data.message }));
     showToast(res.data.message);
   };
 
@@ -978,12 +994,13 @@ export function AppShell() {
         setUpdateState((state) => ({
           ...state,
           loading: false,
+          downloadPercent: null,
           message: appRes.data.message,
           latest: appRes.data.latest,
           hasUpdate: appRes.data.hasUpdate,
         }));
       } else if (appRes && !appRes.success) {
-        setUpdateState({ loading: false, downloading: false, message: `检查失败：${appRes.error}`, latest: null, hasUpdate: false });
+        setUpdateState({ loading: false, downloading: false, downloadPercent: null, message: `检查失败：${appRes.error}`, latest: null, hasUpdate: false });
       }
       if (cliRes?.success) {
         setCliUpdateState((state) => ({
@@ -2784,7 +2801,9 @@ export function AppShell() {
                           style={{ paddingLeft: 16, paddingRight: 18 }}
                         >
                           <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
-                          {updateState.downloading ? "下载中" : "升级"}
+                          {updateState.downloading
+                            ? `下载中 ${Math.round(updateState.downloadPercent ?? 0)}%`
+                            : "升级"}
                         </button>
                       )}
                       <button

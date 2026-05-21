@@ -1,5 +1,6 @@
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
+import { isEmptyStatusUpdate } from "@/utils/sessionMetrics";
 
 interface StatusCardProps {
   event: Extract<TimelineEvent, { type: "status_update" }>;
@@ -36,6 +37,7 @@ function formatTimestamp(timestamp: number): string {
 
 export function StatusCard({ event }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
+  if (isEmptyStatusUpdate(event)) return null;
   const details = [
     event.planMode === true ? "Plan" : "",
     event.message ? event.message : "",
