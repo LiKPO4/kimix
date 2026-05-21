@@ -2303,6 +2303,7 @@ const SettingsSchema = z.object({
   sessionRecommendationEnabled: z.boolean().optional(),
   sessionRecommendationTurnLimit: z.number().int().min(1).max(200).optional(),
   voiceShortcut: z.string().min(1).max(80).optional(),
+  notificationMode: z.enum(["never", "unfocused", "always"]).optional(),
   clarificationToolMode: z.enum(["off", "on", "auto"]).optional(),
   clarificationToolEnabled: z.boolean().optional(),
   expandToolCalls: z.boolean().optional(),

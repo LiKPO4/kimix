@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.7 本地待发布：修复引导消息过早切断当前输出，改为引导接入成功后再从引导位置开启新输出。
+v2.8.8 本地待发布：修复通知设置项校验漏项，确保完成通知模式能正确保存。
 
 ## 当前版本
-**v2.8.7** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.8** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
