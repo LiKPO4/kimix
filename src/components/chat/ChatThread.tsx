@@ -454,10 +454,9 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
   return items;
 }
 
-function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end", isRunning: boolean): TimelineEvent[] {
+function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end"): TimelineEvent[] {
   return events.filter((event, index) => {
     if (event.type !== "status_update") return true;
-    if (isRunning) return false;
     if (display === "each") return true;
     const nextTurnIndex = events.findIndex((candidate, candidateIndex) => (
       candidateIndex > index &&
@@ -540,9 +539,8 @@ export function ChatThread() {
     () => filterStatusUpdates(
       collapseCompletedCompactions(session?.events ?? []),
       statusUpdateDisplay,
-      Boolean(session?.id && runningSessionId === session.id),
     ),
-    [session?.events, session?.id, runningSessionId, statusUpdateDisplay]
+    [session?.events, statusUpdateDisplay]
   );
   const renderItems = useMemo(() => buildRenderItems(visibleEvents), [visibleEvents]);
   const contentVersion = useMemo(() => {

@@ -1594,7 +1594,7 @@ export function AppShell() {
 
   return (
     <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
-      <header className="z-50 flex h-12 w-full shrink-0 items-center justify-between px-3" style={{ WebkitAppRegion: "drag" as const }}>
+      <header className="z-50 flex h-12 w-full shrink-0 items-center justify-between" style={{ WebkitAppRegion: "drag" as const, paddingLeft: 12, paddingRight: 0 }}>
         <div className="flex h-full items-center gap-7" style={{ WebkitAppRegion: "no-drag" as const }}>
           <div className="flex items-center gap-2 text-[#7d7972]">
             <button onClick={toggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" style={{ marginLeft: 14 }} aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"} title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}>
@@ -1656,7 +1656,7 @@ export function AppShell() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: "no-drag" as const, paddingRight: 12 }}>
+        <div className="flex items-center" style={{ WebkitAppRegion: "no-drag" as const, gap: 8 }}>
           <button onClick={() => window.api.minimizeWindow()} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#7d7972] transition-colors hover:bg-black/5" aria-label="最小化">
             <Minus size={14} />
           </button>
