@@ -613,7 +613,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
               <canvas
                 ref={canvasRef}
                 className="block max-h-[64vh] max-w-full touch-none rounded-lg border border-[var(--kimix-panel-border)] bg-white shadow-[0_8px_26px_rgba(25,23,20,0.10)]"
-                style={{ aspectRatio: `${size.width} / ${size.height}` }}
+                style={{ aspectRatio: `${canvasSize.width} / ${canvasSize.height}` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={finishDrawing}
