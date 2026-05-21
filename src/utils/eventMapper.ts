@@ -472,7 +472,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       });
     }
 
-    const latestSteerIndex = existing.findLastIndex((e) => e.type === "steer_message" && e.status !== "sending");
+    const latestSteerIndex = existing.findLastIndex((e) => e.type === "steer_message" && e.status === "sent");
     const lastIndex = existing.findLastIndex(
       (e, index) => index > latestSteerIndex && e.type === "assistant_message" && !e.isComplete
     );
@@ -550,12 +550,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         status: incoming.status,
         error: incoming.error,
       } as TimelineEvent;
-      if (incoming.status !== "sent") return result;
-      return result.map((event, index) => (
-        index < duplicateIndex && event.type === "assistant_message" && !event.isComplete
-          ? { ...event, isComplete: true, isThinking: false }
-          : event
-      ));
+      return result;
     }
     return [...existing, incoming];
   }
