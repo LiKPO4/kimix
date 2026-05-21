@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.4 本地待发布：修复无焦点通知策略在窗口实际有焦点时仍弹通知和红点的问题。
+v2.8.5 本地待发布：继续加固无焦点通知策略，用渲染层最近聚焦/交互状态兜底避免误弹通知和红点。
 
 ## 当前版本
-**v2.8.4** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.5** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成

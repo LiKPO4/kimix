@@ -23,6 +23,7 @@ const LOCAL_PENDING_KEY = "kimix_pending";
 const LOCAL_PERSIST_DEBOUNCE_MS = 900;
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const STREAM_EVENT_FLUSH_MS = 80;
+let rendererWindowFocusedHint = typeof document !== "undefined" ? document.hasFocus() : false;
 
 interface HandoffJob {
   sourceSessionId: string;
@@ -162,7 +163,7 @@ function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label
   void window.api.notifyTurnComplete({
     title: `Kimix 本轮已完成${suffix}`,
     body: `「${sessionTitle}」已处理完成，可以回来查看结果。`,
-    windowFocused: document.hasFocus(),
+    windowFocused: document.hasFocus() || rendererWindowFocusedHint,
   }).catch((err) => {
     console.warn("Notify turn complete failed:", err, { uiSessionId, runtimeSessionId });
   });
@@ -1318,6 +1319,16 @@ function App() {
     });
     const handleBeforeUnload = flushLocalConversationState;
     window.addEventListener("beforeunload", handleBeforeUnload);
+    const markRendererWindowFocused = () => {
+      rendererWindowFocusedHint = true;
+    };
+    const markRendererWindowBlurred = () => {
+      rendererWindowFocusedHint = false;
+    };
+    window.addEventListener("focus", markRendererWindowFocused);
+    window.addEventListener("blur", markRendererWindowBlurred);
+    document.addEventListener("pointerdown", markRendererWindowFocused, true);
+    document.addEventListener("keydown", markRendererWindowFocused, true);
 
     const flushStreamEvents = () => {
       streamFlushTimerRef.current = null;
@@ -1678,6 +1689,10 @@ function App() {
       unsubscribeBootstrap();
       unsubscribeSessionPersistence();
       window.removeEventListener("kimix:startHandoff", handleStartHandoff);
+      window.removeEventListener("focus", markRendererWindowFocused);
+      window.removeEventListener("blur", markRendererWindowBlurred);
+      document.removeEventListener("pointerdown", markRendererWindowFocused, true);
+      document.removeEventListener("keydown", markRendererWindowFocused, true);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.clearInterval(lagTimer);
