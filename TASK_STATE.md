@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.6 本地待发布：按 Page Visibility 最佳实践加固无焦点通知，页面可见时不弹通知和红点。
+v2.8.7 本地待发布：修复引导消息过早切断当前输出，改为引导接入成功后再从引导位置开启新输出。
 
 ## 当前版本
-**v2.8.6** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.7** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成

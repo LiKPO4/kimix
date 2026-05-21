@@ -784,10 +784,7 @@ export function Composer() {
       updateSession(currentSession.id, (session) => ({
         ...session,
         events: [
-          ...session.events.map((event) => event.type === "assistant_message" && !event.isComplete
-            ? { ...event, isComplete: true, isThinking: false }
-            : event
-          ),
+          ...session.events,
           {
             id: steerEventId,
             type: "steer_message",
@@ -824,6 +821,18 @@ export function Composer() {
           updatedAt: Date.now(),
         }));
         addPendingMessage(pending.content);
+      } else {
+        updateSession(currentSession.id, (session) => ({
+          ...session,
+          events: session.events.map((event) => {
+            if (event.id === steerEventId) return { ...event, status: "sent" as const };
+            if (event.type === "assistant_message" && !event.isComplete) {
+              return { ...event, isComplete: true, isThinking: false };
+            }
+            return event;
+          }),
+          updatedAt: Date.now(),
+        }));
       }
       return;
     }
