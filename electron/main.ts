@@ -743,7 +743,7 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
   if (!response.ok) throw new Error(`下载失败：GitHub 返回 ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   const updateDir = path.join(app.getPath("downloads"), "Kimix Updates", sanitizeDownloadName(tagName || "latest"));
-  ensureDir(updateDir);
+  ensureDirectoryExists(updateDir);
   const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));
   fs.writeFileSync(targetPath, bytes);
   return targetPath;

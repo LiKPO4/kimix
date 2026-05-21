@@ -1640,6 +1640,19 @@ export function AppShell() {
                 )}
               </div>
             ))}
+            {updateState.hasUpdate && (
+              <button
+                type="button"
+                onClick={() => setHelpDialog("updates")}
+                className="kimix-top-menu-trigger flex items-center text-[#2f6fad]"
+                style={{ gap: 7, marginLeft: 4 }}
+                title={updateState.message || "有新版本可用"}
+                aria-label="打开更新窗口"
+              >
+                <ArrowUp size={14} />
+                升级
+              </button>
+            )}
           </nav>
         </div>
 
@@ -1714,17 +1727,6 @@ export function AppShell() {
             </div>
 
             <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
-              {updateState.hasUpdate && (
-                <button
-                  type="button"
-                  onClick={() => setHelpDialog("updates")}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#b9daf9] bg-[#eef7ff] text-[#2f6fad] shadow-[0_6px_18px_rgba(51,154,240,0.14)] transition-colors hover:bg-[#dff0ff] hover:text-[#1f6fb2]"
-                  title={updateState.message || "有新版本可用"}
-                  aria-label="打开更新窗口"
-                >
-                  <ArrowUp size={15} />
-                </button>
-              )}
               {longTaskMeta ? (
                 <button
                   type="button"
