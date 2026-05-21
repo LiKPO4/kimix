@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.7.112 待验收：release workflow 自动 publish draft，更新下载增加 net.fetch 兜底并在失败时打开发布页；修正兜底逻辑落点。
+v2.8.0 发布：独家功能画板上线，优化图片表达和需求澄清中断后的 agent 沟通链路；准备通过 GitHub Actions 标签发布。
 
 ## 当前版本
-**v2.7.112** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.0** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成

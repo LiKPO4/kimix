@@ -1,11 +1,12 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
+import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function genId(): string {
@@ -38,6 +39,8 @@ const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc
   { value: "off", label: "关闭", desc: "直接发送原消息" },
   { value: "auto", label: "自动", desc: "由 AI 判断是否需要澄清" },
 ];
+
+const DRAWING_BOARD_RATIOS: DrawingBoardRequest["ratio"][] = ["1:1", "4:3", "3:4", "16:9", "9:16"];
 
 const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
   auto: "【Kimix 需求澄清工具：自动判断】\n先判断用户需求是否足够明确。只要存在会改变执行方向、文件范围、命令/网络/写入操作、验收标准或风险边界的不确定点，就必须先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题。用户只说“浏览项目、推荐下一步、优化、调整、修复、处理一下”且目标不具体时，至少询问优先方向或期望产出。只有在信息已足够完成一个低风险最小增量时，才不要解释本规则并直接继续。",
@@ -102,6 +105,7 @@ export function Composer() {
   const [input, setInput] = useState("");
   const [imageAttachments, setImageAttachments] = useState<ImageAttachment[]>([]);
   const [previewImage, setPreviewImage] = useState<ImageAttachment | null>(null);
+  const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [slashCommands, setSlashCommands] = useState<CompletionItem[]>([]);
   const [fileItems, setFileItems] = useState<CompletionItem[]>([]);
   const [activeCompletionIndex, setActiveCompletionIndex] = useState(0);
@@ -300,6 +304,35 @@ export function Composer() {
     void addImageFiles(files);
   };
 
+  const openBlankDrawingBoard = (ratio: DrawingBoardRequest["ratio"]) => {
+    setDrawingBoardRequest({ ratio });
+    setShowAddMenu(false);
+  };
+
+  const openImageDrawingBoard = (image: ImageAttachment) => {
+    setDrawingBoardRequest({ ratio: "1:1", source: image });
+    setPreviewImage(null);
+  };
+
+  const handleSaveDrawingBoard = (image: { name: string; dataUrl: string; sourceId?: string }) => {
+    const attachment: ImageAttachment = {
+      id: genId(),
+      name: image.name,
+      dataUrl: image.dataUrl,
+    };
+    setImageAttachments((prev) => {
+      if (!image.sourceId) return [...prev, attachment];
+      const sourceIndex = prev.findIndex((item) => item.id === image.sourceId);
+      if (sourceIndex < 0) return [...prev, attachment];
+      return [
+        ...prev.slice(0, sourceIndex + 1),
+        attachment,
+        ...prev.slice(sourceIndex + 1),
+      ];
+    });
+    setDrawingBoardRequest(null);
+  };
+
   const ensureSession = async () => {
     if (currentSession) {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
@@ -427,6 +460,18 @@ export function Composer() {
       }));
       return;
     }
+  };
+
+  const settlePendingClarifications = (sessionId: string, status: "skipped" | "answered" = "skipped") => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      events: session.events.map((event) => (
+        event.type === "question_request" && event.status === "pending"
+          ? { ...event, status, answers: event.answers ?? {} }
+          : event
+      )),
+      updatedAt: Date.now(),
+    }));
   };
 
   const appendLocalEvent = async (event: TimelineEvent) => {
@@ -580,6 +625,10 @@ export function Composer() {
     setEditingPendingId(null);
     inputRef.current?.reset();
 
+    if (!isCurrentSessionRunning && !hasUnfinishedAssistant && activeSession) {
+      settlePendingClarifications(activeSession.id);
+    }
+
     if (isCurrentSessionRunning && currentSession) {
       addPendingMessage(trimmed);
       return;
@@ -596,6 +645,8 @@ export function Composer() {
       ...session,
       events: session.events.map((event) => event.type === "assistant_message" && !event.isComplete
         ? { ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, Date.now() - event.timestamp) }
+        : event.type === "question_request" && event.status === "pending"
+          ? { ...event, status: "skipped" as const, answers: event.answers ?? {} }
         : event
       ),
       updatedAt: Date.now(),
@@ -1089,6 +1140,28 @@ export function Composer() {
                 <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[372px] rounded-xl" style={{ padding: "16px 16px 15px" }}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
                     <section>
+                      <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 10 }}>
+                        <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
+                          <Palette size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                          <span>画板</span>
+                        </div>
+                        <span className="shrink-0 text-[12.5px] text-[var(--kimix-panel-text-muted)]">新建空白画布</span>
+                      </div>
+                      <div className="grid grid-cols-5" style={{ gap: 8 }}>
+                        {DRAWING_BOARD_RATIOS.map((ratio) => (
+                          <button
+                            key={ratio}
+                            type="button"
+                            onClick={() => openBlankDrawingBoard(ratio)}
+                            className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-[#625d55] hover:bg-[var(--kimix-panel-hover)]"
+                          >
+                            {ratio}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
                       <div className="flex items-center justify-between" style={{ gap: 12 }}>
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
@@ -1292,13 +1365,31 @@ export function Composer() {
               <X size={20} />
             </button>
           </div>
-          <img
-            src={previewImage.dataUrl}
-            alt={previewImage.name}
-            className="kimix-preview-image max-h-[82vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
-            onClick={(event) => event.stopPropagation()}
-          />
+          <div className="flex max-h-[88vh] max-w-[88vw] flex-col items-center" style={{ gap: 14 }} onClick={(event) => event.stopPropagation()}>
+            <img
+              src={previewImage.dataUrl}
+              alt={previewImage.name}
+              className="kimix-preview-image max-h-[76vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+            />
+            <button
+              type="button"
+              onClick={() => openImageDrawingBoard(previewImage)}
+              className="kimix-icon-text-button rounded-xl bg-white text-[#302d28] shadow-[0_8px_26px_rgba(0,0,0,0.18)] hover:bg-[#f7f5f0]"
+              style={{ paddingLeft: 16, paddingRight: 16 }}
+            >
+              <Palette size={15} />
+              画板
+            </button>
+          </div>
         </div>
+      )}
+
+      {drawingBoardRequest && (
+        <DrawingBoard
+          request={drawingBoardRequest}
+          onClose={() => setDrawingBoardRequest(null)}
+          onSave={handleSaveDrawingBoard}
+        />
       )}
     </div>
   );

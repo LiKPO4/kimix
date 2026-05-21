@@ -85,7 +85,13 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setRecentProjects: (projects) => set({ recentProjects: projects }),
 
   addPendingMessage: (content) =>
-    set((state) => ({ pendingMessages: [...state.pendingMessages, createPendingMessage(content)] })),
+    set((state) => {
+      const normalized = content.trim();
+      if (!normalized) return state;
+      const latest = state.pendingMessages.at(-1);
+      if (latest?.content.trim() === normalized) return state;
+      return { pendingMessages: [...state.pendingMessages, createPendingMessage(normalized)] };
+    }),
 
   updatePendingMessage: (id, content) =>
     set((state) => ({

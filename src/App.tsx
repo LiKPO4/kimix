@@ -298,6 +298,15 @@ function hasPendingQuestion(events: TimelineEvent[]) {
   return events.some((event) => event.type === "question_request" && event.status === "pending");
 }
 
+function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "answered" = "skipped"): TimelineEvent[] {
+  if (!events.some((event) => event.type === "question_request" && event.status === "pending")) return events;
+  return events.map((event) => (
+    event.type === "question_request" && event.status === "pending"
+      ? { ...event, status, answers: event.answers ?? {} }
+      : event
+  ));
+}
+
 function latestAssistantContent(events: TimelineEvent[]) {
   return [...events].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
     event.type === "assistant_message" && event.content.trim().length > 0
@@ -1499,7 +1508,7 @@ function App() {
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: settlePendingSteerMessages(
-            closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete))),
+            settlePendingQuestions(closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)))),
             "failed",
             payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
           ),
@@ -1538,6 +1547,12 @@ function App() {
               ? "审查 agent 已结束，但没有给出明确结论（通过 / 需修复 / 待人工审查），已暂停当前长程任务。"
               : "审查 agent 已结束，但没有返回可用结果，已暂停当前长程任务。",
           );
+          return;
+        }
+
+        const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+        if (latestSession && hasPendingQuestion(latestSession.events)) {
+          persistLocalConversationState();
           return;
         }
 
