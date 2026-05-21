@@ -594,6 +594,7 @@ export type TurnCompleteNotificationRequest = {
   title?: string;
   body?: string;
   windowFocused?: boolean;
+  pageVisible?: boolean;
 }
 
 export type ScheduleShutdownRequest = {

@@ -583,12 +583,15 @@ function clearTaskbarAttention() {
   app.setBadgeCount(0);
 }
 
-function showTurnCompleteNotification(title: string, body: string, rendererWindowFocused = false) {
+function showTurnCompleteNotification(title: string, body: string, rendererWindowFocused = false, rendererPageVisible = false) {
   const settings = settingsService.loadSettings();
   const notificationMode = settings.notificationMode ?? "unfocused";
+  const windowAvailable = Boolean(mainWindow && !mainWindow.isDestroyed());
   const windowFocused = rendererWindowFocused || Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
+  const windowVisible = windowAvailable && Boolean(mainWindow?.isVisible()) && !mainWindow?.isMinimized();
+  const userCanSeeKimix = windowFocused || (rendererPageVisible && windowVisible);
   if (notificationMode === "never") return;
-  if (notificationMode === "unfocused" && windowFocused) return;
+  if (notificationMode === "unfocused" && userCanSeeKimix) return;
   if (!windowFocused) setTaskbarAttention();
   if (!Notification.isSupported()) return;
   const notification = new Notification({
@@ -2342,7 +2345,8 @@ ipcMain.handle("app:notifyTurnComplete", async (_, request: unknown) => {
     const title = typeof payload.title === "string" ? payload.title.slice(0, 80) : "Kimix 本轮已完成";
     const body = typeof payload.body === "string" ? payload.body.slice(0, 180) : "当前轮次处理已完成，可以回来查看结果。";
     const windowFocused = payload.windowFocused === true;
-    showTurnCompleteNotification(title, body, windowFocused);
+    const pageVisible = payload.pageVisible === true;
+    showTurnCompleteNotification(title, body, windowFocused, pageVisible);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

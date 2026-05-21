@@ -442,7 +442,7 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.5 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.6 · 设置将自动保存到本地</div>
         </div>
       </div>
     </div>
