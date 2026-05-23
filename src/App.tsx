@@ -201,6 +201,20 @@ function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label
   });
 }
 
+function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string, questionContent?: string) {
+  const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+  const sessionTitle = session?.title?.trim() || "当前会话";
+  const summary = summarizeNotificationBody(questionContent ?? "");
+  void window.api.notifyTurnComplete({
+    title: "Kimix 需要你回复需求澄清",
+    body: summary || `「${sessionTitle}」正在等待你的澄清回复。`,
+    windowFocused: document.hasFocus() || rendererWindowFocusedHint,
+    pageVisible: document.visibilityState === "visible",
+  }).catch((err) => {
+    console.warn("Notify clarification needed failed:", err, { uiSessionId, runtimeSessionId });
+  });
+}
+
 function updateRecommendationEvent(sessionId: string, eventId: string, patch: Partial<Extract<TimelineEvent, { type: "session_recommendation" }>>) {
   useSessionStore.getState().updateSession(sessionId, (session) => ({
     ...session,
@@ -330,6 +344,14 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
 
 function hasPendingQuestion(events: TimelineEvent[]) {
   return events.some((event) => event.type === "question_request" && event.status === "pending");
+}
+
+function questionRequestNotificationKey(event: Extract<TimelineEvent, { type: "question_request" }>) {
+  return event.rpcRequestId || event.requestId || event.toolCallId || event.id;
+}
+
+function summarizeQuestionRequest(event: Extract<TimelineEvent, { type: "question_request" }>) {
+  return event.questions.map((question) => question.question).filter(Boolean).join(" / ");
 }
 
 function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "answered" = "skipped"): TimelineEvent[] {
@@ -719,6 +741,7 @@ function App() {
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
+  const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
 
   const syncCurrentSessionFromStore = (uiSessionId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -1491,6 +1514,13 @@ function App() {
         const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
         const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
         markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
+        if (mappedWithRole.type === "question_request" && mappedWithRole.status === "pending") {
+          const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedWithRole)}`;
+          if (!notifiedQuestionRequestRef.current.has(notifyKey)) {
+            notifiedQuestionRequestRef.current.add(notifyKey);
+            notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedWithRole));
+          }
+        }
         if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
           mergeHiddenLongTaskEvent(payload.sessionId, mappedWithRole);
           if (shouldMirrorHiddenLongTaskEvent(mappedWithRole)) {

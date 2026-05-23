@@ -1,10 +1,50 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.37 待验收：TodoList 全完成后自动隐藏；桌面通知正文改用本轮 assistant 回复摘要。
+v2.8.38 待验收：卡在需求澄清等待用户回复时发送桌面通知。
 
 ## 当前版本
-**v2.8.37** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.38** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+
+## Kimi 特有能力路线图
+### 执行顺序
+1. Hooks 自动化规则中心
+2. Plugins / 项目工具箱
+3. 视觉验收：自动截图、让 Kimi 查看并给出修复建议
+4. 会话 Fork：从历史轮次分支出新方案
+
+### Step 1：Hooks 自动化规则中心
+目标：把 Kimi Code 官方 hooks 做成 Kimix 可视化规则中心，用于安全拦截、自动验收、通知和项目级工作流。
+- [ ] 盘点 SDK/CLI hooks 支持面：`PreToolUse`、`PostToolUse`、`Stop`、`StopFailure`、`SessionStart`、`SubagentStart`、`PreCompact` 等。
+- [ ] 设计规则数据结构：触发事件、匹配器、动作类型、命令/提示/阻断原因、启用状态、项目级/全局级。
+- [ ] 后端接入 Agent SDK `hooks`，支持 allow/block、timeout、错误回传和日志记录。
+- [ ] 前端新增 Hooks 设置页：规则列表、新建/编辑、启停、测试触发、最近命中记录。
+- [ ] 内置首批模板：危险命令拦截、文件改动后自动 build/lint、失败时通知、需求澄清/审批/完成通知增强。
+- [ ] 验收：至少一个 `PreToolUse` 阻断规则和一个 `Stop` 后自动命令规则可端到端运行。
+
+### Step 2：Plugins / 项目工具箱
+目标：把 Kimi Code plugins 和项目常用脚本做成可安装、可启停、可测试的工具箱。
+- [ ] 盘点官方 plugins 配置方式和本地目录结构。
+- [ ] 设计插件列表、详情、启停、项目级安装/移除 UI。
+- [ ] 支持把项目脚本包装成 agent 可调用工具。
+- [ ] 内置常用模板：运行测试、生成 changelog、读取项目约定、发布前检查。
+- [ ] 验收：一个本地插件能被 Kimix 创建、启用，并被 Kimi Code 调用。
+
+### Step 3：视觉验收自动截图查看
+目标：对 UI 改动自动截图，让 Kimi 读取截图并按 Kimix 留白规则给出问题和修复建议。
+- [ ] 接入本地窗口/页面截图能力，支持 Electron 主窗口和指定区域。
+- [ ] 设计视觉验收任务：截图、附带当前改动摘要、调用 Kimi 视觉能力分析。
+- [ ] 输出结构化结果：通过/不通过、问题位置、建议改法、可一键转成修复 prompt。
+- [ ] 优先覆盖高风险区域：右侧栏、弹窗、小浮层、对话流圆角框、底部状态栏浮层。
+- [ ] 验收：一次 UI 改动后可生成截图分析，并能把问题回填到当前会话。
+
+### Step 4：会话 Fork
+目标：利用 Kimi SDK `forkSession` / `parseSessionEvents`，从历史轮次分支出不同实现方案。
+- [ ] 读取官方 session 列表和事件，映射到 Kimix 当前会话。
+- [ ] 在消息/轮次菜单增加“从这里 Fork”。
+- [ ] Fork 后创建新 Kimix 会话，保留来源信息和分支说明。
+- [ ] 支持比较两个分支的结果、文件变更和验收状态。
+- [ ] 验收：从历史第 N 轮 fork 出新会话并继续提问，原会话不受影响。
 
 ## 当前开发会话待办
 ### 已完成
@@ -1211,3 +1251,12 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 版本号三处同步到 v2.8.37。
 ## 下一步
 等待 v2.8.37 实例验收；确认 TodoList 全完成后自动消失，桌面通知正文使用本轮 agent 回复内容。
+
+# 2026-05-23 需求澄清等待通知
+## 已完成
+- 收到 pending `question_request` 时触发桌面通知，提示用户回到 Kimix 回复需求澄清。
+- 通知正文使用澄清问题摘要，并复用当前通知可见性设置，窗口可见时按设置避免打扰。
+- 按 runtime session + request id 去重，避免同一张澄清卡重复弹通知。
+- 版本号三处同步到 v2.8.38。
+## 下一步
+等待 v2.8.38 实例验收；触发一次需求澄清，确认窗口不在前台时会提示用户回复。
