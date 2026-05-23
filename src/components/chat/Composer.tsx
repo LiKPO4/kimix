@@ -4,7 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
-import { TodoPanel } from "./TodoPanel";
+import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -887,6 +887,7 @@ export function Composer() {
       : "请先选择项目";
   const composerCardSessionId = activeSession?.id ?? "__global__";
   const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
+  const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
   const pendingHidden = hiddenCards.includes("pending");
   const hideComposerCard = (card: "todo" | "pending", label: string) => {
@@ -902,7 +903,7 @@ export function Composer() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {activeSession && !todoHidden && (
+      {activeSession && visibleTodos.length > 0 && !todoHidden && (
         <TodoPanel
           events={activeSession.events}
           onDismiss={() => hideComposerCard("todo", "TodoList")}

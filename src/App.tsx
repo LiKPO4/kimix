@@ -156,13 +156,44 @@ function settlePendingSteerMessages(events: TimelineEvent[], status: "sent" | "f
   ));
 }
 
-function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label?: string) {
+function summarizeNotificationBody(content: string): string {
+  const normalized = content
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[[^\]]*]\([^)]+\)/g, " ")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/[#>*_`~-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return "";
+  return normalized.length > 120 ? `${normalized.slice(0, 118)}...` : normalized;
+}
+
+function extractAssistantContentForTurn(
+  events: TimelineEvent[],
+  start?: { eventStartIndex: number; openAssistantIds: Set<string> },
+): string {
+  const settled = settleInactiveEvents(events);
+  const eventStartIndex = Math.max(0, Math.min(start?.eventStartIndex ?? 0, settled.length));
+  const openAssistantIds = start?.openAssistantIds ?? new Set<string>();
+  const assistant = settled
+    .map((event, index) => ({ event, index }))
+    .reverse()
+    .find((entry): entry is { event: Extract<TimelineEvent, { type: "assistant_message" }>; index: number } => (
+      entry.event.type === "assistant_message" &&
+      entry.event.content.trim().length > 0 &&
+      (entry.index >= eventStartIndex || openAssistantIds.has(entry.event.id))
+    ));
+  return assistant?.event.content.trim() ?? "";
+}
+
+function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label?: string, assistantContent?: string) {
   const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
   const sessionTitle = session?.title?.trim() || "当前会话";
+  const summary = summarizeNotificationBody(assistantContent ?? "");
   const suffix = label ? `（${label}）` : "";
   void window.api.notifyTurnComplete({
     title: `Kimix 本轮已完成${suffix}`,
-    body: `「${sessionTitle}」已处理完成，可以回来查看结果。`,
+    body: summary || `「${sessionTitle}」已处理完成，可以回来查看结果。`,
     windowFocused: document.hasFocus() || rendererWindowFocusedHint,
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
@@ -687,6 +718,7 @@ function App() {
   const longTaskReviewDispatchRef = useRef<Set<string>>(new Set());
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
+  const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
 
   const syncCurrentSessionFromStore = (uiSessionId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -1493,8 +1525,14 @@ function App() {
 
       if (payload.status === "running") {
         const uiSessionId = resolveUiSessionId(payload.sessionId);
-        markLongTaskRuntimeActivity(uiSessionId, payload.sessionId, "running");
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+        runtimeTurnStartRef.current.set(payload.sessionId, {
+          eventStartIndex: runningSession?.events.length ?? 0,
+          openAssistantIds: new Set((runningSession?.events ?? []).flatMap((event) => (
+            event.type === "assistant_message" && !event.isComplete ? [event.id] : []
+          ))),
+        });
+        markLongTaskRuntimeActivity(uiSessionId, payload.sessionId, "running");
         if (runningSession?.longTask?.reviewerSessionId === payload.sessionId) {
           upsertLongTaskAgentProxyMessage(uiSessionId, "reviewer", "running");
         }
@@ -1520,6 +1558,7 @@ function App() {
       }
 
       if (payload.status === "error" || payload.status === "interrupted") {
+        runtimeTurnStartRef.current.delete(payload.sessionId);
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: settlePendingSteerMessages(
@@ -1532,6 +1571,7 @@ function App() {
       }
 
       if (payload.status === "completed") {
+        const turnStart = runtimeTurnStartRef.current.get(payload.sessionId);
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: appendSessionRecommendationIfNeeded(
@@ -1545,7 +1585,10 @@ function App() {
           useSessionStore.getState().sessions.find((session) => session.id === uiSessionId),
           payload.sessionId,
         );
-        notifyTurnComplete(uiSessionId, payload.sessionId, completedRole === "executor" ? "执行" : completedRole === "reviewer" ? "审核" : undefined);
+        const completedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+        const assistantContent = extractAssistantContentForTurn(completedSession?.events ?? [], turnStart);
+        notifyTurnComplete(uiSessionId, payload.sessionId, completedRole === "executor" ? "执行" : completedRole === "reviewer" ? "审核" : undefined, assistantContent);
+        runtimeTurnStartRef.current.delete(payload.sessionId);
 
         applyLongTaskProgressFromLatestOutput(uiSessionId, payload.sessionId);
         if (dispatchLongTaskReview(uiSessionId, payload.sessionId)) {

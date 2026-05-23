@@ -48,9 +48,14 @@ export function getLatestTodos(events: TimelineEvent[]): TodoItem[] {
   return [];
 }
 
+export function getVisibleTodos(events: TimelineEvent[]): TodoItem[] {
+  const items = getLatestTodos(events);
+  return items.some((item) => item.status !== "done") ? items : [];
+}
+
 export function TodoPanel({ events, onDismiss }: TodoPanelProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const items = useMemo(() => getLatestTodos(events), [events]);
+  const items = useMemo(() => getVisibleTodos(events), [events]);
   if (items.length === 0) return null;
 
   const doneCount = items.filter((item) => item.status === "done").length;

@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.36 待验收：AGENTS.md 增补小浮层/列表 UI 制作规范，沉淀本轮工作目录浮层踩坑。
+v2.8.37 待验收：TodoList 全完成后自动隐藏；桌面通知正文改用本轮 assistant 回复摘要。
 
 ## 当前版本
-**v2.8.36** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.37** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 当前开发会话待办
 ### 已完成
@@ -1202,3 +1202,12 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 版本号三处同步到 v2.8.36。
 ## 下一步
 等待 v2.8.36 实例验收；后续小浮层和动态列表 UI 必须按新规则先做结构自查。
+
+# 2026-05-23 TodoList 自动隐藏与通知正文
+## 已完成
+- TodoList 推导新增 `getVisibleTodos`：最新 Todo 全部为 `done` 时视为已结束，不再显示输入区 TodoList，也不再进入右侧“已收起卡片”恢复入口。
+- 桌面通知记录 runtime 本轮开始位置和当时未完成的 assistant 占位消息；完成时从本轮新增/本轮占位 assistant 正文中提取摘要作为通知正文。
+- 通知摘要会剥离 Markdown 代码块、图片、链接语法并截断到约 120 字；若本轮没有 assistant 正文，才回退到会话标题完成提示。
+- 版本号三处同步到 v2.8.37。
+## 下一步
+等待 v2.8.37 实例验收；确认 TodoList 全完成后自动消失，桌面通知正文使用本轮 agent 回复内容。

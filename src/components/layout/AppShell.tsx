@@ -3,7 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
-import { getLatestTodos } from "@/components/chat/TodoPanel";
+import { getVisibleTodos } from "@/components/chat/TodoPanel";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
@@ -1198,7 +1198,7 @@ export function AppShell() {
     () => collectSessionDiffs(liveCurrentSession?.events ?? []),
     [liveCurrentSession?.events],
   );
-  const latestTodos = useMemo(() => getLatestTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
+  const latestTodos = useMemo(() => getVisibleTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
   const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
   const hiddenComposerCardEntries = [
