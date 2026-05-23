@@ -10,6 +10,18 @@ export type OpenProjectResponse = {
   error: string;
 };
 
+export type ChooseDirectoryRequest = {
+  defaultPath?: string;
+};
+
+export type ChooseDirectoryResponse = {
+  success: true;
+  data: string | null;
+} | {
+  success: false;
+  error: string;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -149,6 +161,7 @@ export type StartSessionRequest = {
   planMode?: boolean;
   afkMode?: boolean;
   skillsDir?: string;
+  agentFile?: string;
   additionalWorkDirs?: string[];
 }
 
@@ -434,6 +447,8 @@ export type ReadTextFileResponse = {
     path: string;
     content: string;
     updatedAt: number;
+    missing?: boolean;
+    message?: string;
   };
 } | {
   success: false;
@@ -526,6 +541,39 @@ export type ImportSkillArchiveResponse = {
   data: {
     imported: SkillInfo[];
     skills: SkillInfo[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type InstallSuperpowersResponse = {
+  success: true;
+  data: {
+    installed: SkillInfo[];
+    skills: SkillInfo[];
+    enabledNames: string[];
+    enabledDir: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SuperpowersBootstrapResponse = {
+  success: true;
+  data: {
+    enabled: boolean;
+    content: string;
+    agentFile?: string;
+    skillsDir?: string;
+    enabledNames?: string[];
+    superpowerSkills?: string[];
+    agentFileExists?: boolean;
+    skillsDirExists?: boolean;
+    legacyAgentFileExists?: boolean;
+    usingSkillPath?: string;
+    diagnostics?: string[];
   };
 } | {
   success: false;

@@ -91,6 +91,7 @@ function installBrowserPreviewApi() {
 
   const previewApi: WindowAPI = {
     openProject: (): Promise<OpenProjectResponse> => Promise.resolve({ success: true, data: null }),
+    chooseDirectory: () => Promise.resolve({ success: true, data: null }),
     listRecentProjects: (): Promise<ListRecentResponse> => Promise.resolve({ success: true, data: [] }),
     addRecentProject: () => Promise.resolve(),
     removeRecentProject: () => Promise.resolve(),
@@ -106,6 +107,8 @@ function installBrowserPreviewApi() {
     saveEnabledSkills: (): Promise<SaveEnabledSkillsResponse> =>
       Promise.resolve({ success: true, data: { enabledNames: [], enabledDir: "" } }),
     importSkillArchive: () => fail("导入技能包"),
+    installSuperpowers: () => fail("安装 Superpowers"),
+    getSuperpowersBootstrap: () => Promise.resolve({ success: true, data: { enabled: false, content: "" } }),
 
     listLongTasks: (): Promise<ListLongTasksResponse> => Promise.resolve({ success: true, data: [] }),
     createLongTask: () => fail("创建长程任务"),

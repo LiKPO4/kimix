@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Circle, Crop, Eraser, Minus, PaintBucket, Pencil, Redo2, Save, Square, Undo2, X } from "lucide-react";
+import { Check, Circle, Copy, Crop, Eraser, Minus, PaintBucket, Pencil, Redo2, Save, Square, Undo2, X } from "lucide-react";
 
 type BoardRatio = "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
 
@@ -477,6 +477,14 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     });
   };
 
+  const handleCopy = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL("image/png");
+    const res = await window.api.copyImage({ dataUrl });
+    if (!res.success) return;
+  };
+
   return (
     <div className="kimix-preview-overlay fixed inset-0 z-[90] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="画板">
       <div className="kimix-modal-card flex max-h-[92vh] w-[min(1120px,94vw)] flex-col rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.28)]" style={{ padding: 20 }} onClick={(event) => event.stopPropagation()}>
@@ -636,9 +644,13 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
 
         <div className="flex items-center justify-between" style={{ gap: 14, marginTop: 16 }}>
           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">保存后会作为一张 PNG 图片加入输入区的上传图片列表。</div>
-          <div className="flex shrink-0 items-center" style={{ gap: 10 }}>
+          <div className="flex shrink-0 items-center" style={{ gap: 14 }}>
             <button type="button" onClick={onClose} className="kimix-icon-text-button is-compact rounded-lg text-[#625d55] hover:bg-[var(--kimix-panel-hover)]">
               取消
+            </button>
+            <button type="button" onClick={() => void handleCopy()} className="kimix-icon-text-button is-compact rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]">
+              <Copy size={14} />
+              复制
             </button>
             <button type="button" onClick={handleSave} className="kimix-icon-text-button is-compact rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]">
               <Save size={14} />

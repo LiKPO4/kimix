@@ -181,6 +181,13 @@ type SessionDiffEntry = {
   deletions: number;
 };
 
+type DiffLine = {
+  kind: "same" | "added" | "removed";
+  oldNumber?: number;
+  newNumber?: number;
+  text: string;
+};
+
 const longTaskStageLabels: Record<NonNullable<Session["longTask"]>["stage"], string> = {
   drafting: "澄清中",
   planning: "规划中",
@@ -498,6 +505,82 @@ function countDiffLines(value: string) {
   return value.split("\n").length;
 }
 
+function buildUnifiedDiff(oldText = "", newText = ""): DiffLine[] {
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
+  const rows = oldLines.length + 1;
+  const cols = newLines.length + 1;
+  const table = Array.from({ length: rows }, () => Array<number>(cols).fill(0));
+  for (let i = oldLines.length - 1; i >= 0; i -= 1) {
+    for (let j = newLines.length - 1; j >= 0; j -= 1) {
+      table[i][j] = oldLines[i] === newLines[j]
+        ? table[i + 1][j + 1] + 1
+        : Math.max(table[i + 1][j], table[i][j + 1]);
+    }
+  }
+
+  const diff: DiffLine[] = [];
+  let oldIndex = 0;
+  let newIndex = 0;
+  while (oldIndex < oldLines.length && newIndex < newLines.length) {
+    if (oldLines[oldIndex] === newLines[newIndex]) {
+      diff.push({ kind: "same", oldNumber: oldIndex + 1, newNumber: newIndex + 1, text: oldLines[oldIndex] });
+      oldIndex += 1;
+      newIndex += 1;
+    } else if (table[oldIndex + 1][newIndex] >= table[oldIndex][newIndex + 1]) {
+      diff.push({ kind: "removed", oldNumber: oldIndex + 1, text: oldLines[oldIndex] });
+      oldIndex += 1;
+    } else {
+      diff.push({ kind: "added", newNumber: newIndex + 1, text: newLines[newIndex] });
+      newIndex += 1;
+    }
+  }
+  while (oldIndex < oldLines.length) {
+    diff.push({ kind: "removed", oldNumber: oldIndex + 1, text: oldLines[oldIndex] });
+    oldIndex += 1;
+  }
+  while (newIndex < newLines.length) {
+    diff.push({ kind: "added", newNumber: newIndex + 1, text: newLines[newIndex] });
+    newIndex += 1;
+  }
+  return diff;
+}
+
+function renderUnifiedDiff(oldText: string, newText: string) {
+  const diff = buildUnifiedDiff(oldText, newText);
+  if (diff.length === 0) {
+    return (
+      <div className="text-[12.5px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "12px 14px" }}>
+        没有可展示的文本差异。
+      </div>
+    );
+  }
+  return diff.map((line, index) => {
+    const isAdded = line.kind === "added";
+    const isRemoved = line.kind === "removed";
+    const sign = isAdded ? "+" : isRemoved ? "-" : " ";
+    return (
+      <div
+        key={`${line.kind}-${line.oldNumber ?? ""}-${line.newNumber ?? ""}-${index}`}
+        className="grid min-w-0 grid-cols-[20px_42px_1fr] font-mono text-[12px] leading-5"
+        style={{
+          backgroundColor: isAdded ? "#ecf8ef" : isRemoved ? "#fff1ed" : "transparent",
+          color: isAdded ? "#1f6f35" : isRemoved ? "#8f321f" : "#5f564d",
+          padding: "3px 8px",
+        }}
+      >
+        <span className="select-none text-center font-semibold">{sign}</span>
+        <span className="select-none text-right text-[#aaa49a]" style={{ paddingRight: 10 }}>
+          {line.newNumber ?? line.oldNumber ?? ""}
+        </span>
+        <span className="min-w-0 whitespace-pre-wrap break-words">
+          {line.text || " "}
+        </span>
+      </div>
+    );
+  });
+}
+
 function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[] {
   return events
     .filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff")
@@ -519,6 +602,7 @@ type SessionPlanState = {
   content: string;
   updatedAt: number | null;
   error: string | null;
+  message?: string;
 };
 
 const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi\/plans\/[^\s"'<>|]+\.md|\.kimi[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
@@ -667,6 +751,7 @@ export function AppShell() {
     content: "",
     updatedAt: null,
     error: null,
+    message: undefined,
   });
 
   const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1397,7 +1482,7 @@ export function AppShell() {
 
   const refreshSessionPlan = useCallback((options?: { silent?: boolean }) => {
     if (!longTaskInspectorOpen || hasLongTaskMeta || !liveCurrentSessionProjectPath) {
-      setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null });
+      setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null, message: undefined });
       return;
     }
     const pathToRead = sessionPlanPath ?? "__latest_kimi_plan__";
@@ -1412,9 +1497,10 @@ export function AppShell() {
           content: res.data.content,
           updatedAt: res.data.updatedAt,
           error: null,
+          message: res.data.message,
         });
       } else {
-        setSessionPlanState({ loading: false, path: sessionPlanPath, content: "", updatedAt: null, error: res.error });
+        setSessionPlanState({ loading: false, path: sessionPlanPath, content: "", updatedAt: null, error: res.error, message: undefined });
       }
     }).catch((err: unknown) => {
       setSessionPlanState({
@@ -1423,6 +1509,7 @@ export function AppShell() {
         content: "",
         updatedAt: null,
         error: err instanceof Error ? err.message : String(err),
+        message: undefined,
       });
     });
   }, [hasLongTaskMeta, liveCurrentSessionProjectPath, longTaskInspectorOpen, sessionPlanPath]);
@@ -2431,7 +2518,7 @@ export function AppShell() {
                       </div>
                     ) : (
                       <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        开启 Plan 模式并让 Kimi 生成计划后，这里会显示官方写入的 markdown 内容。
+                        {sessionPlanState.message || "开启 Plan 模式并让 Kimi 生成计划后，这里会显示官方写入的 markdown 内容。"}
                       </div>
                     )}
                   </section>
@@ -2538,14 +2625,13 @@ export function AppShell() {
                           打开
                         </button>
                       </div>
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        <div className="rounded-lg border border-[var(--kimix-warning-border)] bg-[var(--kimix-warning-bg)]" style={{ padding: "12px 12px" }}>
-                          <div className="text-[12px] font-medium leading-5 text-[var(--kimix-warning-text)]">修改前</div>
-                          <pre className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--kimix-warning-text-secondary)]">{diff.oldText || "空"}</pre>
+                      <div className="mt-4 overflow-hidden rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]">
+                        <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)] bg-[var(--kimix-panel-soft-bg)] text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 10, padding: "10px 12px" }}>
+                          <span>行级差异</span>
+                          <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">+{diff.additions} / -{diff.deletions}</span>
                         </div>
-                        <div className="rounded-lg border border-[var(--kimix-success-border)] bg-[var(--kimix-success-bg)]" style={{ padding: "12px 12px" }}>
-                          <div className="text-[12px] font-medium leading-5 text-[var(--kimix-success-text)]">修改后</div>
-                          <pre className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]">{diff.newText || "空"}</pre>
+                        <div className="max-h-[520px] overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                          {renderUnifiedDiff(diff.oldText, diff.newText)}
                         </div>
                       </div>
                     </section>

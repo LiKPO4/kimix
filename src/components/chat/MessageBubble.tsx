@@ -7,6 +7,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -14,6 +15,7 @@ interface MessageBubbleProps {
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   changedFiles?: string[];
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
+  hideProcessSummary?: boolean;
 }
 
 function useCopyTimeout() {
@@ -56,6 +58,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   const { copied, trigger } = useCopyTimeout();
   const [imageCopied, setImageCopied] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ name: string; dataUrl?: string } | null>(null);
+  const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
@@ -117,6 +120,12 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
     if (!res.success) return;
     setImageCopied(true);
     window.setTimeout(() => setImageCopied(false), 1200);
+  };
+
+  const handleSaveDrawingBoard = (image: { name: string; dataUrl: string }) => {
+    window.dispatchEvent(new CustomEvent("kimix:addDrawingImage", { detail: image }));
+    setDrawingBoardRequest(null);
+    setPreviewImage(null);
   };
 
   return (
@@ -204,12 +213,38 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
             onClick={(clickEvent) => clickEvent.stopPropagation()}
             onContextMenu={(contextEvent) => previewImage.dataUrl && void handleCopyPreviewImage(contextEvent, previewImage.dataUrl)}
           />
+          <button
+            type="button"
+            onClick={(clickEvent) => {
+              clickEvent.stopPropagation();
+              if (!previewImage.dataUrl) return;
+              setDrawingBoardRequest({
+                ratio: "1:1",
+                source: {
+                  id: previewImage.name,
+                  name: previewImage.name,
+                  dataUrl: previewImage.dataUrl,
+                },
+              });
+            }}
+            className="kimix-icon-text-button absolute bottom-8 rounded-xl bg-[#339af0] text-white shadow-[0_8px_24px_rgba(0,0,0,0.22)] hover:bg-[#228be6]"
+            style={{ paddingLeft: 16, paddingRight: 16 }}
+          >
+            画板
+          </button>
           {imageCopied && (
             <div className="kimix-preview-toast absolute bottom-8 rounded-full text-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.2)]" style={{ padding: "8px 16px" }}>
               已复制图片
             </div>
           )}
         </div>
+      )}
+      {drawingBoardRequest && (
+        <DrawingBoard
+          request={drawingBoardRequest}
+          onClose={() => setDrawingBoardRequest(null)}
+          onSave={handleSaveDrawingBoard}
+        />
       )}
     </div>
   );
@@ -450,7 +485,7 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], changedFiles = [], trailingStatuses = [] }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
+function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -462,7 +497,8 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const isActiveAssistant = Boolean(currentSession?.id && runningSessionId === currentSession.id && !event.isComplete);
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
-  const hasProcessDetails = Boolean(event.thinking?.trim() || leadingTools.length > 0 || leadingSubagents.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
+  const hasThinkingDetails = Boolean(event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim().length > 0));
+  const hasProcessDetails = Boolean(hasThinkingDetails || leadingTools.length > 0 || leadingSubagents.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
   const shouldShowNoContentHint = !hasContent && !hasProcessDetails && (event.isComplete || (isActiveAssistant && elapsed >= 8000));
   const durationLabel = event.isComplete
     ? formatDuration(event.durationMs && event.durationMs > 0 ? event.durationMs : elapsed)
@@ -479,7 +515,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   return (
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {(event.isThinking || event.isComplete || !hasContent) && (
+        {!hideProcessSummary && (event.isThinking || event.isComplete || !hasContent) && (
           <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={displayProcessLabel} />
         )}
 
@@ -534,12 +570,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   );
 }
 
-export function MessageBubble({ event, leadingTools, leadingSubagents, changedFiles, trailingStatuses }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, leadingSubagents, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }

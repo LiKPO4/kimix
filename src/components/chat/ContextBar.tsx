@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, ChevronDown, Download, FolderOpen, GitBranch, Loader2 } from "lucide-react";
+import { BarChart3, ChevronDown, Download, FolderOpen, GitBranch, Loader2, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
@@ -62,13 +62,17 @@ function showPendingToast() {
 export function ContextBar() {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
+  const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
   const [gitBranch, setGitBranch] = useState<string | null>(null);
+  const [workDirsOpen, setWorkDirsOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [now, setNow] = useState(Date.now());
   const usageMenuRef = useRef<HTMLDivElement>(null);
+  const workDirsRef = useRef<HTMLDivElement>(null);
 
   const handleExport = () => {
     if (!session) return;
@@ -94,6 +98,40 @@ export function ContextBar() {
     a.download = `${session.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "_")}.md`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const addAdditionalWorkDir = async () => {
+    let res;
+    try {
+      res = await window.api.chooseDirectory({ defaultPath: project?.path });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const needsRestart = message.includes("project:chooseDirectory") || message.includes("No handler registered");
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: needsRestart
+          ? "选择目录入口需要重启到新版 Kimix 后生效"
+          : `选择目录失败：${message}`,
+      }));
+      return;
+    }
+    if (!res.success) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `选择目录失败：${res.error}` }));
+      return;
+    }
+    const selected = res.data?.trim();
+    if (!selected) return;
+    const normalizedSelected = selected.replace(/\\/g, "/").toLowerCase();
+    const exists = additionalWorkDirs.some((dir) => dir.replace(/\\/g, "/").toLowerCase() === normalizedSelected);
+    if (exists) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "该目录已在额外工作目录中" }));
+      return;
+    }
+    setAdditionalWorkDirs([...additionalWorkDirs, selected]);
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已添加额外工作目录" }));
+  };
+
+  const removeAdditionalWorkDir = (index: number) => {
+    setAdditionalWorkDirs(additionalWorkDirs.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const loadUsage = async () => {
@@ -154,12 +192,15 @@ export function ContextBar() {
   }, [project?.path, project?.gitBranch]);
 
   useEffect(() => {
-    if (!usageOpen) return;
+    if (!usageOpen && !workDirsOpen) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     const handlePointerDown = (event: PointerEvent) => {
       if (!usageMenuRef.current?.contains(event.target as Node)) {
         setUsageOpen(false);
+      }
+      if (!workDirsRef.current?.contains(event.target as Node)) {
+        setWorkDirsOpen(false);
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
@@ -167,22 +208,75 @@ export function ContextBar() {
       window.clearInterval(timer);
       document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [usageOpen]);
+  }, [usageOpen, workDirsOpen]);
 
   return (
     <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[var(--kimix-panel-text-secondary)]" style={{ height: 36 }}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <button
-          type="button"
-          onClick={showPendingToast}
-          className="kimix-muted-action flex min-w-0 items-center rounded-lg"
-          style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
-          title={project?.path ?? "当前项目"}
-          aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
-        >
-          <FolderOpen size={16} className="shrink-0" />
-          <span className="max-w-[220px] truncate">{project?.name ?? "未选择项目"}</span>
-        </button>
+        <div ref={workDirsRef} className="relative min-w-0">
+          <button
+            type="button"
+            onClick={() => setWorkDirsOpen((value) => !value)}
+            className="kimix-muted-action flex min-w-0 items-center rounded-lg"
+            style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
+            title={project?.path ?? "当前项目"}
+            aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
+          >
+            <FolderOpen size={16} className="shrink-0" />
+            <span className="max-w-[220px] truncate">{project?.name ?? "未选择项目"}</span>
+          </button>
+          {workDirsOpen && (
+            <div className="kimix-floating-panel absolute bottom-9 left-0 z-40 w-[360px] rounded-xl" style={{ padding: "16px 18px 18px" }}>
+              <div className="grid items-center" style={{ columnGap: 16, gridTemplateColumns: "minmax(0, 1fr) auto" }}>
+                <div className="min-w-0 self-center">
+                  <div className="text-[14px] font-semibold leading-5 text-[var(--kimix-panel-text)]">工作目录</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>额外目录会通过 Kimi CLI --add-dir 纳入当前会话。</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void addAdditionalWorkDir()}
+                  className="kimix-icon-text-button is-compact flex shrink-0 items-center justify-center self-center rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]"
+                  style={{ height: 34, minHeight: 34, transform: "translateY(1px)" }}
+                >
+                  <FolderOpen size={13} />
+                  选择目录
+                </button>
+              </div>
+              <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 16, padding: "12px 13px" }}>
+                <div className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">主目录</div>
+                <div className="break-all text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>{project?.path ?? "未选择项目"}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ marginTop: 14, padding: "12px 12px 12px" }}>
+                <div className="grid items-center" style={{ gap: 10, gridTemplateColumns: "minmax(0, 1fr) auto", marginBottom: 10 }}>
+                  <span className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">额外工作目录</span>
+                  <span className="inline-flex items-center justify-center rounded-full bg-[#eef7ff] text-[12px] leading-none text-[#2f6fad]" style={{ height: 20, minWidth: 20, paddingLeft: 8, paddingRight: 8 }}>{additionalWorkDirs.length}</span>
+                </div>
+                {additionalWorkDirs.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
+                    暂无额外目录。点击“选择目录”添加共享库、相邻仓库或资源目录。
+                  </div>
+                ) : (
+                  <div className="flex flex-col" style={{ gap: 8 }}>
+                    {additionalWorkDirs.map((dir, index) => (
+                      <div key={`${index}-${dir}`} className="grid items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ columnGap: 10, gridTemplateColumns: "minmax(0, 1fr) 32px", padding: "10px 10px 10px 12px" }}>
+                        <div className="min-w-0 flex-1 break-all text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">{dir}</div>
+                        <button
+                          type="button"
+                          onClick={() => removeAdditionalWorkDir(index)}
+                          className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-lg text-[#8b3d34]"
+                          title="移除目录"
+                          aria-label="移除目录"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <div ref={usageMenuRef} className="relative hidden min-w-0 sm:block">
           <button
             type="button"

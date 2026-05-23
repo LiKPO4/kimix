@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   OpenProjectRequest,
   OpenProjectResponse,
+  ChooseDirectoryRequest,
+  ChooseDirectoryResponse,
   ListRecentResponse,
   ListLongTasksRequest,
   ListLongTasksResponse,
@@ -53,6 +55,8 @@ import type {
   ListSkillsResponse,
   ImportSkillArchiveRequest,
   ImportSkillArchiveResponse,
+  InstallSuperpowersResponse,
+  SuperpowersBootstrapResponse,
   SaveEnabledSkillsRequest,
   SaveEnabledSkillsResponse,
   OpenTerminalRequest,
@@ -77,6 +81,8 @@ const api = {
   // Project
   openProject: (req?: OpenProjectRequest): Promise<OpenProjectResponse> =>
     ipcRenderer.invoke("project:open", req),
+  chooseDirectory: (req?: ChooseDirectoryRequest): Promise<ChooseDirectoryResponse> =>
+    ipcRenderer.invoke("project:chooseDirectory", req),
   listRecentProjects: (): Promise<ListRecentResponse> =>
     ipcRenderer.invoke("project:listRecent"),
   addRecentProject: (project: Project): Promise<void> =>
@@ -105,6 +111,10 @@ const api = {
     ipcRenderer.invoke("project:saveEnabledSkills", req),
   importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
     ipcRenderer.invoke("project:importSkillArchive", req),
+  installSuperpowers: (): Promise<InstallSuperpowersResponse> =>
+    ipcRenderer.invoke("project:installSuperpowers"),
+  getSuperpowersBootstrap: (): Promise<SuperpowersBootstrapResponse> =>
+    ipcRenderer.invoke("project:getSuperpowersBootstrap"),
 
   // Long tasks
   listLongTasks: (req: ListLongTasksRequest): Promise<ListLongTasksResponse> =>

@@ -16,7 +16,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
@@ -208,13 +208,13 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, changedFiles, trailingStatuses }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
+function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, changedFiles, trailingStatuses, hideProcessSummary }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
       return <MessageBubble event={event} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} />;
+      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -316,21 +316,21 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
   const renderTurnBody = (turnEvents: TimelineEvent[]) => {
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
     const assistantEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
-    const primaryAssistantIndex = turnEvents.findIndex((event) => (
-      event.type === "assistant_message" && event.content.trim().length > 0
-    ));
-    const primaryAssistant = primaryAssistantIndex >= 0
-      ? turnEvents[primaryAssistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>
-      : mergeAssistantProcessEvents(assistantEvents);
     const changedFiles = new Set(
       turnEvents
         .filter((e): e is Extract<TimelineEvent, { type: "change_summary" }> => e.type === "change_summary")
         .flatMap((e) => e.files.map((f) => f.path))
     );
     let toolsAttached = false;
+    let assistantAttached = false;
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
+    const turnSettled = (
+      !assistantEvents.some((event) => !event.isComplete) &&
+      !tools.some((event) => event.status === "running") &&
+      !subagents.some((event) => event.status === "running")
+    );
     const diffEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff");
     const mergedChangeSummary = mergeChangeSummaryEvents(turnEvents.filter((event): event is Extract<TimelineEvent, { type: "change_summary" }> => event.type === "change_summary"));
     const summaryPathSet = new Set((mergedChangeSummary?.files ?? []).map((file) => normalizeFilePath(file.path)));
@@ -339,12 +339,9 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       return !summaryPathSet.has(normalized) && !Array.from(summaryPathSet).some((path) => path.endsWith(`/${normalized}`) || normalized.endsWith(`/${path}`));
     });
     const planPath = findPlanPathInChangeSummary(mergedChangeSummary);
-    let assistantAttached = false;
     let changeSummaryAttached = false;
     let diffGroupAttached = false;
     let planPreviewAttached = false;
-    const trailingStatuses = statusEvents;
-
     for (const [eventIndex, event] of turnEvents.entries()) {
       const type = (event as { type?: unknown }).type;
       if (type === "tool_call" || type === "tool_result") continue;
@@ -352,13 +349,26 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       if (type === "status_update") continue;
       if (type === "change_summary") continue;
       if (type === "diff") continue;
-      if (event === primaryAssistant) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
-        toolsAttached = true;
+      if (type === "assistant_message") {
+        const assistantEvent = event as Extract<TimelineEvent, { type: "assistant_message" }>;
+        const hasContent = assistantEvent.content.trim().length > 0;
+        const hasOwnProcessDetails = Boolean(
+          assistantEvent.thinking?.trim() ||
+          assistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0)
+        );
+        items.push({
+          type: "event",
+          event,
+          leadingTools: assistantAttached ? [] : tools,
+          leadingSubagents: assistantAttached ? [] : subagents,
+          changedFiles: assistantAttached ? [] : Array.from(changedFiles),
+          trailingStatuses: [],
+          hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
+        });
         assistantAttached = true;
+        toolsAttached = true;
         continue;
       }
-      if (type === "assistant_message") continue;
       if (
         type !== "assistant_message" &&
         type !== "approval_request" &&
@@ -373,17 +383,13 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         continue;
       }
       if (type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses: [] });
         toolsAttached = true;
         assistantAttached = true;
         continue;
       }
       if (!toolsAttached) {
-        if (primaryAssistant && !assistantAttached) {
-          items.push({ type: "event", event: primaryAssistant, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
-          assistantAttached = true;
-          toolsAttached = true;
-        } else if (tools.length > 0) {
+        if (tools.length > 0) {
           pushStandaloneTools(tools);
           toolsAttached = true;
         }
@@ -407,11 +413,6 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       items.push({ type: "event", event });
     }
 
-    if (primaryAssistant && !assistantAttached) {
-      items.push({ type: "event", event: primaryAssistant, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses });
-      toolsAttached = true;
-      assistantAttached = true;
-    }
     if (!toolsAttached) pushStandaloneTools(tools);
     if (mergedChangeSummary && !changeSummaryAttached) {
       items.push({ type: "event", event: mergedChangeSummary });
@@ -428,9 +429,11 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     if (planPath && !planPreviewAttached) {
       items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
     }
+    if (turnSettled) {
+      statusEvents.forEach((event) => items.push({ type: "event", event }));
+    }
     if (!assistantAttached) {
       subagents.forEach((event) => items.push({ type: "event", event }));
-      statusEvents.forEach((event) => items.push({ type: "event", event }));
     }
   };
 
@@ -665,7 +668,7 @@ export function ChatThread() {
                 ? <PlanPreviewCard key={item.id} path={item.path} projectPath={item.projectPath} />
                 : item.type === "change_group"
                   ? <ChangeCard key={item.id} changes={item.changes} />
-                : <EventRenderer key={item.event.id} event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} />
+                : <EventRenderer key={item.event.id} event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} />
           ))}
         </div>
       </div>

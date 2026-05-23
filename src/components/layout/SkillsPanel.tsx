@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, LayoutGrid, Plus, Upload, X } from "lucide-react";
+import { Check, LayoutGrid, Plus, Sparkles, Upload, X } from "lucide-react";
 
 type SkillInfo = {
   name: string;
@@ -9,6 +9,19 @@ type SkillInfo = {
   enabled: boolean;
 };
 
+type SuperpowersDiagnostics = {
+  enabled: boolean;
+  agentFile?: string;
+  skillsDir?: string;
+  enabledNames?: string[];
+  superpowerSkills?: string[];
+  agentFileExists?: boolean;
+  skillsDirExists?: boolean;
+  legacyAgentFileExists?: boolean;
+  usingSkillPath?: string;
+  diagnostics?: string[];
+};
+
 export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [enabledNames, setEnabledNames] = useState<string[]>([]);
@@ -16,7 +29,24 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
   const [message, setMessage] = useState("正在扫描本地 Skills...");
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [installingSuperpowers, setInstallingSuperpowers] = useState(false);
+  const [checkingSuperpowers, setCheckingSuperpowers] = useState(false);
+  const [superpowersDiagnostics, setSuperpowersDiagnostics] = useState<SuperpowersDiagnostics | null>(null);
   const [dragActive, setDragActive] = useState(false);
+
+  const refreshSuperpowersDiagnostics = async () => {
+    setCheckingSuperpowers(true);
+    const res = await window.api.getSuperpowersBootstrap();
+    setCheckingSuperpowers(false);
+    if (!res.success) {
+      setSuperpowersDiagnostics({
+        enabled: false,
+        diagnostics: [`诊断失败：${res.error}`],
+      });
+      return;
+    }
+    setSuperpowersDiagnostics(res.data);
+  };
 
   const refreshSkills = async (nextMessage?: string) => {
     setMessage("正在扫描本地 Skills...");
@@ -29,6 +59,7 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
     setEnabledNames(res.data.enabledNames);
     setEnabledDir(res.data.enabledDir);
     setMessage(nextMessage ?? (res.data.skills.length > 0 ? `已发现 ${res.data.skills.length} 个本地 Skill` : "未发现本地 Skill"));
+    void refreshSuperpowersDiagnostics();
   };
 
   useEffect(() => {
@@ -45,6 +76,7 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
       setEnabledNames(res.data.enabledNames);
       setEnabledDir(res.data.enabledDir);
       setMessage(res.data.skills.length > 0 ? `已发现 ${res.data.skills.length} 个本地 Skill` : "未发现本地 Skill");
+      void refreshSuperpowersDiagnostics();
     });
     return () => {
       cancelled = true;
@@ -66,6 +98,7 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
     setEnabledNames(res.data.enabledNames);
     setEnabledDir(res.data.enabledDir);
     setMessage(`已启用 ${res.data.enabledNames.length} 个 Skill。新会话将通过 --skills-dir 使用这些 Skill。`);
+    void refreshSuperpowersDiagnostics();
   };
 
   const importArchive = async (archivePath?: string) => {
@@ -82,6 +115,22 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
     const importedNames = res.data.imported.map((skill) => skill.name);
     setMessage(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : "已取消导入");
     void refreshSkills(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : undefined);
+  };
+
+  const installSuperpowers = async () => {
+    setInstallingSuperpowers(true);
+    setMessage("正在安装 Superpowers...");
+    const res = await window.api.installSuperpowers();
+    setInstallingSuperpowers(false);
+    if (!res.success) {
+      setMessage(`安装失败：${res.error}`);
+      return;
+    }
+    setSkills(res.data.skills);
+    setEnabledNames(res.data.enabledNames);
+    setEnabledDir(res.data.enabledDir);
+    setMessage(`已安装 Superpowers：${res.data.installed.length} 个 Skill 已写入本地并启用核心 bootstrap。`);
+    void refreshSuperpowersDiagnostics();
   };
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -138,6 +187,16 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
           <div className="flex items-center" style={{ gap: 8 }}>
             <button
               type="button"
+              onClick={() => void installSuperpowers()}
+              disabled={installingSuperpowers}
+              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+              title="安装 Superpowers"
+            >
+              <Sparkles size={15} />
+              <span>{installingSuperpowers ? "安装中" : "Superpowers"}</span>
+            </button>
+            <button
+              type="button"
               onClick={() => void importArchive()}
               disabled={importing}
               className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
@@ -158,6 +217,40 @@ export function SkillsPanel({ open, onClose }: { open: boolean; onClose: () => v
           <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ marginTop: 14, padding: "14px 16px" }}>
             <div>{message}{saving ? "，正在保存..." : ""}</div>
             {enabledDir && <div className="mt-1 truncate" title={enabledDir}>启用目录：{enabledDir}</div>}
+          </div>
+          <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ marginTop: 14, padding: "14px 16px" }}>
+            <div className="flex items-start justify-between" style={{ gap: 12 }}>
+              <div className="min-w-0">
+                <div className="font-medium text-[var(--kimix-panel-text)]">
+                  Superpowers：{superpowersDiagnostics?.enabled ? "已接入" : "未接入"}
+                </div>
+                <div className="mt-1 text-[var(--kimix-panel-text-secondary)]">
+                  {superpowersDiagnostics?.enabled
+                    ? `已启用 ${superpowersDiagnostics.superpowerSkills?.length ?? 0} 个 Superpowers Skill`
+                    : "需要安装并启用 using-superpowers 后，新会话才会注入 agent-file。"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void refreshSuperpowersDiagnostics()}
+                disabled={checkingSuperpowers}
+                className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:cursor-wait disabled:opacity-50"
+              >
+                <Sparkles size={14} />
+                <span>{checkingSuperpowers ? "检查中" : "诊断"}</span>
+              </button>
+            </div>
+            {superpowersDiagnostics && (
+              <div className="mt-3 flex flex-col text-[12.5px] text-[var(--kimix-panel-text-muted)]" style={{ gap: 6 }}>
+                {superpowersDiagnostics.skillsDir && <div className="truncate" title={superpowersDiagnostics.skillsDir}>skills-dir：{superpowersDiagnostics.skillsDir}{superpowersDiagnostics.skillsDirExists === false ? "（不存在）" : ""}</div>}
+                {superpowersDiagnostics.agentFile && <div className="truncate" title={superpowersDiagnostics.agentFile}>agent-file：{superpowersDiagnostics.agentFile}{superpowersDiagnostics.agentFileExists === false ? "（未生成）" : ""}</div>}
+                {superpowersDiagnostics.usingSkillPath && <div className="truncate" title={superpowersDiagnostics.usingSkillPath}>using-superpowers：{superpowersDiagnostics.usingSkillPath}</div>}
+                {superpowersDiagnostics.legacyAgentFileExists && <div className="text-[#9b4b34]">检测到旧 superpowers-agent.md 残留，当前版本会改用 superpowers-agent.yaml。</div>}
+                {(superpowersDiagnostics.diagnostics ?? []).map((line) => (
+                  <div key={line} className="truncate" title={line}>{line}</div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex flex-col" style={{ gap: 12, marginTop: 16 }}>
             {skills.map((skill) => (

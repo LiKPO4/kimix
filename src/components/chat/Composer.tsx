@@ -126,8 +126,6 @@ export function Composer() {
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
   const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const setDefaultAfkMode = useAppStore((s) => s.setDefaultAfkMode);
-  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
-  const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const hiddenComposerCards = useAppStore((s) => s.hiddenComposerCards);
   const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
@@ -183,6 +181,24 @@ export function Composer() {
   useEffect(() => {
     if (focusInputTrigger > 0) inputRef.current?.focus();
   }, [focusInputTrigger]);
+
+  useEffect(() => {
+    const handleAddDrawingImage = (event: Event) => {
+      const detail = (event as CustomEvent<{ name?: string; dataUrl?: string }>).detail;
+      if (!detail?.dataUrl?.startsWith("data:image/")) return;
+      setImageAttachments((prev) => [
+        ...prev,
+        {
+          id: genId(),
+          name: detail.name?.trim() || "画板图片.png",
+          dataUrl: detail.dataUrl,
+        },
+      ]);
+      inputRef.current?.focus();
+    };
+    window.addEventListener("kimix:addDrawingImage", handleAddDrawingImage);
+    return () => window.removeEventListener("kimix:addDrawingImage", handleAddDrawingImage);
+  }, []);
 
   useEffect(() => {
     if (!currentSession) {
@@ -729,20 +745,6 @@ export function Composer() {
     }));
   };
 
-  const handleAddWorkDir = () => {
-    setAdditionalWorkDirs([...additionalWorkDirs, ""]);
-  };
-
-  const handleChangeWorkDir = (index: number, value: string) => {
-    const next = [...additionalWorkDirs];
-    next[index] = value;
-    setAdditionalWorkDirs(next);
-  };
-
-  const handleRemoveWorkDir = (index: number) => {
-    setAdditionalWorkDirs(additionalWorkDirs.filter((_, itemIndex) => itemIndex !== index));
-  };
-
   const handleDragOver = (e: React.DragEvent) => {
     if (!hasDraggedFiles(e)) return;
     e.preventDefault();
@@ -883,7 +885,7 @@ export function Composer() {
     : isCurrentSessionHandoff
       ? "正在生成交接内容..."
       : "请先选择项目";
-  const composerCardSessionId = currentSession?.id ?? "__global__";
+  const composerCardSessionId = activeSession?.id ?? "__global__";
   const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
   const todoHidden = hiddenCards.includes("todo");
   const pendingHidden = hiddenCards.includes("pending");
@@ -900,9 +902,9 @@ export function Composer() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {currentSession && !todoHidden && (
+      {activeSession && !todoHidden && (
         <TodoPanel
-          events={currentSession.events}
+          events={activeSession.events}
           onDismiss={() => hideComposerCard("todo", "TodoList")}
         />
       )}
@@ -1220,48 +1222,6 @@ export function Composer() {
                       </div>
                     </section>
 
-                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
-                      <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 10 }}>
-                        <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
-                          <TerminalSquare size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-                          <span>额外工作目录</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddWorkDir}
-                          className="kimix-icon-text-button is-compact shrink-0 text-[#625d55] hover:bg-[var(--kimix-panel-hover)]"
-                        >
-                          <Plus size={13} />
-                          添加
-                        </button>
-                      </div>
-                      <div className="flex flex-col" style={{ gap: 8 }}>
-                        {additionalWorkDirs.length === 0 ? (
-                          <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "10px 11px" }}>
-                            暂无额外目录。添加后会通过 Kimi CLI --add-dir 纳入工作区范围。
-                          </div>
-                        ) : additionalWorkDirs.map((dir, index) => (
-                          <div key={`${index}-${dir}`} className="flex items-center" style={{ gap: 8 }}>
-                            <input
-                              type="text"
-                              value={dir}
-                              onChange={(event) => handleChangeWorkDir(index, event.target.value)}
-                              placeholder="例如 D:\\Projects\\shared-lib"
-                              className="kimix-settings-input h-9 min-w-0 flex-1 rounded-lg px-3 text-[13px] outline-none transition-colors"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveWorkDir(index)}
-                              className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8b3d34]"
-                              title="删除目录"
-                              aria-label="删除目录"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
                   </div>
                 </div>
               )}

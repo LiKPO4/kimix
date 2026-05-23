@@ -218,6 +218,7 @@ export async function startSession(options: {
   planMode?: boolean;
   afkMode?: boolean;
   skillsDir?: string;
+  agentFile?: string;
   additionalWorkDirs?: string[];
 }): Promise<{ sessionId: string; workDir: string; slashCommands: SlashCommandInfo[] }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
@@ -256,6 +257,7 @@ export async function startSession(options: {
     yoloMode: options.yoloMode ?? false,
     executable: "kimi",
     env: Object.keys(env).length > 0 ? env : {},
+    agentFile: options.agentFile,
     skillsDir: options.skillsDir,
   });
 

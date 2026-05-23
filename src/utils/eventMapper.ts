@@ -15,6 +15,8 @@ function isNumber(v: unknown): v is number {
 const LATEST_TOOL_CALL = "__kimix_latest_tool_call__";
 const CLARIFICATION_ORIGINAL_MARKER = "\n\n用户原始需求：\n";
 const LONG_TASK_ORIGINAL_MARKER = "\n\n用户初始需求：\n";
+const SUPERPOWERS_BOOTSTRAP_MARKER = "\n\n【用户当前消息】\n";
+const SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER = "\n\n用户当前消息：\n";
 
 type ExtractedUserMessage = {
   content: string;
@@ -66,6 +68,19 @@ function extractUserInput(input: unknown): string {
 }
 
 function stripKimixClarificationInstruction(content: string): string {
+  if (content.startsWith("【Kimix 隐藏 Superpowers Bootstrap】")) {
+    const marker = content.includes(SUPERPOWERS_BOOTSTRAP_MARKER)
+      ? SUPERPOWERS_BOOTSTRAP_MARKER
+      : SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER;
+    const markerIndex = content.indexOf(marker);
+    if (markerIndex === -1) return "";
+    return stripKimixClarificationInstruction(content.slice(markerIndex + marker.length));
+  }
+  if (content.startsWith("<!-- kimix-superpowers-bootstrap -->")) {
+    const markerIndex = content.indexOf(SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER);
+    if (markerIndex === -1) return "";
+    return stripKimixClarificationInstruction(content.slice(markerIndex + SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER.length));
+  }
   if (content.startsWith("【Kimix 长程任务：")) {
     const markerIndex = content.indexOf(LONG_TASK_ORIGINAL_MARKER);
     if (markerIndex === -1) return "";
@@ -481,14 +496,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const eventsAfterOpenAssistant = existing.slice(lastIndex + 1);
       const hasQuestionBoundary = eventsAfterOpenAssistant.some((event) => event.type === "question_request");
       if (hasQuestionBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
-        const result = [...existing];
-        result[lastIndex] = {
-          ...last,
-          isThinking: false,
-          isComplete: true,
-          durationMs: last.durationMs ?? Math.max(0, incoming.timestamp - last.timestamp),
-        };
-        return [...result, incoming];
+        return [...existing, incoming];
       }
       const shouldBreakParagraph = !last.content.trim() &&
         eventsAfterOpenAssistant.some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
@@ -568,8 +576,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         ...incoming,
         id: current.id,
         timestamp: current.timestamp,
-        status: current.status,
-        answers: current.answers,
+        status: incoming.status ?? current.status,
+        answers: incoming.answers ?? current.answers,
       };
       return result;
     }
