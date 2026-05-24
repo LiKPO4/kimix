@@ -1,10 +1,10 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-v2.8.38 待验收：卡在需求澄清等待用户回复时发送桌面通知。
+v2.8.56 待验收：隐藏规则创建 agent 内部会话，避免 prompt/JSON 暴露到侧栏和主对话。
 
 ## 当前版本
-**v2.8.38** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.56** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## Kimi 特有能力路线图
 ### 执行顺序
@@ -1260,3 +1260,42 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 版本号三处同步到 v2.8.38。
 ## 下一步
 等待 v2.8.38 实例验收；触发一次需求澄清，确认窗口不在前台时会提示用户回复。
+
+# 2026-05-23 插件与 Hooks 右侧界面
+## 已完成
+- 左侧“技能”入口改为“插件”，点击后切换到主工作区右侧页面，不再使用居中弹窗。
+- 左侧在“插件”和“长程任务”之间新增 Hooks 入口；误改成“自动化”的文案已恢复为“长程任务”。
+- 插件页复用原 Skills 管理逻辑，保留导入、Superpowers、启用状态和诊断，并把 Skill 卡片改为两列网格提高信息密度。
+- Hooks 页改为真正两列：左侧规则状态、已有规则、模板、最近命中；右侧规则编辑器。
+- 点击新建或模板创建规则时隐藏已有规则，进入“规则创建 Agent + 规则草稿”两列创建态，保存后回到已有规则列表。
+- Hooks 设置接入 `hookRules` / `hookRunLog` 类型、默认设置、主进程保存 schema 和浏览器预览保存返回值，修复保存不生效的问题。
+- 创建规则窗口新增自然语言描述与规则创建提示词；v2.8.40 已从本地启发式生成改为 `hooks:generateRule` 调用临时 Kimi session，由规则创建 Agent 输出 HookRule JSON 草稿。
+- 点击“生成规则草稿”后会进入生成中状态，按钮禁用并显示转圈；生成失败会在规则状态里显示错误，不再瞬间填入假草稿。
+- v2.8.41 补齐 HookRule 的 `timeout` 字段，并要求通知/提示类 hook 也生成可执行 `command`。
+- 对“每轮开始提示当前时间”这类需求增加后端兜底，会生成 `SessionStart + notify + powershell Get-Date` 命令，避免只有名称和说明。
+- v2.8.42 在前端收到 agent 结果后、保存草稿前都再次补全 HookRule；即使后端返回空 command，右侧命令框和保存内容也会填入可执行脚本。
+- v2.8.43 将 settings 中启用的 HookRule 转换为 Kimi SDK `hooks` 注册到新建 session；handler 执行规则 command、写入 hookRunLog，并按 block/exit 2 返回阻断。
+- Hooks 编辑交互调整：保存后关闭右侧编辑窗口，右上角改为“取消”，删除规则按钮移动到保存按钮下方。
+- v2.8.44 将自然语言规则创建的一次性 Kimi session 使用 `kimix-hidden-hooks-` 前缀，并在后端历史列表过滤；前端启动恢复时会清理已泄漏的旧规则创建会话。
+- v2.8.45 修复 `selectedRuleId=null` 后仍通过 `rules[0]` 自动打开编辑器的问题；保存、取消、删除当前规则后会保持右侧为空态。
+- v2.8.46 移除 Hooks/插件工作区顶部 toolbar 的重复小标题，保留页面内主标题。
+- v2.8.46 保存 HookRule 时同步写入官方 `~/.kimi/config.toml` 的 `[[hooks]]` 配置块；用于需要 stdout 注入上下文的 shell hooks。
+- v2.8.47 修复时间注入规则误用 `SessionStart` 的问题：官方“用户提交输入前”事件是 `UserPromptSubmit`，用于每轮注入上下文。
+- v2.8.47 补齐官方 hooks 事件列表：`PreToolUse` / `PostToolUse` / `PostToolUseFailure` / `Notification` / `Stop` / `StopFailure` / `UserPromptSubmit` / `SessionStart` / `SessionEnd` / `SubagentStart` / `SubagentStop` / `PreCompact` / `PostCompact`。
+- v2.8.47 写入 `~/.kimi/config.toml` 前会移除顶层 `hooks = []`，避免和 `[[hooks]]` 数组表冲突；加载设置时也会自动同步一次已有规则。
+- v2.8.48 映射 Kimi `HookTriggered` / `HookResolved` 事件，并在助手消息复制按钮旁显示“钩子 N”提示，悬停可看事件和结果。
+- 版本号三处同步到 v2.8.48。
+- v2.8.49 将 `UserPromptSubmit` 从官方 TOML 同步中剔除，改为 Kimix 在 `sendPrompt` 前执行命令、发送 HookTriggered/HookResolved UI 事件，并把 stdout 作为隐藏上下文拼入本轮用户消息，解决 wire 会话里触发但模型不吃上下文的问题。
+- v2.8.49 复制按钮旁钩子提示只统计 resolved 阶段并去重，避免一个规则显示成“钩子 2”；Hooks 页“新建规则”按钮改为蓝色主按钮。
+- v2.8.50 修复 Windows PowerShell hook stdout 中文乱码：执行 hook command 时读取 buffer，优先 UTF-8，检测到替换字符后退回 GB18030 解码。
+- v2.8.51 依据真实 `wire.jsonl` 排查到 hook 上下文已进入 `TurnBegin.payload.user_input`，但被包在需求澄清工具外层；改为对 `UserPromptSubmit` 只匹配用户原始需求，并把 hook 上下文注入到“用户原始需求”内部，同时强化“必须先读取并遵守”指令。
+- v2.8.51 清理 hook stdout 中的替换字符、控制字符和 Windows emoji 退化出的行首 `??`，减少 tooltip/log 的残留乱码。
+- v2.8.52 根据截图反馈修正：`eventMapper` 剥离需求澄清包装后递归剥离 Hooks 包装，避免 `TurnBegin` 回放把隐藏 Hook 上下文显示成第二条用户气泡。
+- v2.8.52 不再把 Hook 上下文插入“用户原始需求”开头，改为追加到整条 prompt 末尾作为本轮硬性要求，降低被用户原消息/澄清包装覆盖的概率。
+- v2.8.53 思考过程展开后，顶部摘要行保持单行并收紧底部留白，减少截图中展开态上半部分占用空间的问题。
+- v2.8.53 设置入口改为右侧主工作区页面，复用现有 `workspaceView`，设置面板支持 workspace/modal 两种承载；右侧页面下隐藏弹窗关闭按钮。
+- v2.8.54 修复设置页 workspace 模式误用 CSS columns 导致内容横向排到屏幕外的问题；改为两列 CSS grid，`overflow-y: auto`、`overflow-x: hidden`，窄宽度自动单列。
+- v2.8.55 排查到 `settings.json` 已有 `hookRunLog`，但 HooksPanel “最近命中”仍是写死占位；改为读取 `hookRunLog` 并展示规则名、事件、动作、结果、时间和消息摘要。
+- v2.8.56 将内部会话过滤抽为 `isHiddenInternalSession`，覆盖 `kimix-hidden-hooks-`、规则创建 prompt 标题和 HookRule JSON 标题；用于启动恢复、搜索加载、侧栏展示和 store 清理，避免 Hooks 规则创建 agent 会话暴露。
+## 下一步
+等待用户验收 v2.8.56；确认侧栏不再显示规则创建 agent prompt/JSON 会话，主对话也不会打开这些内部会话。

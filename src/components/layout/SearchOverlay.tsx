@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { isHiddenInternalSession } from "@/utils/internalSessions";
 
 type SearchMatch = {
   session: Session;
@@ -57,6 +58,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       if (cancelled || !res.success) return;
       const knownIds = new Set(useSessionStore.getState().sessions.map((session) => session.id));
       for (const item of res.data) {
+        if (isHiddenInternalSession(item)) continue;
         if (knownIds.has(item.id)) continue;
         addSession({
           id: item.id,
@@ -78,6 +80,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     if (!open || !currentProject) return;
     const unloaded = sessions
       .filter((session) => session.projectPath === currentProject.path && session.events.length === 0)
+      .filter((session) => !isHiddenInternalSession(session))
       .slice(0, 12);
     if (unloaded.length === 0) return;
     let cancelled = false;
@@ -86,6 +89,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       const loaded = await window.api.loadSession({ workDir: session.projectPath, sessionId: session.id });
       if (!loaded.success || cancelled) return;
       const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+      if (isHiddenInternalSession({ ...session, events })) return;
       updateSession(session.id, (current) => ({
         ...current,
         events,
@@ -104,6 +108,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const projectSessions = useMemo(() => {
     return sessions
       .filter((session) => !session.archivedAt && (!currentProject || session.projectPath === currentProject.path))
+      .filter((session) => !isHiddenInternalSession(session))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [sessions, currentProject]);
 

@@ -8,6 +8,7 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
+import { HooksPanel } from "./HooksPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
 import {
   ArrowLeft,
@@ -670,11 +671,10 @@ export function AppShell() {
   const currentProject = useAppStore((s) => s.currentProject);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
-  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const searchOpen = useAppStore((s) => s.searchOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
-  const skillsOpen = useAppStore((s) => s.skillsOpen);
-  const setSkillsOpen = useAppStore((s) => s.setSkillsOpen);
+  const workspaceView = useAppStore((s) => s.workspaceView);
+  const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const longTaskInspectorOpen = useAppStore((s) => s.longTaskInspectorOpen);
   const setLongTaskInspectorOpen = useAppStore((s) => s.setLongTaskInspectorOpen);
   const diffPanelOpen = useAppStore((s) => s.diffPanelOpen);
@@ -1125,7 +1125,7 @@ export function AppShell() {
     if (action === "close-chat") setCurrentSession(null);
     if (action === "new-chat" || action === "quick-chat") void createSessionForProject();
     if (action === "open-project") void handleOpenProject();
-    if (action === "settings") setSettingsOpen(true);
+    if (action === "settings") setWorkspaceView("settings");
     if (action === "about") setHelpDialog("about");
     if (action === "exit") void window.api.closeWindow();
     if (action === "undo") sendDocumentCommand("undo");
@@ -1164,7 +1164,7 @@ export function AppShell() {
     }
     if (action === "whats-new") setHelpDialog("updates");
     if (action === "keyboard-shortcuts") setHelpDialog("shortcuts");
-    if (action === "skills") setSkillsOpen(true);
+    if (action === "skills") setWorkspaceView("plugins");
     if (["automations", "local-environments", "worktrees", "mcp", "troubleshooting", "performance-trace", "logout", "toggle-file-tree", "open-browser-tab", "new-window"].includes(action)) {
       openInfoTopic(action);
     }
@@ -1695,6 +1695,11 @@ export function AppShell() {
     if (res.success) setLaunchCommandDialogOpen(false);
   };
   const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && kimiOnboarding.available === false;
+  const pluginWorkspaceActive = workspaceView === "plugins";
+  const hooksWorkspaceActive = workspaceView === "hooks";
+  const settingsWorkspaceActive = workspaceView === "settings";
+  const chatWorkspaceActive = workspaceView === "chat";
+  const workspaceTitle = sessionTitle;
 
   return (
     <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
@@ -1789,10 +1794,12 @@ export function AppShell() {
         <main className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
           <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 12 }}>
             <div className="flex min-w-0 items-center gap-2.5">
-              <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
-                {sessionTitle}
-              </div>
-              <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+              {chatWorkspaceActive && (
+                <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
+                  {workspaceTitle}
+                </div>
+              )}
+              {chatWorkspaceActive && <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => setSessionMenuOpen((open) => !open)}
                   className={`kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg ${sessionMenuOpen ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : ""}`}
@@ -1827,10 +1834,10 @@ export function AppShell() {
                     ))}
                   </div>
                 )}
-              </div>
+              </div>}
             </div>
 
-            <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
+            {chatWorkspaceActive ? <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
               {longTaskMeta ? (
                 <button
                   type="button"
@@ -2020,21 +2027,39 @@ export function AppShell() {
               >
                 <PanelRight size={15} />
               </button>
-            </div>
+            </div> : <div className="flex shrink-0 items-center" style={{ gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setWorkspaceView("chat")}
+                className="kimix-icon-text-button kimix-muted-action is-compact"
+              >
+                返回对话
+              </button>
+            </div>}
           </div>
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <ChatThread />
-          </div>
-          <div className="kimix-app-shell-footer kimix-content-x shrink-0" style={{ paddingTop: 10, paddingBottom: 10 }}>
-            <div className="kimix-chat-column">
-              <Composer />
-              <div style={{ marginTop: 10 }}>
-                <ContextBar />
+          {pluginWorkspaceActive ? (
+            <SkillsPanel open />
+          ) : hooksWorkspaceActive ? (
+            <HooksPanel />
+          ) : settingsWorkspaceActive ? (
+            <SettingsPanel variant="workspace" />
+          ) : (
+            <>
+              <div className="relative min-h-0 flex-1 overflow-hidden">
+                <ChatThread />
               </div>
-            </div>
-          </div>
+              <div className="kimix-app-shell-footer kimix-content-x shrink-0" style={{ paddingTop: 10, paddingBottom: 10 }}>
+                <div className="kimix-chat-column">
+                  <Composer />
+                  <div style={{ marginTop: 10 }}>
+                    <ContextBar />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </main>
-        {(longTaskInspectorOpen || diffPanelOpen) && (
+        {chatWorkspaceActive && (longTaskInspectorOpen || diffPanelOpen) && (
           <div
             role="separator"
             aria-orientation="vertical"
@@ -2043,7 +2068,7 @@ export function AppShell() {
             onPointerDown={startRightPanelResize}
           />
         )}
-        {longTaskInspectorOpen && (
+        {chatWorkspaceActive && longTaskInspectorOpen && (
           <aside style={{ width: rightPanelWidth }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#dbeafa]" style={{ paddingLeft: 18, paddingRight: 14 }}>
               <div className="min-w-0">
@@ -2584,7 +2609,7 @@ export function AppShell() {
             </div>
           </aside>
         )}
-        {diffPanelOpen && (
+        {chatWorkspaceActive && diffPanelOpen && (
           <aside style={{ width: rightPanelWidth }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ paddingLeft: 18, paddingRight: 14 }}>
               <div className="min-w-0">
@@ -2647,9 +2672,7 @@ export function AppShell() {
         )}
       </div>
 
-      <SettingsPanel />
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <SkillsPanel open={skillsOpen} onClose={() => setSkillsOpen(false)} />
       <LongTasksPanel />
       {showKimiOnboarding && (
         <div className="kimix-onboarding-overlay fixed inset-0 z-[118] flex items-center justify-center backdrop-blur-sm" style={{ padding: 24 }}>
@@ -2727,7 +2750,7 @@ export function AppShell() {
                   type="button"
                   onClick={() => {
                     setKimiOnboardingDismissed(true);
-                    setSettingsOpen(true);
+                    setWorkspaceView("settings");
                   }}
                   className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]"
                   style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, WorkspaceView } from "@/types/ui";
 
 interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
@@ -24,6 +24,7 @@ interface AppStore extends AppState {
   setDiffPanelOpen: (open: boolean) => void;
   setComposerCardHidden: (sessionId: string, card: ComposerDockCard, hidden: boolean) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
+  setWorkspaceView: (view: WorkspaceView) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   settingsOpen: boolean;
@@ -34,8 +35,6 @@ interface AppStore extends AppState {
   setSearchQuery: (q: string) => void;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
-  skillsOpen: boolean;
-  setSkillsOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -61,13 +60,13 @@ export const useAppStore = create<AppStore>((set) => ({
   diffPanelOpen: false,
   hiddenComposerCards: {},
   handoffSessionId: null,
+  workspaceView: "chat",
   sidebarOpen: true,
   theme: "light",
   settingsOpen: false,
   focusInputTrigger: 0,
   searchQuery: "",
   searchOpen: false,
-  skillsOpen: false,
 
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
@@ -102,11 +101,11 @@ export const useAppStore = create<AppStore>((set) => ({
     };
   }),
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
+  setWorkspaceView: (view) => set({ workspaceView: view }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchOpen: (open) => set({ searchOpen: open }),
-  setSkillsOpen: (open) => set({ skillsOpen: open }),
   setTheme: (theme) => set({ theme }),
 }));

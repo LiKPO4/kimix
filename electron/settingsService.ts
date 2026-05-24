@@ -29,6 +29,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoShowGitStatus: true,
   enabledSkillNames: [],
   additionalWorkDirs: [],
+  hookRules: [],
+  hookRunLog: [],
 };
 
 function ensureDir() {
@@ -53,7 +55,11 @@ export function loadSettings(): AppSettings {
       (rawSettings.clarificationToolEnabled === true ? "on" :
         rawSettings.clarificationToolEnabled === false ? "off" :
           DEFAULT_SETTINGS.clarificationToolMode);
-    return { ...DEFAULT_SETTINGS, ...rawSettings, clarificationToolMode };
+    const settings = { ...DEFAULT_SETTINGS, ...rawSettings, clarificationToolMode };
+    if ((settings.hookRules ?? []).length > 0) {
+      try { syncKimiHookConfig(settings.hookRules ?? []); } catch {}
+    }
+    return settings;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -64,11 +70,59 @@ export function saveSettings(settings: Partial<AppSettings>): void {
   try {
     const current = loadSettings();
     const merged = { ...current, ...settings };
+    if (merged.hookRules) {
+      merged.hookRules = merged.hookRules.map(normalizeHookRule);
+    }
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), "utf-8");
+    if (settings.hookRules) syncKimiHookConfig(merged.hookRules ?? []);
   } catch (err) {
     console.error("Failed to save settings:", err);
     throw err;
   }
+}
+
+function escapeTomlString(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function hookRuleToToml(rule: NonNullable<AppSettings["hookRules"]>[number]) {
+  rule = normalizeHookRule(rule);
+  const command = rule.command?.trim();
+  if (rule.event === "UserPromptSubmit") return null;
+  if (!rule.enabled || !command) return null;
+  return [
+    "[[hooks]]",
+    `event = "${escapeTomlString(rule.event)}"`,
+    `matcher = "${escapeTomlString(rule.matcher.trim() || ".*")}"`,
+    `command = "${escapeTomlString(command)}"`,
+    `timeout = ${Math.max(1, Math.min(600, rule.timeout ?? 30))}`,
+  ].join("\n");
+}
+
+function normalizeHookRule(rule: NonNullable<AppSettings["hookRules"]>[number]) {
+  const text = `${rule.name} ${rule.reason ?? ""} ${rule.command ?? ""}`.toLowerCase();
+  if (/时间|日期|current\s*time|date|clock/.test(text) && rule.event === "SessionStart") {
+    return { ...rule, event: "UserPromptSubmit" as const };
+  }
+  return rule;
+}
+
+function syncKimiHookConfig(rules: NonNullable<AppSettings["hookRules"]>) {
+  const configPath = path.join(os.homedir(), ".kimi", "config.toml");
+  const begin = "# >>> Kimix managed hooks >>>";
+  const end = "# <<< Kimix managed hooks <<<";
+  const body = rules.map(hookRuleToToml).filter(Boolean).join("\n\n");
+  const block = `${begin}\n${body}\n${end}`;
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  const current = (fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "")
+    .replace(/^\s*hooks\s*=\s*\[\]\s*\r?\n?/m, "");
+  const escapedBegin = begin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedEnd = end.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`${escapedBegin}[\\s\\S]*?${escapedEnd}`);
+  const next = pattern.test(current)
+    ? current.replace(pattern, block)
+    : `${current.trimEnd()}${current.trim() ? "\n\n" : ""}${block}\n`;
+  fs.writeFileSync(configPath, next, "utf-8");
 }
 
 export function getDefaultWorkDir(): string {

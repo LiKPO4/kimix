@@ -4,6 +4,7 @@ export type PermissionMode = "manual" | "approve_for_session" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending";
+export type WorkspaceView = "chat" | "plugins" | "hooks" | "settings";
 
 export interface AppState {
   currentProject: Project | null;
@@ -28,6 +29,7 @@ export interface AppState {
   diffPanelOpen: boolean;
   hiddenComposerCards: Record<string, ComposerDockCard[]>;
   handoffSessionId: string | null;
+  workspaceView: WorkspaceView;
   sidebarOpen: boolean;
   theme: Theme;
 }
@@ -82,6 +84,7 @@ export type TimelineEvent =
   | ChangeSummaryEvent
   | SessionRecommendationEvent
   | SubagentEvent
+  | HookEvent
   | CompactionEvent
   | ErrorEvent
   | DiffEvent
@@ -149,6 +152,19 @@ export interface ToolResultEvent {
   toolName: string;
   result: unknown;
   display?: ToolDisplay;
+}
+
+export interface HookEvent {
+  id: string;
+  type: "hook";
+  timestamp: number;
+  phase: "triggered" | "resolved";
+  eventName: string;
+  target: string;
+  action?: "allow" | "block";
+  reason?: string;
+  hookCount?: number;
+  durationMs?: number;
 }
 
 export interface ToolDisplay {

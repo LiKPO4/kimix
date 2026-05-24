@@ -17,6 +17,7 @@ const CLARIFICATION_ORIGINAL_MARKER = "\n\n用户原始需求：\n";
 const LONG_TASK_ORIGINAL_MARKER = "\n\n用户初始需求：\n";
 const SUPERPOWERS_BOOTSTRAP_MARKER = "\n\n【用户当前消息】\n";
 const SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER = "\n\n用户当前消息：\n";
+const HOOK_CONTEXT_MARKER = "\n\n【用户当前消息】\n";
 
 type ExtractedUserMessage = {
   content: string;
@@ -68,6 +69,15 @@ function extractUserInput(input: unknown): string {
 }
 
 function stripKimixClarificationInstruction(content: string): string {
+  if (content.startsWith("【Kimix Hooks 上下文】")) {
+    const markerIndex = content.indexOf(HOOK_CONTEXT_MARKER);
+    if (markerIndex === -1) return "";
+    return stripKimixClarificationInstruction(content.slice(markerIndex + HOOK_CONTEXT_MARKER.length));
+  }
+  const trailingHookIndex = content.indexOf("\n\n【Kimix Hooks 上下文】");
+  if (trailingHookIndex !== -1) {
+    return stripKimixClarificationInstruction(content.slice(0, trailingHookIndex).trimEnd());
+  }
   if (content.startsWith("【Kimix 隐藏 Superpowers Bootstrap】")) {
     const marker = content.includes(SUPERPOWERS_BOOTSTRAP_MARKER)
       ? SUPERPOWERS_BOOTSTRAP_MARKER
@@ -89,7 +99,7 @@ function stripKimixClarificationInstruction(content: string): string {
   if (!content.startsWith("【Kimix 需求澄清工具：")) return content;
   const markerIndex = content.indexOf(CLARIFICATION_ORIGINAL_MARKER);
   if (markerIndex === -1) return content;
-  return content.slice(markerIndex + CLARIFICATION_ORIGINAL_MARKER.length);
+  return stripKimixClarificationInstruction(content.slice(markerIndex + CLARIFICATION_ORIGINAL_MARKER.length));
 }
 
 function extractUserMessage(input: unknown): ExtractedUserMessage {
@@ -369,6 +379,32 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         files: mappedFiles,
         additions: mappedFiles.reduce((sum, file) => sum + (file.additions ?? 0), 0),
         deletions: mappedFiles.reduce((sum, file) => sum + (file.deletions ?? 0), 0),
+      };
+    }
+
+    case "HookTriggered": {
+      return {
+        id: generateId(),
+        type: "hook",
+        timestamp: eventTimestamp,
+        phase: "triggered",
+        eventName: isString(payload.event) ? payload.event : "Hook",
+        target: isString(payload.target) ? payload.target : "",
+        hookCount: isNumber(payload.hook_count) ? payload.hook_count : undefined,
+      };
+    }
+
+    case "HookResolved": {
+      return {
+        id: generateId(),
+        type: "hook",
+        timestamp: eventTimestamp,
+        phase: "resolved",
+        eventName: isString(payload.event) ? payload.event : "Hook",
+        target: isString(payload.target) ? payload.target : "",
+        action: payload.action === "block" ? "block" : "allow",
+        reason: isString(payload.reason) ? payload.reason : "",
+        durationMs: isNumber(payload.duration_ms) ? payload.duration_ms : undefined,
       };
     }
 

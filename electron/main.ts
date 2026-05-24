@@ -39,6 +39,9 @@ const SUPERPOWERS_SKILL_NAMES = [
   "writing-skills",
 ];
 
+const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
+const HOOK_ACTIONS = ["allow", "block", "notify", "run_command"] as const;
+
 function prependProcessPath(dir: string) {
   if (!dir) return;
   const delimiter = process.platform === "win32" ? ";" : ":";
@@ -2249,6 +2252,129 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
   }
 });
 
+const GeneratedHookRuleSchema = z.object({
+  name: z.string().min(1).max(80),
+  event: z.enum(HOOK_EVENTS),
+  matcher: z.string().min(1).max(500),
+  action: z.enum(HOOK_ACTIONS),
+  command: z.string().max(300).optional(),
+  reason: z.string().max(500).optional(),
+  timeout: z.number().int().min(1).max(600).optional(),
+  enabled: z.boolean().optional(),
+  scope: z.enum(["global", "project"]).optional(),
+});
+
+function extractJsonObject(text: string): unknown {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const source = (fenced?.[1] ?? text).trim();
+  try {
+    return JSON.parse(source);
+  } catch {
+    const start = source.indexOf("{");
+    const end = source.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(source.slice(start, end + 1));
+    }
+    throw new Error("规则创建 Agent 未返回 JSON 对象");
+  }
+}
+
+function buildHookRulePrompt(description: string) {
+  return `你是 Kimix Hooks 规则创建 agent。请把用户的自然语言需求转换为一条可保存的 HookRule JSON。
+
+只允许输出一个 JSON 对象，不要 Markdown，不要解释。
+
+字段要求：
+- name: 简短中文名称，最多 20 个汉字。
+- event: 只能是 PreToolUse / PostToolUse / PostToolUseFailure / Notification / Stop / StopFailure / UserPromptSubmit / SessionStart / SessionEnd / SubagentStart / SubagentStop / PreCompact / PostCompact。
+- matcher: 简短正则或关键词，用来匹配工具名、命令、文件路径、事件摘要或会话状态；SessionStart/SubagentStart 通常用 ".*"。
+- action: 只能是 allow / block / notify / run_command。
+- command: 必须尽量填写真正可执行的一行 hook 脚本；Kimi hooks 会执行 command，并把 hook 事件 JSON 传入 stdin，stdout 会补充给 agent 上下文，退出码 2 表示阻断。
+- reason: 面向用户展示的阻断、通知或执行说明，必须具体写清楚触发后做什么。
+- timeout: 秒数，通知/提示 30，构建/测试 120。
+- enabled: true。
+- scope: global 或 project。
+
+选择规则：
+- 危险命令、删除、强推、重置：PreToolUse + block，command 要检查 stdin 中的命令并在命中时输出风险说明后 exit 2。
+- 任务结束后构建、测试、lint：Stop + run_command，command 填用户要求的真实命令。
+- 失败、等待用户、需要提醒：StopFailure + notify，command 要输出提醒文本。
+- 每轮用户输入前、每次注入上下文、提示当前时间：UserPromptSubmit + notify，command 要输出要注入上下文的文本。
+- 会话创建时一次性提示：SessionStart + notify。
+- 子 agent 启动时提示：SubagentStart + notify。
+- 如果用户说“每轮开始前/每轮开始时提示当前时间给 agent”，必须生成能输出当前时间的 command：
+  powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
+
+用户需求：
+${description}`;
+}
+
+function completeGeneratedHookRule(rule: z.infer<typeof GeneratedHookRuleSchema>, description: string) {
+  const text = description.toLowerCase();
+  const next = { ...rule };
+  if (!next.timeout) {
+    next.timeout = next.action === "run_command" ? 120 : 30;
+  }
+  if (/时间|current\s*time|date|clock/.test(text) && !next.command?.trim()) {
+    next.event = "UserPromptSubmit";
+    next.action = "notify";
+    next.matcher = next.matcher?.trim() || ".*";
+    next.command = `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
+    next.reason = next.reason?.trim() || "每轮开始时把当前时间写入 hook 输出，提示给 agent。";
+  }
+  if (next.action === "notify" && !next.command?.trim()) {
+    const message = (next.reason || description).replace(/"/g, "'");
+    next.command = `powershell -NoProfile -Command "Write-Output '${message}'"`;
+  }
+  if (next.action === "block" && !next.command?.trim()) {
+    const message = (next.reason || "该操作被 Hook 规则阻断。").replace(/"/g, "'");
+    next.command = `powershell -NoProfile -Command "Write-Error '${message}'; exit 2"`;
+  }
+  return next;
+}
+
+ipcMain.handle("hooks:generateRule", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const description = typeof req.description === "string" ? req.description.trim() : "";
+    const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
+    if (!description) return { success: false, error: "请先输入自然语言描述" };
+    const workDir = projectPath && fs.existsSync(projectPath) ? projectPath : app.getPath("home");
+    const output = await kimiBridge.runOneShotPrompt({
+      workDir,
+      sessionId: `kimix-hidden-hooks-${randomUUID()}`,
+      content: buildHookRulePrompt(description),
+      thinking: true,
+      yoloMode: false,
+      timeoutMs: 120000,
+    });
+    const parsed = GeneratedHookRuleSchema.safeParse(extractJsonObject(output));
+    if (!parsed.success) {
+      return { success: false, error: "规则创建 Agent 返回的 JSON 不符合 HookRule 格式" };
+    }
+    const completed = completeGeneratedHookRule(parsed.data, description);
+    const now = Date.now();
+    const rule = {
+      id: randomUUID(),
+      name: completed.name.trim(),
+      event: completed.event,
+      matcher: completed.matcher.trim() || ".*",
+      action: completed.action,
+      command: completed.command?.trim() ?? "",
+      reason: completed.reason?.trim() || description,
+      timeout: completed.timeout,
+      enabled: completed.enabled ?? true,
+      scope: completed.scope ?? "global",
+      projectPath: completed.scope === "project" ? projectPath : undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return { success: true, data: rule };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 // Kimi IPC handlers
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
@@ -2643,6 +2769,31 @@ const SettingsSchema = z.object({
   additionalWorkDirs: z.array(z.string()).optional(),
   autoReadAgentsMd: z.boolean().optional(),
   autoShowGitStatus: z.boolean().optional(),
+  hookRules: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    event: z.enum(HOOK_EVENTS),
+    matcher: z.string(),
+    action: z.enum(["allow", "block", "notify", "run_command"]),
+    command: z.string().optional(),
+    reason: z.string().optional(),
+    timeout: z.number().int().min(1).max(600).optional(),
+    enabled: z.boolean(),
+    scope: z.enum(["global", "project"]),
+    projectPath: z.string().optional(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+  })).optional(),
+  hookRunLog: z.array(z.object({
+    id: z.string(),
+    ruleId: z.string(),
+    ruleName: z.string(),
+    event: z.enum(HOOK_EVENTS),
+    action: z.enum(["allow", "block", "notify", "run_command"]),
+    result: z.enum(["allow", "block", "notify", "run_command", "error"]),
+    message: z.string(),
+    timestamp: z.number(),
+  })).optional(),
 });
 
 ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {

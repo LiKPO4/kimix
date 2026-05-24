@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
+import { Bot, Brain, Cable, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -13,6 +13,7 @@ interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
+  leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[];
   changedFiles?: string[];
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
@@ -425,6 +426,18 @@ function formatAgentRole(role?: "executor" | "reviewer") {
   return null;
 }
 
+function getHookBadgeEvents(hooks: Extract<TimelineEvent, { type: "hook" }>[]) {
+  const settled = hooks.filter((hook) => hook.phase === "resolved");
+  const source = settled.length > 0 ? settled : hooks.filter((hook) => hook.phase === "triggered");
+  const seen = new Set<string>();
+  return source.filter((hook) => {
+    const key = `${hook.eventName}:${hook.target}:${hook.phase}:${hook.action ?? ""}:${hook.reason ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function AssistantProcessSummary({ event, tools, subagents, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; label: string }) {
   const [expanded, setExpanded] = useState(false);
   const thinkingBlocks = getThinkingBlocks(event);
@@ -445,18 +458,18 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   ]);
 
   return (
-    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: expanded && hasDetails ? 14 : 12 }}>
+    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: expanded && hasDetails ? 8 : 12 }}>
       <button
         type="button"
         onClick={() => hasDetails && setExpanded((value) => !value)}
         disabled={!hasDetails}
-        className="flex h-8 items-center rounded-lg text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
+        className="flex h-8 max-w-full items-center rounded-lg text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
         style={{ gap: 8, paddingLeft: 4, paddingRight: 12 }}
       >
         {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
-        <span>{label}</span>
+        <span className="shrink-0">{label}</span>
         {hasDetails && (
-          <span className="text-[13px] text-[var(--kimix-panel-text-muted)]">
+          <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
             {summary}
           </span>
         )}
@@ -485,7 +498,7 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -506,6 +519,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
       ? formatDuration(elapsed)
       : "";
   const roleLabel = formatAgentRole(event.agentRole);
+  const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const displayProcessLabel = event.isComplete
     ? `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
     : isActivelyThinking
@@ -563,6 +577,18 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
             >
               {copied ? <Check size={13} className="text-accent-green" /> : <Copy size={13} />}
             </button>
+            {hookBadgeEvents.length > 0 && (
+              <button
+                type="button"
+                className="flex h-6 items-center rounded-md text-[12px] text-text-muted transition-colors hover:bg-bg-hover"
+                style={{ gap: 4, paddingLeft: 7, paddingRight: 7 }}
+                title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
+                aria-label="Hook 命中"
+              >
+                <Cable size={13} />
+                <span>钩子 {hookBadgeEvents.length}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -570,12 +596,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   );
 }
 
-export function MessageBubble({ event, leadingTools, leadingSubagents, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, leadingSubagents, leadingHooks, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }

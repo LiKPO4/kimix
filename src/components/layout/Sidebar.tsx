@@ -1,10 +1,11 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { isHiddenInternalSession } from "@/utils/internalSessions";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -36,9 +37,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
-  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
-  const setSkillsOpen = useAppStore((s) => s.setSkillsOpen);
+  const workspaceView = useAppStore((s) => s.workspaceView);
+  const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const setLongTasksOpen = useAppStore((s) => s.setLongTasksOpen);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -165,7 +166,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const archiveProjectSessions = (project: Project) => {
-    const targets = sessions.filter((session) => session.projectPath === project.path && !session.archivedAt);
+    const targets = sessions.filter((session) => session.projectPath === project.path && !session.archivedAt && !isHiddenInternalSession(session));
     targets.forEach((session) => archiveSession(session.id));
     if (currentSession && currentSession.projectPath === project.path) {
       setCurrentSession(null);
@@ -212,19 +213,27 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           <Search size={17} />
         </button>
         <button
-          onClick={() => setSkillsOpen(true)}
-          className={collapsedNavItemClass}
-          title="技能"
-          aria-label="技能"
+          onClick={() => setWorkspaceView("plugins")}
+          className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-black/6 text-[#26231f]" : ""}`}
+          title="插件"
+          aria-label="插件"
         >
           <LayoutGrid size={17} />
+        </button>
+        <button
+          onClick={() => setWorkspaceView("hooks")}
+          className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-black/6 text-[#26231f]" : ""}`}
+          title="Hooks"
+          aria-label="Hooks"
+        >
+          <Cable size={17} />
         </button>
       </aside>
     );
   }
 
   const projectSessions = (projectPath: string) =>
-    sessions.filter((s) => s.projectPath === projectPath && !s.archivedAt);
+    sessions.filter((s) => s.projectPath === projectPath && !s.archivedAt && !isHiddenInternalSession(s));
 
   const selectSession = async (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId);
@@ -238,6 +247,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     });
     if (!loaded.success) return;
     const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+    if (isHiddenInternalSession({ ...session, events })) {
+      deleteSession(session.id);
+      return;
+    }
     updateSession(session.id, (current) => ({
       ...current,
       events,
@@ -253,6 +266,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         <button
           onClick={async () => {
             if (currentProject) {
+              setWorkspaceView("chat");
               await createSessionForProject(currentProject);
             }
           }}
@@ -266,9 +280,21 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           <Search size={17} className="shrink-0 text-[#706b63]" />
           <span>搜索</span>
         </button>
-        <button onClick={() => setSkillsOpen(true)} className={navItemClass} title="技能">
+        <button
+          onClick={() => setWorkspaceView("plugins")}
+          className={`${navItemClass} ${workspaceView === "plugins" ? "bg-black/5 text-[#26231f]" : ""}`}
+          title="插件"
+        >
           <LayoutGrid size={17} className="shrink-0 text-[#706b63]" />
-          <span>技能</span>
+          <span>插件</span>
+        </button>
+        <button
+          onClick={() => setWorkspaceView("hooks")}
+          className={`${navItemClass} ${workspaceView === "hooks" ? "bg-black/5 text-[#26231f]" : ""}`}
+          title="Hooks"
+        >
+          <Cable size={17} className="shrink-0 text-[#706b63]" />
+          <span>Hooks</span>
         </button>
         <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
           <span className="flex items-center gap-3">
@@ -315,7 +341,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                     onClick={async () => {
                       setCurrentProject(project);
                       setExpandedProject(isExpanded ? null : project.id);
-                      const hasSession = sessions.some((s) => s.projectPath === project.path && !s.archivedAt);
+                      const hasSession = sessions.some((s) => s.projectPath === project.path && !s.archivedAt && !isHiddenInternalSession(s));
                       if (!hasSession && !useAppStore.getState().creatingSessionProjectPath) {
                         await createSessionForProject(project);
                       }
@@ -414,7 +440,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           }`}
                         >
                           <button
-                            onClick={() => void selectSession(s.id)}
+                            onClick={() => {
+                              setWorkspaceView("chat");
+                              void selectSession(s.id);
+                            }}
                             className="min-w-0 flex-1 truncate text-left"
                           >
                             {s.title}
@@ -459,13 +488,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
       <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
         <button
-          onClick={() => setSettingsOpen(true)}
-          className="kimix-settings-entry flex w-full items-center gap-3 rounded-xl text-[16px] text-[#302d28] transition-colors"
+          onClick={() => setWorkspaceView("settings")}
+          className={`kimix-settings-entry flex w-full items-center gap-3 rounded-xl text-[16px] text-[#302d28] transition-colors ${workspaceView === "settings" ? "bg-black/5" : ""}`}
           style={{ height: 36 }}
         >
           <Settings size={18} className="text-[#706b63]" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.8.38</span>
+          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.8.56</span>
         </button>
       </div>
     </aside>

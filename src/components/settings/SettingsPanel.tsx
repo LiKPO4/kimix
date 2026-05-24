@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode } from "@/types/ui";
@@ -40,7 +40,7 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   );
 }
 
-export function SettingsPanel() {
+export function SettingsPanel({ variant = "modal" }: { variant?: "modal" | "workspace" }) {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const theme = useAppStore((s) => s.theme);
@@ -118,13 +118,13 @@ export function SettingsPanel() {
   };
 
   useEffect(() => {
-    if (settingsOpen) {
+    if (settingsOpen || variant === "workspace") {
       void checkConnection(false);
       loadFreezeReports();
     }
-  }, [settingsOpen]);
+  }, [settingsOpen, variant]);
 
-  if (!settingsOpen) return null;
+  if (!settingsOpen && variant === "modal") return null;
 
   const themes: { value: Theme; label: string; icon: typeof Sun }[] = [
     { value: "light", label: "浅色", icon: Sun },
@@ -152,20 +152,18 @@ export function SettingsPanel() {
     if (restored) setCurrentSession({ ...restored, archivedAt: undefined });
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={() => setSettingsOpen(false)}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
-      <div className="kimix-settings-panel" onClick={(e) => e.stopPropagation()}>
+  const content = (
+      <div className={variant === "workspace" ? "kimix-settings-panel is-workspace" : "kimix-settings-panel"} onClick={(e) => e.stopPropagation()}>
         <div className="kimix-settings-header">
-          <h2 id="settings-title" className="kimix-settings-title">设置</h2>
-          <button onClick={() => setSettingsOpen(false)} className="kimix-settings-icon-button" aria-label="关闭设置">
-            <X size={18} />
-          </button>
+          <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
+            {variant === "workspace" && <Settings size={18} className="shrink-0 text-[#8f887e]" />}
+            <h2 id="settings-title" className="kimix-settings-title">设置</h2>
+          </div>
+          {variant === "modal" && (
+            <button onClick={() => setSettingsOpen(false)} className="kimix-settings-icon-button" aria-label="关闭设置">
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         <div className="kimix-settings-body">
@@ -442,9 +440,22 @@ export function SettingsPanel() {
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.38 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.56 · 设置将自动保存到本地</div>
         </div>
       </div>
+  );
+
+  if (variant === "workspace") return content;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      onClick={() => setSettingsOpen(false)}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
+      {content}
     </div>
   );
 }

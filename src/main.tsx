@@ -22,6 +22,7 @@ import type {
   StartSessionResponse,
   UpdateKimiCliResponse,
   VoidResponse,
+  GenerateHookRuleResponse,
 } from "../electron/types/ipc";
 import App from "./App";
 import "./index.css";
@@ -44,12 +45,15 @@ const defaultBrowserPreviewSettings = {
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
   voiceShortcut: "Win+H",
+  notificationMode: "unfocused",
   clarificationToolMode: "auto",
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   enabledSkillNames: [],
   additionalWorkDirs: [],
+  hookRules: [],
+  hookRunLog: [],
 };
 
 function readBrowserPreviewSettings(): SettingsResponse {
@@ -115,6 +119,7 @@ function installBrowserPreviewApi() {
     getLongTaskDetail: () => fail("读取长程任务详情"),
     updateLongTaskState: () => fail("更新长程任务状态"),
     appendLongTaskRound: () => fail("写入长程任务轮次记录"),
+    generateHookRule: (): Promise<GenerateHookRuleResponse> => fail("调用规则创建 Agent"),
 
     startSession: (): Promise<StartSessionResponse> => fail("启动会话"),
     checkKimiCli: (): Promise<CheckKimiCliResponse> => Promise.resolve({
@@ -165,7 +170,7 @@ function installBrowserPreviewApi() {
     getSettings: (): Promise<SettingsResponse> => Promise.resolve(readBrowserPreviewSettings()),
     saveSettings: (settings) => {
       writeBrowserPreviewSettings(settings);
-      return Promise.resolve();
+      return okVoid();
     },
     getAppInfo: (): Promise<AppInfoResponse> => Promise.resolve({
       success: true,

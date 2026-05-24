@@ -9,6 +9,7 @@ import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapp
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
+import { isHiddenInternalSession } from "@/utils/internalSessions";
 
 const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent的提示词，注意回复内容中应该仅仅包含这段提示词。如果没有agent.md文档，请根据以下形式总结并给出提示词
 - 项目背景
@@ -1249,7 +1250,7 @@ function App() {
       window.api.listSessions({ workDir: payload.project.path }).then(async (res) => {
         if (!res.success) return;
         const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
-        const latest = res.data.find((session) => !hiddenHandoffSessionIds.has(session.id));
+        const latest = res.data.find((session) => !hiddenHandoffSessionIds.has(session.id) && !isHiddenInternalSession(session));
         const startRes = await window.api.startSession({
           workDir: payload.project.path,
           sessionId: latest?.id,
@@ -1319,8 +1320,12 @@ function App() {
       try {
         const parsed = JSON.parse(storedSessions);
         if (Array.isArray(parsed)) {
+          const visibleSessions = parsed.filter((session) => !isHiddenInternalSession(session));
+          if (visibleSessions.length !== parsed.length) {
+            localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
+          }
           useSessionStore.setState({
-            sessions: parsed.map((session) => hydrateLongTaskProgressFromHistory({
+            sessions: visibleSessions.map((session) => hydrateLongTaskProgressFromHistory({
               ...session,
               events: Array.isArray(session.events) ? settleInactiveEvents(session.events) : [],
               isLoading: false,
@@ -1371,6 +1376,11 @@ function App() {
     };
     const unsubscribeSessionPersistence = useSessionStore.subscribe((state, prev) => {
       if (state.sessions === prev.sessions && state.pendingMessages === prev.pendingMessages) return;
+      const visibleSessions = state.sessions.filter((session) => !isHiddenInternalSession(session));
+      if (visibleSessions.length !== state.sessions.length) {
+        useSessionStore.setState({ sessions: visibleSessions });
+        return;
+      }
       scheduleLocalConversationPersist();
     });
     const handleBeforeUnload = flushLocalConversationState;

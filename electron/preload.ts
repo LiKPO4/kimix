@@ -69,6 +69,8 @@ import type {
   TriggerShortcutRequest,
   TurnCompleteNotificationRequest,
   ScheduleShutdownRequest,
+  GenerateHookRuleRequest,
+  GenerateHookRuleResponse,
   SettingsResponse,
   SaveSettingsRequest,
   KimiEventPayload,
@@ -127,6 +129,8 @@ const api = {
     ipcRenderer.invoke("longTasks:updateState", req),
   appendLongTaskRound: (req: AppendLongTaskRoundRequest): Promise<AppendLongTaskRoundResponse> =>
     ipcRenderer.invoke("longTasks:appendRound", req),
+  generateHookRule: (req: GenerateHookRuleRequest): Promise<GenerateHookRuleResponse> =>
+    ipcRenderer.invoke("hooks:generateRule", req),
 
   // Kimi
   startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>
@@ -176,7 +180,7 @@ const api = {
 
   // App
   getSettings: (): Promise<SettingsResponse> => ipcRenderer.invoke("app:getSettings"),
-  saveSettings: (settings: SaveSettingsRequest): Promise<void> =>
+  saveSettings: (settings: SaveSettingsRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:saveSettings", settings),
   getAppInfo: (): Promise<AppInfoResponse> => ipcRenderer.invoke("app:getInfo"),
   checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),

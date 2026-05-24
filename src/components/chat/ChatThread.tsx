@@ -16,7 +16,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
@@ -208,13 +208,13 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, changedFiles, trailingStatuses, hideProcessSummary }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, changedFiles, trailingStatuses, hideProcessSummary }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
       return <MessageBubble event={event} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -232,6 +232,7 @@ function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSub
     case "session_recommendation":
       return <SessionRecommendationCard event={event} sourceSessionId={sessionId} projectPath={projectPath} />;
     case "todo":
+    case "hook":
       return null;
     case "diff":
       return <ChangeCard changes={[{ path: event.filePath, oldText: event.oldText, newText: event.newText }]} />;
@@ -326,6 +327,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
+    const hooks = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "hook" }> => event.type === "hook");
     const turnSettled = (
       !assistantEvents.some((event) => !event.isComplete) &&
       !tools.some((event) => event.status === "running") &&
@@ -346,6 +348,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       const type = (event as { type?: unknown }).type;
       if (type === "tool_call" || type === "tool_result") continue;
       if (type === "subagent") continue;
+      if (type === "hook") continue;
       if (type === "status_update") continue;
       if (type === "change_summary") continue;
       if (type === "diff") continue;
@@ -361,6 +364,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
           event,
           leadingTools: assistantAttached ? [] : tools,
           leadingSubagents: assistantAttached ? [] : subagents,
+          leadingHooks: assistantAttached ? [] : hooks,
           changedFiles: assistantAttached ? [] : Array.from(changedFiles),
           trailingStatuses: [],
           hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
@@ -383,7 +387,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         continue;
       }
       if (type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, changedFiles: Array.from(changedFiles), trailingStatuses: [] });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), trailingStatuses: [] });
         toolsAttached = true;
         assistantAttached = true;
         continue;
@@ -668,7 +672,7 @@ export function ChatThread() {
                 ? <PlanPreviewCard key={item.id} path={item.path} projectPath={item.projectPath} />
                 : item.type === "change_group"
                   ? <ChangeCard key={item.id} changes={item.changes} />
-                : <EventRenderer key={item.event.id} event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} />
+                : <EventRenderer key={item.event.id} event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} />
           ))}
         </div>
       </div>

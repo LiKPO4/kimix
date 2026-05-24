@@ -696,7 +696,49 @@ export type AppSettings = {
   enabledSkillNames: string[];
   enabledSkillsDir?: string;
   additionalWorkDirs?: string[];
+  hookRules?: HookRule[];
+  hookRunLog?: HookRunLogEntry[];
 }
+
+export type HookRule = {
+  id: string;
+  name: string;
+  event: "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "Notification" | "Stop" | "StopFailure" | "UserPromptSubmit" | "SessionStart" | "SessionEnd" | "SubagentStart" | "SubagentStop" | "PreCompact" | "PostCompact";
+  matcher: string;
+  action: "allow" | "block" | "notify" | "run_command";
+  command?: string;
+  reason?: string;
+  timeout?: number;
+  enabled: boolean;
+  scope: "global" | "project";
+  projectPath?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type HookRunLogEntry = {
+  id: string;
+  ruleId: string;
+  ruleName: string;
+  event: HookRule["event"];
+  action: HookRule["action"];
+  result: "allow" | "block" | "notify" | "run_command" | "error";
+  message: string;
+  timestamp: number;
+}
+
+export type GenerateHookRuleRequest = {
+  description: string;
+  projectPath?: string;
+}
+
+export type GenerateHookRuleResponse = {
+  success: true;
+  data: HookRule;
+} | {
+  success: false;
+  error: string;
+};
 
 export type SettingsResponse = {
   success: true;
