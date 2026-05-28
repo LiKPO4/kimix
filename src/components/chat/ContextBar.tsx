@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, ChevronDown, Download, FolderOpen, GitBranch, Loader2, X } from "lucide-react";
+import { BarChart3, ChevronDown, Download, ExternalLink, FolderOpen, GitBranch, Loader2, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import { useSessionStore } from "@/stores/sessionStore";
+import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
@@ -11,7 +11,7 @@ function formatUsage(period: UsagePeriod) {
     return period.message ?? "暂无官方数据";
   }
   const remaining = Math.max(0, period.limit - period.used);
-  return `已用 ${period.used}/${period.limit}，剩余 ${remaining}`;
+  return `剩余 ${remaining}/${period.limit}`;
 }
 
 function formatDuration(ms: number) {
@@ -48,8 +48,8 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
         />
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">
-        <span className="min-w-0 truncate">{formatUsage(period)}</span>
         <span className="shrink-0">{formatRefreshTime(period.refreshAt, now)}</span>
+        <span className="min-w-0 truncate">{formatUsage(period)}</span>
       </div>
     </div>
   );
@@ -64,7 +64,7 @@ export function ContextBar() {
   const currentSession = useAppStore((s) => s.currentSession);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
-  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
+  const session = useLiveSession(currentSession?.id);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   const [workDirsOpen, setWorkDirsOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
@@ -176,6 +176,27 @@ export function ContextBar() {
     }
   };
 
+  const openVisualizer = async () => {
+    try {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "正在启动 Kimi Agent Tracing Visualizer…" }));
+      const startRes = await window.api.startKimiVis();
+      if (!startRes.success) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `启动失败：${startRes.error}` }));
+        return;
+      }
+      // 给 vis 一点时间启动 HTTP 服务
+      await new Promise((r) => setTimeout(r, 3000));
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "正在打开浏览器…" }));
+      const res = await window.api.openExternal("http://localhost:5495");
+      if (!res.success) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `打开失败：${res.error}` }));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `打开使用详情出错：${message}` }));
+    }
+  };
+
   useEffect(() => {
     setGitBranch(null);
     if (!project?.path) return;
@@ -235,7 +256,7 @@ export function ContextBar() {
                 <button
                   type="button"
                   onClick={() => void addAdditionalWorkDir()}
-                  className="kimix-icon-text-button is-compact flex shrink-0 items-center justify-center self-center rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]"
+                  className="kimix-icon-text-button is-compact flex shrink-0 items-center justify-center self-center rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark"
                   style={{ height: 34, minHeight: 34, transform: "translateY(1px)" }}
                 >
                   <FolderOpen size={13} />
@@ -249,7 +270,7 @@ export function ContextBar() {
               <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ marginTop: 14, padding: "12px 12px 12px" }}>
                 <div className="grid items-center" style={{ gap: 10, gridTemplateColumns: "minmax(0, 1fr) auto", marginBottom: 10 }}>
                   <span className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">额外工作目录</span>
-                  <span className="inline-flex items-center justify-center rounded-full bg-[#eef7ff] text-[12px] leading-none text-[#2f6fad]" style={{ height: 20, minWidth: 20, paddingLeft: 8, paddingRight: 8 }}>{additionalWorkDirs.length}</span>
+                  <span className="inline-flex items-center justify-center rounded-full bg-accent-primary-light text-[12px] leading-none text-accent-primary-dark" style={{ height: 20, minWidth: 20, paddingLeft: 8, paddingRight: 8 }}>{additionalWorkDirs.length}</span>
                 </div>
                 {additionalWorkDirs.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
@@ -263,7 +284,7 @@ export function ContextBar() {
                         <button
                           type="button"
                           onClick={() => removeAdditionalWorkDir(index)}
-                          className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-lg text-[#8b3d34]"
+                          className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-lg text-accent-danger"
                           title="移除目录"
                           aria-label="移除目录"
                         >
@@ -295,18 +316,28 @@ export function ContextBar() {
               className="kimix-floating-panel absolute bottom-10 left-0 z-40 w-[330px] rounded-xl"
               style={{ paddingLeft: 22, paddingRight: 22, paddingTop: 20, paddingBottom: 21 }}
             >
-              <div className="flex items-start justify-between gap-4" style={{ marginBottom: 18 }}>
+              <div className="flex items-center justify-between gap-4" style={{ marginBottom: 18 }}>
                 <div className="min-w-0">
                   <div className="text-[16px] font-medium leading-5 text-[var(--kimix-panel-text)]">套餐用量</div>
-                  <div className="mt-1.5 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">{usageData?.source ?? "Kimi Code 官方用量接口"}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={loadUsage}
-                  className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
-                >
-                  {usageLoading ? <Loader2 size={14} className="animate-spin" /> : "刷新"}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void openVisualizer()}
+                    className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
+                    title="打开 Kimi Agent Tracing Visualizer"
+                  >
+                    <ExternalLink size={14} />
+                    使用详情
+                  </button>
+                  <button
+                    type="button"
+                    onClick={loadUsage}
+                    className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
+                  >
+                    {usageLoading ? <Loader2 size={14} className="animate-spin" /> : "刷新"}
+                  </button>
+                </div>
               </div>
               <div className="flex flex-col" style={{ gap: 15 }}>
                 {(usageData?.periods ?? [

@@ -22,7 +22,7 @@ type SuperpowersDiagnostics = {
   diagnostics?: string[];
 };
 
-export function SkillsPanel({ open }: { open: boolean }) {
+export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToChat?: () => void }) {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [enabledNames, setEnabledNames] = useState<string[]>([]);
   const [enabledDir, setEnabledDir] = useState("");
@@ -178,7 +178,7 @@ export function SkillsPanel({ open }: { open: boolean }) {
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "18px 28px" }}>
+        <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]">
               <LayoutGrid size={20} />
@@ -209,6 +209,16 @@ export function SkillsPanel({ open }: { open: boolean }) {
               <Plus size={15} />
               <span>{importing ? "导入中" : "添加"}</span>
             </button>
+            {onBackToChat && (
+              <button
+                type="button"
+                onClick={onBackToChat}
+                className="kimix-icon-text-button kimix-muted-action is-compact"
+                style={{ marginLeft: 4 }}
+              >
+                返回对话
+              </button>
+            )}
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "22px 28px 30px" }}>
@@ -229,8 +239,8 @@ export function SkillsPanel({ open }: { open: boolean }) {
                     </div>
                     <div className="mt-1 text-[var(--kimix-panel-text-secondary)]">
                       {superpowersDiagnostics?.enabled
-                        ? `已启用 ${superpowersDiagnostics.superpowerSkills?.length ?? 0} 个 Superpowers Skill`
-                        : "需要安装并启用 using-superpowers 后，新会话才会注入 agent-file。"}
+                        ? `已启用 ${superpowersDiagnostics.superpowerSkills?.length ?? 0} 个 Superpowers Skill，新会话会自动带上这些能力。`
+                        : "安装后可启用 Superpowers Skill，新会话会自动带上这些能力。"}
                     </div>
                   </div>
                   <button
@@ -243,41 +253,44 @@ export function SkillsPanel({ open }: { open: boolean }) {
                     <span>{checkingSuperpowers ? "检查中" : "诊断"}</span>
                   </button>
                 </div>
-                {superpowersDiagnostics && (
-                  <div className="mt-3 flex flex-col text-[12.5px] text-[var(--kimix-panel-text-muted)]" style={{ gap: 6 }}>
-                    {superpowersDiagnostics.skillsDir && <div className="break-all" title={superpowersDiagnostics.skillsDir}>skills-dir：{superpowersDiagnostics.skillsDir}{superpowersDiagnostics.skillsDirExists === false ? "（不存在）" : ""}</div>}
-                    {superpowersDiagnostics.agentFile && <div className="break-all" title={superpowersDiagnostics.agentFile}>agent-file：{superpowersDiagnostics.agentFile}{superpowersDiagnostics.agentFileExists === false ? "（未生成）" : ""}</div>}
-                    {superpowersDiagnostics.usingSkillPath && <div className="break-all" title={superpowersDiagnostics.usingSkillPath}>using-superpowers：{superpowersDiagnostics.usingSkillPath}</div>}
-                    {superpowersDiagnostics.legacyAgentFileExists && <div className="text-[#9b4b34]">检测到旧 superpowers-agent.md 残留，当前版本会改用 superpowers-agent.yaml。</div>}
-                    {(superpowersDiagnostics.diagnostics ?? []).map((line) => (
-                      <div key={line} className="break-all" title={line}>{line}</div>
-                    ))}
-                  </div>
-                )}
               </div>
             </aside>
-            <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+            <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridAutoRows: 142, gap: 12 }}>
               {skills.map((skill) => (
                 <button
                   key={skill.path}
                   type="button"
                   onClick={() => void toggleSkill(skill.name)}
-                  className={`min-h-[142px] w-full rounded-xl border text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] ${enabledNames.includes(skill.name) ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"}`}
+                  className={`h-full w-full overflow-hidden rounded-xl border text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] ${enabledNames.includes(skill.name) ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"}`}
                   style={{
-                    padding: "16px 18px",
+                    padding: "14px 18px",
                     background: enabledNames.includes(skill.name)
                       ? "color-mix(in srgb, var(--accent-blue) 8%, var(--kimix-panel-bg))"
                       : undefined,
                   }}
                 >
-                  <div className="grid h-full" style={{ gridTemplateColumns: "22px minmax(0, 1fr) auto", gap: 12 }}>
+                  <div className="grid h-full min-h-0" style={{ gridTemplateColumns: "22px minmax(0, 1fr) auto", gap: 12 }}>
                     <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabledNames.includes(skill.name) ? "border-[var(--accent-blue)] bg-[var(--accent-blue)] text-white" : "border-[var(--kimix-selection-idle-border)] text-transparent"}`}>
                       <Check size={13} />
                     </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[15px] font-semibold leading-5 text-[var(--kimix-panel-text)]">{skill.name}</span>
-                      <span className="mt-2 line-clamp-2 block text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={skill.description}>{shortDescription(skill.description)}</span>
-                      <span className="mt-2 block truncate text-[12px] text-[var(--kimix-panel-text-muted)]" title={skill.path}>{skill.path}</span>
+                    <span className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+                      <span className="block truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ lineHeight: "22px" }}>{skill.name}</span>
+                      <span
+                        className="block text-[13px] text-[var(--kimix-panel-text-secondary)]"
+                        title={skill.description}
+                        style={{
+                          display: "-webkit-box",
+                          marginTop: 7,
+                          lineHeight: "20px",
+                          WebkitBoxOrient: "vertical",
+                          WebkitLineClamp: 3,
+                          maxHeight: 60,
+                          overflow: "hidden",
+                        }}
+                      >
+                        {shortDescription(skill.description)}
+                      </span>
+                      <span className="mt-auto block truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ paddingTop: 7 }} title={skill.path}>{skill.path}</span>
                     </span>
                     <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${enabledNames.includes(skill.name) ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
                       {enabledNames.includes(skill.name) ? "已启用" : "未启用"}

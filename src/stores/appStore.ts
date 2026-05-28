@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, WorkspaceView } from "@/types/ui";
 
-interface AppStore extends AppState {
+export interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
   setCurrentSession: (session: Session | null) => void;
   setPermissionMode: (mode: PermissionMode) => void;

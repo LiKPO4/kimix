@@ -19,8 +19,17 @@ import type {
   StartSessionResponse,
   CheckKimiCliRequest,
   CheckKimiCliResponse,
+  GetKimiAuthStatusResponse,
   InstallKimiCliResponse,
   CheckKimiCliUpdateResponse,
+  KimiLoginResponse,
+  KimiLogoutResponse,
+  ListMcpServersResponse,
+  AddMcpServerRequest,
+  RemoveMcpServerRequest,
+  McpServerActionRequest,
+  McpServerMutationResponse,
+  TestMcpServerResponse,
   UpdateKimiCliResponse,
   SendPromptRequest,
   SendPromptResponse,
@@ -137,6 +146,24 @@ const api = {
     ipcRenderer.invoke("kimi:startSession", req),
   checkKimiCli: (req?: CheckKimiCliRequest): Promise<CheckKimiCliResponse> =>
     ipcRenderer.invoke("kimi:checkCli", req),
+  getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> =>
+    ipcRenderer.invoke("kimi:getAuthStatus"),
+  loginKimi: (): Promise<KimiLoginResponse> =>
+    ipcRenderer.invoke("kimi:login"),
+  logoutKimi: (): Promise<KimiLogoutResponse> =>
+    ipcRenderer.invoke("kimi:logout"),
+  listMcpServers: (): Promise<ListMcpServersResponse> =>
+    ipcRenderer.invoke("kimi:listMcpServers"),
+  addMcpServer: (req: AddMcpServerRequest): Promise<McpServerMutationResponse> =>
+    ipcRenderer.invoke("kimi:addMcpServer", req),
+  removeMcpServer: (req: RemoveMcpServerRequest): Promise<McpServerMutationResponse> =>
+    ipcRenderer.invoke("kimi:removeMcpServer", req),
+  authMcpServer: (req: McpServerActionRequest): Promise<McpServerMutationResponse> =>
+    ipcRenderer.invoke("kimi:authMcpServer", req),
+  resetMcpServerAuth: (req: McpServerActionRequest): Promise<McpServerMutationResponse> =>
+    ipcRenderer.invoke("kimi:resetMcpServerAuth", req),
+  testMcpServer: (req: McpServerActionRequest): Promise<TestMcpServerResponse> =>
+    ipcRenderer.invoke("kimi:testMcpServer", req),
   installKimiCli: (): Promise<InstallKimiCliResponse> =>
     ipcRenderer.invoke("kimi:installCli"),
   checkKimiCliUpdate: (): Promise<CheckKimiCliUpdateResponse> =>
@@ -165,6 +192,8 @@ const api = {
     ipcRenderer.invoke("kimi:loadSession", req),
   getKimiUsage: (): Promise<KimiUsageResponse> =>
     ipcRenderer.invoke("kimi:getUsage"),
+  startKimiVis: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi:startVis"),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {

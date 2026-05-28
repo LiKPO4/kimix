@@ -11,6 +11,16 @@ import * as kimiBridge from "./kimiBridge";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
+import {
+  authMCP,
+  createKimiPaths,
+  isLoggedIn,
+  login,
+  logout,
+  parseConfig,
+  resetAuthMCP,
+  testMCP,
+} from "@moonshot-ai/kimi-agent-sdk";
 import type { ContentPart } from "@moonshot-ai/kimi-agent-sdk";
 
 const GITHUB_REPO = "LiKPO4/kimix";
@@ -251,6 +261,79 @@ async function installKimiCli() {
   if (!kimiPath) throw new Error("安装完成后仍未找到 kimi 命令，请重新打开 Kimix 后再试");
   const version = await runCommand(kimiPath, ["--version"]).catch(() => output);
   return { path: kimiPath, output: version, message: "Kimi CLI 安装完成" };
+}
+
+type McpServerRecord = {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  url?: string;
+  transport?: "http" | "stdio";
+  auth?: "oauth" | string;
+};
+
+function getKimiPaths() {
+  return createKimiPaths(process.env.KIMI_SHARE_DIR);
+}
+
+async function getKimiAuthStatus() {
+  const kimiPath = await resolveCommand("kimi");
+  const paths = getKimiPaths();
+  const config = parseConfig(process.env.KIMI_SHARE_DIR);
+  const loggedIn = isLoggedIn(process.env.KIMI_SHARE_DIR);
+  return {
+    available: Boolean(kimiPath),
+    path: kimiPath ?? undefined,
+    loggedIn,
+    configPath: paths.config,
+    mcpConfigPath: paths.mcpConfig,
+    defaultModel: config.defaultModel,
+    defaultThinking: config.defaultThinking,
+    message: !kimiPath
+      ? "未找到 kimi CLI，请先安装或检查 PATH"
+      : loggedIn
+        ? "Kimi CLI 已登录"
+        : "Kimi CLI 已安装，但当前未登录",
+  };
+}
+
+function readMcpServers() {
+  const paths = getKimiPaths();
+  if (!fs.existsSync(paths.mcpConfig)) {
+    return {
+      configPath: paths.mcpConfig,
+      servers: [],
+      rawExists: false,
+    };
+  }
+  const raw = fs.readFileSync(paths.mcpConfig, "utf-8");
+  const parsed = JSON.parse(raw) as { mcpServers?: Record<string, McpServerRecord> };
+  const entries = parsed && parsed.mcpServers && typeof parsed.mcpServers === "object" ? parsed.mcpServers : {};
+  const servers = Object.entries(entries).map(([name, value]) => ({
+    name,
+    transport: value.transport === "http" || value.url ? "http" as const : "stdio" as const,
+    url: value.url,
+    command: value.command,
+    args: Array.isArray(value.args) ? value.args : [],
+    env: value.env && typeof value.env === "object" ? value.env : undefined,
+    headers: value.headers && typeof value.headers === "object" ? value.headers : undefined,
+    auth: value.auth,
+  }));
+  servers.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+  return {
+    configPath: paths.mcpConfig,
+    servers,
+    rawExists: true,
+  };
+}
+
+async function requireKimiExecutable() {
+  const kimiPath = await resolveCommand("kimi");
+  if (!kimiPath) {
+    throw new Error("未找到 kimi CLI，请先安装或检查 PATH");
+  }
+  return kimiPath;
 }
 
 function spawnDetached(command: string, args: string[], cwd?: string): Promise<void> {
@@ -722,7 +805,7 @@ type ReleaseAssetInfo = {
   size?: number;
 };
 
-function emitDownloadUpdateProgress(receivedBytes: number, totalBytes?: number) {
+function emitDownloadUpdateProgress(receivedBytes: number, totalBytes?: number, bytesPerSecond?: number) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const percent = totalBytes && totalBytes > 0
     ? Math.max(0, Math.min(100, (receivedBytes / totalBytes) * 100))
@@ -731,6 +814,7 @@ function emitDownloadUpdateProgress(receivedBytes: number, totalBytes?: number) 
     percent,
     receivedBytes,
     totalBytes,
+    bytesPerSecond,
   });
 }
 
@@ -764,6 +848,10 @@ function sanitizeDownloadName(name: string) {
 }
 
 async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
+  const updateDir = path.join(app.getPath("downloads"), "Kimix Updates", sanitizeDownloadName(tagName || "latest"));
+  ensureDirectoryExists(updateDir);
+  const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));
+  const tempPath = `${targetPath}.download`;
   let response: Response;
   try {
     response = await fetch(asset.downloadUrl, {
@@ -789,32 +877,50 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
   const totalBytes = Number.isFinite(parsedTotalBytes) && parsedTotalBytes && parsedTotalBytes > 0
     ? parsedTotalBytes
     : asset.size;
-  const chunks: Buffer[] = [];
   let receivedBytes = 0;
-  emitDownloadUpdateProgress(0, Number.isFinite(totalBytes) ? totalBytes : undefined);
-  if (response.body) {
-    const reader = response.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      const chunk = Buffer.from(value);
-      chunks.push(chunk);
-      receivedBytes += chunk.length;
-      emitDownloadUpdateProgress(receivedBytes, Number.isFinite(totalBytes) ? totalBytes : undefined);
+  const startedAt = Date.now();
+  const knownTotalBytes = Number.isFinite(totalBytes) ? totalBytes : undefined;
+  const speed = () => {
+    const seconds = Math.max(0.25, (Date.now() - startedAt) / 1000);
+    return receivedBytes / seconds;
+  };
+  emitDownloadUpdateProgress(0, knownTotalBytes, 0);
+  try {
+    await fs.promises.rm(tempPath, { force: true });
+    const writer = fs.createWriteStream(tempPath);
+    try {
+      if (response.body) {
+        const reader = response.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!value) continue;
+          const chunk = Buffer.from(value);
+          await new Promise<void>((resolve, reject) => {
+            writer.write(chunk, (err) => err ? reject(err) : resolve());
+          });
+          receivedBytes += chunk.length;
+          emitDownloadUpdateProgress(receivedBytes, knownTotalBytes, speed());
+        }
+      } else {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        await new Promise<void>((resolve, reject) => {
+          writer.write(bytes, (err) => err ? reject(err) : resolve());
+        });
+        receivedBytes = bytes.length;
+        emitDownloadUpdateProgress(receivedBytes, receivedBytes, speed());
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        writer.end((err?: Error | null) => err ? reject(err) : resolve());
+      });
     }
-  } else {
-    const bytes = Buffer.from(await response.arrayBuffer());
-    chunks.push(bytes);
-    receivedBytes = bytes.length;
-    emitDownloadUpdateProgress(receivedBytes, receivedBytes);
+    emitDownloadUpdateProgress(receivedBytes, knownTotalBytes ?? receivedBytes, speed());
+    await fs.promises.rename(tempPath, targetPath);
+  } catch (err) {
+    await fs.promises.rm(tempPath, { force: true }).catch(() => {});
+    throw err;
   }
-  emitDownloadUpdateProgress(receivedBytes, Number.isFinite(totalBytes) ? totalBytes : receivedBytes);
-  const bytes = Buffer.concat(chunks);
-  const updateDir = path.join(app.getPath("downloads"), "Kimix Updates", sanitizeDownloadName(tagName || "latest"));
-  ensureDirectoryExists(updateDir);
-  const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));
-  fs.writeFileSync(targetPath, bytes);
   return targetPath;
 }
 
@@ -1617,7 +1723,7 @@ function createWindow() {
         ...details.responseHeaders,
         "Content-Security-Policy": [
           DEV_SERVER_URL
-            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*;"
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*;"
             : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self';"
         ],
       },
@@ -2419,6 +2525,149 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   }
 });
 
+ipcMain.handle("kimi:getAuthStatus", async () => {
+  try {
+    return { success: true, data: await getKimiAuthStatus() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:login", async () => {
+  try {
+    const kimiPath = await requireKimiExecutable();
+    let verificationUrl = "";
+    const result = await login({
+      executable: kimiPath,
+      onUrl: (url) => {
+        verificationUrl = url;
+        void shell.openExternal(url).catch(() => {});
+      },
+    });
+    if (!result.success) {
+      return { success: false, error: result.error ?? "登录失败" };
+    }
+    const status = await getKimiAuthStatus();
+    return {
+      success: true,
+      data: {
+        ...status,
+        verificationUrl: verificationUrl || undefined,
+        message: status.loggedIn ? "登录完成" : (verificationUrl ? "已打开登录链接，请在浏览器中继续完成授权" : status.message),
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:logout", async () => {
+  try {
+    const kimiPath = await requireKimiExecutable();
+    const result = await logout({ executable: kimiPath });
+    if (!result.success) {
+      return { success: false, error: result.error ?? "退出登录失败" };
+    }
+    const status = await getKimiAuthStatus();
+    return {
+      success: true,
+      data: {
+        ...status,
+        message: "已退出 Kimi 登录",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:listMcpServers", async () => {
+  try {
+    return { success: true, data: readMcpServers() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:addMcpServer", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({
+      name: z.string().trim().min(1),
+      transport: z.enum(["http", "stdio"]),
+      url: z.string().trim().optional(),
+      command: z.string().trim().optional(),
+      args: z.array(z.string().trim()).optional(),
+      env: z.array(z.string().trim()).optional(),
+      headers: z.array(z.string().trim()).optional(),
+      auth: z.literal("oauth").optional(),
+    }).parse(request);
+    const kimiPath = await requireKimiExecutable();
+    const args = ["mcp", "add", parsed.name, "--transport", parsed.transport];
+    if (parsed.auth) args.push("--auth", parsed.auth);
+    for (const envValue of parsed.env ?? []) {
+      if (envValue) args.push("--env", envValue);
+    }
+    for (const headerValue of parsed.headers ?? []) {
+      if (headerValue) args.push("--header", headerValue);
+    }
+    if (parsed.transport === "http") {
+      if (!parsed.url) throw new Error("HTTP MCP 需要填写 URL");
+      args.push(parsed.url);
+    } else {
+      if (!parsed.command) throw new Error("stdio MCP 需要填写命令");
+      args.push("--", parsed.command, ...(parsed.args ?? []).filter(Boolean));
+    }
+    await runCommand(kimiPath, args);
+    return { success: true, data: { message: `已添加 MCP 服务 ${parsed.name}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:removeMcpServer", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
+    const kimiPath = await requireKimiExecutable();
+    await runCommand(kimiPath, ["mcp", "remove", parsed.name]);
+    return { success: true, data: { message: `已移除 MCP 服务 ${parsed.name}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:authMcpServer", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
+    const kimiPath = await requireKimiExecutable();
+    await authMCP(parsed.name, { executable: kimiPath });
+    return { success: true, data: { message: `已完成 ${parsed.name} 的 MCP 授权` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:resetMcpServerAuth", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
+    const kimiPath = await requireKimiExecutable();
+    await resetAuthMCP(parsed.name, { executable: kimiPath });
+    return { success: true, data: { message: `已重置 ${parsed.name} 的 MCP 授权` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:testMcpServer", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
+    const kimiPath = await requireKimiExecutable();
+    const result = await testMCP(parsed.name, { executable: kimiPath });
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:installCli", async () => {
   try {
     const result = await installKimiCli();
@@ -2637,6 +2886,83 @@ ipcMain.handle("kimi:getUsage", async () => {
     const payload = getRecord(await res.json());
     if (!payload) throw new Error("Kimi 用量接口返回格式异常");
     return { success: true, data: parseKimiUsagePayload(payload) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:startVis", async () => {
+  try {
+    let kimiPath = await resolveCommand("kimi");
+    if (!kimiPath) {
+      const hinted = commandHintPaths("kimi").find((candidate) => fs.existsSync(candidate));
+      if (hinted) {
+        kimiPath = hinted;
+      }
+    }
+    if (!kimiPath) {
+      // 直接在 PATH 环境变量里扫一遍
+      const pathEnv = process.env.PATH || "";
+      const delimiter = process.platform === "win32" ? ";" : ":";
+      const ext = process.platform === "win32" ? ".exe" : "";
+      for (const dir of pathEnv.split(delimiter)) {
+        const candidate = path.join(dir.trim(), `kimi${ext}`);
+        if (fs.existsSync(candidate)) {
+          kimiPath = candidate;
+          break;
+        }
+      }
+    }
+    if (!kimiPath) {
+      return { success: false, error: "未找到 kimi CLI。请先安装并在终端运行 'kimi --version' 确认可用。" };
+    }
+
+    // 验证 kimi 可执行
+    try {
+      await runCommand(kimiPath, ["--version"]);
+    } catch {
+      return { success: false, error: `找到 kimi 路径 ${kimiPath}，但无法运行。请检查安装是否完整。` };
+    }
+
+    const child = spawn(kimiPath, ["vis", "--no-open"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      cwd: os.homedir(),
+      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    });
+
+    let exited = false;
+    child.on("error", (err) => {
+      console.error("[KIMI VIS] spawn error:", err);
+    });
+    child.on("exit", (code) => {
+      exited = true;
+      console.warn(`[KIMI VIS] exited with code ${code ?? "unknown"}`);
+    });
+
+    // 等待 3 秒，看进程是否立即崩溃
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    if (exited) {
+      return {
+        success: false,
+        error: "kimi vis 进程启动后立刻退出。请确保 kimi CLI 已正确安装，并能在终端运行 'kimi vis --no-open'。",
+      };
+    }
+
+    // 确认进程仍在运行
+    try {
+      if (child.pid) process.kill(child.pid, 0);
+    } catch {
+      return {
+        success: false,
+        error: "kimi vis 进程已退出。请确保 kimi CLI 已正确安装。",
+      };
+    }
+
+    child.unref();
+    return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

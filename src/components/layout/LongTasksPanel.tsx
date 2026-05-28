@@ -173,65 +173,65 @@ export function LongTasksPanel() {
       aria-labelledby="long-tasks-title"
     >
       <div
-        className="flex max-h-[84vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[18px] border border-[#dedad2] bg-white shadow-[0_28px_90px_rgba(25,23,20,0.22)]"
+        className="flex max-h-[84vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[18px] border border-border-default bg-surface-elevated shadow-floating-token"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#ebe7df]" style={{ padding: "20px 24px" }}>
+        <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "20px 24px" }}>
           <div className="flex min-w-0 items-center gap-2.5">
-            <Clock size={18} className="shrink-0 text-[#8f887e]" />
+            <Clock size={18} className="shrink-0 text-text-muted" />
             <div className="min-w-0">
-              <h2 id="long-tasks-title" className="text-[18px] font-semibold leading-6 text-[#24211d]">长程任务</h2>
-              <div className="mt-0.5 truncate text-[13px] leading-5 text-[#8f887e]">
+              <h2 id="long-tasks-title" className="text-[18px] font-semibold leading-6 text-text-primary">长程任务</h2>
+              <div className="mt-0.5 truncate text-[13px] leading-5 text-text-muted">
                 {selectedProject ? selectedProject.name : "未选择项目"}
               </div>
             </div>
           </div>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8f887e] hover:bg-[#f1eee8] hover:text-[#24211d]" onClick={() => setOpen(false)} aria-label="关闭长程任务">
+          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={() => setOpen(false)} aria-label="关闭长程任务">
             <X size={16} />
           </button>
         </div>
 
         <div className="min-h-0 overflow-y-auto" style={{ padding: 28 }}>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-[#e7e2d8] bg-[#fbfaf7]" style={{ gap: 16, padding: "18px 18px" }}>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border-default bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
             <div className="min-w-0">
-              <div className="text-[14.5px] font-medium leading-5 text-[#302d28]">项目</div>
-              <div className="mt-1 truncate text-[13px] leading-5 text-[#7c756c]">{selectedProject?.path ?? "选择一个项目来创建长程任务"}</div>
+              <div className="text-[14.5px] font-medium leading-5 text-text-primary">项目</div>
+              <div className="mt-1 truncate text-[13px] leading-5 text-text-secondary">{selectedProject?.path ?? "选择一个项目来创建长程任务"}</div>
             </div>
             <div className="flex shrink-0 items-center" style={{ gap: 10 }}>
               {currentProject && (
-                <button type="button" onClick={() => setSelectedProject(currentProject)} className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#eeeae3]">
+                <button type="button" onClick={() => setSelectedProject(currentProject)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover">
                   <FolderOpen size={14} />
                   <span>当前项目</span>
                 </button>
               )}
-              <button type="button" onClick={selectOtherProject} className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#eeeae3]">
+              <button type="button" onClick={selectOtherProject} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover">
                 <Plus size={14} />
                 <span>选择项目</span>
               </button>
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#e7e2d8] bg-white" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
-            <div className="flex items-center gap-2 text-[15px] font-medium leading-6 text-[#302d28]">
-              <MessageSquareText size={16} className="text-[#706b63]" />
+          <div className="rounded-xl border border-border-default bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
+            <div className="flex items-center gap-2 text-[15px] font-medium leading-6 text-text-primary">
+              <MessageSquareText size={16} className="text-text-secondary" />
               <span>创建长程任务</span>
             </div>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="任务标题（可选）"
-              className="h-10 w-full rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
+              className="h-10 w-full rounded-xl border border-border-default bg-surface-base text-[14px] outline-none placeholder:text-text-muted focus:border-border-strong focus:bg-surface-elevated"
               style={{ marginTop: 20, paddingLeft: 16, paddingRight: 16 }}
             />
             <textarea
               value={initialRequest}
               onChange={(event) => setInitialRequest(event.target.value)}
               placeholder="输入长程任务的初始需求，后续会进入多轮澄清和计划设计"
-              className="min-h-[120px] w-full resize-none rounded-xl border border-[#e3ded6] bg-[#fbfaf7] text-[14px] leading-6 outline-none placeholder:text-[#aaa49a] focus:border-[#cfc8bc] focus:bg-white"
+              className="min-h-[120px] w-full resize-none rounded-xl border border-border-default bg-surface-base text-[14px] leading-6 outline-none placeholder:text-text-muted focus:border-border-strong focus:bg-surface-elevated"
               style={{ marginTop: 16, padding: "14px 16px" }}
             />
             <div className="flex flex-wrap items-center justify-between" style={{ marginTop: 20, gap: 14 }}>
-              <div className="flex min-w-0 items-center gap-2 text-[13px] leading-5 text-[#8f887e]">
+              <div className="flex min-w-0 items-center gap-2 text-[13px] leading-5 text-text-muted">
                 <Bot size={14} />
                 <span className="truncate">创建后会启动执行 agent 和审查 agent 两个独立 session</span>
               </div>
@@ -239,7 +239,7 @@ export function LongTasksPanel() {
                 type="button"
                 disabled={!selectedProject || !initialRequest.trim() || isCreating}
                 onClick={() => void createTask()}
-                className="kimix-icon-text-button bg-[#339af0] text-white hover:bg-[#228be6] disabled:cursor-not-allowed disabled:opacity-50"
+                className="kimix-icon-text-button bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ paddingLeft: 16, paddingRight: 16 }}
               >
                 {isCreating ? <Loader2 size={14} className="kimix-spin" /> : <Plus size={14} />}
@@ -249,7 +249,7 @@ export function LongTasksPanel() {
           </div>
 
           {error && (
-            <div className="mt-4 rounded-xl border border-[#f0d7b8] bg-[#fff8ef] text-[13.5px] leading-5 text-[#8b5a24]" style={{ padding: "12px 14px" }}>
+            <div className="mt-4 rounded-xl border border-accent-warning/30 bg-accent-warning-light text-[13.5px] leading-5 text-accent-warning" style={{ padding: "12px 14px" }}>
               {error}
             </div>
           )}

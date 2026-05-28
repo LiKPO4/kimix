@@ -69,7 +69,7 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
         disabled={disabled}
         rows={1}
         style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT, overflowWrap: "anywhere", wordBreak: "break-word", paddingTop: 3, paddingBottom: 6 }}
-        className="no-focus-outline block w-full resize-none whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-[14.5px] leading-[21px] text-[#27231f] placeholder:text-[#b8b2a8] shadow-none outline-none ring-0 caret-[#24211d] focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
+        className="no-focus-outline block w-full resize-none whitespace-pre-wrap break-words border-0 bg-transparent p-0 text-[14.5px] leading-[21px] text-text-primary placeholder:text-text-muted shadow-none outline-none ring-0 caret-accent-primary focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed"
       />
     );
   },

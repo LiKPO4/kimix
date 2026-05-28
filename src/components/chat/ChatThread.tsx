@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import { useSessionStore } from "@/stores/sessionStore";
+import { useLiveSession } from "@/hooks/useLiveSession";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
@@ -95,18 +95,18 @@ function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: st
   }, [path, projectPath]);
 
   return (
-    <div className="w-full overflow-hidden rounded-[14px] border border-[#cfe4fb] bg-[#f8fbff]">
-      <div className="flex min-h-14 items-center border-b border-[#dbeafa]" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
-        <FileText size={16} className="shrink-0 text-[#2f6fad]" />
+    <div className="w-full overflow-hidden rounded-[var(--radius-md)] border border-accent-primary-soft bg-accent-primary-light">
+      <div className="flex min-h-14 items-center border-b border-accent-primary-soft" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
+        <FileText size={16} className="shrink-0 text-accent-primary" />
         <div className="min-w-0 flex-1">
-          <div className="text-[14.5px] font-medium leading-5 text-[#24415f]">待确认的 Plan</div>
-          <div className="mt-1 truncate text-[12.5px] leading-5 text-[#6f87a1]">{path}</div>
+          <div className="text-[14.5px] font-medium leading-5 text-accent-primary-dark">待确认的 Plan</div>
+          <div className="mt-1 truncate text-[12.5px] leading-5 text-accent-primary-soft">{path}</div>
         </div>
         <button
           type="button"
           onClick={loadPlan}
           disabled={loading}
-          className="kimix-icon-text-button is-compact shrink-0 bg-white text-[#2f6fad] hover:bg-[#eef7ff] disabled:cursor-wait disabled:opacity-60"
+          className="kimix-icon-text-button is-compact shrink-0 bg-surface-elevated text-accent-primary hover:bg-accent-primary-light disabled:cursor-wait disabled:opacity-60"
         >
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
           刷新
@@ -114,15 +114,15 @@ function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: st
       </div>
       <div style={{ padding: "16px 18px 18px" }}>
         {loading ? (
-          <div className="rounded-lg bg-white text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 14px" }}>
+          <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-accent-primary-soft" style={{ padding: "13px 14px" }}>
             正在读取 Plan 内容...
           </div>
         ) : error ? (
-          <div className="rounded-lg bg-[#fff4f0] text-[13px] leading-6 text-[#9b4b34]" style={{ padding: "13px 14px" }}>
+          <div className="rounded-lg bg-accent-danger-light text-[13px] leading-6 text-accent-danger" style={{ padding: "13px 14px" }}>
             读取 Plan 失败：{error}
           </div>
         ) : (
-          <div className="max-h-[520px] overflow-y-auto rounded-lg bg-white text-[14px] leading-6 text-[#24415f]" style={{ padding: "16px 16px" }}>
+          <div className="max-h-[520px] overflow-y-auto rounded-lg bg-surface-elevated text-[14px] leading-6 text-accent-primary-dark" style={{ padding: "16px 16px" }}>
             <MarkdownRenderer content={content || "Plan 文件为空。"} />
           </div>
         )}
@@ -532,7 +532,7 @@ export function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
-  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
+  const session = useLiveSession(currentSession?.id);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoFollowRef = useRef(true);
   const userScrollRef = useRef(false);
@@ -665,14 +665,17 @@ export function ChatThread() {
         onTouchStart={pauseAutoFollowForUser}
       >
         <div className="kimix-chat-column flex w-full flex-col" style={{ gap: 22 }}>
-          {renderItems.map((item) => (
-            item.type === "tool_group"
-              ? <ToolGroup key={item.id} tools={item.tools} />
-              : item.type === "plan_preview"
-                ? <PlanPreviewCard key={item.id} path={item.path} projectPath={item.projectPath} />
-                : item.type === "change_group"
-                  ? <ChangeCard key={item.id} changes={item.changes} />
-                : <EventRenderer key={item.event.id} event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} />
+          {renderItems.map((item, index) => (
+            <div key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id} className="kimix-message-enter" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
+              {item.type === "tool_group"
+                ? <ToolGroup tools={item.tools} />
+                : item.type === "plan_preview"
+                  ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} />
+                  : item.type === "change_group"
+                    ? <ChangeCard changes={item.changes} />
+                    : <EventRenderer event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} />
+              }
+            </div>
           ))}
         </div>
       </div>

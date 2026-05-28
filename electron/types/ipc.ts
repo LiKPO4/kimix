@@ -214,6 +214,109 @@ export type CheckKimiCliRequest = {
   verify?: boolean;
 };
 
+export type KimiAuthStatus = {
+  available: boolean;
+  path?: string;
+  loggedIn: boolean;
+  configPath: string;
+  mcpConfigPath: string;
+  defaultModel: string | null;
+  defaultThinking: boolean;
+  message: string;
+};
+
+export type GetKimiAuthStatusResponse = {
+  success: true;
+  data: KimiAuthStatus;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiLoginResponse = {
+  success: true;
+  data: KimiAuthStatus & {
+    verificationUrl?: string;
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiLogoutResponse = {
+  success: true;
+  data: KimiAuthStatus & {
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type McpServerInfo = {
+  name: string;
+  transport: "http" | "stdio";
+  url?: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  auth?: "oauth" | string;
+};
+
+export type ListMcpServersResponse = {
+  success: true;
+  data: {
+    configPath: string;
+    servers: McpServerInfo[];
+    rawExists: boolean;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type AddMcpServerRequest = {
+  name: string;
+  transport: "http" | "stdio";
+  url?: string;
+  command?: string;
+  args?: string[];
+  env?: string[];
+  headers?: string[];
+  auth?: "oauth";
+};
+
+export type RemoveMcpServerRequest = {
+  name: string;
+};
+
+export type McpServerActionRequest = {
+  name: string;
+};
+
+export type McpServerMutationResponse = {
+  success: true;
+  data: {
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type TestMcpServerResponse = {
+  success: true;
+  data: {
+    success: boolean;
+    output: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type InstallKimiCliResponse = {
   success: true;
   data: {
@@ -634,6 +737,7 @@ export type DownloadUpdateProgress = {
   percent: number;
   receivedBytes: number;
   totalBytes?: number;
+  bytesPerSecond?: number;
 };
 
 export type CopyImageRequest = {

@@ -143,7 +143,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
                   key={image.id ?? `${image.name}-${index}`}
                   type="button"
                   onClick={() => setPreviewImage(image)}
-                  className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[14px] shadow-[0_1px_3px_rgba(25,23,20,0.06)] transition-colors"
+                  className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
                   title="点击查看图片"
                   aria-label={`查看图片 ${image.name}`}
                 >
@@ -165,7 +165,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
         {hasText && (
           <div
             style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8, whiteSpace: "pre-wrap" }}
-            className="kimix-user-bubble rounded-[16px] text-[14.5px] leading-[1.45] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+            className="kimix-user-bubble rounded-[var(--radius-md)] text-[14.5px] leading-[1.45]"
           >
             {event.content}
           </div>
@@ -177,7 +177,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
             title="复制"
             aria-label="复制"
           >
-            {copied ? <Check size={13} className="text-accent-green" /> : <Copy size={13} />}
+            {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
           </button>
           <button
             onClick={handleResend}
@@ -228,7 +228,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
                 },
               });
             }}
-            className="kimix-icon-text-button absolute bottom-8 rounded-xl bg-[#339af0] text-white shadow-[0_8px_24px_rgba(0,0,0,0.22)] hover:bg-[#228be6]"
+            className="kimix-icon-text-button absolute bottom-8 rounded-xl bg-accent-primary text-white shadow-elevated-token hover:bg-accent-primary-dark"
             style={{ paddingLeft: 16, paddingRight: 16 }}
           >
             画板
@@ -264,14 +264,14 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
         <div className="max-w-[58%]">
           <div
             style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
-            className="kimix-user-bubble rounded-[16px] text-[14.5px] leading-[1.45] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+            className="kimix-user-bubble rounded-[var(--radius-md)] text-[14.5px] leading-[1.45]"
           >
             {event.content}
           </div>
-          <div className={`mt-1.5 text-right text-[13px] leading-5 ${event.status === "failed" ? "text-accent-red" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+          <div className={`mt-1.5 text-right text-[13px] leading-5 ${event.status === "failed" ? "text-accent-danger" : "text-[var(--kimix-panel-text-secondary)]"}`}>
             {label}
           </div>
-          {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-red">{event.error}</div>}
+          {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-danger">{event.error}</div>}
         </div>
       </div>
     </div>
@@ -307,6 +307,16 @@ function describeTool(tool: ToolEvent) {
       ? tool.arguments.cmd
       : tool.rawArguments || tool.toolName || "工具调用";
   return command.replace(/\s+/g, " ").slice(0, 220);
+}
+
+function stringifyToolDetail(value: unknown) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
@@ -361,13 +371,13 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid min-h-10 w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] leading-6 text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 8, paddingBottom: 8 }}
+        className="grid h-10 w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] leading-none text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Brain size={15} />
         </span>
-        <span className="min-w-0 flex-1">{firstThinkingSentence(block.text)}</span>
+        <span className="min-w-0 flex-1 truncate">{firstThinkingSentence(block.text)}</span>
         {canExpand && (
           <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -375,7 +385,7 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         )}
       </button>
       {expanded && (
-        <pre className="kimix-soft-card-strong mt-3 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
+        <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
           {block.text}
         </pre>
       )}
@@ -384,34 +394,88 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
 }
 
 function ToolProcessItem({ tool }: { tool: ToolEvent }) {
+  const [expanded, setExpanded] = useState(false);
+  const argumentText = tool.rawArguments?.trim() || stringifyToolDetail(tool.arguments);
+  const resultText = stringifyToolDetail(tool.result).trim();
+  const detailText = [
+    `工具：${tool.toolName || "未知工具"}`,
+    argumentText ? `参数：\n${argumentText}` : "",
+    resultText ? `结果：\n${resultText}` : "",
+  ].filter(Boolean).join("\n\n");
+  const canExpand = detailText.trim().length > 0;
   return (
-    <div className="kimix-soft-card grid min-h-10 grid-cols-[18px_auto_minmax(0,1fr)_auto_8px] items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
-      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
-        <SquareTerminal size={14} />
-      </span>
-      <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
-      <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
-      {tool.durationMs !== undefined && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">{Math.max(0, Math.round(tool.durationMs / 1000))}s</span>}
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tool.status === "error" ? "bg-[#d83b01]" : tool.status === "running" ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
+    <div className="kimix-soft-card overflow-hidden rounded-xl text-[13.5px]">
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((value) => !value)}
+        disabled={!canExpand}
+        className="grid h-10 w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+      >
+        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+          <SquareTerminal size={14} />
+        </span>
+        <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
+        <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
+        <span className="w-8 shrink-0 text-right text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
+          <span className={`h-1.5 w-1.5 rounded-full ${tool.status === "error" ? "bg-accent-danger" : tool.status === "running" ? "bg-accent-warning" : "bg-accent-success"}`} />
+        </span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+        </span>
+      </button>
+      {expanded && (
+        <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13px] leading-6" style={{ padding: "12px 14px" }}>
+          {detailText}
+        </pre>
+      )}
     </div>
   );
 }
 
 function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
+  const [expanded, setExpanded] = useState(false);
   const isRunning = subagent.status === "running";
   const isError = subagent.status === "error";
+  const childSummary = subagent.events.length > 0
+    ? `${subagent.events.length} 条子事件`
+    : "暂无子事件详情";
+  const detailText = [
+    `子代理：${subagent.agentName || "subagent"}`,
+    `状态：${isRunning ? "运行中" : isError ? "运行失败" : "已完成"}`,
+    `详情：${childSummary}`,
+  ].join("\n");
   return (
-    <div className="kimix-soft-card grid min-h-10 grid-cols-[18px_auto_minmax(0,1fr)_8px] items-center rounded-xl text-[13.5px]" style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}>
-      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
-        {isRunning ? (
-          <Loader2 size={14} className="kimix-spin" />
-        ) : (
-          <Bot size={14} />
-        )}
-      </span>
-      <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
-      <span className="min-w-0 flex-1 truncate">{subagent.agentName || "子代理"}</span>
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isError ? "bg-[#d83b01]" : isRunning ? "bg-[#d6a100]" : "bg-[#1a8f3a]"}`} />
+    <div className="kimix-soft-card overflow-hidden rounded-xl text-[13.5px]">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="grid h-10 w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+      >
+        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+          {isRunning ? (
+            <Loader2 size={14} className="kimix-spin" />
+          ) : (
+            <Bot size={14} />
+          )}
+        </span>
+        <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
+        <span className="min-w-0 flex-1 truncate">{subagent.agentName || "子代理"}</span>
+        <span className="w-8 shrink-0 text-right text-[var(--kimix-panel-text-muted)]">{subagent.events.length > 0 ? `${subagent.events.length}条` : ""}</span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
+          <span className={`h-1.5 w-1.5 rounded-full ${isError ? "bg-accent-danger" : isRunning ? "bg-accent-warning" : "bg-accent-success"}`} />
+        </span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        </span>
+      </button>
+      {expanded && (
+        <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13px] leading-6" style={{ padding: "12px 14px" }}>
+          {detailText}
+        </pre>
+      )}
     </div>
   );
 }
@@ -575,7 +639,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
               title="复制"
               aria-label="复制"
             >
-              {copied ? <Check size={13} className="text-accent-green" /> : <Copy size={13} />}
+              {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
             </button>
             {hookBadgeEvents.length > 0 && (
               <button

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useAppStore } from "@/stores/appStore";
-import { useSessionStore } from "@/stores/sessionStore";
+import { useLiveSession } from "@/hooks/useLiveSession";
 import { getSessionRecommendationMetrics, getLatestMeaningfulStatus } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
@@ -22,7 +22,7 @@ function CircularProgress({ percent, size = 18, strokeWidth = 2.5 }: { percent: 
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="#e8e3da"
+        stroke="var(--border-default)"
         strokeWidth={strokeWidth}
       />
       <circle
@@ -68,7 +68,7 @@ export function ContextRing() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const sessionRecommendationEnabled = useAppStore((s) => s.sessionRecommendationEnabled);
   const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
-  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === currentSession?.id));
+  const session = useLiveSession(currentSession?.id);
 
   const latestStatus = getLatestMeaningfulStatus(session?.events ?? []);
 
@@ -141,18 +141,18 @@ export function ContextRing() {
     >
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-xl text-[#8f887e] transition-colors hover:bg-[#f1eee8] hover:text-[#24211d]"
+        className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
         aria-label="上下文使用情况"
       >
         <CircularProgress percent={percent} size={18} strokeWidth={2.5} />
       </button>
       {showTooltip && (
         <div
-          className="absolute bottom-full right-0 z-[90] mb-2 w-[248px] rounded-xl border border-[#e5e1d8] bg-white shadow-[0_14px_34px_rgba(25,23,20,0.14)]"
+          className="absolute bottom-full right-0 z-[90] mb-2 w-[248px] rounded-xl border border-border-subtle bg-surface-elevated shadow-floating-token"
           style={{ padding: "18px 20px" }}
         >
           <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-            <span className="text-[13px] text-[#8a847a]">背景信息窗口：</span>
+            <span className="text-[13px] text-text-muted">背景信息窗口：</span>
             <button
               type="button"
               onClick={handleCompact}
@@ -160,7 +160,7 @@ export function ContextRing() {
               className="shrink-0 rounded-md text-[13px] transition-colors disabled:cursor-not-allowed"
               style={{
                 padding: "2px 8px",
-                color: isCompacting ? "#d6a100" : canCompact ? "#339af0" : "#aaa49a",
+                color: isCompacting ? "var(--accent-warning)" : canCompact ? "var(--accent-primary)" : "var(--text-muted)",
               }}
             >
               {isCompacting ? (
@@ -171,41 +171,41 @@ export function ContextRing() {
               ) : "压缩"}
             </button>
           </div>
-          <div className="text-[14px] font-medium text-[#24211d]">
+          <div className="text-[14px] font-medium text-text-primary">
             {percent.toFixed(0)}% 已用（剩余 {remaining.toFixed(0)}%）
           </div>
-          <div className="text-[13px] text-[#8a847a]" style={{ marginTop: 4 }}>
+          <div className="text-[13px] text-text-muted" style={{ marginTop: 4 }}>
             已用 {formatK(used)} 标记，共 {formatK(contextLimit)}
           </div>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#f0ece5]">
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
             <div
               className="h-full rounded-full"
               style={{
                 width: `${percent}%`,
-                backgroundColor: percent >= 90 ? "#d83b01" : percent >= 70 ? "#d6a100" : "#339af0",
+                backgroundColor: percent >= 90 ? "var(--accent-danger)" : percent >= 70 ? "var(--accent-warning)" : "var(--accent-primary)",
                 transition: "width 0.3s ease",
               }}
             />
           </div>
           {sessionRecommendationEnabled && (
-            <div className="mt-4 border-t border-[#eee9e1]" style={{ paddingTop: 14 }}>
+            <div className="mt-4 border-t border-border-subtle" style={{ paddingTop: 14 }}>
               <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 7 }}>
-                <span className="text-[13px] text-[#8a847a]">推荐会话长度：</span>
-                <span className={`shrink-0 text-[13px] ${recommendation.remainingTurns === 0 ? "text-[#d08300]" : "text-[#625d55]"}`}>
+                <span className="text-[13px] text-text-muted">推荐会话长度：</span>
+                <span className={`shrink-0 text-[13px] ${recommendation.remainingTurns === 0 ? "text-accent-warning" : "text-text-secondary"}`}>
                   剩余 {recommendation.remainingTurns}/{recommendation.turnLimit} 轮
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#f0ece5]">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
                 <div
                   className="h-full rounded-full"
                   style={{
                     width: `${recommendation.turnPercent}%`,
-                    backgroundColor: recommendation.turnPercent >= 100 ? "#d08300" : "#4b8fd8",
+                    backgroundColor: recommendation.turnPercent >= 100 ? "var(--accent-warning)" : "var(--accent-primary)",
                     transition: "width 0.3s ease",
                   }}
                 />
               </div>
-              <div className="mt-2 text-[12.5px] leading-5 text-[#9a948b]">
+              <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
                 已进行 {recommendation.turnCount} 轮，达到上限后会在每轮末尾提示开启新对话。
               </div>
             </div>

@@ -43,15 +43,15 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   };
 
   return (
-    <div className="relative my-3 overflow-hidden rounded-lg border border-[#e3ded5] bg-[#fbfaf7]">
-      <div className="flex items-center justify-between border-b border-[#e8e3da] bg-[#f2f0eb]" style={{ gap: 12, paddingLeft: 18, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}>
-        <span className="min-w-0 truncate font-mono text-xs text-[#9a948b]">
+    <div className="relative my-3 overflow-hidden rounded-lg border border-border-subtle bg-surface-base">
+      <div className="flex items-center justify-between border-b border-border-subtle bg-surface-hover" style={{ gap: 12, paddingLeft: 18, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}>
+        <span className="min-w-0 truncate font-mono text-xs text-text-muted">
           {className?.replace("language-", "") || "code"}
         </span>
         <button
           type="button"
           onClick={() => void copyCode()}
-          className="kimix-icon-text-button is-compact shrink-0 text-[#9a948b] hover:bg-[#e9e5de] hover:text-[#706b63]"
+          className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-active hover:text-text-secondary"
           style={{ minHeight: 30, paddingLeft: 11, paddingRight: 12 }}
           title="复制代码"
           aria-label="复制代码"
@@ -61,7 +61,7 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
         </button>
       </div>
       <pre
-        className={`${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"} bg-[#fbfaf7]`}
+        className={`${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"} bg-surface-base`}
         style={{
           paddingLeft: 18,
           paddingRight: 18,
@@ -134,7 +134,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
         if (!isBlock) {
           return (
             <code
-              className="rounded-md bg-[#f2f0eb] font-mono text-[0.9em] text-[#37322c]"
+              className="rounded-md bg-surface-hover font-mono text-[0.9em] text-text-primary"
               style={{
                 marginLeft: 2,
                 marginRight: 2,
@@ -193,6 +193,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
       th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 text-left" style={{ border: "1px solid #e5e1d8" }}>{children}</th>,
       td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2" style={{ border: "1px solid #eee9e1" }}>{children}</td>,
       hr: () => <hr className="my-4 border-border-default" />,
+      del: ({ children }: { children?: React.ReactNode }) => <span>~{children}~</span>,
     }),
     [wrapLongLines]
   );

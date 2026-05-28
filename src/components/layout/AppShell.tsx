@@ -4,121 +4,42 @@ import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
 import { getVisibleTodos } from "@/components/chat/TodoPanel";
-import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
 import { HooksPanel } from "./HooksPanel";
+import { McpPanel } from "./McpPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
 import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  Archive,
-  BookOpen,
-  CheckCircle2,
-  ChevronDown,
-  Code2,
-  Copy,
-  Clipboard,
   ClipboardList,
-  ClipboardCopy,
-  Ellipsis,
-  ExternalLink,
-  FileText,
-  FolderOpen,
-  GitFork,
-  GitBranch,
-  HelpCircle,
-  History,
-  Info,
-  Keyboard,
-  Laptop,
-  Link,
-  Minus,
+  LucideIcon,
   MessageSquarePlus,
-  Monitor,
-  PanelLeft,
-  PanelLeftOpen,
-  PanelRight,
-  Pencil,
-  Pin,
-  Play,
-  Pause,
-  RefreshCw,
-  RotateCcw,
-  Square,
-  SquareTerminal,
-  X,
-  type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Session, TimelineEvent } from "@/types/ui";
+import type { Session } from "@/types/ui";
 import type { KimiCliUpdateInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { collectSessionDiffs } from "@/utils/diff";
+import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
+import { type DownloadProgressInfo } from "@/utils/format";
+import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
+import { sendDocumentCommand, isInputLike } from "@/utils/dom";
+import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
+import { clampWidth } from "@/utils/number";
+import { DialogSystem } from "./DialogSystem";
+import { SessionToolbar } from "./SessionToolbar";
+import { DiffPanel } from "./DiffPanel";
+import { ToastSystem } from "./ToastSystem";
+import { LongTaskInspectorPanel, type SessionPlanState } from "./LongTaskInspectorPanel";
+import { ResizeHandle } from "./ResizeHandle";
 
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 440;
 const RIGHT_PANEL_MIN_WIDTH = 280;
 const RIGHT_PANEL_MAX_WIDTH = 560;
 
-type MenuAction =
-  | "close-chat"
-  | "new-window"
-  | "new-chat"
-  | "quick-chat"
-  | "open-project"
-  | "settings"
-  | "about"
-  | "logout"
-  | "exit"
-  | "undo"
-  | "redo"
-  | "cut"
-  | "copy"
-  | "paste"
-  | "delete"
-  | "select-all"
-  | "toggle-sidebar"
-  | "toggle-terminal"
-  | "toggle-file-tree"
-  | "open-browser-tab"
-  | "reload-browser-page"
-  | "toggle-diff-panel"
-  | "find"
-  | "previous-chat"
-  | "next-chat"
-  | "back"
-  | "forward"
-  | "zoom-in"
-  | "zoom-out"
-  | "actual-size"
-  | "toggle-fullscreen"
-  | "minimize"
-  | "zoom-window"
-  | "close-window"
-  | "documentation"
-  | "whats-new"
-  | "automations"
-  | "local-environments"
-  | "worktrees"
-  | "skills"
-  | "mcp"
-  | "troubleshooting"
-  | "send-feedback"
-  | "performance-trace"
-  | "keyboard-shortcuts";
-
-type MenuEntry =
-  | { type: "separator" }
-  | { type?: "item"; label: string; hint?: string; action: MenuAction; disabled?: boolean; note?: string };
-
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
-
-type SessionMenuEntry =
-  | { type: "separator" }
-  | { type?: "item"; label: string; hint?: string; icon: LucideIcon; disabled?: boolean; action: () => void | Promise<void> };
 
 type ReleaseInfo = {
   tagName: string;
@@ -136,244 +57,6 @@ type KimiCliOnboardingState = {
   path?: string;
   output?: string;
 };
-
-const KIMI_CLI_DOCS_URL = "https://moonshotai.github.io/kimi-cli/zh/guides/getting-started.html";
-const KIMI_CLI_WINDOWS_INSTALL_COMMAND = "Invoke-RestMethod https://code.kimi.com/install.ps1 | Invoke-Expression";
-
-type ParsedBigPlanStep = {
-  index: number;
-  title: string;
-  goal: string;
-  scope: string;
-  acceptance: string;
-  status: string;
-};
-
-type ParsedLongTaskDetail = {
-  goal: string;
-  initialRequest: string;
-  steps: ParsedBigPlanStep[];
-  reviewItems: string[];
-  rounds: ParsedLongTaskRound[];
-};
-
-type ParsedLongTaskRoundEntry = {
-  title: string;
-  phase: string;
-  role: string;
-  conclusion: string;
-  content: string;
-};
-
-type ParsedLongTaskRound = {
-  step: number;
-  filePath: string;
-  updatedAt: number;
-  entries: ParsedLongTaskRoundEntry[];
-};
-
-type SessionDiffEntry = {
-  id: string;
-  filePath: string;
-  timestamp: number;
-  oldText: string;
-  newText: string;
-  additions: number;
-  deletions: number;
-};
-
-type DiffLine = {
-  kind: "same" | "added" | "removed";
-  oldNumber?: number;
-  newNumber?: number;
-  text: string;
-};
-
-const longTaskStageLabels: Record<NonNullable<Session["longTask"]>["stage"], string> = {
-  drafting: "澄清中",
-  planning: "规划中",
-  ready: "待执行",
-  running: "执行中",
-  reviewing: "审查中",
-  paused: "已暂停",
-  completed: "已完成",
-};
-
-const longTaskAgentLabels: Record<NonNullable<Session["longTask"]>["activeAgent"], string> = {
-  executor: "执行",
-  reviewer: "审查",
-};
-
-function extractMarkdownSection(content: string, heading: string) {
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = content.match(new RegExp(`^##\\s+${escaped}\\s*\\r?\\n([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, "m"));
-  return match?.[1]?.trim() ?? "";
-}
-
-function extractField(block: string, label: string) {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = block.match(new RegExp(`^${escaped}：\\s*(.*)$`, "m"));
-  return match?.[1]?.trim() ?? "";
-}
-
-function parseBigPlanSteps(content: string): ParsedBigPlanStep[] {
-  const steps: ParsedBigPlanStep[] = [];
-  const stepRegex = /^###\s+Step\s+(\d+)([^\r\n]*)\r?\n([\s\S]*?)(?=^###\s+Step\s+\d+|^##\s+|(?![\s\S]))/gm;
-  for (const match of content.matchAll(stepRegex)) {
-    const index = Number(match[1]);
-    const suffix = match[2]?.trim();
-    const block = match[3] ?? "";
-    steps.push({
-      index,
-      title: suffix || `Step ${index}`,
-      goal: extractField(block, "目标"),
-      scope: extractField(block, "范围"),
-      acceptance: extractField(block, "验收标准"),
-      status: extractField(block, "状态") || "未标记",
-    });
-  }
-  return steps;
-}
-
-function parseReviewItems(content: string) {
-  const pending = extractMarkdownSection(content, "待处理") || content;
-  return pending
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => /^[-*]\s+/.test(line))
-    .map((line) => line.replace(/^[-*]\s+/, "").trim())
-    .filter((line) => line && line !== "暂无");
-}
-
-function extractBulletField(block: string, label: string) {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = block.match(new RegExp(`^-\\s+${escaped}：\\s*(.*)$`, "m"));
-  return match?.[1]?.trim() ?? "";
-}
-
-function parseRoundEntries(content: string): ParsedLongTaskRoundEntry[] {
-  const entries: ParsedLongTaskRoundEntry[] = [];
-  const entryRegex = /^##\s+([^\r\n]+)\r?\n([\s\S]*?)(?=^##\s+|(?![\s\S]))/gm;
-  for (const match of content.matchAll(entryRegex)) {
-    const block = match[2] ?? "";
-    const recordMatch = block.match(/^###\s+记录\s*\r?\n([\s\S]*)$/m);
-    entries.push({
-      title: match[1]?.trim() || "轮次记录",
-      phase: extractBulletField(block, "阶段"),
-      role: extractBulletField(block, "角色"),
-      conclusion: extractBulletField(block, "结论"),
-      content: (recordMatch?.[1] ?? block).trim(),
-    });
-  }
-  if (entries.length > 0) return entries;
-  const fallback = content.replace(/^#\s+[^\r\n]+\r?\n+/, "").trim();
-  return fallback ? [{
-    title: "轮次记录",
-    phase: "",
-    role: "",
-    conclusion: "",
-    content: fallback,
-  }] : [];
-}
-
-function parseLongTaskRounds(detail: LongTaskDetail) {
-  return detail.rounds.map((round) => ({
-    step: round.step,
-    filePath: round.filePath,
-    updatedAt: round.updatedAt,
-    entries: parseRoundEntries(round.content),
-  }));
-}
-
-function parseLongTaskDetail(detail: LongTaskDetail | null): ParsedLongTaskDetail | null {
-  if (!detail) return null;
-  return {
-    goal: extractMarkdownSection(detail.bigPlanContent, "目标") || detail.title,
-    initialRequest: extractMarkdownSection(detail.bigPlanContent, "初始需求") || detail.initialRequest,
-    steps: parseBigPlanSteps(detail.bigPlanContent),
-    reviewItems: parseReviewItems(detail.reviewQueueContent),
-    rounds: parseLongTaskRounds(detail),
-  };
-}
-
-function normalizeReviewItem(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-const MENU_ITEMS: Record<string, MenuEntry[]> = {
-  文件: [
-    { label: "关闭对话", hint: "Ctrl+W", action: "close-chat" },
-    { label: "新建窗口", hint: "Ctrl+Shift+N", action: "new-window", disabled: true, note: "新建窗口暂未接入" },
-    { label: "新对话", hint: "Ctrl+N", action: "new-chat" },
-    { label: "快速对话", hint: "Alt+Ctrl+N", action: "quick-chat" },
-    { label: "打开项目...", hint: "Ctrl+O", action: "open-project" },
-    { type: "separator" },
-    { label: "设置...", hint: "Ctrl+逗号", action: "settings" },
-    { type: "separator" },
-    { label: "关于 Kimix", action: "about" },
-    { label: "退出登录", action: "logout", disabled: true, note: "官方 Kimi 登录态暂未暴露给桌面端" },
-    { label: "退出", action: "exit" },
-  ],
-  编辑: [
-    { label: "撤销", hint: "Ctrl+Z", action: "undo" },
-    { label: "重做", hint: "Ctrl+Y", action: "redo" },
-    { type: "separator" },
-    { label: "剪切", hint: "Ctrl+X", action: "cut" },
-    { label: "复制", hint: "Ctrl+C", action: "copy" },
-    { label: "粘贴", hint: "Ctrl+V", action: "paste" },
-    { label: "删除", action: "delete" },
-    { type: "separator" },
-    { label: "全选", hint: "Ctrl+A", action: "select-all" },
-  ],
-  查看: [
-    { label: "切换侧边栏", hint: "Ctrl+B", action: "toggle-sidebar" },
-    { label: "打开终端", hint: "Ctrl+J", action: "toggle-terminal" },
-    { label: "切换文件树", hint: "Ctrl+Shift+E", action: "toggle-file-tree", disabled: true, note: "文件树面板暂未实现" },
-    { label: "打开浏览器标签页", hint: "Ctrl+T", action: "open-browser-tab", disabled: true, note: "内置浏览器页暂未实现" },
-    { label: "重新载入页面", hint: "Ctrl+R", action: "reload-browser-page" },
-    { label: "切换差异面板", hint: "Alt+Ctrl+B", action: "toggle-diff-panel" },
-    { label: "查找", hint: "Ctrl+F", action: "find" },
-    { type: "separator" },
-    { label: "上一个对话", hint: "Ctrl+Shift+[", action: "previous-chat" },
-    { label: "下一个对话", hint: "Ctrl+Shift+]", action: "next-chat" },
-    { label: "后退", hint: "Ctrl+[", action: "back" },
-    { label: "前进", hint: "Ctrl+]", action: "forward" },
-    { type: "separator" },
-    { label: "放大", hint: "Ctrl++", action: "zoom-in" },
-    { label: "缩小", hint: "Ctrl+-", action: "zoom-out" },
-    { label: "实际大小", hint: "Ctrl+0", action: "actual-size" },
-    { type: "separator" },
-    { label: "切换全屏", hint: "F11", action: "toggle-fullscreen" },
-  ],
-  窗口: [
-    { label: "最小化", hint: "Ctrl+M", action: "minimize" },
-    { label: "缩放", action: "zoom-window" },
-    { label: "关闭", hint: "Ctrl+W", action: "close-window" },
-  ],
-  帮助: [
-    { label: "Kimix 文档", action: "documentation" },
-    { label: "更新记录", action: "whats-new" },
-    { label: "自动化", action: "automations" },
-    { label: "本地环境", action: "local-environments" },
-    { label: "工作树", action: "worktrees" },
-    { label: "技能", action: "skills" },
-    { label: "模型上下文协议", action: "mcp" },
-    { label: "故障排查", action: "troubleshooting" },
-    { type: "separator" },
-    { label: "发送反馈", action: "send-feedback" },
-    { label: "开始性能跟踪", action: "performance-trace", disabled: true, note: "性能跟踪暂未接入" },
-    { type: "separator" },
-    { label: "键盘快捷键", action: "keyboard-shortcuts" },
-  ],
-};
-
-const RELEASE_TIMELINE = [
-  { version: "v2.5.0", date: "2026-05-10", text: "补齐顶部中文菜单、关于与更新页面，接入 GitHub Release 检查更新。" },
-  { version: "v2.4.24", date: "2026-05-10", text: "修复引导状态显示、官方 steer 事件映射、队列续发顺序和 dev 白屏。" },
-  { version: "v2.4.23", date: "2026-05-10", text: "增加启动后渲染内容自检，空 root 时自动重载一次。" },
-  { version: "v2.4.22", date: "2026-05-10", text: "收敛按钮尺寸、圆角框灰色化，并优化 TodoList 面板密度。" },
-  { version: "v2.4.18", date: "2026-05-10", text: "接入官方 slash 命令和项目文件候选。" },
-];
 
 const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: string }> = {
   automations: {
@@ -394,7 +77,7 @@ const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: strin
   },
   mcp: {
     title: "模型上下文协议",
-    body: "MCP 管理页尚未实现。当前 Kimix 主要通过 Kimi 官方 SDK 与本机 CLI 通信。",
+    body: "MCP 管理页已经接入首版能力，可查看服务列表、添加服务、测试连接，以及处理 OAuth 授权。",
   },
   troubleshooting: {
     title: "故障排查",
@@ -452,219 +135,6 @@ const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: strin
   "close-window": { title: "", body: "" },
 };
 
-function sendDocumentCommand(command: string) {
-  document.execCommand(command);
-}
-
-function isInputLike(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement {
-  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-}
-
-function formatReleaseDate(value: string): string {
-  if (!value) return "未知时间";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
-}
-
-function formatEventAsMarkdown(event: TimelineEvent): string {
-  if (event.type === "user_message") {
-    const imageLines = event.images?.length
-      ? `\n\n${event.images.map((image) => `![${image.name}](${image.dataUrl ?? image.name})`).join("\n")}`
-      : "";
-    return `## 用户\n\n${event.content || "[图片]"}${imageLines}`;
-  }
-  if (event.type === "steer_message") return `## 用户引导\n\n${event.content}`;
-  if (event.type === "assistant_message") {
-    const thinking = event.thinking ? `\n\n<details>\n<summary>思考</summary>\n\n${event.thinking}\n\n</details>` : "";
-    return `## Kimi\n\n${event.content || ""}${thinking}`;
-  }
-  if (event.type === "tool_call") return `> 命令：${event.toolName}\n>\n> ${event.rawArguments ?? JSON.stringify(event.arguments)}`;
-  if (event.type === "status_update") return `> 状态：${event.message ?? "处理中"}`;
-  if (event.type === "change_summary") return `> 已更改 ${event.files.length} 个文件，+${event.additions} -${event.deletions}`;
-  if (event.type === "file_artifact") return `> 文件：${event.filePath}`;
-  if (event.type === "error") return `> 错误：${event.message}`;
-  if (event.type === "todo") return `> TodoList：${event.items.length} 项`;
-  if (event.type === "session_recommendation") return `> 会话建议：已进行 ${event.turnCount} 轮，推荐上限 ${event.turnLimit} 轮。`;
-  if (event.type === "compaction") return `> 上下文压缩${event.phase === "begin" ? "开始" : "完成"}`;
-  if (event.type === "diff") return `> Diff：${event.filePath}`;
-  if (event.type === "approval_request") return `> 审批请求：${event.description}`;
-  if (event.type === "question_request") return `> 需求澄清：${event.questions.map((question) => question.question).join(" / ")}`;
-  if (event.type === "tool_result") return `> 工具结果：${event.toolName}`;
-  if (event.type === "subagent") return `> 子任务：${event.agentName} ${event.status}`;
-  return "";
-}
-
-function sessionToMarkdown(session: Session): string {
-  const header = `# ${session.title}\n\n- 会话 ID：${session.id}\n- 工作目录：${session.projectPath}\n`;
-  const body = session.events.map(formatEventAsMarkdown).filter(Boolean).join("\n\n---\n\n");
-  return `${header}\n${body}\n`;
-}
-
-function countDiffLines(value: string) {
-  if (!value.trim()) return 0;
-  return value.split("\n").length;
-}
-
-function buildUnifiedDiff(oldText = "", newText = ""): DiffLine[] {
-  const oldLines = oldText.split("\n");
-  const newLines = newText.split("\n");
-  const rows = oldLines.length + 1;
-  const cols = newLines.length + 1;
-  const table = Array.from({ length: rows }, () => Array<number>(cols).fill(0));
-  for (let i = oldLines.length - 1; i >= 0; i -= 1) {
-    for (let j = newLines.length - 1; j >= 0; j -= 1) {
-      table[i][j] = oldLines[i] === newLines[j]
-        ? table[i + 1][j + 1] + 1
-        : Math.max(table[i + 1][j], table[i][j + 1]);
-    }
-  }
-
-  const diff: DiffLine[] = [];
-  let oldIndex = 0;
-  let newIndex = 0;
-  while (oldIndex < oldLines.length && newIndex < newLines.length) {
-    if (oldLines[oldIndex] === newLines[newIndex]) {
-      diff.push({ kind: "same", oldNumber: oldIndex + 1, newNumber: newIndex + 1, text: oldLines[oldIndex] });
-      oldIndex += 1;
-      newIndex += 1;
-    } else if (table[oldIndex + 1][newIndex] >= table[oldIndex][newIndex + 1]) {
-      diff.push({ kind: "removed", oldNumber: oldIndex + 1, text: oldLines[oldIndex] });
-      oldIndex += 1;
-    } else {
-      diff.push({ kind: "added", newNumber: newIndex + 1, text: newLines[newIndex] });
-      newIndex += 1;
-    }
-  }
-  while (oldIndex < oldLines.length) {
-    diff.push({ kind: "removed", oldNumber: oldIndex + 1, text: oldLines[oldIndex] });
-    oldIndex += 1;
-  }
-  while (newIndex < newLines.length) {
-    diff.push({ kind: "added", newNumber: newIndex + 1, text: newLines[newIndex] });
-    newIndex += 1;
-  }
-  return diff;
-}
-
-function renderUnifiedDiff(oldText: string, newText: string) {
-  const diff = buildUnifiedDiff(oldText, newText);
-  if (diff.length === 0) {
-    return (
-      <div className="text-[12.5px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "12px 14px" }}>
-        没有可展示的文本差异。
-      </div>
-    );
-  }
-  return diff.map((line, index) => {
-    const isAdded = line.kind === "added";
-    const isRemoved = line.kind === "removed";
-    const sign = isAdded ? "+" : isRemoved ? "-" : " ";
-    return (
-      <div
-        key={`${line.kind}-${line.oldNumber ?? ""}-${line.newNumber ?? ""}-${index}`}
-        className="grid min-w-0 grid-cols-[20px_42px_1fr] font-mono text-[12px] leading-5"
-        style={{
-          backgroundColor: isAdded ? "#ecf8ef" : isRemoved ? "#fff1ed" : "transparent",
-          color: isAdded ? "#1f6f35" : isRemoved ? "#8f321f" : "#5f564d",
-          padding: "3px 8px",
-        }}
-      >
-        <span className="select-none text-center font-semibold">{sign}</span>
-        <span className="select-none text-right text-[#aaa49a]" style={{ paddingRight: 10 }}>
-          {line.newNumber ?? line.oldNumber ?? ""}
-        </span>
-        <span className="min-w-0 whitespace-pre-wrap break-words">
-          {line.text || " "}
-        </span>
-      </div>
-    );
-  });
-}
-
-function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[] {
-  return events
-    .filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff")
-    .map((event) => ({
-      id: event.id,
-      filePath: event.filePath,
-      timestamp: event.timestamp,
-      oldText: event.oldText,
-      newText: event.newText,
-      additions: Math.max(0, countDiffLines(event.newText) - countDiffLines(event.oldText)),
-      deletions: Math.max(0, countDiffLines(event.oldText) - countDiffLines(event.newText)),
-    }))
-    .sort((a, b) => b.timestamp - a.timestamp);
-}
-
-type SessionPlanState = {
-  loading: boolean;
-  path: string | null;
-  content: string;
-  updatedAt: number | null;
-  error: string | null;
-  message?: string;
-};
-
-const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi\/plans\/[^\s"'<>|]+\.md|\.kimi[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
-
-function cleanPlanPath(pathValue: string) {
-  return pathValue.trim().replace(/[),.;，。；）]+$/u, "");
-}
-
-function extractPlanPathFromText(text: string) {
-  const matches = text.match(KIMI_PLAN_PATH_PATTERN);
-  return matches?.map(cleanPlanPath).find(Boolean) ?? null;
-}
-
-function findSessionPlanPath(events: TimelineEvent[]) {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.type === "change_summary") {
-      for (let fileIndex = event.files.length - 1; fileIndex >= 0; fileIndex -= 1) {
-        const planPath = extractPlanPathFromText(event.files[fileIndex].path);
-        if (planPath) return planPath;
-      }
-    }
-    if (event.type === "assistant_message" || event.type === "user_message" || event.type === "steer_message") {
-      const planPath = extractPlanPathFromText(event.content);
-      if (planPath) return planPath;
-    }
-    if (event.type === "question_request") {
-      for (const question of event.questions) {
-        const planPath = extractPlanPathFromText([
-          question.header,
-          question.question,
-          ...question.options.flatMap((option) => [option.label, option.description]),
-        ].filter(Boolean).join("\n"));
-        if (planPath) return planPath;
-      }
-    }
-  }
-  return null;
-}
-
-function hasSessionPlanSignal(events: TimelineEvent[]) {
-  return events.some((event) => {
-    if (event.type === "question_request") {
-      return event.questions.some((question) => (
-        /plan/i.test(question.header ?? "") ||
-        /approve this plan|reject and exit/i.test([
-          question.question,
-          ...question.options.flatMap((option) => [option.label, option.description ?? ""]),
-        ].join("\n"))
-      ));
-    }
-    if (event.type === "change_summary") {
-      return event.files.some((file) => /[\\/]?\.kimi[\\/]plans[\\/].+\.md/i.test(file.path));
-    }
-    return false;
-  });
-}
-
-function clampWidth(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
 
 export function AppShell() {
   const currentSession = useAppStore((s) => s.currentSession);
@@ -693,29 +163,23 @@ export function AppShell() {
   const addSession = useSessionStore((s) => s.addSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
-  const archiveSession = useSessionStore((s) => s.archiveSession);
   const sessions = useSessionStore((s) => s.sessions);
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
   const [launchCommandDialogOpen, setLaunchCommandDialogOpen] = useState(false);
   const [launchCommandDraft, setLaunchCommandDraft] = useState("");
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const [isMaximized, setIsMaximized] = useState(false);
   const [helpDialog, setHelpDialog] = useState<HelpDialog | null>(null);
   const [infoTopic, setInfoTopic] = useState<{ title: string; body: string; url?: string } | null>(null);
   const [appInfo, setAppInfo] = useState({ name: "Kimix", version: "2.5.0", author: "@linjianglu", repository: "https://github.com/LiKPO4/kimix" });
-  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; downloadPercent: number | null; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
+  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; downloadProgress: DownloadProgressInfo | null; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
     loading: false,
     downloading: false,
-    downloadPercent: null,
+    downloadProgress: null,
     message: "尚未检查更新",
     latest: null,
     hasUpdate: false,
@@ -854,17 +318,6 @@ export function AppShell() {
     }
   };
 
-  useEffect(() => {
-    const close = () => {
-      setOpenMenu(null);
-      setLaunchMenuOpen(false);
-      setProjectMenuOpen(false);
-      setSessionMenuOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-
   const showToast = (message = "待实现") => {
     setToastMessage(message);
     if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
@@ -887,16 +340,12 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    void window.api.isWindowMaximized().then((res) => {
-      if (res.success) setIsMaximized(res.data);
-    });
     if (typeof window.api.getAppInfo === "function") {
       void window.api.getAppInfo().then((res) => {
         if (res.success) setAppInfo(res.data);
       });
     }
     void checkKimiForOnboarding();
-    return window.api.onWindowMaximizedChange((payload) => setIsMaximized(payload.maximized));
   }, []);
 
   useEffect(() => {
@@ -907,7 +356,12 @@ export function AppShell() {
         const percent = Math.max(0, Math.min(100, payload.percent));
         return {
           ...state,
-          downloadPercent: Number.isFinite(percent) ? percent : state.downloadPercent,
+          downloadProgress: {
+            percent: Number.isFinite(percent) ? percent : state.downloadProgress?.percent ?? 0,
+            receivedBytes: payload.receivedBytes,
+            totalBytes: payload.totalBytes,
+            bytesPerSecond: payload.bytesPerSecond,
+          },
         };
       });
     });
@@ -987,18 +441,18 @@ export function AppShell() {
   const handleCheckUpdates = async () => {
     setUpdateState((state) => ({ ...state, loading: true, message: "正在检查 GitHub 发布版本..." }));
     if (typeof window.api.checkForUpdates !== "function") {
-      setUpdateState({ loading: false, downloading: false, downloadPercent: null, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
       return;
     }
     const res = await window.api.checkForUpdates();
     if (!res.success) {
-      setUpdateState({ loading: false, downloading: false, downloadPercent: null, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
       return;
     }
     setUpdateState((state) => ({
       ...state,
       loading: false,
-      downloadPercent: null,
+      downloadProgress: null,
       message: res.data.message,
       latest: res.data.latest,
       hasUpdate: res.data.hasUpdate,
@@ -1006,18 +460,23 @@ export function AppShell() {
   };
 
   const handleDownloadUpdate = async () => {
-    setUpdateState((state) => ({ ...state, downloading: true, downloadPercent: 0, message: "正在下载匹配当前包体的升级包..." }));
+    setUpdateState((state) => ({ ...state, downloading: true, downloadProgress: { percent: 0, receivedBytes: 0 }, message: "正在下载匹配当前包体的升级包..." }));
     if (typeof window.api.downloadUpdate !== "function") {
-      setUpdateState((state) => ({ ...state, downloading: false, downloadPercent: null, message: "升级接口尚未载入，请重启应用后再试" }));
+      setUpdateState((state) => ({ ...state, downloading: false, downloadProgress: null, message: "升级接口尚未载入，请重启应用后再试" }));
       return;
     }
     const res = await window.api.downloadUpdate();
     if (!res.success) {
-      setUpdateState((state) => ({ ...state, downloading: false, downloadPercent: null, message: `升级失败：${res.error}` }));
+      setUpdateState((state) => ({ ...state, downloading: false, downloadProgress: null, message: `升级失败：${res.error}` }));
       return;
     }
-    setUpdateState((state) => ({ ...state, downloading: false, downloadPercent: 100, message: res.data.message }));
+    setUpdateState((state) => ({ ...state, downloading: false, downloadProgress: state.downloadProgress ? { ...state.downloadProgress, percent: 100 } : { percent: 100, receivedBytes: 0 }, message: res.data.message }));
     showToast(res.data.message);
+  };
+
+  const handleOpenLatestRelease = () => {
+    const url = updateState.latest?.htmlUrl || appInfo.repository;
+    void window.api.openExternal(url);
   };
 
   const handleCheckCliUpdate = async () => {
@@ -1079,13 +538,13 @@ export function AppShell() {
         setUpdateState((state) => ({
           ...state,
           loading: false,
-          downloadPercent: null,
+          downloadProgress: null,
           message: appRes.data.message,
           latest: appRes.data.latest,
           hasUpdate: appRes.data.hasUpdate,
         }));
       } else if (appRes && !appRes.success) {
-        setUpdateState({ loading: false, downloading: false, downloadPercent: null, message: `检查失败：${appRes.error}`, latest: null, hasUpdate: false });
+        setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: `检查失败：${appRes.error}`, latest: null, hasUpdate: false });
       }
       if (cliRes?.success) {
         setCliUpdateState((state) => ({
@@ -1117,7 +576,6 @@ export function AppShell() {
         setInfoTopic({ title: entry.label, body: entry.note });
         setHelpDialog("info");
       }
-      setOpenMenu(null);
       return;
     }
 
@@ -1127,6 +585,15 @@ export function AppShell() {
     if (action === "open-project") void handleOpenProject();
     if (action === "settings") setWorkspaceView("settings");
     if (action === "about") setHelpDialog("about");
+    if (action === "logout") {
+      void window.api.logoutKimi().then((res) => {
+        const message = res.success ? res.data.message : `退出失败：${res.error}`;
+        showToast(message);
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent("kimix:kimi-auth-changed"));
+        }
+      });
+    }
     if (action === "exit") void window.api.closeWindow();
     if (action === "undo") sendDocumentCommand("undo");
     if (action === "redo") sendDocumentCommand("redo");
@@ -1165,10 +632,10 @@ export function AppShell() {
     if (action === "whats-new") setHelpDialog("updates");
     if (action === "keyboard-shortcuts") setHelpDialog("shortcuts");
     if (action === "skills") setWorkspaceView("plugins");
-    if (["automations", "local-environments", "worktrees", "mcp", "troubleshooting", "performance-trace", "logout", "toggle-file-tree", "open-browser-tab", "new-window"].includes(action)) {
+    if (action === "mcp") setWorkspaceView("mcp");
+    if (["automations", "local-environments", "worktrees", "troubleshooting", "performance-trace", "toggle-file-tree", "open-browser-tab", "new-window"].includes(action)) {
       openInfoTopic(action);
     }
-    setOpenMenu(null);
   };
 
   const liveCurrentSession = useMemo(
@@ -1606,82 +1073,12 @@ export function AppShell() {
     await navigator.clipboard.writeText(text);
     showToast(successMessage);
   };
-  const renameCurrentSession = () => {
-    if (!liveCurrentSession) {
-      showToast("当前没有对话");
-      return;
-    }
-    const nextTitle = window.prompt("重命名对话", liveCurrentSession.title)?.trim();
-    if (!nextTitle || nextTitle === liveCurrentSession.title) return;
-    const updatedAt = Date.now();
-    updateSession(liveCurrentSession.id, (session) => ({ ...session, title: nextTitle, updatedAt }));
-    setCurrentSession({ ...liveCurrentSession, title: nextTitle, updatedAt });
-    showToast("已重命名");
-  };
-  const archiveCurrentSession = () => {
-    if (!liveCurrentSession) {
-      showToast("当前没有对话");
-      return;
-    }
-    archiveSession(liveCurrentSession.id);
-    setCurrentSession(null);
-    showToast("已归档对话");
-  };
-  const sessionMenuItems: SessionMenuEntry[] = [
-    { label: "置顶对话", hint: "Ctrl+Alt+P", icon: Pin, disabled: true, action: () => undefined },
-    { label: "重命名对话", hint: "Ctrl+Alt+R", icon: Pencil, action: renameCurrentSession },
-    { label: "归档对话", hint: "Ctrl+Shift+A", icon: Archive, action: archiveCurrentSession },
-    { type: "separator" },
-    { label: "复制工作目录", hint: "Ctrl+Shift+C", icon: ClipboardCopy, action: () => copyToClipboard(projectPath ?? liveCurrentSession?.projectPath ?? "", "已复制工作目录") },
-    { label: "复制会话 ID", hint: "Ctrl+Alt+C", icon: Clipboard, action: () => copyToClipboard(liveCurrentSession?.id ?? "", "已复制会话 ID") },
-    { label: "复制深度链接", hint: "Ctrl+Alt+L", icon: Link, action: () => copyToClipboard(`kimix://session/${liveCurrentSession?.id ?? ""}`, "已复制深度链接") },
-    { label: "复制为 Markdown", icon: FileText, action: () => liveCurrentSession ? copyToClipboard(sessionToMarkdown(liveCurrentSession), "已复制 Markdown") : showToast("当前没有对话") },
-    { type: "separator" },
-    { label: "打开侧边聊天", icon: MessageSquarePlus, disabled: true, action: () => undefined },
-    { label: "派生到本地", icon: Laptop, disabled: true, action: () => undefined },
-    { label: "派生到新工作树", icon: GitFork, disabled: true, action: () => undefined },
-    { label: "添加自动化...", icon: History, disabled: true, action: () => undefined },
-    { type: "separator" },
-    { label: "在新窗口中打开", icon: ExternalLink, disabled: true, action: () => undefined },
-  ];
-  const handleSessionMenuEntry = (entry: SessionMenuEntry) => {
-    if (entry.type === "separator" || entry.disabled) return;
-    void entry.action();
-    setSessionMenuOpen(false);
-  };
-  const openProjectPath = () => {
-    if (projectPath) void window.api.openProjectPath({ path: projectPath });
-    setProjectMenuOpen(false);
-  };
-  const openProjectEditor = (editor: "vscode" | "trae" | "coder") => {
-    if (projectPath) void window.api.openProjectEditor({ path: projectPath, editor });
-    setProjectMenuOpen(false);
-  };
   const openProjectTerminal = () => {
     if (projectPath) void window.api.openProjectTerminal({ path: projectPath });
-    setProjectMenuOpen(false);
-  };
-  const launchExecutable = async () => {
-    const res = await window.api.launchExecutable();
-    if (!res.success) {
-      showToast(`启动失败：${res.error}`);
-    }
-  };
-  const chooseExecutable = async () => {
-    const res = await window.api.chooseExecutable();
-    showToast(res.success ? "已更新启动文件" : `选择失败：${res.error}`);
-    setLaunchMenuOpen(false);
-  };
-  const launchSavedCommand = async () => {
-    const res = await window.api.launchCommand({ cwd: projectPath ?? undefined });
-    if (!res.success) {
-      showToast(`启动失败：${res.error}`);
-    }
   };
   const setLaunchCommand = async () => {
     const current = await window.api.getSettings();
     setLaunchCommandDraft(current.success ? current.data.selectedLaunchCommand ?? "" : "");
-    setLaunchMenuOpen(false);
     setLaunchCommandDialogOpen(true);
   };
   const saveLaunchCommand = async () => {
@@ -1697,352 +1094,61 @@ export function AppShell() {
   const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && kimiOnboarding.available === false;
   const pluginWorkspaceActive = workspaceView === "plugins";
   const hooksWorkspaceActive = workspaceView === "hooks";
+  const mcpWorkspaceActive = workspaceView === "mcp";
   const settingsWorkspaceActive = workspaceView === "settings";
   const chatWorkspaceActive = workspaceView === "chat";
-  const workspaceTitle = sessionTitle;
 
   return (
     <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
-      <header className="z-50 flex h-12 w-full shrink-0 items-center justify-between" style={{ WebkitAppRegion: "drag" as const, paddingLeft: 12, paddingRight: 0 }}>
-        <div className="flex h-full items-center gap-7" style={{ WebkitAppRegion: "no-drag" as const }}>
-          <div className="flex items-center gap-2 text-[#7d7972]">
-            <button onClick={toggleSidebar} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" style={{ marginLeft: 14 }} aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"} title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}>
-              {sidebarOpen ? <PanelLeft size={17} /> : <PanelLeftOpen size={17} />}
-            </button>
-            <button onClick={() => window.history.back()} className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="后退">
-              <ArrowLeft size={17} />
-            </button>
-            <button onClick={() => window.history.forward()} className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5" aria-label="前进">
-              <ArrowRight size={17} />
-            </button>
-          </div>
-
-          <nav className="flex items-center gap-1.5 text-[14px] text-[#69645d]">
-            {Object.keys(MENU_ITEMS).map((menu) => (
-              <div key={menu} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => setOpenMenu((current) => current === menu ? null : menu)}
-                  className={`kimix-top-menu-trigger ${openMenu === menu ? "is-active" : ""}`}
-                >
-                  {menu}
-                </button>
-                {openMenu === menu && (
-                  <div className="kimix-top-menu absolute left-0 top-full z-[60] mt-2 min-w-[236px] overflow-hidden rounded-[15px] border border-[#e5e1d8] bg-white py-3 text-[14px]">
-                    {MENU_ITEMS[menu].map((item, index) => (
-                      item.type === "separator" ? (
-                        <div key={`separator-${index}`} className="my-2 border-t border-[#eee9e1]" />
-                      ) : (
-                        <button
-                          key={item.label}
-                          onClick={() => handleMenuAction(item)}
-                          style={{ paddingLeft: 24, paddingRight: 22, paddingTop: 10, paddingBottom: 10 }}
-                          className={`flex min-h-10 w-full items-center justify-between gap-5 text-left leading-none transition-colors hover:bg-[#f3f1ec] ${
-                            item.disabled ? "text-[#aaa49a]" : "text-[#26231f]"
-                          }`}
-                        >
-                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                          {item.hint && <span className="shrink-0 text-[13px] text-[#6f695f]">{item.hint}</span>}
-                        </button>
-                      )
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            {updateState.hasUpdate && (
-              <button
-                type="button"
-                onClick={() => setHelpDialog("updates")}
-                className="kimix-top-menu-trigger flex items-center text-[#2f6fad]"
-                style={{ gap: 7, marginLeft: 4 }}
-                title={updateState.message || "有新版本可用"}
-                aria-label="打开更新窗口"
-              >
-                <ArrowUp size={14} />
-                升级
-              </button>
-            )}
-          </nav>
-        </div>
-
-        <div className="flex items-center" style={{ WebkitAppRegion: "no-drag" as const, gap: 8 }}>
-          <button onClick={() => window.api.minimizeWindow()} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#7d7972] transition-colors hover:bg-black/5" aria-label="最小化">
-            <Minus size={14} />
-          </button>
-          <button onClick={() => window.api.maximizeWindow()} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#7d7972] transition-colors hover:bg-black/5" aria-label={isMaximized ? "还原" : "最大化"}>
-            {isMaximized ? <Copy size={12} /> : <Square size={12} />}
-          </button>
-          <button onClick={() => window.api.closeWindow()} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#7d7972] transition-colors hover:bg-accent-red/10 hover:text-accent-red" aria-label="关闭">
-            <X size={14} />
-          </button>
-        </div>
-      </header>
+      <TopMenuBar
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={toggleSidebar}
+        onMenuAction={handleMenuAction}
+        hasUpdate={updateState.hasUpdate}
+        updateMessage={updateState.message}
+        onOpenUpdates={() => setHelpDialog("updates")}
+      />
 
       <div style={{ paddingBottom: 0, paddingRight: 0, gap: 0 }} className="flex min-h-0 flex-1">
         <Sidebar width={sidebarWidth} />
         {sidebarOpen ? (
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="调整左侧栏宽度"
-            className="kimix-layout-resizer"
-            onPointerDown={startSidebarResize}
-          />
+          <ResizeHandle ariaLabel="调整左侧栏宽度" onPointerDown={startSidebarResize} />
         ) : (
           <div className="kimix-layout-spacer" />
         )}
-        <main className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
-          <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 12 }}>
-            <div className="flex min-w-0 items-center gap-2.5">
-              {chatWorkspaceActive && (
-                <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
-                  {workspaceTitle}
-                </div>
-              )}
-              {chatWorkspaceActive && <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => setSessionMenuOpen((open) => !open)}
-                  className={`kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg ${sessionMenuOpen ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : ""}`}
-                  title="更多"
-                  aria-label="更多"
-                >
-                  <Ellipsis size={17} />
-                </button>
-                {sessionMenuOpen && (
-                  <div className="kimix-floating-menu absolute left-0 top-full z-[65] mt-2 w-[332px] overflow-hidden rounded-[15px] py-3 text-[14px] text-[var(--kimix-panel-text)]">
-                    {sessionMenuItems.map((item, index) => (
-                      item.type === "separator" ? (
-                        <div key={`session-menu-separator-${index}`} className="my-2 border-t border-[var(--kimix-panel-divider)]" />
-                      ) : (
-                        <button
-                          key={item.label}
-                          type="button"
-                          disabled={item.disabled}
-                          onClick={() => handleSessionMenuEntry(item)}
-                          className={`flex min-h-10 w-full items-center gap-3 text-left leading-none transition-colors ${
-                            item.disabled
-                              ? "cursor-not-allowed text-[var(--kimix-panel-text-muted)]"
-                              : "text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)]"
-                          }`}
-                          style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 9, paddingBottom: 9 }}
-                        >
-                          <item.icon size={17} className="shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                          {item.hint && <span className="shrink-0 text-[13px] text-[var(--kimix-panel-text-muted)]">{item.hint}</span>}
-                        </button>
-                      )
-                    ))}
-                  </div>
-                )}
-              </div>}
-            </div>
-
-            {chatWorkspaceActive ? <div className="flex shrink-0 items-center gap-3.5 text-[#8a847a]">
-              {longTaskMeta ? (
-                <button
-                  type="button"
-                  onClick={() => setLongTaskInspectorOpen(true)}
-                  className={`flex h-9 min-w-[148px] items-center rounded-xl border bg-white text-left transition-colors ${
-                    longTaskStatusTone === "reviewer"
-                      ? "border-[#f1ddb0] text-[#8a6a1f] hover:bg-[#fff8e8]"
-                      : "border-[#cfe4fb] text-[#2f6fad] hover:bg-[#f4f9ff]"
-                  }`}
-                  style={{ gap: 9, paddingLeft: 13, paddingRight: 14 }}
-                  title="查看长程任务状态"
-                  aria-label="查看长程任务状态"
-                >
-                  {longTaskMeta.stage === "completed" ? (
-                    <CheckCircle2 size={15} className="shrink-0" />
-                  ) : isCurrentSessionRunning ? (
-                    <Square size={13} className="shrink-0 fill-current" />
-                  ) : longTaskMeta.stage === "paused" ? (
-                    <Pause size={15} className="shrink-0" />
-                  ) : (
-                    <Play size={15} className="shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-[13px] leading-5">
-                    {longTaskAgentLabels[longTaskMeta.activeAgent]} · {longTaskStageLabels[longTaskMeta.stage]}
-                  </span>
-                  <span className="shrink-0 rounded-full bg-white/75 text-[12px] leading-5" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                    {longTaskMeta.currentStep}{longTaskMeta.targetStep ? `/${longTaskMeta.targetStep}` : ""}
-                  </span>
-                </button>
-              ) : (
-                <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="flex h-8 w-14 items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]">
-                    <button
-                      onClick={() => void launchExecutable()}
-                      className="flex h-full flex-1 items-center justify-center"
-                      style={{ paddingLeft: 9, paddingRight: 4 }}
-                      title="启动当前启动文件"
-                      aria-label="启动"
-                    >
-                      <Play size={14} className="shrink-0" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLaunchMenuOpen((value) => !value);
-                      }}
-                      className="mr-0.5 flex h-7 w-6 items-center justify-center rounded-lg transition-colors hover:bg-black/5"
-                      title="启动方式"
-                      aria-label="启动方式"
-                    >
-                      <ChevronDown size={13} />
-                    </button>
-                  </div>
-                  {launchMenuOpen && (
-                    <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[224px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
-                      <button
-                        onClick={() => {
-                          setLaunchMenuOpen(false);
-                          void launchExecutable();
-                        }}
-                        style={{ paddingLeft: 18, paddingRight: 16 }}
-                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-                      >
-                        <Play size={15} className="w-6 shrink-0 text-[#7b756d]" />
-                        <span className="min-w-0 flex-1 truncate">启动文件</span>
-                      </button>
-                      <button
-                        onClick={() => void chooseExecutable()}
-                        style={{ paddingLeft: 18, paddingRight: 16 }}
-                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-                      >
-                        <FolderOpen size={15} className="w-6 shrink-0 text-[#d19a32]" />
-                        <span className="min-w-0 flex-1 truncate">选择启动文件...</span>
-                      </button>
-                      <div className="my-1.5 border-t border-[var(--kimix-panel-divider)]" />
-                      <button
-                        onClick={() => {
-                          setLaunchMenuOpen(false);
-                          void launchSavedCommand();
-                        }}
-                        style={{ paddingLeft: 18, paddingRight: 16 }}
-                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-                      >
-                        <SquareTerminal size={15} className="w-6 shrink-0 text-[#777168]" />
-                        <span className="min-w-0 flex-1 truncate">启动命令</span>
-                      </button>
-                      <button
-                        onClick={() => void setLaunchCommand()}
-                        style={{ paddingLeft: 18, paddingRight: 16 }}
-                        className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-                      >
-                        <Pencil size={15} className="w-6 shrink-0 text-[#8f887e]" />
-                        <span className="min-w-0 flex-1 truncate">设置启动命令...</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-                <div className={`flex h-8 w-14 items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] ${!projectPath ? "opacity-45" : ""}`}>
-                  <button
-                    onClick={openProjectPath}
-                    disabled={!projectPath}
-                    className="flex h-full flex-1 items-center justify-center disabled:cursor-not-allowed"
-                    style={{ paddingLeft: 8, paddingRight: 3 }}
-                    title={currentProject?.path ?? "工作区"}
-                    aria-label="在文件资源管理器中打开项目"
-                  >
-                    <FolderOpen size={16} className="shrink-0 text-[#d19a32]" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setProjectMenuOpen((value) => !value);
-                    }}
-                    disabled={!projectPath}
-                    className="mr-0.5 flex h-7 w-6 items-center justify-center rounded-lg transition-colors hover:bg-black/5 disabled:cursor-not-allowed"
-                    title="打开方式"
-                    aria-label="打开方式"
-                  >
-                    <ChevronDown size={13} />
-                  </button>
-                </div>
-                {projectMenuOpen && (
-                  <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[236px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
-                    <button onClick={() => openProjectEditor("vscode")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <Code2 size={15} className="w-6 shrink-0 text-[#3483eb]" />
-                      <span className="min-w-0 flex-1 truncate">使用 VS Code 打开</span>
-                    </button>
-                    <button onClick={openProjectPath} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <FolderOpen size={15} className="w-6 shrink-0 text-[#d19a32]" />
-                      <span className="min-w-0 flex-1 truncate">在文件资源管理器中打开</span>
-                    </button>
-                    <button onClick={openProjectTerminal} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <SquareTerminal size={15} className="w-6 shrink-0 text-[#777168]" />
-                      <span className="min-w-0 flex-1 truncate">打开终端</span>
-                    </button>
-                    <button onClick={() => openProjectEditor("trae")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <GitBranch size={15} className="w-6 shrink-0 text-[#9a948b]" />
-                      <span className="min-w-0 flex-1 truncate">使用 Trae 打开</span>
-                    </button>
-                    <button onClick={() => openProjectEditor("coder")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                      <Code2 size={15} className="w-6 shrink-0 text-[#9a948b]" />
-                      <span className="min-w-0 flex-1 truncate">使用 Coder 打开</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={openProjectTerminal}
-                disabled={!projectPath}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
-                title="终端"
-                aria-label="终端"
-              >
-                <SquareTerminal size={15} />
-              </button>
-              <button
-                onClick={() => {
-                  setLongTaskInspectorOpen(false);
-                  setDiffPanelOpen(!diffPanelOpen);
-                }}
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
-                  diffPanelOpen
-                    ? "border-[var(--accent-blue)] bg-[#eef7ff] text-[var(--accent-blue)]"
-                    : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
-                }`}
-                title="差异面板"
-                aria-label="差异面板"
-              >
-                <FileText size={15} />
-              </button>
-              <button
-                onClick={() => {
-                  setDiffPanelOpen(false);
-                  setLongTaskInspectorOpen(!longTaskInspectorOpen);
-                }}
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
-                  longTaskInspectorOpen
-                    ? "border-[var(--accent-blue)] bg-[#eef7ff] text-[var(--accent-blue)]"
-                    : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
-                }`}
-                title="会话侧栏"
-                aria-label="会话侧栏"
-              >
-                <PanelRight size={15} />
-              </button>
-            </div> : <div className="flex shrink-0 items-center" style={{ gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setWorkspaceView("chat")}
-                className="kimix-icon-text-button kimix-muted-action is-compact"
-              >
-                返回对话
-              </button>
-            </div>}
-          </div>
+        <main className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+          {chatWorkspaceActive && (
+            <SessionToolbar
+              title={sessionTitle}
+              longTaskMeta={longTaskMeta}
+              longTaskStatusTone={longTaskStatusTone}
+              isCurrentSessionRunning={isCurrentSessionRunning}
+              onOpenLongTaskInspector={() => setLongTaskInspectorOpen(true)}
+              projectPath={projectPath}
+              currentProject={currentProject}
+              diffPanelOpen={diffPanelOpen}
+              onToggleDiffPanel={() => {
+                setLongTaskInspectorOpen(false);
+                setDiffPanelOpen(!diffPanelOpen);
+              }}
+              longTaskInspectorOpen={longTaskInspectorOpen}
+              onToggleLongTaskInspector={() => {
+                setDiffPanelOpen(false);
+                setLongTaskInspectorOpen(!longTaskInspectorOpen);
+              }}
+              showToast={showToast}
+              copyToClipboard={copyToClipboard}
+              onSetLaunchCommand={setLaunchCommand}
+            />
+          )}
           {pluginWorkspaceActive ? (
-            <SkillsPanel open />
+            <SkillsPanel open onBackToChat={() => setWorkspaceView("chat")} />
           ) : hooksWorkspaceActive ? (
-            <HooksPanel />
+            <HooksPanel onBackToChat={() => setWorkspaceView("chat")} />
+          ) : mcpWorkspaceActive ? (
+            <McpPanel onBackToChat={() => setWorkspaceView("chat")} />
           ) : settingsWorkspaceActive ? (
-            <SettingsPanel variant="workspace" />
+            <SettingsPanel variant="workspace" onBackToChat={() => setWorkspaceView("chat")} />
           ) : (
             <>
               <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -2060,951 +1166,96 @@ export function AppShell() {
           )}
         </main>
         {chatWorkspaceActive && (longTaskInspectorOpen || diffPanelOpen) && (
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="调整右侧栏宽度"
-            className="kimix-layout-resizer"
-            onPointerDown={startRightPanelResize}
-          />
+          <ResizeHandle ariaLabel="调整右侧栏宽度" onPointerDown={startRightPanelResize} />
         )}
         {chatWorkspaceActive && longTaskInspectorOpen && (
-          <aside style={{ width: rightPanelWidth }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#dbeafa]" style={{ paddingLeft: 18, paddingRight: 14 }}>
-              <div className="min-w-0">
-                <div className="text-[15px] font-semibold leading-5 text-[#24415f]">{rightPanelTitle}</div>
-                <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[#6f87a1]">
-                  {rightPanelSubtitle}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLongTaskInspectorOpen(false)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#6f87a1] transition-colors hover:bg-[#eaf4ff] hover:text-[#24415f]"
-                aria-label="关闭会话侧栏"
-                title="关闭"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
-              {longTaskMeta ? (
-                  <div className="flex flex-col" style={{ gap: 16 }}>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ padding: "18px 16px 20px" }}>
-                    <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">当前状态</div>
-                    <div className="mt-2 text-[14px] leading-6 text-[#24415f]">
-                      {longTaskMeta.activeAgent === "reviewer" ? "审查 agent" : "执行 agent"} · {longTaskMeta.stage}
-                    </div>
-                    <div className="mt-1 text-[13px] leading-5 text-[#6f87a1]">
-                      步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
-                    </div>
-                    <div className="flex flex-col" style={{ gap: 18, marginTop: 22 }}>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "20px 16px 18px" }}>
-                        <div className="flex flex-col" style={{ gap: 16 }}>
-                          <span className="text-[13px] font-medium leading-5 text-[#2f6fad]">工作 agent</span>
-                          <div className="flex w-full items-center rounded-lg bg-white" style={{ gap: 10, padding: 7 }}>
-                            <button
-                              type="button"
-                              disabled={longTaskControlBusy}
-                              onClick={() => void patchLongTaskMeta({ activeAgent: "executor", stage: longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage }, { message: "已切换到执行 agent" })}
-                              className={`h-9 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-[#dff0ff] text-[#2f6fad]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
-                              style={{ paddingLeft: 14, paddingRight: 14 }}
-                            >
-                              执行
-                            </button>
-                            <button
-                              type="button"
-                              disabled={longTaskControlBusy}
-                              onClick={() => void patchLongTaskMeta({ activeAgent: "reviewer", stage: longTaskMeta.stage === "running" ? "paused" : longTaskMeta.stage }, { message: "已切换到审查 agent" })}
-                              className={`h-9 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-[#fff3d6] text-[#8a6a1f]" : "text-[#6f87a1] hover:bg-[#eef7ff]"}`}
-                              style={{ paddingLeft: 14, paddingRight: 14 }}
-                            >
-                              审查
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex items-center" style={{ gap: 14, marginTop: 22 }}>
-                          <button
-                            type="button"
-                            disabled={longTaskControlBusy || longTaskMeta.stage === "paused" || longTaskMeta.stage === "completed"}
-                            onClick={() => void patchLongTaskMeta({ stage: "paused" }, { stopRunning: true, message: "已暂停长程任务" })}
-                            className="kimix-icon-text-button is-compact flex-1 justify-center bg-white text-[#6f87a1] hover:bg-[#eef7ff] disabled:cursor-not-allowed disabled:opacity-55"
-                          >
-                            <Pause size={14} />
-                            暂停
-                          </button>
-                          <button
-                            type="button"
-                            disabled={longTaskControlBusy || Boolean(runningSessionId) || longTaskMeta.stage === "completed"}
-                            onClick={() => void applyTargetStep(true)}
-                            className="kimix-icon-text-button is-compact flex-1 justify-center bg-white text-[#2f6fad] hover:bg-[#eef7ff] disabled:cursor-not-allowed disabled:opacity-55"
-                          >
-                            <Play size={14} />
-                            继续
-                          </button>
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "20px 16px 18px" }}>
-                        <div className="flex flex-col" style={{ gap: 14 }}>
-                          <label className="text-[13px] font-medium leading-5 text-[#2f6fad]" htmlFor="long-task-target-step">
-                            执行到
-                          </label>
-                          <input
-                            id="long-task-target-step"
-                            type="number"
-                            min={1}
-                            max={totalLongTaskSteps || undefined}
-                            value={targetStepDraft}
-                            onChange={(event) => setTargetStepDraft(event.target.value)}
-                            className="h-9 w-full min-w-0 rounded-lg border border-[#cfe4fb] bg-white text-[13px] text-[#24415f] outline-none focus:border-[#90c4f2]"
-                            style={{ paddingLeft: 10, paddingRight: 10 }}
-                            placeholder={totalLongTaskSteps ? `1-${totalLongTaskSteps}` : "Step"}
-                          />
-                        </div>
-                        <label className="flex items-center justify-between rounded-lg bg-white text-[13px] leading-5 text-[#24415f]" style={{ gap: 14, marginTop: 18, padding: "13px 14px" }}>
-                          <span className="min-w-0">执行完成后关机</span>
-                          <input
-                            type="checkbox"
-                            checked={shutdownAfterLongTaskId === longTaskMeta.taskId}
-                            onChange={(event) => setShutdownAfterLongTaskId(event.target.checked ? longTaskMeta.taskId : null)}
-                            className="h-4 w-4 shrink-0 accent-[#339af0]"
-                          />
-                        </label>
-                        <div className="flex items-center" style={{ gap: 14, marginTop: 20 }}>
-                          <button
-                            type="button"
-                            disabled={targetStepBusy}
-                            onClick={() => void applyTargetStep(false)}
-                            className="kimix-icon-text-button is-compact flex-1 justify-center bg-white text-[#2f6fad] hover:bg-[#eef7ff] disabled:cursor-wait disabled:opacity-60"
-                          >
-                            保存目标
-                          </button>
-                          <button
-                            type="button"
-                            disabled={targetStepBusy || Boolean(runningSessionId)}
-                            onClick={() => void applyTargetStep(true)}
-                            className="kimix-icon-text-button is-compact flex-1 justify-center bg-[#339af0] text-white hover:bg-[#228be6] disabled:cursor-wait disabled:opacity-60"
-                          >
-                            {runningSessionId ? "运行中" : "开始执行"}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-[#f8fbff] text-[13px] leading-5 text-[#5e7894]" style={{ padding: "13px 12px" }}>
-                        <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                          <span className="font-medium text-[#2f6fad]">下一步 prompt</span>
-                          <button
-                            type="button"
-                            onClick={() => void copyNextLongTaskPrompt()}
-                            className="kimix-icon-text-button is-compact shrink-0 bg-white text-[#2f6fad] hover:bg-[#eef7ff]"
-                          >
-                            <ClipboardCopy size={13} />
-                            复制
-                          </button>
-                        </div>
-                        <div className="mt-3 line-clamp-4 whitespace-pre-wrap text-[#6f87a1]">
-                          {buildNextLongTaskPrompt()}
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 2, padding: "16px 16px 18px" }}>
-                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">BIGPLAN</div>
-                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">{longTaskMeta.bigPlanPath}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: longTaskMeta.bigPlanPath });
-                        }}
-                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff]"
-                      >
-                        打开
-                      </button>
-                    </div>
-                    {longTaskDetailLoading ? (
-                      <div className="mt-4 rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        正在读取 BIGPLAN...
-                      </div>
-                    ) : longTaskDetailError ? (
-                      <div className="mt-4 rounded-lg bg-[#fff4f0] text-[13px] leading-6 text-[#9b4b34]" style={{ padding: "13px 12px" }}>
-                        读取失败：{longTaskDetailError}
-                      </div>
-                    ) : parsedLongTaskDetail ? (
-                      <div className="mt-4 flex flex-col" style={{ gap: 12 }}>
-                        <div className="rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#24415f]" style={{ padding: "13px 12px" }}>
-                          <div className="font-medium text-[#2f6fad]">目标</div>
-                          <div className="mt-1 line-clamp-3 text-[#4f6f8f]">{parsedLongTaskDetail.goal}</div>
-                          <div className="mt-2 font-medium text-[#2f6fad]">初始需求</div>
-                          <div className="mt-1 line-clamp-3 text-[#4f6f8f]">{parsedLongTaskDetail.initialRequest}</div>
-                        </div>
-                        <div className="flex flex-col" style={{ gap: 10 }}>
-                          {parsedLongTaskDetail.steps.map((step) => {
-                            const isCurrent = step.index === longTaskMeta.currentStep;
-                            return (
-                              <div
-                                key={step.index}
-                                className={`rounded-lg border ${isCurrent ? "border-[#b7d9f7] bg-[#f4f9ff]" : "border-[#e2edf8] bg-white"}`}
-                                style={{ padding: "12px 12px" }}
-                              >
-                                <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                                  <div className="min-w-0 truncate text-[13.5px] font-medium leading-5 text-[#24415f]">
-                                    Step {step.index}
-                                  </div>
-                                  <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                                    {step.status}
-                                  </span>
-                                </div>
-                                <div className="mt-2 text-[13px] leading-5 text-[#5e7894]">
-                                  {step.goal || step.title || "暂未填写目标"}
-                                </div>
-                                {(step.scope || step.acceptance) && (
-                                  <div className="mt-2 text-[12.5px] leading-5 text-[#7b91a7]">
-                                    {step.scope && <div className="line-clamp-2">范围：{step.scope}</div>}
-                                    {step.acceptance && <div className="line-clamp-2">验收：{step.acceptance}</div>}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                          {parsedLongTaskDetail.steps.length === 0 && (
-                            <div className="rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                              BIGPLAN 还没有解析到 Step，等待执行 agent 完成规划。
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 3, padding: "16px 16px 18px" }}>
-                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">轮次记录</div>
-                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">rounds/step-XXX.md</div>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                        {parsedLongTaskDetail?.rounds.length ?? 0}
-                      </span>
-                    </div>
-                    {longTaskDetailLoading ? (
-                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        正在读取轮次记录...
-                      </div>
-                    ) : parsedLongTaskDetail && parsedLongTaskDetail.rounds.length > 0 ? (
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        {parsedLongTaskDetail.rounds.map((round) => (
-                          <div key={round.filePath} className="rounded-lg border border-[#e2edf8] bg-[#fbfdff]" style={{ padding: "12px 12px" }}>
-                            <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                              <div className="flex min-w-0 items-center" style={{ gap: 7 }}>
-                                <FileText size={14} className="shrink-0 text-[#6f87a1]" />
-                                <span className="truncate text-[13.5px] font-medium leading-5 text-[#24415f]">Step {round.step}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: round.filePath });
-                                }}
-                                className="kimix-icon-text-button is-compact shrink-0 bg-white text-[#2f6fad] hover:bg-[#eef7ff]"
-                              >
-                                打开
-                              </button>
-                            </div>
-                            <div className="mt-3 flex flex-col" style={{ gap: 10 }}>
-                              {round.entries.map((entry, index) => (
-                                <div key={`${round.filePath}-${index}`} className="rounded-lg bg-white text-[13px] leading-5 text-[#5e7894]" style={{ padding: "11px 11px" }}>
-                                  <div className="flex items-center justify-between" style={{ gap: 8 }}>
-                                    <div className="min-w-0 truncate font-medium text-[#2f6fad]">{entry.title}</div>
-                                    {(entry.phase || entry.role) && (
-                                      <span className="shrink-0 rounded-full bg-[#f4f9ff] text-[12px] leading-5 text-[#6f87a1]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                        {[entry.phase, entry.role].filter(Boolean).join(" · ")}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {entry.conclusion && (
-                                    <div className="mt-1 text-[12.5px] leading-5 text-[#7b91a7]">结论：{entry.conclusion}</div>
-                                  )}
-                                  <div className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-[#5e7894]">
-                                    {entry.content || "暂无正文。"}
-                                  </div>
-                                </div>
-                              ))}
-                              {round.entries.length === 0 && (
-                                <div className="rounded-lg bg-white text-[13px] leading-6 text-[#7b91a7]" style={{ padding: "11px 11px" }}>
-                                  这个 Step 记录暂时为空。
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        暂无 Step 轮次记录。
-                      </div>
-                    )}
-                  </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 1, padding: "16px 16px 18px" }}>
-                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">待审查</div>
-                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">{longTaskMeta.reviewQueuePath}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: longTaskMeta.reviewQueuePath });
-                        }}
-                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff]"
-                      >
-                        打开
-                      </button>
-                    </div>
-                    {longTaskDetailLoading ? (
-                      <div className="mt-4 rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "13px 12px" }}>
-                        正在读取待审查队列...
-                      </div>
-                    ) : parsedLongTaskDetail && parsedLongTaskDetail.reviewItems.length > 0 ? (
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        {pendingReviewItems.map((item, index) => (
-                          <button
-                            key={`${index}-${item}`}
-                            type="button"
-                            onClick={() => setReviewItemChecked(item, true)}
-                            className="flex w-full items-start rounded-lg border border-[#efe1bf] bg-[#fffdf7] text-left text-[13px] leading-5 text-[#7b6d4a] transition-colors hover:bg-[#fff8e8]"
-                            style={{ gap: 10, padding: "12px 12px" }}
-                            title="点击标记为已审查"
-                          >
-                            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#e2c884] text-transparent">
-                              <CheckCircle2 size={12} />
-                            </span>
-                            <span className="min-w-0 flex-1">{item}</span>
-                          </button>
-                        ))}
-                        {pendingReviewItems.length === 0 && (
-                          <div className="rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "13px 12px" }}>
-                            待审查项都已确认。
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-lg bg-[#fffdf7] text-[13px] leading-6 text-[#7b6d4a]" style={{ padding: "13px 12px" }}>
-                        暂无待人工审查项。
-                      </div>
-                    )}
-                  </section>
-                  {completedReviewItems.length > 0 && (
-                    <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 4, padding: "16px 16px 18px" }}>
-                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">已审查</div>
-                          <div className="mt-1 text-[13px] leading-5 text-[#8aa0b5]">点击条目可撤回到待审查</div>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                          {completedReviewItems.length}
-                        </span>
-                      </div>
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        {completedReviewItems.map((item, index) => (
-                          <button
-                            key={`${index}-${item}`}
-                            type="button"
-                            onClick={() => setReviewItemChecked(item, false)}
-                            className="flex w-full items-start rounded-lg border border-[#d8e8d8] bg-[#f7fbf7] text-left text-[13px] leading-5 text-[#6f806f] transition-colors hover:bg-[#edf7ed]"
-                            style={{ gap: 10, padding: "12px 12px" }}
-                            title="点击撤回到待审查"
-                          >
-                            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#4d9f55]" />
-                            <span className="min-w-0 flex-1 line-through decoration-[#7d937d] decoration-1">{item}</span>
-                            <RotateCcw size={13} className="mt-1 shrink-0 text-[#89a089]" />
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col" style={{ gap: 14 }}>
-                  {hiddenComposerCardEntries.length > 0 && (
-                    <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 0, padding: "16px 16px 18px" }}>
-                      <div className="flex items-start justify-between" style={{ gap: 12 }}>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">已收起卡片</div>
-                          <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">可恢复到输入框上方</div>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                          {hiddenComposerCardEntries.length}
-                        </span>
-                      </div>
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        {hiddenComposerCardEntries.map((entry) => (
-                          <button
-                            key={entry.key}
-                            type="button"
-                            onClick={() => {
-                              setComposerCardHidden(composerCardSessionId, entry.key, false);
-                              showToast(`${entry.title}已恢复到输入框上方`);
-                            }}
-                            className="flex w-full items-center rounded-lg border border-[#e2edf8] bg-[#fbfdff] text-left transition-colors hover:bg-[#f4f9ff]"
-                            style={{ gap: 10, padding: "12px 12px" }}
-                          >
-                            <entry.icon size={16} className="shrink-0 text-[#6f87a1]" />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[13.5px] font-medium leading-5 text-[#24415f]">{entry.title}</span>
-                              <span className="block truncate text-[12.5px] leading-5 text-[#6f87a1]">{entry.desc}</span>
-                            </span>
-                            <span className="shrink-0 rounded-full bg-white text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                              显示
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 4, padding: "16px 16px 18px" }}>
-                    <div className="flex items-start justify-between" style={{ gap: 12 }}>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">长程任务</div>
-                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">
-                          {visibleSessionLongTasks.length > 0 ? `${visibleSessionLongTasks.length} 个任务` : "当前项目暂无任务"}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={sessionLongTasksLoading || !(liveCurrentSession?.projectPath ?? currentProject?.path)}
-                        onClick={() => refreshSessionLongTasks()}
-                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff] disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        <RefreshCw size={13} className={sessionLongTasksLoading ? "animate-spin" : ""} />
-                        刷新
-                      </button>
-                    </div>
-                    {visibleSessionLongTasks.length > 0 ? (
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        {visibleSessionLongTasks.slice(0, 3).map((task) => (
-                          <div key={task.id} className="rounded-lg border border-[#e2edf8] bg-[#fbfdff]" style={{ padding: "12px 12px" }}>
-                            <div className="truncate text-[13.5px] font-medium leading-5 text-[#24415f]">{task.title}</div>
-                            <div className="mt-1 text-[12.5px] leading-5 text-[#6f87a1]">
-                              Step {task.currentStep}{task.targetStep ? ` / ${task.targetStep}` : ""} · {task.stage}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        如果这个对话已经关联长程任务，刷新后这里会显示任务卡片。
-                      </div>
-                    )}
-                  </section>
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 1, padding: "16px 16px 18px" }}>
-                    <div className="flex items-start justify-between" style={{ gap: 12 }}>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">Plan</div>
-                        <div className="mt-1 truncate text-[13px] leading-5 text-[#24415f]">
-                          {sessionPlanState.path || (sessionPlanPath === "__latest_kimi_plan__" ? "最近官方 Plan 文件" : sessionPlanPath) || "当前会话还没有捕获到官方 Plan 文件"}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={!liveCurrentSession || sessionPlanState.loading}
-                        onClick={() => refreshSessionPlan()}
-                        className="kimix-icon-text-button is-compact shrink-0 bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff] disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        <RefreshCw size={13} className={sessionPlanState.loading ? "animate-spin" : ""} />
-                        刷新
-                      </button>
-                    </div>
-                    {sessionPlanState.loading ? (
-                      <div className="mt-4 rounded-lg bg-[#f4f9ff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        正在读取 Plan 内容...
-                      </div>
-                    ) : sessionPlanState.error ? (
-                      <div className="mt-4 rounded-lg bg-[#fff4f0] text-[13px] leading-6 text-[#9b4b34]" style={{ padding: "13px 12px" }}>
-                        读取失败：{sessionPlanState.error}
-                      </div>
-                    ) : sessionPlanState.content ? (
-                      <div className="mt-4 rounded-lg border border-[#e2edf8] bg-[#fbfdff]" style={{ padding: "14px 13px" }}>
-                        <div className="max-h-[460px] min-w-0 overflow-x-hidden overflow-y-auto text-[13px] leading-6 text-[#3f5f80]">
-                          <MarkdownRenderer content={sessionPlanState.content} wrapLongLines />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-[12px] leading-5 text-[#8aa0b5]" style={{ gap: 10 }}>
-                          <span className="truncate">
-                            {sessionPlanState.updatedAt ? `更新于 ${formatReleaseDate(new Date(sessionPlanState.updatedAt).toISOString())}` : "已读取官方 Plan 文件"}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => void copyToClipboard(sessionPlanState.content, "已复制 Plan 内容")}
-                            className="kimix-icon-text-button is-compact shrink-0 text-[#2f6fad] hover:bg-[#eef7ff]"
-                          >
-                            <Copy size={13} />
-                            复制
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        {sessionPlanState.message || "开启 Plan 模式并让 Kimi 生成计划后，这里会显示官方写入的 markdown 内容。"}
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 2, padding: "16px 16px 18px" }}>
-                    <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">会话信息</div>
-                    <div className="mt-3 flex flex-col text-[13px] leading-5 text-[#5e7894]" style={{ gap: 10 }}>
-                      <div className="rounded-lg bg-[#f4f9ff]" style={{ padding: "11px 12px" }}>
-                        <div className="font-medium text-[#2f6fad]">Session</div>
-                        <div className="mt-1 break-all">{liveCurrentSession?.id ?? "未选择会话"}</div>
-                      </div>
-                      <div className="rounded-lg bg-[#f8fbff]" style={{ padding: "11px 12px" }}>
-                        <div className="font-medium text-[#2f6fad]">工作目录</div>
-                        <div className="mt-1 break-all">{liveCurrentSession?.projectPath ?? currentProject?.path ?? "未选择项目"}</div>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg bg-[#f8fbff]" style={{ gap: 12, padding: "11px 12px" }}>
-                        <span className="font-medium text-[#2f6fad]">Plan 模式</span>
-                        <span className="rounded-full bg-white text-[12px] leading-5 text-[#5e7894]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                          {defaultPlanMode ? "已开启" : "已关闭"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg bg-[#f8fbff]" style={{ gap: 12, padding: "11px 12px" }}>
-                        <span className="font-medium text-[#2f6fad]">自动模式</span>
-                        <span className="rounded-full bg-white text-[12px] leading-5 text-[#5e7894]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                          {defaultAfkMode ? "已开启" : "已关闭"}
-                        </span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="rounded-xl border border-[#dbeafa] bg-white" style={{ order: 3, padding: "16px 16px 18px" }}>
-                    <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                      <div className="text-[13px] font-medium leading-5 text-[#6f87a1]">最近变更</div>
-                      <span className="shrink-0 rounded-full bg-[#eef7ff] text-[12px] leading-5 text-[#2f6fad]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                        {sessionDiffs.length}
-                      </span>
-                    </div>
-                    {sessionDiffs.length > 0 ? (
-                      <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                        {sessionDiffs.slice(0, 4).map((diff) => (
-                          <button
-                            key={diff.id}
-                            type="button"
-                            onClick={() => {
-                              if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: diff.filePath });
-                            }}
-                            className="w-full rounded-lg border border-[#e2edf8] bg-[#fbfdff] text-left transition-colors hover:bg-[#f4f9ff]"
-                            style={{ padding: "12px 12px" }}
-                          >
-                            <div className="truncate text-[13px] font-medium leading-5 text-[#24415f]">{diff.filePath}</div>
-                            <div className="mt-1 text-[12px] leading-5 text-[#7b91a7]">+{diff.additions} / -{diff.deletions}</div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-lg bg-[#f8fbff] text-[13px] leading-6 text-[#6f87a1]" style={{ padding: "13px 12px" }}>
-                        当前会话还没有 diff 记录。
-                      </div>
-                    )}
-                  </section>
-                </div>
-              )}
-            </div>
-          </aside>
+          <LongTaskInspectorPanel
+            width={rightPanelWidth}
+            title={rightPanelTitle}
+            subtitle={rightPanelSubtitle}
+            longTaskMeta={longTaskMeta}
+            longTaskDetail={longTaskDetail}
+            longTaskDetailLoading={longTaskDetailLoading}
+            longTaskDetailError={longTaskDetailError}
+            parsedLongTaskDetail={parsedLongTaskDetail}
+            pendingReviewItems={pendingReviewItems}
+            completedReviewItems={completedReviewItems}
+            targetStepDraft={targetStepDraft}
+            targetStepBusy={targetStepBusy}
+            longTaskControlBusy={longTaskControlBusy}
+            runningSessionId={runningSessionId}
+            totalLongTaskSteps={totalLongTaskSteps}
+            sessionLongTasksLoading={sessionLongTasksLoading}
+            shutdownAfterLongTaskId={shutdownAfterLongTaskId}
+            sessionPlanState={sessionPlanState}
+            sessionPlanPath={sessionPlanPath}
+            liveCurrentSession={liveCurrentSession}
+            currentProject={currentProject}
+            hiddenComposerCardEntries={hiddenComposerCardEntries}
+            composerCardSessionId={composerCardSessionId}
+            visibleSessionLongTasks={visibleSessionLongTasks}
+            sessionDiffs={sessionDiffs}
+            defaultPlanMode={defaultPlanMode}
+            defaultAfkMode={defaultAfkMode}
+            buildNextLongTaskPrompt={buildNextLongTaskPrompt}
+            onClose={() => setLongTaskInspectorOpen(false)}
+            onPatchLongTaskMeta={patchLongTaskMeta}
+            onApplyTargetStep={applyTargetStep}
+            onSetReviewItemChecked={setReviewItemChecked}
+            onCopyNextLongTaskPrompt={copyNextLongTaskPrompt}
+            onRefreshLongTaskDetail={refreshLongTaskDetail}
+            onRefreshSessionPlan={refreshSessionPlan}
+            onRefreshSessionLongTasks={refreshSessionLongTasks}
+            onSetTargetStepDraft={setTargetStepDraft}
+            onSetShutdownAfterLongTaskId={setShutdownAfterLongTaskId}
+            onSetComposerCardHidden={setComposerCardHidden}
+            showToast={showToast}
+            copyToClipboard={copyToClipboard}
+          />
         )}
         {chatWorkspaceActive && diffPanelOpen && (
-          <aside style={{ width: rightPanelWidth }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden rounded-[18px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ paddingLeft: 18, paddingRight: 14 }}>
-              <div className="min-w-0">
-                <div className="text-[15px] font-semibold leading-5 text-[var(--kimix-panel-text)]">差异面板</div>
-                <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">
-                  {sessionDiffs.length > 0 ? `${sessionDiffs.length} 条最近变更` : "当前会话还没有 diff 记录"}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDiffPanelOpen(false)}
-                className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                aria-label="关闭差异面板"
-                title="关闭"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 12, paddingBottom: 18 }}>
-              {sessionDiffs.length > 0 ? (
-                <div className="flex flex-col" style={{ gap: 14 }}>
-                  {sessionDiffs.map((diff) => (
-                    <section key={diff.id} className="kimix-soft-card rounded-xl" style={{ padding: "16px 16px 18px" }}>
-                      <div className="flex items-start justify-between" style={{ gap: 10 }}>
-                        <div className="min-w-0">
-                          <div className="truncate text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">{diff.filePath}</div>
-                          <div className="mt-1 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">
-                            +{diff.additions} / -{diff.deletions} · {formatReleaseDate(new Date(diff.timestamp).toISOString())}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: diff.filePath });
-                          }}
-                          className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
-                        >
-                          打开
-                        </button>
-                      </div>
-                      <div className="mt-4 overflow-hidden rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]">
-                        <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)] bg-[var(--kimix-panel-soft-bg)] text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 10, padding: "10px 12px" }}>
-                          <span>行级差异</span>
-                          <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">+{diff.additions} / -{diff.deletions}</span>
-                        </div>
-                        <div className="max-h-[520px] overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                          {renderUnifiedDiff(diff.oldText, diff.newText)}
-                        </div>
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6" style={{ padding: "18px 16px" }}>
-                  当工具调用返回结构化 diff 后，这里会按时间展示文件变更明细。
-                </div>
-              )}
-            </div>
-          </aside>
+          <DiffPanel
+            width={rightPanelWidth}
+            diffs={sessionDiffs}
+            onClose={() => setDiffPanelOpen(false)}
+            onOpenFile={(filePath) => {
+              if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath });
+            }}
+          />
         )}
       </div>
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       <LongTasksPanel />
-      {showKimiOnboarding && (
-        <div className="kimix-onboarding-overlay fixed inset-0 z-[118] flex items-center justify-center backdrop-blur-sm" style={{ padding: 24 }}>
-          <div className="kimix-onboarding-card w-full max-w-[560px] rounded-[18px] border shadow-[0_26px_80px_rgba(35,31,25,0.18)]" style={{ padding: "22px 24px" }}>
-            <div className="flex items-start justify-between" style={{ gap: 16 }}>
-              <div className="flex min-w-0 items-start" style={{ gap: 14 }}>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef7ff] text-[#2f6fad]">
-                  <SquareTerminal size={20} />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[18px] font-semibold leading-7 text-[#24211d]">需要先配置 Kimi CLI</div>
-                  <div className="mt-1 text-[14px] leading-6 text-[#706b63]">
-                    Kimix 通过本机的 <span className="font-medium text-[#3a362f]">kimi</span> 命令启动对话。当前没有在 PATH 中找到 Kimi CLI，配置完成后才能正常发送消息。
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setKimiOnboardingDismissed(true)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8a847a] hover:bg-[#f3f1ec]"
-                aria-label="稍后配置"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="mt-5 rounded-xl border border-[#eee8dc] bg-[#fbfaf7]" style={{ padding: "16px 16px 18px" }}>
-              <div className="text-[13px] font-medium leading-5 text-[#625d55]">推荐步骤</div>
-              <div className="mt-2 grid gap-2 text-[13.5px] leading-6 text-[#6f685f]">
-                <div>1. 点击“一键安装”，或使用官方脚本安装 Kimi CLI（脚本会自动安装 uv）。</div>
-                <div>2. 安装完成后，在系统终端运行 <span className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[12.5px] text-[#3a362f]">kimi</span>，再输入 <span className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[12.5px] text-[#3a362f]">/login</span> 完成登录。</div>
-                <div>3. 重启 Kimix 或点击“重新检测”。</div>
-              </div>
-              <div className="mt-4 rounded-lg border border-[#e6dfd2] bg-white font-mono text-[12.5px] leading-5 text-[#3a362f]" style={{ padding: "12px 12px" }}>
-                {KIMI_CLI_WINDOWS_INSTALL_COMMAND}
-              </div>
-              <div className="mt-2 text-[12.5px] leading-5 text-[#9a948b]">
-                检测结果：{kimiOnboarding.message}
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center justify-between" style={{ gap: 12, marginTop: 24 }}>
-              <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => void installKimiCliFromOnboarding()}
-                  disabled={kimiInstallBusy}
-                  className="kimix-icon-text-button is-compact bg-[#339af0] text-white hover:bg-[#228be6] disabled:cursor-wait disabled:opacity-65"
-                  style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
-                >
-                  {kimiInstallBusy ? <RefreshCw size={14} className="kimix-spin" /> : <SquareTerminal size={14} />}
-                  <span>{kimiInstallBusy ? "安装中" : "一键安装"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void window.api.openExternal(KIMI_CLI_DOCS_URL)}
-                  className="kimix-icon-text-button is-compact text-[#2f6fad] hover:bg-[#eef4fb]"
-                  style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
-                >
-                  <ExternalLink size={14} />
-                  <span>打开官方说明</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void copyToClipboard(KIMI_CLI_WINDOWS_INSTALL_COMMAND, "已复制安装命令")}
-                  className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]"
-                  style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
-                >
-                  <Copy size={14} />
-                  <span>复制安装命令</span>
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKimiOnboardingDismissed(true);
-                    setWorkspaceView("settings");
-                  }}
-                  className="kimix-icon-text-button is-compact text-[#625d55] hover:bg-[#f1eee8]"
-                  style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
-                >
-                  <Monitor size={14} />
-                  <span>打开设置</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void checkKimiForOnboarding()}
-                  className="kimix-icon-text-button is-compact text-[#2f6fad] hover:bg-[#eef7ff]"
-                  style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
-                >
-                  <RefreshCw size={14} />
-                  <span>重新检测</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {toastMessage && (
-        <div
-          className="pointer-events-none fixed left-1/2 top-16 z-[120] -translate-x-1/2 rounded-full border border-[#ded9cf] bg-white text-[14px] font-medium leading-5 text-[#3a362f] shadow-[0_16px_40px_rgba(25,23,20,0.16)]"
-          style={{ padding: "9px 18px" }}
-        >
-          {toastMessage}
-        </div>
-      )}
-      {launchCommandDialogOpen && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/20 px-5" onMouseDown={() => setLaunchCommandDialogOpen(false)}>
-          <div
-            className="kimix-modal-card w-full max-w-[520px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]"
-            style={{ padding: "22px 24px 24px" }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between" style={{ gap: 16 }}>
-              <div className="min-w-0">
-                <div className="text-[18px] font-semibold leading-6 text-[#24211d]">设置启动命令</div>
-                <div className="mt-2 text-[13.5px] leading-6 text-[#706b63]">命令会在当前项目目录中打开终端执行。</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLaunchCommandDialogOpen(false)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8f887e] hover:bg-[#f1eee8] hover:text-[#24211d]"
-                aria-label="关闭"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <textarea
-              value={launchCommandDraft}
-              onChange={(event) => setLaunchCommandDraft(event.target.value)}
-              className="mt-5 min-h-[96px] w-full resize-y rounded-xl border border-[#ded9cf] bg-white text-[14px] leading-6 text-[#24211d] outline-none focus:border-[#b9d7f4]"
-              style={{ padding: "12px 14px" }}
-              placeholder="例如：pnpm dev"
-              autoFocus
-            />
-            <div className="mt-5 flex justify-end" style={{ gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => setLaunchCommandDialogOpen(false)}
-                className="kimix-icon-text-button bg-[#f5f3ef] text-[#625d55] hover:bg-[#ece8df]"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveLaunchCommand()}
-                className="kimix-icon-text-button bg-[#24211d] text-white hover:bg-black"
-              >
-                保存命令
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {shutdownDialog && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/25 px-5">
-          <div className="kimix-modal-card w-full max-w-[460px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" style={{ padding: "22px 24px" }}>
-            <div className="text-[18px] font-semibold leading-6 text-[#24211d]">长程任务已完成</div>
-            <div className="mt-3 text-[14px] leading-6 text-[#625d55]">
-              「{shutdownDialog.taskTitle}」已执行完成。已按你的设置安排关机。
-            </div>
-            <div className="mt-5 rounded-xl border border-[#e5e1d8] bg-[#faf8f4] text-center" style={{ padding: "18px 16px" }}>
-              <div className="text-[13px] leading-5 text-[#8f887e]">距离关机还有</div>
-              <div className="mt-1 font-mono text-[34px] font-semibold leading-[1.2] text-[#24211d]">
-                {Math.floor(shutdownDialog.remainingSeconds / 60)}:{String(shutdownDialog.remainingSeconds % 60).padStart(2, "0")}
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end" style={{ gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => void cancelScheduledShutdown()}
-                className="kimix-icon-text-button bg-[#339af0] text-white hover:bg-[#228be6]"
-                style={{ paddingLeft: 18, paddingRight: 18 }}
-              >
-                取消关机
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {helpDialog && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-5" onMouseDown={() => setHelpDialog(null)}>
-          <div className="kimix-modal-card w-full max-w-[560px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#ebe7df]" style={{ padding: "16px 20px" }}>
-              <div className="flex items-center gap-2.5 text-[18px] font-semibold text-[#24211d]">
-                {helpDialog === "about" && <Info size={18} />}
-                {helpDialog === "updates" && <History size={18} />}
-                {helpDialog === "shortcuts" && <Keyboard size={18} />}
-                {helpDialog === "info" && <HelpCircle size={18} />}
-                <span>
-                  {helpDialog === "about" ? "关于 Kimix" : helpDialog === "updates" ? "更新记录" : helpDialog === "shortcuts" ? "键盘快捷键" : infoTopic?.title}
-                </span>
-              </div>
-              <button className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8f887e] hover:bg-[#f1eee8] hover:text-[#24211d]" onClick={() => setHelpDialog(null)} aria-label="关闭">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="max-h-[70vh] overflow-y-auto" style={{ padding: 22 }}>
-              {helpDialog === "about" && (
-                <div className="space-y-4 text-[14.5px] leading-7 text-[#625d55]">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f3f1ec] text-[#24211d]">
-                      <BookOpen size={22} />
-                    </div>
-                    <div>
-                      <div className="text-[20px] font-semibold text-[#24211d]">{appInfo.name}</div>
-                      <div className="text-[#8a847a]">版本 v{appInfo.version}</div>
-                    </div>
-                  </div>
-                  <p>Kimix 是一个面向 Kimi Code CLI 的桌面客户端，目标是提供接近 Codex 的项目对话、队列、引导、工具调用和本地开发体验。</p>
-                  <div className="rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
-                    <div>开发者：{appInfo.author}</div>
-                    <button className="kimix-icon-text-button is-compact mt-4 text-[#2f6fad] hover:bg-[#eef4fb]" onClick={() => window.api.openExternal(appInfo.repository)}>
-                      打开 GitHub 仓库 <ExternalLink size={13} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {helpDialog === "updates" && (
-                <div className="space-y-4 text-[14.5px] text-[#625d55]">
-                  <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
-                    <div className="min-w-0">
-                      <div className="mb-1 text-[12px] font-semibold text-[#9a9287]">Kimix 本体</div>
-                      <div className="font-semibold text-[#24211d]">{updateState.message}</div>
-                      {updateState.latest && <div className="mt-1 text-[13px] text-[#8a847a]">最新版本：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
-                    </div>
-                    <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-                      {updateState.hasUpdate && (
-                        <button
-                          onClick={handleDownloadUpdate}
-                          disabled={updateState.downloading || updateState.loading}
-                          className="kimix-icon-text-button h-10 shrink-0 bg-[#339af0] text-white hover:bg-[#228be6] disabled:opacity-45"
-                          style={{ paddingLeft: 16, paddingRight: 18 }}
-                        >
-                          <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
-                          {updateState.downloading
-                            ? `下载中 ${Math.round(updateState.downloadPercent ?? 0)}%`
-                            : "升级"}
-                        </button>
-                      )}
-                      <button
-                        onClick={handleCheckUpdates}
-                        disabled={updateState.loading || updateState.downloading}
-                        className="kimix-icon-text-button h-10 shrink-0 bg-[#24211d] text-white hover:bg-black disabled:opacity-45"
-                        style={{ paddingLeft: 16, paddingRight: 18 }}
-                      >
-                        <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
-                        检查本体
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e5e1d8] bg-[#faf8f4]" style={{ paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
-                    <div className="min-w-0">
-                      <div className="mb-1 text-[12px] font-semibold text-[#9a9287]">Kimi CLI</div>
-                      <div className="font-semibold text-[#24211d]">{cliUpdateState.message}</div>
-                      {cliUpdateState.info && (
-                        <div className="mt-1 text-[13px] text-[#8a847a]">
-                          当前：{cliUpdateState.info.currentVersion ?? "未安装"} · 最新：{cliUpdateState.info.latestVersion ?? "未知"}
-                        </div>
-                      )}
-                      {cliUpdateState.info?.path && <div className="mt-1 truncate text-[12px] text-[#aaa49a]" title={cliUpdateState.info.path}>{cliUpdateState.info.path}</div>}
-                    </div>
-                    <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-                      {cliUpdateState.hasUpdate && (
-                        <button
-                          onClick={handleUpdateKimiCli}
-                          disabled={cliUpdateState.updating || cliUpdateState.loading}
-                          className="kimix-icon-text-button h-10 shrink-0 bg-[#339af0] text-white hover:bg-[#228be6] disabled:opacity-45"
-                          style={{ paddingLeft: 16, paddingRight: 18 }}
-                        >
-                          <RefreshCw size={14} className={cliUpdateState.updating ? "kimix-spin" : ""} />
-                          {cliUpdateState.updating ? "更新中" : "一键更新"}
-                        </button>
-                      )}
-                      <button
-                        onClick={handleCheckCliUpdate}
-                        disabled={cliUpdateState.loading || cliUpdateState.updating}
-                        className="kimix-icon-text-button h-10 shrink-0 bg-[#24211d] text-white hover:bg-black disabled:opacity-45"
-                        style={{ paddingLeft: 16, paddingRight: 18 }}
-                      >
-                        <RefreshCw size={14} className={cliUpdateState.loading ? "kimix-spin" : ""} />
-                        检查 CLI
-                      </button>
-                    </div>
-                  </div>
-                  {updateState.latest && (
-                    <div className="rounded-xl border border-[#e5e1d8]" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
-                      <div className="font-semibold text-[#24211d]">{updateState.latest.name || updateState.latest.tagName}</div>
-                      <p className="mt-3 whitespace-pre-wrap leading-6">{updateState.latest.body || "该版本没有填写更新说明。"}</p>
-                      <button className="kimix-icon-text-button is-compact mt-4 text-[#2f6fad] hover:bg-[#eef4fb]" onClick={() => window.api.openExternal(updateState.latest!.htmlUrl)}>
-                        打开发布页面 <ExternalLink size={13} />
-                      </button>
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    {RELEASE_TIMELINE.map((item) => (
-                      <div key={item.version} className="rounded-xl border border-[#e5e1d8] bg-white" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-semibold text-[#24211d]">{item.version}</span>
-                          <span className="text-[13px] text-[#8a847a]">{item.date}</span>
-                        </div>
-                        <p className="mt-3 leading-6">{item.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {helpDialog === "shortcuts" && (
-                <div className="grid gap-2 text-[14px] text-[#625d55]">
-                  {["Ctrl+B 切换侧边栏", "Ctrl+K 聚焦输入框", "Ctrl+N 新对话", "Ctrl+O 打开项目", "Ctrl+R 重新载入页面", "Ctrl++ 放大", "Ctrl+- 缩小", "Ctrl+0 实际大小", "F11 切换全屏", "Esc 停止当前任务"].map((line) => (
-                    <div key={line} className="rounded-lg bg-[#faf8f4]" style={{ padding: "10px 14px" }}>{line}</div>
-                  ))}
-                </div>
-              )}
-
-              {helpDialog === "info" && infoTopic && (
-                <div className="space-y-4 text-[14.5px] leading-7 text-[#625d55]">
-                  <p>{infoTopic.body}</p>
-                  {infoTopic.url && (
-                    <button className="kimix-icon-text-button is-compact text-[#2f6fad] hover:bg-[#eef4fb]" onClick={() => window.api.openExternal(infoTopic.url!)}>
-                      打开相关页面 <ExternalLink size={13} />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <ToastSystem message={toastMessage} />
+      <DialogSystem
+        showKimiOnboarding={showKimiOnboarding}
+        kimiOnboardingMessage={kimiOnboarding.message}
+        kimiInstallBusy={kimiInstallBusy}
+        onKimiDismiss={() => setKimiOnboardingDismissed(true)}
+        onKimiInstall={installKimiCliFromOnboarding}
+        onKimiCheck={checkKimiForOnboarding}
+        onKimiOpenSettings={() => setWorkspaceView("settings")}
+        copyToClipboard={copyToClipboard}
+        launchCommandOpen={launchCommandDialogOpen}
+        launchCommandDraft={launchCommandDraft}
+        onLaunchCommandChange={setLaunchCommandDraft}
+        onLaunchCommandClose={() => setLaunchCommandDialogOpen(false)}
+        onLaunchCommandSave={saveLaunchCommand}
+        shutdownDialog={shutdownDialog}
+        onShutdownCancel={cancelScheduledShutdown}
+        helpDialog={helpDialog}
+        infoTopic={infoTopic}
+        appInfo={appInfo}
+        updateState={updateState}
+        cliUpdateState={cliUpdateState}
+        onHelpClose={() => setHelpDialog(null)}
+        onDownloadUpdate={handleDownloadUpdate}
+        onOpenLatestRelease={handleOpenLatestRelease}
+        onCheckUpdates={handleCheckUpdates}
+        onUpdateKimiCli={handleUpdateKimiCli}
+        onCheckCliUpdate={handleCheckCliUpdate}
+      />
     </div>
   );
 }

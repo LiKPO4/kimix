@@ -52,18 +52,18 @@ export function SessionRecommendationCard({ event, sourceSessionId, projectPath 
   return (
     <div className="flex justify-center">
       <div
-        className="w-full max-w-[860px] rounded-xl border border-[#d8e6f5] bg-[#f7fbff] text-[14.5px] leading-6 text-[#4f5963]"
+        className="w-full max-w-[860px] rounded-xl border border-accent-primary-soft bg-accent-primary-light text-[14.5px] leading-6 text-text-secondary"
         style={{ padding: "16px 20px" }}
       >
         <div className="flex items-start" style={{ gap: 14 }}>
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center text-[#2f79bd]" style={{ marginTop: 1 }}>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center text-accent-primary" style={{ marginTop: 1 }}>
             <MessageSquarePlus size={18} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="leading-6">
               当前会话已进行 {event.turnCount} 轮，达到推荐上限 {event.turnLimit} 轮。建议开启新对话，减少旧上下文和无用信息干扰。
               {event.handoffStatus === "error" && event.handoffError && (
-                <span className="ml-2 text-[#b54708]">交接失败：{event.handoffError}</span>
+                <span className="ml-2 text-accent-warning">交接失败：{event.handoffError}</span>
               )}
             </div>
             <div className="mt-2 flex flex-wrap items-center" style={{ gap: 8 }}>
@@ -71,7 +71,7 @@ export function SessionRecommendationCard({ event, sourceSessionId, projectPath 
                 type="button"
                 disabled={disabled}
                 onClick={startFreshSession}
-                className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-[#1f73c9] transition-colors hover:bg-[#e8f2fd] disabled:cursor-wait disabled:text-[#8aa9c8]"
+                className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-accent-primary transition-colors hover:bg-accent-primary/10 disabled:cursor-wait disabled:text-text-muted"
                 style={{ gap: 6, paddingLeft: 10, paddingRight: 12 }}
               >
                 <span>{creating ? "正在开启" : "开启新对话"}</span>
@@ -81,7 +81,7 @@ export function SessionRecommendationCard({ event, sourceSessionId, projectPath 
                 type="button"
                 disabled={disabled}
                 onClick={startHandoff}
-                className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-[#1f73c9] transition-colors hover:bg-[#e8f2fd] disabled:cursor-wait disabled:text-[#8aa9c8]"
+                className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-accent-primary transition-colors hover:bg-accent-primary/10 disabled:cursor-wait disabled:text-text-muted"
                 style={{ gap: 6, paddingLeft: 10, paddingRight: 12 }}
               >
                 <span>{isHandoffRunning ? `交接中${dots}` : "携带交接内容开启新对话"}</span>

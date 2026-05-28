@@ -74,14 +74,14 @@ export function ToolCard({ event }: ToolCardProps) {
   const details = isToolCall ? stringifyValue(event.arguments) : stringifyValue(event.result);
 
   const statusText = status === "running" ? "正在运行" : status === "error" ? "失败" : "已运行";
-  const dotClass = status === "running" ? "bg-[#d6a100]" : status === "error" ? "bg-[#d83b01]" : "bg-[#1a8f3a]";
+  const dotClass = status === "running" ? "bg-accent-warning" : status === "error" ? "bg-accent-danger" : "bg-accent-success";
 
   return (
     <div className="flex justify-start">
       <div className="w-full">
         <button
           onClick={() => setExpanded((value) => !value)}
-          className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-[#8a847a] transition-colors hover:bg-[#f3f1ec]"
+          className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-text-muted transition-colors hover:bg-surface-hover"
           style={{ gap: 8, paddingLeft: 4, paddingRight: 10 }}
         >
           {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
@@ -89,12 +89,12 @@ export function ToolCard({ event }: ToolCardProps) {
           <span className="min-w-0 flex-1 truncate">
             {statusText} {meta.label}
           </span>
-          {duration && <span className="shrink-0 text-[#9a948b]">{duration}</span>}
+          {duration && <span className="shrink-0 text-text-muted">{duration}</span>}
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
         </button>
         {expanded && (
           <pre
-            className="mt-2 max-h-52 min-w-0 overflow-auto rounded-xl bg-[#f7f5f1] whitespace-pre-wrap break-words text-[14px] leading-7 text-[#706b63]"
+            className="mt-2 max-h-52 min-w-0 overflow-auto rounded-xl bg-surface-base whitespace-pre-wrap break-words text-[14px] leading-7 text-text-secondary"
             style={{ paddingLeft: 32, paddingRight: 32, paddingTop: 20, paddingBottom: 20 }}
           >
             {details || meta.detail}

@@ -7,7 +7,7 @@ export interface PendingMessage {
   createdAt: number;
 }
 
-interface SessionStore {
+export interface SessionStore {
   sessions: Session[];
   recentProjects: Project[];
   pendingMessages: PendingMessage[];

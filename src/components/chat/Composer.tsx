@@ -2,7 +2,8 @@
 import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Session, TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
+import { useLiveSession } from "@/hooks/useLiveSession";
+import type { TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
@@ -28,11 +29,6 @@ const permissionMenuIcons = {
   approve_for_session: RotateCw,
   yolo: ShieldAlert,
 };
-
-const THINKING_OPTIONS = [
-  { value: true, label: "思考开启", tooltip: "思考开启：允许 Kimi 展示并使用思考过程，适合复杂任务。" },
-  { value: false, label: "思考关闭", tooltip: "思考关闭：减少思考过程输出，适合简单问答或快速执行。" },
-];
 
 const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc: string }[] = [
   { value: "on", label: "开启", desc: "优先澄清不明确需求" },
@@ -140,10 +136,9 @@ export function Composer() {
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const removePendingMessage = useSessionStore((s) => s.removePendingMessage);
   const reorderPendingMessage = useSessionStore((s) => s.reorderPendingMessage);
-  const liveSession = useSessionStore((s) => s.sessions.find((session) => session.id === currentSession?.id));
+  const liveSession = useLiveSession(currentSession?.id);
 
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
-  const [showThinkingMenu, setShowThinkingMenu] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -151,7 +146,6 @@ export function Composer() {
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
-  const thinkingBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
   const activeSession = liveSession ?? currentSession;
   const isCurrentSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
@@ -166,9 +160,6 @@ export function Composer() {
     const handleClick = (e: MouseEvent) => {
       if (permissionBtnRef.current && !permissionBtnRef.current.contains(e.target as Node)) {
         setShowPermissionMenu(false);
-      }
-      if (thinkingBtnRef.current && !thinkingBtnRef.current.contains(e.target as Node)) {
-        setShowThinkingMenu(false);
       }
       if (addBtnRef.current && !addBtnRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
@@ -978,7 +969,7 @@ export function Composer() {
 
       <div
         style={{ paddingLeft: 17, paddingRight: 17, paddingTop: 14, paddingBottom: 10 }}
-        className={`kimix-composer-surface kimix-composer-card relative flex min-w-0 flex-col overflow-visible rounded-[19px] border transition-colors ${
+        className={`kimix-composer-surface kimix-composer-card relative flex min-w-0 flex-col overflow-visible border transition-colors ${
           isDragging
             ? "border-accent-blue"
             : isFocused
@@ -987,8 +978,8 @@ export function Composer() {
         } ${!canUseComposer ? "opacity-60" : ""}`}
       >
         {isDragging && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[19px] border border-dashed border-accent-blue bg-accent-blue/5">
-            <span className="text-sm font-medium text-accent-blue">释放以添加附件</span>
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-accent-primary bg-accent-primary/5">
+            <span className="text-sm font-medium text-accent-primary">释放以添加附件</span>
           </div>
         )}
         {activeCompletion && (
@@ -1153,7 +1144,7 @@ export function Composer() {
                             key={ratio}
                             type="button"
                             onClick={() => openBlankDrawingBoard(ratio)}
-                            className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-[#625d55] hover:bg-[var(--kimix-panel-hover)]"
+                            className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-text-secondary hover:bg-[var(--kimix-panel-hover)]"
                           >
                             {ratio}
                           </button>
@@ -1176,7 +1167,7 @@ export function Composer() {
                                 type="button"
                                 title={option.desc}
                                 onClick={() => handleSetClarificationToolMode(option.value)}
-                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-white text-[#1769aa] shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-white/70"}`}
+                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
                               >
                                 {option.label}
                               </button>
@@ -1212,7 +1203,7 @@ export function Composer() {
                                 onClick={() => {
                                   if (defaultAfkMode !== option.value) handleToggleAfkMode();
                                 }}
-                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-white text-[#1769aa] shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-white/70"}`}
+                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
                                 aria-pressed={active}
                               >
                                 {option.label}
@@ -1230,7 +1221,7 @@ export function Composer() {
 
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
               <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35">
-                <AlertTriangle size={14} className="shrink-0 text-[#d97706]" />
+                <AlertTriangle size={14} className="shrink-0 text-accent-warning" />
                 <span className="truncate">{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
@@ -1257,10 +1248,10 @@ export function Composer() {
               onClick={() => void handleTogglePlanMode()}
               className="kimix-icon-text-button kimix-muted-action is-compact min-w-[92px] border disabled:cursor-not-allowed disabled:opacity-35"
               style={{
-                borderColor: defaultPlanMode ? "#8cc7f7" : "transparent",
-                backgroundColor: defaultPlanMode ? "#e7f4ff" : "transparent",
-                color: defaultPlanMode ? "#1769aa" : undefined,
-                boxShadow: defaultPlanMode ? "inset 0 0 0 1px rgba(51, 154, 240, 0.16)" : undefined,
+                borderColor: defaultPlanMode ? "var(--accent-primary-soft)" : "transparent",
+                backgroundColor: defaultPlanMode ? "var(--accent-primary-light)" : "transparent",
+                color: defaultPlanMode ? "var(--accent-primary-dark)" : undefined,
+                boxShadow: defaultPlanMode ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
               }}
               title={defaultPlanMode ? "关闭 Plan 模式。Plan 模式会先生成计划，等待确认后再执行。" : "开启 Plan 模式。Plan 模式会先生成计划，等待确认后再执行。"}
               aria-pressed={defaultPlanMode}
@@ -1268,23 +1259,29 @@ export function Composer() {
               <ClipboardList size={14} className="shrink-0" />
               <span>{defaultPlanMode ? "Plan 开" : "Plan 关"}</span>
             </button>
-            <div ref={thinkingBtnRef} className="relative">
-              <button disabled={!canUseComposer} onClick={() => setShowThinkingMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact min-w-[126px] disabled:cursor-not-allowed disabled:opacity-35">
-                <Brain size={14} className="shrink-0" />
-                <span>{defaultThinking ? "思考开启" : "思考关闭"}</span>
-                <ChevronDown size={12} className="shrink-0" />
-              </button>
-              {showThinkingMenu && (
-                <div className="kimix-floating-panel absolute bottom-full right-0 z-20 mb-2 w-[188px] rounded-xl" style={{ paddingTop: 12, paddingBottom: 12 }}>
-                  {THINKING_OPTIONS.map((option) => (
-                    <button key={String(option.value)} title={option.tooltip} onClick={() => { setDefaultThinking(option.value); setShowThinkingMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center justify-between gap-4 text-left text-[14px] leading-none hover:bg-[var(--kimix-panel-hover)] ${defaultThinking === option.value ? "text-accent-blue" : "text-[var(--kimix-panel-text-secondary)]"}`}>
-                      {option.label}
-                      {defaultThinking === option.value && <Check size={14} />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              disabled={!canUseComposer}
+              onClick={() => {
+                if (!canUseComposer) return;
+                const next = !defaultThinking;
+                setDefaultThinking(next);
+                window.dispatchEvent(new CustomEvent("kimix:toast", {
+                  detail: next ? "思考开" : "思考关",
+                }));
+              }}
+              className="kimix-icon-text-button kimix-muted-action is-compact min-w-[100px] border disabled:cursor-not-allowed disabled:opacity-35"
+              style={{
+                borderColor: defaultThinking ? "var(--accent-primary-soft)" : "transparent",
+                backgroundColor: defaultThinking ? "var(--accent-primary-light)" : "transparent",
+                color: defaultThinking ? "var(--accent-primary-dark)" : undefined,
+                boxShadow: defaultThinking ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
+              }}
+              title={defaultThinking ? "关闭思考" : "开启思考"}
+              aria-pressed={defaultThinking}
+            >
+              <Brain size={14} className="shrink-0" />
+              <span>{defaultThinking ? "思考开" : "思考关"}</span>
+            </button>
 
             <ContextRing />
             <button disabled={!canUseComposer} onClick={() => void handleVoiceShortcut()} className={iconButtonClass} title={`语音快捷键：${voiceShortcut || "Win+H"}`} aria-label="语音">
@@ -1296,7 +1293,7 @@ export function Composer() {
                 <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
               </button>
             ) : (
-              <button onClick={handleSend} disabled={(!input.trim() && imageAttachments.length === 0) || !canUseComposer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#339af0] text-white transition-colors hover:bg-[#228be6] disabled:bg-[#ece9e3] disabled:text-[#aaa49a]" title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
+              <button onClick={handleSend} disabled={(!input.trim() && imageAttachments.length === 0) || !canUseComposer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark disabled:bg-surface-hover disabled:text-text-muted" title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
                 <ArrowUp size={17} strokeWidth={2.5} />
               </button>
             )}
@@ -1332,7 +1329,7 @@ export function Composer() {
             <button
               type="button"
               onClick={() => openImageDrawingBoard(previewImage)}
-              className="kimix-icon-text-button rounded-xl bg-white text-[#302d28] shadow-[0_8px_26px_rgba(0,0,0,0.18)] hover:bg-[#f7f5f0]"
+              className="kimix-icon-text-button rounded-xl bg-surface-elevated text-text-primary shadow-elevated-token hover:bg-surface-hover"
               style={{ paddingLeft: 16, paddingRight: 16 }}
             >
               <Palette size={15} />

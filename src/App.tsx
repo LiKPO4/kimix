@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef, useCallback } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
@@ -10,6 +10,25 @@ import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import {
+  settleInactiveEvents,
+  closeOpenCompaction,
+  latestAssistantContent,
+  latestAssistantVisibleOrThinkingContent,
+} from "@/utils/eventHelpers";
+import {
+  getHiddenHandoffSessionIds,
+  rememberHiddenHandoffSession,
+  persistLocalConversationState,
+  LOCAL_SESSIONS_KEY,
+  LOCAL_PENDING_KEY,
+} from "@/utils/persistence";
+import { useRendererLagDetector } from "@/hooks/useRendererLagDetector";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useSettingsSync } from "@/hooks/useSettingsSync";
+import { useStatePersistence } from "@/hooks/useStatePersistence";
+import { useEventStream } from "@/hooks/useEventStream";
+import { useBootstrap } from "@/hooks/useBootstrap";
 
 const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent的提示词，注意回复内容中应该仅仅包含这段提示词。如果没有agent.md文档，请根据以下形式总结并给出提示词
 - 项目背景
@@ -19,11 +38,6 @@ const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent�
 - 阻塞
 - 关键文件/命令
 - 下一步最小行动`;
-const LOCAL_SESSIONS_KEY = "kimix_sessions";
-const LOCAL_PENDING_KEY = "kimix_pending";
-const LOCAL_PERSIST_DEBOUNCE_MS = 900;
-const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
-const STREAM_EVENT_FLUSH_MS = 80;
 let rendererWindowFocusedHint = typeof document !== "undefined" ? document.hasFocus() : false;
 
 interface HandoffJob {
@@ -40,55 +54,6 @@ interface StartHandoffDetail {
   recommendationEventId: string;
 }
 
-function recordRendererLag(lagMs: number) {
-  const report = {
-    at: new Date().toISOString(),
-    lagMs: Math.round(lagMs),
-    sessionId: useAppStore.getState().currentSession?.id ?? null,
-    runningSessionId: useAppStore.getState().runningSessionId,
-  };
-  console.warn("[Kimix] renderer event loop lag detected", report);
-  try {
-    const parsed = JSON.parse(localStorage.getItem(FREEZE_REPORTS_KEY) ?? "[]");
-    const reports = Array.isArray(parsed) ? parsed : [];
-    reports.push(report);
-    localStorage.setItem(FREEZE_REPORTS_KEY, JSON.stringify(reports.slice(-20)));
-  } catch {
-    localStorage.setItem(FREEZE_REPORTS_KEY, JSON.stringify([report]));
-  }
-}
-
-function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
-  const settledAt = Date.now();
-  const settled = events.flatMap((event) => {
-    if (event.type === "subagent") {
-      return event.status === "running" ? [{ ...event, status: "completed" as const }] : [event];
-    }
-    if (event.type !== "assistant_message" || event.isComplete) return [event];
-    const hasContent = event.content.trim().length > 0;
-    const hasThinking = Boolean(event.thinking?.trim());
-    if (!hasContent && !hasThinking) return [];
-    return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, settledAt - event.timestamp) }];
-  });
-  return closeOpenCompaction(settled);
-}
-
-function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
-  const lastCompaction = [...events].reverse().find((event) => event.type === "compaction");
-  if (!lastCompaction || lastCompaction.type !== "compaction" || lastCompaction.phase !== "begin") {
-    return events;
-  }
-  return [
-    ...events,
-    {
-      id: Math.random().toString(36).substring(2, 11),
-      type: "compaction",
-      timestamp: Date.now(),
-      phase: "end",
-    },
-  ];
-}
-
 function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string): Session | undefined {
   const ids = new Set([historySessionId, runtimeSessionId].filter((id): id is string => Boolean(id)));
   return useSessionStore.getState().sessions.find((session) => (
@@ -97,21 +62,6 @@ function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?:
     Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
     Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
   ));
-}
-
-function persistLocalConversationState() {
-  try {
-    const state = useSessionStore.getState();
-    const runningSessionId = useAppStore.getState().runningSessionId;
-    localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(state.sessions.map((session) => ({
-      ...session,
-      events: session.id === runningSessionId ? session.events : settleInactiveEvents(session.events),
-      isLoading: false,
-    }))));
-    localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(state.pendingMessages));
-  } catch (err) {
-    console.warn("Persist local conversation state failed:", err);
-  }
 }
 
 function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: boolean, turnLimit: number): TimelineEvent[] {
@@ -235,20 +185,6 @@ function extractAssistantContent(events: TimelineEvent[]): string {
   return assistant?.content.trim() ?? "";
 }
 
-function getHiddenHandoffSessionIds(): string[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("kimix_hidden_handoff_sessions") ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberHiddenHandoffSession(sessionId: string) {
-  const ids = Array.from(new Set([...getHiddenHandoffSessionIds(), sessionId]));
-  localStorage.setItem("kimix_hidden_handoff_sessions", JSON.stringify(ids.slice(-50)));
-}
-
 function eventToHandoffLine(event: TimelineEvent): string | null {
   if (event.type === "user_message") return `用户：${event.content || "[图片]"}`;
   if (event.type === "steer_message") return `用户引导：${event.content}`;
@@ -362,24 +298,6 @@ function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "an
       ? { ...event, status, answers: event.answers ?? {} }
       : event
   ));
-}
-
-function latestAssistantContent(events: TimelineEvent[]) {
-  return [...events].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
-    event.type === "assistant_message" && event.content.trim().length > 0
-  ))?.content.trim() ?? "";
-}
-
-function latestAssistantVisibleOrThinkingContent(events: TimelineEvent[]) {
-  const content = latestAssistantContent(events);
-  if (content) return content;
-  const assistant = [...settleInactiveEvents(events)].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
-    event.type === "assistant_message" &&
-    (Boolean(event.thinking?.trim()) || Boolean(event.thinkingParts?.some((part) => part.text.trim().length > 0)))
-  ));
-  if (!assistant) return "";
-  const parts = assistant.thinkingParts?.map((part) => part.text).join("").trim();
-  return parts || assistant.thinking?.trim() || "";
 }
 
 function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSessionId: string) {
@@ -710,7 +628,6 @@ function App() {
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
   const setDefaultAfkMode = useAppStore((s) => s.setDefaultAfkMode);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
-  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
@@ -732,17 +649,44 @@ function App() {
   const currentSessionRef = useRef(currentSession);
   currentSessionRef.current = currentSession;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const streamBatchRef = useRef<Map<string, TimelineEvent[]>>(new Map());
-  const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bootstrapDoneRef = useRef(false);
-  const settingsHydratedRef = useRef(false);
   const handoffJobRef = useRef<HandoffJob | null>(null);
   const longTaskReviewDispatchRef = useRef<Set<string>>(new Set());
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
+
+  useRendererLagDetector();
+  useSettingsSync();
+  useStatePersistence();
+  const { enqueueStreamEvent, flushStreamEvents } = useEventStream();
+
+  const handleEscape = useCallback(() => {
+    const sessionId = useAppStore.getState().runningSessionId ?? useAppStore.getState().currentSession?.id;
+    if (sessionId) {
+      setRunningSessionId(null);
+      window.api.stopTurn({ sessionId: resolveRuntimeSessionId(sessionId) }).catch(() => {});
+    }
+  }, [setRunningSessionId]);
+
+  useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
+  useBootstrap({
+    setTheme,
+    setPermissionMode,
+    setDefaultThinking,
+    setDefaultPlanMode,
+    setDefaultAfkMode,
+    setAdditionalWorkDirs,
+    setDetailedContext,
+    setStatusUpdateDisplay,
+    setSessionRecommendationEnabled,
+    setSessionRecommendationTurnLimit,
+    setVoiceShortcut,
+    setNotificationMode,
+    setClarificationToolMode,
+    setRecentProjects,
+  });
 
   const syncCurrentSessionFromStore = (uiSessionId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -1200,44 +1144,6 @@ function App() {
   };
 
   useEffect(() => {
-    let lastTick = performance.now();
-    const lagTimer = window.setInterval(() => {
-      const now = performance.now();
-      const lagMs = now - lastTick - 1000;
-      lastTick = now;
-      if (lagMs > 2500) recordRendererLag(lagMs);
-    }, 1000);
-
-    if (!settingsHydratedRef.current) {
-      settingsHydratedRef.current = true;
-      window.api.getSettings().then((res) => {
-        if (res.success) {
-          setTheme(res.data.theme);
-          setPermissionMode(res.data.defaultPermissionMode);
-          setDefaultThinking(res.data.defaultThinking);
-          setDefaultPlanMode(res.data.defaultPlanMode);
-          setDefaultAfkMode(res.data.defaultAfkMode);
-          setAdditionalWorkDirs(res.data.additionalWorkDirs ?? []);
-          setDetailedContext(res.data.detailedContext);
-          setStatusUpdateDisplay(res.data.statusUpdateDisplay);
-          setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
-          setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
-          setVoiceShortcut(res.data.voiceShortcut);
-          setNotificationMode(res.data.notificationMode);
-          setClarificationToolMode(res.data.clarificationToolMode);
-        }
-      }).catch(() => {});
-    }
-
-    window.api.listRecentProjects().then((res) => {
-      if (res.success) {
-        setRecentProjects(res.data);
-        if (!useAppStore.getState().currentProject && res.data[0]) {
-          useAppStore.setState({ currentProject: res.data[0] });
-        }
-      }
-    }).catch(() => {});
-
     const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
       if (bootstrapDoneRef.current) return;
       bootstrapDoneRef.current = true;
@@ -1360,31 +1266,6 @@ function App() {
       }
     }
 
-    const flushLocalConversationState = () => {
-      if (persistenceTimerRef.current) {
-        clearTimeout(persistenceTimerRef.current);
-        persistenceTimerRef.current = null;
-      }
-      persistLocalConversationState();
-    };
-    const scheduleLocalConversationPersist = () => {
-      if (persistenceTimerRef.current) clearTimeout(persistenceTimerRef.current);
-      persistenceTimerRef.current = setTimeout(() => {
-        persistenceTimerRef.current = null;
-        persistLocalConversationState();
-      }, LOCAL_PERSIST_DEBOUNCE_MS);
-    };
-    const unsubscribeSessionPersistence = useSessionStore.subscribe((state, prev) => {
-      if (state.sessions === prev.sessions && state.pendingMessages === prev.pendingMessages) return;
-      const visibleSessions = state.sessions.filter((session) => !isHiddenInternalSession(session));
-      if (visibleSessions.length !== state.sessions.length) {
-        useSessionStore.setState({ sessions: visibleSessions });
-        return;
-      }
-      scheduleLocalConversationPersist();
-    });
-    const handleBeforeUnload = flushLocalConversationState;
-    window.addEventListener("beforeunload", handleBeforeUnload);
     const markRendererWindowFocused = () => {
       rendererWindowFocusedHint = true;
     };
@@ -1395,32 +1276,6 @@ function App() {
     window.addEventListener("blur", markRendererWindowBlurred);
     document.addEventListener("pointerdown", markRendererWindowFocused, true);
     document.addEventListener("keydown", markRendererWindowFocused, true);
-
-    const flushStreamEvents = () => {
-      streamFlushTimerRef.current = null;
-      const batches = streamBatchRef.current;
-      if (batches.size === 0) return;
-      streamBatchRef.current = new Map();
-      batches.forEach((items, uiSessionId) => {
-        updateSession(uiSessionId, (session) => {
-          let events = session.events;
-          for (const item of items) {
-            events = mergeEvents(events, item);
-          }
-          const title = deriveSessionTitle(events, session.title);
-          return { ...session, events, title, updatedAt: Date.now() };
-        });
-      });
-    };
-
-    const enqueueStreamEvent = (uiSessionId: string, event: TimelineEvent) => {
-      const current = streamBatchRef.current.get(uiSessionId) ?? [];
-      current.push(event);
-      streamBatchRef.current.set(uiSessionId, current);
-      if (!streamFlushTimerRef.current) {
-        streamFlushTimerRef.current = setTimeout(flushStreamEvents, STREAM_EVENT_FLUSH_MS);
-      }
-    };
 
     const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
       handoffJobRef.current = null;
@@ -1706,91 +1561,19 @@ function App() {
       }
     });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.querySelector('[aria-modal="true"]')) return;
-
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-
-      const isMod = e.metaKey || e.ctrlKey;
-      if (e.key === "Escape") {
-        const sessionId = useAppStore.getState().runningSessionId ?? currentSessionRef.current?.id;
-        if (sessionId) {
-          setRunningSessionId(null);
-          window.api.stopTurn({ sessionId: resolveRuntimeSessionId(sessionId) }).catch(() => {});
-        }
-        return;
-      }
-      if (isMod && e.key === "b") {
-        e.preventDefault();
-        toggleSidebar();
-        return;
-      }
-      if (isMod && e.key === "k") {
-        e.preventDefault();
-        triggerFocusInput();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-
-    const unsubSettings = useAppStore.subscribe((state, prev) => {
-      if (
-        state.theme !== prev.theme ||
-        state.permissionMode !== prev.permissionMode ||
-        state.defaultThinking !== prev.defaultThinking ||
-        state.defaultPlanMode !== prev.defaultPlanMode ||
-        state.defaultAfkMode !== prev.defaultAfkMode ||
-        state.additionalWorkDirs !== prev.additionalWorkDirs ||
-        state.detailedContext !== prev.detailedContext ||
-        state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
-        state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
-        state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
-        state.voiceShortcut !== prev.voiceShortcut ||
-        state.notificationMode !== prev.notificationMode ||
-        state.clarificationToolMode !== prev.clarificationToolMode
-      ) {
-        window.api.saveSettings({
-          theme: state.theme,
-          defaultPermissionMode: state.permissionMode,
-          defaultThinking: state.defaultThinking,
-          defaultPlanMode: state.defaultPlanMode,
-          defaultAfkMode: state.defaultAfkMode,
-          additionalWorkDirs: state.additionalWorkDirs,
-          detailedContext: state.detailedContext,
-          statusUpdateDisplay: state.statusUpdateDisplay,
-          sessionRecommendationEnabled: state.sessionRecommendationEnabled,
-          sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
-          voiceShortcut: state.voiceShortcut,
-          notificationMode: state.notificationMode,
-          clarificationToolMode: state.clarificationToolMode,
-        }).catch(() => {});
-      }
-    });
-
     return () => {
       unsubscribeEvent();
       unsubscribeStatus();
       unsubscribeBootstrap();
-      unsubscribeSessionPersistence();
       window.removeEventListener("kimix:startHandoff", handleStartHandoff);
       window.removeEventListener("focus", markRendererWindowFocused);
       window.removeEventListener("blur", markRendererWindowBlurred);
       document.removeEventListener("pointerdown", markRendererWindowFocused, true);
       document.removeEventListener("keydown", markRendererWindowFocused, true);
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.clearInterval(lagTimer);
-      if (streamFlushTimerRef.current) {
-        clearTimeout(streamFlushTimerRef.current);
-        streamFlushTimerRef.current = null;
-      }
-      flushStreamEvents();
-      unsubSettings();
-      flushLocalConversationState();
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setTheme, setPermissionMode, setDefaultThinking, setDefaultPlanMode, setDefaultAfkMode, setDetailedContext, setStatusUpdateDisplay, setSessionRecommendationEnabled, setSessionRecommendationTurnLimit, setVoiceShortcut, setNotificationMode, setClarificationToolMode, setHandoffSessionId, setRunningSessionId, toggleSidebar, triggerFocusInput, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode]);
+  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

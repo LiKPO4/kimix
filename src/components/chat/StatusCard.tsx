@@ -49,7 +49,7 @@ export function StatusCard({ event }: StatusCardProps) {
   return (
     <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
       <div
-        className="inline-flex max-w-full items-center rounded-full bg-[#faf8f4] text-[#aaa49a]"
+        className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-text-muted"
         style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6, fontSize: 13, lineHeight: "18px" }}
       >
         {details.map((detail, index) => (

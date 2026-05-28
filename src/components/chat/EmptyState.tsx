@@ -204,7 +204,7 @@ export function EmptyState() {
               key={suggestion.text}
               onClick={() => handleSuggestion(suggestion.text)}
               disabled={isSending}
-              className={`flex w-full items-center rounded-lg text-left text-[15px] leading-6 transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed ${pendingSuggestion === suggestion.text ? "bg-[#f1eee8] text-text-primary opacity-100" : "text-text-secondary disabled:opacity-50"}`}
+              className={`flex w-full items-center rounded-lg text-left text-[15px] leading-6 transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed ${pendingSuggestion === suggestion.text ? "bg-surface-hover text-text-primary opacity-100" : "text-text-secondary disabled:opacity-50"}`}
               style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6 }}
             >
               <suggestion.icon size={18} className="shrink-0 text-text-muted" />

@@ -1,155 +1,263 @@
-@import "tailwindcss";
+/* ── Font Imports (must precede all other rules) ── */
+@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+@import "tailwindcss";
 @config "../tailwind.config.ts";
 
+/* ═══════════════════════════════════════════
+   Kimix Design System — Warm Paper Editorial
+   ═══════════════════════════════════════════ */
+
+/* ── CSS Variables ── */
+
 :root {
-  /* Codex 暖色调 Light */
-  --bg-primary: #F6F4EF;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #efedea;
-  --bg-elevated: #ffffff;
-  --bg-composer: #ffffff;
-  --bg-hover: #f0eeeb;
-  --border-default: #e8e6e1;
-  --border-subtle: #f0eeeb;
-  --border-strong: #d4d0c8;
-  --text-primary: #1a1a1a;
-  --text-secondary: #6e6e6e;
-  --text-muted: #a3a3a3;
-  --text-accent: #0078d4;
-  --accent-blue: #0078d4;
-  --accent-green: #107c10;
-  --accent-yellow: #c19c00;
-  --accent-red: #d13438;
-  --accent-orange: #d83b01;
-  --accent-purple: #8764b8;
-  --kimix-shell-bg: #f6f4ef;
-  --kimix-sidebar-bg: #f6f4ef;
-  --kimix-main-bg: #ffffff;
-  --kimix-main-border: #e5e1d8;
-  --kimix-main-border-soft: #efebe3;
-  --kimix-panel-bg: #ffffff;
-  --kimix-panel-border: #dedad2;
-  --kimix-panel-border-soft: #e5e1d8;
-  --kimix-panel-divider: #ebe7df;
-  --kimix-panel-soft-bg: #faf8f4;
-  --kimix-panel-subtle-bg: #fbfaf7;
-  --kimix-panel-hover: #f1eee8;
-  --kimix-panel-text: #24211d;
-  --kimix-panel-text-secondary: #625d55;
-  --kimix-panel-text-muted: #8f887e;
-  --kimix-panel-badge-bg: #f1eee8;
-  --kimix-panel-badge-text: #7c756c;
-  --kimix-overlay-bg: rgba(246, 244, 239, 0.74);
-  --kimix-selection-idle-bg: #ffffff;
-  --kimix-selection-idle-border: #cfc8bc;
-  --kimix-composer-bg: #ffffff;
-  --kimix-composer-border: #dfdbd2;
-  --kimix-composer-border-focus: #d4cfc5;
+  /* Typography */
+  --font-sans: "LXGW WenKai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+
+  /* Surface Colors */
+  --surface-ground: #EDE9E0;
+  --surface-base: #FCFAF5;
+  --surface-elevated: #FFFFFF;
+  --surface-hover: #F5F2EB;
+  --surface-active: #F0ECE4;
+
+  /* Text Colors */
+  --text-primary: #1C1917;
+  --text-secondary: #6B6560;
+  --text-muted: #A39E96;
+  --text-inverse: #FFFFFF;
+  --text-placeholder: #C4BDB3;
+
+  /* Border Colors */
+  --border-subtle: #E8E4DC;
+  --border-default: #D9D4CC;
+  --border-strong: #C4BDB3;
+
+  /* Accent — Primary Blue (#1982ff) */
+  --accent-primary: #1982ff;
+  --accent-primary-light: #EBF4FF;
+  --accent-primary-soft: #8EC5FF;
+  --accent-primary-dark: #1466CC;
+
+  /* Accent — Secondary (Warm Chestnut) */
+  --accent-secondary: #B85C38;
+  --accent-secondary-light: #FFF0E8;
+
+  /* Semantic Accents */
+  --accent-success: #15803D;
+  --accent-success-light: #F0FDF4;
+  --accent-warning: #CA8A04;
+  --accent-warning-light: #FEFCE8;
+  --accent-danger: #DC2626;
+  --accent-danger-light: #FEF2F2;
+
+  /* Legacy Aliases (for backward compatibility during migration) */
+  --bg-primary: var(--surface-ground);
+  --bg-secondary: var(--surface-base);
+  --bg-tertiary: var(--surface-hover);
+  --bg-elevated: var(--surface-elevated);
+  --bg-composer: var(--surface-elevated);
+  --bg-hover: var(--surface-hover);
+
+  --text-accent: var(--accent-primary);
+  --accent-blue: var(--accent-primary);
+  --accent-green: var(--accent-success);
+  --accent-yellow: var(--accent-warning);
+  --accent-red: var(--accent-danger);
+  --accent-orange: var(--accent-secondary);
+
+  /* Kimix Legacy Aliases */
+  --kimix-shell-bg: var(--surface-ground);
+  --kimix-sidebar-bg: var(--surface-ground);
+  --kimix-main-bg: var(--surface-base);
+  --kimix-main-border: var(--border-default);
+  --kimix-main-border-soft: var(--border-subtle);
+  --kimix-panel-bg: var(--surface-elevated);
+  --kimix-panel-border: var(--border-default);
+  --kimix-panel-border-soft: var(--border-subtle);
+  --kimix-panel-divider: var(--border-subtle);
+  --kimix-panel-soft-bg: var(--surface-base);
+  --kimix-panel-subtle-bg: var(--surface-hover);
+  --kimix-panel-hover: var(--surface-hover);
+  --kimix-panel-text: var(--text-primary);
+  --kimix-panel-text-secondary: var(--text-secondary);
+  --kimix-panel-text-muted: var(--text-muted);
+  --kimix-panel-badge-bg: var(--surface-hover);
+  --kimix-panel-badge-text: var(--text-secondary);
+
+  --kimix-overlay-bg: rgba(245, 242, 235, 0.74);
+  --kimix-selection-idle-bg: var(--surface-elevated);
+  --kimix-selection-idle-border: var(--border-strong);
+  --kimix-composer-bg: var(--surface-elevated);
+  --kimix-composer-border: var(--border-default);
+  --kimix-composer-border-focus: var(--border-strong);
   --kimix-composer-shadow: 0 1px 2px rgba(25, 23, 20, 0.06);
   --kimix-float-shadow: 0 16px 42px rgba(25, 23, 20, 0.12);
   --kimix-overlay-strong: rgba(12, 12, 14, 0.72);
-  --kimix-process-bg: #fbfaf7;
-  --kimix-process-bg-strong: #f6f3ed;
-  --kimix-process-border: #e8e3da;
-  --kimix-process-text: #706b63;
-  --kimix-process-muted: #9a948b;
-  --kimix-info-bg: #f4f9ff;
-  --kimix-info-bg-soft: #f8fbff;
-  --kimix-info-border: #dbeafa;
-  --kimix-info-text: #24415f;
-  --kimix-info-text-secondary: #6f87a1;
-  --kimix-warning-bg: #fff8e8;
-  --kimix-warning-border: #f1ddb0;
-  --kimix-warning-text: #8a6a1f;
-  --kimix-warning-text-secondary: #7b6d4a;
-  --kimix-success-bg: #f7fbf7;
-  --kimix-success-border: #d8e8d8;
-  --kimix-success-text: #6f806f;
-  --kimix-progress-track: #ece8df;
-  --kimix-progress-fill: #8f887d;
-  --kimix-user-bubble-bg: #f3f3f3;
-  --kimix-user-bubble-text: #24211d;
-  --kimix-media-thumb-bg: #f7f5f1;
-  --kimix-media-thumb-border: #ded8cf;
-  --kimix-media-thumb-border-hover: #cfc8bc;
+  --kimix-process-bg: var(--surface-base);
+  --kimix-process-bg-strong: var(--surface-hover);
+  --kimix-process-border: var(--border-default);
+  --kimix-process-text: var(--text-secondary);
+  --kimix-process-muted: var(--text-muted);
+  --kimix-info-bg: var(--accent-primary-light);
+  --kimix-info-bg-soft: #F5FAFF;
+  --kimix-info-border: #C2E0FF;
+  --kimix-info-text: #1A4A7A;
+  --kimix-info-text-secondary: #4A7A9E;
+  --kimix-warning-bg: var(--accent-warning-light);
+  --kimix-warning-border: #F0D78C;
+  --kimix-warning-text: #7A5C00;
+  --kimix-warning-text-secondary: #8A7A5C;
+  --kimix-success-bg: var(--accent-success-light);
+  --kimix-success-border: #BBE4C8;
+  --kimix-success-text: #1A5C33;
+  --kimix-progress-track: #ECE8DF;
+  --kimix-progress-fill: var(--text-muted);
+  --kimix-user-bubble-bg: var(--surface-elevated);
+  --kimix-user-bubble-text: var(--text-primary);
+  --kimix-media-thumb-bg: #F7F5F1;
+  --kimix-media-thumb-border: var(--border-default);
+  --kimix-media-thumb-border-hover: var(--border-strong);
   --kimix-strong-button-bg: #171512;
-  --kimix-strong-button-text: #ffffff;
+  --kimix-strong-button-text: #FFFFFF;
+
+  /* Radius Tokens */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  /* Shadow Tokens */
+  --shadow-hover: 0 2px 8px rgba(25, 23, 20, 0.06);
+  --shadow-elevated: 0 8px 24px rgba(25, 23, 20, 0.08), 0 2px 6px rgba(25, 23, 20, 0.04);
+  --shadow-floating: 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
+
+  /* Spacing Tokens (reference) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Motion Tokens */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-hover: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 120ms;
+  --duration-base: 150ms;
+  --duration-enter: 200ms;
+  --duration-panel: 250ms;
+  --duration-toast: 300ms;
 }
 
 [data-theme="dark"] {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252526;
-  --bg-tertiary: #2d2d30;
-  --bg-elevated: #2d2d30;
-  --bg-composer: #252526;
-  --bg-hover: #3e3e42;
-  --border-default: #3e3e42;
-  --border-subtle: #2d2d30;
-  --border-strong: #5a5a5a;
-  --text-primary: #cccccc;
-  --text-secondary: #9cdcfe;
-  --text-muted: #6e6e6e;
-  --text-accent: #4fc1ff;
-  --accent-blue: #4fc1ff;
-  --accent-green: #4ec9b0;
-  --accent-yellow: #dcdcaa;
-  --accent-red: #f48771;
-  --accent-orange: #ce9178;
-  --accent-purple: #c586c0;
-  --kimix-shell-bg: #101317;
-  --kimix-sidebar-bg: #15191e;
-  --kimix-main-bg: #1a1f26;
-  --kimix-main-border: #323943;
-  --kimix-main-border-soft: #2a3039;
-  --kimix-panel-bg: #20252c;
-  --kimix-panel-border: #38404b;
-  --kimix-panel-border-soft: #343b46;
-  --kimix-panel-divider: #313843;
-  --kimix-panel-soft-bg: #252b33;
-  --kimix-panel-subtle-bg: #2a3038;
-  --kimix-panel-hover: #303743;
-  --kimix-panel-text: #ece7dd;
-  --kimix-panel-text-secondary: #c7c0b5;
-  --kimix-panel-text-muted: #9d968b;
-  --kimix-panel-badge-bg: #2d3440;
-  --kimix-panel-badge-text: #b7c7d8;
-  --kimix-overlay-bg: rgba(12, 14, 18, 0.72);
-  --kimix-selection-idle-bg: #252b33;
-  --kimix-selection-idle-border: #4a5361;
-  --kimix-composer-bg: #20252c;
-  --kimix-composer-border: #38404b;
-  --kimix-composer-border-focus: #4a5361;
+  /* Dark Mode: Deep Editorial */
+  --surface-ground: #0E0C0A;
+  --surface-base: #242018;
+  --surface-elevated: #2E2A24;
+  --surface-hover: #38342E;
+  --surface-active: #403C34;
+
+  --text-primary: #E8E4DE;
+  --text-secondary: #9E9890;
+  --text-muted: #6B6560;
+  --text-inverse: #12100E;
+  --text-placeholder: #4A4640;
+
+  --border-subtle: #36322A;
+  --border-default: #484440;
+  --border-strong: #56524A;
+
+  --accent-primary: #4FA3FF;
+  --accent-primary-light: #1A2F4A;
+  --accent-primary-soft: #2A4A6E;
+  --accent-primary-dark: #6BB8FF;
+
+  --accent-secondary: #D4896A;
+  --accent-secondary-light: #3A2218;
+
+  --accent-success: #4ADE80;
+  --accent-success-light: #1A3324;
+  --accent-warning: #FACC15;
+  --accent-warning-light: #3A3318;
+  --accent-danger: #F87171;
+  --accent-danger-light: #3A1A1A;
+
+  /* Legacy Aliases */
+  --bg-primary: var(--surface-ground);
+  --bg-secondary: var(--surface-base);
+  --bg-tertiary: var(--surface-hover);
+  --bg-elevated: var(--surface-elevated);
+  --bg-composer: var(--surface-elevated);
+  --bg-hover: var(--surface-hover);
+
+  --text-accent: var(--accent-primary);
+  --accent-blue: var(--accent-primary);
+  --accent-green: var(--accent-success);
+  --accent-yellow: var(--accent-warning);
+  --accent-red: var(--accent-danger);
+  --accent-orange: var(--accent-secondary);
+
+  --kimix-shell-bg: var(--surface-ground);
+  --kimix-sidebar-bg: var(--surface-ground);
+  --kimix-main-bg: var(--surface-base);
+  --kimix-main-border: var(--border-default);
+  --kimix-main-border-soft: var(--border-subtle);
+  --kimix-panel-bg: var(--surface-elevated);
+  --kimix-panel-border: var(--border-default);
+  --kimix-panel-border-soft: var(--border-subtle);
+  --kimix-panel-divider: var(--border-subtle);
+  --kimix-panel-soft-bg: var(--surface-base);
+  --kimix-panel-subtle-bg: var(--surface-hover);
+  --kimix-panel-hover: var(--surface-hover);
+  --kimix-panel-text: var(--text-primary);
+  --kimix-panel-text-secondary: var(--text-secondary);
+  --kimix-panel-text-muted: var(--text-muted);
+  --kimix-panel-badge-bg: var(--surface-hover);
+  --kimix-panel-badge-text: var(--text-secondary);
+
+  --kimix-overlay-bg: rgba(18, 16, 14, 0.72);
+  --kimix-selection-idle-bg: var(--surface-base);
+  --kimix-selection-idle-border: var(--border-strong);
+  --kimix-composer-bg: var(--surface-elevated);
+  --kimix-composer-border: var(--border-default);
+  --kimix-composer-border-focus: var(--border-strong);
   --kimix-composer-shadow: 0 1px 2px rgba(5, 8, 11, 0.28);
   --kimix-float-shadow: 0 16px 42px rgba(3, 5, 8, 0.3);
   --kimix-overlay-strong: rgba(5, 7, 10, 0.78);
-  --kimix-process-bg: #252b33;
-  --kimix-process-bg-strong: #1f252d;
-  --kimix-process-border: #38404b;
-  --kimix-process-text: #c7c0b5;
-  --kimix-process-muted: #9d968b;
-  --kimix-info-bg: #222b35;
-  --kimix-info-bg-soft: #1f2730;
-  --kimix-info-border: #364453;
-  --kimix-info-text: #d9e5f0;
-  --kimix-info-text-secondary: #9fb4c8;
-  --kimix-warning-bg: #362d20;
-  --kimix-warning-border: #665235;
-  --kimix-warning-text: #f2d49f;
-  --kimix-warning-text-secondary: #d4b783;
-  --kimix-success-bg: #233127;
-  --kimix-success-border: #3b5742;
-  --kimix-success-text: #b8d8bf;
-  --kimix-progress-track: #2b333d;
-  --kimix-progress-fill: #8ea8c0;
-  --kimix-user-bubble-bg: #2a3038;
-  --kimix-user-bubble-text: #ece7dd;
-  --kimix-media-thumb-bg: #252b33;
-  --kimix-media-thumb-border: #404955;
-  --kimix-media-thumb-border-hover: #586271;
-  --kimix-strong-button-bg: #e7ecf2;
-  --kimix-strong-button-text: #18202a;
+  --kimix-process-bg: var(--surface-base);
+  --kimix-process-bg-strong: var(--surface-hover);
+  --kimix-process-border: var(--border-default);
+  --kimix-process-text: var(--text-secondary);
+  --kimix-process-muted: var(--text-muted);
+  --kimix-info-bg: #1A2530;
+  --kimix-info-bg-soft: #1A222C;
+  --kimix-info-border: #2A3A4A;
+  --kimix-info-text: #A8C8E8;
+  --kimix-info-text-secondary: #7A9AB8;
+  --kimix-warning-bg: #2A2418;
+  --kimix-warning-border: #4A4028;
+  --kimix-warning-text: #D8C898;
+  --kimix-warning-text-secondary: #A89878;
+  --kimix-success-bg: #1A2C22;
+  --kimix-success-border: #2A4A38;
+  --kimix-success-text: #98D8A8;
+  --kimix-progress-track: #2C2824;
+  --kimix-progress-fill: var(--text-muted);
+  --kimix-user-bubble-bg: var(--surface-elevated);
+  --kimix-user-bubble-text: var(--text-primary);
+  --kimix-media-thumb-bg: var(--surface-base);
+  --kimix-media-thumb-border: var(--border-default);
+  --kimix-media-thumb-border-hover: var(--border-strong);
+  --kimix-strong-button-bg: #E7ECF2;
+  --kimix-strong-button-text: #18202A;
 }
+
+/* ── Base ── */
 
 * {
   margin: 0;
@@ -164,20 +272,31 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB",
-    "Microsoft YaHei", sans-serif;
-  background-color: var(--bg-primary);
+  font-family: var(--font-sans);
+  background-color: var(--surface-ground);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 15px;
+  line-height: 1.7;
 }
 
-/* Scrollbar styling */
+/* Paper Texture Overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.008;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* ── Scrollbar ── */
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -186,20 +305,33 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   border-radius: 999px;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
-/* Focus styles */
-*:not(.no-focus-outline):focus-visible {
-  outline: 1px solid #cfc8bc;
-  outline-offset: 2px;
+/* ── Selection ── */
+
+::selection {
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
 }
+
+/* ── Focus ── */
+
+*:not(.no-focus-outline):focus-visible {
+  outline: 2px solid var(--accent-primary-soft);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Runtime Error ── */
 
 #kimix-runtime-error {
   position: fixed;
@@ -209,19 +341,19 @@ body {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: rgba(246, 244, 239, 0.88);
+  background: rgba(245, 242, 235, 0.88);
   backdrop-filter: blur(6px);
 }
 
 .kimix-runtime-error-card {
   position: relative;
   width: min(520px, 100%);
-  border: 1px solid #eadbd8;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 28px 90px rgba(25, 23, 20, 0.18);
-  padding: 24px 24px 22px;
-  color: #3a362f;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-floating);
+  padding: 24px;
+  color: var(--text-primary);
 }
 
 .kimix-runtime-error-close {
@@ -233,16 +365,17 @@ body {
   width: 32px;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
-  color: #8f887e;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   font-size: 22px;
   line-height: 1;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover);
 }
 
 .kimix-runtime-error-close:hover {
-  background: #f3f1ec;
-  color: #3a362f;
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .kimix-runtime-error-heading {
@@ -259,9 +392,9 @@ body {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: #fff4f0;
-  color: #b55242;
+  border-radius: var(--radius-sm);
+  background: var(--accent-danger-light);
+  color: var(--accent-danger);
 }
 
 .kimix-runtime-error-icon svg {
@@ -275,8 +408,9 @@ body {
 }
 
 .kimix-runtime-error-title {
-  color: #8b3d34;
+  color: var(--accent-danger);
   font-size: 18px;
+  line-height: 1.2;
   font-weight: 650;
 }
 
@@ -289,9 +423,9 @@ body {
 
 .kimix-runtime-error-detail {
   margin-top: 12px;
-  border-radius: 10px;
-  background: #fbfaf7;
-  color: #8f887e;
+  border-radius: var(--radius-sm);
+  background: var(--surface-hover);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -305,17 +439,19 @@ body {
 .kimix-runtime-error-button {
   margin-top: 20px;
   height: 34px;
-  border-radius: 8px;
-  background: #8b3d34;
+  border-radius: var(--radius-sm);
+  background: var(--accent-danger);
   padding: 0 14px;
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 13px;
-  transition: background 0.15s ease;
+  transition: background-color var(--duration-base) var(--ease-hover);
 }
 
 .kimix-runtime-error-button:hover {
-  background: #74332c;
+  background: #B91C1C;
 }
+
+/* ── Composer Focus Override ── */
 
 .kimix-composer-surface:focus,
 .kimix-composer-surface:focus-visible,
@@ -331,15 +467,17 @@ body {
   outline: none;
 }
 
-/* 对话区与输入区统一水平留白（保证 ChatThread / EmptyState / Composer 左右边缘严格对齐） */
+/* ── Layout ── */
+
 .kimix-content-x {
-  padding-left: 24px;
-  padding-right: 24px;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
 }
+
 @media (min-width: 1024px) {
   .kimix-content-x {
-    padding-left: 40px;
-    padding-right: 40px;
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
   }
 }
 
@@ -349,43 +487,23 @@ body {
   margin-right: auto;
 }
 
-.kimix-top-menu,
-.kimix-floating-menu {
-  box-shadow: 0 18px 48px rgba(25, 23, 20, 0.18), 0 4px 14px rgba(25, 23, 20, 0.08);
-}
-
-.kimix-top-menu-trigger {
-  display: inline-flex;
-  min-width: 52px;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 11px;
-  padding-left: 14px;
-  padding-right: 14px;
-  line-height: 1;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
-}
-
-.kimix-top-menu-trigger:hover,
-.kimix-top-menu-trigger.is-active {
-  background: rgba(25, 23, 20, 0.06);
-  box-shadow: 0 8px 20px rgba(25, 23, 20, 0.08);
-  color: #1f1d1a;
-}
+/* ── Buttons & Actions ── */
 
 .kimix-icon-text-button {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 10px;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
   padding: 0 14px;
   font-size: 13px;
   line-height: 1;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover),
+              opacity var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover);
 }
 
 .kimix-icon-text-button svg {
@@ -399,75 +517,109 @@ body {
   padding-right: 12px;
 }
 
-@keyframes kimix-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.kimix-icon-text-button:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-hover);
 }
 
-.kimix-spin {
-  animation: kimix-spin 0.9s linear infinite;
+.kimix-muted-action {
+  color: var(--text-muted);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover),
+              opacity var(--duration-base) var(--ease-hover);
 }
 
-.kimix-settings-panel {
-  width: min(448px, calc(100vw - 40px));
-  max-height: 78vh;
-  overflow: hidden;
-  border: 1px solid var(--kimix-panel-border);
-  border-radius: 18px;
-  background: var(--kimix-panel-bg);
-  box-shadow: 0 24px 70px rgba(25, 23, 20, 0.22);
-  color: var(--kimix-panel-text);
+.kimix-muted-action:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
-.kimix-settings-panel.is-workspace {
-  width: 100%;
-  height: 100%;
-  max-height: none;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: var(--kimix-main-bg);
+.kimix-strong-action {
+  background: var(--kimix-strong-button-bg);
+  color: var(--kimix-strong-button-text);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              transform var(--duration-fast) var(--ease-hover);
 }
 
-.kimix-settings-entry {
-  padding-left: 16px;
+.kimix-strong-action:hover {
+  transform: scale(1.02);
+}
+
+/* ── Menus ── */
+
+.kimix-top-menu,
+.kimix-floating-menu {
+  background: var(--surface-elevated);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-elevated);
+}
+
+.kimix-top-menu-trigger {
+  display: inline-flex;
+  min-width: 52px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  padding-left: 14px;
   padding-right: 14px;
-  box-shadow: none;
+  line-height: 1;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover);
 }
 
-.kimix-settings-entry:hover {
-  background: rgba(0, 0, 0, 0.05);
-  box-shadow: 0 10px 28px rgba(25, 23, 20, 0.09);
+.kimix-top-menu-trigger:hover,
+.kimix-top-menu-trigger.is-active {
+  background: rgba(25, 23, 20, 0.06);
+  box-shadow: var(--shadow-hover);
+  color: var(--text-primary);
 }
+
+/* ── Sidebar ── */
 
 .kimix-sidebar {
-  background: var(--kimix-sidebar-bg);
-  color: var(--kimix-panel-text);
+  background: var(--surface-ground);
+  color: var(--text-primary);
 }
 
 .kimix-sidebar-nav-item {
-  gap: 14px;
+  gap: var(--space-3);
   padding-left: 18px;
   padding-right: 16px;
-  color: var(--kimix-panel-text);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover);
 }
 
 .kimix-sidebar-nav-item:hover {
-  background: var(--kimix-panel-hover);
-  box-shadow: 0 8px 20px rgba(25, 23, 20, 0.08);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-hover);
 }
 
+/* ── App Shell ── */
+
 .kimix-app-shell {
-  background: var(--kimix-shell-bg);
-  color: var(--kimix-panel-text);
+  background: var(--surface-ground);
+  color: var(--text-primary);
   padding-right: 8px;
 }
 
 .kimix-app-shell-main {
-  border-color: var(--kimix-main-border);
-  background: var(--kimix-main-bg);
+  border-color: var(--border-subtle);
+  background: var(--surface-base);
+  border-radius: var(--radius-lg);
 }
+
+.kimix-app-shell-toolbar,
+.kimix-app-shell-footer {
+  border-color: var(--border-subtle);
+  background: var(--surface-base);
+}
+
+/* ── Layout Resizer ── */
 
 .kimix-layout-resizer {
   position: relative;
@@ -497,33 +649,31 @@ body {
 
 .kimix-layout-resizer:hover::after,
 .kimix-layout-resizer:active::after {
-  background: rgba(47, 111, 173, 0.38);
-  box-shadow: 0 0 0 3px rgba(47, 111, 173, 0.08);
+  background: rgba(25, 130, 255, 0.38);
+  box-shadow: 0 0 0 3px rgba(25, 130, 255, 0.08);
 }
 
-.kimix-app-shell-toolbar,
-.kimix-app-shell-footer {
-  border-color: var(--kimix-main-border-soft);
-  background: var(--kimix-main-bg);
+/* ── Panels & Cards ── */
+
+.kimix-settings-panel {
+  width: min(448px, calc(100vw - 40px));
+  max-height: 78vh;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-floating);
+  color: var(--text-primary);
 }
 
-.kimix-longtask-inspector,
-.kimix-modal-card,
-.kimix-onboarding-card {
-  border-color: var(--kimix-panel-border);
-  background: var(--kimix-panel-bg);
-  color: var(--kimix-panel-text);
-}
-
-.kimix-onboarding-overlay {
-  background: var(--kimix-overlay-bg);
-}
-
-.kimix-top-menu,
-.kimix-floating-menu {
-  background: var(--kimix-panel-bg);
-  border-color: var(--kimix-panel-border-soft);
-  color: var(--kimix-panel-text-secondary);
+.kimix-settings-panel.is-workspace {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--surface-base);
 }
 
 .kimix-settings-header {
@@ -531,14 +681,14 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--kimix-panel-divider);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .kimix-settings-title {
   font-size: 18px;
   line-height: 1.2;
   font-weight: 650;
-  color: var(--kimix-panel-text);
+  color: var(--text-primary);
 }
 
 .kimix-settings-icon-button {
@@ -547,14 +697,15 @@ body {
   height: 32px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  color: var(--kimix-panel-text-muted);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover);
 }
 
 .kimix-settings-icon-button:hover {
-  background: var(--kimix-panel-hover);
-  color: var(--kimix-panel-text);
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .kimix-settings-body {
@@ -569,28 +720,48 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 18px 24px 22px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
+}
+
+.kimix-settings-columns {
+  display: contents;
+}
+
+.kimix-settings-col {
+  display: contents;
+}
+
+.kimix-settings-columns.is-workspace {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
 }
 
-.kimix-settings-panel.is-workspace .kimix-settings-section,
-.kimix-settings-panel.is-workspace .kimix-settings-footer {
-  min-width: 0;
+.kimix-settings-columns.is-workspace .kimix-settings-section {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  padding: 16px;
 }
 
-.kimix-settings-panel.is-workspace .kimix-settings-section + .kimix-settings-section {
+.kimix-settings-panel.is-workspace .kimix-settings-footer {
+  margin-top: 18px;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-section + .kimix-settings-section {
   margin-top: 0;
 }
 
-.kimix-settings-panel.is-workspace .kimix-settings-footer {
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 980px) {
-  .kimix-settings-panel.is-workspace .kimix-settings-body {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 720px) {
+  .kimix-settings-columns.is-workspace {
+    flex-direction: column;
   }
 }
 
@@ -602,25 +773,26 @@ body {
 .kimix-settings-row-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--kimix-panel-text);
+  gap: var(--space-2);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
+  min-height: 36px;
 }
 
 .kimix-settings-row-title {
   justify-content: space-between;
 }
 
-.kimix-settings-section-title + *,
-.kimix-settings-row-title + * {
+.kimix-settings-section > .kimix-settings-section-title + *,
+.kimix-settings-section > .kimix-settings-row-title + * {
   margin-top: 12px;
 }
 
 .kimix-settings-theme-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 12px;
 }
 
@@ -631,41 +803,45 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid var(--kimix-panel-border-soft);
-  border-radius: 12px;
-  background: var(--kimix-panel-bg);
-  color: var(--kimix-panel-text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
   font-size: 13px;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover);
 }
 
 .kimix-settings-theme:hover {
-  background: var(--kimix-panel-soft-bg);
+  background: var(--surface-hover);
 }
 
 .kimix-settings-theme.is-active {
-  border-color: #0078d4;
-  background: #eef7ff;
-  color: #0078d4;
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
 }
 
 .kimix-settings-check-button {
   display: flex;
   min-height: 34px;
   align-items: center;
-  gap: 8px;
-  border-radius: 10px;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
   padding: 0 14px;
-  color: var(--kimix-panel-text-secondary);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover),
+              opacity var(--duration-base) var(--ease-hover);
 }
 
 .kimix-settings-check-button:hover:not(:disabled) {
-  background: var(--kimix-panel-hover);
-  color: var(--kimix-panel-text);
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .kimix-settings-check-button:disabled {
@@ -675,26 +851,26 @@ body {
 
 .kimix-settings-connection {
   margin-top: 12px;
-  border: 1px solid var(--kimix-panel-border-soft);
-  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   padding: 12px 16px;
-  background: var(--kimix-panel-soft-bg);
+  background: var(--surface-elevated);
 }
 
 .kimix-settings-connection.is-verified {
-  border-color: #b7dfb7;
-  background: #f3fbf3;
+  border-color: var(--accent-success);
+  background: var(--accent-success-light);
 }
 
 .kimix-settings-connection.is-missing {
-  border-color: #f0d7b8;
-  background: #fff8ef;
+  border-color: var(--accent-warning);
+  background: var(--accent-warning-light);
 }
 
 .kimix-settings-connection-inner {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .kimix-settings-connection-copy,
@@ -704,7 +880,7 @@ body {
 
 .kimix-settings-connection-label,
 .kimix-settings-permission-label {
-  color: var(--kimix-panel-text);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
@@ -713,7 +889,7 @@ body {
 .kimix-settings-connection-detail,
 .kimix-settings-permission-desc {
   margin-top: 3px;
-  color: var(--kimix-panel-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -722,7 +898,7 @@ body {
 .kimix-settings-permissions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 12px;
 }
 
@@ -730,138 +906,155 @@ body {
   display: flex;
   width: 100%;
   align-items: flex-start;
-  gap: 12px;
-  border: 1px solid var(--kimix-panel-border-soft);
-  border-radius: 12px;
+  gap: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   padding: 12px 16px;
-  background: var(--kimix-panel-bg);
+  background: var(--surface-elevated);
   text-align: left;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover);
 }
 
 .kimix-settings-permission:hover {
-  background: var(--kimix-panel-soft-bg);
+  background: var(--surface-hover);
 }
 
 .kimix-settings-permission.is-active {
-  border-color: #0078d4;
-  background: #eef7ff;
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
 }
 
 .kimix-settings-permission.is-active .kimix-settings-permission-label {
-  color: #0078d4;
+  color: var(--accent-primary);
 }
 
 .kimix-settings-footer {
   margin-top: 18px;
   padding-top: 12px;
-  border-top: 1px solid var(--kimix-panel-divider);
-  color: var(--kimix-panel-text-muted);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
   text-align: center;
   font-size: 13px;
 }
 
 .kimix-settings-card {
-  border: 1px solid var(--kimix-panel-border-soft);
-  border-radius: 12px;
-  background: var(--kimix-panel-subtle-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
 }
 
 .kimix-settings-list-item {
-  border-radius: 10px;
-  background: var(--kimix-panel-bg);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
 }
 
 .kimix-settings-badge {
   border-radius: 999px;
-  background: var(--kimix-panel-badge-bg);
-  color: var(--kimix-panel-badge-text);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
 }
 
 .kimix-settings-input {
-  border: 1px solid var(--kimix-panel-border);
-  background: var(--kimix-panel-bg);
-  color: var(--kimix-panel-text);
+  border: 1px solid var(--border-default);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--duration-fast) ease-out;
 }
 
 .kimix-settings-input::placeholder {
-  color: var(--kimix-panel-text-muted);
+  color: var(--text-placeholder);
 }
 
 .kimix-settings-input:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--accent-primary);
+  outline: none;
 }
 
 .kimix-settings-input:disabled {
-  background: var(--kimix-panel-soft-bg);
-  color: var(--kimix-panel-text-muted);
+  background: var(--surface-hover);
+  color: var(--text-muted);
 }
 
 .kimix-settings-hint {
-  color: var(--kimix-panel-text-muted);
+  color: var(--text-muted);
 }
 
 .kimix-selection-indicator {
-  border-color: var(--kimix-selection-idle-border);
-  background: var(--kimix-selection-idle-bg);
+  border-color: var(--border-strong);
+  background: var(--surface-elevated);
+  transition: border-color var(--duration-fast) ease-out,
+              background-color var(--duration-fast) ease-out,
+              box-shadow var(--duration-fast) ease-out;
 }
 
 .kimix-selection-indicator.is-selected {
-  border-color: #0078d4;
-  background: #0078d4;
-  color: #ffffff;
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  box-shadow: 0 0 0 3px var(--accent-primary-light);
 }
 
+/* ── Composer ── */
+
 .kimix-composer-card {
-  border-color: var(--kimix-composer-border);
-  background: var(--kimix-composer-bg);
-  color: var(--kimix-panel-text);
-  box-shadow: var(--kimix-composer-shadow);
+  border: 1px solid var(--border-default);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-hover);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover);
 }
 
 .kimix-composer-card.is-focused {
-  border-color: var(--kimix-composer-border-focus);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kimix-composer-border-focus) 45%, transparent);
+  border-color: var(--accent-primary-soft);
+  box-shadow: 0 0 0 3px var(--accent-primary-light),
+              var(--shadow-elevated);
 }
+
+/* ── Floating Panel ── */
 
 .kimix-floating-panel {
-  border: 1px solid var(--kimix-panel-border-soft);
-  background: color-mix(in srgb, var(--kimix-panel-bg) 94%, transparent);
-  color: var(--kimix-panel-text);
-  box-shadow: var(--kimix-float-shadow);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-elevated);
   backdrop-filter: blur(10px);
+  border-radius: var(--radius-md);
 }
 
-.kimix-muted-action {
-  color: var(--kimix-panel-text-muted);
-  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
-}
-
-.kimix-muted-action:hover {
-  background: var(--kimix-panel-hover);
-  color: var(--kimix-panel-text);
-}
+/* ── Soft Card ── */
 
 .kimix-soft-card {
-  border: 1px solid var(--kimix-process-border);
-  background: var(--kimix-process-bg);
-  color: var(--kimix-process-text);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
 }
 
 .kimix-soft-card-strong {
-  border: 1px solid var(--kimix-process-border);
-  background: var(--kimix-process-bg-strong);
-  color: var(--kimix-process-text);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
 }
 
+/* ── Media ── */
+
 .kimix-media-thumb {
-  border: 1px solid var(--kimix-media-thumb-border);
-  background: var(--kimix-media-thumb-bg);
+  border: 1px solid var(--border-default);
+  background: var(--surface-base);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--duration-base) var(--ease-hover);
 }
 
 .kimix-media-thumb:hover {
-  border-color: var(--kimix-media-thumb-border-hover);
+  border-color: var(--border-strong);
 }
+
+/* ── Preview ── */
 
 .kimix-preview-overlay {
   background: var(--kimix-overlay-strong);
@@ -869,22 +1062,26 @@ body {
 
 .kimix-preview-close,
 .kimix-preview-toast {
-  background: var(--kimix-panel-bg);
-  color: var(--kimix-panel-text);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
 }
 
 .kimix-preview-close:hover {
-  background: var(--kimix-panel-hover);
+  background: var(--surface-hover);
 }
 
 .kimix-preview-image {
-  background: var(--kimix-panel-bg);
+  background: var(--surface-elevated);
 }
+
+/* ── Chat Banner ── */
 
 .kimix-chat-banner {
   border: 1px solid var(--kimix-info-border);
   background: var(--kimix-info-bg);
   color: var(--kimix-info-text);
+  border-radius: var(--radius-sm);
 }
 
 .kimix-chat-banner.is-reviewer {
@@ -903,57 +1100,186 @@ body {
 
 .kimix-chat-banner-button,
 .kimix-chat-banner-badge {
-  background: var(--kimix-panel-bg);
+  background: var(--surface-elevated);
 }
+
+/* ── Progress ── */
 
 .kimix-progress-track {
   background: var(--kimix-progress-track);
+  border-radius: 999px;
 }
 
 .kimix-progress-fill {
-  background: var(--kimix-progress-fill);
+  background: var(--accent-primary);
+  border-radius: 999px;
+  transition: width var(--duration-panel) var(--ease-enter);
 }
 
+/* ── Diff Panel ── */
+
 .kimix-diff-panel {
-  border-color: var(--kimix-panel-border);
-  background: var(--kimix-panel-bg);
-  color: var(--kimix-panel-text);
+  border-color: var(--border-subtle) !important;
+  background: var(--surface-base) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-lg) !important;
 }
+
+/* ── User Bubble ── */
 
 .kimix-user-bubble {
   background: var(--kimix-user-bubble-bg);
   color: var(--kimix-user-bubble-text);
+  border-radius: var(--radius-md);
 }
 
-.kimix-strong-action {
-  background: var(--kimix-strong-button-bg);
-  color: var(--kimix-strong-button-text);
+/* ── Modal & Onboarding ── */
+
+.kimix-longtask-inspector {
+  border-color: var(--border-subtle) !important;
+  background: var(--surface-base) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-lg) !important;
 }
 
-/* Selection */
-::selection {
-  background-color: var(--accent-blue);
-  color: #ffffff;
+.kimix-modal-card,
+.kimix-onboarding-card {
+  border-color: var(--border-default);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
 }
 
-/* Markdown body styles */
+.kimix-onboarding-overlay {
+  background: var(--kimix-overlay-bg);
+}
+
+/* ── Settings Entry ── */
+
+.kimix-settings-entry {
+  padding-left: 16px;
+  padding-right: 14px;
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover);
+}
+
+.kimix-settings-entry:hover {
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ── Spin Animation ── */
+
+@keyframes kimix-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.kimix-spin {
+  animation: kimix-spin 0.9s linear infinite;
+}
+
+/* ── Entrance Animations ── */
+
+@keyframes kimix-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kimix-fade-in-up {
+  animation: kimix-fade-in-up var(--duration-enter) var(--ease-enter) forwards;
+}
+
+@keyframes kimix-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.kimix-scale-in {
+  animation: kimix-scale-in var(--duration-enter) var(--ease-enter) forwards;
+}
+
+/* ── Toast Animation ── */
+
+@keyframes kimix-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* ── Message Stagger Entrance ── */
+
+@keyframes kimix-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kimix-message-enter {
+  animation: kimix-message-enter var(--duration-enter) var(--ease-enter) forwards;
+}
+
+/* ── Button Micro Scale ── */
+
+.kimix-button-scale {
+  transition: transform var(--duration-fast) var(--ease-hover);
+}
+
+.kimix-button-scale:hover {
+  transform: scale(1.04);
+}
+
+.kimix-button-scale:active {
+  transform: scale(0.96);
+}
+
+/* ── Breathing Pulse ── */
+
+@keyframes kimix-breathe {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.kimix-breathe {
+  animation: kimix-breathe 2s ease-in-out infinite;
+}
+
+/* ── Markdown Body ── */
+
 .markdown-body {
   font-size: 15px;
   line-height: 1.68;
   color: var(--text-primary);
   min-width: 0;
-}
-
-.kimix-markdown-wrap-long-lines {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.kimix-markdown-wrap-long-lines pre,
-.kimix-markdown-wrap-long-lines code {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 .markdown-body p {
@@ -995,14 +1321,17 @@ body {
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid var(--border-strong);
+  border-left: 3px solid var(--accent-primary);
   padding-left: 1em;
   margin: 1em 0;
   color: var(--text-secondary);
+  background: var(--surface-hover);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 0.5em 1em;
 }
 
 .markdown-body code {
-  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.875em;
 }
 
@@ -1025,39 +1354,60 @@ body {
 .markdown-body th,
 .markdown-body td {
   padding: 0.5em 0.75em;
-  border: 1px solid #e5e1d8;
+  border: 1px solid var(--border-subtle);
   text-align: left;
 }
 
 .markdown-body th {
-  background-color: var(--bg-secondary);
+  background-color: var(--surface-hover);
   font-weight: 600;
 }
 
 .markdown-body tr:nth-child(even) {
-  background-color: var(--bg-secondary);
+  background-color: var(--surface-base);
 }
 
 .markdown-body hr {
   border: none;
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--border-subtle);
   margin: 1.5em 0;
 }
 
 .markdown-body a {
-  color: var(--accent-blue);
+  color: var(--accent-primary);
   text-decoration: none;
+  transition: color var(--duration-fast) ease-out;
 }
 
 .markdown-body a:hover {
+  color: var(--accent-primary-dark);
   text-decoration: underline;
 }
 
 .markdown-body img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .markdown-body strong {
   font-weight: 600;
+}
+
+.markdown-body del {
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+/* ── Wrap Long Lines ── */
+
+.kimix-markdown-wrap-long-lines {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.kimix-markdown-wrap-long-lines pre,
+.kimix-markdown-wrap-long-lines code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

@@ -218,6 +218,7 @@ function replaceColor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, 
 }
 
 export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const snapshotRef = useRef<ImageData | null>(null);
   const startPointRef = useRef<Point | null>(null);
@@ -236,37 +237,52 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
   const [canvasSize, setCanvasSize] = useState({ width: size.width, height: size.height });
 
   const captureCanvas = () => {
-    const canvas = canvasRef.current;
-    return canvas?.toDataURL("image/png") ?? null;
+    const bgCanvas = bgCanvasRef.current;
+    const drawCanvas = canvasRef.current;
+    if (!bgCanvas || !drawCanvas) return null;
+    const temp = document.createElement("canvas");
+    temp.width = drawCanvas.width;
+    temp.height = drawCanvas.height;
+    const ctx = temp.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bgCanvas, 0, 0);
+    ctx.drawImage(drawCanvas, 0, 0);
+    return temp.toDataURL("image/png");
   };
 
   const pushHistory = () => {
-    const dataUrl = captureCanvas();
-    if (!dataUrl) return;
+    const drawCanvas = canvasRef.current;
+    if (!drawCanvas) return;
+    const dataUrl = drawCanvas.toDataURL("image/png");
     setUndoStack((prev) => (prev[prev.length - 1] === dataUrl ? prev : [...prev, dataUrl]));
     setRedoStack([]);
   };
 
   const drawDataUrl = async (dataUrl: string) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
+    const drawCanvas = canvasRef.current;
+    const ctx = drawCanvas?.getContext("2d");
+    if (!drawCanvas || !ctx) return;
     const image = await loadImage(dataUrl);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    ctx.drawImage(image, 0, 0, drawCanvas.width, drawCanvas.height);
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
+    const bgCanvas = bgCanvasRef.current;
+    const drawCanvas = canvasRef.current;
+    const bgCtx = bgCanvas?.getContext("2d");
+    const drawCtx = drawCanvas?.getContext("2d");
+    if (!bgCanvas || !drawCanvas || !bgCtx || !drawCtx) return;
 
     const initCanvas = (width: number, height: number) => {
-      canvas.width = width;
-      canvas.height = height;
+      bgCanvas.width = width;
+      bgCanvas.height = height;
+      drawCanvas.width = width;
+      drawCanvas.height = height;
       setCanvasSize({ width, height });
-      ctx.fillStyle = backgroundColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      bgCtx.fillStyle = backgroundColor;
+      bgCtx.fillRect(0, 0, width, height);
+      drawCtx.clearRect(0, 0, width, height);
       appliedBackgroundRef.current = backgroundColor;
     };
 
@@ -274,7 +290,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
 
     if (!request.source?.dataUrl) {
       initCanvas(size.width, size.height);
-      setUndoStack([canvas.toDataURL("image/png")]);
+      setUndoStack([drawCanvas.toDataURL("image/png")]);
       setRedoStack([]);
       return;
     }
@@ -282,8 +298,8 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     void loadImage(request.source.dataUrl).then((image) => {
       if (cancelled) return;
       initCanvas(image.naturalWidth || image.width, image.naturalHeight || image.height);
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      setUndoStack([canvas.toDataURL("image/png")]);
+      drawCtx.drawImage(image, 0, 0, drawCanvas.width, drawCanvas.height);
+      setUndoStack([drawCanvas.toDataURL("image/png")]);
       setRedoStack([]);
     });
     return () => {
@@ -295,7 +311,13 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.lineWidth = strokeWidth;
-    ctx.strokeStyle = tool === "eraser" ? backgroundColor : color;
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = color;
+    }
   };
 
   const handleUndo = () => {
@@ -383,6 +405,9 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     } else if (isDrawing) {
       pushHistory();
     }
+    if (ctx) {
+      ctx.globalCompositeOperation = "source-over";
+    }
     setIsDrawing(false);
     startPointRef.current = null;
     lastPointRef.current = null;
@@ -390,39 +415,48 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
   };
 
   const handleApplyCrop = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx || !cropSelection) return;
+    const bgCanvas = bgCanvasRef.current;
+    const drawCanvas = canvasRef.current;
+    if (!bgCanvas || !drawCanvas || !cropSelection) return;
+
     const temp = document.createElement("canvas");
     temp.width = cropSelection.width;
     temp.height = cropSelection.height;
     const tempCtx = temp.getContext("2d");
     if (!tempCtx) return;
-    tempCtx.drawImage(
-      canvas,
-      cropSelection.x,
-      cropSelection.y,
-      cropSelection.width,
-      cropSelection.height,
-      0,
-      0,
-      cropSelection.width,
-      cropSelection.height,
-    );
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(temp, 0, 0, canvas.width, canvas.height);
+
+    tempCtx.drawImage(bgCanvas, cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height, 0, 0, cropSelection.width, cropSelection.height);
+    tempCtx.drawImage(drawCanvas, cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height, 0, 0, cropSelection.width, cropSelection.height);
+
+    bgCanvas.width = cropSelection.width;
+    bgCanvas.height = cropSelection.height;
+    drawCanvas.width = cropSelection.width;
+    drawCanvas.height = cropSelection.height;
+    setCanvasSize({ width: cropSelection.width, height: cropSelection.height });
+
+    const bgCtx = bgCanvas.getContext("2d");
+    if (bgCtx) {
+      bgCtx.fillStyle = appliedBackgroundRef.current;
+      bgCtx.fillRect(0, 0, cropSelection.width, cropSelection.height);
+    }
+
+    const drawCtx = drawCanvas.getContext("2d");
+    if (drawCtx) {
+      drawCtx.clearRect(0, 0, cropSelection.width, cropSelection.height);
+      drawCtx.drawImage(temp, 0, 0);
+    }
+
     setCropSelection(null);
     pushHistory();
   };
 
   const applyBackgroundColor = (nextColor: string) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    replaceColor(ctx, canvas, appliedBackgroundRef.current, nextColor);
+    const bgCanvas = bgCanvasRef.current;
+    const bgCtx = bgCanvas?.getContext("2d");
+    if (!bgCanvas || !bgCtx) return;
+    bgCtx.fillStyle = nextColor;
+    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
     appliedBackgroundRef.current = nextColor;
-    pushHistory();
   };
 
   useEffect(() => {
@@ -466,21 +500,20 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
   });
 
   const handleSave = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const dataUrl = captureCanvas();
+    if (!dataUrl) return;
     const now = new Date();
     const suffix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     onSave({
       name: request.source ? `${request.source.name.replace(/\.[^.]+$/, "")}-画板.png` : `kimix-画板-${request.ratio}-${suffix}.png`,
-      dataUrl: canvas.toDataURL("image/png"),
+      dataUrl,
       sourceId: request.source?.id,
     });
   };
 
   const handleCopy = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dataUrl = canvas.toDataURL("image/png");
+    const dataUrl = captureCanvas();
+    if (!dataUrl) return;
     const res = await window.api.copyImage({ dataUrl });
     if (!res.success) return;
   };
@@ -505,11 +538,11 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
             <section>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">历史</div>
               <div className="mt-3 grid grid-cols-2" style={{ gap: 8 }}>
-                <button type="button" onClick={handleUndo} disabled={undoStack.length <= 1} className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-[#625d55] hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-35">
+                <button type="button" onClick={handleUndo} disabled={undoStack.length <= 1} className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-text-secondary hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-35">
                   <Undo2 size={14} />
                   撤销
                 </button>
-                <button type="button" onClick={handleRedo} disabled={redoStack.length === 0} className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-[#625d55] hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-35">
+                <button type="button" onClick={handleRedo} disabled={redoStack.length === 0} className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-text-secondary hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-35">
                   <Redo2 size={14} />
                   重做
                 </button>
@@ -528,7 +561,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                       key={item.value}
                       type="button"
                       onClick={() => setColorPanelMode(item.value)}
-                      className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-white text-[#1769aa] shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-white/70"}`}
+                      className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
                     >
                       {item.label}
                     </button>
@@ -553,7 +586,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                     title={`${colorPanelMode === "stroke" ? "" : "背景"}${item.label}`}
                     aria-label={`选择${colorPanelMode === "stroke" ? "" : "背景"}${item.label}色`}
                   >
-                    {(colorPanelMode === "stroke" ? color : backgroundColor) === item.value && <Check size={15} className={item.value === "#ffffff" || item.value === "#facc15" ? "text-[#171512]" : "text-white"} />}
+                    {(colorPanelMode === "stroke" ? color : backgroundColor) === item.value && <Check size={15} className={item.value === "#ffffff" || item.value === "#facc15" ? "text-text-primary" : "text-white"} />}
                   </button>
                 ))}
               </div>
@@ -569,7 +602,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                       key={item.value}
                       type="button"
                       onClick={() => setStrokeWidth(item.value)}
-                      className={`h-8 rounded-lg text-[13px] transition-colors ${active ? "bg-[#e7f4ff] text-[#1769aa]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      className={`h-8 rounded-lg text-[13px] transition-colors ${active ? "bg-accent-primary-light text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                     >
                       {item.label}
                     </button>
@@ -590,7 +623,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                       key={item.value}
                       type="button"
                       onClick={() => setTool(item.value)}
-                      className={`kimix-icon-text-button is-compact rounded-lg text-[13px] ${active ? "bg-[#e7f4ff] text-[#1769aa]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      className={`kimix-icon-text-button is-compact rounded-lg text-[13px] ${active ? "bg-accent-primary-light text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                       aria-pressed={active}
                     >
                       <Icon size={14} />
@@ -605,10 +638,10 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
               <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
                 <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">已选择裁剪区域，应用后会铺满当前画板。</div>
                 <div className="mt-3 flex" style={{ gap: 8 }}>
-                  <button type="button" onClick={handleApplyCrop} className="kimix-icon-text-button is-compact flex-1 justify-center rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]">
+                  <button type="button" onClick={handleApplyCrop} className="kimix-icon-text-button is-compact flex-1 justify-center rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark">
                     应用
                   </button>
-                  <button type="button" onClick={() => setCropSelection(null)} className="kimix-icon-text-button is-compact justify-center rounded-lg text-[#625d55] hover:bg-[var(--kimix-panel-hover)]">
+                  <button type="button" onClick={() => setCropSelection(null)} className="kimix-icon-text-button is-compact justify-center rounded-lg text-text-secondary hover:bg-[var(--kimix-panel-hover)]">
                     取消
                   </button>
                 </div>
@@ -619,9 +652,14 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
           <div className="flex min-w-0 flex-1 items-center justify-center rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: 18 }}>
             <div className="relative max-h-[64vh] max-w-full">
               <canvas
-                ref={canvasRef}
-                className="block max-h-[64vh] max-w-full touch-none rounded-lg border border-[var(--kimix-panel-border)] bg-white shadow-[0_8px_26px_rgba(25,23,20,0.10)]"
+                ref={bgCanvasRef}
+                className="block max-h-[64vh] max-w-full rounded-lg border border-border-default shadow-elevated-token"
                 style={{ aspectRatio: `${canvasSize.width} / ${canvasSize.height}` }}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 block h-full w-full touch-none rounded-lg"
+                style={{ aspectRatio: `${canvasSize.width} / ${canvasSize.height}`, background: "transparent" }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={finishDrawing}
@@ -629,7 +667,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
               />
               {cropSelection && (
                 <div
-                  className="pointer-events-none absolute border-2 border-dashed border-[#339af0] bg-[#339af0]/10"
+                  className="pointer-events-none absolute border-2 border-dashed border-accent-primary bg-accent-primary/10"
                   style={{
                     left: `${(cropSelection.x / canvasSize.width) * 100}%`,
                     top: `${(cropSelection.y / canvasSize.height) * 100}%`,
@@ -645,14 +683,14 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
         <div className="flex items-center justify-between" style={{ gap: 14, marginTop: 16 }}>
           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">保存后会作为一张 PNG 图片加入输入区的上传图片列表。</div>
           <div className="flex shrink-0 items-center" style={{ gap: 14 }}>
-            <button type="button" onClick={onClose} className="kimix-icon-text-button is-compact rounded-lg text-[#625d55] hover:bg-[var(--kimix-panel-hover)]">
+            <button type="button" onClick={onClose} className="kimix-icon-text-button is-compact rounded-lg text-text-secondary hover:bg-[var(--kimix-panel-hover)]">
               取消
             </button>
-            <button type="button" onClick={() => void handleCopy()} className="kimix-icon-text-button is-compact rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]">
+            <button type="button" onClick={() => void handleCopy()} className="kimix-icon-text-button is-compact rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark">
               <Copy size={14} />
               复制
             </button>
-            <button type="button" onClick={handleSave} className="kimix-icon-text-button is-compact rounded-lg bg-[#339af0] text-white hover:bg-[#228be6]">
+            <button type="button" onClick={handleSave} className="kimix-icon-text-button is-compact rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark">
               <Save size={14} />
               保存
             </button>

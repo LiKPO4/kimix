@@ -20,8 +20,8 @@ function formatRelativeTime(ts: number): string {
   return `${weeks} 周`;
 }
 
-const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-xl text-[15px] text-[#302d28] transition-colors disabled:cursor-not-allowed disabled:opacity-40";
-const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-xl text-[#706b63] transition-colors hover:bg-black/5 hover:text-[#26231f] disabled:cursor-not-allowed disabled:opacity-40";
+const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-xl text-[15px] text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
 
 interface SidebarProps {
   width?: number;
@@ -190,7 +190,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   if (!sidebarOpen) {
     return (
-      <aside className="flex w-[52px] shrink-0 flex-col items-start bg-[#f6f4ef]" style={{ paddingLeft: 12, paddingRight: 4, paddingTop: 12, gap: 8 }}>
+      <aside className="flex w-[52px] shrink-0 flex-col items-start bg-surface-ground" style={{ paddingLeft: 12, paddingRight: 4, paddingTop: 12, gap: 8 }}>
         <button
           onClick={async () => {
             if (currentProject) {
@@ -214,7 +214,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
         <button
           onClick={() => setWorkspaceView("plugins")}
-          className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-black/6 text-[#26231f]" : ""}`}
+          className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
           title="插件"
           aria-label="插件"
         >
@@ -222,7 +222,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
         <button
           onClick={() => setWorkspaceView("hooks")}
-          className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-black/6 text-[#26231f]" : ""}`}
+          className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
           title="Hooks"
           aria-label="Hooks"
         >
@@ -273,32 +273,32 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           disabled={!currentProject || Boolean(creatingSessionProjectPath)}
           className={navItemClass}
         >
-          {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin shrink-0 text-[#706b63]" /> : <SquarePen size={17} className="shrink-0 text-[#706b63]" />}
+          {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin shrink-0 text-text-secondary" /> : <SquarePen size={17} className="shrink-0 text-text-secondary" />}
           <span>{creatingSessionProjectPath ? "创建中" : "新对话"}</span>
         </button>
         <button onClick={() => setSearchOpen(true)} className={navItemClass} title="搜索对话">
-          <Search size={17} className="shrink-0 text-[#706b63]" />
+          <Search size={17} className="shrink-0 text-text-secondary" />
           <span>搜索</span>
         </button>
         <button
           onClick={() => setWorkspaceView("plugins")}
-          className={`${navItemClass} ${workspaceView === "plugins" ? "bg-black/5 text-[#26231f]" : ""}`}
+          className={`${navItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
           title="插件"
         >
-          <LayoutGrid size={17} className="shrink-0 text-[#706b63]" />
+          <LayoutGrid size={17} className="shrink-0 text-text-secondary" />
           <span>插件</span>
         </button>
         <button
           onClick={() => setWorkspaceView("hooks")}
-          className={`${navItemClass} ${workspaceView === "hooks" ? "bg-black/5 text-[#26231f]" : ""}`}
+          className={`${navItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
           title="Hooks"
         >
-          <Cable size={17} className="shrink-0 text-[#706b63]" />
+          <Cable size={17} className="shrink-0 text-text-secondary" />
           <span>Hooks</span>
         </button>
         <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
           <span className="flex items-center gap-3">
-            <Clock size={17} className="shrink-0 text-[#706b63]" />
+            <Clock size={17} className="shrink-0 text-text-secondary" />
             <span>长程任务</span>
           </span>
         </button>
@@ -306,10 +306,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2">
         <div className="mb-2 flex items-center justify-between px-3">
-          <span className="text-[13px] font-medium text-[#8a847a]">项目</span>
+          <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button
             onClick={handleOpenProject}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
             title="打开项目"
             aria-label="打开项目"
           >
@@ -333,8 +333,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                   style={{ paddingLeft: 20, paddingRight: 10 }}
                   className={`group/project relative flex h-9 w-full items-center gap-1 rounded-xl pl-3 pr-1 text-[15px] transition-colors ${
                     isActive
-                      ? "bg-black/5 text-[#26231f]"
-                      : "text-[#625d55] hover:bg-black/5 hover:text-[#26231f]"
+                      ? "bg-surface-hover text-text-primary"
+                      : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                   }`}
                 >
                   <button
@@ -348,7 +348,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                     }}
                     className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                   >
-                    <FolderOpen size={16} className="shrink-0 text-[#777168]" />
+                    <FolderOpen size={16} className="shrink-0 text-text-muted" />
                     <span className="min-w-0 flex-1 truncate">{project.name}</span>
                   </button>
                   <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
@@ -357,7 +357,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         e.stopPropagation();
                         setOpenProjectMenu((current) => current === project.id ? null : project.id);
                       }}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-[#8a847a] transition-colors hover:bg-black/5 hover:text-[#26231f]"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
                       title="项目菜单"
                       aria-label="项目菜单"
                     >
@@ -371,7 +371,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         await createSessionForProject(project);
                       }}
                       disabled={Boolean(creatingSessionProjectPath)}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8a847a] transition-colors hover:bg-black/6 hover:text-[#26231f] disabled:cursor-wait disabled:opacity-60"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
                       title="在该项目下新对话"
                       aria-label="在该项目下新对话"
                     >
@@ -380,30 +380,30 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                   </div>
                   {openProjectMenu === project.id && (
                     <div
-                      className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-[#e5e1d8] bg-white py-1.5 text-[13px] text-[#3a362f] shadow-[0_16px_36px_rgba(25,23,20,0.16)]"
+                      className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-border-subtle bg-surface-elevated py-1.5 text-[13px] text-text-primary shadow-floating-token"
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <Pin size={14} className="text-[#706b63]" />
+                      <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                        <Pin size={14} className="text-text-secondary" />
                         <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
                       </button>
-                      <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <FolderSearch size={14} className="text-[#706b63]" />
+                      <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                        <FolderSearch size={14} className="text-text-secondary" />
                         <span>在资源管理器中打开</span>
                       </button>
-                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <GitBranch size={14} className="text-[#706b63]" />
+                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                        <GitBranch size={14} className="text-text-secondary" />
                         <span>创建永久工作树</span>
                       </button>
-                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <SquarePen size={14} className="text-[#706b63]" />
+                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                        <SquarePen size={14} className="text-text-secondary" />
                         <span>重命名项目</span>
                       </button>
-                      <button onClick={() => archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-[#f3f1ec]" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <Archive size={14} className="text-[#706b63]" />
+                      <button onClick={() => archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                        <Archive size={14} className="text-text-secondary" />
                         <span>归档对话</span>
                       </button>
-                      <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-[#8b3d34] transition-colors hover:bg-[#f9ece9]" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                      <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-accent-danger transition-colors hover:bg-accent-danger-light" style={{ paddingLeft: 18, paddingRight: 18 }}>
                         <X size={14} />
                         <span>移除</span>
                       </button>
@@ -432,11 +432,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           className={`group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
                             currentSession?.id === s.id
                               ? isLongTaskSession
-                                ? "bg-[#dff0ff] text-[#1f4f7a]"
-                                : "bg-black/6 text-[#24211d]"
+                                ? "bg-accent-primary-light text-accent-primary-dark"
+                                : "bg-surface-hover text-text-primary"
                               : isLongTaskSession
-                                ? "bg-[#eef7ff] text-[#2f6fad] hover:bg-[#dff0ff] hover:text-[#1f4f7a]"
-                                : "text-[#6f695f] hover:bg-black/5 hover:text-[#24211d]"
+                                ? "bg-accent-primary-light/60 text-accent-primary hover:bg-accent-primary-light hover:text-accent-primary-dark"
+                                : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                           }`}
                         >
                           <button
@@ -448,9 +448,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           >
                             {s.title}
                           </button>
-                          <span className="flex h-5 min-w-[34px] shrink-0 items-center justify-end text-[12px] text-[#9a948b]">
+                          <span className="flex h-5 min-w-[34px] shrink-0 items-center justify-end text-[12px] text-text-muted">
                             {isSessionBusy ? (
-                              <Loader2 size={14} className="animate-spin text-[#8f887e]" aria-label="会话正在运行" />
+                              <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
                             ) : (
                               formatRelativeTime(s.updatedAt)
                             )}
@@ -463,7 +463,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 setCurrentSession(null);
                               }
                             }}
-                            className="rounded p-0.5 text-[#9a948b] opacity-0 transition-all hover:bg-accent-red/10 hover:text-accent-red group-hover:opacity-100"
+                            className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-accent-danger/10 hover:text-accent-danger group-hover:opacity-100"
                             title="归档会话"
                             aria-label="归档会话"
                           >
@@ -480,7 +480,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </div>
 
         {recentProjects.length === 0 && !currentProject && (
-          <div className="px-3 py-8 text-center text-[13px] text-[#9a948b]">
+          <div className="px-3 py-8 text-center text-[13px] text-text-muted">
             尚未选择项目
           </div>
         )}
@@ -489,12 +489,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
         <button
           onClick={() => setWorkspaceView("settings")}
-          className={`kimix-settings-entry flex w-full items-center gap-3 rounded-xl text-[16px] text-[#302d28] transition-colors ${workspaceView === "settings" ? "bg-black/5" : ""}`}
+          className={`kimix-settings-entry flex w-full items-center gap-3 rounded-xl text-[16px] text-text-primary transition-colors ${workspaceView === "settings" ? "bg-surface-hover" : ""}`}
           style={{ height: 36 }}
         >
-          <Settings size={18} className="text-[#706b63]" />
+          <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-[#aaa49a]">v2.8.56</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.73</span>
         </button>
       </div>
     </aside>

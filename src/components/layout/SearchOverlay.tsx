@@ -139,9 +139,9 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-[85] flex items-start justify-center bg-black/20 px-5" style={{ paddingTop: 86 }} onMouseDown={onClose}>
-      <div className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[#dedad2] bg-white shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex h-14 items-center border-b border-[#eee9e1]" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
-          <Search size={18} className="shrink-0 text-[#8a847a]" />
+      <div className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-border-default bg-surface-elevated shadow-floating-token" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
+          <Search size={18} className="shrink-0 text-text-muted" />
           <input
             ref={inputRef}
             value={query}
@@ -153,15 +153,15 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 onClose();
               }
             }}
-            className="min-w-0 flex-1 bg-transparent text-[16px] text-[#24211d] outline-none placeholder:text-[#aaa49a]"
+            className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none placeholder:text-text-muted"
             placeholder="搜索对话、回复、思考、工具和状态"
           />
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8a847a] hover:bg-[#f3f1ec]" onClick={onClose} aria-label="关闭搜索">
+          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={onClose} aria-label="关闭搜索">
             <X size={16} />
           </button>
         </div>
         <div className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
-          <div className="px-2 pb-2 text-[13px] text-[#8f887e]">
+          <div className="px-2 pb-2 text-[13px] text-text-muted">
             {loadingHistory ? "正在补充加载最近历史..." : query.trim() ? `${matches.length} 条匹配` : "最近对话"}
           </div>
           {matches.length > 0 ? matches.map((match, index) => (
@@ -171,18 +171,18 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 setCurrentSession(match.session);
                 onClose();
               }}
-              className="flex min-h-12 w-full items-center rounded-xl text-left transition-colors hover:bg-[#f3f1ec]"
+              className="flex min-h-12 w-full items-center rounded-xl text-left transition-colors hover:bg-surface-hover"
               style={{ gap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}
             >
-              {match.kind === "最近对话" || match.kind === "标题" ? <MessageSquare size={16} className="shrink-0 text-[#8a847a]" /> : <FileText size={16} className="shrink-0 text-[#8a847a]" />}
+              {match.kind === "最近对话" || match.kind === "标题" ? <MessageSquare size={16} className="shrink-0 text-text-muted" /> : <FileText size={16} className="shrink-0 text-text-muted" />}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14.5px] text-[#24211d]">{match.session.title}</span>
-                <span className="mt-1 block truncate text-[13px] text-[#8a847a]">{match.kind} · {match.text}</span>
+                <span className="block truncate text-[14.5px] text-text-primary">{match.session.title}</span>
+                <span className="mt-1 block truncate text-[13px] text-text-muted">{match.kind} · {match.text}</span>
               </span>
-              <span className="shrink-0 text-[12px] text-[#aaa49a]">Ctrl+{Math.min(index + 1, 9)}</span>
+              <span className="shrink-0 text-[12px] text-text-muted">Ctrl+{Math.min(index + 1, 9)}</span>
             </button>
           )) : (
-            <div className="rounded-xl bg-[#faf8f4] text-center text-[14px] text-[#8a847a]" style={{ padding: 28 }}>
+            <div className="rounded-xl bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
               没有找到匹配内容
             </div>
           )}

@@ -63,21 +63,21 @@ export function TodoPanel({ events, onDismiss }: TodoPanelProps) {
 
   return (
     <div
-      className="overflow-hidden rounded-[16px] border border-[#e1dcd3] bg-white/95 text-[14.5px] shadow-[0_3px_12px_rgba(25,23,20,0.05)]"
+      className="overflow-hidden rounded-[16px] border border-border-subtle bg-surface-elevated text-[14.5px] shadow-hover-token"
       style={{ marginBottom: 8 }}
     >
-      <div className={`flex h-11 items-center border-[#eeeae3] text-[#7c756c] ${collapsed ? "" : "border-b"}`} style={{ paddingLeft: 24, paddingRight: 12 }}>
+      <div className={`flex h-11 items-center border-border-subtle text-text-secondary ${collapsed ? "" : "border-b"}`} style={{ paddingLeft: 24, paddingRight: 12 }}>
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          className="no-focus-outline flex h-full min-w-0 flex-1 items-center text-left transition-colors hover:text-[#4f4941] focus:outline-none focus-visible:outline-none"
+          className="no-focus-outline flex h-full min-w-0 flex-1 items-center text-left transition-colors hover:text-text-primary focus:outline-none focus-visible:outline-none"
           style={{ gap: 11, paddingRight: 10 }}
         >
           {collapsed ? <ChevronRight size={17} className="shrink-0" /> : <ChevronDown size={17} className="shrink-0" />}
-          <ClipboardList size={17} className="shrink-0 text-[#8f887e]" />
+          <ClipboardList size={17} className="shrink-0 text-text-muted" />
           <span className="min-w-0 flex-1 truncate">TodoList</span>
-          {activeCount > 0 && <span className="shrink-0 text-[#8f887e]">{activeCount} 项进行中</span>}
-          <span className="shrink-0 text-[#8f887e]">{doneCount}/{items.length}</span>
+          {activeCount > 0 && <span className="shrink-0 text-text-muted">{activeCount} 项进行中</span>}
+          <span className="shrink-0 text-text-muted">{doneCount}/{items.length}</span>
         </button>
         {onDismiss && (
           <button
@@ -96,17 +96,17 @@ export function TodoPanel({ events, onDismiss }: TodoPanelProps) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex min-h-[42px] min-w-0 items-center border-b border-[#f0ede7] text-[14.5px] leading-6 text-[#5e5850] last:border-b-0"
+              className="flex min-h-[42px] min-w-0 items-center border-b border-border-subtle text-[14.5px] leading-6 text-text-primary last:border-b-0"
               style={{ gap: 12, paddingLeft: 26, paddingRight: 26 }}
             >
               {item.status === "done" ? (
-                <CheckCircle2 size={17} className="shrink-0 text-[#2f8f46]" />
+                <CheckCircle2 size={17} className="shrink-0 text-accent-success" />
               ) : item.status === "in_progress" ? (
-                <Loader2 size={17} className="shrink-0 animate-spin text-[#b7791f]" />
+                <Loader2 size={17} className="shrink-0 animate-spin text-accent-warning" />
               ) : (
-                <Circle size={17} className="shrink-0 text-[#aaa49a]" />
+                <Circle size={17} className="shrink-0 text-text-muted" />
               )}
-              <span className={`min-w-0 flex-1 truncate ${item.status === "done" ? "text-[#8f887e] line-through" : ""}`}>
+              <span className={`min-w-0 flex-1 truncate ${item.status === "done" ? "text-text-muted line-through" : ""}`}>
                 {item.content}
               </span>
             </div>

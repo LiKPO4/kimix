@@ -13,7 +13,7 @@ export function ErrorCard({ event }: ErrorCardProps) {
   return (
     <div className="flex justify-center">
       <div
-        className="w-full rounded-xl border text-[var(--kimix-panel-text)] shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+        className="w-full rounded-xl border text-text-primary shadow-[0_1px_0_rgba(25,23,20,0.02)]"
         style={{
           borderColor: "rgba(216,59,1,0.18)",
           background: "rgba(216,59,1,0.04)",
@@ -24,20 +24,20 @@ export function ErrorCard({ event }: ErrorCardProps) {
         }}
       >
         <div className="flex items-start" style={{ gap: 12 }}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff2ef] text-[#d83b01]">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-danger-light text-accent-danger">
             <AlertCircle size={16} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between" style={{ gap: 12 }}>
               <div className="min-w-0 flex-1">
-                <div className="text-[14.5px] font-medium leading-6 text-[#c43e12]">出错了</div>
-                <p className="mt-1 text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">{event.message}</p>
+                <div className="text-[14.5px] font-medium leading-6 text-accent-danger">出错了</div>
+                <p className="mt-1 text-[13.5px] leading-6 text-text-secondary">{event.message}</p>
               </div>
               {event.canDismiss !== false && (
                 <button
                   type="button"
                   onClick={() => setDismissed(true)}
-                  className="kimix-icon-text-button is-compact shrink-0 text-[var(--kimix-panel-text-muted)] hover:bg-[rgba(216,59,1,0.08)] hover:text-[#c43e12]"
+                  className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
                   style={{ minWidth: 32, paddingLeft: 8, paddingRight: 8 }}
                   aria-label="关闭错误提示"
                 >

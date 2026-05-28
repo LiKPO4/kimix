@@ -4,7 +4,7 @@ export type PermissionMode = "manual" | "approve_for_session" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending";
-export type WorkspaceView = "chat" | "plugins" | "hooks" | "settings";
+export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 
 export interface AppState {
   currentProject: Project | null;
@@ -141,6 +141,7 @@ export interface ToolCallEvent {
   status: "running" | "success" | "error";
   arguments: Record<string, unknown>;
   rawArguments?: string;
+  result?: unknown;
   durationMs?: number;
 }
 

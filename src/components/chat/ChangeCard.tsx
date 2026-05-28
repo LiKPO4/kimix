@@ -125,11 +125,11 @@ function renderDiffColumn(lines: DiffLine[], side: "old" | "new") {
         key={`${side}-${index}`}
         className="grid grid-cols-[40px_1fr] font-mono text-[12px] leading-5"
         style={{
-          backgroundColor: isRemoved ? "#fff1ed" : isAdded ? "#ecf8ef" : isBlank ? "#faf8f4" : "transparent",
-          color: isRemoved ? "#8f321f" : isAdded ? "#1f6f35" : "#5f564d",
+          backgroundColor: isRemoved ? "var(--accent-danger-light)" : isAdded ? "var(--accent-success-light)" : isBlank ? "var(--surface-hover)" : "transparent",
+          color: isRemoved ? "var(--accent-danger)" : isAdded ? "var(--accent-success)" : "var(--text-secondary)",
         }}
       >
-        <span className="select-none text-right text-[#aaa49a]" style={{ paddingRight: 10 }}>
+        <span className="select-none text-right text-text-muted" style={{ paddingRight: 10 }}>
           {isBlank ? "" : index + 1}
         </span>
         <span className="whitespace-pre-wrap break-words" style={{ paddingLeft: 8, paddingRight: 8 }}>
@@ -223,25 +223,25 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
     const diffExpanded = Boolean(expandedDiffs[key]);
     const diffLines = oldText !== undefined || newText !== undefined ? buildLineDiff(oldText, newText) : [];
     return (
-      <div key={file.path} className="border-b border-[#f0ece5] last:border-b-0">
+      <div key={file.path} className="border-b border-border-subtle last:border-b-0">
         <div className="flex min-h-11 items-center" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
           <button
             type="button"
             onClick={() => setExpandedDiffs((state) => ({ ...state, [key]: !state[key] }))}
-            className="flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors hover:bg-[#faf8f4]"
+            className="flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors hover:bg-surface-hover"
             style={{ gap: 8, padding: "6px 8px" }}
             title="展开查看 diff"
           >
-            {diffExpanded ? <ChevronDown size={14} className="shrink-0 text-[#8a847a]" /> : <ChevronRight size={14} className="shrink-0 text-[#8a847a]" />}
-            <span className="min-w-0 flex-1 truncate text-[14px] text-[#24211d]">{file.path}</span>
+            {diffExpanded ? <ChevronDown size={14} className="shrink-0 text-text-muted" /> : <ChevronRight size={14} className="shrink-0 text-text-muted" />}
+            <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{file.path}</span>
           </button>
-          <span className="shrink-0 text-[13.5px] text-[#009a44]">+{file.additions ?? 0}</span>
-          <span className="shrink-0 text-[13.5px] text-[#d83b01]">-{file.deletions ?? 0}</span>
+          <span className="shrink-0 text-[13.5px] text-accent-success">+{file.additions ?? 0}</span>
+          <span className="shrink-0 text-[13.5px] text-accent-danger">-{file.deletions ?? 0}</span>
           <button
             type="button"
             onClick={() => void handleRevert([file])}
             disabled={!projectPath || reverting}
-            className="flex h-8 shrink-0 items-center rounded-md text-[12.5px] text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f] disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-8 shrink-0 items-center rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
             style={{ gap: 6, paddingLeft: 10, paddingRight: 10 }}
             title="撤销此文件"
           >
@@ -250,37 +250,37 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
           </button>
         </div>
         {diffExpanded && (
-          <div className="bg-[#fbfaf7]" style={{ padding: "0 18px 14px 40px" }}>
+          <div className="bg-surface-base" style={{ padding: "0 18px 14px 40px" }}>
             {oldText !== undefined || newText !== undefined ? (
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="overflow-hidden rounded-lg border border-[#f0d3ca] bg-white">
-                  <div style={{ padding: "10px 12px" }} className="border-b border-[#f3ded8] text-[12px] font-medium leading-5 text-[#a15b42]">修改前</div>
+                <div className="overflow-hidden rounded-lg border border-accent-danger/30 bg-surface-elevated">
+                  <div style={{ padding: "10px 12px" }} className="border-b border-accent-danger/20 text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
                   <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
                     {renderDiffColumn(diffLines, "old")}
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-lg border border-[#cfe8d4] bg-white">
-                  <div style={{ padding: "10px 12px" }} className="border-b border-[#dceedd] text-[12px] font-medium leading-5 text-[#328144]">修改后</div>
+                <div className="overflow-hidden rounded-lg border border-accent-success/30 bg-surface-elevated">
+                  <div style={{ padding: "10px 12px" }} className="border-b border-accent-success/20 text-[12px] font-medium leading-5 text-accent-success">修改后</div>
                   <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
                     {renderDiffColumn(diffLines, "new")}
                   </div>
                 </div>
                 {/* keep old pre blocks unavailable: colored line diff above is the source of truth */}
                 {false && (
-                  <div className="rounded-lg border border-[#eee4d8] bg-white" style={{ padding: "12px 12px" }}>
-                  <div className="text-[12px] font-medium leading-5 text-[#a15b42]">修改前</div>
-                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-[#6f6258]">{oldText || "空"}</pre>
+                  <div className="rounded-lg border border-accent-danger/20 bg-surface-elevated" style={{ padding: "12px 12px" }}>
+                  <div className="text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-text-secondary">{oldText || "空"}</pre>
                   </div>
                 )}
                 {false && (
-                  <div className="rounded-lg border border-[#dcebdc] bg-white" style={{ padding: "12px 12px" }}>
-                  <div className="text-[12px] font-medium leading-5 text-[#328144]">修改后</div>
-                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4f6f58]">{newText || "空"}</pre>
+                  <div className="rounded-lg border border-accent-success/20 bg-surface-elevated" style={{ padding: "12px 12px" }}>
+                  <div className="text-[12px] font-medium leading-5 text-accent-success">修改后</div>
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-text-secondary">{newText || "空"}</pre>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-[#e8e3da] bg-white text-[13px] leading-6 text-[#8a847a]" style={{ padding: "12px 13px" }}>
+              <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "12px 13px" }}>
                 当前事件只提供了文件汇总，暂时没有结构化 diff；可以打开右侧差异面板查看已捕获的详细 diff。
               </div>
             )}
@@ -291,19 +291,19 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-[14px] border border-[#e8e3da] bg-white">
-      <div className="flex min-h-14 items-center border-b border-[#eee9e1]" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
+    <div className="w-full overflow-hidden rounded-[14px] border border-border-subtle bg-surface-elevated">
+      <div className="flex min-h-14 items-center border-b border-border-subtle" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
         <button
           type="button"
           onClick={() => canExpand && setExpanded((value) => !value)}
           disabled={!canExpand}
-          className="flex h-8 min-w-0 items-center rounded-lg text-[15px] leading-6 text-[#24211d] transition-colors hover:bg-[#f3f1ec] disabled:cursor-default disabled:hover:bg-transparent"
+          className="flex h-8 min-w-0 items-center rounded-lg text-[15px] leading-6 text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-default disabled:hover:bg-transparent"
           style={{ gap: 8, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
         >
           {canExpand && (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
           <span className="truncate">{files.length} 个文件已更改</span>
-          <span className="shrink-0 text-[#009a44]">+{additions}</span>
-          <span className="shrink-0 text-[#d83b01]">-{deletions}</span>
+          <span className="shrink-0 text-accent-success">+{additions}</span>
+          <span className="shrink-0 text-accent-danger">-{deletions}</span>
         </button>
         <div className="min-w-0 flex-1" />
         {files.length > 1 && (
@@ -311,7 +311,7 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
             type="button"
             onClick={() => void handleRevert(files)}
             disabled={!projectPath || reverting}
-            className="flex h-8 shrink-0 items-center rounded-md text-[12.5px] text-[#8a847a] transition-colors hover:bg-[#f3f1ec] hover:text-[#3a362f] disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-8 shrink-0 items-center rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
             style={{ gap: 6, paddingLeft: 10, paddingRight: 10 }}
             title="撤销全部文件"
           >
@@ -326,7 +326,7 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="flex min-h-10 w-full items-center border-b border-[#f0ece5] text-left text-[13.5px] text-[#706b63] transition-colors hover:bg-[#faf8f4]"
+            className="flex min-h-10 w-full items-center border-b border-border-subtle text-left text-[13.5px] text-text-secondary transition-colors hover:bg-surface-hover"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronDown size={14} />
@@ -337,7 +337,7 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="flex min-h-10 w-full items-center text-left text-[13.5px] text-[#706b63] transition-colors hover:bg-[#faf8f4]"
+            className="flex min-h-10 w-full items-center text-left text-[13.5px] text-text-secondary transition-colors hover:bg-surface-hover"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronUp size={14} />
@@ -346,7 +346,7 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
         )}
       </div>
       {error && (
-        <div className="border-t border-[#f0ece5] text-[13px] leading-5 text-[#b42318]" style={{ padding: "10px 22px" }}>
+        <div className="border-t border-border-subtle text-[13px] leading-5 text-accent-danger" style={{ padding: "10px 22px" }}>
           撤销失败：{error}
         </div>
       )}

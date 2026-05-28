@@ -640,6 +640,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       result[callIndex] = {
         ...call,
         status: "success",
+        result: incoming.result,
         durationMs: Math.max(0, incoming.timestamp - call.timestamp),
       };
       return [...result, ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
