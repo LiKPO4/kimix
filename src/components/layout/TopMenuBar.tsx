@@ -72,7 +72,6 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
     { type: "separator" },
     { label: "设置...", hint: "Ctrl+逗号", action: "settings" },
     { type: "separator" },
-    { label: "退出登录", action: "logout" },
     { label: "退出", action: "exit" },
   ],
   编辑: [
@@ -113,15 +112,8 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
   ],
   帮助: [
     { label: "文档", action: "documentation" },
-    { label: "新功能", action: "whats-new" },
-    { label: "自动化", action: "automations", disabled: true, note: "自动化功能暂未实现" },
-    { label: "本地环境", action: "local-environments", disabled: true, note: "本地环境功能暂未实现" },
-    { label: "Worktrees", action: "worktrees", disabled: true, note: "Worktrees 功能暂未实现" },
-    { label: "Skills", action: "skills" },
-    { label: "MCP", action: "mcp" },
-    { type: "separator" },
-    { label: "故障排查", action: "troubleshooting", disabled: true, note: "故障排查功能暂未实现" },
-    { label: "性能追踪", action: "performance-trace", disabled: true, note: "性能追踪功能暂未实现" },
+    { label: "更新", action: "whats-new" },
+    { label: "插件", action: "skills" },
     { type: "separator" },
     { label: "发送反馈", action: "send-feedback" },
     { label: "键盘快捷键", hint: "Ctrl+/", action: "keyboard-shortcuts" },
@@ -134,6 +126,7 @@ interface TopMenuBarProps {
   onMenuAction: (entry: MenuEntry) => void;
   hasUpdate: boolean;
   updateMessage?: string;
+  updateLabel?: string;
   onOpenUpdates: () => void;
 }
 
@@ -143,6 +136,7 @@ export function TopMenuBar({
   onMenuAction,
   hasUpdate,
   updateMessage,
+  updateLabel = "升级",
   onOpenUpdates,
 }: TopMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -240,7 +234,7 @@ export function TopMenuBar({
               aria-label="打开更新窗口"
             >
               <ArrowUp size={14} />
-              升级
+              {updateLabel}
             </button>
           )}
         </nav>

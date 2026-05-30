@@ -1,7 +1,7 @@
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
-import { settleInactiveEvents } from "./eventHelpers";
+import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
 
 export const LOCAL_SESSIONS_KEY = "kimix_sessions";
 export const LOCAL_PENDING_KEY = "kimix_pending";
@@ -13,7 +13,7 @@ export function persistLocalConversationState() {
     const runningSessionId = useAppStore.getState().runningSessionId;
     localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(state.sessions.map((session) => ({
       ...session,
-      events: session.id === runningSessionId ? session.events : settleInactiveEvents(session.events),
+      events: sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events)),
       isLoading: false,
     }))));
     localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(state.pendingMessages));

@@ -1,6 +1,6 @@
 export type Theme = "dark" | "light" | "system";
 
-export type PermissionMode = "manual" | "approve_for_session" | "yolo";
+export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending";
@@ -15,7 +15,6 @@ export interface AppState {
   creatingSessionProjectPath: string | null;
   defaultThinking: boolean;
   defaultPlanMode: boolean;
-  defaultAfkMode: boolean;
   additionalWorkDirs: string[];
   detailedContext: boolean;
   statusUpdateDisplay: StatusUpdateDisplay;
@@ -34,7 +33,7 @@ export interface AppState {
   theme: Theme;
 }
 
-export type StatusUpdateDisplay = "each" | "turn_end";
+export type StatusUpdateDisplay = "each" | "turn_end" | "never";
 
 export interface Project {
   id: string;

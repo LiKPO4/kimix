@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Cable, KeyRound, LogIn, LogOut, Plus, RefreshCw, ShieldCheck, ShieldX, TestTube2, Trash2 } from "lucide-react";
+import { Cable, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 
 type KimiAuthStatus = {
   available: boolean;
@@ -158,11 +158,11 @@ function KeyValueListEditor({
   );
 }
 
-export function McpPanel({ onBackToChat }: { onBackToChat?: () => void }) {
+export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: () => void; embedded?: boolean }) {
   const [auth, setAuth] = useState<KimiAuthStatus | null>(null);
   const [servers, setServers] = useState<McpServerInfo[]>([]);
   const [configPath, setConfigPath] = useState("");
-  const [message, setMessage] = useState("正在读取 Kimi CLI 与 MCP 状态...");
+  const [message, setMessage] = useState("正在读取 Kimi Code 与 MCP 状态...");
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -210,34 +210,6 @@ export function McpPanel({ onBackToChat }: { onBackToChat?: () => void }) {
     } finally {
       setBusyAction(null);
     }
-  };
-
-  const handleLogin = async () => {
-    await runBusy("login", async () => {
-      setMessage("正在发起 Kimi 登录...");
-      const res = await window.api.loginKimi();
-      if (!res.success) {
-        setMessage(`登录失败：${res.error}`);
-        return;
-      }
-      setAuth(res.data);
-      setMessage(res.data.message);
-      window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
-    });
-  };
-
-  const handleLogout = async () => {
-    await runBusy("logout", async () => {
-      setMessage("正在退出 Kimi 登录...");
-      const res = await window.api.logoutKimi();
-      if (!res.success) {
-        setMessage(`退出失败：${res.error}`);
-        return;
-      }
-      setAuth(res.data);
-      setMessage(res.data.message);
-      window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
-    });
   };
 
   const handleAddServer = async () => {
@@ -316,22 +288,21 @@ export function McpPanel({ onBackToChat }: { onBackToChat?: () => void }) {
     });
   };
 
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--kimix-panel-bg)]">
-      <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
+  const header = (
+    <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
         <div className="min-w-0">
           <div className="flex items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]">
             <Cable size={20} />
-            <span>MCP 与登录</span>
+            <span>MCP</span>
           </div>
           <div className="mt-1 text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
-            管理 Kimi CLI 登录状态、MCP 服务配置，以及授权和连通性测试。
+            管理 MCP 服务配置，以及授权和连通性测试。
           </div>
         </div>
         <div className="flex items-center" style={{ gap: 8 }}>
           <button
             type="button"
-            onClick={() => void refresh("已刷新 Kimi CLI 与 MCP 状态")}
+            onClick={() => void refresh("已刷新 Kimi Code 与 MCP 状态")}
             disabled={loading || Boolean(busyAction)}
             className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
           >
@@ -358,47 +329,17 @@ export function McpPanel({ onBackToChat }: { onBackToChat?: () => void }) {
           )}
         </div>
       </div>
+  );
 
-      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "22px 28px 30px" }}>
+  const body = (
+      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: embedded ? "0" : "22px 28px 30px" }}>
         <div className="grid min-w-0 items-start" style={{ gridTemplateColumns: "320px minmax(0, 1fr)", gap: 18 }}>
           <aside className="flex min-w-0 flex-col" style={{ gap: 14 }}>
-            <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 16px 15px" }}>
-              <div className="flex items-start justify-between" style={{ gap: 12 }}>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--kimix-panel-text)]">
-                    {auth?.loggedIn ? <ShieldCheck size={16} className="text-accent-success" /> : <ShieldX size={16} className="text-accent-danger" />}
-                    <span>{loading ? "读取中" : auth?.loggedIn ? "已登录" : "未登录"}</span>
-                  </div>
-                  <div className="mt-2 text-[13px] leading-6 text-[var(--kimix-panel-text-secondary)]">
-                    {auth?.message ?? "正在读取登录状态..."}
-                  </div>
-                  {auth?.path && <div className="mt-2 break-all text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{auth.path}</div>}
-                </div>
-              </div>
-              <div className="flex flex-wrap" style={{ gap: 8, marginTop: 14 }}>
-                <button
-                  type="button"
-                  onClick={() => void handleLogin()}
-                  disabled={Boolean(busyAction) || !auth?.available}
-                  className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-55"
-                >
-                  <LogIn size={14} />
-                  <span>{busyAction === "login" ? "登录中" : "登录"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleLogout()}
-                  disabled={Boolean(busyAction) || !auth?.available || !auth?.loggedIn}
-                  className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-danger hover:bg-accent-danger-light disabled:cursor-wait disabled:opacity-55"
-                >
-                  <LogOut size={14} />
-                  <span>{busyAction === "logout" ? "退出中" : "退出登录"}</span>
-                </button>
-              </div>
-            </div>
-
             <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "16px 16px 15px" }}>
               <div className="font-medium text-[var(--kimix-panel-text)]">当前配置</div>
+              <div className="mt-2 text-[var(--kimix-panel-text-secondary)]">
+                登录状态：{loading ? "读取中" : auth?.loggedIn ? "已登录" : "未登录"}
+              </div>
               <div className="mt-2 text-[var(--kimix-panel-text-secondary)]">
                 默认模型：{auth?.defaultModel ?? "未设置"}
               </div>
@@ -651,6 +592,14 @@ export function McpPanel({ onBackToChat }: { onBackToChat?: () => void }) {
           </section>
         </div>
       </div>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--kimix-panel-bg)]">
+      {header}
+      {body}
     </div>
   );
 }

@@ -10,7 +10,6 @@ export interface AppStore extends AppState {
   setCreatingSessionProjectPath: (projectPath: string | null) => void;
   setDefaultThinking: (thinking: boolean) => void;
   setDefaultPlanMode: (enabled: boolean) => void;
-  setDefaultAfkMode: (enabled: boolean) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (enabled: boolean) => void;
   setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
@@ -46,7 +45,6 @@ export const useAppStore = create<AppStore>((set) => ({
   creatingSessionProjectPath: null,
   defaultThinking: true,
   defaultPlanMode: false,
-  defaultAfkMode: false,
   additionalWorkDirs: [],
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
@@ -76,7 +74,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setCreatingSessionProjectPath: (projectPath) => set({ creatingSessionProjectPath: projectPath }),
   setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
   setDefaultPlanMode: (enabled) => set({ defaultPlanMode: enabled }),
-  setDefaultAfkMode: (enabled) => set({ defaultAfkMode: enabled }),
   setAdditionalWorkDirs: (dirs) => set({ additionalWorkDirs: dirs }),
   setDetailedContext: (enabled) => set({ detailedContext: enabled }),
   setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),

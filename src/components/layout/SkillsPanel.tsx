@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { Check, LayoutGrid, Plus, Sparkles, Upload } from "lucide-react";
+import { Cable, Check, LayoutGrid, Plus, Sparkles, Upload } from "lucide-react";
+import { McpPanel } from "./McpPanel";
 
 type SkillInfo = {
   name: string;
   description: string;
   path: string;
   source: string;
+  sourceLabel?: string;
+  trustLevel?: "kimi-official" | "curated" | "third-party" | "local";
   enabled: boolean;
 };
 
@@ -22,7 +25,10 @@ type SuperpowersDiagnostics = {
   diagnostics?: string[];
 };
 
-export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToChat?: () => void }) {
+type PluginPanelTab = "skills" | "mcp";
+
+export function SkillsPanel({ open, onBackToChat, activeTab = "skills", onActiveTabChange }: { open: boolean; onBackToChat?: () => void; activeTab?: PluginPanelTab; onActiveTabChange?: (tab: PluginPanelTab) => void }) {
+  const [localActiveTab, setLocalActiveTab] = useState<PluginPanelTab>(activeTab);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [enabledNames, setEnabledNames] = useState<string[]>([]);
   const [enabledDir, setEnabledDir] = useState("");
@@ -33,6 +39,16 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
   const [checkingSuperpowers, setCheckingSuperpowers] = useState(false);
   const [superpowersDiagnostics, setSuperpowersDiagnostics] = useState<SuperpowersDiagnostics | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
+
+  useEffect(() => {
+    setLocalActiveTab(activeTab);
+  }, [activeTab]);
+
+  const setSelectedTab = (tab: PluginPanelTab) => {
+    setLocalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  };
 
   const refreshSuperpowersDiagnostics = async () => {
     setCheckingSuperpowers(true);
@@ -160,6 +176,19 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
     return firstSentence.length > 96 ? `${firstSentence.slice(0, 96)}...` : firstSentence;
   };
 
+  const trustMeta = (skill: SkillInfo) => {
+    switch (skill.trustLevel) {
+      case "kimi-official":
+        return { label: "Kimi 官方", className: "bg-accent-primary text-white" };
+      case "curated":
+        return { label: "精选", className: "bg-accent-success-light text-accent-success" };
+      case "third-party":
+        return { label: "第三方", className: "bg-accent-warning-light text-accent-warning" };
+      default:
+        return { label: "本地", className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -185,30 +214,34 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
               <span>插件</span>
             </div>
             <div className="mt-1 text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
-              管理 Kimix 传给 Kimi Code 的 Skills，后续会扩展为完整 Plugins 项目工具箱。
+              管理 Kimix 扩展能力：Skills 负责本地能力包，MCP 负责外部工具服务。
             </div>
           </div>
           <div className="flex items-center" style={{ gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => void installSuperpowers()}
-              disabled={installingSuperpowers}
-              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
-              title="安装 Superpowers"
-            >
-              <Sparkles size={15} />
-              <span>{installingSuperpowers ? "安装中" : "Superpowers"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void importArchive()}
-              disabled={importing}
-              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
-              title="导入 Skill 压缩包"
-            >
-              <Plus size={15} />
-              <span>{importing ? "导入中" : "添加"}</span>
-            </button>
+            {selectedTab === "skills" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void installSuperpowers()}
+                  disabled={installingSuperpowers}
+                  className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+                  title="安装 Superpowers"
+                >
+                  <Sparkles size={15} />
+                  <span>{installingSuperpowers ? "安装中" : "Superpowers"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void importArchive()}
+                  disabled={importing}
+                  className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+                  title="导入 Skill 压缩包"
+                >
+                  <Plus size={15} />
+                  <span>{importing ? "导入中" : "添加"}</span>
+                </button>
+              </>
+            )}
             {onBackToChat && (
               <button
                 type="button"
@@ -222,6 +255,27 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "22px 28px 30px" }}>
+          <div className="flex items-center" style={{ gap: 8, marginBottom: 18 }}>
+            <button
+              type="button"
+              onClick={() => setSelectedTab("skills")}
+              className={`kimix-icon-text-button is-compact ${selectedTab === "skills" ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "kimix-muted-action"}`}
+            >
+              <Sparkles size={14} />
+              <span>Skills</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedTab("mcp")}
+              className={`kimix-icon-text-button is-compact ${selectedTab === "mcp" ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "kimix-muted-action"}`}
+            >
+              <Cable size={14} />
+              <span>MCP</span>
+            </button>
+          </div>
+          {selectedTab === "mcp" ? (
+            <McpPanel embedded />
+          ) : (
           <div className="grid w-full items-start" style={{ gridTemplateColumns: "320px minmax(0, 1fr)", gap: 18 }}>
             <aside className="flex flex-col" style={{ gap: 14 }}>
               <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6" style={{ padding: "14px 16px" }}>
@@ -255,8 +309,11 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
                 </div>
               </div>
             </aside>
-            <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridAutoRows: 142, gap: 12 }}>
+            <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridAutoRows: 174, gap: 12 }}>
               {skills.map((skill) => (
+                (() => {
+                  const trust = trustMeta(skill);
+                  return (
                 <button
                   key={skill.path}
                   type="button"
@@ -275,6 +332,14 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
                     </span>
                     <span className="flex min-h-0 min-w-0 flex-col overflow-hidden">
                       <span className="block truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ lineHeight: "22px" }}>{skill.name}</span>
+                      <span className="mt-2 flex min-w-0 flex-wrap items-center" style={{ gap: 6 }}>
+                        <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${trust.className}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          {trust.label}
+                        </span>
+                        <span className="h-6 min-w-0 truncate rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-6 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 9, paddingRight: 9 }} title={skill.source}>
+                          {skill.sourceLabel ?? "本地 Skill"}
+                        </span>
+                      </span>
                       <span
                         className="block text-[13px] text-[var(--kimix-panel-text-secondary)]"
                         title={skill.description}
@@ -297,9 +362,12 @@ export function SkillsPanel({ open, onBackToChat }: { open: boolean; onBackToCha
                     </span>
                   </div>
                 </button>
+                  );
+                })()
               ))}
             </section>
           </div>
+          )}
         </div>
       </div>
     </div>

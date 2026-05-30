@@ -12,6 +12,7 @@ import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeS
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import {
   settleInactiveEvents,
+  sanitizePersistedEvents,
   closeOpenCompaction,
   latestAssistantContent,
   latestAssistantVisibleOrThinkingContent,
@@ -574,8 +575,8 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     model: "kimi-code/kimi-for-coding",
     thinking: appState.defaultThinking,
     yoloMode: appState.permissionMode === "yolo",
+    autoMode: appState.permissionMode === "auto",
     planMode: appState.defaultPlanMode,
-    afkMode: appState.defaultAfkMode,
   });
   if (!sessionRes.success) throw new Error(sessionRes.error);
 
@@ -616,8 +617,8 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     content,
     thinking: appState.defaultThinking,
     yoloMode: appState.permissionMode === "yolo",
+    autoMode: appState.permissionMode === "auto",
     planMode: appState.defaultPlanMode,
-    afkMode: appState.defaultAfkMode,
   });
 }
 
@@ -626,7 +627,6 @@ function App() {
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
-  const setDefaultAfkMode = useAppStore((s) => s.setDefaultAfkMode);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
@@ -639,7 +639,6 @@ function App() {
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
@@ -676,7 +675,6 @@ function App() {
     setPermissionMode,
     setDefaultThinking,
     setDefaultPlanMode,
-    setDefaultAfkMode,
     setAdditionalWorkDirs,
     setDetailedContext,
     setStatusUpdateDisplay,
@@ -728,7 +726,7 @@ function App() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
-      afkMode: defaultAfkMode,
+      autoMode: permissionMode === "auto",
     });
     if (!startRes.success) throw new Error(startRes.error);
 
@@ -760,7 +758,7 @@ function App() {
       content: prompt,
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
-      afkMode: defaultAfkMode,
+      autoMode: permissionMode === "auto",
     });
     if (!sendRes.success) throw new Error(sendRes.error);
   };
@@ -973,7 +971,7 @@ function App() {
       content: buildLongTaskReviewPrompt(latestForPrompt),
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
-      afkMode: defaultAfkMode,
+      autoMode: permissionMode === "auto",
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -1113,7 +1111,7 @@ function App() {
       content: prompt,
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
-      afkMode: defaultAfkMode,
+      autoMode: permissionMode === "auto",
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -1162,8 +1160,8 @@ function App() {
           sessionId: latest?.id,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
+          autoMode: useAppStore.getState().permissionMode === "auto",
           planMode: useAppStore.getState().defaultPlanMode,
-          afkMode: useAppStore.getState().defaultAfkMode,
         });
         if (!startRes.success || !latest) return;
         const runtimeOwner = findLocalSessionForRuntime(latest.id, startRes.data.sessionId);
@@ -1226,14 +1224,19 @@ function App() {
       try {
         const parsed = JSON.parse(storedSessions);
         if (Array.isArray(parsed)) {
-          const visibleSessions = parsed.filter((session) => !isHiddenInternalSession(session));
-          if (visibleSessions.length !== parsed.length) {
+          const visibleSessions = parsed
+            .filter((session) => !isHiddenInternalSession(session))
+            .map((session) => ({
+              ...session,
+              events: sanitizePersistedEvents(Array.isArray(session.events) ? session.events : []),
+            }));
+          if (JSON.stringify(visibleSessions) !== storedSessions) {
             localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
           }
           useSessionStore.setState({
             sessions: visibleSessions.map((session) => hydrateLongTaskProgressFromHistory({
               ...session,
-              events: Array.isArray(session.events) ? settleInactiveEvents(session.events) : [],
+              events: sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []),
               isLoading: false,
             })),
           });
@@ -1331,7 +1334,7 @@ function App() {
           model: "kimi-code/kimi-for-coding",
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
-          afkMode: useAppStore.getState().defaultAfkMode,
+          autoMode: useAppStore.getState().permissionMode === "auto",
         });
         if (!startRes.success) throw new Error(startRes.error);
         rememberHiddenHandoffSession(startRes.data.sessionId);
@@ -1348,7 +1351,7 @@ function App() {
           content: prompt,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
-          afkMode: useAppStore.getState().defaultAfkMode,
+          autoMode: useAppStore.getState().permissionMode === "auto",
         });
         if (!sendRes.success) throw new Error(sendRes.error);
       })().catch((err) => {
@@ -1542,8 +1545,8 @@ function App() {
               content: next.content,
               thinking: useAppStore.getState().defaultThinking,
               yoloMode: useAppStore.getState().permissionMode === "yolo",
+              autoMode: useAppStore.getState().permissionMode === "auto",
               planMode: useAppStore.getState().defaultPlanMode,
-              afkMode: useAppStore.getState().defaultAfkMode,
             }).then((res) => {
               if (res.success) return;
               throw new Error(res.error);
@@ -1573,7 +1576,7 @@ function App() {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
+  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1597,7 +1600,7 @@ function App() {
       }
     }, 1400);
     return () => clearTimeout(timer);
-  }, [defaultThinking, defaultPlanMode, defaultAfkMode, permissionMode, updateSession]);
+  }, [defaultThinking, defaultPlanMode, permissionMode, updateSession]);
 
   return (
     <ThemeProvider>

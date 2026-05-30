@@ -44,7 +44,6 @@ export function EmptyState() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -93,8 +92,8 @@ export function EmptyState() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
       planMode: defaultPlanMode,
-      afkMode: defaultAfkMode,
     });
     if (!sessionRes.success) return null;
 
@@ -157,8 +156,8 @@ export function EmptyState() {
         content: text,
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,
-        afkMode: defaultAfkMode,
       });
       if (!sendRes.success) throw new Error(sendRes.error);
     } catch (err) {

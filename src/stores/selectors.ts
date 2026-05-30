@@ -8,7 +8,6 @@ import type { Session } from "@/types/ui";
 export const selectDefaultSettings = (s: AppStore) => ({
   thinking: s.defaultThinking,
   planMode: s.defaultPlanMode,
-  afkMode: s.defaultAfkMode,
   permissionMode: s.permissionMode,
 });
 

@@ -55,7 +55,7 @@ const longTaskAgentLabels: Record<LongTaskSessionMeta["activeAgent"], string> = 
   reviewer: "审查 agent",
 };
 
-const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi\/plans\/[^\s"'<>|]+\.md|\.kimi[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/i;
+const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi(?:-code)?\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi(?:-code)?\/plans\/[^\s"'<>|]+\.md|\.kimi(?:-code)?[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/i;
 
 function cleanPlanPath(pathValue: string) {
   return pathValue.trim().replace(/[),.;，。；）]+$/u, "");
@@ -324,6 +324,8 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     );
     let toolsAttached = false;
     let assistantAttached = false;
+    const mergedAssistantEvent = mergeAssistantProcessEvents(assistantEvents);
+    const assistantEventIds = new Set(assistantEvents.map((assistantEvent) => assistantEvent.id));
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
@@ -353,15 +355,15 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
       if (type === "change_summary") continue;
       if (type === "diff") continue;
       if (type === "assistant_message") {
-        const assistantEvent = event as Extract<TimelineEvent, { type: "assistant_message" }>;
-        const hasContent = assistantEvent.content.trim().length > 0;
+        if (assistantAttached || !mergedAssistantEvent) continue;
+        const hasContent = mergedAssistantEvent.content.trim().length > 0;
         const hasOwnProcessDetails = Boolean(
-          assistantEvent.thinking?.trim() ||
-          assistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0)
+          mergedAssistantEvent.thinking?.trim() ||
+          mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0)
         );
         items.push({
           type: "event",
-          event,
+          event: mergedAssistantEvent,
           leadingTools: assistantAttached ? [] : tools,
           leadingSubagents: assistantAttached ? [] : subagents,
           leadingHooks: assistantAttached ? [] : hooks,
@@ -374,6 +376,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         continue;
       }
       if (
+        (type !== "assistant_message" || assistantEventIds.has(event.id)) &&
         type !== "assistant_message" &&
         type !== "approval_request" &&
         type !== "question_request" &&
@@ -461,9 +464,10 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
   return items;
 }
 
-function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end"): TimelineEvent[] {
+function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end" | "never"): TimelineEvent[] {
   return events.filter((event, index) => {
     if (event.type !== "status_update") return true;
+    if (display === "never") return false;
     if (display === "each") return true;
     const nextTurnIndex = events.findIndex((candidate, candidateIndex) => (
       candidateIndex > index &&
@@ -659,12 +663,12 @@ export function ChatThread() {
       <div
         ref={scrollRef}
         className="kimix-content-x h-full overflow-y-auto"
-        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 42 }}
+        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 120 }}
         onScroll={handleScroll}
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div className="kimix-chat-column flex w-full flex-col" style={{ gap: 22 }}>
+        <div className="kimix-chat-column flex min-h-full w-full flex-col" style={{ gap: 22 }}>
           {renderItems.map((item, index) => (
             <div key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id} className="kimix-message-enter" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
               {item.type === "tool_group"

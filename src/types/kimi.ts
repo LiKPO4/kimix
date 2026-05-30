@@ -7,7 +7,7 @@ export interface KimiSessionConfig {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
-  afkMode?: boolean;
+  autoMode?: boolean;
 }
 
 export type KimiEventType =

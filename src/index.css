@@ -40,6 +40,7 @@
   --accent-primary-light: #EBF4FF;
   --accent-primary-soft: #8EC5FF;
   --accent-primary-dark: #1466CC;
+  --kimix-primary-button-hover: #2F74B8;
 
   /* Accent — Secondary (Warm Chestnut) */
   --accent-secondary: #B85C38;
@@ -176,6 +177,7 @@
   --accent-primary-light: #1A2F4A;
   --accent-primary-soft: #2A4A6E;
   --accent-primary-dark: #6BB8FF;
+  --kimix-primary-button-hover: #3D88D0;
 
   --accent-secondary: #D4896A;
   --accent-secondary-light: #3A2218;
@@ -522,6 +524,32 @@ body::before {
   box-shadow: var(--shadow-hover);
 }
 
+.bg-accent-primary:hover:not(:disabled),
+button.bg-accent-primary:hover:not(:disabled),
+.kimix-icon-text-button.bg-accent-primary:hover:not(:disabled) {
+  background: var(--kimix-primary-button-hover) !important;
+  color: var(--text-inverse) !important;
+  box-shadow: var(--shadow-hover);
+}
+
+.bg-accent-primary:focus-visible:not(:disabled),
+button.bg-accent-primary:focus-visible:not(:disabled),
+.kimix-icon-text-button.bg-accent-primary:focus-visible:not(:disabled) {
+  background: var(--kimix-primary-button-hover) !important;
+  color: var(--text-inverse) !important;
+}
+
+.bg-accent-primary:disabled,
+.bg-accent-primary:disabled:hover,
+button.bg-accent-primary:disabled,
+button.bg-accent-primary:disabled:hover,
+.kimix-icon-text-button.bg-accent-primary:disabled,
+.kimix-icon-text-button.bg-accent-primary:disabled:hover {
+  background: var(--accent-primary) !important;
+  color: var(--text-inverse) !important;
+  box-shadow: none !important;
+}
+
 .kimix-muted-action {
   color: var(--text-muted);
   transition: background-color var(--duration-base) var(--ease-hover),
@@ -857,9 +885,16 @@ body::before {
   background: var(--surface-elevated);
 }
 
-.kimix-settings-connection.is-verified {
-  border-color: var(--accent-success);
-  background: var(--accent-success-light);
+.kimix-settings-connection.is-verified,
+.kimix-settings-connection.is-found {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+.kimix-settings-connection.is-verified .kimix-settings-connection-label,
+.kimix-settings-connection.is-found .kimix-settings-connection-label {
+  color: var(--accent-primary);
+  font-weight: 600;
 }
 
 .kimix-settings-connection.is-missing {
@@ -942,6 +977,15 @@ body::before {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-elevated);
+}
+
+.kimix-settings-card.is-active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+.kimix-settings-card.is-active .kimix-settings-permission-label {
+  color: var(--accent-primary);
 }
 
 .kimix-settings-list-item {
@@ -1177,6 +1221,7 @@ body::before {
     transform: rotate(360deg);
   }
 }
+
 
 .kimix-spin {
   animation: kimix-spin 0.9s linear infinite;

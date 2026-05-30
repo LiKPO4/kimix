@@ -10,7 +10,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: "kimi-code/kimi-for-coding",
   defaultThinking: true,
   defaultPlanMode: false,
-  defaultAfkMode: false,
   maxTurns: 50,
   enableCompaction: true,
   defaultPermissionMode: "manual",
@@ -56,6 +55,9 @@ export function loadSettings(): AppSettings {
         rawSettings.clarificationToolEnabled === false ? "off" :
           DEFAULT_SETTINGS.clarificationToolMode);
     const settings = { ...DEFAULT_SETTINGS, ...rawSettings, clarificationToolMode };
+    if (!["manual", "auto", "yolo"].includes(settings.defaultPermissionMode)) {
+      settings.defaultPermissionMode = "manual";
+    }
     if ((settings.hookRules ?? []).length > 0) {
       try { syncKimiHookConfig(settings.hookRules ?? []); } catch {}
     }
@@ -108,7 +110,10 @@ function normalizeHookRule(rule: NonNullable<AppSettings["hookRules"]>[number]) 
 }
 
 function syncKimiHookConfig(rules: NonNullable<AppSettings["hookRules"]>) {
-  const configPath = path.join(os.homedir(), ".kimi", "config.toml");
+  const kimiCodeDir = path.join(os.homedir(), ".kimi-code");
+  const legacyKimiDir = path.join(os.homedir(), ".kimi");
+  const shareDir = process.env.KIMI_SHARE_DIR || (fs.existsSync(kimiCodeDir) ? kimiCodeDir : fs.existsSync(legacyKimiDir) ? legacyKimiDir : kimiCodeDir);
+  const configPath = path.join(shareDir, "config.toml");
   const begin = "# >>> Kimix managed hooks >>>";
   const end = "# <<< Kimix managed hooks <<<";
   const body = rules.map(hookRuleToToml).filter(Boolean).join("\n\n");

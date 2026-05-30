@@ -1,6 +1,6 @@
 import type { TimelineEvent } from "@/types/ui";
 
-const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi\/plans\/[^\s"'<>|]+\.md|\.kimi[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
+const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi(?:-code)?\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi(?:-code)?\/plans\/[^\s"'<>|]+\.md|\.kimi(?:-code)?[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
 
 export function cleanPlanPath(pathValue: string) {
   return pathValue.trim().replace(/[),.;，。；）]+$/u, "");
@@ -50,7 +50,7 @@ export function hasSessionPlanSignal(events: TimelineEvent[]) {
       ));
     }
     if (event.type === "change_summary") {
-      return event.files.some((file) => /[\\/]?\.kimi[\\/]plans[\\/].+\.md/i.test(file.path));
+      return event.files.some((file) => /[\\/]?\.kimi(?:-code)?[\\/]plans[\\/].+\.md/i.test(file.path));
     }
     return false;
   });

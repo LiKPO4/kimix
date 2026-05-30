@@ -8,7 +8,6 @@ import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
 import { HooksPanel } from "./HooksPanel";
-import { McpPanel } from "./McpPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
 import {
   ClipboardList,
@@ -18,7 +17,7 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session } from "@/types/ui";
-import type { KimiCliUpdateInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { DownloadUpdateProgress, KimiCliUpdateInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
@@ -40,6 +39,7 @@ const RIGHT_PANEL_MIN_WIDTH = 280;
 const RIGHT_PANEL_MAX_WIDTH = 560;
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
+type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
 
 type ReleaseInfo = {
   tagName: string;
@@ -56,6 +56,8 @@ type KimiCliOnboardingState = {
   message: string;
   path?: string;
   output?: string;
+  version?: string | null;
+  isLegacy?: boolean;
 };
 
 const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: string }> = {
@@ -65,23 +67,23 @@ const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: strin
   },
   "local-environments": {
     title: "本地环境",
-    body: "当前版本会直接使用本机 Kimi CLI 和项目目录。隔离环境、环境模板和一键初始化仍需后续接入。",
+    body: "当前版本会直接使用本机 Kimi Code 和项目目录。隔离环境、环境模板和一键初始化仍需后续接入。",
   },
   worktrees: {
     title: "工作树",
     body: "工作树菜单先保留为说明入口。后续会基于 Git worktree 增加独立任务目录和分支隔离。",
   },
   skills: {
-    title: "技能",
-    body: "技能入口对应 Codex 风格能力分组。Kimix 当前只展示入口，尚未提供技能安装、启用和管理页面。",
+    title: "插件",
+    body: "插件页统一管理 Kimix 扩展能力，包括本地 Skills 与 MCP 服务。",
   },
   mcp: {
     title: "模型上下文协议",
-    body: "MCP 管理页已经接入首版能力，可查看服务列表、添加服务、测试连接，以及处理 OAuth 授权。",
+    body: "MCP 已整合进插件页，可查看服务列表、添加服务、测试连接，以及处理 OAuth 授权。",
   },
   troubleshooting: {
     title: "故障排查",
-    body: "常见问题：确认 Kimi CLI 已安装并登录，项目路径存在，启动日志里 root 内容自检非 0。",
+    body: "常见问题：确认 Kimi Code 已安装并登录，项目路径存在，启动日志里 root 内容自检非 0。",
   },
   documentation: {
     title: "Kimix 文档",
@@ -156,7 +158,6 @@ export function AppShell() {
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
@@ -169,6 +170,7 @@ export function AppShell() {
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const [launchCommandDialogOpen, setLaunchCommandDialogOpen] = useState(false);
   const [launchCommandDraft, setLaunchCommandDraft] = useState("");
+  const [pluginPanelTab, setPluginPanelTab] = useState<"skills" | "mcp">("skills");
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -184,10 +186,13 @@ export function AppShell() {
     latest: null,
     hasUpdate: false,
   });
-  const [cliUpdateState, setCliUpdateState] = useState<{ loading: boolean; updating: boolean; message: string; info: KimiCliUpdateInfo | null; hasUpdate: boolean }>({
+  const [cliUpdateState, setCliUpdateState] = useState<{ loading: boolean; updating: boolean; progressStartedAt: number | null; progressPercent: number; progressPhase: KimiCodeInstallPhase | null; message: string; info: KimiCliUpdateInfo | null; hasUpdate: boolean }>({
     loading: false,
     updating: false,
-    message: "尚未检查 Kimi CLI 更新",
+    progressStartedAt: null,
+    progressPercent: 0,
+    progressPhase: null,
+    message: "尚未检查 Kimi Code 更新",
     info: null,
     hasUpdate: false,
   });
@@ -205,7 +210,7 @@ export function AppShell() {
   const [kimiOnboarding, setKimiOnboarding] = useState<KimiCliOnboardingState>({
     loading: true,
     available: null,
-    message: "正在检测 Kimi CLI",
+    message: "正在检测 Kimi Code",
   });
   const [kimiOnboardingDismissed, setKimiOnboardingDismissed] = useState(false);
   const [kimiInstallBusy, setKimiInstallBusy] = useState(false);
@@ -273,7 +278,7 @@ export function AppShell() {
   }, [rightPanelWidth]);
 
   const checkKimiForOnboarding = async () => {
-    setKimiOnboarding((state) => ({ ...state, loading: true, message: "正在检测 Kimi CLI" }));
+    setKimiOnboarding((state) => ({ ...state, loading: true, message: "正在检测 Kimi Code" }));
     const res = await window.api.checkKimiCli({ verify: false });
     if (res.success) {
       setKimiOnboarding({
@@ -282,8 +287,10 @@ export function AppShell() {
         message: res.data.message,
         path: res.data.path,
         output: res.data.output,
+        version: res.data.version,
+        isLegacy: res.data.isLegacy,
       });
-      if (res.data.available) setKimiOnboardingDismissed(true);
+      if (res.data.available && !res.data.isLegacy) setKimiOnboardingDismissed(true);
       return;
     }
     setKimiOnboarding({ loading: false, available: false, message: res.error });
@@ -295,12 +302,21 @@ export function AppShell() {
     setKimiOnboarding((state) => ({
       ...state,
       loading: true,
-      message: "正在一键安装 Kimi CLI，首次安装可能需要 1-2 分钟",
+      message: "正在一键安装 Kimi Code，首次安装可能需要 1-2 分钟",
     }));
+      setCliUpdateState((state) => ({
+        ...state,
+        updating: true,
+        progressStartedAt: Date.now(),
+        progressPercent: 0,
+        progressPhase: null,
+        message: "正在安装 Kimi Code，首次安装可能需要 1-2 分钟...",
+      }));
     try {
       const res = await window.api.installKimiCli();
       if (!res.success) {
         setKimiOnboarding({ loading: false, available: false, message: res.error });
+        setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `安装失败：${res.error}` }));
         return;
       }
       setKimiOnboarding({
@@ -311,9 +327,23 @@ export function AppShell() {
         output: res.data.output,
       });
       setKimiOnboardingDismissed(true);
-      showToast("Kimi CLI 已安装，接下来请执行登录");
+      showToast("Kimi Code 已安装，接下来请执行登录");
+      const cliRes = await window.api.checkKimiCliUpdate?.();
+      if (cliRes?.success) {
+        setCliUpdateState({
+          loading: false,
+          updating: false,
+          progressStartedAt: null,
+          progressPercent: 0,
+          progressPhase: null,
+          message: cliRes.data.message,
+          info: cliRes.data,
+          hasUpdate: cliRes.data.hasUpdate,
+        });
+      }
       await checkKimiForOnboarding();
     } finally {
+      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null }));
       setKimiInstallBusy(false);
     }
   };
@@ -351,6 +381,18 @@ export function AppShell() {
   useEffect(() => {
     if (typeof window.api.onDownloadUpdateProgress !== "function") return;
     return window.api.onDownloadUpdateProgress((payload) => {
+      if (payload.scope === "kimi-code") {
+        const phase = payload.phase ?? null;
+        const isBinaryDownload = phase === "binary";
+        setCliUpdateState((state) => ({
+          ...state,
+          updating: phase !== "done",
+          progressPhase: phase,
+          progressPercent: isBinaryDownload ? Math.max(0, Math.min(100, payload.percent)) : 0,
+          message: payload.message ?? state.message,
+        }));
+        return;
+      }
       setUpdateState((state) => {
         if (!state.downloading) return state;
         const percent = Math.max(0, Math.min(100, payload.percent));
@@ -390,8 +432,8 @@ export function AppShell() {
         model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,
-        afkMode: defaultAfkMode,
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -480,14 +522,14 @@ export function AppShell() {
   };
 
   const handleCheckCliUpdate = async () => {
-    setCliUpdateState((state) => ({ ...state, loading: true, message: "正在检查 Kimi CLI 最新版本..." }));
+    setCliUpdateState((state) => ({ ...state, loading: true, message: "正在检查 Kimi Code 最新版本..." }));
     if (typeof window.api.checkKimiCliUpdate !== "function") {
-      setCliUpdateState({ loading: false, updating: false, message: "CLI 更新检查接口尚未载入，请重启应用后再试", info: null, hasUpdate: false });
+      setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: "CLI 更新检查接口尚未载入，请重启应用后再试", info: null, hasUpdate: false });
       return;
     }
     const res = await window.api.checkKimiCliUpdate();
     if (!res.success) {
-      setCliUpdateState({ loading: false, updating: false, message: `CLI 检查失败：${res.error}`, info: null, hasUpdate: false });
+      setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `CLI 检查失败：${res.error}`, info: null, hasUpdate: false });
       return;
     }
     setCliUpdateState((state) => ({
@@ -497,22 +539,26 @@ export function AppShell() {
       info: res.data,
       hasUpdate: res.data.hasUpdate,
     }));
+    if (res.data.isLegacy || res.data.hasUpdate) setHelpDialog("updates");
   };
 
   const handleUpdateKimiCli = async () => {
-    setCliUpdateState((state) => ({ ...state, updating: true, message: "正在更新 Kimi CLI..." }));
+    setCliUpdateState((state) => ({ ...state, updating: true, progressStartedAt: Date.now(), progressPercent: 0, progressPhase: null, message: state.info?.isLegacy ? "正在升级到 Kimi Code，准备下载安装包..." : "正在更新 Kimi Code，准备下载安装包..." }));
     if (typeof window.api.updateKimiCli !== "function") {
-      setCliUpdateState((state) => ({ ...state, updating: false, message: "CLI 更新接口尚未载入，请重启应用后再试" }));
+      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: "CLI 更新接口尚未载入，请重启应用后再试" }));
       return;
     }
     const res = await window.api.updateKimiCli();
     if (!res.success) {
-      setCliUpdateState((state) => ({ ...state, updating: false, message: `CLI 更新失败：${res.error}` }));
+      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `CLI 更新失败：${res.error}` }));
       return;
     }
     setCliUpdateState({
       loading: false,
       updating: false,
+      progressStartedAt: null,
+      progressPercent: 0,
+      progressPhase: null,
       message: res.data.message,
       info: res.data,
       hasUpdate: res.data.hasUpdate,
@@ -555,10 +601,11 @@ export function AppShell() {
           hasUpdate: cliRes.data.hasUpdate,
         }));
       } else if (cliRes && !cliRes.success) {
-        setCliUpdateState({ loading: false, updating: false, message: `CLI 检查失败：${cliRes.error}`, info: null, hasUpdate: false });
+        setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `CLI 检查失败：${cliRes.error}`, info: null, hasUpdate: false });
       }
       if (appRes?.success && appRes.data.hasUpdate) showToast(appRes.data.message);
       if (cliRes?.success && cliRes.data.hasUpdate) showToast(cliRes.data.message);
+      if (cliRes?.success && cliRes.data.isLegacy) showToast("检测到旧版 Kimi CLI，请升级并迁移到 Kimi Code");
     })();
   }, []);
 
@@ -631,8 +678,14 @@ export function AppShell() {
     }
     if (action === "whats-new") setHelpDialog("updates");
     if (action === "keyboard-shortcuts") setHelpDialog("shortcuts");
-    if (action === "skills") setWorkspaceView("plugins");
-    if (action === "mcp") setWorkspaceView("mcp");
+    if (action === "skills") {
+      setPluginPanelTab("skills");
+      setWorkspaceView("plugins");
+    }
+    if (action === "mcp") {
+      setPluginPanelTab("mcp");
+      setWorkspaceView("plugins");
+    }
     if (["automations", "local-environments", "worktrees", "troubleshooting", "performance-trace", "toggle-file-tree", "open-browser-tab", "new-window"].includes(action)) {
       openInfoTopic(action);
     }
@@ -910,7 +963,7 @@ export function AppShell() {
         content: prompt,
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
-        afkMode: defaultAfkMode,
+        autoMode: permissionMode === "auto",
       });
       if (!res.success) throw new Error(res.error);
     } catch (err) {
@@ -1091,12 +1144,31 @@ export function AppShell() {
     showToast(res.success ? "已更新启动命令" : `设置失败：${res.error}`);
     if (res.success) setLaunchCommandDialogOpen(false);
   };
-  const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && kimiOnboarding.available === false;
-  const pluginWorkspaceActive = workspaceView === "plugins";
+  const showKimiOnboarding = !kimiOnboardingDismissed && !kimiOnboarding.loading && (kimiOnboarding.available === false || kimiOnboarding.isLegacy);
+  const needsKimiCodeSetup = kimiOnboarding.available === false || cliUpdateState.info?.available === false;
+  const hasKimiCodeUpdate = needsKimiCodeSetup || cliUpdateState.hasUpdate || Boolean(cliUpdateState.info?.isLegacy) || Boolean(kimiOnboarding.isLegacy);
+  const topUpdateLabel = updateState.hasUpdate
+    ? "升级 Kimix"
+    : needsKimiCodeSetup
+      ? "安装 Kimi Code"
+      : hasKimiCodeUpdate
+        ? "升级 Kimi Code"
+        : "升级";
+  const topUpdateMessage = updateState.hasUpdate
+    ? updateState.message
+    : needsKimiCodeSetup
+      ? "未找到 Kimi Code，点击查看安装和迁移指引"
+      : hasKimiCodeUpdate
+        ? cliUpdateState.info?.migrationHint ?? cliUpdateState.message
+        : updateState.message;
+  const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
   const hooksWorkspaceActive = workspaceView === "hooks";
-  const mcpWorkspaceActive = workspaceView === "mcp";
   const settingsWorkspaceActive = workspaceView === "settings";
   const chatWorkspaceActive = workspaceView === "chat";
+  const handlePluginTabChange = (tab: "skills" | "mcp") => {
+    setPluginPanelTab(tab);
+    if (workspaceView === "mcp") setWorkspaceView("plugins");
+  };
 
   return (
     <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
@@ -1104,8 +1176,9 @@ export function AppShell() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={toggleSidebar}
         onMenuAction={handleMenuAction}
-        hasUpdate={updateState.hasUpdate}
-        updateMessage={updateState.message}
+        hasUpdate={updateState.hasUpdate || hasKimiCodeUpdate}
+        updateMessage={topUpdateMessage}
+        updateLabel={topUpdateLabel}
         onOpenUpdates={() => setHelpDialog("updates")}
       />
 
@@ -1142,11 +1215,9 @@ export function AppShell() {
             />
           )}
           {pluginWorkspaceActive ? (
-            <SkillsPanel open onBackToChat={() => setWorkspaceView("chat")} />
+            <SkillsPanel open activeTab={workspaceView === "mcp" ? "mcp" : pluginPanelTab} onActiveTabChange={handlePluginTabChange} onBackToChat={() => setWorkspaceView("chat")} />
           ) : hooksWorkspaceActive ? (
             <HooksPanel onBackToChat={() => setWorkspaceView("chat")} />
-          ) : mcpWorkspaceActive ? (
-            <McpPanel onBackToChat={() => setWorkspaceView("chat")} />
           ) : settingsWorkspaceActive ? (
             <SettingsPanel variant="workspace" onBackToChat={() => setWorkspaceView("chat")} />
           ) : (
@@ -1196,7 +1267,6 @@ export function AppShell() {
             visibleSessionLongTasks={visibleSessionLongTasks}
             sessionDiffs={sessionDiffs}
             defaultPlanMode={defaultPlanMode}
-            defaultAfkMode={defaultAfkMode}
             buildNextLongTaskPrompt={buildNextLongTaskPrompt}
             onClose={() => setLongTaskInspectorOpen(false)}
             onPatchLongTaskMeta={patchLongTaskMeta}
@@ -1232,6 +1302,8 @@ export function AppShell() {
         showKimiOnboarding={showKimiOnboarding}
         kimiOnboardingMessage={kimiOnboarding.message}
         kimiInstallBusy={kimiInstallBusy}
+        kimiInstallPercent={cliUpdateState.progressPercent}
+        kimiInstallPhase={cliUpdateState.progressPhase}
         onKimiDismiss={() => setKimiOnboardingDismissed(true)}
         onKimiInstall={installKimiCliFromOnboarding}
         onKimiCheck={checkKimiForOnboarding}
@@ -1254,6 +1326,7 @@ export function AppShell() {
         onOpenLatestRelease={handleOpenLatestRelease}
         onCheckUpdates={handleCheckUpdates}
         onUpdateKimiCli={handleUpdateKimiCli}
+        onInstallKimiCli={installKimiCliFromOnboarding}
         onCheckCliUpdate={handleCheckCliUpdate}
       />
     </div>

@@ -85,7 +85,6 @@ export function LongTasksPanel() {
   const setOpen = useAppStore((s) => s.setLongTasksOpen);
   const currentProject = useAppStore((s) => s.currentProject);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -129,7 +128,7 @@ export function LongTasksPanel() {
         initialRequest: initialRequest.trim(),
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
-        afkMode: defaultAfkMode,
+        autoMode: permissionMode === "auto",
       });
       if (!res.success) throw new Error(res.error);
 
@@ -147,7 +146,7 @@ export function LongTasksPanel() {
         content: buildPlanningKickoffPrompt(res.data),
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
-        afkMode: defaultAfkMode,
+        autoMode: permissionMode === "auto",
       });
       if (!kickoff.success) {
         setRunningSessionId(null);

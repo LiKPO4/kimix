@@ -59,7 +59,6 @@ interface LongTaskInspectorPanelProps {
   visibleSessionLongTasks: LongTaskSummary[];
   sessionDiffs: { id: string; filePath: string; additions: number; deletions: number; timestamp: number }[];
   defaultPlanMode: boolean;
-  defaultAfkMode: boolean;
   buildNextLongTaskPrompt: () => string;
   onClose: () => void;
   onPatchLongTaskMeta: (
@@ -105,7 +104,6 @@ export function LongTaskInspectorPanel({
   visibleSessionLongTasks,
   sessionDiffs,
   defaultPlanMode,
-  defaultAfkMode,
   buildNextLongTaskPrompt,
   onClose,
   onPatchLongTaskMeta,
@@ -611,12 +609,6 @@ export function LongTaskInspectorPanel({
                   <span className="font-medium text-accent-primary">Plan 模式</span>
                   <span className="rounded-full bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
                     {defaultPlanMode ? "已开启" : "已关闭"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-surface-elevated" style={{ gap: 12, padding: "11px 12px" }}>
-                  <span className="font-medium text-accent-primary">自动模式</span>
-                  <span className="rounded-full bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                    {defaultAfkMode ? "已开启" : "已关闭"}
                   </span>
                 </div>
               </div>

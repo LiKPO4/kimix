@@ -1,36 +1,33 @@
-# Kimix v2.8.73 Release Notes
+# Kimix v2.8.106 Release Notes
 
-## 重大更新
+## 中型更新：适配 Kimi Code 0.6.0
 
-### 前端架构重构
-- 从 `App.tsx` 提取 9 个自定义 Hooks，彻底解耦业务逻辑与 UI 渲染
-- 将 `AppShell.tsx`（3069 行）拆分为专注子组件：`TopMenuBar`、`SessionToolbar`、`DialogSystem`、`ToastSystem`、`ResizeHandle`、`LongTaskInspectorPanel`、`DiffPanel`
-- 新增 Zustand 选择器与派生 Hooks（`useLiveSession`、`useSessionDiffs`），消除过度订阅导致的重渲染
-- 引入 Vitest 测试基础设施，为核心工具函数建立单元测试防护网
+本次更新围绕官方新版 Kimi Code 0.6.0 做兼容适配，修复迁移后影响日常使用的核心链路，并同步优化部分高频界面。
 
-### 视觉设计系统（Phase 5）
-- 建立统一的 "Warm Paper Editorial + Blue Precision" 设计 Token 体系
-- 纸张底色 `#F5F2EB` + 明亮蓝 `#1982ff` + 暖栗 `#B85C38` 配色方案
-- 引入霞鹜文楷界面字体 + JetBrains Mono 代码字体
-- 核心组件全面视觉升级：`Composer`、`MessageBubble`、`Sidebar`、`ChatThread`、`SettingsPanel`
-- 完整深色模式映射，对比度与质感全面优化
+### Kimi Code 0.6.0 兼容
+- 适配新版 prompt-mode 行为，连续对话改用实测稳定的 `--continue` 恢复会话。
+- 支持新版思考内容回读：从 `.kimi-code/sessions/.../agents/main/wire.jsonl` 读取 `think` 片段，并补发到前端。
+- 修复 prompt-mode 成功结束后缺少完成事件的问题，避免对话状态停留在运行中。
+- 权限模式按官方新版收敛为手动审批、自动权限、完全访问，并清理旧 AFK 链路。
 
-### 设置面板修复
-- 统一所有卡片背景色，消除深浅不一的混乱
-- 修复两列布局：采用独立 Flex 双列，避免 Grid 拉伸导致的错位
-- 标题行统一高度（36px）+ 垂直居中，含右侧按钮时也对齐
+### 套餐用量修复
+- 修复底部套餐用量刷新失败。
+- OAuth refresh token 请求改为 `application/x-www-form-urlencoded`，匹配官方接口要求。
+- 刷新失败时保留服务端错误摘要，便于后续定位登录或接口问题。
 
-### Kimi Agent Tracing Visualizer 集成
-- 套餐用量面板新增「使用详情」按钮
-- 自动检测并启动 `kimi vis --no-open`，3 秒后自动打开浏览器
-- Windows 兼容的 `spawn` 实现（`detached: true` + `stdio: "ignore"`）
-- Toast 实时反馈启动和打开状态
+### 思考展开与消息稳定性
+- 新发较长思考问题时，“正在思考 / 已处理”可展开查看新版 Kimi Code 的 thinking 内容。
+- 补齐新版历史回放解析，减少升级后旧会话和新会话展示不一致。
+- 对 prompt-mode 结束状态做兜底，提升整体对话流稳定性。
 
-### 其他改进
-- 前景面板颜色提亮，与背景形成更清晰的视觉层次
-- 轮次通知与变更卡片渲染优化
+### 界面细节
+- 输入区加号小浮层从 372px 收窄到 260px，减少宽浮层遮挡。
+- 画板比例按钮和需求澄清分段控件同步收窄，保持紧凑场景下的可读性。
+- 继续遵守 Kimix 留白规则，避免紧凑浮层内按钮、文案和边框贴边。
 
 ## 验证
 
-- 已通过 `pnpm build` 和 `pnpm test:run`
+- 已通过 `pnpm build`
+- 已通过 `git diff --check`
+- 套餐用量、思考展开和加号小浮层已经完成用户侧验收
 - 发布产物由 GitHub Actions 自动构建和发布，请以 CI 产物为准

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode } from "@/types/ui";
@@ -12,6 +12,18 @@ type FreezeReport = {
 };
 
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
+const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
+
+type KimiAuthStatus = {
+  available: boolean;
+  path?: string;
+  loggedIn: boolean;
+  configPath: string;
+  mcpConfigPath: string;
+  defaultModel: string | null;
+  defaultThinking: boolean;
+  message: string;
+};
 
 function formatFreezeTime(value: string) {
   const date = new Date(value);
@@ -63,6 +75,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const sessions = useSessionStore((s) => s.sessions);
   const restoreSession = useSessionStore((s) => s.restoreSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
+  const [auth, setAuth] = useState<KimiAuthStatus | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
   const [connection, setConnection] = useState<{
     loading: boolean;
     available: boolean | null;
@@ -70,13 +86,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     message: string;
     path?: string;
     output?: string;
-  }>({ loading: true, available: null, verified: false, message: "正在查找 Kimi CLI" });
+  }>({ loading: true, available: null, verified: false, message: "正在查找 Kimi Code" });
 
   const checkConnection = async (verify = false) => {
     setConnection((current) => ({
       ...current,
       loading: true,
-      message: verify ? "正在检查 Kimi CLI 响应" : "正在查找 Kimi CLI",
+      message: verify ? "正在检查 Kimi Code 响应" : "正在查找 Kimi Code",
     }));
     const res = await window.api.checkKimiCli({ verify });
     if (res.success) {
@@ -91,6 +107,67 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     setConnection({ loading: false, available: false, verified: false, message: res.error });
+  };
+
+  const refreshAuth = async () => {
+    setAuthLoading(true);
+    const res = await window.api.getKimiAuthStatus();
+    setAuthLoading(false);
+    if (res.success) {
+      setAuth(res.data);
+      return;
+    }
+    setAuth({
+      available: false,
+      loggedIn: false,
+      configPath: "",
+      mcpConfigPath: "",
+      defaultModel: null,
+      defaultThinking: false,
+      message: `读取登录状态失败：${res.error}`,
+    });
+  };
+
+  const handleLogin = async () => {
+    setAuthBusyAction("login");
+    const res = await window.api.loginKimi();
+    setAuthBusyAction(null);
+    if (res.success) {
+      setAuth(res.data);
+      window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
+      return;
+    }
+    setAuth((current) => ({
+      available: current?.available ?? false,
+      loggedIn: current?.loggedIn ?? false,
+      path: current?.path,
+      configPath: current?.configPath ?? "",
+      mcpConfigPath: current?.mcpConfigPath ?? "",
+      defaultModel: current?.defaultModel ?? null,
+      defaultThinking: current?.defaultThinking ?? false,
+      message: `登录失败：${res.error}`,
+    }));
+  };
+
+  const handleLogout = async () => {
+    setAuthBusyAction("logout");
+    const res = await window.api.logoutKimi();
+    setAuthBusyAction(null);
+    if (res.success) {
+      setAuth(res.data);
+      window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
+      return;
+    }
+    setAuth((current) => ({
+      available: current?.available ?? false,
+      loggedIn: current?.loggedIn ?? false,
+      path: current?.path,
+      configPath: current?.configPath ?? "",
+      mcpConfigPath: current?.mcpConfigPath ?? "",
+      defaultModel: current?.defaultModel ?? null,
+      defaultThinking: current?.defaultThinking ?? false,
+      message: `退出失败：${res.error}`,
+    }));
   };
 
   const loadFreezeReports = () => {
@@ -120,8 +197,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   useEffect(() => {
     if (settingsOpen || variant === "workspace") {
       void checkConnection(false);
+      void refreshAuth();
       loadFreezeReports();
     }
+  }, [settingsOpen, variant]);
+
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      if (settingsOpen || variant === "workspace") void refreshAuth();
+    };
+    window.addEventListener(KIMI_AUTH_CHANGED_EVENT, handleAuthChanged);
+    return () => window.removeEventListener(KIMI_AUTH_CHANGED_EVENT, handleAuthChanged);
   }, [settingsOpen, variant]);
 
   if (!settingsOpen && variant === "modal") return null;
@@ -134,7 +220,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
     { value: "manual", label: "手动审批", desc: "每次工具调用都需要确认", icon: Shield, tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
-    { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动批准同类请求", icon: Zap, tooltip: "本会话允许：同类工具请求在当前会话内自动批准，减少重复确认。" },
+    { value: "auto", label: "自动权限", desc: "自动处理审批，不再向用户提问", icon: Zap, tooltip: "自动权限：使用官方 auto 权限模式，自动处理工具审批，且 Agent 不再向用户提问。" },
     { value: "yolo", label: "完全访问", desc: "自动批准所有工具请求（谨慎使用）", icon: GitBranch, tooltip: "完全访问：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
   ];
   const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [
@@ -145,6 +231,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const archivedSessions = sessions
     .filter((session) => session.archivedAt)
     .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
+  const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, 8);
+  const hiddenArchivedCount = Math.max(0, archivedSessions.length - 8);
 
   const handleRestoreSession = (sessionId: string) => {
     restoreSession(sessionId);
@@ -237,6 +325,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-desc">适合调试上下文增长，会在对话中多次显示状态胶囊</div>
                     </div>
                   </button>
+                  <button onClick={() => setStatusUpdateDisplay("never")} className={`kimix-settings-permission ${statusUpdateDisplay === "never" ? "is-active" : ""}`}>
+                    <SelectionIndicator selected={statusUpdateDisplay === "never"} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">永不显示</div>
+                      <div className="kimix-settings-permission-desc">对话中完全隐藏 Tokens 和 Context 信息</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -245,7 +340,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <MessageSquare size={16} className="text-text-muted" />
                   <span>新对话建议</span>
                 </div>
-                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
+                <div className={`kimix-settings-card ${sessionRecommendationEnabled ? "is-active" : ""}`} style={{ padding: "18px 16px" }}>
                   <button
                     type="button"
                     onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
@@ -254,12 +349,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   >
                     <SelectionIndicator selected={sessionRecommendationEnabled} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">达到推荐轮数后提示开启新对话</div>
-                      <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
+                      <div className="kimix-settings-permission-label">达到推荐轮数后提示开启新对话</div>
+                      <div className="kimix-settings-permission-desc">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
                     </div>
                   </button>
-                  <div className="mt-5 flex items-center justify-between" style={{ gap: 14 }}>
-                    <label htmlFor="session-turn-limit" className="min-w-0 text-[14px] text-[var(--kimix-panel-text-secondary)]">推荐轮数上限</label>
+                  <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px", gap: 14, marginTop: 18, minHeight: 42 }}>
+                    <label htmlFor="session-turn-limit" className="min-w-0 text-[14px] leading-5 text-[var(--kimix-panel-text-secondary)]">推荐轮数上限</label>
                     <input
                       id="session-turn-limit"
                       type="number"
@@ -268,7 +363,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       value={sessionRecommendationTurnLimit}
                       disabled={!sessionRecommendationEnabled}
                       onChange={(event) => setSessionRecommendationTurnLimit(Number(event.target.value || 1))}
-                      className="kimix-settings-input h-9 w-24 rounded-lg text-center text-[14px] outline-none transition-colors"
+                      className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -287,7 +382,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   {archivedSessions.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 10 }}>
-                      {archivedSessions.slice(0, 8).map((session) => (
+                      {visibleArchivedSessions.map((session) => (
                         <div key={session.id} className="kimix-settings-list-item flex min-w-0 items-center" style={{ gap: 10, padding: "11px 11px" }}>
                           <MessageSquare size={15} className="shrink-0 text-text-muted" />
                           <div className="min-w-0 flex-1">
@@ -304,8 +399,16 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           </button>
                         </div>
                       ))}
-                      {archivedSessions.length > 8 && (
-                        <div className="pt-1 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">仅显示最近 8 个归档对话。</div>
+                      {hiddenArchivedCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setArchivedExpanded((current) => !current)}
+                          className="kimix-icon-text-button kimix-muted-action is-compact self-start"
+                          style={{ marginTop: 2 }}
+                        >
+                          {archivedExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          <span>{archivedExpanded ? `折叠剩余 ${hiddenArchivedCount} 个归档对话` : `展开剩余 ${hiddenArchivedCount} 个归档对话`}</span>
+                        </button>
                       )}
                     </div>
                   ) : (
@@ -322,7 +425,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <Terminal size={16} className="text-text-muted" />
                     <span>连接情况</span>
                   </div>
-                  <button onClick={() => void checkConnection(Boolean(connection.path))} disabled={connection.loading || !connection.path} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi CLI 响应" : "未找到路径，无法检查"}>
+                  <button onClick={() => void checkConnection(Boolean(connection.path))} disabled={connection.loading || !connection.path} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "未找到路径，无法检查"}>
                     <RefreshCw size={15} className={connection.loading ? "kimix-spin" : ""} />
                     <span>检查</span>
                   </button>
@@ -340,10 +443,73 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     )}
                     <div className="kimix-settings-connection-copy">
                       <div className="kimix-settings-connection-label">
-                        {connection.loading ? "检测中" : connection.verified ? "Kimi CLI 连接正常" : connection.available ? "已找到 Kimi CLI" : "Kimi CLI 未连接"}
+                        {connection.loading ? "检测中" : connection.verified ? "Kimi Code 连接正常" : connection.available ? "已找到 Kimi Code" : "Kimi Code 未连接"}
                       </div>
                       <div className="kimix-settings-connection-detail">{connection.output ?? connection.path ?? connection.message}</div>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="kimix-settings-section">
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    {auth?.loggedIn ? <ShieldCheck size={16} className="text-accent-success" /> : <ShieldX size={16} className="text-text-muted" />}
+                    <span>Kimi 登录</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void refreshAuth()}
+                    disabled={authLoading || Boolean(authBusyAction)}
+                    className="kimix-settings-check-button"
+                  >
+                    <RefreshCw size={15} className={authLoading ? "kimix-spin" : ""} />
+                    <span>刷新</span>
+                  </button>
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
+                  <div className="flex items-start" style={{ gap: 12 }}>
+                    {authLoading ? (
+                      <RefreshCw size={18} className="kimix-spin mt-0.5 shrink-0 text-text-muted" />
+                    ) : auth?.loggedIn ? (
+                      <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accent-success" />
+                    ) : (
+                      <ShieldX size={18} className="mt-0.5 shrink-0 text-accent-danger" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">
+                        {authLoading ? "正在读取登录状态" : auth?.loggedIn ? "Kimi Code 已登录" : "Kimi Code 未登录"}
+                      </div>
+                      <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                        {auth?.message ?? "登录状态会影响对话、MCP OAuth 授权和 CLI 调用。"}
+                      </div>
+                      {auth?.path && (
+                        <div className="mt-2 break-all text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{auth.path}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap" style={{ gap: 8, marginTop: 14 }}>
+                    {auth?.loggedIn ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleLogout()}
+                        disabled={Boolean(authBusyAction) || authLoading || !auth?.available}
+                        className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-danger hover:bg-accent-danger-light disabled:cursor-wait disabled:opacity-55"
+                      >
+                        <LogOut size={14} />
+                        <span>{authBusyAction === "logout" ? "退出中" : "退出登录"}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleLogin()}
+                        disabled={Boolean(authBusyAction) || authLoading || !auth?.available}
+                        className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-55"
+                      >
+                        <LogIn size={14} />
+                        <span>{authBusyAction === "login" ? "登录中" : "登录"}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -353,14 +519,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <Terminal size={16} className="text-text-muted" />
                   <span>上下文显示</span>
                 </div>
-                <button onClick={() => setDetailedContext(!detailedContext)} className={`kimix-settings-permission ${detailedContext ? "is-active" : ""}`}>
-                  <SelectionIndicator selected={detailedContext} />
-                  <Terminal size={18} className={`mt-0.5 shrink-0 ${detailedContext ? "text-accent-primary" : "text-text-muted"}`} />
-                  <div className="kimix-settings-permission-copy">
-                    <div className="kimix-settings-permission-label">上下文详细显示</div>
-                    <div className="kimix-settings-permission-desc">开启后显示 12.34/256k，关闭后显示百分比</div>
-                  </div>
-                </button>
+                <div className="kimix-settings-permissions">
+                  <button onClick={() => setDetailedContext(false)} className={`kimix-settings-permission ${!detailedContext ? "is-active" : ""}`}>
+                    <SelectionIndicator selected={!detailedContext} />
+                    <Terminal size={18} className={`mt-0.5 shrink-0 ${!detailedContext ? "text-accent-primary" : "text-text-muted"}`} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">上下文百分比显示</div>
+                      <div className="kimix-settings-permission-desc">默认选项，显示当前 Context 百分比</div>
+                    </div>
+                  </button>
+                  <button onClick={() => setDetailedContext(true)} className={`kimix-settings-permission ${detailedContext ? "is-active" : ""}`}>
+                    <SelectionIndicator selected={detailedContext} />
+                    <Terminal size={18} className={`mt-0.5 shrink-0 ${detailedContext ? "text-accent-primary" : "text-text-muted"}`} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">上下文详细显示</div>
+                      <div className="kimix-settings-permission-desc">显示 12.34/256k 这类详细用量</div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
               <div className="kimix-settings-section">
@@ -399,18 +575,23 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
                     </div>
                   </div>
-                  <div className="mt-5 flex items-center justify-between" style={{ gap: 14 }}>
-                    <label htmlFor="voice-shortcut" className="min-w-0 text-[14px] text-[var(--kimix-panel-text-secondary)]">快捷键</label>
-                    <input
-                      id="voice-shortcut"
-                      type="text"
-                      value={voiceShortcut}
-                      onChange={(event) => setVoiceShortcut(event.target.value)}
-                      placeholder="Win+H"
-                      className="kimix-settings-input h-9 w-40 rounded-lg text-center text-[14px] outline-none transition-colors"
-                    />
+                  <div className="min-w-0" style={{ marginTop: 18 }}>
+                    <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 14, minHeight: 36 }}>
+                      <label htmlFor="voice-shortcut" className="min-w-0 text-[14px] leading-5 text-[var(--kimix-panel-text-secondary)]">快捷键</label>
+                      <input
+                        id="voice-shortcut"
+                        type="text"
+                        value={voiceShortcut}
+                        onChange={(event) => setVoiceShortcut(event.target.value)}
+                        placeholder="Win+H"
+                        className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                      />
+                    </div>
+                    <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 14, marginTop: 6 }}>
+                      <div aria-hidden="true" />
+                      <div className="kimix-settings-hint text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V</div>
+                    </div>
                   </div>
-                  <div className="kimix-settings-hint mt-3 text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V、F8</div>
                 </div>
               </div>
 
@@ -437,7 +618,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   {freezeReports.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 10 }}>
-                      {freezeReports.map((report, index) => (
+                      {freezeReports.slice(0, 8).map((report, index) => (
                         <div key={`${report.at}-${index}`} className="kimix-settings-list-item" style={{ padding: "12px 12px" }}>
                           <div className="flex min-w-0 items-center justify-between" style={{ gap: 10 }}>
                             <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{formatFreezeTime(report.at)}</div>
@@ -451,6 +632,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           </div>
                         </div>
                       ))}
+                      {freezeReports.length > 8 && (
+                        <div className="pt-1 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">仅显示最近 8 条卡死诊断记录。</div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">暂无卡死诊断记录。</div>
@@ -460,7 +644,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.73 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.106 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

@@ -1,6 +1,33 @@
 # Kimix 长程任务状态
 
 ## 当前目标
+适配 Kimi Code 0.6.0 官方变更，按优先级完成 Kimix 兼容修正。
+
+## 当前优先级 Todo
+1. [x] P0：确认官方 0.6.0 CLI 行为，验证 prompt-mode 是否可用 `--session` 续会话。
+2. [x] P1：实现 prompt-mode 连续对话恢复，当前采用实测可用的 `--continue`，避开 Windows 下 `--session <id> -p` 误报 different directory。
+3. [x] P2：补齐 `auto` 权限模式到类型、设置、输入框和会话启动参数。
+4. [x] P3：增加官方导出能力入口：会话侧栏支持导出 Kimi Debug ZIP，后端调用官方 `kimi export`。
+5. [x] P4：补插件来源与信任级别展示，Skill 扫描覆盖 `.kimi-code/skills` 与 `.kimi-code/plugins`，插件页显示 Kimi 官方 / 精选 / 第三方 / 本地徽章。
+6. [x] P5：接入 `KIMI_MODEL_*` 高级模型环境变量透传；prompt 模式继承进程环境，wire 模式显式传入匹配变量。
+7. [x] P6：评估官方定时任务能力；当前 0.6.0 帮助中未暴露任务管理 CLI/API，暂不新增伪 UI，继续保留 Kimix 长程任务能力。
+8. [ ] P7：构建、空白检查、重启 dev 并等待用户视觉验收。
+9. [x] P8：权限模式按官方 0.6.0 收敛为手动审批 / 自动权限 / 完全访问；移除输入框加号菜单旧 AFK 自动模式，并清理底层 `--afk` / `KIMIX_KIMI_AFK` 链路。
+10. [x] P9：支持 Kimi Code 0.6.0 新版思考内容展开；prompt-mode 从新版 `agents/main/wire.jsonl` 回读本轮 `content.part` 的 `think`，并补齐新版历史回放解析。
+
+## 当前版本
+**v2.8.106** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+
+## 本轮证据
+- 官方 changelog/npm/本机均确认 Kimi Code 最新为 `0.6.0`。
+- 实测 `kimi --session <session_id> --output-format stream-json -p ...` 仍会误报 different directory。
+- 实测 `kimi --continue --output-format stream-json -p ...` 可恢复最近会话并返回同一 `session.resume_hint`。
+- 实测 `kimi --output-format stream-json -p ...` 的 stdout 只返回 assistant 正文和 `session.resume_hint`；新版思考内容落在 `.kimi-code/sessions/wd_<project>_<hash>/session_<id>/agents/main/wire.jsonl` 的 `context.append_loop_event` / `content.part` / `part.type="think"`。
+- `pnpm build` 通过；`git diff --check` 通过（仅 Git 的 LF/CRLF warning）。
+- v2.8.105：输入区加号小浮层宽度从 372px 缩到 260px；画板比例按钮改为 38px 固定宽度，需求澄清分段控件同步收窄，保持现有行数不换行。
+- v2.8.106：修复套餐用量查询失败。根因是 Kimi Code 0.6.0 的 OAuth refresh token 接口要求 `application/x-www-form-urlencoded`，Kimix 旧实现发送 JSON 导致 HTTP 400 `unsupported_grant_type`；已改为和官方 CLI 一致的 form body，并在刷新失败时带出服务端错误摘要。
+
+## 历史目标
 v2.8.56 待验收：隐藏规则创建 agent 内部会话，避免 prompt/JSON 暴露到侧栏和主对话。
 
 ## 当前版本

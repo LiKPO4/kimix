@@ -372,7 +372,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
           <button
             type="button"
             onClick={() => startCreate()}
-            className="kimix-icon-text-button is-compact bg-[var(--accent-blue)] text-white shadow-[0_6px_16px_rgba(51,154,240,0.20)] hover:bg-accent-primary-dark"
+            className="kimix-icon-text-button is-compact bg-accent-primary text-white shadow-[0_6px_16px_rgba(51,154,240,0.20)] hover:bg-accent-primary-dark"
             style={{ paddingLeft: 14, paddingRight: 14 }}
           >
             <Plus size={15} />
@@ -429,7 +429,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 type="button"
                 onClick={() => void generateDraft()}
                 disabled={generating || !naturalLanguage.trim()}
-                className="kimix-icon-text-button justify-center rounded-lg bg-[var(--accent-blue)] text-white disabled:cursor-wait disabled:opacity-60"
+                className="kimix-icon-text-button justify-center rounded-lg bg-accent-primary text-white disabled:cursor-wait disabled:opacity-60"
               >
                 {generating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                 <span>{generating ? "Agent 生成中" : "生成规则草稿"}</span>
@@ -458,7 +458,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 draftRule,
                 updateDraft,
                 handleDraftScope,
-                <button type="button" onClick={() => void saveDraftRule()} disabled={saving || generating} className="kimix-icon-text-button justify-center rounded-lg bg-[var(--accent-blue)] text-white disabled:cursor-wait disabled:opacity-60">
+                <button type="button" onClick={() => void saveDraftRule()} disabled={saving || generating} className="kimix-icon-text-button justify-center rounded-lg bg-accent-primary text-white disabled:cursor-wait disabled:opacity-60">
                   <Check size={15} />
                   <span>{saving ? "保存中" : "创建并保存"}</span>
                 </button>,
@@ -577,7 +577,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                       (patch) => updateRule(selectedRule.id, patch),
                       handleSelectedScope,
                       <div className="flex flex-col" style={{ gap: 12 }}>
-                        <button type="button" onClick={() => void saveSelectedRule()} disabled={saving} className="kimix-icon-text-button justify-center rounded-lg bg-[var(--accent-blue)] text-white disabled:cursor-wait disabled:opacity-60">
+                        <button type="button" onClick={() => void saveSelectedRule()} disabled={saving} className="kimix-icon-text-button justify-center rounded-lg bg-accent-primary text-white disabled:cursor-wait disabled:opacity-60">
                           <Check size={15} />
                           <span>{saving ? "保存中" : "保存规则"}</span>
                         </button>

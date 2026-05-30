@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, RotateCw, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -20,13 +20,13 @@ function hasDraggedFiles(event: React.DragEvent): boolean {
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; tooltip: string }[] = [
   { value: "manual", label: "手动审批", desc: "每次操作都需要确认", tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
-  { value: "approve_for_session", label: "本会话允许", desc: "当前会话内自动允许", tooltip: "本会话允许：同类工具请求在当前会话内自动批准，减少重复确认。" },
+  { value: "auto", label: "自动权限", desc: "自动处理审批", tooltip: "自动权限：使用官方 auto 权限模式，自动处理工具审批，且 Agent 不再向用户提问。" },
   { value: "yolo", label: "完全访问权限", desc: "无需确认，直接执行", tooltip: "完全访问权限：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
 ];
 
 const permissionMenuIcons = {
   manual: Hand,
-  approve_for_session: RotateCw,
+  auto: Brain,
   yolo: ShieldAlert,
 };
 
@@ -120,8 +120,6 @@ export function Composer() {
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
-  const setDefaultAfkMode = useAppStore((s) => s.setDefaultAfkMode);
   const hiddenComposerCards = useAppStore((s) => s.hiddenComposerCards);
   const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
@@ -350,8 +348,8 @@ export function Composer() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
       planMode: defaultPlanMode,
-      afkMode: defaultAfkMode,
     });
     if (!sessionRes.success) return null;
     setSlashCommands((sessionRes.data.slashCommands ?? []).map((command) => ({
@@ -422,8 +420,8 @@ export function Composer() {
       images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
       planMode: defaultPlanMode,
-      afkMode: defaultAfkMode,
     });
     try {
       let res = await sendToRuntime(runtimeSessionId);
@@ -434,8 +432,8 @@ export function Composer() {
           model: "kimi-code/kimi-for-coding",
           thinking: defaultThinking,
           yoloMode: permissionMode === "yolo",
+          autoMode: permissionMode === "auto",
           planMode: defaultPlanMode,
-          afkMode: defaultAfkMode,
         });
         if (!startRes.success) throw new Error(startRes.error);
         runtimeSessionId = startRes.data.sessionId;
@@ -543,8 +541,8 @@ export function Composer() {
       model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
       planMode: defaultPlanMode,
-      afkMode: defaultAfkMode,
       skillsDir: saveRes.data.enabledDir,
     });
     if (!startRes.success) {
@@ -728,14 +726,6 @@ export function Composer() {
     }));
   };
 
-  const handleToggleAfkMode = () => {
-    const next = !defaultAfkMode;
-    setDefaultAfkMode(next);
-    window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: next ? "自动模式已开启" : "自动模式已关闭",
-    }));
-  };
-
   const handleDragOver = (e: React.DragEvent) => {
     if (!hasDraggedFiles(e)) return;
     e.preventDefault();
@@ -867,7 +857,7 @@ export function Composer() {
 
   const permissionLabel = {
     manual: "手动审批",
-    approve_for_session: "本会话允许",
+    auto: "自动权限",
     yolo: "完全访问权限",
   }[permissionMode];
 
@@ -1128,23 +1118,24 @@ export function Composer() {
                 <Plus size={18} />
               </button>
               {showAddMenu && (
-                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[372px] rounded-xl" style={{ padding: "16px 16px 15px" }}>
+                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[260px] rounded-xl" style={{ padding: "14px 14px 14px" }}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
                     <section>
-                      <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 10 }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <Palette size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span>画板</span>
                         </div>
                         <span className="shrink-0 text-[12.5px] text-[var(--kimix-panel-text-muted)]">新建空白画布</span>
                       </div>
-                      <div className="grid grid-cols-5" style={{ gap: 8 }}>
+                      <div className="grid justify-between" style={{ gridTemplateColumns: "repeat(5, 38px)", gap: 6 }}>
                         {DRAWING_BOARD_RATIOS.map((ratio) => (
                           <button
                             key={ratio}
                             type="button"
                             onClick={() => openBlankDrawingBoard(ratio)}
                             className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-text-secondary hover:bg-[var(--kimix-panel-hover)]"
+                            style={{ width: 38, paddingLeft: 0, paddingRight: 0 }}
                           >
                             {ratio}
                           </button>
@@ -1153,12 +1144,12 @@ export function Composer() {
                     </section>
 
                     <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
-                      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span>需求澄清</span>
                         </div>
-                        <div className="flex w-[158px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ gap: 4, padding: 4 }}>
+                        <div className="flex w-[132px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ gap: 4, padding: 4 }}>
                           {CLARIFICATION_OPTIONS.map((option) => {
                             const active = clarificationToolMode === option.value;
                             return (
@@ -1168,43 +1159,6 @@ export function Composer() {
                                 title={option.desc}
                                 onClick={() => handleSetClarificationToolMode(option.value)}
                                 className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
-                      <div className="flex items-center justify-between" style={{ gap: 12 }}>
-                        <div
-                          className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]"
-                          title="自动模式会按 AFK 行为自动跳过用户提问并自动批准工具调用。"
-                        >
-                          <Bot size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-                          <span>自动模式</span>
-                        </div>
-                        <div
-                          className="flex w-[158px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]"
-                          style={{ gap: 4, padding: 4 }}
-                          title="自动模式会按 AFK 行为自动跳过用户提问并自动批准工具调用。"
-                        >
-                          {[
-                            { value: false, label: "关闭" },
-                            { value: true, label: "开启" },
-                          ].map((option) => {
-                            const active = defaultAfkMode === option.value;
-                            return (
-                              <button
-                                key={String(option.value)}
-                                type="button"
-                                onClick={() => {
-                                  if (defaultAfkMode !== option.value) handleToggleAfkMode();
-                                }}
-                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
-                                aria-pressed={active}
                               >
                                 {option.label}
                               </button>

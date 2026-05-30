@@ -1,5 +1,15 @@
 import type { TimelineEvent } from "@/types/ui";
 
+export function isLegacyKimiWorkDirError(message: string) {
+  return /unknown option\s+['"]?--work-dir['"]?/i.test(message);
+}
+
+export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[] {
+  return events.filter((event) => (
+    event.type !== "error" || !isLegacyKimiWorkDirError(event.message)
+  ));
+}
+
 export function latestAssistantContent(events: TimelineEvent[]) {
   return [...events].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
     event.type === "assistant_message" && event.content.trim().length > 0

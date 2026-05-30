@@ -1,8 +1,9 @@
 ﻿import {
   createSession,
-  listSessions,
-  parseSessionEvents,
+  createKimiPaths,
+  parseEventPayload,
   type Session,
+  type SessionInfo,
   type Turn,
   type StreamEvent,
   type ApprovalResponse,
@@ -12,31 +13,426 @@
   parseRequestPayload,
 } from "@moonshot-ai/kimi-agent-sdk";
 import type { BrowserWindow } from "electron";
-import { exec } from "node:child_process";
+import { exec, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { TextDecoder } from "node:util";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import type { HookRule, HookRunLogEntry } from "./types/ipc";
 
+type PromptModeSession = {
+  sessionId: string;
+  cliSessionId?: string;
+  workDir: string;
+  model?: string;
+  thinking: boolean;
+  yoloMode: boolean;
+  autoMode: boolean;
+  planMode: boolean;
+  skillsDir?: string;
+  agentFile?: string;
+  continueNextPrompt: boolean;
+};
+
 const activeSessions = new Map<string, Session>();
 const activeTurns = new Map<string, Turn>();
+const promptModeSessions = new Map<string, PromptModeSession>();
+const activePromptProcesses = new Map<string, ChildProcessWithoutNullStreams>();
 const sendingLocks = new Set<string>();
 const interruptedTurns = new WeakSet<Turn>();
 const HIDDEN_SESSION_PREFIXES = ["kimix-hidden-hooks-"];
 const CLARIFICATION_ORIGINAL_MARKER = "\n\n用户原始需求：\n";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function defaultKimiCodeShareDir() {
+  return path.join(os.homedir(), ".kimi-code");
+}
+
+function legacyKimiShareDir() {
+  return path.join(os.homedir(), ".kimi");
+}
+
+function resolveKimiShareDir() {
+  if (process.env.KIMI_SHARE_DIR) return process.env.KIMI_SHARE_DIR;
+  const current = defaultKimiCodeShareDir();
+  const legacy = legacyKimiShareDir();
+  if (fs.existsSync(current)) return current;
+  if (fs.existsSync(legacy)) return legacy;
+  return current;
+}
+
+function candidateKimiShareDirs() {
+  const dirs = process.env.KIMI_SHARE_DIR
+    ? [process.env.KIMI_SHARE_DIR]
+    : [defaultKimiCodeShareDir(), legacyKimiShareDir()];
+  return Array.from(new Set(dirs));
+}
+
+function collectKimiModelEnv() {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(([key, value]) => (
+      key.startsWith("KIMI_MODEL_") && typeof value === "string"
+    ))
+  ) as Record<string, string>;
+}
+
+let kimiWireSupportPromise: Promise<boolean> | null = null;
+
+function supportsKimiWireMode() {
+  if (kimiWireSupportPromise) return kimiWireSupportPromise;
+  kimiWireSupportPromise = new Promise((resolve) => {
+    const child = spawn("kimi", ["--wire"], { cwd: os.homedir(), windowsHide: true });
+    let output = "";
+    const done = (supported: boolean) => {
+      clearTimeout(timer);
+      child.removeAllListeners();
+      if (!child.killed) {
+        try { child.kill(); } catch {}
+      }
+      resolve(supported);
+    };
+    const timer = setTimeout(() => done(true), 1200);
+    child.stdout.on("data", (data) => { output += data.toString(); });
+    child.stderr.on("data", (data) => { output += data.toString(); });
+    child.on("error", () => done(false));
+    child.on("exit", () => {
+      done(!/unknown option ['"]?--wire/i.test(output));
+    });
+  });
+  return kimiWireSupportPromise;
+}
+
+function contentToPromptText(content: string | ContentPart[]) {
+  if (typeof content === "string") return content;
+  return content
+    .map((part) => {
+      if (part && typeof part === "object" && "type" in part && part.type === "text" && "text" in part && typeof part.text === "string") return part.text;
+      if (part && typeof part === "object" && "type" in part && part.type === "image_url") return "[图片]";
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function readSessionMetadata(sessionDir: string): { title?: string } | null {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(sessionDir, "metadata.json"), "utf-8")) as { title?: string };
+  } catch {
+    return null;
+  }
+}
+
+function stripFileTags(text: string) {
+  return text
+    .replace(/<uploaded_files>[\s\S]*?<\/uploaded_files>\s*/g, "")
+    .replace(/<document[^>]*>[\s\S]*?<\/document>\s*/g, "")
+    .replace(/<image[^>]*>[\s\S]*?<\/image>\s*/g, "")
+    .trim();
+}
+
+function extractUserText(userInput: unknown) {
+  if (typeof userInput === "string") return stripFileTags(userInput);
+  if (Array.isArray(userInput)) {
+    return stripFileTags(userInput
+      .filter((part): part is { type: string; text: string } => (
+        part && typeof part === "object" &&
+        (part as { type?: unknown }).type === "text" &&
+        typeof (part as { text?: unknown }).text === "string"
+      ))
+      .map((part) => part.text)
+      .join("\n"));
+  }
+  return "";
+}
+
+async function getFirstUserMessage(wireFile: string) {
+  try {
+    const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      try {
+        const record = JSON.parse(line) as { message?: { type?: string; payload?: { user_input?: unknown } } };
+        if (record.message?.type !== "TurnBegin") continue;
+        const text = extractUserText(record.message.payload?.user_input);
+        if (text) {
+          rl.close();
+          stream.destroy();
+          return text;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // Ignore unreadable history files.
+  }
+  return "";
+}
+
+function sanitizeKimiWorkDirName(workDir: string) {
+  const base = path.basename(path.resolve(workDir)).toLowerCase() || "default-project";
+  return base.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "default-project";
+}
+
+function kimiWorkDirBucketNames(workDir: string) {
+  const resolved = path.resolve(workDir);
+  const normalized = resolved.replace(/\\/g, "/");
+  const variants = Array.from(new Set([normalized, resolved]));
+  return variants.map((value) => {
+    const hash = createHash("sha256").update(value).digest("hex").slice(0, 12);
+    return `wd_${sanitizeKimiWorkDirName(workDir)}_${hash}`;
+  });
+}
+
+function kimiSessionDirNames(sessionId: string) {
+  const bare = sessionId.replace(/^(session_|ses_)/, "");
+  return Array.from(new Set([sessionId, `session_${bare}`, `ses_${bare}`, bare]));
+}
+
+function getNewKimiWireFile(sessionDir: string) {
+  return path.join(sessionDir, "agents", "main", "wire.jsonl");
+}
+
+async function findKimiCodeSessionDir(shareDir: string, workDir: string, sessionId: string): Promise<string | null> {
+  const sessionsRoot = path.join(shareDir, "sessions");
+  const names = kimiSessionDirNames(sessionId);
+  const buckets = kimiWorkDirBucketNames(workDir);
+
+  for (const bucket of buckets) {
+    for (const name of names) {
+      const candidate = path.join(sessionsRoot, bucket, name);
+      if (fs.existsSync(getNewKimiWireFile(candidate))) return candidate;
+    }
+  }
+
+  const bucketEntries = await fsp.readdir(sessionsRoot, { withFileTypes: true }).catch(() => []);
+  for (const bucket of bucketEntries) {
+    if (!bucket.isDirectory() || !buckets.includes(bucket.name)) continue;
+    const bucketDir = path.join(sessionsRoot, bucket.name);
+    const sessionEntries = await fsp.readdir(bucketDir, { withFileTypes: true }).catch(() => []);
+    for (const entry of sessionEntries) {
+      if (!entry.isDirectory() || !names.includes(entry.name)) continue;
+      const candidate = path.join(bucketDir, entry.name);
+      if (fs.existsSync(getNewKimiWireFile(candidate))) return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function getKimiCodeSessionDirs(shareDir: string, workDir: string) {
+  const sessionsRoot = path.join(shareDir, "sessions");
+  const buckets = new Set(kimiWorkDirBucketNames(workDir));
+  const bucketEntries = await fsp.readdir(sessionsRoot, { withFileTypes: true }).catch(() => []);
+  const dirs: string[] = [];
+  for (const bucket of bucketEntries) {
+    if (!bucket.isDirectory() || !buckets.has(bucket.name)) continue;
+    const bucketDir = path.join(sessionsRoot, bucket.name);
+    const sessionEntries = await fsp.readdir(bucketDir, { withFileTypes: true }).catch(() => []);
+    for (const entry of sessionEntries) {
+      if (!entry.isDirectory() || !/^(session_|ses_)?[0-9a-f-]{36}$/i.test(entry.name)) continue;
+      const sessionDir = path.join(bucketDir, entry.name);
+      if (fs.existsSync(getNewKimiWireFile(sessionDir))) dirs.push(sessionDir);
+    }
+  }
+  return dirs;
+}
+
+function readKimiCodeSessionMetadata(sessionDir: string): { title?: string; updatedAt?: string; lastPrompt?: string } | null {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(sessionDir, "state.json"), "utf-8")) as { title?: string; updatedAt?: string; lastPrompt?: string };
+  } catch {
+    return null;
+  }
+}
+
+function parseKimiCodeRecord(record: Record<string, unknown>): StreamEvent | null {
+  if (record.message && typeof record.message === "object") {
+    const message = record.message as { type?: unknown; payload?: unknown };
+    if (typeof message.type !== "string") return null;
+    const result = parseEventPayload(message.type, message.payload);
+    return result.ok ? result.value : null;
+  }
+
+  if (record.type === "turn.prompt") {
+    return {
+      type: "TurnBegin",
+      payload: { user_input: record.input },
+      time: record.time,
+    } as unknown as StreamEvent;
+  }
+
+  if (record.type === "context.append_loop_event" && record.event && typeof record.event === "object") {
+    const event = record.event as { type?: unknown; part?: unknown; time?: unknown };
+    if (event.type === "content.part" && event.part && typeof event.part === "object") {
+      return {
+        type: "ContentPart",
+        payload: event.part,
+        time: event.time ?? record.time,
+      } as unknown as StreamEvent;
+    }
+    if (event.type === "step.end") {
+      return {
+        type: "TurnEnd",
+        payload: {},
+        time: event.time ?? record.time,
+      } as unknown as StreamEvent;
+    }
+  }
+
+  return null;
+}
+
+async function parseKimiCodeWireEvents(wireFile: string): Promise<StreamEvent[]> {
+  if (!fs.existsSync(wireFile)) return [];
+  const events: StreamEvent[] = [];
+  const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
+  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line) as Record<string, unknown>;
+      const event = parseKimiCodeRecord(record);
+      if (event) events.push(event);
+    } catch {
+      continue;
+    }
+  }
+  return events;
+}
+
+async function readLatestKimiCodeTurnThinking(shareDir: string, workDir: string, sessionId: string): Promise<StreamEvent[]> {
+  const sessionDir = await findKimiCodeSessionDir(shareDir, workDir, sessionId);
+  if (!sessionDir) return [];
+  const wireFile = getNewKimiWireFile(sessionDir);
+  const records: Array<{ turnId: string; event: StreamEvent }> = [];
+  const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
+  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line) as { type?: unknown; event?: { type?: unknown; turnId?: unknown; part?: { type?: unknown; think?: unknown }; time?: unknown }; time?: unknown };
+      const loopEvent = record.type === "context.append_loop_event" ? record.event : null;
+      if (loopEvent?.type !== "content.part" || loopEvent.part?.type !== "think" || typeof loopEvent.part.think !== "string") continue;
+      records.push({
+        turnId: typeof loopEvent.turnId === "string" ? loopEvent.turnId : "",
+        event: {
+          type: "ContentPart",
+          payload: loopEvent.part,
+          time: loopEvent.time ?? record.time,
+        } as unknown as StreamEvent,
+      });
+    } catch {
+      continue;
+    }
+  }
+  const latestTurnId = [...records].reverse().find((record) => record.turnId)?.turnId ?? records.at(-1)?.turnId;
+  return latestTurnId ? records.filter((record) => record.turnId === latestTurnId).map((record) => record.event) : [];
+}
+
+async function listSessionsFromShareDir(shareDir: string, workDir: string): Promise<SessionInfo[]> {
+  const sessionsDir = createKimiPaths(shareDir).sessionsDir(workDir);
+  const newSessionDirs = await getKimiCodeSessionDirs(shareDir, workDir);
+  const entries = await fsp.readdir(sessionsDir, { withFileTypes: true }).catch(() => []);
+  const sessions: SessionInfo[] = [];
+  for (const sessionDir of newSessionDirs) {
+    const wireFile = getNewKimiWireFile(sessionDir);
+    try {
+      const stat = await fsp.stat(wireFile);
+      if (stat.size === 0) continue;
+      const metadata = readKimiCodeSessionMetadata(sessionDir);
+      const brief = metadata?.title || metadata?.lastPrompt || await getFirstUserMessage(wireFile);
+      if (!brief) continue;
+      sessions.push({
+        id: path.basename(sessionDir),
+        workDir,
+        contextFile: wireFile,
+        updatedAt: metadata?.updatedAt ? Date.parse(metadata.updatedAt) || stat.mtimeMs : stat.mtimeMs,
+        brief,
+      });
+    } catch {
+      continue;
+    }
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !UUID_REGEX.test(entry.name)) continue;
+    const sessionDir = path.join(sessionsDir, entry.name);
+    const wireFile = path.join(sessionDir, "wire.jsonl");
+    if (!fs.existsSync(wireFile)) continue;
+    try {
+      const stat = await fsp.stat(wireFile);
+      if (stat.size === 0) continue;
+      const metadata = readSessionMetadata(sessionDir);
+      const brief = metadata?.title || await getFirstUserMessage(wireFile);
+      if (!brief) continue;
+      sessions.push({ id: entry.name, workDir, contextFile: wireFile, updatedAt: stat.mtimeMs, brief });
+    } catch {
+      continue;
+    }
+  }
+  return sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+async function parseSessionEventsFromShareDir(shareDir: string, workDir: string, sessionId: string): Promise<StreamEvent[]> {
+  const newSessionDir = await findKimiCodeSessionDir(shareDir, workDir, sessionId);
+  if (newSessionDir) {
+    const events = await parseKimiCodeWireEvents(getNewKimiWireFile(newSessionDir));
+    if (events.length > 0) return events;
+  }
+  const wireFile = path.join(createKimiPaths(shareDir).sessionDir(workDir, sessionId), "wire.jsonl");
+  if (!fs.existsSync(wireFile)) return [];
+  const events: StreamEvent[] = [];
+  const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
+  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line) as { message?: { type?: string; payload?: unknown } };
+      if (!record.message?.type) continue;
+      const result = parseEventPayload(record.message.type, record.message.payload);
+      if (result.ok) events.push(result.value);
+    } catch {
+      continue;
+    }
+  }
+  return events;
+}
 
 type PatchableProtocolClient = typeof ProtocolClient & {
   prototype: {
     __kimixQuestionRequestPatch?: boolean;
-    __kimixAfkModePatch?: boolean;
+    __kimixKimiCodeCliCompatPatch?: boolean;
+    __kimixAutoModePatch?: boolean;
     __kimixAddDirPatch?: boolean;
-    buildArgs?: (options: { environmentVariables?: Record<string, string> }) => string[];
+    buildArgs?: (options: { environmentVariables?: Record<string, string>; workDir?: string }) => string[];
     handleServerRequest?: (requestId: string, params: unknown) => void;
     pushEvent?: (event: unknown) => void;
     emitParseError?: (code: string, message: string, raw?: string) => void;
   };
 };
+
+function installKimiCodeCliCompatPatch() {
+  const proto = (ProtocolClient as PatchableProtocolClient).prototype;
+  if (proto.__kimixKimiCodeCliCompatPatch || typeof proto.buildArgs !== "function") return;
+  const original = proto.buildArgs;
+  proto.buildArgs = function patchedBuildArgs(this: PatchableProtocolClient["prototype"], options: { environmentVariables?: Record<string, string>; workDir?: string }) {
+    const args = original.call(this, options);
+    const workDirIndex = args.indexOf("--work-dir");
+    if (workDirIndex >= 0) {
+      args.splice(workDirIndex, args[workDirIndex + 1] ? 2 : 1);
+    }
+    return args;
+  };
+  proto.__kimixKimiCodeCliCompatPatch = true;
+}
+
+installKimiCodeCliCompatPatch();
 
 function installQuestionRequestPatch() {
   const proto = (ProtocolClient as PatchableProtocolClient).prototype;
@@ -66,26 +462,26 @@ function installQuestionRequestPatch() {
 
 installQuestionRequestPatch();
 
-function installAfkModePatch() {
+function installAutoModePatch() {
   const proto = (ProtocolClient as PatchableProtocolClient).prototype;
-  if (proto.__kimixAfkModePatch || typeof proto.buildArgs !== "function") return;
+  if (proto.__kimixAutoModePatch || typeof proto.buildArgs !== "function") return;
   const original = proto.buildArgs;
   proto.buildArgs = function patchedBuildArgs(this: PatchableProtocolClient["prototype"], options: { environmentVariables?: Record<string, string> }) {
     const args = original.call(this, options);
-    if (options.environmentVariables?.KIMIX_KIMI_AFK === "1" && !args.includes("--afk")) {
+    if (options.environmentVariables?.KIMIX_KIMI_AUTO === "1" && !args.includes("--auto")) {
       const wireIndex = args.indexOf("--wire");
       if (wireIndex >= 0) {
-        args.splice(wireIndex, 0, "--afk");
+        args.splice(wireIndex, 0, "--auto");
       } else {
-        args.push("--afk");
+        args.push("--auto");
       }
     }
     return args;
   };
-  proto.__kimixAfkModePatch = true;
+  proto.__kimixAutoModePatch = true;
 }
 
-installAfkModePatch();
+installAutoModePatch();
 
 function installAddDirPatch() {
   const proto = (ProtocolClient as PatchableProtocolClient).prototype;
@@ -415,8 +811,8 @@ export async function startSession(options: {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  autoMode?: boolean;
   planMode?: boolean;
-  afkMode?: boolean;
   skillsDir?: string;
   agentFile?: string;
   additionalWorkDirs?: string[];
@@ -438,15 +834,32 @@ export async function startSession(options: {
     return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
   }
 
-  const env: Record<string, string> = {};
-  if (options.afkMode) {
-    env.KIMIX_KIMI_AFK = "1";
+  const env: Record<string, string> = collectKimiModelEnv();
+  if (options.autoMode) {
+    env.KIMIX_KIMI_AUTO = "1";
   }
   const dirs = Array.from(new Set((options.additionalWorkDirs ?? settingsService.loadSettings().additionalWorkDirs ?? [])
     .map((dir) => dir.trim())
     .filter(Boolean)));
   if (dirs.length > 0) {
     env.KIMIX_KIMI_ADD_DIRS = dirs.join("\n");
+  }
+
+  if (!(await supportsKimiWireMode())) {
+    const sessionId = options.sessionId || `kimix-prompt-${randomUUID()}`;
+    promptModeSessions.set(sessionId, {
+      sessionId,
+      workDir: options.workDir,
+      model: options.model,
+      thinking: options.thinking ?? true,
+      yoloMode: options.yoloMode ?? false,
+      autoMode: options.autoMode ?? false,
+      planMode: options.planMode ?? false,
+      skillsDir: options.skillsDir,
+      agentFile: options.agentFile,
+      continueNextPrompt: Boolean(options.sessionId),
+    });
+    return { sessionId, workDir: options.workDir, slashCommands: [] };
   }
 
   const session = createSession({
@@ -459,6 +872,7 @@ export async function startSession(options: {
     env: Object.keys(env).length > 0 ? env : {},
     agentFile: options.agentFile,
     skillsDir: options.skillsDir,
+    shareDir: resolveKimiShareDir(),
   });
 
   activeSessions.set(session.sessionId, session);
@@ -473,21 +887,139 @@ export async function startSession(options: {
 }
 
 export async function setPlanMode(sessionId: string, enabled: boolean): Promise<boolean> {
+  const promptSession = promptModeSessions.get(sessionId);
+  if (promptSession) {
+    promptSession.planMode = enabled;
+    return enabled;
+  }
   const session = activeSessions.get(sessionId);
   if (!session) throw new Error("Session not found");
   return session.setPlanMode(enabled);
 }
 
 export async function getSlashCommands(sessionId: string): Promise<SlashCommandInfo[]> {
+  if (promptModeSessions.has(sessionId)) return [];
   const session = activeSessions.get(sessionId);
   if (!session) throw new Error("Session not found");
   await warmSessionMetadata(session);
   return session.slashCommands;
 }
 
-export async function sendPrompt(sessionId: string, content: string | ContentPart[], options?: { thinking?: boolean; yoloMode?: boolean; planMode?: boolean; afkMode?: boolean }) {
+function buildPromptModeArgs(session: PromptModeSession, prompt: string) {
+  const args: string[] = [];
+  if (session.model) args.push("--model", session.model);
+  if (session.skillsDir) args.push("--skills-dir", session.skillsDir);
+  if (session.continueNextPrompt) args.push("--continue");
+  args.push("--output-format", "stream-json", "-p", prompt);
+  return args;
+}
+
+function runPromptModeTurn(sessionId: string, session: PromptModeSession, prompt: string, gitBaseline: TurnGitBaseline) {
+  const child = spawn("kimi", buildPromptModeArgs(session, prompt), {
+    cwd: session.workDir,
+    windowsHide: true,
+    env: {
+      ...process.env,
+    },
+  });
+  activePromptProcesses.set(sessionId, child);
+  sendStatus(sessionId, "running");
+
+  let stdoutBuffer = "";
+  let stderr = "";
+  let assistantText = "";
+  const flushLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    try {
+      const record = JSON.parse(trimmed) as { role?: string; content?: string; type?: string; session_id?: string };
+      if (record.role === "assistant" && typeof record.content === "string") {
+        assistantText += record.content;
+        sendEvent(sessionId, { type: "ContentPart", payload: { type: "text", text: record.content } });
+      }
+      if (record.role === "meta" && record.type === "session.resume_hint" && typeof record.session_id === "string") {
+        session.cliSessionId = record.session_id;
+        session.continueNextPrompt = true;
+      }
+    } catch {
+      assistantText += `${trimmed}\n`;
+      sendEvent(sessionId, { type: "ContentPart", payload: { type: "text", text: `${trimmed}\n` } });
+    }
+  };
+
+  child.stdout.on("data", (data) => {
+    stdoutBuffer += data.toString();
+    const lines = stdoutBuffer.split(/\r?\n/);
+    stdoutBuffer = lines.pop() ?? "";
+    for (const line of lines) flushLine(line);
+  });
+  child.stderr.on("data", (data) => {
+    stderr += data.toString();
+  });
+  child.on("error", (err) => {
+    activePromptProcesses.delete(sessionId);
+    sendingLocks.delete(sessionId);
+    sendEvent(sessionId, { type: "Error", payload: { message: err.message } });
+    sendStatus(sessionId, "error");
+  });
+  child.on("exit", (code) => {
+    void (async () => {
+      activePromptProcesses.delete(sessionId);
+      try {
+        if (stdoutBuffer.trim()) flushLine(stdoutBuffer);
+        if (code === 0) {
+          if (session.cliSessionId) {
+            try {
+              const thinkingEvents = await readLatestKimiCodeTurnThinking(resolveKimiShareDir(), session.workDir, session.cliSessionId);
+              for (const event of thinkingEvents) sendEvent(sessionId, event);
+            } catch (err) {
+              console.error(`[kimiBridge] Failed to replay prompt-mode thinking for ${session.cliSessionId}:`, err);
+            }
+          }
+          sendEvent(sessionId, { type: "TurnEnd", payload: {} });
+          sendEvent(sessionId, { type: "TurnResult", payload: { result: assistantText } });
+          void emitTurnChanges(sessionId, session.workDir, gitBaseline).finally(() => {
+            sendStatus(sessionId, "completed");
+            sendingLocks.delete(sessionId);
+          });
+          return;
+        }
+        const message = (stderr || `CLI exited with code ${code ?? "unknown"}`).trim();
+        sendEvent(sessionId, { type: "Error", payload: { message } });
+        sendStatus(sessionId, "error");
+      } finally {
+        if (code !== 0) sendingLocks.delete(sessionId);
+      }
+    })();
+  });
+}
+
+export async function sendPrompt(sessionId: string, content: string | ContentPart[], options?: { thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean }) {
   if (sendingLocks.has(sessionId)) throw new Error("Turn already in progress");
   sendingLocks.add(sessionId);
+
+  const promptSession = promptModeSessions.get(sessionId);
+  if (promptSession) {
+    if (typeof options?.thinking === "boolean") promptSession.thinking = options.thinking;
+    if (typeof options?.yoloMode === "boolean") promptSession.yoloMode = options.yoloMode;
+    if (typeof options?.autoMode === "boolean") promptSession.autoMode = options.autoMode;
+    if (typeof options?.planMode === "boolean") promptSession.planMode = options.planMode;
+    let promptContent = content;
+    try {
+      promptContent = await applyPromptSubmitHooks(sessionId, content, promptSession.workDir);
+    } catch (err) {
+      sendingLocks.delete(sessionId);
+      const message = err instanceof Error ? err.message : String(err);
+      try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
+      try { sendStatus(sessionId, "error"); } catch {}
+      throw err;
+    }
+    const promptText = contentToPromptText(promptContent);
+    const gitBaseline = await getTurnGitBaseline(promptSession.workDir);
+    sendEvent(sessionId, { type: "TurnBegin", payload: { user_input: promptContent } });
+    runPromptModeTurn(sessionId, promptSession, promptText, gitBaseline);
+    return;
+  }
 
   const session = activeSessions.get(sessionId);
   if (!session) {
@@ -500,8 +1032,8 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
   if (typeof options?.yoloMode === "boolean") {
     session.yoloMode = options.yoloMode;
   }
-  if (typeof options?.afkMode === "boolean") {
-    session.env = options.afkMode ? { ...session.env, KIMIX_KIMI_AFK: "1" } : Object.fromEntries(Object.entries(session.env).filter(([key]) => key !== "KIMIX_KIMI_AFK"));
+  if (typeof options?.autoMode === "boolean") {
+    session.env = options.autoMode ? { ...session.env, KIMIX_KIMI_AUTO: "1" } : Object.fromEntries(Object.entries(session.env).filter(([key]) => key !== "KIMIX_KIMI_AUTO"));
   }
   if (typeof options?.planMode === "boolean" && session.planMode !== options.planMode) {
     await warmSessionMetadata(session);
@@ -566,6 +1098,14 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
 }
 
 export async function stopTurn(sessionId: string) {
+  const promptProcess = activePromptProcesses.get(sessionId);
+  if (promptProcess) {
+    activePromptProcesses.delete(sessionId);
+    sendingLocks.delete(sessionId);
+    try { promptProcess.kill(); } catch {}
+    sendStatus(sessionId, "interrupted");
+    return;
+  }
   const turn = activeTurns.get(sessionId);
   if (!turn) {
     sendingLocks.delete(sessionId);
@@ -617,6 +1157,12 @@ export async function respondQuestion(
 }
 
 export async function closeSession(sessionId: string) {
+  const promptProcess = activePromptProcesses.get(sessionId);
+  if (promptProcess) {
+    activePromptProcesses.delete(sessionId);
+    try { promptProcess.kill(); } catch {}
+  }
+  promptModeSessions.delete(sessionId);
   const session = activeSessions.get(sessionId);
   if (session) {
     activeSessions.delete(sessionId);
@@ -653,6 +1199,7 @@ export async function runOneShotPrompt(options: {
     yoloMode: options.yoloMode ?? false,
     executable: "kimi",
     agentFile: options.agentFile,
+    shareDir: resolveKimiShareDir(),
   });
   const turn = session.prompt(options.content);
   const parts: string[] = [];
@@ -686,10 +1233,22 @@ export function getActiveSessionIds(): string[] {
 }
 
 export async function getSessions(workDir: string) {
-  const sessions = await listSessions(workDir);
-  return sessions.filter((session) => !HIDDEN_SESSION_PREFIXES.some((prefix) => session.id.startsWith(prefix)));
+  const byId = new Map<string, SessionInfo>();
+  for (const shareDir of candidateKimiShareDirs()) {
+    const sessions = await listSessionsFromShareDir(shareDir, workDir);
+    for (const session of sessions) {
+      if (HIDDEN_SESSION_PREFIXES.some((prefix) => session.id.startsWith(prefix))) continue;
+      const existing = byId.get(session.id);
+      if (!existing || session.updatedAt > existing.updatedAt) byId.set(session.id, session);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function getSessionHistory(workDir: string, sessionId: string) {
-  return parseSessionEvents(workDir, sessionId);
+  for (const shareDir of candidateKimiShareDirs()) {
+    const events = await parseSessionEventsFromShareDir(shareDir, workDir, sessionId);
+    if (events.length > 0) return events;
+  }
+  return [];
 }

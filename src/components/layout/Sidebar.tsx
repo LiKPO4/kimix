@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable, Download } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -32,7 +32,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
@@ -95,8 +94,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,
-        afkMode: defaultAfkMode,
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -173,6 +172,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     }
     setOpenProjectMenu(null);
     toast(targets.length > 0 ? `已归档 ${targets.length} 个对话` : "没有可归档的对话");
+  };
+
+  const exportSessionArchive = async (sessionId: string, title: string) => {
+    const res = await window.api.exportSession({ sessionId, title });
+    if (!res.success) {
+      toast(`导出失败：${res.error}`);
+      return;
+    }
+    toast(res.data.path ? "已导出 Kimi Debug ZIP" : "已取消导出");
   };
 
   const removeProject = async (project: Project) => {
@@ -458,6 +466,17 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              void exportSessionArchive(s.id, s.title);
+                            }}
+                            className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
+                            title="导出 Kimi Debug ZIP"
+                            aria-label="导出 Kimi Debug ZIP"
+                          >
+                            <Download size={11} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               archiveSession(s.id);
                               if (currentSession?.id === s.id) {
                                 setCurrentSession(null);
@@ -494,7 +513,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.73</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.106</span>
         </button>
       </div>
     </aside>

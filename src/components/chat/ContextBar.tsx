@@ -251,7 +251,7 @@ export function ContextBar() {
               <div className="grid items-center" style={{ columnGap: 16, gridTemplateColumns: "minmax(0, 1fr) auto" }}>
                 <div className="min-w-0 self-center">
                   <div className="text-[14px] font-semibold leading-5 text-[var(--kimix-panel-text)]">工作目录</div>
-                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>额外目录会通过 Kimi CLI --add-dir 纳入当前会话。</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>额外目录会通过 Kimi Code --add-dir 纳入当前会话。</div>
                 </div>
                 <button
                   type="button"

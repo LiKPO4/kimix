@@ -73,7 +73,7 @@ export type CreateLongTaskRequest = {
   initialRequest: string;
   thinking?: boolean;
   yoloMode?: boolean;
-  afkMode?: boolean;
+  autoMode?: boolean;
 }
 
 export type CreateLongTaskResponse = {
@@ -158,8 +158,8 @@ export type StartSessionRequest = {
   model?: string;
   thinking?: boolean;
   yoloMode?: boolean;
+  autoMode?: boolean;
   planMode?: boolean;
-  afkMode?: boolean;
   skillsDir?: string;
   agentFile?: string;
   additionalWorkDirs?: string[];
@@ -203,6 +203,8 @@ export type CheckKimiCliResponse = {
     command: string;
     path?: string;
     output?: string;
+    version?: string | null;
+    isLegacy?: boolean;
     message: string;
   };
 } | {
@@ -334,6 +336,8 @@ export type KimiCliUpdateInfo = {
   currentVersion: string | null;
   latestVersion: string | null;
   hasUpdate: boolean;
+  isLegacy?: boolean;
+  migrationHint?: string;
   path?: string;
   message: string;
 };
@@ -365,8 +369,8 @@ export type SendPromptRequest = {
   }[];
   thinking?: boolean;
   yoloMode?: boolean;
+  autoMode?: boolean;
   planMode?: boolean;
-  afkMode?: boolean;
 }
 
 export type SendPromptResponse = {
@@ -500,6 +504,22 @@ export type LoadSessionResponse = {
   error: string;
 };
 
+export type ExportSessionRequest = {
+  sessionId?: string;
+  title?: string;
+}
+
+export type ExportSessionResponse = {
+  success: true;
+  data: {
+    path: string;
+    output?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type GitInfoResponse = {
   success: true;
   data: {
@@ -605,6 +625,8 @@ export type SkillInfo = {
   description: string;
   path: string;
   source: string;
+  sourceLabel?: string;
+  trustLevel?: "kimi-official" | "curated" | "third-party" | "local";
   enabled: boolean;
 };
 
@@ -738,6 +760,9 @@ export type DownloadUpdateProgress = {
   receivedBytes: number;
   totalBytes?: number;
   bytesPerSecond?: number;
+  scope?: "kimix" | "kimi-code";
+  phase?: "script" | "manifest" | "binary" | "install" | "done";
+  message?: string;
 };
 
 export type CopyImageRequest = {
@@ -777,10 +802,9 @@ export type AppSettings = {
   defaultModel: string;
   defaultThinking: boolean;
   defaultPlanMode: boolean;
-  defaultAfkMode: boolean;
   maxTurns: number;
   enableCompaction: boolean;
-  defaultPermissionMode: "manual" | "approve_for_session" | "yolo";
+  defaultPermissionMode: "manual" | "auto" | "yolo";
   theme: "dark" | "light" | "system";
   fontSize: number;
   showThinking: boolean;

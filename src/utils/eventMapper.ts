@@ -1,4 +1,5 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
+import { isLegacyKimiWorkDirError } from "./eventHelpers";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -455,11 +456,13 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     }
 
     case "Error": {
+      const message = isString(payload.message) ? payload.message : "未知错误";
+      if (isLegacyKimiWorkDirError(message)) return null;
       return {
         id: generateId(),
         type: "error",
         timestamp: eventTimestamp,
-        message: isString(payload.message) ? payload.message : "未知错误",
+        message,
         source: "sdk",
       };
     }

@@ -11,10 +11,11 @@ import {
   SquareTerminal,
   X,
 } from "lucide-react";
-import type { KimiCliUpdateInfo } from "@electron/types/ipc";
+import type { DownloadUpdateProgress, KimiCliUpdateInfo } from "@electron/types/ipc";
 import { formatDownloadPercent, formatDownloadDetail, formatReleaseDate, type DownloadProgressInfo } from "@/utils/format";
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
+type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
 
 type ReleaseInfo = {
   tagName: string;
@@ -33,13 +34,15 @@ const RELEASE_TIMELINE = [
   { version: "v2.4.18", date: "2026-05-10", text: "接入官方 slash 命令和项目文件候选。" },
 ];
 
-const KIMI_CLI_DOCS_URL = "https://moonshotai.github.io/kimi-cli/zh/guides/getting-started.html";
-const KIMI_CLI_WINDOWS_INSTALL_COMMAND = "Invoke-RestMethod https://code.kimi.com/install.ps1 | Invoke-Expression";
+const KIMI_CODE_DOCS_URL = "https://moonshotai.github.io/kimi-code/zh/guides/getting-started.html";
+const KIMI_CODE_WINDOWS_INSTALL_COMMAND = "irm https://code.kimi.com/kimi-code/install.ps1 | iex";
 
 interface KimiOnboardingProps {
   show: boolean;
   message: string;
   installBusy: boolean;
+  installPercent: number;
+  installPhase: KimiCodeInstallPhase | null;
   onDismiss: () => void;
   onInstall: () => void;
   onCheck: () => void;
@@ -51,13 +54,16 @@ function KimiOnboardingDialog({
   show,
   message,
   installBusy,
+  installPercent,
+  installPhase,
   onDismiss,
   onInstall,
   onCheck,
   onOpenSettings,
   copyToClipboard,
 }: KimiOnboardingProps) {
-  if (!show) return null;
+  if (!show && !installBusy) return null;
+  const showDownloadPercent = installPhase === "binary" && installPercent > 0;
   return (
     <div className="kimix-onboarding-overlay fixed inset-0 z-[118] flex items-center justify-center backdrop-blur-sm" style={{ padding: 24 }}>
       <div className="kimix-onboarding-card w-full max-w-[560px] rounded-[18px] border shadow-[0_26px_80px_rgba(35,31,25,0.18)]" style={{ padding: "22px 24px" }}>
@@ -67,9 +73,9 @@ function KimiOnboardingDialog({
               <SquareTerminal size={20} />
             </div>
             <div className="min-w-0">
-              <div className="text-[18px] font-semibold leading-7 text-text-primary">需要先配置 Kimi CLI</div>
+              <div className="text-[18px] font-semibold leading-7 text-text-primary">需要先配置 Kimi Code</div>
               <div className="mt-1 text-[14px] leading-6 text-text-secondary">
-                Kimix 通过本机的 <span className="font-medium text-text-primary">kimi</span> 命令启动对话。当前没有在 PATH 中找到 Kimi CLI，配置完成后才能正常发送消息。
+                Kimix 通过本机的 <span className="font-medium text-text-primary">kimi</span> 命令启动对话。当前没有在 PATH 中找到 Kimi Code，配置完成后才能正常发送消息。
               </div>
             </div>
           </div>
@@ -86,33 +92,50 @@ function KimiOnboardingDialog({
         <div className="mt-5 rounded-xl border border-border-subtle bg-surface-base" style={{ padding: "16px 16px 18px" }}>
           <div className="text-[13px] font-medium leading-5 text-text-secondary">推荐步骤</div>
           <div className="mt-2 grid gap-2 text-[13.5px] leading-6 text-text-secondary">
-            <div>1. 点击"一键安装"，或使用官方脚本安装 Kimi CLI（脚本会自动安装 uv）。</div>
+            <div>1. 点击"一键安装"，或使用官方脚本安装 Kimi Code。</div>
             <div>2. 安装完成后，在系统终端运行 <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 font-mono text-[12.5px] text-text-primary">kimi</span>，再输入 <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 font-mono text-[12.5px] text-text-primary">/login</span> 完成登录。</div>
             <div>3. 重启 Kimix 或点击"重新检测"。</div>
           </div>
           <div className="mt-4 rounded-lg border border-border-subtle bg-surface-elevated font-mono text-[12.5px] leading-5 text-text-primary" style={{ padding: "12px 12px" }}>
-            {KIMI_CLI_WINDOWS_INSTALL_COMMAND}
+            {KIMI_CODE_WINDOWS_INSTALL_COMMAND}
           </div>
           <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
             检测结果：{message}
           </div>
+          {installBusy && (
+            <div style={{ marginTop: 12 }}>
+              <div className="flex items-center justify-between text-[12.5px] leading-5 text-text-muted">
+                <span>{showDownloadPercent ? "下载进度" : "安装状态"}</span>
+                {showDownloadPercent && <span>{Math.max(0, Math.min(100, Math.round(installPercent)))}%</span>}
+              </div>
+              {showDownloadPercent ? (
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent-primary-light">
+                  <div className="h-full rounded-full bg-accent-primary transition-[width]" style={{ width: `${Math.max(0, Math.min(100, Math.round(installPercent)))}%` }} />
+                </div>
+              ) : (
+                <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
+                  正在获取版本、校验安装包或写入本地目录，当前阶段没有可用的字节百分比。
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between" style={{ gap: 12, marginTop: 24 }}>
           <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => void onInstall()}
-              disabled={installBusy}
+          <button
+            type="button"
+            onClick={() => void onInstall()}
+            disabled={installBusy}
               className="kimix-icon-text-button is-compact bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
               style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
-            >
+          >
               {installBusy ? <RefreshCw size={14} className="kimix-spin" /> : <SquareTerminal size={14} />}
               <span>{installBusy ? "安装中" : "一键安装"}</span>
             </button>
             <button
               type="button"
-              onClick={() => void window.api.openExternal(KIMI_CLI_DOCS_URL)}
+              onClick={() => void window.api.openExternal(KIMI_CODE_DOCS_URL)}
               className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light"
               style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
             >
@@ -121,7 +144,7 @@ function KimiOnboardingDialog({
             </button>
             <button
               type="button"
-              onClick={() => void copyToClipboard(KIMI_CLI_WINDOWS_INSTALL_COMMAND, "已复制安装命令")}
+              onClick={() => void copyToClipboard(KIMI_CODE_WINDOWS_INSTALL_COMMAND, "已复制安装命令")}
               className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
               style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
             >
@@ -268,6 +291,9 @@ interface HelpDialogProps {
   cliUpdateState: {
     loading: boolean;
     updating: boolean;
+    progressStartedAt: number | null;
+    progressPercent: number;
+    progressPhase: KimiCodeInstallPhase | null;
     message: string;
     info: KimiCliUpdateInfo | null;
     hasUpdate: boolean;
@@ -277,7 +303,9 @@ interface HelpDialogProps {
   onOpenLatestRelease: () => void;
   onCheckUpdates: () => void;
   onUpdateKimiCli: () => void;
+  onInstallKimiCli: () => void;
   onCheckCliUpdate: () => void;
+  kimiInstallBusy: boolean;
 }
 
 function HelpDialogPanel({
@@ -291,9 +319,12 @@ function HelpDialogPanel({
   onOpenLatestRelease,
   onCheckUpdates,
   onUpdateKimiCli,
+  onInstallKimiCli,
   onCheckCliUpdate,
+  kimiInstallBusy,
 }: HelpDialogProps) {
   if (!dialog) return null;
+  const showCliDownloadPercent = cliUpdateState.progressPhase === "binary" && cliUpdateState.progressPercent > 0;
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-5" onMouseDown={onClose}>
       <div className="kimix-modal-card w-full max-w-[560px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>
@@ -334,7 +365,7 @@ function HelpDialogPanel({
           )}
 
           {dialog === "updates" && (
-            <div className="space-y-4 text-[14.5px] text-text-secondary">
+            <div className="flex flex-col text-[14.5px] text-text-secondary" style={{ gap: 16 }}>
               <div className="grid rounded-xl border border-border-subtle bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                 <div className="min-w-0">
                   <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimix 本体</div>
@@ -372,7 +403,7 @@ function HelpDialogPanel({
                   <button
                     onClick={onCheckUpdates}
                     disabled={updateState.loading || updateState.downloading}
-                    className="kimix-icon-text-button h-10 shrink-0 bg-text-primary text-text-inverse hover:opacity-90 disabled:opacity-45"
+                    className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
                     style={{ paddingLeft: 16, paddingRight: 18 }}
                   >
                     <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
@@ -380,33 +411,74 @@ function HelpDialogPanel({
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-surface-base" style={{ paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
+              <div className="grid rounded-xl border border-border-subtle bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                 <div className="min-w-0">
-                  <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimi CLI</div>
+                  <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimi Code</div>
                   <div className="font-semibold text-text-primary">{cliUpdateState.message}</div>
+                  {cliUpdateState.updating && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[12.5px] leading-5 text-text-muted">
+                        <span>{showCliDownloadPercent ? "下载进度" : "安装状态"}</span>
+                        {showCliDownloadPercent && <span>{Math.max(0, Math.min(100, Math.round(cliUpdateState.progressPercent)))}%</span>}
+                      </div>
+                      {showCliDownloadPercent ? (
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent-primary-light">
+                          <div className="h-full rounded-full bg-accent-primary transition-[width]" style={{ width: `${Math.max(0, Math.min(100, Math.round(cliUpdateState.progressPercent)))}%` }} />
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
+                          正在获取版本、校验安装包或写入本地目录，当前阶段没有可用的字节百分比。
+                        </div>
+                      )}
+                      <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
+                        正在处理 Kimi Code，网络慢时可能需要 1-2 分钟，请先不要关闭窗口。
+                      </div>
+                    </div>
+                  )}
                   {cliUpdateState.info && (
                     <div className="mt-1 text-[13px] text-text-muted">
                       当前：{cliUpdateState.info.currentVersion ?? "未安装"} · 最新：{cliUpdateState.info.latestVersion ?? "未知"}
                     </div>
                   )}
                   {cliUpdateState.info?.path && <div className="mt-1 truncate text-[12px] text-text-muted" title={cliUpdateState.info.path}>{cliUpdateState.info.path}</div>}
+                  {(cliUpdateState.info?.available === false || cliUpdateState.info?.isLegacy) && (
+                    <div className="mt-3 rounded-lg border border-accent-primary-soft bg-accent-primary-light text-[13px] leading-6 text-accent-primary-dark" style={{ padding: "12px 14px" }}>
+                      {cliUpdateState.info?.available === false
+                        ? "当前没有找到 kimi 命令。请先安装新版 Kimi Code，安装完成后打开终端运行 kimi /login。"
+                        : "当前是旧版 Kimi CLI。升级到新版 Kimi Code 后，请在终端运行 kimi migrate，并重新执行 /login 与 MCP 授权。"}
+                    </div>
+                  )}
+                  {cliUpdateState.info?.migrationHint && (
+                    <div className="mt-2 text-[12.5px] leading-5 text-text-muted">{cliUpdateState.info.migrationHint}</div>
+                  )}
                 </div>
-                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                <div className="flex shrink-0 items-center self-center" style={{ gap: 8 }}>
+                  {cliUpdateState.info?.available === false && (
+                    <button
+                      onClick={onInstallKimiCli}
+                      disabled={kimiInstallBusy || cliUpdateState.loading || cliUpdateState.updating}
+                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
+                      style={{ paddingLeft: 16, paddingRight: 18 }}
+                    >
+                      <RefreshCw size={14} className={kimiInstallBusy ? "kimix-spin" : ""} />
+                      {kimiInstallBusy ? "安装中" : "安装"}
+                    </button>
+                  )}
                   {cliUpdateState.hasUpdate && (
                     <button
                       onClick={onUpdateKimiCli}
                       disabled={cliUpdateState.updating || cliUpdateState.loading}
-                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
+                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
                       style={{ paddingLeft: 16, paddingRight: 18 }}
                     >
                       <RefreshCw size={14} className={cliUpdateState.updating ? "kimix-spin" : ""} />
-                      {cliUpdateState.updating ? "更新中" : "一键更新"}
+                      {cliUpdateState.updating ? (cliUpdateState.info?.isLegacy ? "升级中" : "更新中") : cliUpdateState.info?.isLegacy ? "升级并迁移" : "重新安装/更新"}
                     </button>
                   )}
                   <button
                     onClick={onCheckCliUpdate}
                     disabled={cliUpdateState.loading || cliUpdateState.updating}
-                    className="kimix-icon-text-button h-10 shrink-0 bg-text-primary text-text-inverse hover:opacity-90 disabled:opacity-45"
+                    className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
                     style={{ paddingLeft: 16, paddingRight: 18 }}
                   >
                     <RefreshCw size={14} className={cliUpdateState.loading ? "kimix-spin" : ""} />
@@ -423,7 +495,7 @@ function HelpDialogPanel({
                   </button>
                 </div>
               )}
-              <div className="space-y-3">
+              <div className="flex flex-col" style={{ gap: 12 }}>
                 {RELEASE_TIMELINE.map((item) => (
                   <div key={item.version} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
                     <div className="flex items-center justify-between gap-3">
@@ -466,6 +538,8 @@ interface DialogSystemProps {
   showKimiOnboarding: boolean;
   kimiOnboardingMessage: string;
   kimiInstallBusy: boolean;
+  kimiInstallPercent: number;
+  kimiInstallPhase: KimiCodeInstallPhase | null;
   onKimiDismiss: () => void;
   onKimiInstall: () => void;
   onKimiCheck: () => void;
@@ -494,6 +568,7 @@ interface DialogSystemProps {
   onOpenLatestRelease: () => void;
   onCheckUpdates: () => void;
   onUpdateKimiCli: () => void;
+  onInstallKimiCli: () => void;
   onCheckCliUpdate: () => void;
 }
 
@@ -504,6 +579,8 @@ export function DialogSystem(props: DialogSystemProps) {
         show={props.showKimiOnboarding}
         message={props.kimiOnboardingMessage}
         installBusy={props.kimiInstallBusy}
+        installPercent={props.kimiInstallPercent}
+        installPhase={props.kimiInstallPhase}
         onDismiss={props.onKimiDismiss}
         onInstall={props.onKimiInstall}
         onCheck={props.onKimiCheck}
@@ -532,7 +609,9 @@ export function DialogSystem(props: DialogSystemProps) {
         onOpenLatestRelease={props.onOpenLatestRelease}
         onCheckUpdates={props.onCheckUpdates}
         onUpdateKimiCli={props.onUpdateKimiCli}
+        onInstallKimiCli={props.onInstallKimiCli}
         onCheckCliUpdate={props.onCheckCliUpdate}
+        kimiInstallBusy={props.kimiInstallBusy}
       />
     </>
   );

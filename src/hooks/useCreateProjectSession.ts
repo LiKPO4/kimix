@@ -12,7 +12,6 @@ export function useCreateProjectSession() {
   const currentSession = useAppStore((s) => s.currentSession);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
@@ -51,8 +50,8 @@ export function useCreateProjectSession() {
         model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,
-        afkMode: defaultAfkMode,
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -71,7 +70,7 @@ export function useCreateProjectSession() {
     } finally {
       setCreatingSessionProjectPath(null);
     }
-  }, [addSession, currentProject, currentSession?.projectPath, defaultThinking, defaultPlanMode, defaultAfkMode, deleteSession, permissionMode, setCreatingSessionProjectPath, setCurrentProject, setCurrentSession, updateSession]);
+  }, [addSession, currentProject, currentSession?.projectPath, defaultThinking, defaultPlanMode, deleteSession, permissionMode, setCreatingSessionProjectPath, setCurrentProject, setCurrentSession, updateSession]);
 
   return {
     createSession,

@@ -7,7 +7,6 @@ interface BootstrapSetters {
   setPermissionMode: (mode: PermissionMode) => void;
   setDefaultThinking: (v: boolean) => void;
   setDefaultPlanMode: (v: boolean) => void;
-  setDefaultAfkMode: (v: boolean) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (v: boolean) => void;
   setStatusUpdateDisplay: (v: StatusUpdateDisplay) => void;
@@ -31,7 +30,6 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setPermissionMode(res.data.defaultPermissionMode);
           setters.setDefaultThinking(res.data.defaultThinking);
           setters.setDefaultPlanMode(res.data.defaultPlanMode);
-          setters.setDefaultAfkMode(res.data.defaultAfkMode);
           setters.setAdditionalWorkDirs(res.data.additionalWorkDirs ?? []);
           setters.setDetailedContext(res.data.detailedContext);
           setters.setStatusUpdateDisplay(res.data.statusUpdateDisplay);

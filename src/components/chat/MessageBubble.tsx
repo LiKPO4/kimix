@@ -64,7 +64,6 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const defaultAfkMode = useAppStore((s) => s.defaultAfkMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -101,11 +100,11 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
         content: event.content,
         images: images
           .filter((image) => Boolean(image.dataUrl))
-          .map((image) => ({ name: image.name, dataUrl: image.dataUrl as string })),
+        .map((image) => ({ name: image.name, dataUrl: image.dataUrl as string })),
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
+        autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,
-        afkMode: defaultAfkMode,
       });
       if (!res.success) throw new Error(res.error);
     } catch (err) {

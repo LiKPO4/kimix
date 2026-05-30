@@ -51,6 +51,8 @@ import type {
   ListSlashCommandsResponse,
   LoadSessionRequest,
   LoadSessionResponse,
+  ExportSessionRequest,
+  ExportSessionResponse,
   GitInfoResponse,
   KimiUsageResponse,
   OpenFileRequest,
@@ -190,6 +192,8 @@ const api = {
     ipcRenderer.invoke("kimi:listSessions", req),
   loadSession: (req: LoadSessionRequest): Promise<LoadSessionResponse> =>
     ipcRenderer.invoke("kimi:loadSession", req),
+  exportSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>
+    ipcRenderer.invoke("kimi:exportSession", req),
   getKimiUsage: (): Promise<KimiUsageResponse> =>
     ipcRenderer.invoke("kimi:getUsage"),
   startKimiVis: (): Promise<VoidResponse> =>

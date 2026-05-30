@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
@@ -27,9 +27,9 @@ const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
 const KIMI_CODE_USAGE_URL = "https://api.kimi.com/coding/v1/usages";
 const KIMI_CODE_REFRESH_URL = "https://auth.kimi.com/api/oauth/token";
-const KIMI_CLI_INSTALL_PS1_URL = "https://code.kimi.com/install.ps1";
-const KIMI_CLI_INSTALL_SH_URL = "https://code.kimi.com/install.sh";
-const KIMI_CLI_PYPI_URL = "https://pypi.org/pypi/kimi-cli/json";
+const KIMI_CODE_INSTALL_PS1_URL = "https://code.kimi.com/kimi-code/install.ps1";
+const KIMI_CODE_INSTALL_SH_URL = "https://code.kimi.com/kimi-code/install.sh";
+const KIMI_CODE_NPM_REGISTRY_URL = "https://registry.npmjs.org/@moonshot-ai%2Fkimi-code/latest";
 const SUPERPOWERS_ZIP_URL = "https://github.com/obra/superpowers/archive/refs/heads/main.zip";
 const SUPERPOWERS_GIT_URL = "https://github.com/obra/superpowers.git";
 const SUPERPOWERS_SKILL_NAMES = [
@@ -71,6 +71,7 @@ function commandHintPaths(command: string) {
   const fileName = command.endsWith(ext) ? command : `${command}${ext}`;
   const home = os.homedir();
   const hints = [
+    path.join(process.env.KIMI_INSTALL_DIR || path.join(home, ".kimi-code"), "bin", fileName),
     path.join(home, ".local", "bin", fileName),
   ];
   if (process.platform === "win32") {
@@ -93,6 +94,15 @@ async function resolveCommand(command: string): Promise<string | null> {
     return hinted;
   }
   return null;
+}
+
+async function resolveKimiCommand(): Promise<string | null> {
+  const hinted = commandHintPaths("kimi").find((candidate) => fs.existsSync(candidate));
+  if (hinted) {
+    prependProcessPath(path.dirname(hinted));
+    return hinted;
+  }
+  return resolveCommand("kimi");
 }
 
 function checkCommand(command: string): Promise<string | null> {
@@ -137,47 +147,62 @@ function runLongCommand(command: string, args: string[], timeoutMs = 10 * 60 * 1
 }
 
 function extractKimiCliVersion(output: string): string | null {
-  const match = output.match(/(?:kimi-cli version:|kimi,\s*version)\s*v?([0-9]+(?:\.[0-9]+){1,3})/i);
+  const match = output.match(/(?:kimi-cli version:|kimi,\s*version)?\s*v?([0-9]+(?:\.[0-9]+){1,3})/i);
   return match?.[1] ?? null;
 }
 
-async function getInstalledKimiCliInfo() {
-  const kimiPath = await resolveCommand("kimi");
+function isLegacyKimiCodeInstallation(output: string, kimiPath?: string | null) {
+  if (/kimi-cli/i.test(output)) return true;
+  if (!kimiPath) return false;
+  const normalized = kimiPath.replace(/\\/g, "/").toLowerCase();
+  return normalized.includes("/.local/bin/") && !normalized.includes("/.kimi-code/bin/");
+}
+
+async function getInstalledKimiCodeInfo() {
+  const kimiPath = await resolveKimiCommand();
   if (!kimiPath) {
     return {
       available: false,
       path: undefined,
       version: null,
       output: "",
+      isLegacy: false,
     };
   }
   const output = await runCommand(kimiPath, ["--version"]).catch(() => "");
+  const version = extractKimiCliVersion(output);
   return {
     available: true,
     path: kimiPath,
-    version: extractKimiCliVersion(output),
+    version,
     output,
+    isLegacy: isLegacyKimiCodeInstallation(output, kimiPath),
   };
 }
 
-async function fetchLatestKimiCliVersion() {
-  const res = await fetch(KIMI_CLI_PYPI_URL, {
+async function fetchLatestKimiCodeVersion() {
+  const res = await fetch(KIMI_CODE_NPM_REGISTRY_URL, {
     headers: {
       "Accept": "application/json",
       "User-Agent": "Kimix",
     },
   });
-  if (!res.ok) throw new Error(`PyPI 返回 ${res.status}`);
+  if (!res.ok) throw new Error(`npm registry 返回 ${res.status}`);
   const data = await res.json() as { info?: { version?: unknown } };
-  const version = data.info && typeof data.info.version === "string" ? data.info.version : "";
-  if (!version) throw new Error("PyPI 未返回 Kimi CLI 最新版本");
+  const version = typeof (data as { version?: unknown }).version === "string"
+    ? String((data as { version?: unknown }).version)
+    : data.info && typeof data.info.version === "string"
+      ? data.info.version
+      : "";
+  if (!version) throw new Error("npm registry 未返回 Kimi Code 最新版本");
   return version;
 }
 
 async function checkKimiCliUpdate() {
+  ensureKimiCodeMigratedConfig();
   const [installed, latestVersion] = await Promise.all([
-    getInstalledKimiCliInfo(),
-    fetchLatestKimiCliVersion(),
+    getInstalledKimiCodeInfo(),
+    fetchLatestKimiCodeVersion(),
   ]);
   if (!installed.available) {
     return {
@@ -186,81 +211,165 @@ async function checkKimiCliUpdate() {
       latestVersion,
       hasUpdate: true,
       path: undefined,
-      message: `未找到 Kimi CLI，可安装最新版本 ${latestVersion}`,
+      message: `未找到 Kimi Code，可安装最新版本 ${latestVersion}`,
     };
   }
   const currentVersion = installed.version;
   const hasUpdate = currentVersion ? isVersionGreater(latestVersion, currentVersion) : true;
+  const migrationHint = installed.isLegacy
+    ? "检测到旧版 Kimi CLI。更新到 Kimi Code 后，请在终端运行 kimi migrate，并重新登录与授权 MCP。"
+    : undefined;
   return {
     available: true,
     currentVersion,
     latestVersion,
-    hasUpdate,
+    hasUpdate: hasUpdate || installed.isLegacy,
+    isLegacy: installed.isLegacy,
+    migrationHint,
     path: installed.path,
-    message: hasUpdate
-      ? `发现 Kimi CLI 新版本 ${latestVersion}`
-      : `Kimi CLI 已是最新版本 ${currentVersion ?? latestVersion}`,
+    message: installed.isLegacy
+      ? `检测到旧版 Kimi CLI ${currentVersion ?? ""}，建议升级并迁移到 Kimi Code`
+      : hasUpdate
+        ? `发现 Kimi Code 新版本 ${latestVersion}`
+        : `Kimi Code 已是最新版本 ${currentVersion ?? latestVersion}`,
   };
 }
 
 async function updateKimiCli() {
-  const latestVersion = await fetchLatestKimiCliVersion();
-  const uvPath = await resolveCommand("uv");
+  ensureKimiCodeMigratedConfig();
+  const latestVersion = await fetchLatestKimiCodeVersion();
+  const before = await getInstalledKimiCodeInfo();
   let output = "";
   let upgradeError = "";
-  if (uvPath) {
-    try {
-      output = await runLongCommand(uvPath, ["tool", "upgrade", "kimi-cli"]);
-    } catch (err) {
-      upgradeError = err instanceof Error ? err.message : String(err);
-    }
-  } else {
+  if (process.platform === "win32" || before.isLegacy || !before.available) {
     try {
       const result = await installKimiCli();
       output = result.output || result.message;
     } catch (err) {
       upgradeError = err instanceof Error ? err.message : String(err);
     }
+  } else {
+    const npmPath = await resolveCommand(process.platform === "win32" ? "npm.cmd" : "npm");
+    if (npmPath) {
+      try {
+        output = process.platform === "win32"
+          ? await runLongCommand("cmd.exe", ["/d", "/s", "/c", `"${npmPath}" install -g @moonshot-ai/kimi-code@latest`])
+          : await runLongCommand(npmPath, ["install", "-g", "@moonshot-ai/kimi-code@latest"]);
+      } catch (err) {
+        upgradeError = err instanceof Error ? err.message : String(err);
+      }
+    } else {
+      try {
+        const result = await installKimiCli();
+        output = result.output || result.message;
+      } catch (err) {
+        upgradeError = err instanceof Error ? err.message : String(err);
+      }
+    }
   }
 
   const checked = await checkKimiCliUpdate();
-  if (checked.currentVersion && !isVersionGreater(latestVersion, checked.currentVersion)) {
+  if (!checked.isLegacy && checked.currentVersion && !isVersionGreater(latestVersion, checked.currentVersion)) {
     return {
       ...checked,
       latestVersion,
       hasUpdate: false,
       output: output || upgradeError,
       message: upgradeError
-        ? `Kimi CLI 已更新到 ${checked.currentVersion}，但安装器提示：${upgradeError}`
-        : `Kimi CLI 已更新到 ${checked.currentVersion}`,
+        ? `Kimi Code 已更新到 ${checked.currentVersion}，但安装器提示：${upgradeError}`
+        : `Kimi Code 已更新到 ${checked.currentVersion}`,
     };
   }
 
-  throw new Error(upgradeError || `Kimi CLI 更新后仍未达到最新版本 ${latestVersion}`);
+  throw new Error(upgradeError || (checked.isLegacy
+    ? "安装器执行后仍检测到旧版 Kimi CLI，请确认新版安装目录已加入 PATH，或重启系统后再检查"
+    : `Kimi Code 更新后仍未达到最新版本 ${latestVersion}`));
 }
 
 async function installKimiCli() {
+  ensureKimiCodeMigratedConfig();
   if (process.platform === "win32") {
-    const output = await runLongCommand("powershell.exe", [
-      "-NoProfile",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-Command",
-      `Invoke-RestMethod ${KIMI_CLI_INSTALL_PS1_URL} | Invoke-Expression`,
-    ]);
-    const kimiPath = await resolveCommand("kimi");
+    const result = await installKimiCodeWindows();
+    const kimiPath = result.binaryPath || await resolveKimiCommand();
     if (!kimiPath) throw new Error("安装完成后仍未找到 kimi 命令，请重新打开 Kimix 后再试");
-    const version = await runCommand(kimiPath, ["--version"]).catch(() => output);
-    return { path: kimiPath, output: version, message: "Kimi CLI 安装完成" };
+    const version = await runCommand(kimiPath, ["--version"]).catch(() => result.output);
+    return { path: kimiPath, output: version, message: "Kimi Code 安装完成" };
   }
 
   const shellPath = await resolveCommand("bash");
-  if (!shellPath) throw new Error("未找到 bash，无法执行 Kimi CLI 安装脚本");
-  const output = await runLongCommand(shellPath, ["-lc", `curl -LsSf ${KIMI_CLI_INSTALL_SH_URL} | bash`]);
-  const kimiPath = await resolveCommand("kimi");
+  if (!shellPath) throw new Error("未找到 bash，无法执行 Kimi Code 安装脚本");
+  const output = await runLongCommand(shellPath, ["-lc", `curl -LsSf ${KIMI_CODE_INSTALL_SH_URL} | bash`]);
+  const kimiPath = await resolveKimiCommand();
   if (!kimiPath) throw new Error("安装完成后仍未找到 kimi 命令，请重新打开 Kimix 后再试");
   const version = await runCommand(kimiPath, ["--version"]).catch(() => output);
-  return { path: kimiPath, output: version, message: "Kimi CLI 安装完成" };
+  return { path: kimiPath, output: version, message: "Kimi Code 安装完成" };
+}
+
+async function installKimiCodeWindows(): Promise<{ binaryPath: string; output: string }> {
+  const latestBuffer = await downloadBufferWithProgress(`${KIMI_CODE_INSTALL_PS1_URL.replace(/\/install\.ps1$/, "")}/latest`, "script", "正在获取最新版本");
+  const version = latestBuffer.toString("utf8").trim();
+  if (!version) throw new Error("无法获取 Kimi Code 最新版本");
+
+  const manifestUrl = `${KIMI_CODE_INSTALL_PS1_URL.replace(/\/install\.ps1$/, "")}/${version}/manifest.json`;
+  const manifestBuffer = await downloadBufferWithProgress(manifestUrl, "manifest", "正在获取安装清单");
+  const manifest = JSON.parse(manifestBuffer.toString("utf8")) as {
+    platforms?: Record<string, { filename?: string; checksum?: string }>;
+  };
+  const target = process.arch === "arm64" ? "win32-arm64" : process.arch === "ia32" ? "win32-x86" : "win32-x64";
+  const entry = manifest.platforms?.[target];
+  if (!entry?.filename || !entry.checksum) throw new Error(`安装清单缺少 ${target}`);
+
+  const baseUrl = KIMI_CODE_INSTALL_PS1_URL.replace(/\/install\.ps1$/, "");
+  const binaryUrl = `${baseUrl}/${version}/${entry.filename}`;
+  const binary = await downloadBufferWithProgress(binaryUrl, "binary", "正在下载 Kimi Code 安装包");
+  const actual = createHash("sha256").update(binary).digest("hex");
+  if (actual.toLowerCase() !== entry.checksum.toLowerCase()) {
+    throw new Error(`安装包校验失败：expected ${entry.checksum}, got ${actual}`);
+  }
+
+  emitKimiCodeInstallProgress({ phase: "install", message: "正在写入安装目录并迁移旧版命令", receivedBytes: binary.length, totalBytes: binary.length });
+  const installDir = process.env.KIMI_INSTALL_DIR || path.join(os.homedir(), ".kimi-code");
+  const binDir = path.join(installDir, "bin");
+  ensureDirectoryExists(binDir);
+  const binaryDest = path.join(binDir, "kimi.exe");
+  if (fs.existsSync(binaryDest)) {
+    const backup = `${binaryDest}.bak`;
+    try { if (fs.existsSync(backup)) fs.rmSync(backup, { force: true }); } catch {}
+    fs.renameSync(binaryDest, backup);
+  }
+  fs.writeFileSync(binaryDest, binary);
+  await ensureUserPathContains(binDir);
+  const migrationOutput = await runBundledKimiLegacyMigrationScript();
+  ensureKimiCodeMigratedConfig();
+  emitKimiCodeInstallProgress({ phase: "done", message: "Kimi Code 安装完成", receivedBytes: binary.length, totalBytes: binary.length });
+  return { binaryPath: binaryDest, output: [`Installed ${version} to ${binaryDest}`, migrationOutput].filter(Boolean).join("\n") };
+}
+
+async function ensureUserPathContains(dir: string) {
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `$dir = ${JSON.stringify(dir)}`,
+    "$current = [Environment]::GetEnvironmentVariable('Path', 'User')",
+    "if (-not $current -or -not ($current.Split(';') -contains $dir)) {",
+    "  $next = if ($current) { \"$dir;$current\" } else { $dir }",
+    "  [Environment]::SetEnvironmentVariable('Path', $next, 'User')",
+    "}",
+  ].join("\n");
+  await runLongCommandWithOutput("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script]);
+  prependProcessPath(dir);
+}
+
+async function runBundledKimiLegacyMigrationScript() {
+  const installScript = (await downloadBufferWithProgress(KIMI_CODE_INSTALL_PS1_URL, "script", "正在获取旧版迁移脚本")).toString("utf8");
+  const match = installScript.match(/# ---------- legacy kimi-cli migration ----------[\s\S]*?Invoke-LegacyMigration/);
+  if (!match) return "";
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "$KimiNoPath = $env:KIMI_NO_MODIFY_PATH",
+    `$KimiInstallDir = ${JSON.stringify(process.env.KIMI_INSTALL_DIR || path.join(os.homedir(), ".kimi-code"))}`,
+    match[0],
+  ].join("\n");
+  return runLongCommandWithOutput("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script]).catch((err) => `旧版迁移脚本提示：${err instanceof Error ? err.message : String(err)}`);
 }
 
 type McpServerRecord = {
@@ -274,14 +383,64 @@ type McpServerRecord = {
 };
 
 function getKimiPaths() {
-  return createKimiPaths(process.env.KIMI_SHARE_DIR);
+  return createKimiPaths(resolveKimiShareDir());
+}
+
+function defaultKimiCodeShareDir() {
+  return path.join(os.homedir(), ".kimi-code");
+}
+
+function legacyKimiShareDir() {
+  return path.join(os.homedir(), ".kimi");
+}
+
+function resolveKimiShareDir() {
+  if (process.env.KIMI_SHARE_DIR) return process.env.KIMI_SHARE_DIR;
+  const current = defaultKimiCodeShareDir();
+  const legacy = legacyKimiShareDir();
+  if (fs.existsSync(current)) return current;
+  if (fs.existsSync(legacy)) return legacy;
+  return current;
+}
+
+function backupFileIfExists(filePath: string) {
+  if (!fs.existsSync(filePath)) return;
+  const backup = `${filePath}.kimix-backup-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}`;
+  fs.copyFileSync(filePath, backup);
+}
+
+function ensureKimiCodeMigratedConfig() {
+  const current = defaultKimiCodeShareDir();
+  const legacy = legacyKimiShareDir();
+  const currentConfig = path.join(current, "config.toml");
+  const legacyConfig = path.join(legacy, "config.toml");
+  if (fs.existsSync(legacyConfig)) {
+    const currentText = fs.existsSync(currentConfig) ? fs.readFileSync(currentConfig, "utf-8") : "";
+    const legacyText = fs.readFileSync(legacyConfig, "utf-8");
+    const currentHasModel = /default_model\s*=\s*"[^"]+"/.test(currentText) && /\[models\."kimi-code\/kimi-for-coding"\]/.test(currentText);
+    const legacyHasModel = /default_model\s*=\s*"[^"]+"/.test(legacyText) && /\[models\."kimi-code\/kimi-for-coding"\]/.test(legacyText);
+    if (!currentHasModel && legacyHasModel) {
+      ensureDirectoryExists(current);
+      backupFileIfExists(currentConfig);
+      fs.copyFileSync(legacyConfig, currentConfig);
+    }
+  }
+
+  const legacyCredential = path.join(legacy, "credentials", "kimi-code.json");
+  const currentCredential = path.join(current, "credentials", "kimi-code.json");
+  if (fs.existsSync(legacyCredential) && !fs.existsSync(currentCredential)) {
+    ensureDirectoryExists(path.dirname(currentCredential));
+    fs.copyFileSync(legacyCredential, currentCredential);
+  }
 }
 
 async function getKimiAuthStatus() {
-  const kimiPath = await resolveCommand("kimi");
+  ensureKimiCodeMigratedConfig();
+  const kimiPath = await resolveKimiCommand();
   const paths = getKimiPaths();
-  const config = parseConfig(process.env.KIMI_SHARE_DIR);
-  const loggedIn = isLoggedIn(process.env.KIMI_SHARE_DIR);
+  const shareDir = resolveKimiShareDir();
+  const config = parseConfig(shareDir);
+  const loggedIn = isLoggedIn(shareDir);
   return {
     available: Boolean(kimiPath),
     path: kimiPath ?? undefined,
@@ -291,10 +450,10 @@ async function getKimiAuthStatus() {
     defaultModel: config.defaultModel,
     defaultThinking: config.defaultThinking,
     message: !kimiPath
-      ? "未找到 kimi CLI，请先安装或检查 PATH"
+      ? "未找到 Kimi Code，请先安装或检查 PATH"
       : loggedIn
-        ? "Kimi CLI 已登录"
-        : "Kimi CLI 已安装，但当前未登录",
+        ? "Kimi Code 已登录"
+        : "Kimi Code 已安装，但当前未登录",
   };
 }
 
@@ -329,9 +488,9 @@ function readMcpServers() {
 }
 
 async function requireKimiExecutable() {
-  const kimiPath = await resolveCommand("kimi");
+  const kimiPath = await resolveKimiCommand();
   if (!kimiPath) {
-    throw new Error("未找到 kimi CLI，请先安装或检查 PATH");
+    throw new Error("未找到 Kimi Code，请先安装或检查 PATH");
   }
   return kimiPath;
 }
@@ -538,7 +697,7 @@ function resolveReadableTextFile(requestPath: string, projectPath?: string) {
   const trimmedPath = requestPath.trim();
   if (!trimmedPath) throw new Error("Missing file path");
 
-  const kimiPlansDir = path.join(os.homedir(), ".kimi", "plans");
+  const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
   if (trimmedPath === "__latest_kimi_plan__") {
     const latest = fs.readdirSync(kimiPlansDir, { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"))
@@ -554,7 +713,7 @@ function resolveReadableTextFile(requestPath: string, projectPath?: string) {
     return { resolvedFile: latest.filePath, updatedAt: stat.mtimeMs };
   }
   const normalizedRequest = trimmedPath.replace(/\\/g, "/");
-  const isKimiPlanRelative = normalizedRequest.startsWith(".kimi/plans/");
+  const isKimiPlanRelative = normalizedRequest.startsWith(".kimi/plans/") || normalizedRequest.startsWith(".kimi-code/plans/");
   const resolvedFile = isKimiPlanRelative
     ? path.resolve(os.homedir(), trimmedPath)
     : path.isAbsolute(trimmedPath)
@@ -818,6 +977,74 @@ function emitDownloadUpdateProgress(receivedBytes: number, totalBytes?: number, 
   });
 }
 
+function runLongCommandWithOutput(command: string, args: string[], timeoutMs = 10 * 60 * 1000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(command, args, { windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, encoding: "utf8" }, (error, stdout, stderr) => {
+      const output = [stdout, stderr].filter(Boolean).join("\n").trim();
+      if (error) {
+        reject(new Error(output || error.message));
+        return;
+      }
+      resolve(output);
+    });
+    child.on("error", reject);
+  });
+}
+
+function emitKimiCodeInstallProgress(payload: {
+  phase: "script" | "manifest" | "binary" | "install" | "done";
+  message: string;
+  receivedBytes?: number;
+  totalBytes?: number;
+  percent?: number;
+  bytesPerSecond?: number;
+}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("app:downloadUpdateProgress", {
+    scope: "kimi-code",
+    phase: payload.phase,
+    message: payload.message,
+    receivedBytes: payload.receivedBytes ?? 0,
+    totalBytes: payload.totalBytes,
+    bytesPerSecond: payload.bytesPerSecond,
+    percent: payload.percent ?? (payload.totalBytes && payload.totalBytes > 0 ? Math.max(0, Math.min(100, ((payload.receivedBytes ?? 0) / payload.totalBytes) * 100)) : 0),
+  });
+}
+
+async function downloadBufferWithProgress(url: string, phase: "script" | "manifest" | "binary", message: string) {
+  const startedAt = Date.now();
+  const res = await fetch(url, { headers: { "User-Agent": "Kimix" } });
+  if (!res.ok) throw new Error(`${message}失败：HTTP ${res.status}`);
+  const totalBytes = Number(res.headers.get("content-length") || 0) || undefined;
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+  emitKimiCodeInstallProgress({ phase, message, receivedBytes, totalBytes });
+  if (!res.body) {
+    const buffer = Buffer.from(await res.arrayBuffer());
+    emitKimiCodeInstallProgress({ phase, message, receivedBytes: buffer.length, totalBytes: totalBytes ?? buffer.length, percent: 100 });
+    return buffer;
+  }
+  const reader = res.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    chunks.push(value);
+    receivedBytes += value.byteLength;
+    const elapsedSeconds = Math.max(0.001, (Date.now() - startedAt) / 1000);
+    emitKimiCodeInstallProgress({
+      phase,
+      message,
+      receivedBytes,
+      totalBytes,
+      bytesPerSecond: receivedBytes / elapsedSeconds,
+    });
+  }
+  const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+  emitKimiCodeInstallProgress({ phase, message, receivedBytes: buffer.length, totalBytes: totalBytes ?? buffer.length, percent: 100 });
+  return buffer;
+}
+
 function isPortableRuntime() {
   if (process.platform !== "win32") return false;
   const exeName = path.basename(process.execPath).toLowerCase();
@@ -845,6 +1072,35 @@ function pickUpdateAsset(assets: ReleaseAssetInfo[]) {
 
 function sanitizeDownloadName(name: string) {
   return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim() || "Kimix-update";
+}
+
+function normalizeKimiExportSessionId(sessionId?: string) {
+  const trimmed = sessionId?.trim();
+  if (!trimmed || trimmed.startsWith("kimix-prompt-") || trimmed.startsWith("creating-")) return "";
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return `session_${trimmed}`;
+  }
+  return trimmed;
+}
+
+async function exportKimiSessionArchive(request: { sessionId?: string; title?: string }) {
+  const kimiPath = await resolveKimiCommand();
+  if (!kimiPath) throw new Error("未找到 Kimi Code，无法导出会话");
+  const defaultName = `${sanitizeDownloadName(request.title || "Kimi 会话")}-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
+  const result = await dialog.showSaveDialog({
+    title: "导出 Kimi Debug ZIP",
+    defaultPath: path.join(app.getPath("downloads"), defaultName),
+    filters: [{ name: "ZIP 归档", extensions: ["zip"] }],
+  });
+  if (result.canceled || !result.filePath) {
+    return { path: "", output: "用户取消导出" };
+  }
+  ensureDirectoryExists(path.dirname(result.filePath));
+  const exportSessionId = normalizeKimiExportSessionId(request.sessionId);
+  const args = ["export", ...(exportSessionId ? [exportSessionId] : []), "-o", result.filePath, "-y"];
+  const output = await runLongCommand(kimiPath, args, 2 * 60 * 1000);
+  await shell.showItemInFolder(result.filePath);
+  return { path: result.filePath, output };
 }
 
 async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
@@ -977,14 +1233,37 @@ function parseSkillFrontmatter(content: string): { name?: string; description?: 
 function listLocalSkills() {
   const roots = [
     path.join(os.homedir(), ".kimix", "skills"),
+    path.join(os.homedir(), ".kimi-code", "skills"),
+    path.join(os.homedir(), ".kimi-code", "plugins"),
     path.join(os.homedir(), ".kimi", "skills"),
     path.join(os.homedir(), ".config", "agents", "skills"),
     path.join(os.homedir(), ".codex", "skills"),
   ];
   const settings = settingsService.loadSettings();
   const enabled = new Set(settings.enabledSkillNames ?? []);
-  const results: { name: string; description: string; path: string; source: string; enabled: boolean }[] = [];
+  const results: { name: string; description: string; path: string; source: string; sourceLabel: string; trustLevel: "kimi-official" | "curated" | "third-party" | "local"; enabled: boolean }[] = [];
   const seen = new Set<string>();
+
+  function classifySkillSource(root: string, skillPath: string) {
+    const normalizedRoot = root.replace(/\\/g, "/").toLowerCase();
+    const normalizedPath = skillPath.replace(/\\/g, "/").toLowerCase();
+    if (normalizedPath.includes("/.kimi-code/plugins/")) {
+      if (/\/(kimi-official|moonshot|official)\//.test(normalizedPath)) {
+        return { sourceLabel: "Kimi 官方 Plugin", trustLevel: "kimi-official" as const };
+      }
+      return { sourceLabel: "Kimi Plugin", trustLevel: "third-party" as const };
+    }
+    if (normalizedPath.includes("/superpowers/") || normalizedPath.includes("/.codex/plugins/cache/")) {
+      return { sourceLabel: "Curated", trustLevel: "curated" as const };
+    }
+    if (normalizedRoot.includes("/.kimix/skills")) {
+      return { sourceLabel: "Kimix 导入", trustLevel: "third-party" as const };
+    }
+    if (normalizedRoot.includes("/.kimi-code/skills")) {
+      return { sourceLabel: "Kimi Code 用户 Skill", trustLevel: "local" as const };
+    }
+    return { sourceLabel: "本地 Skill", trustLevel: "local" as const };
+  }
 
   function collectSkillFiles(root: string) {
     const skillFiles: string[] = [];
@@ -1025,11 +1304,14 @@ function listLocalSkills() {
         const meta = parseSkillFrontmatter(raw);
         const skillDir = path.dirname(skillPath);
         const fallbackName = path.basename(skillDir);
+        const sourceInfo = classifySkillSource(root, skillPath);
         results.push({
           name: meta.name || fallbackName,
           description: meta.description || "本地 Skill",
           path: skillPath,
           source: root,
+          sourceLabel: sourceInfo.sourceLabel,
+          trustLevel: sourceInfo.trustLevel,
           enabled: enabled.has(meta.name || fallbackName),
         });
         seen.add(normalizedSkillPath);
@@ -1380,7 +1662,7 @@ function readSuperpowersBootstrap() {
   if (superpowerSkills.length === 0) diagnostics.push("未识别到来自 superpowers 目录的 Skill");
   if (fs.existsSync(legacyAgentFile)) diagnostics.push(`发现旧 agent 文件残留：${legacyAgentFile}`);
   const roleAdditional = [
-    "当前会话已启用 Superpowers skills，并已通过 Kimi CLI 的 --skills-dir 提供给你。",
+    "当前会话已启用 Superpowers skills，并已通过 Kimi Code 的 --skills-dir 提供给你。",
     "不要把本文件内容复述给用户，不要声称调用了不存在的 Skill tool。",
     "在回答或执行用户任务前，先判断是否有相关 Superpowers skill 适用；如果适用，请按该 skill 的工作流执行，并在回复开头用一句中文简短说明“我会按 <skill-name> 的流程处理”。",
     "如果需要读取 skill 内容，请使用当前可用的文件/读取工具查看启用 skills 目录下对应的 SKILL.md；不要把整篇 SKILL.md 原样展示给用户。",
@@ -1440,7 +1722,7 @@ type KimiUsagePeriod = {
 };
 
 function kimiShareDir() {
-  return path.join(os.homedir(), ".kimi");
+  return resolveKimiShareDir();
 }
 
 function kimiCredentialsPath() {
@@ -1463,7 +1745,7 @@ function readKimiDeviceId() {
 
 function kimiCommonHeaders() {
   return {
-    "X-Msh-Platform": "kimi_cli",
+    "X-Msh-Platform": "kimi_code",
     "X-Msh-Version": app.getVersion(),
     "X-Msh-Device-Name": os.hostname() || "unknown",
     "X-Msh-Device-Model": `${os.type()} ${os.release()} ${os.arch()}`,
@@ -1492,20 +1774,24 @@ function readKimiOAuthToken(): KimiOAuthToken {
 }
 
 async function refreshKimiOAuthToken(token: KimiOAuthToken): Promise<KimiOAuthToken> {
+  const body = new URLSearchParams({
+    client_id: KIMI_CODE_CLIENT_ID,
+    grant_type: "refresh_token",
+    refresh_token: token.refresh_token,
+  }).toString();
   const res = await fetch(KIMI_CODE_REFRESH_URL, {
     method: "POST",
     headers: {
       ...kimiCommonHeaders(),
-      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({
-      client_id: KIMI_CODE_CLIENT_ID,
-      grant_type: "refresh_token",
-      refresh_token: token.refresh_token,
-    }),
+    body,
   });
   if (!res.ok) {
-    throw new Error(`Kimi 登录刷新失败：HTTP ${res.status}`);
+    const detail = await res.text().catch(() => "");
+    const message = detail.trim() ? `：${detail.trim().slice(0, 180)}` : "";
+    throw new Error(`Kimi 登录刷新失败：HTTP ${res.status}${message}`);
   }
   const payload = await res.json() as {
     access_token?: unknown;
@@ -1872,7 +2158,7 @@ const CreateLongTaskSchema = z.object({
   initialRequest: z.string().min(1).max(20000),
   thinking: z.boolean().optional(),
   yoloMode: z.boolean().optional(),
-  afkMode: z.boolean().optional(),
+  autoMode: z.boolean().optional(),
 });
 
 ipcMain.handle("project:addRecent", async (_, project: unknown) => {
@@ -1971,14 +2257,14 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     const title = (parsed.data.title?.trim() || initialRequest.trim().split(/\r?\n/)[0] || "长程任务").slice(0, 80);
     const thinking = parsed.data.thinking ?? true;
     const yoloMode = parsed.data.yoloMode ?? false;
-    const afkMode = parsed.data.afkMode ?? false;
+    const autoMode = parsed.data.autoMode ?? false;
 
     const executor = await kimiBridge.startSession({
       workDir: project.path,
       model: "kimi-code/kimi-for-coding",
       thinking,
       yoloMode,
-      afkMode,
+      autoMode,
     });
     executorSessionId = executor.sessionId;
 
@@ -1987,7 +2273,7 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
       model: "kimi-code/kimi-for-coding",
       thinking,
       yoloMode,
-      afkMode,
+      autoMode,
     });
     reviewerSessionId = reviewer.sessionId;
 
@@ -2327,7 +2613,7 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
     const requestPath = typeof req.path === "string" ? req.path : "";
     const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
     if (requestPath.trim() === "__latest_kimi_plan__") {
-      const kimiPlansDir = path.join(os.homedir(), ".kimi", "plans");
+      const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
       const hasPlanFile = fs.existsSync(kimiPlansDir) && fs.readdirSync(kimiPlansDir, { withFileTypes: true })
         .some((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"));
       if (!hasPlanFile) {
@@ -2484,7 +2770,7 @@ ipcMain.handle("hooks:generateRule", async (_, request: unknown) => {
 // Kimi IPC handlers
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
-    const kimiPath = await resolveCommand("kimi");
+    const kimiPath = await resolveKimiCommand();
     if (!kimiPath) {
       return {
         success: true,
@@ -2492,12 +2778,16 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
           available: false,
           verified: false,
           command: "kimi",
-          message: "未找到 kimi CLI，请检查 PATH",
+          version: null,
+          isLegacy: false,
+          message: "未找到 Kimi Code，请检查 PATH",
         },
       };
     }
     if (request?.verify) {
       const output = await runCommand(kimiPath, ["--version"]);
+      const version = extractKimiCliVersion(output);
+      const isLegacy = isLegacyKimiCodeInstallation(output, kimiPath);
       return {
         success: true,
         data: {
@@ -2506,10 +2796,15 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
           command: "kimi",
           path: kimiPath,
           output,
-          message: output || "Kimi CLI 响应正常",
+          version,
+          isLegacy,
+          message: isLegacy ? `检测到旧版 Kimi CLI ${version ?? ""}，建议升级并迁移到 Kimi Code` : output || "Kimi Code 响应正常",
         },
       };
     }
+    const output = await runCommand(kimiPath, ["--version"]).catch(() => "");
+    const version = extractKimiCliVersion(output);
+    const isLegacy = isLegacyKimiCodeInstallation(output, kimiPath);
     return {
       success: true,
       data: {
@@ -2517,7 +2812,10 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
         verified: false,
         command: "kimi",
         path: kimiPath,
-        message: "已找到 kimi CLI，点击检查验证响应",
+        output,
+        version,
+        isLegacy,
+        message: isLegacy ? `已找到旧版 Kimi CLI ${version ?? ""}，请升级并迁移` : "已找到 Kimi Code，点击检查验证响应",
       },
     };
   } catch (err) {
@@ -2693,7 +2991,7 @@ ipcMain.handle("kimi:updateCli", async () => {
   }
 });
 
-ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; planMode?: boolean; afkMode?: boolean; skillsDir?: string; agentFile?: string }) => {
+ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string }) => {
   try {
     const settings = settingsService.loadSettings();
     const skillsDir = request.skillsDir || ((settings.enabledSkillNames ?? []).length > 0 ? settings.enabledSkillsDir || enabledSkillsDir() : undefined);
@@ -2757,8 +3055,8 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
     : [];
   const thinking = typeof req.thinking === "boolean" ? req.thinking : undefined;
   const yoloMode = typeof req.yoloMode === "boolean" ? req.yoloMode : undefined;
+  const autoMode = typeof req.autoMode === "boolean" ? req.autoMode : undefined;
   const planMode = typeof req.planMode === "boolean" ? req.planMode : undefined;
-  const afkMode = typeof req.afkMode === "boolean" ? req.afkMode : undefined;
   if (!sessionId || (!content && images.length === 0)) {
     return { success: false, error: "Missing sessionId or content" };
   }
@@ -2769,7 +3067,7 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
       ]
     : content;
   try {
-    await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode, planMode, afkMode });
+    await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode, autoMode, planMode });
     return { success: true, data: { sessionId } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -2893,7 +3191,7 @@ ipcMain.handle("kimi:getUsage", async () => {
 
 ipcMain.handle("kimi:startVis", async () => {
   try {
-    let kimiPath = await resolveCommand("kimi");
+    let kimiPath = await resolveKimiCommand();
     if (!kimiPath) {
       const hinted = commandHintPaths("kimi").find((candidate) => fs.existsSync(candidate));
       if (hinted) {
@@ -2914,7 +3212,7 @@ ipcMain.handle("kimi:startVis", async () => {
       }
     }
     if (!kimiPath) {
-      return { success: false, error: "未找到 kimi CLI。请先安装并在终端运行 'kimi --version' 确认可用。" };
+      return { success: false, error: "未找到 Kimi Code。请先安装并在终端运行 'kimi --version' 确认可用。" };
     }
 
     // 验证 kimi 可执行
@@ -2947,7 +3245,7 @@ ipcMain.handle("kimi:startVis", async () => {
     if (exited) {
       return {
         success: false,
-        error: "kimi vis 进程启动后立刻退出。请确保 kimi CLI 已正确安装，并能在终端运行 'kimi vis --no-open'。",
+        error: "kimi vis 进程启动后立刻退出。请确保 Kimi Code 已正确安装，并能在终端运行 'kimi vis --no-open'。",
       };
     }
 
@@ -2957,7 +3255,7 @@ ipcMain.handle("kimi:startVis", async () => {
     } catch {
       return {
         success: false,
-        error: "kimi vis 进程已退出。请确保 kimi CLI 已正确安装。",
+        error: "kimi vis 进程已退出。请确保 Kimi Code 已正确安装。",
       };
     }
 
@@ -2972,6 +3270,21 @@ ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; session
   try {
     const events = await kimiBridge.getSessionHistory(request.workDir, request.sessionId);
     return { success: true, data: { sessionId: request.sessionId, events } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:exportSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    return {
+      success: true,
+      data: await exportKimiSessionArchive({
+        sessionId: typeof req.sessionId === "string" ? req.sessionId : undefined,
+        title: typeof req.title === "string" ? req.title : undefined,
+      }),
+    };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -3073,10 +3386,9 @@ const SettingsSchema = z.object({
   defaultModel: z.string().optional(),
   defaultThinking: z.boolean().optional(),
   defaultPlanMode: z.boolean().optional(),
-  defaultAfkMode: z.boolean().optional(),
   maxTurns: z.number().int().min(1).max(1000).optional(),
   enableCompaction: z.boolean().optional(),
-  defaultPermissionMode: z.enum(["manual", "approve_for_session", "yolo"]).optional(),
+  defaultPermissionMode: z.enum(["manual", "auto", "yolo"]).optional(),
   theme: z.enum(["dark", "light", "system"]).optional(),
   fontSize: z.number().int().min(8).max(32).optional(),
   showThinking: z.boolean().optional(),
