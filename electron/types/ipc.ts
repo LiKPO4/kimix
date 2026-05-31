@@ -1,4 +1,4 @@
-﻿export type OpenProjectRequest = {
+export type OpenProjectRequest = {
   defaultPath?: string;
 }
 
@@ -33,6 +33,15 @@ export type Project = {
 export type LongTaskStage = "drafting" | "planning" | "ready" | "running" | "reviewing" | "paused" | "completed";
 export type LongTaskAgentRole = "executor" | "reviewer";
 
+export type LongTaskRecoveryStatus = "none" | "failed" | "interrupted" | "paused";
+
+export type LongTaskRecoveryInfo = {
+  status: LongTaskRecoveryStatus;
+  reason: string;
+  suggestedAction: string;
+  updatedAt: number;
+};
+
 export type LongTaskSummary = {
   id: string;
   title: string;
@@ -47,6 +56,7 @@ export type LongTaskSummary = {
   reviewerSessionId: string;
   stage: LongTaskStage;
   activeAgent: LongTaskAgentRole;
+  recovery?: LongTaskRecoveryInfo | null;
   currentStep: number;
   targetStep: number | null;
   reviewedReviewItems?: string[];
@@ -113,7 +123,7 @@ export type GetLongTaskDetailResponse = {
 export type UpdateLongTaskStateRequest = {
   projectPath: string;
   taskId: string;
-  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems" | "executorSessionId" | "reviewerSessionId">>;
+  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "recovery" | "currentStep" | "targetStep" | "reviewedReviewItems" | "executorSessionId" | "reviewerSessionId">>;
 }
 
 export type UpdateLongTaskStateResponse = {
@@ -170,11 +180,175 @@ export type StartSessionResponse = {
   data: {
     sessionId: string;
     workDir: string;
+    model?: string | null;
     slashCommands?: SlashCommandInfo[];
   };
 } | {
   success: false;
   error: string;
+};
+
+export type TuiSessionStatus = "starting" | "running" | "stopping" | "exited" | "error";
+
+export type TuiToolCallSnapshot = {
+  toolCallId: string;
+  toolName: string;
+  command: string;
+  status: "running" | "success" | "error";
+  output: string;
+};
+
+export type TuiApprovalPreviewSnapshot = {
+  kind: "write" | "edit";
+  toolName: string;
+  filePath: string;
+  oldText: string;
+  newText: string;
+};
+
+export type TuiChangeSummarySnapshot = {
+  kind: "write" | "edit";
+  filePath: string;
+  additions: number;
+  deletions: number;
+};
+
+export type TuiQuestionSnapshot = {
+  questionId: string;
+  questionText: string;
+};
+
+export type TuiPluginSnapshot = {
+  id: string;
+  name: string;
+  status: "enabled" | "installed" | "disabled" | "available" | "unknown";
+  trustLevel: "official" | "curated" | "third-party" | "unknown";
+  skillsCount: number | null;
+  mcpSummary: string | null;
+  version: string | null;
+  source: "installed" | "marketplace";
+  selected: boolean;
+};
+
+export type TuiModelOptionSnapshot = {
+  id: string;
+  name: string;
+  provider: string | null;
+  selected: boolean;
+  current: boolean;
+};
+
+export type TuiScreenSnapshot = {
+  cols: number;
+  rows: number;
+  cursorX: number;
+  cursorY: number;
+  viewportY: number;
+  baseY: number;
+  lines: string[];
+  assistantText: string;
+  answerText: string;
+  thinkingText: string;
+  approvalText: string;
+  approvalPreview: TuiApprovalPreviewSnapshot | null;
+  changeSummary: TuiChangeSummarySnapshot | null;
+  changeSummaries: TuiChangeSummarySnapshot[];
+  toolCalls: TuiToolCallSnapshot[];
+  questionRequest: TuiQuestionSnapshot | null;
+  permissionMode: "manual" | "auto" | null;
+  modelName: string | null;
+  models: TuiModelOptionSnapshot[];
+  plugins: TuiPluginSnapshot[];
+  isBusy: boolean;
+  isAwaitingApproval: boolean;
+  isInputIdle: boolean;
+  updatedAt: number;
+};
+
+export type TuiSessionSummary = {
+  sessionId: string;
+  workDir: string;
+  command: string;
+  args: string[];
+  backend: "pty" | "pipe";
+  status: TuiSessionStatus;
+  pid: number | null;
+  startedAt: number;
+  updatedAt: number;
+  exitCode: number | null;
+  signal: string | number | null;
+  interrupted: boolean;
+  error: string | null;
+  rawOutput: string;
+  output: string;
+  screen: TuiScreenSnapshot | null;
+  officialSessionId?: string | null;
+  sessionDir?: string | null;
+  wireFile?: string | null;
+  rawWireTail?: string;
+  semanticEventsTail?: TuiSemanticEvent[];
+};
+
+export type StartTuiSessionRequest = {
+  workDir?: string;
+  command?: string;
+  args?: string[];
+};
+
+export type StartTuiSessionResponse = {
+  success: true;
+  data: TuiSessionSummary;
+} | {
+  success: false;
+  error: string;
+};
+
+export type SendTuiInputRequest = {
+  sessionId: string;
+  text: string;
+  images?: { name: string; dataUrl: string }[];
+};
+
+export type TuiKeyName = "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO";
+
+export type SendTuiKeyRequest = {
+  sessionId: string;
+  key: TuiKeyName;
+};
+
+export type StopTuiSessionRequest = {
+  sessionId: string;
+};
+
+export type ResizeTuiSessionRequest = {
+  sessionId: string;
+  cols: number;
+  rows: number;
+};
+
+export type ListTuiSessionsResponse = {
+  success: true;
+  data: TuiSessionSummary[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type TuiEventPayload = {
+  sessionId: string;
+  kind: "started" | "output" | "screen" | "semantic" | "status" | "exit" | "error";
+  session: TuiSessionSummary;
+  chunk?: string;
+  message?: string;
+  semanticEvents?: TuiSemanticEvent[];
+};
+
+export type TuiSemanticEvent = {
+  type: string;
+  payload?: Record<string, unknown>;
+  time?: number;
+  turnId?: string;
+  toolCallId?: string;
 };
 
 export type SlashCommandInfo = {
@@ -227,6 +401,74 @@ export type KimiAuthStatus = {
   message: string;
 };
 
+export type KimiModelProviderSummary = {
+  name: string;
+  type: string | null;
+  baseUrl: string | null;
+  hasApiKey: boolean;
+  hasOauth: boolean;
+};
+
+export type KimiModelAliasSummary = {
+  alias: string;
+  provider: string | null;
+  model: string | null;
+  displayName: string | null;
+  maxContextSize: number | null;
+  isDefault: boolean;
+};
+
+export type KimiModelConfigSummary = {
+  configPath: string;
+  exists: boolean;
+  defaultModel: string | null;
+  providers: KimiModelProviderSummary[];
+  models: KimiModelAliasSummary[];
+};
+
+export type GetKimiModelConfigResponse = {
+  success: true;
+  data: KimiModelConfigSummary;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiOpenAiProviderConfigRequest = {
+  providerName: string;
+  modelAlias: string;
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+  maxContextSize?: number;
+  makeDefault?: boolean;
+};
+
+export type SetKimiDefaultModelRequest = {
+  modelAlias: string;
+};
+
+export type SaveKimiModelConfigResponse = {
+  success: true;
+  data: KimiModelConfigSummary & {
+    message: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type TestKimiModelConfigResponse = {
+  success: true;
+  data: {
+    message: string;
+    output: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type GetKimiAuthStatusResponse = {
   success: true;
   data: KimiAuthStatus;
@@ -267,11 +509,20 @@ export type McpServerInfo = {
   auth?: "oauth" | string;
 };
 
+export type PluginMcpServerInfo = McpServerInfo & {
+  pluginId: string;
+  pluginName: string;
+  pluginPath: string;
+  manifestPath: string;
+  enabled: boolean;
+};
+
 export type ListMcpServersResponse = {
   success: true;
   data: {
     configPath: string;
     servers: McpServerInfo[];
+    pluginServers: PluginMcpServerInfo[];
     rawExists: boolean;
   };
 } | {
@@ -288,6 +539,11 @@ export type AddMcpServerRequest = {
   env?: string[];
   headers?: string[];
   auth?: "oauth";
+};
+
+export type ImportPluginMcpServerRequest = {
+  manifestPath: string;
+  name: string;
 };
 
 export type RemoveMcpServerRequest = {
@@ -509,6 +765,22 @@ export type ExportSessionRequest = {
   title?: string;
 }
 
+export type ExportMarkdownRequest = {
+  title?: string;
+  content: string;
+}
+
+export type ExportMarkdownResponse = {
+  success: true;
+  data: {
+    path: string;
+    output?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type ExportSessionResponse = {
   success: true;
   data: {
@@ -672,6 +944,24 @@ export type ImportSkillArchiveResponse = {
   error: string;
 };
 
+export type InstallKimiPluginRequest = {
+  url: string;
+};
+
+export type InstallKimiPluginResponse = {
+  success: true;
+  data: {
+    message: string;
+    output: string;
+    skills: SkillInfo[];
+    enabledNames: string[];
+    enabledDir: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type InstallSuperpowersResponse = {
   success: true;
   data: {
@@ -815,6 +1105,7 @@ export type AppSettings = {
   voiceShortcut: string;
   notificationMode: "never" | "unfocused" | "always";
   clarificationToolMode: "off" | "on" | "auto";
+  experimentalTuiEngineEnabled: boolean;
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;
@@ -902,4 +1193,3 @@ export type DefaultWorkDirResponse = {
   success: false;
   error: string;
 }
-

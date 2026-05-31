@@ -17,7 +17,7 @@ function buildPlanningKickoffPrompt(task: LongTaskSummary) {
 - ${task.executorPromptPath}
 - ${task.bigPlanPath}
 
-然后基于用户初始需求开始澄清与规划阶段。你需要先判断是否还需要澄清；如果需要，必须调用官方 AskUserQuestion/需求澄清工具提出 1-3 个关键问题，让界面显示结构化澄清卡片；不要用普通正文罗列问题替代需求澄清工具。可以多轮澄清，直到目标、范围、验收标准和风险边界足够明确。不要直接开始执行代码。
+然后基于用户初始需求开始澄清与规划阶段。你需要先判断是否还需要澄清；如果当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，可以使用官方 AskUserQuestion/需求澄清工具提出 1-3 个关键问题，让界面显示结构化澄清卡片。若当前处于 prompt/auto 等禁止向用户提问的模式，不要调用 AskUserQuestion，改为做合理假设、记录风险并继续规划。可以多轮澄清，直到目标、范围、验收标准和风险边界足够明确。不要直接开始执行代码。
 规划阶段只和用户澄清并完善 BIGPLAN，不要交给审查 agent。进入执行阶段后，每轮执行完成需要审查时，只说明交给审查 agent 审查；不要自己调用 subagent、Reviewer 或其它子代理来模拟审查，Kimix 会用独立 reviewer session 接棒。
 
 用户初始需求：

@@ -44,6 +44,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const updateSession = useSessionStore((s) => s.updateSession);
   const [query, setQuery] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [searchOnlySessions, setSearchOnlySessions] = useState<Session[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -52,33 +53,49 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   }, [open]);
 
   useEffect(() => {
+    setSearchOnlySessions([]);
+  }, [currentProject?.path]);
+
+  useEffect(() => {
     if (!open || !currentProject) return;
     let cancelled = false;
     void window.api.listSessions({ workDir: currentProject.path }).then((res) => {
       if (cancelled || !res.success) return;
-      const knownIds = new Set(useSessionStore.getState().sessions.map((session) => session.id));
-      for (const item of res.data) {
-        if (isHiddenInternalSession(item)) continue;
-        if (knownIds.has(item.id)) continue;
-        addSession({
-          id: item.id,
-          title: item.brief || "历史对话",
-          projectPath: item.workDir || currentProject.path,
-          createdAt: item.updatedAt,
-          updatedAt: item.updatedAt,
-          events: [],
-          isLoading: false,
-        });
-      }
+      setSearchOnlySessions((current) => {
+        const knownIds = new Set([
+          ...useSessionStore.getState().sessions.map((session) => session.id),
+          ...current.map((session) => session.id),
+        ]);
+        const additions = res.data
+          .filter((item) => !knownIds.has(item.id) && !isHiddenInternalSession(item))
+          .map((item): Session => ({
+            id: item.id,
+            title: item.brief || "历史对话",
+            projectPath: item.workDir || currentProject.path,
+            createdAt: item.updatedAt,
+            updatedAt: item.updatedAt,
+            events: [],
+            isLoading: false,
+          }));
+        return additions.length > 0 ? [...additions, ...current] : current;
+      });
     });
     return () => {
       cancelled = true;
     };
-  }, [open, currentProject?.path, addSession]);
+  }, [open, currentProject?.path]);
+
+  const searchableSessions = useMemo(() => {
+    const storeIds = new Set(sessions.map((session) => session.id));
+    return [
+      ...sessions,
+      ...searchOnlySessions.filter((session) => !storeIds.has(session.id)),
+    ];
+  }, [sessions, searchOnlySessions]);
 
   useEffect(() => {
     if (!open || !currentProject) return;
-    const unloaded = sessions
+    const unloaded = searchableSessions
       .filter((session) => session.projectPath === currentProject.path && session.events.length === 0)
       .filter((session) => !isHiddenInternalSession(session))
       .slice(0, 12);
@@ -90,27 +107,42 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       if (!loaded.success || cancelled) return;
       const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
       if (isHiddenInternalSession({ ...session, events })) return;
-      updateSession(session.id, (current) => ({
-        ...current,
-        events,
-        title: deriveSessionTitle(events, current.title),
-        isLoading: false,
-        updatedAt: Date.now(),
-      }));
+      const isStoreSession = useSessionStore.getState().sessions.some((item) => item.id === session.id);
+      if (isStoreSession) {
+        updateSession(session.id, (current) => ({
+          ...current,
+          events,
+          title: deriveSessionTitle(events, current.title),
+          isLoading: false,
+        }));
+        return;
+      }
+      setSearchOnlySessions((current) => current.map((item) => (
+        item.id === session.id
+          ? { ...item, events, title: deriveSessionTitle(events, item.title), isLoading: false }
+          : item
+      )));
     })).finally(() => {
       if (!cancelled) setLoadingHistory(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [open, currentProject?.path, sessions, updateSession]);
+  }, [open, currentProject?.path, searchableSessions, updateSession]);
 
   const projectSessions = useMemo(() => {
-    return sessions
+    return searchableSessions
       .filter((session) => !session.archivedAt && (!currentProject || session.projectPath === currentProject.path))
       .filter((session) => !isHiddenInternalSession(session))
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [sessions, currentProject]);
+  }, [searchableSessions, currentProject]);
+
+  const openSession = (session: Session) => {
+    const current = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+    if (!current) addSession(session);
+    setCurrentSession(current ?? session);
+    onClose();
+  };
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -149,8 +181,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             onKeyDown={(event) => {
               if (event.key === "Escape") onClose();
               if (event.key === "Enter" && matches[0]) {
-                setCurrentSession(matches[0].session);
-                onClose();
+                openSession(matches[0].session);
               }
             }}
             className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none placeholder:text-text-muted"
@@ -168,8 +199,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             <button
               key={`${match.session.id}-${match.kind}-${match.timestamp}-${index}`}
               onClick={() => {
-                setCurrentSession(match.session);
-                onClose();
+                openSession(match.session);
               }}
               className="flex min-h-12 w-full items-center rounded-xl text-left transition-colors hover:bg-surface-hover"
               style={{ gap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}

@@ -1,10 +1,11 @@
 import { create } from "zustand";
-import type { Session, TimelineEvent, Project } from "@/types/ui";
+import type { Session, TimelineEvent, Project, UserMessageImage } from "@/types/ui";
 
 export interface PendingMessage {
   id: string;
   content: string;
   createdAt: number;
+  images?: UserMessageImage[];
 }
 
 export interface SessionStore {
@@ -19,7 +20,7 @@ export interface SessionStore {
   archiveSession: (id: string) => void;
   restoreSession: (id: string) => void;
   setRecentProjects: (projects: Project[]) => void;
-  addPendingMessage: (content: string) => void;
+  addPendingMessage: (content: string, images?: UserMessageImage[]) => void;
   updatePendingMessage: (id: string, content: string) => void;
   removePendingMessage: (id: string) => void;
   movePendingMessage: (id: string, direction: "up" | "down") => void;
@@ -28,11 +29,12 @@ export interface SessionStore {
   shiftPendingMessage: () => PendingMessage | undefined;
 }
 
-function createPendingMessage(content: string): PendingMessage {
+function createPendingMessage(content: string, images: UserMessageImage[] = []): PendingMessage {
   return {
     id: crypto.randomUUID(),
     content,
     createdAt: Date.now(),
+    images,
   };
 }
 
@@ -84,13 +86,16 @@ export const useSessionStore = create<SessionStore>((set) => ({
 
   setRecentProjects: (projects) => set({ recentProjects: projects }),
 
-  addPendingMessage: (content) =>
+  addPendingMessage: (content, images = []) =>
     set((state) => {
       const normalized = content.trim();
-      if (!normalized) return state;
+      const normalizedImages = images.filter((image) => Boolean(image.dataUrl));
+      if (!normalized && normalizedImages.length === 0) return state;
       const latest = state.pendingMessages.at(-1);
-      if (latest?.content.trim() === normalized) return state;
-      return { pendingMessages: [...state.pendingMessages, createPendingMessage(normalized)] };
+      const imageSignature = normalizedImages.map((image) => image.dataUrl || image.name).join("|");
+      const latestImageSignature = (latest?.images ?? []).map((image) => image.dataUrl || image.name).join("|");
+      if (latest?.content.trim() === normalized && latestImageSignature === imageSignature) return state;
+      return { pendingMessages: [...state.pendingMessages, createPendingMessage(normalized, normalizedImages)] };
     }),
 
   updatePendingMessage: (id, content) =>

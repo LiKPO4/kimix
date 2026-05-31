@@ -48,6 +48,14 @@ const longTaskStageLabels: Record<LongTaskStage, string> = {
   completed: "已完成",
 };
 
+function longTaskRecoveryLabel(recovery?: Session["longTask"] extends infer T ? T extends object ? T["recovery"] : never : never) {
+  if (!recovery || recovery.status === "none") return "";
+  if (recovery.status === "failed") return "可恢复 · 失败";
+  if (recovery.status === "interrupted") return "可恢复 · 中断";
+  if (recovery.status === "paused") return "可恢复 · 暂停";
+  return "";
+}
+
 const longTaskAgentLabels: Record<LongTaskAgent, string> = {
   executor: "执行",
   reviewer: "审查",
@@ -229,7 +237,9 @@ export function SessionToolbar({
             type="button"
             onClick={onOpenLongTaskInspector}
             className={`flex h-9 min-w-[148px] items-center rounded-xl border bg-surface-elevated text-left transition-colors ${
-              longTaskStatusTone === "reviewer"
+              longTaskMeta.recovery && longTaskMeta.recovery.status !== "none"
+                ? "border-accent-warning text-accent-warning hover:bg-accent-warning-light"
+                : longTaskStatusTone === "reviewer"
                 ? "border-accent-warning text-accent-warning hover:bg-accent-warning-light"
                 : "border-accent-primary-soft text-accent-primary hover:bg-accent-primary-light"
             }`}
@@ -237,7 +247,9 @@ export function SessionToolbar({
             title="查看长程任务状态"
             aria-label="查看长程任务状态"
           >
-            {longTaskMeta.stage === "completed" ? (
+            {longTaskMeta.recovery && longTaskMeta.recovery.status !== "none" ? (
+              <Pause size={15} className="shrink-0" />
+            ) : longTaskMeta.stage === "completed" ? (
               <CheckCircle2 size={15} className="shrink-0" />
             ) : isCurrentSessionRunning ? (
               <Square size={13} className="shrink-0 fill-current" />
@@ -247,7 +259,7 @@ export function SessionToolbar({
               <Play size={15} className="shrink-0" />
             )}
             <span className="min-w-0 flex-1 truncate text-[13px] leading-5">
-              {longTaskAgentLabels[longTaskMeta.activeAgent]} · {longTaskStageLabels[longTaskMeta.stage]}
+              {longTaskRecoveryLabel(longTaskMeta.recovery) || `${longTaskAgentLabels[longTaskMeta.activeAgent]} · ${longTaskStageLabels[longTaskMeta.stage]}`}
             </span>
             <span className="shrink-0 rounded-full bg-surface-elevated/75 text-[12px] leading-5" style={{ paddingLeft: 8, paddingRight: 8 }}>
               {longTaskMeta.currentStep}{longTaskMeta.targetStep ? `/${longTaskMeta.targetStep}` : ""}

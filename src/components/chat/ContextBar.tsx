@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, ChevronDown, Download, ExternalLink, FolderOpen, GitBranch, Loader2, X } from "lucide-react";
+import { BarChart3, Bot, ChevronDown, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, TerminalSquare, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import type { KimiUsageResponse, TuiSessionSummary, UsagePeriod } from "../../../electron/types/ipc";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 
@@ -22,6 +23,17 @@ function formatDuration(ms: number) {
   if (days > 0) return hours > 0 ? `${days}天${hours}小时` : `${days}天`;
   if (hours > 0) return minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`;
   return `${minutes}分钟`;
+}
+
+function formatUpdatedAt(value: number | undefined) {
+  if (!value) return "尚未刷新";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "尚未刷新";
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function isUsageLoginExpired(message?: string) {
+  return Boolean(message && /授权失败|重新登录|login|401|unauthorized/i.test(message));
 }
 
 function formatRefreshTime(value: number | undefined, now: number) {
@@ -59,20 +71,117 @@ function showPendingToast() {
   window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "待实现" }));
 }
 
+function formatTuiStatus(status: TuiSessionSummary["status"] | undefined) {
+  switch (status) {
+    case "starting":
+      return "启动中";
+    case "running":
+      return "运行中";
+    case "exited":
+      return "已退出";
+    case "error":
+      return "异常";
+    default:
+      return "连接中";
+  }
+}
+
+function formatPluginSource(source: string | undefined) {
+  return source === "marketplace" ? "Marketplace" : "Installed";
+}
+
 export function ContextBar() {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
+  const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const session = useLiveSession(currentSession?.id);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   const [workDirsOpen, setWorkDirsOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
+  const [executionOpen, setExecutionOpen] = useState(false);
+  const [modelNavigating, setModelNavigating] = useState<"up" | "down" | null>(null);
+  const [modelClosing, setModelClosing] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [usageLoginState, setUsageLoginState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [now, setNow] = useState(Date.now());
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const workDirsRef = useRef<HTMLDivElement>(null);
+  const executionRef = useRef<HTMLDivElement>(null);
+  const activeSession = session ?? currentSession;
+  const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
+  const isTuiSession = activeSession?.engine === "tui";
+  const [tuiRuntimeSummary, setTuiRuntimeSummary] = useState<TuiSessionSummary | null>(null);
+  const sessionModel = activeSession?.model ?? null;
+  const executionLabel = isTuiSession
+    ? `hidden TUI · ${tuiRuntimeSummary?.backend?.toUpperCase() ?? "PTY"} · ${formatTuiStatus(tuiRuntimeSummary?.status)}`
+    : "Prompt 兼容链路";
+  const executionTitle = isTuiSession
+    ? `当前对话底层执行层：真实隐藏 Kimi Code TUI${activeRuntimeSessionId ? `\nRuntime: ${activeRuntimeSessionId}` : ""}`
+    : "当前对话底层执行层：prompt-mode 兼容链路";
+  const tuiPlugins = tuiRuntimeSummary?.screen?.plugins ?? [];
+  const tuiModels = tuiRuntimeSummary?.screen?.models ?? [];
+  const selectedTuiPlugin = tuiPlugins.find((plugin) => plugin.selected);
+  const selectedTuiModel = tuiModels.find((model) => model.selected);
+  const tuiScreenPreview = (tuiRuntimeSummary?.screen?.lines ?? [])
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0)
+    .slice(-5)
+    .join("\n");
+
+  const navigateTuiModel = async (direction: "up" | "down") => {
+    if (!activeRuntimeSessionId) return;
+    setModelNavigating(direction);
+    try {
+      const res = await window.api.sendTuiKey({
+        sessionId: activeRuntimeSessionId,
+        key: direction === "up" ? "arrowUp" : "arrowDown",
+      });
+      if (!res.success) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `移动 TUI 模型选中项失败：${res.error}` }));
+      }
+    } finally {
+      window.setTimeout(() => setModelNavigating(null), 180);
+    }
+  };
+
+  const closeTuiModelMenu = async () => {
+    if (!activeRuntimeSessionId) return;
+    setModelClosing(true);
+    try {
+      const res = await window.api.sendTuiKey({ sessionId: activeRuntimeSessionId, key: "escape" });
+      if (!res.success) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `退出 TUI 模型菜单失败：${res.error}` }));
+      }
+    } finally {
+      window.setTimeout(() => setModelClosing(false), 180);
+    }
+  };
+
+  useEffect(() => {
+    if (!isTuiSession || !activeRuntimeSessionId) {
+      setTuiRuntimeSummary(null);
+      return;
+    }
+    let cancelled = false;
+    const sync = (summary: TuiSessionSummary | null | undefined) => {
+      if (!cancelled) setTuiRuntimeSummary(summary ?? null);
+    };
+    void window.api.listTuiSessions().then((res) => {
+      if (!res.success) return;
+      sync(res.data.find((item) => item.sessionId === activeRuntimeSessionId));
+    }).catch(() => {});
+    const unsubscribe = window.api.onTuiEvent((payload) => {
+      if (payload.sessionId !== activeRuntimeSessionId) return;
+      sync(payload.session);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [activeRuntimeSessionId, isTuiSession]);
 
   const handleExport = () => {
     if (!session) return;
@@ -136,6 +245,7 @@ export function ContextBar() {
 
   const loadUsage = async () => {
     setUsageLoading(true);
+    setUsageLoginState("idle");
     try {
       const res = await window.api.getKimiUsage();
       if (res.success) {
@@ -168,12 +278,44 @@ export function ContextBar() {
     }
   };
 
+  const loginForUsage = async () => {
+    setUsageLoginState("running");
+    const res = await window.api.loginKimi();
+    if (!res.success) {
+      setUsageLoginState("error");
+      setUsageData((current) => current ? { ...current, message: res.error } : current);
+      return;
+    }
+    setUsageLoginState("done");
+    window.dispatchEvent(new CustomEvent("kimix:kimi-auth-changed"));
+    await loadUsage();
+  };
   const toggleUsage = () => {
     const next = !usageOpen;
     setUsageOpen(next);
     if (next && !usageData) {
       void loadUsage();
     }
+  };
+
+  const openModelSettings = async () => {
+    const activeSession = currentSession?.engine === "tui" ? currentSession : session ?? currentSession;
+    const runtimeSessionId = activeSession?.engine === "tui" ? getRuntimeSessionId(activeSession) : null;
+    if (runtimeSessionId) {
+      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/model" });
+      if (res.success) {
+        setUsageOpen(false);
+        setWorkDirsOpen(false);
+        setExecutionOpen(true);
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已打开官方 TUI 模型菜单，可在执行层查看" }));
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `打开 TUI 模型菜单失败：${res.error}` }));
+    }
+    setWorkspaceView("settings");
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("kimix:focus-model-settings"));
+    }, 80);
   };
 
   const openVisualizer = async () => {
@@ -213,7 +355,7 @@ export function ContextBar() {
   }, [project?.path, project?.gitBranch]);
 
   useEffect(() => {
-    if (!usageOpen && !workDirsOpen) return;
+    if (!usageOpen && !workDirsOpen && !executionOpen) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     const handlePointerDown = (event: PointerEvent) => {
@@ -223,13 +365,16 @@ export function ContextBar() {
       if (!workDirsRef.current?.contains(event.target as Node)) {
         setWorkDirsOpen(false);
       }
+      if (!executionRef.current?.contains(event.target as Node)) {
+        setExecutionOpen(false);
+      }
     };
     document.addEventListener("pointerdown", handlePointerDown);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [usageOpen, workDirsOpen]);
+  }, [usageOpen, workDirsOpen, executionOpen]);
 
   return (
     <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[var(--kimix-panel-text-secondary)]" style={{ height: 36 }}>
@@ -368,6 +513,143 @@ export function ContextBar() {
             <span className="max-w-[150px] truncate">{gitBranch}</span>
           </button>
         )}
+        <div ref={executionRef} className="relative min-w-0">
+          <button
+            type="button"
+            onClick={() => setExecutionOpen((value) => !value)}
+            className="kimix-muted-action flex min-w-0 items-center rounded-lg bg-[var(--kimix-panel-soft-bg)]"
+            style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
+            title={executionTitle}
+            aria-label={executionTitle.replace(/\n/g, " ")}
+          >
+            <TerminalSquare size={16} className="shrink-0" />
+            <span className="shrink-0">执行层</span>
+            <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]">{executionLabel}</span>
+            <ChevronDown size={14} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
+          </button>
+          {executionOpen && (
+            <div className="kimix-floating-panel absolute bottom-10 left-0 z-40 w-[380px] rounded-xl" style={{ padding: "18px 20px 20px" }}>
+              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[15px] font-semibold leading-5 text-[var(--kimix-panel-text)]">执行层</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>
+                    {isTuiSession ? "正式对话正在接管真实 hidden TUI。" : "当前对话仍在使用 prompt-mode 兼容链路。"}
+                  </div>
+                </div>
+                <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                  {isTuiSession ? "TUI" : "Prompt"}
+                </span>
+              </div>
+              <div className="flex flex-col" style={{ gap: 10, marginTop: 16 }}>
+                <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 13px" }}>
+                  <div className="grid min-w-0" style={{ gridTemplateColumns: "88px minmax(0, 1fr)", gap: 10 }}>
+                    <span className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">状态</span>
+                    <span className="truncate text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">{executionLabel}</span>
+                  </div>
+                  <div className="grid min-w-0" style={{ gridTemplateColumns: "88px minmax(0, 1fr)", gap: 10, marginTop: 8 }}>
+                    <span className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">Runtime</span>
+                    <span className="truncate text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={activeRuntimeSessionId ?? undefined}>
+                      {activeRuntimeSessionId ?? "未绑定"}
+                    </span>
+                  </div>
+                  <div className="grid min-w-0" style={{ gridTemplateColumns: "88px minmax(0, 1fr)", gap: 10, marginTop: 8 }}>
+                    <span className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">模型/权限</span>
+                    <span className="truncate text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                      {tuiRuntimeSummary?.screen?.modelName ?? sessionModel ?? "未记录"} · {tuiRuntimeSummary?.screen?.permissionMode ?? "manual"}
+                    </span>
+                  </div>
+                </div>
+                {isTuiSession && (
+                  <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "12px 13px" }}>
+                    <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                      <span className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">TUI 镜像摘要</span>
+                      <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                        {tuiRuntimeSummary?.screen ? `${tuiRuntimeSummary.screen.cols}x${tuiRuntimeSummary.screen.rows}` : "等待屏幕"}
+                      </span>
+                    </div>
+                    {selectedTuiPlugin ? (
+                      <div className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10, padding: "8px 10px" }}>
+                        插件选中：<span className="font-medium text-[var(--kimix-panel-text)]">{selectedTuiPlugin.name}</span> · {formatPluginSource(selectedTuiPlugin.source)}
+                      </div>
+                    ) : null}
+                    {tuiModels.length > 0 ? (
+                      <div className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 10, padding: "9px 10px" }}>
+                        <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                          <span className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                            模型选中：<span className="font-medium text-[var(--kimix-panel-text)]">{selectedTuiModel?.name ?? tuiRuntimeSummary?.screen?.modelName ?? "未选中"}</span>
+                          </span>
+                          <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                            {tuiModels.length}
+                          </span>
+                        </div>
+                        <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 9 }}>
+                          <button
+                            type="button"
+                            onClick={() => void navigateTuiModel("up")}
+                            disabled={Boolean(modelNavigating) || modelClosing}
+                            className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
+                            style={{ width: "100%" }}
+                          >
+                            <span>{modelNavigating === "up" ? "移动中" : "上移选中"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void navigateTuiModel("down")}
+                            disabled={Boolean(modelNavigating) || modelClosing}
+                            className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
+                            style={{ width: "100%" }}
+                          >
+                            <span>{modelNavigating === "down" ? "移动中" : "下移选中"}</span>
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void closeTuiModelMenu()}
+                          disabled={Boolean(modelNavigating) || modelClosing}
+                          className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
+                          style={{ width: "100%", marginTop: 8 }}
+                        >
+                          <span>{modelClosing ? "退出中" : "退出模型菜单"}</span>
+                        </button>
+                        <div className="flex flex-col" style={{ gap: 7, marginTop: 9 }}>
+                          {tuiModels.slice(0, 4).map((model) => (
+                            <div
+                              key={model.id}
+                              className={`grid items-center rounded-lg border ${model.selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)]" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]"}`}
+                              style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "7px 9px" }}
+                            >
+                              <span className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                                {model.name}{model.provider ? ` · ${model.provider}` : ""}
+                              </span>
+                              <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                {model.current ? "当前" : model.selected ? "选中" : "可选"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    <pre className="max-h-[118px] overflow-hidden whitespace-pre-wrap break-words rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10, padding: "10px 11px" }}>
+                      {tuiScreenPreview || "当前还没有可显示的 TUI 屏幕内容。"}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void openModelSettings()}
+          className="kimix-muted-action hidden min-w-0 items-center rounded-lg lg:flex"
+          style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
+          title={sessionModel ? `当前对话模型：${sessionModel}` : "当前对话模型未记录"}
+          aria-label={sessionModel ? `当前对话模型：${sessionModel}，打开模型设置` : "当前对话模型未记录，打开模型设置"}
+        >
+          <Bot size={16} className="shrink-0" />
+          <span className="shrink-0">模型</span>
+          <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]">{sessionModel ?? "未记录"}</span>
+        </button>
       </div>
 
       {session && (

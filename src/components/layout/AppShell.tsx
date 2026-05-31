@@ -9,6 +9,7 @@ import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
 import { HooksPanel } from "./HooksPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
+import { TuiDebugPanel } from "./TuiDebugPanel";
 import {
   ClipboardList,
   LucideIcon,
@@ -32,6 +33,7 @@ import { DiffPanel } from "./DiffPanel";
 import { ToastSystem } from "./ToastSystem";
 import { LongTaskInspectorPanel, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
+import { isHiddenInternalSession } from "@/utils/internalSessions";
 
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 440;
@@ -425,11 +427,11 @@ export function AppShell() {
     };
     setCreatingSessionProjectPath(project.path);
     addSession(placeholder);
+    setWorkspaceView("chat");
     setCurrentSession(placeholder);
     try {
       const sessionRes = await window.api.startSession({
         workDir: project.path,
-        model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
         autoMode: permissionMode === "auto",
@@ -467,7 +469,7 @@ export function AppShell() {
   };
 
   const sortedSessions = useMemo(
-    () => sessions.filter((session) => !session.archivedAt && (!currentProject || session.projectPath === currentProject.path)),
+    () => sessions.filter((session) => !session.archivedAt && !isHiddenInternalSession(session) && (!currentProject || session.projectPath === currentProject.path)),
     [sessions, currentProject],
   );
 
@@ -616,6 +618,34 @@ export function AppShell() {
     setHelpDialog("info");
   };
 
+  const openOfficialPluginMarketplace = async () => {
+    const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
+    if (!runtimeSessionId) return false;
+    const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/plugins marketplace" });
+    if (res.success) {
+      setWorkspaceView("tui");
+      showToast("已打开官方 TUI 插件商店");
+      return true;
+    }
+    showToast(`打开 TUI 插件商店失败：${res.error}`);
+    return false;
+  };
+
+  const openPluginWorkspace = async (tab: "skills" | "mcp") => {
+    setPluginPanelTab(tab);
+    const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
+    if (runtimeSessionId) {
+      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: tab === "skills" ? "/plugins marketplace" : "/plugins" });
+      if (res.success) {
+        setWorkspaceView("tui");
+        showToast(tab === "skills" ? "已打开官方 TUI 插件商店" : "已打开官方 TUI 插件菜单");
+        return;
+      }
+      showToast(`打开 TUI 插件入口失败：${res.error}`);
+    }
+    setWorkspaceView("plugins");
+  };
+
   const handleMenuAction = (entry: MenuEntry) => {
     if (entry.type === "separator") return;
     if (entry.disabled) {
@@ -662,8 +692,8 @@ export function AppShell() {
     if (action === "find") setSearchOpen(true);
     if (action === "previous-chat") moveChat("previous");
     if (action === "next-chat") moveChat("next");
-    if (action === "back") window.history.back();
-    if (action === "forward") window.history.forward();
+    if (action === "back") moveChat("previous");
+    if (action === "forward") moveChat("next");
     if (action === "zoom-in" && typeof window.api.setZoomLevel === "function") void window.api.setZoomLevel(0.5);
     if (action === "zoom-out" && typeof window.api.setZoomLevel === "function") void window.api.setZoomLevel(-0.5);
     if (action === "actual-size" && typeof window.api.resetZoom === "function") void window.api.resetZoom();
@@ -679,12 +709,10 @@ export function AppShell() {
     if (action === "whats-new") setHelpDialog("updates");
     if (action === "keyboard-shortcuts") setHelpDialog("shortcuts");
     if (action === "skills") {
-      setPluginPanelTab("skills");
-      setWorkspaceView("plugins");
+      void openPluginWorkspace("skills");
     }
     if (action === "mcp") {
-      setPluginPanelTab("mcp");
-      setWorkspaceView("plugins");
+      void openPluginWorkspace("mcp");
     }
     if (["automations", "local-environments", "worktrees", "troubleshooting", "performance-trace", "toggle-file-tree", "open-browser-tab", "new-window"].includes(action)) {
       openInfoTopic(action);
@@ -796,6 +824,7 @@ export function AppShell() {
         patch: {
           stage: latestSession.longTask.stage,
           activeAgent: latestSession.longTask.activeAgent,
+          recovery: latestSession.longTask.recovery ?? null,
           currentStep: latestSession.longTask.currentStep,
           targetStep: latestSession.longTask.targetStep,
           reviewedReviewItems: latestSession.longTask.reviewedReviewItems ?? [],
@@ -812,6 +841,7 @@ export function AppShell() {
       patch: {
         stage: session.longTask.stage,
         activeAgent: session.longTask.activeAgent,
+        recovery: session.longTask.recovery ?? null,
         currentStep: session.longTask.currentStep,
         targetStep: session.longTask.targetStep,
         reviewedReviewItems: session.longTask.reviewedReviewItems ?? [],
@@ -827,6 +857,7 @@ export function AppShell() {
       patch: {
         stage: session.longTask.stage,
         activeAgent: session.longTask.activeAgent,
+        recovery: session.longTask.recovery ?? null,
         currentStep: session.longTask.currentStep,
         targetStep: session.longTask.targetStep,
         reviewedReviewItems: session.longTask.reviewedReviewItems ?? [],
@@ -848,7 +879,20 @@ export function AppShell() {
       }
       updateSession(liveCurrentSession.id, (session) => {
         if (!session.longTask) return session;
-        const nextMeta = { ...session.longTask, ...patch };
+        const nextMeta = {
+          ...session.longTask,
+          ...patch,
+          recovery: patch.recovery !== undefined
+            ? patch.recovery
+            : options?.stopRunning
+              ? {
+                  status: "paused" as const,
+                  reason: "用户暂停了长程任务",
+                  suggestedAction: "确认当前状态后点击继续，或复制下一步 prompt 手动恢复。",
+                  updatedAt: Date.now(),
+                }
+              : session.longTask.recovery,
+        };
         const runtimeSessionId = nextMeta.activeAgent === "reviewer" ? nextMeta.reviewerSessionId : nextMeta.executorSessionId;
         latestSession = {
           ...session,
@@ -908,12 +952,14 @@ export function AppShell() {
 
     setTargetStepBusy(true);
     let latestSession = liveCurrentSession;
+    const wasRecovering = Boolean(liveCurrentSession.longTask.recovery && liveCurrentSession.longTask.recovery.status !== "none");
     try {
       updateSession(liveCurrentSession.id, (session) => {
         if (!session.longTask) return session;
         const stage = startNow && ["drafting", "planning", "ready", "paused"].includes(session.longTask.stage)
           ? "running"
           : session.longTask.stage;
+        const recovery = startNow ? null : session.longTask.recovery;
         latestSession = {
           ...session,
           runtimeSessionId: session.longTask.executorSessionId,
@@ -921,6 +967,7 @@ export function AppShell() {
             ...session.longTask,
             activeAgent: "executor",
             stage,
+            recovery,
             targetStep: target,
           },
           updatedAt: Date.now(),
@@ -966,6 +1013,7 @@ export function AppShell() {
         autoMode: permissionMode === "auto",
       });
       if (!res.success) throw new Error(res.error);
+      showToast(wasRecovering ? "已继续长程任务" : "已启动长程任务");
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err));
       setRunningSessionId(null);
@@ -1163,6 +1211,7 @@ export function AppShell() {
         : updateState.message;
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
   const hooksWorkspaceActive = workspaceView === "hooks";
+  const tuiWorkspaceActive = workspaceView === "tui";
   const settingsWorkspaceActive = workspaceView === "settings";
   const chatWorkspaceActive = workspaceView === "chat";
   const handlePluginTabChange = (tab: "skills" | "mcp") => {
@@ -1172,10 +1221,12 @@ export function AppShell() {
 
   return (
     <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
-      <TopMenuBar
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={toggleSidebar}
-        onMenuAction={handleMenuAction}
+        <TopMenuBar
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={toggleSidebar}
+          onNavigateBack={() => moveChat("previous")}
+          onNavigateForward={() => moveChat("next")}
+          onMenuAction={handleMenuAction}
         hasUpdate={updateState.hasUpdate || hasKimiCodeUpdate}
         updateMessage={topUpdateMessage}
         updateLabel={topUpdateLabel}
@@ -1215,9 +1266,11 @@ export function AppShell() {
             />
           )}
           {pluginWorkspaceActive ? (
-            <SkillsPanel open activeTab={workspaceView === "mcp" ? "mcp" : pluginPanelTab} onActiveTabChange={handlePluginTabChange} onBackToChat={() => setWorkspaceView("chat")} />
+            <SkillsPanel open activeTab={workspaceView === "mcp" ? "mcp" : pluginPanelTab} onActiveTabChange={handlePluginTabChange} onBackToChat={() => setWorkspaceView("chat")} onOpenOfficialMarketplace={openOfficialPluginMarketplace} />
           ) : hooksWorkspaceActive ? (
             <HooksPanel onBackToChat={() => setWorkspaceView("chat")} />
+          ) : tuiWorkspaceActive ? (
+            <TuiDebugPanel />
           ) : settingsWorkspaceActive ? (
             <SettingsPanel variant="workspace" onBackToChat={() => setWorkspaceView("chat")} />
           ) : (

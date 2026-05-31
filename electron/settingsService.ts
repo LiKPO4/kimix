@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
+  experimentalTuiEngineEnabled: true,
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
@@ -112,7 +113,7 @@ function normalizeHookRule(rule: NonNullable<AppSettings["hookRules"]>[number]) 
 function syncKimiHookConfig(rules: NonNullable<AppSettings["hookRules"]>) {
   const kimiCodeDir = path.join(os.homedir(), ".kimi-code");
   const legacyKimiDir = path.join(os.homedir(), ".kimi");
-  const shareDir = process.env.KIMI_SHARE_DIR || (fs.existsSync(kimiCodeDir) ? kimiCodeDir : fs.existsSync(legacyKimiDir) ? legacyKimiDir : kimiCodeDir);
+  const shareDir = process.env.KIMI_CODE_HOME || process.env.KIMI_SHARE_DIR || (fs.existsSync(kimiCodeDir) ? kimiCodeDir : fs.existsSync(legacyKimiDir) ? legacyKimiDir : kimiCodeDir);
   const configPath = path.join(shareDir, "config.toml");
   const begin = "# >>> Kimix managed hooks >>>";
   const end = "# <<< Kimix managed hooks <<<";

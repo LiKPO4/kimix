@@ -123,6 +123,8 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
 interface TopMenuBarProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onNavigateBack: () => void;
+  onNavigateForward: () => void;
   onMenuAction: (entry: MenuEntry) => void;
   hasUpdate: boolean;
   updateMessage?: string;
@@ -133,6 +135,8 @@ interface TopMenuBarProps {
 export function TopMenuBar({
   sidebarOpen,
   onToggleSidebar,
+  onNavigateBack,
+  onNavigateForward,
   onMenuAction,
   hasUpdate,
   updateMessage,
@@ -177,14 +181,14 @@ export function TopMenuBar({
             {sidebarOpen ? <PanelLeft size={17} /> : <PanelLeftOpen size={17} />}
           </button>
           <button
-            onClick={() => window.history.back()}
+            onClick={onNavigateBack}
             className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
             aria-label="后退"
           >
             <ArrowLeft size={17} />
           </button>
           <button
-            onClick={() => window.history.forward()}
+            onClick={onNavigateForward}
             className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
             aria-label="前进"
           >

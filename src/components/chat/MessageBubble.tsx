@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Brain, Cable, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, X, SquareTerminal } from "lucide-react";
+import { Bot, Brain, Cable, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, SquareTerminal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -7,7 +7,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
+import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -57,9 +57,7 @@ function useElapsed(start: number, active: boolean) {
 
 function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
   const { copied, trigger } = useCopyTimeout();
-  const [imageCopied, setImageCopied] = useState(false);
-  const [previewImage, setPreviewImage] = useState<{ name: string; dataUrl?: string } | null>(null);
-  const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
@@ -113,18 +111,8 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
     }
   };
 
-  const handleCopyPreviewImage = async (clickEvent: React.MouseEvent, dataUrl: string) => {
-    clickEvent.preventDefault();
-    clickEvent.stopPropagation();
-    const res = await window.api.copyImage({ dataUrl });
-    if (!res.success) return;
-    setImageCopied(true);
-    window.setTimeout(() => setImageCopied(false), 1200);
-  };
-
   const handleSaveDrawingBoard = (image: { name: string; dataUrl: string }) => {
     window.dispatchEvent(new CustomEvent("kimix:addDrawingImage", { detail: image }));
-    setDrawingBoardRequest(null);
     setPreviewImage(null);
   };
 
@@ -141,7 +129,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
                 <button
                   key={image.id ?? `${image.name}-${index}`}
                   type="button"
-                  onClick={() => setPreviewImage(image)}
+                  onClick={() => setPreviewImage({ id: image.id, name: image.name, dataUrl: image.dataUrl })}
                   className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
                   title="点击查看图片"
                   aria-label={`查看图片 ${image.name}`}
@@ -190,60 +178,10 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
         </div>
       </div>
       {previewImage?.dataUrl && (
-        <div
-          className="kimix-preview-overlay fixed inset-0 z-[80] flex items-center justify-center"
-          onClick={() => setPreviewImage(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="图片预览"
-        >
-          <button
-            type="button"
-            onClick={() => setPreviewImage(null)}
-            className="kimix-preview-close absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors"
-            title="关闭"
-            aria-label="关闭图片预览"
-          >
-            <X size={20} />
-          </button>
-          <img
-            src={previewImage.dataUrl}
-            alt={previewImage.name}
-            className="kimix-preview-image max-h-[82vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
-            onClick={(clickEvent) => clickEvent.stopPropagation()}
-            onContextMenu={(contextEvent) => previewImage.dataUrl && void handleCopyPreviewImage(contextEvent, previewImage.dataUrl)}
-          />
-          <button
-            type="button"
-            onClick={(clickEvent) => {
-              clickEvent.stopPropagation();
-              if (!previewImage.dataUrl) return;
-              setDrawingBoardRequest({
-                ratio: "1:1",
-                source: {
-                  id: previewImage.name,
-                  name: previewImage.name,
-                  dataUrl: previewImage.dataUrl,
-                },
-              });
-            }}
-            className="kimix-icon-text-button absolute bottom-8 rounded-xl bg-accent-primary text-white shadow-elevated-token hover:bg-accent-primary-dark"
-            style={{ paddingLeft: 16, paddingRight: 16 }}
-          >
-            画板
-          </button>
-          {imageCopied && (
-            <div className="kimix-preview-toast absolute bottom-8 rounded-full text-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.2)]" style={{ padding: "8px 16px" }}>
-              已复制图片
-            </div>
-          )}
-        </div>
-      )}
-      {drawingBoardRequest && (
-        <DrawingBoard
-          request={drawingBoardRequest}
-          onClose={() => setDrawingBoardRequest(null)}
-          onSave={handleSaveDrawingBoard}
+        <ImagePreviewOverlay
+          image={previewImage}
+          onClose={() => setPreviewImage(null)}
+          onSaveDrawing={handleSaveDrawingBoard}
         />
       )}
     </div>
@@ -319,6 +257,7 @@ function stringifyToolDetail(value: unknown) {
 }
 
 function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
+  if (isKimixSyntheticThinking(text)) return [];
   const paragraphs = text
     .split(/\n\s*\n+/)
     .map((part) => part.trim())
@@ -340,8 +279,11 @@ function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
 }
 
 function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
-  const parts = event.thinkingParts?.filter((part) => part.text.trim()) ?? [];
-  if (parts.length === 0) return event.thinking ? splitLegacyThinking(event.thinking, event.timestamp) : [];
+  const parts = event.thinkingParts?.filter((part) => {
+    const text = part.text.trim();
+    return text && !isKimixSyntheticThinking(text);
+  }) ?? [];
+  if (parts.length === 0) return event.thinking && !isKimixSyntheticThinking(event.thinking) ? splitLegacyThinking(event.thinking, event.timestamp) : [];
 
   const blocks: ThinkingBlock[] = [];
   let current = "";
@@ -361,9 +303,16 @@ function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
   return blocks;
 }
 
+function isKimixSyntheticThinking(text: string) {
+  const trimmed = text.trim();
+  return trimmed.startsWith("【实时状态】") ||
+    trimmed.includes("当前 prompt-mode 尚未实时写出思考正文") ||
+    trimmed.includes("Kimix 会继续回放");
+}
+
 function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
-  const canExpand = block.text.trim().length > 140 || /\n/.test(block.text);
+  const canExpand = block.text.trim().length > 0;
   return (
     <div className="kimix-soft-card overflow-hidden rounded-xl">
       <button
@@ -577,7 +526,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const hasProcessDetails = Boolean(hasThinkingDetails || leadingTools.length > 0 || leadingSubagents.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
   const shouldShowNoContentHint = !hasContent && !hasProcessDetails && (event.isComplete || (isActiveAssistant && elapsed >= 8000));
   const durationLabel = event.isComplete
-    ? formatDuration(event.durationMs && event.durationMs > 0 ? event.durationMs : elapsed)
+    ? formatDuration(Number.isFinite(event.durationMs) ? event.durationMs ?? 0 : 0)
     : isActiveAssistant && elapsed >= 1000
       ? formatDuration(elapsed)
       : "";
@@ -592,7 +541,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   return (
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {!hideProcessSummary && (event.isThinking || event.isComplete || !hasContent) && (
+        {!hideProcessSummary && (
           <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={displayProcessLabel} />
         )}
 
@@ -602,8 +551,8 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
             style={{ padding: "12px 14px" }}
           >
             {event.isComplete
-              ? "本轮没有生成正文内容，Kimi 只返回了思考过程、命令执行或文件变更。"
-              : "Kimi 还没有生成正文内容，当前仍在思考或执行命令。"}
+              ? "本轮没有生成正文内容，Agent 只返回了思考过程、命令执行或文件变更。"
+              : "Agent 还没有生成正文内容，当前仍在思考或执行命令。"}
           </div>
         )}
 

@@ -17,19 +17,27 @@ import type {
   AppendLongTaskRoundResponse,
   StartSessionRequest,
   StartSessionResponse,
+  StartTuiSessionRequest,
+  StartTuiSessionResponse,
   CheckKimiCliRequest,
   CheckKimiCliResponse,
   GetKimiAuthStatusResponse,
+  GetKimiModelConfigResponse,
   InstallKimiCliResponse,
+  KimiOpenAiProviderConfigRequest,
   CheckKimiCliUpdateResponse,
   KimiLoginResponse,
   KimiLogoutResponse,
+  SaveKimiModelConfigResponse,
+  SetKimiDefaultModelRequest,
   ListMcpServersResponse,
   AddMcpServerRequest,
+  ImportPluginMcpServerRequest,
   RemoveMcpServerRequest,
   McpServerActionRequest,
   McpServerMutationResponse,
   TestMcpServerResponse,
+  TestKimiModelConfigResponse,
   UpdateKimiCliResponse,
   SendPromptRequest,
   SendPromptResponse,
@@ -39,6 +47,7 @@ import type {
   SteerPromptResponse,
   StopTurnRequest,
   StopTurnResponse,
+  StopTuiSessionRequest,
   ApproveRequest,
   ApproveResponse,
   RespondQuestionRequest,
@@ -53,6 +62,8 @@ import type {
   LoadSessionResponse,
   ExportSessionRequest,
   ExportSessionResponse,
+  ExportMarkdownRequest,
+  ExportMarkdownResponse,
   GitInfoResponse,
   KimiUsageResponse,
   OpenFileRequest,
@@ -64,6 +75,8 @@ import type {
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
   ListSkillsResponse,
+  InstallKimiPluginRequest,
+  InstallKimiPluginResponse,
   ImportSkillArchiveRequest,
   ImportSkillArchiveResponse,
   InstallSuperpowersResponse,
@@ -86,8 +99,13 @@ import type {
   SaveSettingsRequest,
   KimiEventPayload,
   KimiStatusPayload,
+  ListTuiSessionsResponse,
+  SendTuiKeyRequest,
+  SendTuiInputRequest,
+  ResizeTuiSessionRequest,
   Project,
   VoidResponse,
+  TuiEventPayload,
 } from "./types/ipc";
 
 const api = {
@@ -124,6 +142,8 @@ const api = {
     ipcRenderer.invoke("project:saveEnabledSkills", req),
   importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
     ipcRenderer.invoke("project:importSkillArchive", req),
+  installKimiPlugin: (req: InstallKimiPluginRequest): Promise<InstallKimiPluginResponse> =>
+    ipcRenderer.invoke("project:installKimiPlugin", req),
   installSuperpowers: (): Promise<InstallSuperpowersResponse> =>
     ipcRenderer.invoke("project:installSuperpowers"),
   getSuperpowersBootstrap: (): Promise<SuperpowersBootstrapResponse> =>
@@ -150,6 +170,14 @@ const api = {
     ipcRenderer.invoke("kimi:checkCli", req),
   getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> =>
     ipcRenderer.invoke("kimi:getAuthStatus"),
+  getKimiModelConfig: (): Promise<GetKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:getModelConfig"),
+  saveKimiOpenAiProvider: (req: KimiOpenAiProviderConfigRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:saveOpenAiProvider", req),
+  setKimiDefaultModel: (req: SetKimiDefaultModelRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:setDefaultModel", req),
+  testKimiOpenAiProvider: (req: KimiOpenAiProviderConfigRequest): Promise<TestKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:testOpenAiProvider", req),
   loginKimi: (): Promise<KimiLoginResponse> =>
     ipcRenderer.invoke("kimi:login"),
   logoutKimi: (): Promise<KimiLogoutResponse> =>
@@ -158,6 +186,8 @@ const api = {
     ipcRenderer.invoke("kimi:listMcpServers"),
   addMcpServer: (req: AddMcpServerRequest): Promise<McpServerMutationResponse> =>
     ipcRenderer.invoke("kimi:addMcpServer", req),
+  importPluginMcpServer: (req: ImportPluginMcpServerRequest): Promise<McpServerMutationResponse> =>
+    ipcRenderer.invoke("kimi:importPluginMcpServer", req),
   removeMcpServer: (req: RemoveMcpServerRequest): Promise<McpServerMutationResponse> =>
     ipcRenderer.invoke("kimi:removeMcpServer", req),
   authMcpServer: (req: McpServerActionRequest): Promise<McpServerMutationResponse> =>
@@ -194,10 +224,24 @@ const api = {
     ipcRenderer.invoke("kimi:loadSession", req),
   exportSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>
     ipcRenderer.invoke("kimi:exportSession", req),
+  exportMarkdown: (req: ExportMarkdownRequest): Promise<ExportMarkdownResponse> =>
+    ipcRenderer.invoke("project:exportMarkdown", req),
   getKimiUsage: (): Promise<KimiUsageResponse> =>
     ipcRenderer.invoke("kimi:getUsage"),
   startKimiVis: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi:startVis"),
+  startTuiSession: (req?: StartTuiSessionRequest): Promise<StartTuiSessionResponse> =>
+    ipcRenderer.invoke("tui:startSession", req),
+  sendTuiInput: (req: SendTuiInputRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("tui:sendInput", req),
+  sendTuiKey: (req: SendTuiKeyRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("tui:sendKey", req),
+  stopTuiSession: (req: StopTuiSessionRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("tui:stopSession", req),
+  resizeTuiSession: (req: ResizeTuiSessionRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("tui:resizeSession", req),
+  listTuiSessions: (): Promise<ListTuiSessionsResponse> =>
+    ipcRenderer.invoke("tui:listSessions"),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {
@@ -209,6 +253,11 @@ const api = {
     const handler = (_: unknown, payload: KimiStatusPayload) => callback(payload);
     ipcRenderer.on("kimi:status", handler);
     return () => ipcRenderer.off("kimi:status", handler);
+  },
+  onTuiEvent: (callback: (payload: TuiEventPayload) => void) => {
+    const handler = (_: unknown, payload: TuiEventPayload) => callback(payload);
+    ipcRenderer.on("tui:event", handler);
+    return () => ipcRenderer.off("tui:event", handler);
   },
 
   // App

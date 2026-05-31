@@ -23,6 +23,14 @@ type McpServerInfo = {
   auth?: string;
 };
 
+type PluginMcpServerInfo = McpServerInfo & {
+  pluginId: string;
+  pluginName: string;
+  pluginPath: string;
+  manifestPath: string;
+  enabled: boolean;
+};
+
 type KeyValueItem = {
   id: string;
   key: string;
@@ -161,6 +169,7 @@ function KeyValueListEditor({
 export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: () => void; embedded?: boolean }) {
   const [auth, setAuth] = useState<KimiAuthStatus | null>(null);
   const [servers, setServers] = useState<McpServerInfo[]>([]);
+  const [pluginServers, setPluginServers] = useState<PluginMcpServerInfo[]>([]);
   const [configPath, setConfigPath] = useState("");
   const [message, setMessage] = useState("正在读取 Kimi Code 与 MCP 状态...");
   const [loading, setLoading] = useState(true);
@@ -187,6 +196,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     }
     setAuth(authRes.data);
     setServers(listRes.data.servers);
+    setPluginServers(listRes.data.pluginServers ?? []);
     setConfigPath(listRes.data.configPath);
     setMessage(nextMessage ?? authRes.data.message);
   };
@@ -287,6 +297,22 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
       setMessage(res.data.success ? `${name} 测试通过` : `${name} 测试失败`);
     });
   };
+
+  const handleImportPluginServer = async (server: PluginMcpServerInfo) => {
+    await runBusy(`import-plugin:${server.manifestPath}:${server.name}`, async () => {
+      setMessage(`正在将 ${server.pluginName} / ${server.name} 加入 MCP 配置...`);
+      const res = await window.api.importPluginMcpServer({
+        manifestPath: server.manifestPath,
+        name: server.name,
+      });
+      if (!res.success) {
+        setMessage(`加入失败：${res.error}`);
+        return;
+      }
+      await refresh(`${res.data.message}。现在可以在普通 MCP 服务卡片里测试或授权。`);
+    });
+  };
+
 
   const header = (
     <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
@@ -510,6 +536,60 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
             )}
 
             <div className="grid min-w-0" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+              {pluginServers.length > 0 && (
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "18px 18px 16px", gridColumn: "1 / -1" }}>
+                  <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--kimix-panel-text)]">
+                    <Cable size={15} />
+                    <span>Plugin 随带 MCP</span>
+                  </div>
+                  <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
+                    这些服务来自已安装 Plugin 的 manifest。官方默认在新会话启用，可在 Kimi Code 的 `/plugins` 里启停。
+                  </div>
+                  <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                    {pluginServers.map((server) => (
+                      <div
+                        key={`${server.pluginId}:${server.name}:${server.manifestPath}`}
+                        className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
+                        style={{ padding: "13px 14px 12px" }}
+                      >
+                        <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                          <div className="min-w-0">
+                            <div className="truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
+                              {server.name}
+                            </div>
+                            <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                              来源：{server.pluginName} · {server.transport.toUpperCase()}
+                            </div>
+                            <div className="break-all text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 5 }}>
+                              {summarizeServer(server)}
+                            </div>
+                          </div>
+                          <div
+                            className="flex shrink-0 flex-col items-end"
+                            style={{ gap: 8 }}
+                          >
+                            <div
+                              className={`rounded-full text-[11px] font-medium ${server.enabled ? "bg-accent-success-light text-accent-success" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
+                              style={{ height: 26, minWidth: 58, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
+                            >
+                              {server.enabled ? "默认启用" : "已禁用"}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleImportPluginServer(server)}
+                              disabled={Boolean(busyAction)}
+                              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
+                            >
+                              <Plus size={14} />
+                              <span>{busyAction === `import-plugin:${server.manifestPath}:${server.name}` ? "加入中" : "加入配置"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {servers.length === 0 ? (
                 <div className="kimix-soft-card rounded-xl text-[14px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "18px 18px 16px", gridColumn: "1 / -1" }}>
                   当前还没有 MCP 服务。可以先添加一个 HTTP 或 stdio 服务，再做测试和授权。

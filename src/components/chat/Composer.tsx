@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Lock } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -8,6 +8,7 @@ import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
+import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function genId(): string {
@@ -39,8 +40,8 @@ const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc
 const DRAWING_BOARD_RATIOS: DrawingBoardRequest["ratio"][] = ["1:1", "4:3", "3:4", "16:9", "9:16"];
 
 const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
-  auto: "【Kimix 需求澄清工具：自动判断】\n先判断用户需求是否足够明确。只要存在会改变执行方向、文件范围、命令/网络/写入操作、验收标准或风险边界的不确定点，就必须先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题。用户只说“浏览项目、推荐下一步、优化、调整、修复、处理一下”且目标不具体时，至少询问优先方向或期望产出。只有在信息已足够完成一个低风险最小增量时，才不要解释本规则并直接继续。",
-  on: "【Kimix 需求澄清工具：开启】\n在开始执行前先做需求澄清检查。只要存在任何会影响实现范围、文件改动、命令执行、验收标准或风险边界的不确定点，就优先调用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；如已经明确，请不要解释本规则，直接继续完成任务。",
+  auto: "【Kimix 需求澄清工具：自动判断】\n请先判断用户需求是否足够明确。若当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，可以使用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；若当前处于 prompt/auto 等禁止向用户提问的模式，请不要调用 AskUserQuestion，也不要解释本规则，按官方要求做合理判断并继续。",
+  on: "【Kimix 需求澄清工具：开启】\n请在开始执行前做需求澄清检查。若当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，优先使用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；若当前处于 prompt/auto 等禁止向用户提问的模式，请不要调用 AskUserQuestion，也不要解释本规则，按官方要求做合理判断并继续。",
 };
 
 function withClarificationBehavior(content: string, mode: ClarificationToolMode): string {
@@ -127,6 +128,9 @@ export function Composer() {
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
+  const experimentalTuiEngineEnabled = useAppStore((s) => s.experimentalTuiEngineEnabled);
+  const clarificationLockedByYolo = permissionMode === "yolo";
+  const effectiveClarificationToolMode = clarificationLockedByYolo ? "off" : clarificationToolMode;
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const addSession = useSessionStore((s) => s.addSession);
@@ -146,7 +150,11 @@ export function Composer() {
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
   const activeSession = liveSession ?? currentSession;
-  const isCurrentSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
+  const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
+  const isCurrentSessionRunning = Boolean(activeSession && (
+    runningSessionId === activeSession.id ||
+    Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
+  ));
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const hasUnfinishedAssistant = Boolean(activeSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
   const shouldShowStopButton = Boolean(isCurrentSessionRunning || hasUnfinishedAssistant);
@@ -191,6 +199,10 @@ export function Composer() {
 
   useEffect(() => {
     if (!currentSession) {
+      setSlashCommands([]);
+      return;
+    }
+    if (currentSession.engine === "tui") {
       setSlashCommands([]);
       return;
     }
@@ -314,11 +326,6 @@ export function Composer() {
     setShowAddMenu(false);
   };
 
-  const openImageDrawingBoard = (image: ImageAttachment) => {
-    setDrawingBoardRequest({ ratio: "1:1", source: image });
-    setPreviewImage(null);
-  };
-
   const handleSaveDrawingBoard = (image: { name: string; dataUrl: string; sourceId?: string }) => {
     const attachment: ImageAttachment = {
       id: genId(),
@@ -343,9 +350,23 @@ export function Composer() {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
     }
     if (!currentProject) return null;
+    if (experimentalTuiEngineEnabled) {
+      const session = {
+        id: genId(),
+        engine: "tui" as const,
+        title: "新会话",
+        projectPath: currentProject.path,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        events: [],
+        isLoading: false,
+      };
+      addSession(session);
+      setCurrentSession(session);
+      return session;
+    }
     const sessionRes = await window.api.startSession({
       workDir: currentProject.path,
-      model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
       autoMode: permissionMode === "auto",
@@ -407,8 +428,60 @@ export function Composer() {
       updatedAt: Date.now(),
     }));
 
+    const shouldUseTuiEngine = experimentalTuiEngineEnabled && !targetSession.longTask;
+    const outboundContent = targetSession.longTask
+      ? content
+      : shouldUseTuiEngine
+        ? content
+        : withClarificationBehavior(content, effectiveClarificationToolMode);
     setRunningSessionId(targetSession.id);
-    const outboundContent = targetSession.longTask ? content : withClarificationBehavior(content, clarificationToolMode);
+    if (shouldUseTuiEngine) {
+      try {
+        let tuiSessionId = targetSession.engine === "tui" ? targetSession.runtimeSessionId : undefined;
+        if (!tuiSessionId) {
+          const startRes = await window.api.startTuiSession({ workDir: targetSession.projectPath });
+          if (!startRes.success) throw new Error(startRes.error);
+          tuiSessionId = startRes.data.sessionId;
+          targetSession = { ...targetSession, engine: "tui", runtimeSessionId: tuiSessionId };
+          updateSession(targetSession.id, (session) => ({
+            ...session,
+            engine: "tui",
+            runtimeSessionId: tuiSessionId,
+            model: "Kimi TUI",
+            updatedAt: Date.now(),
+          }));
+          if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+        }
+        const sendRes = await window.api.sendTuiInput({
+          sessionId: tuiSessionId,
+          text: outboundContent,
+          images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
+        });
+        if (!sendRes.success) throw new Error(sendRes.error);
+        return;
+      } catch (err) {
+        console.error("TUI send failed:", err);
+        setRunningSessionId(null);
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          events: [
+            ...session.events.map((event) => event.type === "assistant_message" && !event.isComplete
+              ? { ...event, isComplete: true, isThinking: false }
+              : event
+            ),
+            {
+              id: genId(),
+              type: "error",
+              timestamp: Date.now(),
+              message: err instanceof Error ? err.message : String(err),
+              source: "ipc",
+            },
+          ],
+          updatedAt: Date.now(),
+        }));
+        return;
+      }
+    }
     let runtimeSessionId = getRuntimeSessionId(targetSession);
     if (!runtimeSessionId) {
       setRunningSessionId(null);
@@ -429,7 +502,6 @@ export function Composer() {
         const startRes = await window.api.startSession({
           workDir: targetSession.projectPath,
           sessionId: targetSession.id,
-          model: "kimi-code/kimi-for-coding",
           thinking: defaultThinking,
           yoloMode: permissionMode === "yolo",
           autoMode: permissionMode === "auto",
@@ -538,7 +610,6 @@ export function Composer() {
     const startRes = await window.api.startSession({
       workDir: targetSession.projectPath,
       sessionId: getRuntimeSessionId(targetSession) ?? targetSession.id,
-      model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
       autoMode: permissionMode === "auto",
@@ -594,6 +665,15 @@ export function Composer() {
       inputRef.current?.reset();
       const applied = await applySkillCommand(skillName);
       if (applied && (restContent || imagesToSend.length > 0)) {
+        if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
+          addPendingMessage(restContent, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
+          if (imagesToSend.length > 0) {
+            window.dispatchEvent(new CustomEvent("kimix:toast", {
+              detail: "当前轮次还没结束，文字和图片已加入队列，等待官方 TUI 完成后自动发送。",
+            }));
+          }
+          return;
+        }
         await sendPromptContent(restContent, { images: imagesToSend });
       }
       return;
@@ -602,7 +682,7 @@ export function Composer() {
     if (slashMatch) {
       const slashName = slashMatch[1];
       const isKnown = allowedSlashNames.has(slashName);
-      const shouldBlock = unsupportedSlashHints[slashName] || (slashCommands.length > 0 && !isKnown);
+      const shouldBlock = !experimentalTuiEngineEnabled && (unsupportedSlashHints[slashName] || (slashCommands.length > 0 && !isKnown));
       if (shouldBlock) {
         const targetSession = await ensureSession();
         if (!targetSession) return;
@@ -634,8 +714,8 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    if (isCurrentSessionRunning && currentSession) {
-      addPendingMessage(trimmed);
+    if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
+      addPendingMessage(trimmed, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
       return;
     }
     await sendPromptContent(trimmed, { images: imagesToSend });
@@ -643,9 +723,13 @@ export function Composer() {
 
   const handleStop = async () => {
     const stateRunningSessionId = useAppStore.getState().runningSessionId;
-    const sessionId = hasUnfinishedAssistant && activeSession ? activeSession.id : stateRunningSessionId ?? activeSession?.id;
+    const stateRunningMatchesActive = Boolean(activeSession && (
+      stateRunningSessionId === activeSession.id ||
+      Boolean(activeRuntimeSessionId && stateRunningSessionId === activeRuntimeSessionId)
+    ));
+    const sessionId = (hasUnfinishedAssistant || stateRunningMatchesActive) && activeSession ? activeSession.id : stateRunningSessionId ?? activeSession?.id;
     if (!sessionId) return;
-    if (stateRunningSessionId === sessionId) setRunningSessionId(null);
+    if (stateRunningSessionId === sessionId || (activeRuntimeSessionId && stateRunningSessionId === activeRuntimeSessionId)) setRunningSessionId(null);
     updateSession(sessionId, (session) => ({
       ...session,
       events: session.events.map((event) => event.type === "assistant_message" && !event.isComplete
@@ -677,7 +761,9 @@ export function Composer() {
     try {
       const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
       const runtimeSessionId = latest ? getRuntimeSessionId(latest) : sessionId;
-      const res = await window.api.stopTurn({ sessionId: runtimeSessionId ?? sessionId });
+      const res = latest?.engine === "tui" && runtimeSessionId
+        ? await window.api.stopTuiSession({ sessionId: runtimeSessionId })
+        : await window.api.stopTurn({ sessionId: runtimeSessionId ?? sessionId });
       if (!res.success) {
         console.error("Stop failed:", res.error);
       }
@@ -695,9 +781,44 @@ export function Composer() {
   };
 
   const handleSetClarificationToolMode = (mode: ClarificationToolMode) => {
+    if (clarificationLockedByYolo) {
+      if (clarificationToolMode !== "off") setClarificationToolMode("off");
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "官方 yolo 模式不支持开启需求澄清工具",
+      }));
+      return;
+    }
     setClarificationToolMode(mode);
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: `需求澄清工具：${CLARIFICATION_OPTIONS.find((option) => option.value === mode)?.label ?? mode}`,
+    }));
+  };
+
+  const handleSetPermissionMode = async (mode: PermissionMode) => {
+    const previousMode = permissionMode;
+    setPermissionMode(mode);
+    if (mode === "yolo" && clarificationToolMode !== "off") {
+      setClarificationToolMode("off");
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "已关闭需求澄清工具：官方 yolo 模式不支持开启",
+      }));
+    }
+    setShowPermissionMenu(false);
+    if (!experimentalTuiEngineEnabled || !activeSession || activeSession.engine !== "tui" || (mode !== "manual" && mode !== "auto")) {
+      return;
+    }
+    const runtimeSessionId = getRuntimeSessionId(activeSession);
+    if (!runtimeSessionId || previousMode === mode) return;
+    const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/auto" });
+    if (!res.success) {
+      setPermissionMode(previousMode);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `TUI 权限切换失败：${res.error}`,
+      }));
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: mode === "auto" ? "已发送 /auto，等待 TUI 切到自动权限" : "已发送 /auto，等待 TUI 切回手动审批",
     }));
   };
 
@@ -709,6 +830,21 @@ export function Composer() {
     if (!runtimeSessionId) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: next ? "Plan 模式已开启" : "Plan 模式已关闭",
+      }));
+      return;
+    }
+    if (activeSession?.engine === "tui") {
+      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/plan" });
+      if (!res.success) {
+        setDefaultPlanMode(!next);
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `TUI Plan 模式切换失败：${res.error}`,
+        }));
+        return;
+      }
+      setDefaultPlanMode(next);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: next ? "已发送 /plan，等待 TUI 开启 Plan 模式" : "已发送 /plan，等待 TUI 关闭 Plan 模式",
       }));
       return;
     }
@@ -761,60 +897,31 @@ export function Composer() {
   const handleSendPendingNow = async (id: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending || !canUseComposer) return;
-    if (isCurrentSessionRunning && currentSession) {
-      removePendingMessage(id);
-      const steerEventId = genId();
-      updateSession(currentSession.id, (session) => ({
-        ...session,
-        events: [
-          ...session.events,
-          {
-            id: steerEventId,
-            type: "steer_message",
-            timestamp: Date.now(),
-            content: pending.content,
-            status: "sending",
-          },
-        ],
-        updatedAt: Date.now(),
+    if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "当前轮次还没结束，这条消息会留在队列里，等待官方 TUI 完成后自动发送。",
       }));
-      const runtimeSessionId = getRuntimeSessionId(activeSession ?? currentSession);
-      if (!runtimeSessionId) {
-        updateSession(currentSession.id, (session) => ({
-          ...session,
-          events: session.events.map((event) => event.id === steerEventId
-            ? { ...event, status: "failed" as const, error: "当前运行会话不存在，无法引导。" }
-            : event),
-          updatedAt: Date.now(),
-        }));
-        addPendingMessage(pending.content);
-        return;
-      }
-      const res = await window.api.steerPrompt({
-        sessionId: runtimeSessionId,
-        content: pending.content,
-      });
-      if (!res.success) {
-        console.error("Steer failed:", res.error);
-        updateSession(currentSession.id, (session) => ({
-          ...session,
-          events: session.events.map((event) => event.id === steerEventId
-            ? { ...event, status: "failed" as const, error: res.error }
-            : event),
-          updatedAt: Date.now(),
-        }));
-        addPendingMessage(pending.content);
-      }
       return;
     }
     removePendingMessage(id);
-    await sendPromptContent(pending.content);
+    await sendPromptContent(pending.content, {
+      images: (pending.images ?? []).map((image) => ({
+        id: image.id ?? genId(),
+        name: image.name,
+        dataUrl: image.dataUrl ?? "",
+      })).filter((image) => image.dataUrl),
+    });
   };
 
   const handleEditPending = (id: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending) return;
     setInput(pending.content);
+    setImageAttachments((pending.images ?? []).map((image) => ({
+      id: image.id ?? genId(),
+      name: image.name,
+      dataUrl: image.dataUrl ?? "",
+    })).filter((image) => image.dataUrl));
     setEditingPendingId(id);
     removePendingMessage(id);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -862,7 +969,7 @@ export function Composer() {
   }[permissionMode];
 
   const placeholder = canUseComposer
-    ? "向 Kimi 询问任何事。输入 @ 使用插件或提及文件"
+    ? "向 Agent 询问任何事。输入 @ 使用插件或提及文件"
     : isCurrentSessionHandoff
       ? "正在生成交接内容..."
       : "请先选择项目";
@@ -871,6 +978,7 @@ export function Composer() {
   const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
   const pendingHidden = hiddenCards.includes("pending");
+  const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
   const hideComposerCard = (card: "todo" | "pending", label: string) => {
     setComposerCardHidden(composerCardSessionId, card, true);
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
@@ -935,11 +1043,16 @@ export function Composer() {
                 <div className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)] active:cursor-grabbing">
                   <GripVertical size={15} />
                 </div>
-                <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">{msg.content}</div>
+                <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">
+                  {msg.content || "[图片]"}
+                  {(msg.images?.length ?? 0) > 0 && (
+                    <span className="text-[12.5px] text-[var(--kimix-panel-text-muted)]"> · {msg.images?.length} 张图片</span>
+                  )}
+                </div>
                 <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
-                  <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title={isCurrentSessionRunning ? "引导当前任务" : "立即发送"}>
+                  <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title={isCurrentSessionRunning || hasUnfinishedAssistant ? "等待当前轮次结束后自动发送" : "发送这条队列消息"}>
                     <Send size={13} />
-                    <span>引导</span>
+                    <span>{isCurrentSessionRunning || hasUnfinishedAssistant ? "等待" : "发送"}</span>
                   </button>
                   <button onClick={() => handleEditPending(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="撤回到输入框修改" aria-label="撤回到输入框修改">
                     <Edit2 size={13} />
@@ -1056,7 +1169,7 @@ export function Composer() {
                 )) : (
                   <div className="flex items-center gap-2 px-2 py-1.5 text-[var(--kimix-panel-text-muted)]">
                     <AtSign size={14} />
-                    <span>正在从 Kimi 加载命令，或当前会话未返回 slash_commands</span>
+                    <span>正在从 Agent 加载命令，或当前会话未返回 slash_commands</span>
                   </div>
                 )}
               </>
@@ -1148,15 +1261,20 @@ export function Composer() {
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span>需求澄清</span>
+                          {clarificationLockedByYolo && <Lock size={12} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />}
                         </div>
-                        <div className="flex w-[132px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ gap: 4, padding: 4 }}>
+                        <div
+                          className="flex w-[132px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]"
+                          style={{ gap: 4, padding: 4, opacity: clarificationLockedByYolo ? 0.72 : 1 }}
+                          title={clarificationLockedByYolo ? "官方 yolo 模式不支持开启需求澄清工具" : undefined}
+                        >
                           {CLARIFICATION_OPTIONS.map((option) => {
-                            const active = clarificationToolMode === option.value;
+                            const active = effectiveClarificationToolMode === option.value;
                             return (
                               <button
                                 key={option.value}
                                 type="button"
-                                title={option.desc}
+                                title={clarificationLockedByYolo ? "官方 yolo 模式不支持开启需求澄清工具" : option.desc}
                                 onClick={() => handleSetClarificationToolMode(option.value)}
                                 className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
                               >
@@ -1184,7 +1302,7 @@ export function Composer() {
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} title={opt.tooltip} onClick={() => { setPermissionMode(opt.value); setShowPermissionMenu(false); }} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${permissionMode === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${permissionMode === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                         <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
                         {permissionMode === opt.value && <Check size={13} className="mr-1 shrink-0 text-[var(--kimix-panel-text)]" />}
@@ -1247,7 +1365,7 @@ export function Composer() {
                 <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
               </button>
             ) : (
-              <button onClick={handleSend} disabled={(!input.trim() && imageAttachments.length === 0) || !canUseComposer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark disabled:bg-surface-hover disabled:text-text-muted" title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
+              <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
                 <ArrowUp size={17} strokeWidth={2.5} />
               </button>
             )}
@@ -1256,41 +1374,11 @@ export function Composer() {
       </div>
 
       {previewImage && (
-        <div
-          className="kimix-preview-overlay fixed inset-0 z-[80] flex items-center justify-center"
-          onClick={() => setPreviewImage(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="图片预览"
-        >
-          <div className="absolute right-6 top-6 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPreviewImage(null)}
-              className="kimix-preview-close flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors"
-              title="关闭"
-              aria-label="关闭图片预览"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="flex max-h-[88vh] max-w-[88vw] flex-col items-center" style={{ gap: 14 }} onClick={(event) => event.stopPropagation()}>
-            <img
-              src={previewImage.dataUrl}
-              alt={previewImage.name}
-              className="kimix-preview-image max-h-[76vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
-            />
-            <button
-              type="button"
-              onClick={() => openImageDrawingBoard(previewImage)}
-              className="kimix-icon-text-button rounded-xl bg-surface-elevated text-text-primary shadow-elevated-token hover:bg-surface-hover"
-              style={{ paddingLeft: 16, paddingRight: 16 }}
-            >
-              <Palette size={15} />
-              画板
-            </button>
-          </div>
-        </div>
+        <ImagePreviewOverlay
+          image={previewImage}
+          onClose={() => setPreviewImage(null)}
+          onSaveDrawing={handleSaveDrawingBoard}
+        />
       )}
 
       {drawingBoardRequest && (

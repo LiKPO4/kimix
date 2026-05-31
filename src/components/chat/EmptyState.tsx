@@ -89,7 +89,6 @@ export function EmptyState() {
 
     const sessionRes = await window.api.startSession({
       workDir: project.path,
-      model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
       autoMode: permissionMode === "auto",

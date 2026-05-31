@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
 
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
+const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 
 function recordRendererLag(lagMs: number) {
   const report = {
@@ -12,7 +13,8 @@ function recordRendererLag(lagMs: number) {
   };
   console.warn("[Kimix] renderer event loop lag detected", report);
   try {
-    const parsed = JSON.parse(localStorage.getItem(FREEZE_REPORTS_KEY) ?? "[]");
+    const raw = localStorage.getItem(FREEZE_REPORTS_KEY);
+    const parsed = raw && raw.length <= MAX_FREEZE_REPORTS_RAW_LENGTH ? JSON.parse(raw) : [];
     const reports = Array.isArray(parsed) ? parsed : [];
     reports.push(report);
     localStorage.setItem(FREEZE_REPORTS_KEY, JSON.stringify(reports.slice(-20)));

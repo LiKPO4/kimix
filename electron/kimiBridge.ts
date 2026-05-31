@@ -58,6 +58,7 @@ function legacyKimiShareDir() {
 }
 
 function resolveKimiShareDir() {
+  if (process.env.KIMI_CODE_HOME) return process.env.KIMI_CODE_HOME;
   if (process.env.KIMI_SHARE_DIR) return process.env.KIMI_SHARE_DIR;
   const current = defaultKimiCodeShareDir();
   const legacy = legacyKimiShareDir();
@@ -67,7 +68,9 @@ function resolveKimiShareDir() {
 }
 
 function candidateKimiShareDirs() {
-  const dirs = process.env.KIMI_SHARE_DIR
+  const dirs = process.env.KIMI_CODE_HOME
+    ? [process.env.KIMI_CODE_HOME]
+    : process.env.KIMI_SHARE_DIR
     ? [process.env.KIMI_SHARE_DIR]
     : [defaultKimiCodeShareDir(), legacyKimiShareDir()];
   return Array.from(new Set(dirs));
@@ -79,6 +82,22 @@ function collectKimiModelEnv() {
       key.startsWith("KIMI_MODEL_") && typeof value === "string"
     ))
   ) as Record<string, string>;
+}
+
+function readDefaultKimiModelFromConfig() {
+  const configPath = path.join(resolveKimiShareDir(), "config.toml");
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const match = raw.match(/^\s*default_model\s*=\s*"((?:\\.|[^"])*)"\s*$/m);
+    return match ? match[1].replace(/\\"/g, "\"").replace(/\\\\/g, "\\").trim() || null : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveSessionModel(workDir: string, sessionId: string, requestedModel?: string) {
+  return requestedModel ?? await readSessionModelFromShareDir(resolveKimiShareDir(), workDir, sessionId) ?? readDefaultKimiModelFromConfig();
 }
 
 let kimiWireSupportPromise: Promise<boolean> | null = null;
@@ -107,16 +126,65 @@ function supportsKimiWireMode() {
   return kimiWireSupportPromise;
 }
 
-function contentToPromptText(content: string | ContentPart[]) {
+function sanitizeUploadFileName(name: string) {
+  const parsed = path.parse(name.trim() || "image.png");
+  const base = (parsed.name || "image")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "image";
+  return base;
+}
+
+function imageExtensionFromMime(mime: string) {
+  if (/jpe?g/i.test(mime)) return ".jpg";
+  if (/webp/i.test(mime)) return ".webp";
+  if (/gif/i.test(mime)) return ".gif";
+  return ".png";
+}
+
+async function materializePromptModeImages(content: string | ContentPart[], workDir: string) {
   if (typeof content === "string") return content;
-  return content
-    .map((part) => {
-      if (part && typeof part === "object" && "type" in part && part.type === "text" && "text" in part && typeof part.text === "string") return part.text;
-      if (part && typeof part === "object" && "type" in part && part.type === "image_url") return "[图片]";
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
+
+  const textParts: string[] = [];
+  const imageLines: string[] = [];
+  let imageIndex = 0;
+
+  for (const part of content) {
+    if (part && typeof part === "object" && "type" in part && part.type === "text" && "text" in part && typeof part.text === "string") {
+      textParts.push(part.text);
+      continue;
+    }
+    if (!(part && typeof part === "object" && "type" in part && part.type === "image_url")) continue;
+    const imageUrl = "image_url" in part && part.image_url && typeof part.image_url === "object" ? part.image_url as { url?: unknown; id?: unknown } : {};
+    const url = typeof imageUrl.url === "string" ? imageUrl.url : "";
+    imageIndex += 1;
+    const dataMatch = url.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
+    if (!dataMatch) {
+      imageLines.push(`- 图片 ${imageIndex}：${url || "无法识别的图片数据"}`);
+      continue;
+    }
+    const uploadDir = path.join(workDir, ".kimix-uploads", "images");
+    await fsp.mkdir(uploadDir, { recursive: true });
+    const ext = imageExtensionFromMime(dataMatch[1]);
+    const id = typeof imageUrl.id === "string" && imageUrl.id.trim()
+      ? sanitizeUploadFileName(imageUrl.id)
+      : `image-${imageIndex}`;
+    const fileName = `${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}-${randomUUID().slice(0, 8)}-${id}${ext}`;
+    const filePath = path.join(uploadDir, fileName);
+    await fsp.writeFile(filePath, Buffer.from(dataMatch[2], "base64"));
+    imageLines.push(`- 图片 ${imageIndex}：${filePath}`);
+  }
+
+  if (imageLines.length === 0) return textParts.filter(Boolean).join("\n");
+  return [
+    ...textParts.filter(Boolean),
+    "",
+    "【Kimix 图片附件】",
+    "用户本轮上传的图片已保存为本地文件。请先调用 ReadMediaFile 工具逐一读取以下图片文件，再基于图片内容回答。不要只根据路径、文件名或占位符作答：",
+    ...imageLines,
+  ].join("\n");
 }
 
 function readSessionMetadata(sessionDir: string): { title?: string } | null {
@@ -133,6 +201,24 @@ function stripFileTags(text: string) {
     .replace(/<document[^>]*>[\s\S]*?<\/document>\s*/g, "")
     .replace(/<image[^>]*>[\s\S]*?<\/image>\s*/g, "")
     .trim();
+}
+
+function isInternalPromptText(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  return [
+    /^只回复\s*(OK|NEW)$/i,
+    /^【Kimix Hooks 上下文】/,
+    /^【Kimix 需求澄清工具[:：]/,
+    /^【Kimix 长程任务[:：]/,
+    /^【Kimix 隐藏 Superpowers Bootstrap】/,
+    /^<!-- kimix-superpowers-bootstrap -->/,
+    /^请查看agent文档，给出用于交接下一个agent的提示词/,
+    /^请作为(执行|审查)\s*agent/,
+    /^你正在作为 Kimix 长程任务/,
+    /^你是 Kimix Hooks 规则创建 agent/,
+    /这是 Kimix 内部调度指令/,
+  ].some((pattern) => pattern.test(normalized));
 }
 
 function extractUserText(userInput: unknown) {
@@ -160,7 +246,7 @@ async function getFirstUserMessage(wireFile: string) {
         const record = JSON.parse(line) as { message?: { type?: string; payload?: { user_input?: unknown } } };
         if (record.message?.type !== "TurnBegin") continue;
         const text = extractUserText(record.message.payload?.user_input);
-        if (text) {
+        if (text && !isInternalPromptText(text)) {
           rl.close();
           stream.destroy();
           return text;
@@ -307,33 +393,199 @@ async function parseKimiCodeWireEvents(wireFile: string): Promise<StreamEvent[]>
   return events;
 }
 
+function readKimiCodeSessionModelFromWire(wireFile: string): string | null {
+  if (!fs.existsSync(wireFile)) return null;
+  try {
+    const lines = fs.readFileSync(wireFile, "utf-8").split(/\r?\n/);
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const record = JSON.parse(line) as { type?: unknown; modelAlias?: unknown; model?: unknown };
+      if (record.type === "config.update" && typeof record.modelAlias === "string" && record.modelAlias.trim()) {
+        return record.modelAlias.trim();
+      }
+      if (record.type === "usage.record" && typeof record.model === "string" && record.model.trim()) {
+        return record.model.trim();
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function readSessionModelFromShareDir(shareDir: string, workDir: string, sessionId: string): Promise<string | null> {
+  const newSessionDir = await findKimiCodeSessionDir(shareDir, workDir, sessionId);
+  if (newSessionDir) {
+    const model = readKimiCodeSessionModelFromWire(getNewKimiWireFile(newSessionDir));
+    if (model) return model;
+  }
+  const legacyWireFile = path.join(createKimiPaths(shareDir).sessionDir(workDir, sessionId), "wire.jsonl");
+  return readKimiCodeSessionModelFromWire(legacyWireFile);
+}
+
 async function readLatestKimiCodeTurnThinking(shareDir: string, workDir: string, sessionId: string): Promise<StreamEvent[]> {
   const sessionDir = await findKimiCodeSessionDir(shareDir, workDir, sessionId);
   if (!sessionDir) return [];
   const wireFile = getNewKimiWireFile(sessionDir);
-  const records: Array<{ turnId: string; event: StreamEvent }> = [];
+  const records: Array<{ turnId: string; time: number; event: StreamEvent }> = [];
+  let latestUserPromptTime = 0;
   const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   for await (const line of rl) {
     if (!line.trim()) continue;
     try {
-      const record = JSON.parse(line) as { type?: unknown; event?: { type?: unknown; turnId?: unknown; part?: { type?: unknown; think?: unknown }; time?: unknown }; time?: unknown };
+      const record = JSON.parse(line) as {
+        type?: unknown;
+        event?: { type?: unknown; turnId?: unknown; part?: { type?: unknown; think?: unknown }; time?: unknown };
+        message?: { role?: unknown; origin?: { kind?: unknown } };
+        time?: unknown;
+      };
+      const recordTime = typeof record.time === "number" ? record.time : 0;
+      if (record.type === "turn.prompt" && recordTime > 0) {
+        latestUserPromptTime = recordTime;
+      } else if (record.type === "context.append_message" && record.message?.role === "user" && record.message.origin?.kind === "user" && recordTime > 0) {
+        latestUserPromptTime = recordTime;
+      }
       const loopEvent = record.type === "context.append_loop_event" ? record.event : null;
       if (loopEvent?.type !== "content.part" || loopEvent.part?.type !== "think" || typeof loopEvent.part.think !== "string") continue;
+      const time = typeof loopEvent.time === "number" ? loopEvent.time : recordTime;
       records.push({
         turnId: typeof loopEvent.turnId === "string" ? loopEvent.turnId : "",
+        time,
         event: {
           type: "ContentPart",
           payload: loopEvent.part,
-          time: loopEvent.time ?? record.time,
+          time,
         } as unknown as StreamEvent,
       });
     } catch {
       continue;
     }
   }
+  if (latestUserPromptTime > 0) {
+    return records.filter((record) => record.time >= latestUserPromptTime).map((record) => record.event);
+  }
   const latestTurnId = [...records].reverse().find((record) => record.turnId)?.turnId ?? records.at(-1)?.turnId;
   return latestTurnId ? records.filter((record) => record.turnId === latestTurnId).map((record) => record.event) : [];
+}
+
+async function readPromptModeThinkingEvents(
+  shareDir: string,
+  workDir: string,
+  options: { sessionId?: string; startedAt: number; seenKeys: Set<string> },
+): Promise<{ sessionId?: string; events: StreamEvent[] }> {
+  const candidateDirs = await getPromptModeCandidateDirs(shareDir, workDir, options.sessionId, options.startedAt);
+
+  for (const sessionDir of candidateDirs) {
+    const wireFile = getNewKimiWireFile(sessionDir);
+    if (!fs.existsSync(wireFile)) continue;
+    const records: Array<{ key: string; time: number; event: StreamEvent }> = [];
+    const promptTimes: number[] = [];
+    try {
+      const lines = fs.readFileSync(wireFile, "utf-8").split(/\r?\n/);
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const record = JSON.parse(line) as {
+          type?: unknown;
+          time?: unknown;
+          message?: { role?: unknown; origin?: { kind?: unknown } };
+          event?: {
+            type?: unknown;
+            uuid?: unknown;
+            turnId?: unknown;
+            time?: unknown;
+            part?: { type?: unknown; think?: unknown };
+          };
+        };
+        const recordTime = typeof record.time === "number" ? record.time : 0;
+        if (recordTime >= options.startedAt - 5000) {
+          if (record.type === "turn.prompt") {
+            promptTimes.push(recordTime);
+          } else if (record.type === "context.append_message" && record.message?.role === "user" && record.message.origin?.kind === "user") {
+            promptTimes.push(recordTime);
+          }
+        }
+        const loopEvent = record.type === "context.append_loop_event" ? record.event : null;
+        const time = typeof loopEvent?.time === "number" ? loopEvent.time : recordTime;
+        if (time < options.startedAt - 5000) continue;
+        if (loopEvent?.type !== "content.part" || loopEvent.part?.type !== "think" || typeof loopEvent.part.think !== "string") continue;
+        const key = typeof loopEvent.uuid === "string" ? loopEvent.uuid : `${time}:${loopEvent.part.think}`;
+        records.push({
+          key,
+          time,
+          event: {
+            type: "ContentPart",
+            payload: loopEvent.part,
+            time,
+          } as unknown as StreamEvent,
+        });
+      }
+    } catch {
+      continue;
+    }
+
+    const turnStartTime = promptTimes.at(-1) ?? options.startedAt - 2000;
+    const latestRecords = records.filter((record) => record.time >= turnStartTime);
+    const events = latestRecords
+      .filter((record) => !options.seenKeys.has(record.key))
+      .map((record) => {
+        options.seenKeys.add(record.key);
+        return record.event;
+      });
+    if (latestRecords.length > 0) return { sessionId: path.basename(sessionDir), events };
+  }
+
+  return { events: [] };
+}
+
+async function getPromptModeCandidateDirs(shareDir: string, workDir: string, sessionId: string | undefined, startedAt: number): Promise<string[]> {
+  const explicitDir = sessionId ? await findKimiCodeSessionDir(shareDir, workDir, sessionId) : null;
+  const recentDirs = (await Promise.all((await getKimiCodeSessionDirs(shareDir, workDir)).map(async (dir) => {
+    const wireFile = getNewKimiWireFile(dir);
+    const stat = await fsp.stat(wireFile).catch(() => null);
+    return stat && stat.mtimeMs >= startedAt - 5000 ? { dir, mtimeMs: stat.mtimeMs } : null;
+  })))
+    .filter((item): item is { dir: string; mtimeMs: number } => Boolean(item))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .map((item) => item.dir);
+  return Array.from(new Set([...(explicitDir ? [explicitDir] : []), ...recentDirs]));
+}
+
+async function readPromptModeLogProgressEvents(
+  shareDir: string,
+  workDir: string,
+  options: { sessionId?: string; startedAt: number; seenKeys: Set<string> },
+): Promise<{ sessionId?: string; events: StreamEvent[] }> {
+  const candidateDirs = await getPromptModeCandidateDirs(shareDir, workDir, options.sessionId, options.startedAt);
+  for (const sessionDir of candidateDirs) {
+    const logFile = path.join(sessionDir, "logs", "kimi-code.log");
+    if (!fs.existsSync(logFile)) continue;
+    const events: StreamEvent[] = [];
+    try {
+      const lines = fs.readFileSync(logFile, "utf-8").split(/\r?\n/);
+      for (const line of lines) {
+        const match = line.match(/^(\S+)\s+INFO\s+llm request\s+turnStep=([^\s]+)\s+estimatedInputTokens=(\d+)/);
+        if (!match) continue;
+        const time = Date.parse(match[1]);
+        if (!Number.isFinite(time) || time < options.startedAt - 5000) continue;
+        const key = `log:${sessionDir}:${match[1]}:${match[2]}`;
+        if (options.seenKeys.has(key)) continue;
+        options.seenKeys.add(key);
+        events.push({
+          type: "ContentPart",
+          payload: {
+            type: "think",
+            think: `【实时状态】官方 Kimi Code 已开始第 ${match[2]} 步模型请求，约 ${Number(match[3]).toLocaleString("zh-CN")} 输入 tokens。当前 prompt-mode 尚未实时写出思考正文；一旦官方 wire 写入真实思考，Kimix 会继续回放。`,
+          },
+          time,
+        } as unknown as StreamEvent);
+      }
+    } catch {
+      continue;
+    }
+    if (events.length > 0) return { sessionId: path.basename(sessionDir), events };
+  }
+  return { events: [] };
 }
 
 async function listSessionsFromShareDir(shareDir: string, workDir: string): Promise<SessionInfo[]> {
@@ -347,8 +599,9 @@ async function listSessionsFromShareDir(shareDir: string, workDir: string): Prom
       const stat = await fsp.stat(wireFile);
       if (stat.size === 0) continue;
       const metadata = readKimiCodeSessionMetadata(sessionDir);
-      const brief = metadata?.title || metadata?.lastPrompt || await getFirstUserMessage(wireFile);
-      if (!brief) continue;
+      const firstUserMessage = await getFirstUserMessage(wireFile);
+      const brief = firstUserMessage || metadata?.title || metadata?.lastPrompt || "";
+      if (!brief || isInternalPromptText(brief)) continue;
       sessions.push({
         id: path.basename(sessionDir),
         workDir,
@@ -369,8 +622,9 @@ async function listSessionsFromShareDir(shareDir: string, workDir: string): Prom
       const stat = await fsp.stat(wireFile);
       if (stat.size === 0) continue;
       const metadata = readSessionMetadata(sessionDir);
-      const brief = metadata?.title || await getFirstUserMessage(wireFile);
-      if (!brief) continue;
+      const firstUserMessage = await getFirstUserMessage(wireFile);
+      const brief = firstUserMessage || metadata?.title || "";
+      if (!brief || isInternalPromptText(brief)) continue;
       sessions.push({ id: entry.name, workDir, contextFile: wireFile, updatedAt: stat.mtimeMs, brief });
     } catch {
       continue;
@@ -816,7 +1070,7 @@ export async function startSession(options: {
   skillsDir?: string;
   agentFile?: string;
   additionalWorkDirs?: string[];
-}): Promise<{ sessionId: string; workDir: string; slashCommands: SlashCommandInfo[] }> {
+}): Promise<{ sessionId: string; workDir: string; model?: string | null; slashCommands: SlashCommandInfo[] }> {
   const existing = options.sessionId ? activeSessions.get(options.sessionId) : undefined;
   if (existing) {
     activeSessions.delete(options.sessionId!);
@@ -831,7 +1085,8 @@ export async function startSession(options: {
   if (options.sessionId && activeSessions.has(options.sessionId)) {
     const session = activeSessions.get(options.sessionId)!;
     warmSessionMetadataInBackground(session);
-    return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
+    const model = await resolveSessionModel(session.workDir, session.sessionId, options.model);
+    return { sessionId: session.sessionId, workDir: session.workDir, model, slashCommands: session.slashCommands };
   }
 
   const env: Record<string, string> = collectKimiModelEnv();
@@ -859,7 +1114,8 @@ export async function startSession(options: {
       agentFile: options.agentFile,
       continueNextPrompt: Boolean(options.sessionId),
     });
-    return { sessionId, workDir: options.workDir, slashCommands: [] };
+    const model = await resolveSessionModel(options.workDir, sessionId, options.model);
+    return { sessionId, workDir: options.workDir, model, slashCommands: [] };
   }
 
   const session = createSession({
@@ -883,7 +1139,8 @@ export async function startSession(options: {
     });
   }
   warmSessionMetadataInBackground(session);
-  return { sessionId: session.sessionId, workDir: session.workDir, slashCommands: session.slashCommands };
+  const model = await resolveSessionModel(session.workDir, session.sessionId, options.model);
+  return { sessionId: session.sessionId, workDir: session.workDir, model, slashCommands: session.slashCommands };
 }
 
 export async function setPlanMode(sessionId: string, enabled: boolean): Promise<boolean> {
@@ -914,7 +1171,32 @@ function buildPromptModeArgs(session: PromptModeSession, prompt: string) {
   return args;
 }
 
+function normalizePromptModeError(message: string) {
+  const trimmed = message.trim();
+  if (/auth\.login_required|requires login/i.test(trimmed)) {
+    return [
+      "Kimi Code 需要重新登录：官方 Kimi Code 0.6.0 迁移后旧 OAuth 登录不能直接复用。",
+      "请打开设置里的「Kimi 登录」，点击「登录」完成浏览器授权后再发送消息。",
+      `原始错误：${trimmed}`,
+    ].join("\n");
+  }
+  if (/401|unauthorized|api[_ -]?key|invalid key|authentication/i.test(trimmed)) {
+    return `API Key 无效或无权限：${trimmed}`;
+  }
+  if (/404|model.*not.*found|unknown model|invalid model/i.test(trimmed)) {
+    return `模型名不可用或不存在：${trimmed}`;
+  }
+  if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|base_url|Invalid URL/i.test(trimmed)) {
+    return `Base URL 无法连接或格式不兼容：${trimmed}`;
+  }
+  return trimmed;
+}
+
 function runPromptModeTurn(sessionId: string, session: PromptModeSession, prompt: string, gitBaseline: TurnGitBaseline) {
+  const startedAt = Date.now();
+  const thinkingSeenKeys = new Set<string>();
+  const logProgressSeenKeys = new Set<string>();
+  let thinkingPoller: ReturnType<typeof setInterval> | null = null;
   const child = spawn("kimi", buildPromptModeArgs(session, prompt), {
     cwd: session.workDir,
     windowsHide: true,
@@ -928,6 +1210,26 @@ function runPromptModeTurn(sessionId: string, session: PromptModeSession, prompt
   let stdoutBuffer = "";
   let stderr = "";
   let assistantText = "";
+  const replayPromptModeThinking = async () => {
+    try {
+      const replay = await readPromptModeThinkingEvents(resolveKimiShareDir(), session.workDir, {
+        sessionId: session.cliSessionId,
+        startedAt,
+        seenKeys: thinkingSeenKeys,
+      });
+      if (!session.cliSessionId && replay.sessionId) session.cliSessionId = replay.sessionId;
+      for (const event of replay.events) sendEvent(sessionId, event);
+      const logReplay = await readPromptModeLogProgressEvents(resolveKimiShareDir(), session.workDir, {
+        sessionId: session.cliSessionId,
+        startedAt,
+        seenKeys: logProgressSeenKeys,
+      });
+      if (!session.cliSessionId && logReplay.sessionId) session.cliSessionId = logReplay.sessionId;
+      for (const event of logReplay.events) sendEvent(sessionId, event);
+    } catch (err) {
+      console.error(`[kimiBridge] Failed to replay live prompt-mode thinking for ${sessionId}:`, err);
+    }
+  };
   const flushLine = (line: string) => {
     const trimmed = line.trim();
     if (!trimmed) return;
@@ -947,6 +1249,10 @@ function runPromptModeTurn(sessionId: string, session: PromptModeSession, prompt
     }
   };
 
+  thinkingPoller = setInterval(() => {
+    void replayPromptModeThinking();
+  }, 1200);
+
   child.stdout.on("data", (data) => {
     stdoutBuffer += data.toString();
     const lines = stdoutBuffer.split(/\r?\n/);
@@ -957,25 +1263,21 @@ function runPromptModeTurn(sessionId: string, session: PromptModeSession, prompt
     stderr += data.toString();
   });
   child.on("error", (err) => {
+    if (thinkingPoller) clearInterval(thinkingPoller);
     activePromptProcesses.delete(sessionId);
     sendingLocks.delete(sessionId);
-    sendEvent(sessionId, { type: "Error", payload: { message: err.message } });
+    sendEvent(sessionId, { type: "Error", payload: { message: normalizePromptModeError(err.message) } });
     sendStatus(sessionId, "error");
   });
   child.on("exit", (code) => {
     void (async () => {
+      if (thinkingPoller) clearInterval(thinkingPoller);
+      thinkingPoller = null;
       activePromptProcesses.delete(sessionId);
       try {
         if (stdoutBuffer.trim()) flushLine(stdoutBuffer);
         if (code === 0) {
-          if (session.cliSessionId) {
-            try {
-              const thinkingEvents = await readLatestKimiCodeTurnThinking(resolveKimiShareDir(), session.workDir, session.cliSessionId);
-              for (const event of thinkingEvents) sendEvent(sessionId, event);
-            } catch (err) {
-              console.error(`[kimiBridge] Failed to replay prompt-mode thinking for ${session.cliSessionId}:`, err);
-            }
-          }
+          await replayPromptModeThinking();
           sendEvent(sessionId, { type: "TurnEnd", payload: {} });
           sendEvent(sessionId, { type: "TurnResult", payload: { result: assistantText } });
           void emitTurnChanges(sessionId, session.workDir, gitBaseline).finally(() => {
@@ -984,7 +1286,12 @@ function runPromptModeTurn(sessionId: string, session: PromptModeSession, prompt
           });
           return;
         }
-        const message = (stderr || `CLI exited with code ${code ?? "unknown"}`).trim();
+        const rawMessage = stderr || `CLI exited with code ${code ?? "unknown"}`;
+        if (/tool_calls.*tool messages|tool_call_ids did not have response messages/i.test(rawMessage)) {
+          session.continueNextPrompt = false;
+          session.cliSessionId = undefined;
+        }
+        const message = normalizePromptModeError(rawMessage);
         sendEvent(sessionId, { type: "Error", payload: { message } });
         sendStatus(sessionId, "error");
       } finally {
@@ -1009,12 +1316,12 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
       promptContent = await applyPromptSubmitHooks(sessionId, content, promptSession.workDir);
     } catch (err) {
       sendingLocks.delete(sessionId);
-      const message = err instanceof Error ? err.message : String(err);
+      const message = normalizePromptModeError(err instanceof Error ? err.message : String(err));
       try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
       try { sendStatus(sessionId, "error"); } catch {}
       throw err;
     }
-    const promptText = contentToPromptText(promptContent);
+    const promptText = await materializePromptModeImages(promptContent, promptSession.workDir);
     const gitBaseline = await getTurnGitBaseline(promptSession.workDir);
     sendEvent(sessionId, { type: "TurnBegin", payload: { user_input: promptContent } });
     runPromptModeTurn(sessionId, promptSession, promptText, gitBaseline);
@@ -1044,7 +1351,7 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
     promptContent = await applyPromptSubmitHooks(sessionId, content, session.workDir);
   } catch (err) {
     sendingLocks.delete(sessionId);
-    const message = err instanceof Error ? err.message : String(err);
+    const message = normalizePromptModeError(err instanceof Error ? err.message : String(err));
     try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
     try { sendStatus(sessionId, "error"); } catch {}
     throw err;
@@ -1087,7 +1394,7 @@ export async function sendPrompt(sessionId: string, content: string | ContentPar
         sendStatus(sessionId, "interrupted");
         return;
       }
-      const message = err instanceof Error ? err.message : String(err);
+      const message = normalizePromptModeError(err instanceof Error ? err.message : String(err));
       try { sendEvent(sessionId, { type: "Error", payload: { message } }); } catch {}
       try { sendStatus(sessionId, "error"); } catch {}
     } finally {

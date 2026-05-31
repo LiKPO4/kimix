@@ -1,11 +1,13 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable, Download } from "lucide-react";
-import { useState, useEffect } from "react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable, Download, FileText, TerminalSquare } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import { sessionToMarkdown } from "@/utils/markdownExport";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -54,9 +56,24 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
+  const lastAutoExpandedProjectId = useRef<string | null>(null);
 
   const toast = (message: string) => {
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: message }));
+  };
+
+  const openPlugins = async () => {
+    const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
+    if (runtimeSessionId) {
+      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/plugins" });
+      if (res.success) {
+        setWorkspaceView("tui");
+        toast("已打开官方 TUI 插件菜单");
+        return;
+      }
+      toast(`打开 TUI 插件菜单失败：${res.error}`);
+    }
+    setWorkspaceView("plugins");
   };
 
   useEffect(() => {
@@ -66,10 +83,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   }, []);
 
   useEffect(() => {
-    if (currentProject) {
+    if (!currentProject) {
+      lastAutoExpandedProjectId.current = null;
+      return;
+    }
+    if (lastAutoExpandedProjectId.current !== currentProject.id) {
+      lastAutoExpandedProjectId.current = currentProject.id;
       setExpandedProject(currentProject.id);
     }
-  }, [currentProject]);
+  }, [currentProject?.id]);
 
   const createSessionForProject = async (project: Project) => {
     if (useAppStore.getState().creatingSessionProjectPath) return;
@@ -86,12 +108,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     setCreatingSessionProjectPath(project.path);
     addSession(placeholder);
     setCurrentProject(project);
+    setWorkspaceView("chat");
     setCurrentSession(placeholder);
     setExpandedProject(project.id);
     try {
       const sessionRes = await window.api.startSession({
         workDir: project.path,
-        model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
         autoMode: permissionMode === "auto",
@@ -183,6 +205,23 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     toast(res.data.path ? "已导出 Kimi Debug ZIP" : "已取消导出");
   };
 
+  const exportSessionMarkdown = async (sessionId: string) => {
+    const target = sessions.find((session) => session.id === sessionId);
+    if (!target) {
+      toast("没有找到要导出的会话");
+      return;
+    }
+    const res = await window.api.exportMarkdown({
+      title: target.title,
+      content: sessionToMarkdown(target),
+    });
+    if (!res.success) {
+      toast(`导出失败：${res.error}`);
+      return;
+    }
+    toast(res.data.path ? "已导出 Markdown" : "已取消导出");
+  };
+
   const removeProject = async (project: Project) => {
     await window.api.removeRecentProject(project.id);
     const nextProjects = await refreshRecentProjects();
@@ -221,7 +260,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           <Search size={17} />
         </button>
         <button
-          onClick={() => setWorkspaceView("plugins")}
+          onClick={() => void openPlugins()}
           className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
           title="插件"
           aria-label="插件"
@@ -235,6 +274,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           aria-label="Hooks"
         >
           <Cable size={17} />
+        </button>
+        <button
+          onClick={() => setWorkspaceView("tui")}
+          className={`${collapsedNavItemClass} ${workspaceView === "tui" ? "bg-surface-hover text-text-primary" : ""}`}
+          title="TUI 调试"
+          aria-label="TUI 调试"
+        >
+          <TerminalSquare size={17} />
         </button>
       </aside>
     );
@@ -289,7 +336,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           <span>搜索</span>
         </button>
         <button
-          onClick={() => setWorkspaceView("plugins")}
+          onClick={() => void openPlugins()}
           className={`${navItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
           title="插件"
         >
@@ -303,6 +350,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Cable size={17} className="shrink-0 text-text-secondary" />
           <span>Hooks</span>
+        </button>
+        <button
+          onClick={() => setWorkspaceView("tui")}
+          className={`${navItemClass} ${workspaceView === "tui" ? "bg-surface-hover text-text-primary" : ""}`}
+          title="TUI 调试"
+        >
+          <TerminalSquare size={17} className="shrink-0 text-text-secondary" />
+          <span>TUI 调试</span>
         </button>
         <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
           <span className="flex items-center gap-3">
@@ -347,10 +402,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                 >
                   <button
                     onClick={async () => {
-                      setCurrentProject(project);
-                      setExpandedProject(isExpanded ? null : project.id);
+                      const nextExpanded = isExpanded ? null : project.id;
+                      if (!isActive) setCurrentProject(project);
+                      setExpandedProject(nextExpanded);
                       const hasSession = sessions.some((s) => s.projectPath === project.path && !s.archivedAt && !isHiddenInternalSession(s));
-                      if (!hasSession && !useAppStore.getState().creatingSessionProjectPath) {
+                      if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
                         await createSessionForProject(project);
                       }
                     }}
@@ -466,6 +522,17 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              void exportSessionMarkdown(s.id);
+                            }}
+                            className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
+                            title="导出 Markdown"
+                            aria-label="导出 Markdown"
+                          >
+                            <FileText size={11} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               void exportSessionArchive(s.id, s.title);
                             }}
                             className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
@@ -513,7 +580,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.106</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.215</span>
         </button>
       </div>
     </aside>

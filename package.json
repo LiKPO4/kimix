@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.8.106",
+  "version": "2.8.215",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -28,7 +28,9 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@lydell/node-pty": "1.2.0-beta.12",
     "@moonshot-ai/kimi-agent-sdk": "latest",
+    "@xterm/headless": "6.0.0",
     "adm-zip": "^0.5.17",
     "electron-store": "^10.0.0",
     "highlight.js": "^11.11.1",

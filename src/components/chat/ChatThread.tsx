@@ -1,6 +1,8 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
@@ -16,7 +18,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
@@ -63,6 +65,13 @@ function cleanPlanPath(pathValue: string) {
 
 function findPlanPathInChangeSummary(event?: Extract<TimelineEvent, { type: "change_summary" }> | null) {
   return event?.files.map((file) => file.path.match(KIMI_PLAN_PATH_PATTERN)?.[0]).filter(Boolean).map((path) => cleanPlanPath(path as string))[0] ?? null;
+}
+
+function isKimixSyntheticThinking(text: string) {
+  const trimmed = text.trim();
+  return trimmed.startsWith("【实时状态】") ||
+    trimmed.includes("当前 prompt-mode 尚未实时写出思考正文") ||
+    trimmed.includes("Kimix 会继续回放");
 }
 
 function normalizeFilePath(value: string) {
@@ -208,7 +217,7 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, changedFiles, trailingStatuses, hideProcessSummary }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
@@ -220,7 +229,7 @@ function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSub
     case "tool_result":
       return null;
     case "approval_request":
-      return <ApprovalCard event={event} />;
+      return <ApprovalCard event={event} diffPreviews={approvalDiffs} />;
     case "question_request":
       return <QuestionCard event={event} />;
     case "status_update":
@@ -288,7 +297,7 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
-function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
+function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "tui"): RenderItem[] {
   const items: RenderItem[] = [];
 
   const pushStandaloneTools = (tools: ToolCallEvent[]) => {
@@ -358,8 +367,23 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         if (assistantAttached || !mergedAssistantEvent) continue;
         const hasContent = mergedAssistantEvent.content.trim().length > 0;
         const hasOwnProcessDetails = Boolean(
-          mergedAssistantEvent.thinking?.trim() ||
-          mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0)
+          (mergedAssistantEvent.thinking?.trim() && !isKimixSyntheticThinking(mergedAssistantEvent.thinking)) ||
+          mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0 && !isKimixSyntheticThinking(part.text))
+        );
+        const hasSemanticThinkingParts = Boolean(
+          mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0 && !isKimixSyntheticThinking(part.text))
+        );
+        const shouldHideSettledTuiThinkingSummary = Boolean(
+          sessionEngine === "tui" &&
+          turnSettled &&
+          hasContent &&
+          hasOwnProcessDetails &&
+          !hasSemanticThinkingParts &&
+          tools.length === 0 &&
+          subagents.length === 0 &&
+          hooks.length === 0 &&
+          changedFiles.size === 0 &&
+          statusEvents.length === 0
         );
         items.push({
           type: "event",
@@ -369,7 +393,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
           leadingHooks: assistantAttached ? [] : hooks,
           changedFiles: assistantAttached ? [] : Array.from(changedFiles),
           trailingStatuses: [],
-          hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
+          hideProcessSummary: shouldHideSettledTuiThinkingSummary || (assistantAttached && (hasContent || !hasOwnProcessDetails)),
         });
         assistantAttached = true;
         toolsAttached = true;
@@ -417,7 +441,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
         items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
         planPreviewAttached = true;
       }
-      items.push({ type: "event", event });
+      items.push(type === "approval_request" ? { type: "event", event, approvalDiffs: diffEvents.map((diff) => ({ path: diff.filePath, oldText: diff.oldText, newText: diff.newText })) } : { type: "event", event });
     }
 
     if (!toolsAttached) pushStandaloneTools(tools);
@@ -454,7 +478,7 @@ function buildRenderItems(events: TimelineEvent[]): RenderItem[] {
     const type = (event as { type?: unknown }).type;
     if (type === "user_message" || type === "steer_message") {
       flushTurn();
-      items.push({ type: "event", event });
+      items.push(type === "approval_request" ? { type: "event", event, approvalDiffs: diffEvents.map((diff) => ({ path: diff.filePath, oldText: diff.oldText, newText: diff.newText })) } : { type: "event", event });
       continue;
     }
 
@@ -535,6 +559,12 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
 export function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
+  const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const permissionMode = useAppStore((s) => s.permissionMode);
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const updateSession = useSessionStore((s) => s.updateSession);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
   const session = useLiveSession(currentSession?.id);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -553,7 +583,7 @@ export function ChatThread() {
     ),
     [session?.events, statusUpdateDisplay]
   );
-  const renderItems = useMemo(() => buildRenderItems(visibleEvents), [visibleEvents]);
+  const renderItems = useMemo(() => buildRenderItems(visibleEvents, session?.engine), [visibleEvents, session?.engine]);
   const contentVersion = useMemo(() => {
     return (session?.events ?? []).map((event) => {
       if (event.type === "assistant_message") {
@@ -630,6 +660,66 @@ export function ChatThread() {
     updateShowScrollToBottom(distance > 80);
   }, [contentVersion, isAutoFollow]);
 
+  const retryLastUserMessage = async () => {
+    if (!session) throw new Error("当前没有可重试的会话");
+    if (runningSessionId) throw new Error("当前已有任务运行中，稍后再重试");
+    const lastPrompt = [...session.events].reverse().find((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
+      (event.type === "user_message" || event.type === "steer_message") && event.content.trim().length > 0
+    ));
+    if (!lastPrompt) throw new Error("没有找到上一条可重试的用户消息");
+    const runtimeSessionId = getRuntimeSessionId(session);
+    if (!runtimeSessionId) throw new Error("当前会话没有可用的运行时 session");
+
+    const placeholder: TimelineEvent = {
+      id: crypto.randomUUID(),
+      type: "assistant_message",
+      timestamp: Date.now(),
+      content: "",
+      isThinking: defaultThinking,
+      isComplete: false,
+    };
+    updateSession(session.id, (current) => ({
+      ...current,
+      events: [...current.events, placeholder],
+      updatedAt: Date.now(),
+    }));
+    const latest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+    if (latest) setCurrentSession(latest);
+    setRunningSessionId(session.id);
+
+    const res = await window.api.sendPrompt({
+      sessionId: runtimeSessionId,
+      content: lastPrompt.content,
+      images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl) : [],
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
+      planMode: defaultPlanMode,
+    });
+    if (!res.success) {
+      setRunningSessionId(null);
+      updateSession(session.id, (current) => ({
+        ...current,
+        events: [
+          ...current.events.map((event) => event.type === "assistant_message" && event.id === placeholder.id
+            ? { ...event, isComplete: true, isThinking: false }
+            : event
+          ),
+          {
+            id: crypto.randomUUID(),
+            type: "error",
+            timestamp: Date.now(),
+            message: res.error,
+            source: "ui",
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+      const failedLatest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+      if (failedLatest) setCurrentSession(failedLatest);
+      throw new Error(res.error);
+    }
+  };
   const handleScroll = () => {
     const node = scrollRef.current;
     if (!node) return;
@@ -677,7 +767,7 @@ export function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} />
+                    : <EventRenderer event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
               }
             </div>
           ))}

@@ -8,15 +8,14 @@ import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
 import * as kimiBridge from "./kimiBridge";
+import * as tuiHost from "./tuiHost";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
 import {
   authMCP,
   createKimiPaths,
-  isLoggedIn,
   login,
-  logout,
   parseConfig,
   resetAuthMCP,
   testMCP,
@@ -51,6 +50,7 @@ const SUPERPOWERS_SKILL_NAMES = [
 
 const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
 const HOOK_ACTIONS = ["allow", "block", "notify", "run_command"] as const;
+let activeKimiLoginProcess: ReturnType<typeof spawn> | null = null;
 
 function prependProcessPath(dir: string) {
   if (!dir) return;
@@ -380,6 +380,7 @@ type McpServerRecord = {
   url?: string;
   transport?: "http" | "stdio";
   auth?: "oauth" | string;
+  enabled?: boolean;
 };
 
 function getKimiPaths() {
@@ -395,6 +396,7 @@ function legacyKimiShareDir() {
 }
 
 function resolveKimiShareDir() {
+  if (process.env.KIMI_CODE_HOME) return process.env.KIMI_CODE_HOME;
   if (process.env.KIMI_SHARE_DIR) return process.env.KIMI_SHARE_DIR;
   const current = defaultKimiCodeShareDir();
   const legacy = legacyKimiShareDir();
@@ -425,13 +427,119 @@ function ensureKimiCodeMigratedConfig() {
       fs.copyFileSync(legacyConfig, currentConfig);
     }
   }
+}
 
-  const legacyCredential = path.join(legacy, "credentials", "kimi-code.json");
-  const currentCredential = path.join(current, "credentials", "kimi-code.json");
-  if (fs.existsSync(legacyCredential) && !fs.existsSync(currentCredential)) {
-    ensureDirectoryExists(path.dirname(currentCredential));
-    fs.copyFileSync(legacyCredential, currentCredential);
+function hasKimiCodeOAuthReloginNotice() {
+  try {
+    const reportPath = path.join(defaultKimiCodeShareDir(), "migration-report.json");
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf-8")) as {
+      notices?: { oauthLoginsRequiringRelogin?: unknown };
+    };
+    const notices = report.notices?.oauthLoginsRequiringRelogin;
+    return Array.isArray(notices) && notices.some((item) => item === "kimi-code.json");
+  } catch {
+    return false;
   }
+}
+
+function hasUsableKimiCredential(shareDir: string) {
+  try {
+    const tokenPath = path.join(shareDir, "credentials", "kimi-code.json");
+    const raw = JSON.parse(fs.readFileSync(tokenPath, "utf-8")) as {
+      access_token?: unknown;
+      refresh_token?: unknown;
+    };
+    return typeof raw.access_token === "string" && raw.access_token.trim().length > 0
+      && typeof raw.refresh_token === "string" && raw.refresh_token.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function clearKimiCredential(shareDir: string) {
+  const tokenPath = path.join(shareDir, "credentials", "kimi-code.json");
+  if (!fs.existsSync(tokenPath)) return;
+  backupFileIfExists(tokenPath);
+  fs.rmSync(tokenPath, { force: true });
+}
+
+function isKimiCodeMissingAuthSubcommandError(error: string) {
+  return /too many arguments|unknown command|Expected 0 arguments/i.test(error);
+}
+
+function stripAnsi(input: string) {
+  return input.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g, "");
+}
+
+function startKimiInteractiveLogin(kimiPath: string): Promise<{ verificationUrl?: string; message: string }> {
+  if (activeKimiLoginProcess && !activeKimiLoginProcess.killed) {
+    return Promise.resolve({ message: "Kimi 登录流程已启动，请在浏览器中完成授权" });
+  }
+
+  return new Promise((resolve, reject) => {
+    let output = "";
+    let resolved = false;
+    let openedUrl = "";
+    const child = spawn(kimiPath, [], {
+      cwd: os.homedir(),
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1" },
+    });
+    activeKimiLoginProcess = child;
+
+    const finish = (result: { verificationUrl?: string; message: string }) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const handleOutput = (chunk: Buffer | string) => {
+      output += stripAnsi(chunk.toString());
+      const matched = output.match(/https:\/\/www\.kimi\.com\/code\/authorize_device\?user_code=[A-Z0-9-]+/i);
+      if (matched && !openedUrl) {
+        openedUrl = matched[0];
+        void shell.openExternal(openedUrl).catch(() => {});
+        finish({
+          verificationUrl: openedUrl,
+          message: "已打开 Kimi 登录链接，请在浏览器中完成授权；完成后返回 Kimix 点击刷新",
+        });
+      }
+    };
+
+    const timer = setTimeout(() => {
+      finish({
+        verificationUrl: openedUrl || undefined,
+        message: openedUrl
+          ? "已打开 Kimi 登录链接，请在浏览器中完成授权；完成后返回 Kimix 点击刷新"
+          : "已启动 Kimi 登录流程，但暂未捕获到授权链接，请稍后重试",
+      });
+    }, 15000);
+
+    child.stdout.on("data", handleOutput);
+    child.stderr.on("data", handleOutput);
+    child.on("error", (err) => {
+      if (activeKimiLoginProcess === child) activeKimiLoginProcess = null;
+      if (!resolved) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+    child.on("close", (code) => {
+      if (activeKimiLoginProcess === child) activeKimiLoginProcess = null;
+      if (!resolved) {
+        clearTimeout(timer);
+        if (code === 0) {
+          resolve({ message: "Kimi 登录流程已完成" });
+        } else {
+          reject(new Error(stripAnsi(output).trim() || `Kimi 登录流程退出，代码 ${code ?? "unknown"}`));
+        }
+      }
+    });
+
+    child.stdin.write("/login\n");
+  });
 }
 
 async function getKimiAuthStatus() {
@@ -440,7 +548,8 @@ async function getKimiAuthStatus() {
   const paths = getKimiPaths();
   const shareDir = resolveKimiShareDir();
   const config = parseConfig(shareDir);
-  const loggedIn = isLoggedIn(shareDir);
+  const loggedIn = hasUsableKimiCredential(shareDir);
+  const needsRelogin = !loggedIn && hasKimiCodeOAuthReloginNotice();
   return {
     available: Boolean(kimiPath),
     path: kimiPath ?? undefined,
@@ -453,16 +562,287 @@ async function getKimiAuthStatus() {
       ? "未找到 Kimi Code，请先安装或检查 PATH"
       : loggedIn
         ? "Kimi Code 已登录"
-        : "Kimi Code 已安装，但当前未登录",
+        : needsRelogin
+          ? "Kimi Code 0.6.0 迁移后需要重新登录，请点击登录并在浏览器中完成授权"
+          : "Kimi Code 已安装，但当前未登录",
   };
+}
+
+function unescapeTomlString(value: string) {
+  return value.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
+function escapeTomlString(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function readTomlString(sectionText: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*"((?:\\\\.|[^"])*)"`, "m"));
+  return match ? unescapeTomlString(match[1]) : null;
+}
+
+function readTomlInteger(sectionText: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*([0-9]+)\\s*$`, "m"));
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+const KIMIX_MODEL_CONFIG_BEGIN = "# >>> Kimix managed models >>>";
+const KIMIX_MODEL_CONFIG_END = "# <<< Kimix managed models <<<";
+
+function removeKimixManagedModelBlock(raw: string) {
+  const escapedBegin = KIMIX_MODEL_CONFIG_BEGIN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedEnd = KIMIX_MODEL_CONFIG_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return raw.replace(new RegExp(`\\n?${escapedBegin}[\\s\\S]*?${escapedEnd}\\n?`, "m"), "\n");
+}
+
+function listTomlSectionNames(raw: string) {
+  return Array.from(raw.matchAll(/^\s*\[([^\]]+)\]\s*$/gm)).map((match) => match[1].trim());
+}
+
+function toTomlTableKey(name: string) {
+  return /^[A-Za-z0-9_-]+$/.test(name) ? name : `"${escapeTomlString(name)}"`;
+}
+
+function setTopLevelTomlString(raw: string, key: string, value: string) {
+  const line = `${key} = "${escapeTomlString(value)}"`;
+  const pattern = new RegExp(`^\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=\\s*"((?:\\\\.|[^"])*)"\\s*$`, "m");
+  if (pattern.test(raw)) return raw.replace(pattern, line);
+  return `${line}\n${raw.trimStart()}`;
+}
+
+type SavedOpenAiProviderConfig = z.infer<typeof SaveOpenAiProviderConfigSchema> & { apiKey: string };
+
+function readTomlSectionBody(raw: string, sectionName: string) {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
+  if (matchIndex < 0) return null;
+  const match = matches[matchIndex];
+  return raw.slice((match.index ?? 0) + match[0].length, matches[matchIndex + 1]?.index ?? raw.length);
+}
+
+function resolveExistingManagedApiKey(raw: string, providerName: string) {
+  const providerKey = toTomlTableKey(providerName);
+  const body = readTomlSectionBody(raw, `providers.${providerKey}`);
+  return body ? readTomlString(body, "api_key") : null;
+}
+
+function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
+  const maxContextSize = Math.max(1, Math.min(1048576, config.maxContextSize ?? 262144));
+  const providerKey = toTomlTableKey(config.providerName);
+  const modelKey = toTomlTableKey(config.modelAlias);
+  return [
+    KIMIX_MODEL_CONFIG_BEGIN,
+    `[providers.${providerKey}]`,
+    `type = "openai"`,
+    `base_url = "${escapeTomlString(config.baseUrl)}"`,
+    `api_key = "${escapeTomlString(config.apiKey)}"`,
+    "",
+    `[models.${modelKey}]`,
+    `provider = "${escapeTomlString(config.providerName)}"`,
+    `model = "${escapeTomlString(config.model)}"`,
+    `max_context_size = ${maxContextSize}`,
+    `display_name = "${escapeTomlString(config.modelAlias)}"`,
+    KIMIX_MODEL_CONFIG_END,
+    "",
+  ].join("\n");
+}
+
+function readKimiModelConfig() {
+  ensureKimiCodeMigratedConfig();
+  const paths = getKimiPaths();
+  const configPath = paths.config;
+  if (!fs.existsSync(configPath)) {
+    return {
+      configPath,
+      exists: false,
+      defaultModel: null,
+      providers: [],
+      models: [],
+    };
+  }
+
+  const raw = fs.readFileSync(configPath, "utf-8");
+  const defaultModel = readTomlString(raw, "default_model");
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const sections = matches.map((match, index) => ({
+    name: match[1].trim(),
+    body: raw.slice((match.index ?? 0) + match[0].length, matches[index + 1]?.index ?? raw.length),
+  }));
+
+  const providerSections = sections.filter((section) => /^providers\./.test(section.name) && !/\.oauth$|\.env$/.test(section.name));
+  const modelSections = sections.filter((section) => /^models\./.test(section.name));
+  const hasOauth = new Set(
+    sections
+      .filter((section) => /^providers\..+\.oauth$/.test(section.name))
+      .map((section) => section.name.replace(/\.oauth$/, ""))
+  );
+  const stripTablePrefix = (sectionName: string, prefix: string) => {
+    const rawName = sectionName.slice(prefix.length);
+    const quoted = rawName.match(/^"((?:\\.|[^"])*)"$/);
+    return quoted ? unescapeTomlString(quoted[1]) : rawName;
+  };
+
+  return {
+    configPath,
+    exists: true,
+    defaultModel,
+    providers: providerSections.map((section) => ({
+      name: stripTablePrefix(section.name, "providers."),
+      type: readTomlString(section.body, "type"),
+      baseUrl: readTomlString(section.body, "base_url"),
+      hasApiKey: Boolean(readTomlString(section.body, "api_key")),
+      hasOauth: hasOauth.has(section.name),
+    })).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")),
+    models: modelSections.map((section) => {
+      const alias = stripTablePrefix(section.name, "models.");
+      return {
+        alias,
+        provider: readTomlString(section.body, "provider"),
+        model: readTomlString(section.body, "model"),
+        displayName: readTomlString(section.body, "display_name"),
+        maxContextSize: readTomlInteger(section.body, "max_context_size"),
+        isDefault: alias === defaultModel,
+      };
+    }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN")),
+  };
+}
+
+const OpenAiProviderBaseConfigSchema = z.object({
+  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  modelAlias: z.string().trim().min(2).max(120).regex(/^[A-Za-z0-9_./:-]+$/),
+  baseUrl: z.string().trim().url(),
+  model: z.string().trim().min(1).max(160),
+  maxContextSize: z.number().int().min(1).max(1048576).optional(),
+  makeDefault: z.boolean().optional(),
+});
+
+const SaveOpenAiProviderConfigSchema = OpenAiProviderBaseConfigSchema.extend({
+  apiKey: z.string().trim().max(4096).optional(),
+});
+
+const TestOpenAiProviderConfigSchema = OpenAiProviderBaseConfigSchema.extend({
+  apiKey: z.string().trim().min(1).max(4096),
+});
+
+function saveOpenAiProviderConfig(input: unknown) {
+  const config = SaveOpenAiProviderConfigSchema.parse(input);
+  ensureKimiCodeMigratedConfig();
+  const paths = getKimiPaths();
+  const configPath = paths.config;
+  ensureDirectoryExists(path.dirname(configPath));
+  const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+  const apiKey = config.apiKey?.trim() || resolveExistingManagedApiKey(current, config.providerName);
+  if (!apiKey) {
+    throw new Error("API Key 为空，无法保存新 Provider。");
+  }
+  const withoutManagedBlock = removeKimixManagedModelBlock(current);
+  const existingSections = new Set(listTomlSectionNames(withoutManagedBlock));
+  if (existingSections.has(`providers.${toTomlTableKey(config.providerName)}`)) {
+    throw new Error(`Provider ${config.providerName} 已存在于非 Kimix 管理区，请换一个名称或手动整理 config.toml`);
+  }
+  if (existingSections.has(`models.${toTomlTableKey(config.modelAlias)}`)) {
+    throw new Error(`模型别名 ${config.modelAlias} 已存在于非 Kimix 管理区，请换一个名称或手动整理 config.toml`);
+  }
+
+  backupFileIfExists(configPath);
+  const base = config.makeDefault
+    ? setTopLevelTomlString(withoutManagedBlock, "default_model", config.modelAlias)
+    : withoutManagedBlock;
+  const next = `${base.trimEnd()}${base.trim() ? "\n\n" : ""}${buildKimixManagedModelBlock({ ...config, apiKey })}`;
+  fs.writeFileSync(configPath, next, "utf-8");
+  return readKimiModelConfig();
+}
+
+function setDefaultKimiModel(input: unknown) {
+  const req = z.object({ modelAlias: z.string().trim().min(1).max(160) }).parse(input);
+  ensureKimiCodeMigratedConfig();
+  const paths = getKimiPaths();
+  const configPath = paths.config;
+  if (!fs.existsSync(configPath)) throw new Error("尚未找到 Kimi Code config.toml");
+  const current = fs.readFileSync(configPath, "utf-8");
+  const summary = readKimiModelConfig();
+  if (!summary.models.some((model) => model.alias === req.modelAlias)) {
+    throw new Error(`模型别名 ${req.modelAlias} 不存在，请先保存或刷新模型配置`);
+  }
+  backupFileIfExists(configPath);
+  fs.writeFileSync(configPath, setTopLevelTomlString(current, "default_model", req.modelAlias), "utf-8");
+  return readKimiModelConfig();
+}
+async function testOpenAiProviderConfig(input: unknown) {
+  const config = TestOpenAiProviderConfigSchema.parse(input);
+  const kimiPath = await requireKimiExecutable();
+  const env = {
+    ...process.env,
+    KIMI_MODEL_PROVIDER_TYPE: "openai",
+    KIMI_MODEL_NAME: config.model,
+    KIMI_MODEL_BASE_URL: config.baseUrl,
+    KIMI_MODEL_API_KEY: config.apiKey,
+    KIMI_MODEL_MAX_CONTEXT_SIZE: String(config.maxContextSize ?? 262144),
+    KIMI_MODEL_DISPLAY_NAME: config.modelAlias,
+  };
+  const output = await new Promise<string>((resolve, reject) => {
+    const child = execFile(kimiPath, ["--output-format", "stream-json", "-p", "只回复 OK"], {
+      windowsHide: true,
+      timeout: 60000,
+      maxBuffer: 8 * 1024 * 1024,
+      env,
+    }, (error, stdout, stderr) => {
+      const text = [stdout, stderr].filter(Boolean).join("\n").trim();
+      if (error) {
+        reject(new Error(normalizeModelConfigError(text || error.message)));
+        return;
+      }
+      resolve(text);
+    });
+    child.on("error", (err) => reject(new Error(normalizeModelConfigError(err.message))));
+  });
+  return {
+    message: "连接测试通过",
+    output: summarizeKimiPromptOutput(output),
+  };
+}
+
+function summarizeKimiPromptOutput(output: string) {
+  const lines = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const assistantText = lines.map((line) => {
+    try {
+      const record = JSON.parse(line) as { role?: string; content?: unknown };
+      return record.role === "assistant" && typeof record.content === "string" ? record.content : "";
+    } catch {
+      return "";
+    }
+  }).filter(Boolean).join("");
+  return assistantText.trim() || output.slice(0, 500);
+}
+
+function normalizeModelConfigError(message: string) {
+  const text = stripAnsi(message).trim();
+  if (/401|unauthorized|api[_ -]?key|invalid key|authentication/i.test(text)) {
+    return `API Key 无效或无权限：${text}`;
+  }
+  if (/404|model.*not.*found|unknown model|invalid model/i.test(text)) {
+    return `模型名不可用或不存在：${text}`;
+  }
+  if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|base_url|Invalid URL/i.test(text)) {
+    return `Base URL 无法连接或格式不兼容：${text}`;
+  }
+  return text || "连接测试失败";
 }
 
 function readMcpServers() {
   const paths = getKimiPaths();
+  const pluginServers = readPluginMcpServers();
   if (!fs.existsSync(paths.mcpConfig)) {
     return {
       configPath: paths.mcpConfig,
       servers: [],
+      pluginServers,
       rawExists: false,
     };
   }
@@ -483,8 +863,231 @@ function readMcpServers() {
   return {
     configPath: paths.mcpConfig,
     servers,
+    pluginServers,
     rawExists: true,
   };
+}
+
+function findPluginManifestFiles() {
+  const roots = [
+    path.join(resolveKimiShareDir(), "plugins", "managed"),
+    path.join(resolveKimiShareDir(), "plugins"),
+    path.join(os.homedir(), ".kimi-code", "plugins"),
+    path.join(os.homedir(), ".kimi", "plugins"),
+  ];
+  const seenRoots = new Set<string>();
+  const seenFiles = new Set<string>();
+  const manifests: string[] = [];
+
+  function walk(dir: string, depth: number) {
+    if (depth > 5) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (SKILL_SEARCH_IGNORES.has(entry.name) || entry.name === ".git" || entry.name === "node_modules") continue;
+        walk(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const normalized = fullPath.replace(/\\/g, "/").toLowerCase();
+      const isManifest = entry.name === "kimi.plugin.json"
+        || entry.name === "plugin.json"
+        || normalized.endsWith("/.kimi-plugin/plugin.json");
+      if (!isManifest) continue;
+      const resolved = path.resolve(fullPath);
+      if (seenFiles.has(resolved)) continue;
+      seenFiles.add(resolved);
+      manifests.push(fullPath);
+    }
+  }
+
+  for (const root of roots) {
+    const resolvedRoot = path.resolve(root);
+    if (seenRoots.has(resolvedRoot) || !fs.existsSync(root)) continue;
+    seenRoots.add(resolvedRoot);
+    walk(root, 0);
+  }
+  return manifests;
+}
+
+function pluginRootFromManifest(manifestPath: string) {
+  const parent = path.dirname(manifestPath);
+  return path.basename(parent) === ".kimi-plugin" ? path.dirname(parent) : parent;
+}
+
+function toStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function normalizeMcpServerRecord(value: unknown): McpServerRecord | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const env = record.env && typeof record.env === "object" && !Array.isArray(record.env)
+    ? Object.fromEntries(Object.entries(record.env as Record<string, unknown>).map(([key, item]) => [key, String(item)]))
+    : undefined;
+  const headers = record.headers && typeof record.headers === "object" && !Array.isArray(record.headers)
+    ? Object.fromEntries(Object.entries(record.headers as Record<string, unknown>).map(([key, item]) => [key, String(item)]))
+    : undefined;
+  const transport = record.transport === "http" || record.transport === "stdio" ? record.transport : undefined;
+  return {
+    command: typeof record.command === "string" ? record.command : undefined,
+    args: toStringArray(record.args),
+    env,
+    headers,
+    url: typeof record.url === "string" ? record.url : undefined,
+    transport,
+    auth: typeof record.auth === "string" ? record.auth : undefined,
+    enabled: typeof record.enabled === "boolean" ? record.enabled : undefined,
+  };
+}
+
+function readPluginMcpServers() {
+  const servers: {
+    name: string;
+    transport: "http" | "stdio";
+    url?: string;
+    command?: string;
+    args?: string[];
+    env?: Record<string, string>;
+    headers?: Record<string, string>;
+    auth?: "oauth" | string;
+    pluginId: string;
+    pluginName: string;
+    pluginPath: string;
+    manifestPath: string;
+    enabled: boolean;
+  }[] = [];
+
+  for (const manifestPath of findPluginManifestFiles()) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+      const pluginPath = pluginRootFromManifest(manifestPath);
+      const pluginName = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : path.basename(pluginPath);
+      const pluginId = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : pluginName;
+      const mcpServers = raw.mcpServers && typeof raw.mcpServers === "object" && !Array.isArray(raw.mcpServers)
+        ? raw.mcpServers as Record<string, unknown>
+        : {};
+      for (const [name, value] of Object.entries(mcpServers)) {
+        const server = normalizeMcpServerRecord(value);
+        if (!server) continue;
+        servers.push({
+          name,
+          transport: server.transport === "http" || server.url ? "http" : "stdio",
+          url: server.url,
+          command: server.command,
+          args: server.args ?? [],
+          env: server.env,
+          headers: server.headers,
+          auth: server.auth,
+          pluginId,
+          pluginName,
+          pluginPath,
+          manifestPath,
+          enabled: server.enabled !== false,
+        });
+      }
+    } catch {
+      // Ignore malformed third-party plugin manifests; install errors are surfaced separately.
+    }
+  }
+  servers.sort((a, b) => `${a.pluginName}:${a.name}`.localeCompare(`${b.pluginName}:${b.name}`, "zh-CN"));
+  return servers;
+}
+
+function sanitizeMcpServerName(name: string) {
+  return (name || "plugin-mcp")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    || "plugin-mcp";
+}
+
+function sameMcpServerConfig(left: McpServerRecord, right: McpServerRecord) {
+  return JSON.stringify({
+    command: left.command || "",
+    args: left.args ?? [],
+    env: left.env ?? {},
+    headers: left.headers ?? {},
+    url: left.url || "",
+    transport: left.transport || "",
+    auth: left.auth || "",
+  }) === JSON.stringify({
+    command: right.command || "",
+    args: right.args ?? [],
+    env: right.env ?? {},
+    headers: right.headers ?? {},
+    url: right.url || "",
+    transport: right.transport || "",
+    auth: right.auth || "",
+  });
+}
+
+function uniqueMcpServerName(existing: Record<string, McpServerRecord>, preferredName: string, server: McpServerRecord) {
+  const base = sanitizeMcpServerName(preferredName);
+  if (!existing[base]) return { name: base, alreadyExists: false };
+  if (sameMcpServerConfig(existing[base], server)) return { name: base, alreadyExists: true };
+  let index = 2;
+  while (existing[`${base}-${index}`]) {
+    if (sameMcpServerConfig(existing[`${base}-${index}`], server)) {
+      return { name: `${base}-${index}`, alreadyExists: true };
+    }
+    index += 1;
+  }
+  return { name: `${base}-${index}`, alreadyExists: false };
+}
+
+function findPluginMcpServer(manifestPath: string, serverName: string) {
+  const resolvedManifest = path.resolve(manifestPath);
+  const knownManifests = new Set(findPluginManifestFiles().map((item) => path.resolve(item)));
+  if (!knownManifests.has(resolvedManifest)) {
+    throw new Error("未找到可信的 Plugin manifest，请刷新 MCP 面板后重试");
+  }
+  const raw = JSON.parse(fs.readFileSync(resolvedManifest, "utf-8")) as Record<string, unknown>;
+  const pluginPath = pluginRootFromManifest(resolvedManifest);
+  const pluginName = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : path.basename(pluginPath);
+  const mcpServers = raw.mcpServers && typeof raw.mcpServers === "object" && !Array.isArray(raw.mcpServers)
+    ? raw.mcpServers as Record<string, unknown>
+    : {};
+  const server = normalizeMcpServerRecord(mcpServers[serverName]);
+  if (!server) throw new Error(`Plugin manifest 中未找到 MCP 服务 ${serverName}`);
+  return { pluginName, serverName, server };
+}
+
+function importPluginMcpServerToConfig(request: unknown) {
+  const parsed = z.object({
+    manifestPath: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+  }).parse(request);
+  const { pluginName, serverName, server } = findPluginMcpServer(parsed.manifestPath, parsed.name);
+  const paths = getKimiPaths();
+  let config: { mcpServers?: Record<string, McpServerRecord> } = {};
+  if (fs.existsSync(paths.mcpConfig)) {
+    config = JSON.parse(fs.readFileSync(paths.mcpConfig, "utf-8")) as { mcpServers?: Record<string, McpServerRecord> };
+  }
+  const mcpServers = config.mcpServers && typeof config.mcpServers === "object" ? config.mcpServers : {};
+  const imported = uniqueMcpServerName(mcpServers, `plugin-${pluginName}-${serverName}`, server);
+  if (imported.alreadyExists) {
+    return { message: `Plugin MCP 已在配置中：${imported.name}` };
+  }
+  fs.mkdirSync(path.dirname(paths.mcpConfig), { recursive: true });
+  backupFileIfExists(paths.mcpConfig);
+  mcpServers[imported.name] = {
+    transport: server.transport === "http" || server.url ? "http" : "stdio",
+    url: server.url,
+    command: server.command,
+    args: server.args ?? [],
+    env: server.env,
+    headers: server.headers,
+    auth: server.auth,
+  };
+  fs.writeFileSync(paths.mcpConfig, `${JSON.stringify({ ...config, mcpServers }, null, 2)}\n`, "utf-8");
+  return { message: `已将 ${pluginName} / ${serverName} 加入 MCP 配置：${imported.name}` };
 }
 
 async function requireKimiExecutable() {
@@ -1083,6 +1686,25 @@ function normalizeKimiExportSessionId(sessionId?: string) {
   return trimmed;
 }
 
+async function exportMarkdownDocument(request: unknown) {
+  const parsed = z.object({
+    title: z.string().trim().optional(),
+    content: z.string().min(1),
+  }).parse(request);
+  const defaultName = `${sanitizeDownloadName(parsed.title || "Kimix 会话")}-${new Date().toISOString().replace(/[:.]/g, "-")}.md`;
+  const result = await dialog.showSaveDialog(mainWindow ?? undefined, {
+    title: "导出 Markdown",
+    defaultPath: path.join(app.getPath("downloads"), defaultName),
+    filters: [{ name: "Markdown", extensions: ["md"] }],
+  });
+  if (result.canceled || !result.filePath) {
+    return { path: "", output: "用户取消导出" };
+  }
+  ensureDirectoryExists(path.dirname(result.filePath));
+  fs.writeFileSync(result.filePath, parsed.content, "utf-8");
+  await shell.showItemInFolder(result.filePath);
+  return { path: result.filePath, output: "Markdown 导出完成" };
+}
 async function exportKimiSessionArchive(request: { sessionId?: string; title?: string }) {
   const kimiPath = await resolveKimiCommand();
   if (!kimiPath) throw new Error("未找到 Kimi Code，无法导出会话");
@@ -1248,10 +1870,7 @@ function listLocalSkills() {
     const normalizedRoot = root.replace(/\\/g, "/").toLowerCase();
     const normalizedPath = skillPath.replace(/\\/g, "/").toLowerCase();
     if (normalizedPath.includes("/.kimi-code/plugins/")) {
-      if (/\/(kimi-official|moonshot|official)\//.test(normalizedPath)) {
-        return { sourceLabel: "Kimi 官方 Plugin", trustLevel: "kimi-official" as const };
-      }
-      return { sourceLabel: "Kimi Plugin", trustLevel: "third-party" as const };
+      return { sourceLabel: "Kimi Plugin", trustLevel: "kimi-official" as const };
     }
     if (normalizedPath.includes("/superpowers/") || normalizedPath.includes("/.codex/plugins/cache/")) {
       return { sourceLabel: "Curated", trustLevel: "curated" as const };
@@ -1296,6 +1915,38 @@ function listLocalSkills() {
 
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
+    if (root.replace(/\\/g, "/").toLowerCase().includes("/.kimi-code/plugins")) {
+      const normalizedRoot = path.resolve(root);
+      for (const manifestPath of findPluginManifestFiles().filter((item) => path.resolve(item).startsWith(normalizedRoot))) {
+        const normalizedManifestPath = path.resolve(manifestPath);
+        if (seen.has(normalizedManifestPath)) continue;
+        try {
+          const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+          const pluginPath = pluginRootFromManifest(manifestPath);
+          const interfaceInfo = raw.interface && typeof raw.interface === "object" ? raw.interface as Record<string, unknown> : {};
+          const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : path.basename(pluginPath);
+          const displayName = typeof interfaceInfo.displayName === "string" && interfaceInfo.displayName.trim() ? interfaceInfo.displayName.trim() : name;
+          const description = typeof interfaceInfo.shortDescription === "string" && interfaceInfo.shortDescription.trim()
+            ? interfaceInfo.shortDescription.trim()
+            : typeof raw.description === "string" && raw.description.trim()
+            ? raw.description.trim()
+            : "Kimi Plugin";
+          results.push({
+            name: displayName,
+            description,
+            path: manifestPath,
+            source: root,
+            sourceLabel: "Kimi Plugin",
+            trustLevel: "kimi-official",
+            enabled: true,
+          });
+          seen.add(normalizedManifestPath);
+        } catch {
+          // Ignore malformed plugin manifests; Plugin management surfaces install errors separately.
+        }
+      }
+      continue;
+    }
     for (const skillPath of collectSkillFiles(root)) {
       const normalizedSkillPath = path.resolve(skillPath);
       if (seen.has(normalizedSkillPath)) continue;
@@ -1524,6 +2175,65 @@ function importSkillArchive(archivePath: string) {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+function validateKimiPluginUrl(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) throw new Error("请输入 Plugin URL");
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("Plugin URL 格式无效，请输入 https 地址");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("Plugin URL 只支持 https 地址");
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  const pathname = parsed.pathname.toLowerCase();
+  if (hostname === "github.com") {
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) {
+      throw new Error("GitHub Plugin URL 至少需要包含 owner/repo");
+    }
+    return trimmed;
+  }
+  if (pathname.endsWith(".zip")) {
+    return trimmed;
+  }
+  throw new Error("当前入口支持 GitHub Plugin URL 或官方 ZIP Plugin URL");
+}
+
+function normalizePluginInstallError(output: string) {
+  const text = output.trim();
+  if (/unknown command|too many arguments|expected 0 arguments|invalid command|error: unknown/i.test(text)) {
+    return [
+      "当前 Kimi Code CLI 未暴露 `kimi plugin install` 命令，请升级 Kimi Code 或等待官方 CLI 支持后重试。",
+      text ? `CLI 输出：\n${text}` : "",
+    ].filter(Boolean).join("\n\n");
+  }
+  return text || "安装 Kimi Plugin 失败";
+}
+
+async function installKimiPluginFromUrl(request: unknown) {
+  const url = request && typeof request === "object" && typeof (request as { url?: unknown }).url === "string"
+    ? validateKimiPluginUrl((request as { url: string }).url)
+    : validateKimiPluginUrl("");
+  const kimiPath = await requireKimiExecutable();
+  let output = "";
+  try {
+    output = await runLongCommand(kimiPath, ["plugin", "install", url], 2 * 60 * 1000);
+  } catch (err) {
+    throw new Error(normalizePluginInstallError(err instanceof Error ? err.message : String(err)));
+  }
+  const settings = settingsService.loadSettings();
+  return {
+    message: "Kimi Plugin 安装完成，已刷新本地插件列表",
+    output,
+    skills: listLocalSkills(),
+    enabledNames: settings.enabledSkillNames ?? [],
+    enabledDir: settings.enabledSkillsDir || enabledSkillsDir(),
+  };
 }
 
 function findSuperpowersSkillsRoot(root: string) {
@@ -1965,6 +2675,11 @@ function createWindow() {
   });
 
   kimiBridge.setMainWindow(mainWindow);
+  tuiHost.setTuiEventSink((payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("tui:event", payload);
+    }
+  });
 
   if (DEV_SERVER_URL) {
     mainWindow.loadURL(DEV_SERVER_URL);
@@ -2261,7 +2976,6 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
 
     const executor = await kimiBridge.startSession({
       workDir: project.path,
-      model: "kimi-code/kimi-for-coding",
       thinking,
       yoloMode,
       autoMode,
@@ -2270,7 +2984,6 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
 
     const reviewer = await kimiBridge.startSession({
       workDir: project.path,
-      model: "kimi-code/kimi-for-coding",
       thinking,
       yoloMode,
       autoMode,
@@ -2588,6 +3301,14 @@ ipcMain.handle("project:importSkillArchive", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:installKimiPlugin", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await installKimiPluginFromUrl(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:installSuperpowers", async () => {
   try {
     return { success: true, data: await installSuperpowersSkills() };
@@ -2831,9 +3552,53 @@ ipcMain.handle("kimi:getAuthStatus", async () => {
   }
 });
 
+ipcMain.handle("kimi:getModelConfig", async () => {
+  try {
+    return { success: true, data: readKimiModelConfig() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:saveOpenAiProvider", async (_, request: unknown) => {
+  try {
+    const config = saveOpenAiProviderConfig(request);
+    return { success: true, data: { ...config, message: "已保存 OpenAI-compatible Provider" } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:setDefaultModel", async (_, request: unknown) => {
+  try {
+    const config = setDefaultKimiModel(request);
+    return { success: true, data: { ...config, message: "已切换默认模型" } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+ipcMain.handle("kimi:testOpenAiProvider", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await testOpenAiProviderConfig(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:login", async () => {
   try {
     const kimiPath = await requireKimiExecutable();
+    const currentStatus = await getKimiAuthStatus();
+    if (currentStatus.loggedIn) {
+      return {
+        success: true,
+        data: {
+          ...currentStatus,
+          verificationUrl: undefined,
+          message: "Kimi Code 已登录",
+        },
+      };
+    }
     let verificationUrl = "";
     const result = await login({
       executable: kimiPath,
@@ -2843,6 +3608,18 @@ ipcMain.handle("kimi:login", async () => {
       },
     });
     if (!result.success) {
+      if (isKimiCodeMissingAuthSubcommandError(result.error ?? "")) {
+        const loginFlow = await startKimiInteractiveLogin(kimiPath);
+        const status = await getKimiAuthStatus();
+        return {
+          success: true,
+          data: {
+            ...status,
+            verificationUrl: loginFlow.verificationUrl,
+            message: status.loggedIn ? "登录完成" : loginFlow.message,
+          },
+        };
+      }
       return { success: false, error: result.error ?? "登录失败" };
     }
     const status = await getKimiAuthStatus();
@@ -2861,11 +3638,7 @@ ipcMain.handle("kimi:login", async () => {
 
 ipcMain.handle("kimi:logout", async () => {
   try {
-    const kimiPath = await requireKimiExecutable();
-    const result = await logout({ executable: kimiPath });
-    if (!result.success) {
-      return { success: false, error: result.error ?? "退出登录失败" };
-    }
+    clearKimiCredential(resolveKimiShareDir());
     const status = await getKimiAuthStatus();
     return {
       success: true,
@@ -2917,6 +3690,14 @@ ipcMain.handle("kimi:addMcpServer", async (_, request: unknown) => {
     }
     await runCommand(kimiPath, args);
     return { success: true, data: { message: `已添加 MCP 服务 ${parsed.name}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:importPluginMcpServer", async (_, request: unknown) => {
+  try {
+    return { success: true, data: importPluginMcpServerToConfig(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -2995,7 +3776,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
   try {
     const settings = settingsService.loadSettings();
     const skillsDir = request.skillsDir || ((settings.enabledSkillNames ?? []).length > 0 ? settings.enabledSkillsDir || enabledSkillsDir() : undefined);
-    const agentFile = request.agentFile || resolveAgentFileForSkills(skillsDir);
+    const agentFile = request.agentFile;
     const result = await kimiBridge.startSession({ ...request, skillsDir, agentFile });
     return { success: true, data: result };
   } catch (err) {
@@ -3063,7 +3844,7 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
   const promptContent: string | ContentPart[] = images.length > 0
     ? [
         ...(content ? [{ type: "text" as const, text: content }] : []),
-        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl } })),
+        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl, id: image.name } })),
       ]
     : content;
   try {
@@ -3096,7 +3877,7 @@ ipcMain.handle("kimi:steerPrompt", async (_, request: unknown) => {
   const steerContent: string | ContentPart[] = images.length > 0
     ? [
         ...(content ? [{ type: "text" as const, text: content }] : []),
-        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl } })),
+        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl, id: image.name } })),
       ]
     : content;
   try {
@@ -3176,10 +3957,12 @@ ipcMain.handle("kimi:getUsage", async () => {
       },
     });
     if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      const summary = detail.trim() ? `：${detail.trim().slice(0, 220)}` : "";
       if (res.status === 401) {
-        throw new Error("Kimi 授权失败，请重新登录 Kimi Code CLI");
+        throw new Error(`Kimi 授权失败，请重新登录 Kimi Code CLI${summary}`);
       }
-      throw new Error(`Kimi 用量接口返回 HTTP ${res.status}`);
+      throw new Error(`Kimi 用量接口返回 HTTP ${res.status}${summary}`);
     }
     const payload = getRecord(await res.json());
     if (!payload) throw new Error("Kimi 用量接口返回格式异常");
@@ -3275,6 +4058,95 @@ ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; session
   }
 });
 
+ipcMain.handle("project:exportMarkdown", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await exportMarkdownDocument(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("tui:listSessions", async () => {
+  try {
+    return tuiHost.listTuiSessions();
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("tui:startSession", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { workDir?: unknown; command?: unknown; args?: unknown } : {};
+    const result = await tuiHost.startTuiSession({
+      workDir: typeof payload.workDir === "string" ? payload.workDir : undefined,
+      command: typeof payload.command === "string" ? payload.command : undefined,
+      args: Array.isArray(payload.args) ? payload.args.filter((item): item is string => typeof item === "string") : undefined,
+    });
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("tui:sendInput", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; text?: unknown; images?: unknown } : {};
+    if (typeof payload.sessionId !== "string" || typeof payload.text !== "string") {
+      return { success: false, error: "Invalid request" };
+    }
+    const images = Array.isArray(payload.images)
+      ? payload.images.filter((item): item is { name: string; dataUrl: string } => (
+          item &&
+          typeof item === "object" &&
+          typeof (item as { name?: unknown }).name === "string" &&
+          typeof (item as { dataUrl?: unknown }).dataUrl === "string" &&
+          (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
+        ))
+      : [];
+    return tuiHost.sendTuiInput({ sessionId: payload.sessionId, text: payload.text, images });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("tui:sendKey", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; key?: unknown } : {};
+    if (typeof payload.sessionId !== "string" || typeof payload.key !== "string") {
+      return { success: false, error: "Invalid request" };
+    }
+    if (!["escape", "enter", "space", "tab", "arrowUp", "arrowDown", "arrowLeft", "arrowRight", "ctrlO"].includes(payload.key)) {
+      return { success: false, error: "Unsupported TUI key" };
+    }
+    return tuiHost.sendTuiKey({ sessionId: payload.sessionId, key: payload.key as "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO" });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("tui:stopSession", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown } : {};
+    if (typeof payload.sessionId !== "string") {
+      return { success: false, error: "Invalid request" };
+    }
+    return tuiHost.stopTuiSession({ sessionId: payload.sessionId });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("tui:resizeSession", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; cols?: unknown; rows?: unknown } : {};
+    if (typeof payload.sessionId !== "string" || typeof payload.cols !== "number" || typeof payload.rows !== "number") {
+      return { success: false, error: "Invalid request" };
+    }
+    return tuiHost.resizeTuiSession({ sessionId: payload.sessionId, cols: payload.cols, rows: payload.rows });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
 ipcMain.handle("kimi:exportSession", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -3593,11 +4465,13 @@ ipcMain.handle("window:close", () => {
 app.on("before-quit", (event) => {
   if (isQuitting) return;
   const ids = kimiBridge.getActiveSessionIds();
-  if (ids.length === 0) return;
+  const hasTuiSessions = tuiHost.listTuiSessions().data.length > 0;
+  if (ids.length === 0 && !hasTuiSessions) return;
   event.preventDefault();
   isQuitting = true;
   Promise.race([
     Promise.all(ids.map((id) => kimiBridge.closeSession(id).catch(() => {}))),
+    tuiHost.closeAllTuiSessions(),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 10000)),
   ]).then(() => {
     app.quit();

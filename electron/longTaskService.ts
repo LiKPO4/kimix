@@ -107,8 +107,8 @@ function buildExecutorPrompt(projectAgent: string, taskDir: string) {
 ## 工作规则
 - 始终先阅读并维护本任务的 BIGPLAN.md。
 - 规划阶段需要和用户多轮澄清，直到计划足够具体、可执行、可审查。
-- 规划阶段只要存在会影响目标、范围、文件、执行方式、验收标准、风险边界或优先级的不确定点，必须调用官方 AskUserQuestion/需求澄清工具进行结构化提问；不要用普通正文罗列问题来替代需求澄清卡片。
-- 可以连续多轮使用需求澄清工具，直到不再有关键歧义；每轮只问 1-3 个最关键问题，避免一次性塞太多。
+- 规划阶段如存在会影响目标、范围、文件、执行方式、验收标准、风险边界或优先级的不确定点，优先走官方需求澄清能力；但必须遵守当前 Kimi Code 系统/权限规则，如果处于 prompt/auto 等禁止向用户提问的模式，不要调用 AskUserQuestion，改为做合理假设、记录风险并继续。
+- 使用官方需求澄清能力时，每轮只问 1-3 个最关键问题，避免一次性塞太多。
 - 只有当需求已经足够明确，才能写完整 BIGPLAN.md 并请求用户确认进入执行阶段。
 - 每个计划步骤必须是一轮可以完成的工作，不要把过多任务塞进同一个步骤。
 - 用户设置执行到第 N 步时，只按 BIGPLAN.md 顺序推进到目标步骤。
@@ -270,7 +270,7 @@ function findLongTaskStatePath(projectPath: string, taskId: string) {
 export function updateLongTaskState(
   projectPath: string,
   taskId: string,
-  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "currentStep" | "targetStep" | "reviewedReviewItems" | "executorSessionId" | "reviewerSessionId">>,
+  patch: Partial<Pick<LongTaskSummary, "stage" | "activeAgent" | "recovery" | "currentStep" | "targetStep" | "reviewedReviewItems" | "executorSessionId" | "reviewerSessionId">>,
 ): LongTaskSummary {
   const statePath = findLongTaskStatePath(projectPath, taskId);
   if (!statePath) {

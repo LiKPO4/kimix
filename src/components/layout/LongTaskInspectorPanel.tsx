@@ -150,6 +150,37 @@ export function LongTaskInspectorPanel({
               <div className="mt-1 text-[13px] leading-5 text-text-muted">
                 步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
               </div>
+              {longTaskMeta.recovery && longTaskMeta.recovery.status !== "none" && (
+                <div
+                  className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[13px] leading-5 text-accent-warning"
+                  style={{ marginTop: 14, padding: "13px 14px" }}
+                >
+                  <div className="font-medium">可恢复状态</div>
+                  <div style={{ marginTop: 6 }}>{longTaskMeta.recovery.reason}</div>
+                  <div className="text-[12.5px] leading-5" style={{ marginTop: 8 }}>
+                    {longTaskMeta.recovery.suggestedAction}
+                  </div>
+                  <div className="flex items-center" style={{ gap: 10, marginTop: 12 }}>
+                    <button
+                      type="button"
+                      disabled={longTaskControlBusy || Boolean(runningSessionId) || longTaskMeta.stage === "completed"}
+                      onClick={() => void onApplyTargetStep(true)}
+                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/60 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      <Play size={14} />
+                      <span>继续</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onCopyNextLongTaskPrompt()}
+                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/60"
+                    >
+                      <ClipboardCopy size={13} />
+                      <span>复制 prompt</span>
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex flex-col" style={{ gap: 18, marginTop: 22 }}>
                 <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "20px 16px 18px" }}>
                   <div className="flex flex-col" style={{ gap: 16 }}>

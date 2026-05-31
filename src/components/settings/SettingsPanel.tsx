@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -11,7 +11,15 @@ type FreezeReport = {
   runningSessionId: string | null;
 };
 
+type ArchivedSessionSummary = {
+  id: string;
+  title: string;
+  projectPath: string;
+  archivedAt: number;
+};
+
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
+const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 
 type KimiAuthStatus = {
@@ -24,6 +32,46 @@ type KimiAuthStatus = {
   defaultThinking: boolean;
   message: string;
 };
+
+type KimiModelConfigSummary = {
+  configPath: string;
+  exists: boolean;
+  defaultModel: string | null;
+  providers: {
+    name: string;
+    type: string | null;
+    baseUrl: string | null;
+    hasApiKey: boolean;
+    hasOauth: boolean;
+  }[];
+  models: {
+    alias: string;
+    provider: string | null;
+    model: string | null;
+    displayName: string | null;
+    maxContextSize: number | null;
+    isDefault: boolean;
+  }[];
+};
+
+function parseFreezeReports() {
+  const raw = localStorage.getItem(FREEZE_REPORTS_KEY);
+  if (!raw) return [];
+  if (raw.length > MAX_FREEZE_REPORTS_RAW_LENGTH) {
+    localStorage.removeItem(FREEZE_REPORTS_KEY);
+    return [];
+  }
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item): item is FreezeReport => (
+    item &&
+    typeof item === "object" &&
+    typeof item.at === "string" &&
+    typeof item.lagMs === "number" &&
+    ("sessionId" in item) &&
+    ("runningSessionId" in item)
+  ));
+}
 
 function formatFreezeTime(value: string) {
   const date = new Date(value);
@@ -41,7 +89,7 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className={`kimix-selection-indicator mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${selected ? "is-selected" : ""} ${
+      className={`kimix-selection-indicator flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${selected ? "is-selected" : ""} ${
         selected
           ? "border-accent-primary bg-accent-primary text-text-inverse"
           : "text-transparent"
@@ -71,14 +119,56 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const notificationMode = useAppStore((s) => s.notificationMode);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
+  const experimentalTuiEngineEnabled = useAppStore((s) => s.experimentalTuiEngineEnabled);
+  const setExperimentalTuiEngineEnabled = useAppStore((s) => s.setExperimentalTuiEngineEnabled);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
-  const sessions = useSessionStore((s) => s.sessions);
+  const archivedSessionsDigest = useSessionStore((s) => s.sessions
+    .filter((session) => session.archivedAt)
+    .map((session) => JSON.stringify({
+      id: session.id,
+      title: session.title,
+      projectPath: session.projectPath,
+      archivedAt: session.archivedAt ?? 0,
+    }))
+    .join("\n")
+  );
+  const archivedSessionSummaries = useMemo(() => {
+    if (!archivedSessionsDigest) return [];
+    return archivedSessionsDigest
+      .split("\n")
+      .filter(Boolean)
+      .map((line): ArchivedSessionSummary | null => {
+        try {
+          const parsed = JSON.parse(line) as ArchivedSessionSummary;
+          return parsed && typeof parsed.id === "string" ? parsed : null;
+        } catch {
+          return null;
+        }
+      })
+      .filter((session): session is ArchivedSessionSummary => Boolean(session));
+  }, [archivedSessionsDigest]);
   const restoreSession = useSessionStore((s) => s.restoreSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
+  const [freezeExpanded, setFreezeExpanded] = useState(false);
   const [auth, setAuth] = useState<KimiAuthStatus | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
+  const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(null);
+  const [modelConfigLoading, setModelConfigLoading] = useState(true);
+  const [modelConfigMessage, setModelConfigMessage] = useState("");
+  const [providerDraft, setProviderDraft] = useState({
+    providerName: "kimix-openai",
+    modelAlias: "kimix/gpt-4.1",
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "",
+    model: "gpt-4.1",
+    maxContextSize: "1048576",
+  });
+  const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
+  const [providerMessage, setProviderMessage] = useState("");
+  const [selectedModelAlias, setSelectedModelAlias] = useState("");
+  const modelSettingsRef = useRef<HTMLDivElement>(null);
   const [connection, setConnection] = useState<{
     loading: boolean;
     available: boolean | null;
@@ -128,6 +218,104 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     });
   };
 
+  const refreshModelConfig = async () => {
+    setModelConfigLoading(true);
+    const res = await window.api.getKimiModelConfig();
+    setModelConfigLoading(false);
+    if (res.success) {
+      setModelConfig(res.data);
+      setModelConfigMessage(res.data.exists ? "" : "尚未找到 Kimi Code config.toml。");
+      return;
+    }
+    setModelConfig(null);
+    setModelConfigMessage(`读取模型配置失败：${res.error}`);
+  };
+
+  const buildProviderPayload = () => {
+    const contextText = providerDraft.maxContextSize.trim();
+    const contextSize = Number(contextText);
+    if (!contextText || !Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1048576) {
+      return null;
+    }
+    return {
+      providerName: providerDraft.providerName.trim(),
+      modelAlias: providerDraft.modelAlias.trim(),
+      baseUrl: providerDraft.baseUrl.trim(),
+      apiKey: providerDraft.apiKey.trim() || undefined,
+      model: providerDraft.model.trim(),
+      maxContextSize: contextSize,
+    };
+  };
+
+  const handleSelectModel = (model: KimiModelConfigSummary["models"][number]) => {
+    setSelectedModelAlias(model.alias);
+    const provider = modelConfig?.providers.find((item) => item.name === model.provider);
+    setProviderDraft((current) => ({
+      ...current,
+      providerName: provider?.name ?? model.provider ?? current.providerName,
+      modelAlias: model.alias,
+      baseUrl: provider?.baseUrl ?? current.baseUrl,
+      model: model.model ?? model.alias,
+      maxContextSize: String(model.maxContextSize ?? current.maxContextSize),
+    }));
+    setProviderMessage(model.isDefault ? "当前已是默认模型，可新建会话测试。" : "已选中模型；点击设为默认后，新会话会使用它。");
+  };
+
+  const handleSetDefaultModel = async (modelAlias = selectedModelAlias || providerDraft.modelAlias.trim()) => {
+    const alias = modelAlias.trim();
+    if (!alias) {
+      setProviderMessage("请先选中一个模型。");
+      return;
+    }
+    if (typeof window.api.setKimiDefaultModel !== "function") {
+      setProviderMessage("默认模型接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
+      return;
+    }
+    setProviderBusyAction("default");
+    setProviderMessage("正在设为默认模型...");
+    const res = await window.api.setKimiDefaultModel({ modelAlias: alias });
+    setProviderBusyAction(null);
+    if (res.success) {
+      setModelConfig(res.data);
+      setSelectedModelAlias(alias);
+      setProviderDraft((current) => ({ ...current, modelAlias: alias }));
+      setProviderMessage(res.data.message);
+      return;
+    }
+    setProviderMessage(`设为默认失败：${res.error}`);
+  };
+  const handleTestProvider = async () => {
+    const payload = buildProviderPayload();
+    if (!payload) {
+      setProviderMessage("上下文大小填写错误，无法测试。");
+      return;
+    }
+    setProviderBusyAction("test");
+    setProviderMessage("正在测试连接...");
+    const res = await window.api.testKimiOpenAiProvider(payload);
+    setProviderBusyAction(null);
+    setProviderMessage(res.success ? `测试通过：${res.data.output || res.data.message}` : `测试失败：${res.error}`);
+  };
+
+  const handleSaveProvider = async () => {
+    const payload = buildProviderPayload();
+    if (!payload) {
+      setProviderMessage("上下文大小填写错误，无法保存。");
+      return;
+    }
+    setProviderBusyAction("save");
+    setProviderMessage("正在保存配置...");
+    const res = await window.api.saveKimiOpenAiProvider(payload);
+    setProviderBusyAction(null);
+    if (res.success) {
+      setModelConfig(res.data);
+      setModelConfigMessage("");
+      setProviderMessage(res.data.message);
+      return;
+    }
+    setProviderMessage(`保存失败：${res.error}`);
+  };
+
   const handleLogin = async () => {
     setAuthBusyAction("login");
     const res = await window.api.loginKimi();
@@ -172,19 +360,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   const loadFreezeReports = () => {
     try {
-      const parsed = JSON.parse(localStorage.getItem(FREEZE_REPORTS_KEY) ?? "[]");
-      const reports = Array.isArray(parsed)
-        ? parsed.filter((item): item is FreezeReport => (
-          item &&
-          typeof item === "object" &&
-          typeof item.at === "string" &&
-          typeof item.lagMs === "number" &&
-          ("sessionId" in item) &&
-          ("runningSessionId" in item)
-        ))
-        : [];
+      const reports = parseFreezeReports();
       setFreezeReports(reports.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 20));
     } catch {
+      localStorage.removeItem(FREEZE_REPORTS_KEY);
       setFreezeReports([]);
     }
   };
@@ -198,17 +377,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     if (settingsOpen || variant === "workspace") {
       void checkConnection(false);
       void refreshAuth();
+      void refreshModelConfig();
       loadFreezeReports();
     }
   }, [settingsOpen, variant]);
 
   useEffect(() => {
     const handleAuthChanged = () => {
-      if (settingsOpen || variant === "workspace") void refreshAuth();
+      if (settingsOpen || variant === "workspace") {
+        void refreshAuth();
+        void refreshModelConfig();
+      }
     };
     window.addEventListener(KIMI_AUTH_CHANGED_EVENT, handleAuthChanged);
     return () => window.removeEventListener(KIMI_AUTH_CHANGED_EVENT, handleAuthChanged);
   }, [settingsOpen, variant]);
+
+  useEffect(() => {
+    const handleFocusModelSettings = () => {
+      window.setTimeout(() => {
+        modelSettingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    };
+    window.addEventListener("kimix:focus-model-settings", handleFocusModelSettings);
+    return () => window.removeEventListener("kimix:focus-model-settings", handleFocusModelSettings);
+  }, []);
 
   if (!settingsOpen && variant === "modal") return null;
 
@@ -228,11 +421,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "unfocused", label: "无焦点时", desc: "仅 Kimix 窗口没有焦点时提醒" },
     { value: "always", label: "任何时候", desc: "每轮完成都弹出系统通知；红点仍只在无焦点时显示" },
   ];
-  const archivedSessions = sessions
-    .filter((session) => session.archivedAt)
-    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
+  const archivedSessions = [...archivedSessionSummaries]
+    .sort((a, b) => b.archivedAt - a.archivedAt);
   const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, 8);
   const hiddenArchivedCount = Math.max(0, archivedSessions.length - 8);
+  const visibleFreezeReports = freezeExpanded ? freezeReports : freezeReports.slice(0, 8);
+  const hiddenFreezeCount = Math.max(0, freezeReports.length - 8);
 
   const handleRestoreSession = (sessionId: string) => {
     restoreSession(sessionId);
@@ -344,7 +538,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <button
                     type="button"
                     onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
-                    className="flex w-full items-start text-left"
+                    className="flex w-full items-center text-left"
                     style={{ gap: 12 }}
                   >
                     <SelectionIndicator selected={sessionRecommendationEnabled} />
@@ -363,9 +557,40 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       value={sessionRecommendationTurnLimit}
                       disabled={!sessionRecommendationEnabled}
                       onChange={(event) => setSessionRecommendationTurnLimit(Number(event.target.value || 1))}
-                      className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                      className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="kimix-settings-section">
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <Terminal size={16} className="text-text-muted" />
+                    <span>TUI 引擎</span>
+                  </div>
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setExperimentalTuiEngineEnabled(!experimentalTuiEngineEnabled)}
+                    className={`kimix-settings-permission ${experimentalTuiEngineEnabled ? "is-active" : ""}`}
+                    style={{
+                      padding: "14px 14px",
+                      display: "grid",
+                      gridTemplateColumns: "auto minmax(0, 1fr)",
+                      gap: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <SelectionIndicator selected={experimentalTuiEngineEnabled} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">hidden TUI 主链路</div>
+                      <div className="kimix-settings-permission-desc">
+                        默认开启；普通输入优先发送到真实隐藏 Kimi TUI，并把终端镜像回填到当前对话气泡。关闭后使用 prompt 兼容回退。
+                      </div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -425,7 +650,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <Terminal size={16} className="text-text-muted" />
                     <span>连接情况</span>
                   </div>
-                  <button onClick={() => void checkConnection(Boolean(connection.path))} disabled={connection.loading || !connection.path} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "未找到路径，无法检查"}>
+                  <button onClick={() => void checkConnection(Boolean(connection.path))} disabled={connection.loading} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "查找 Kimi Code"}>
                     <RefreshCw size={15} className={connection.loading ? "kimix-spin" : ""} />
                     <span>检查</span>
                   </button>
@@ -509,6 +734,205 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <LogIn size={14} />
                         <span>{authBusyAction === "login" ? "登录中" : "登录"}</span>
                       </button>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+              <div ref={modelSettingsRef} className="kimix-settings-section">
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <Terminal size={16} className="text-text-muted" />
+                    <span>模型配置</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void refreshModelConfig()}
+                    disabled={modelConfigLoading}
+                    className="kimix-settings-check-button"
+                  >
+                    <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
+                    <span>刷新</span>
+                  </button>
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
+                  <div className="flex items-start" style={{ gap: 12 }}>
+                    <Terminal size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">Kimi Code 模型配置</div>
+                      <div className="kimix-settings-permission-desc">
+                        {modelConfig?.configPath ?? "正在读取 Kimi Code config.toml"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                    {modelConfigLoading ? (
+                      <div className="kimix-settings-permission-desc">正在读取模型配置...</div>
+                    ) : modelConfig && modelConfig.exists ? (
+                      <>
+                        <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
+                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>默认模型</div>
+                          <div className="kimix-settings-permission-label break-all text-[13px]">{modelConfig.defaultModel ?? "未设置"}</div>
+                        </div>
+                        <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
+                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Provider</div>
+                          <div className="kimix-settings-permission-label text-[13px]">
+                            {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasOauth).length} 个已配置凭据
+                          </div>
+                        </div>
+                        <div className="flex flex-col" style={{ gap: 8, marginTop: 2 }}>
+                          {modelConfig.models.slice(0, 3).map((model) => {
+                            const selected = selectedModelAlias === model.alias || (!selectedModelAlias && model.isDefault);
+                            return (
+                              <div
+                                key={model.alias}
+                                onClick={() => handleSelectModel(model)}
+                                className={`kimix-settings-permission ${selected ? "is-active" : ""}`}
+                                style={{
+                                  padding: "12px 14px",
+                                  display: "grid",
+                                  gridTemplateColumns: "auto minmax(0, 1fr) auto",
+                                  gap: 12,
+                                  alignItems: "center",
+                                }}
+                              >
+                                <SelectionIndicator selected={selected} />
+                                <div className="kimix-settings-permission-copy">
+                                  <div className="kimix-settings-permission-label truncate">{model.displayName || model.alias}</div>
+                                  <div className="kimix-settings-permission-desc">
+                                    {model.provider ?? "未绑定 provider"} · {model.model ?? model.alias}
+                                  </div>
+                                </div>
+                                {model.isDefault ? (
+                                  <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                                    默认
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleSetDefaultModel(model.alias);
+                                    }}
+                                    disabled={providerBusyAction === "default"}
+                                    className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
+                                  >
+                                    <Check size={13} />
+                                    设为默认
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {modelConfig.models.length > 3 && (
+                          <div className="kimix-settings-permission-desc">另有 {modelConfig.models.length - 3} 个模型别名，后续 P0 写入入口会一并管理。</div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="kimix-settings-permission-desc">{modelConfigMessage || "未读取到模型配置。"}</div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 16, paddingTop: 16 }}>
+                    <div className="kimix-settings-permission-label">OpenAI-compatible Provider</div>
+                    <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                      <label className="min-w-0">
+                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider 名称</span>
+                        <input
+                          value={providerDraft.providerName}
+                          onChange={(event) => setProviderDraft((current) => ({ ...current, providerName: event.target.value }))}
+                          className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                        />
+                      </label>
+                      <label className="min-w-0">
+                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名</span>
+                        <input
+                          value={providerDraft.modelAlias}
+                          onChange={(event) => setProviderDraft((current) => ({ ...current, modelAlias: event.target.value }))}
+                          className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                        />
+                      </label>
+                    </div>
+                    <label className="block min-w-0" style={{ marginTop: 10 }}>
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Base URL</span>
+                      <input
+                        value={providerDraft.baseUrl}
+                        onChange={(event) => setProviderDraft((current) => ({ ...current, baseUrl: event.target.value }))}
+                        className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                        style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                      />
+                    </label>
+                    <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) 128px", gap: 10, marginTop: 10 }}>
+                      <label className="min-w-0">
+                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型名</span>
+                        <input
+                          value={providerDraft.model}
+                          onChange={(event) => setProviderDraft((current) => ({ ...current, model: event.target.value }))}
+                          className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                        />
+                      </label>
+                      <label className="min-w-0">
+                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Context</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={1048576}
+                          value={providerDraft.maxContextSize}
+                          onChange={(event) => setProviderDraft((current) => ({ ...current, maxContextSize: event.target.value }))}
+                          className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[13px] outline-none transition-colors"
+                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                        />
+                      </label>
+                    </div>
+                    <label className="block min-w-0" style={{ marginTop: 10 }}>
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>API Key</span>
+                      <input
+                        type="password"
+                        value={providerDraft.apiKey}
+                        onChange={(event) => setProviderDraft((current) => ({ ...current, apiKey: event.target.value }))}
+                        className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                        style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                      />
+                    </label>
+                    <div className="flex min-w-0 justify-end" style={{ gap: 8, marginTop: 14 }}>
+                        <button
+                          type="button"
+                          onClick={() => void handleSetDefaultModel()}
+                          disabled={Boolean(providerBusyAction) || !providerDraft.modelAlias.trim()}
+                          className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                        >
+                          <Check size={13} />
+                          设为默认
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleTestProvider()}
+                          disabled={Boolean(providerBusyAction)}
+                          className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                        >
+                          <RefreshCw size={13} className={providerBusyAction === "test" ? "kimix-spin" : ""} />
+                          测试
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveProvider()}
+                          disabled={Boolean(providerBusyAction)}
+                          className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-55"
+                        >
+                          <Check size={13} />
+                          保存
+                        </button>
+                    </div>
+                    {providerMessage && (
+                      <div className="break-all text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
+                        {providerMessage}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -618,7 +1042,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   {freezeReports.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 10 }}>
-                      {freezeReports.slice(0, 8).map((report, index) => (
+                      {visibleFreezeReports.map((report, index) => (
                         <div key={`${report.at}-${index}`} className="kimix-settings-list-item" style={{ padding: "12px 12px" }}>
                           <div className="flex min-w-0 items-center justify-between" style={{ gap: 10 }}>
                             <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{formatFreezeTime(report.at)}</div>
@@ -632,8 +1056,16 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           </div>
                         </div>
                       ))}
-                      {freezeReports.length > 8 && (
-                        <div className="pt-1 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">仅显示最近 8 条卡死诊断记录。</div>
+                      {hiddenFreezeCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setFreezeExpanded((current) => !current)}
+                          className="kimix-icon-text-button kimix-muted-action is-compact self-start"
+                          style={{ marginTop: 2 }}
+                        >
+                          {freezeExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          <span>{freezeExpanded ? `折叠剩余 ${hiddenFreezeCount} 条诊断记录` : `展开剩余 ${hiddenFreezeCount} 条诊断记录`}</span>
+                        </button>
                       )}
                     </div>
                   ) : (
@@ -644,7 +1076,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.106 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.215 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

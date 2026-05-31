@@ -4,7 +4,7 @@ export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending";
-export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
+export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "tui" | "settings";
 
 export interface AppState {
   currentProject: Project | null;
@@ -23,6 +23,7 @@ export interface AppState {
   voiceShortcut: string;
   notificationMode: NotificationMode;
   clarificationToolMode: ClarificationToolMode;
+  experimentalTuiEngineEnabled: boolean;
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
   diffPanelOpen: boolean;
@@ -45,7 +46,9 @@ export interface Project {
 
 export interface Session {
   id: string;
+  engine?: "prompt" | "tui";
   runtimeSessionId?: string;
+  model?: string | null;
   longTask?: LongTaskSessionMeta;
   title: string;
   projectPath: string;
@@ -61,6 +64,12 @@ export interface LongTaskSessionMeta {
   title: string;
   stage: "drafting" | "planning" | "ready" | "running" | "reviewing" | "paused" | "completed";
   activeAgent: "executor" | "reviewer";
+  recovery?: {
+    status: "none" | "failed" | "interrupted" | "paused";
+    reason: string;
+    suggestedAction: string;
+    updatedAt: number;
+  } | null;
   executorSessionId: string;
   reviewerSessionId: string;
   bigPlanPath: string;

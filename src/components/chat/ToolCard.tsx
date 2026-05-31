@@ -71,7 +71,10 @@ export function ToolCard({ event }: ToolCardProps) {
   const meta = inferToolMeta(event);
   const Icon = meta.icon;
   const duration = isToolCall ? formatDuration(event.durationMs) : "";
-  const details = isToolCall ? stringifyValue(event.arguments) : stringifyValue(event.result);
+  const toolResult = isToolCall && "result" in event ? event.result : undefined;
+  const details = isToolCall
+    ? [stringifyValue(event.arguments), typeof toolResult === "string" && toolResult.trim() ? `输出:\n${toolResult}` : ""].filter(Boolean).join("\n\n")
+    : stringifyValue(event.result);
 
   const statusText = status === "running" ? "正在运行" : status === "error" ? "失败" : "已运行";
   const dotClass = status === "running" ? "bg-accent-warning" : status === "error" ? "bg-accent-danger" : "bg-accent-success";

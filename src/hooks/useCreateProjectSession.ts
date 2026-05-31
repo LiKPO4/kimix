@@ -47,7 +47,6 @@ export function useCreateProjectSession() {
     try {
       const sessionRes = await window.api.startSession({
         workDir: project.path,
-        model: "kimi-code/kimi-for-coding",
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
         autoMode: permissionMode === "auto",
@@ -61,6 +60,7 @@ export function useCreateProjectSession() {
       const session = {
         ...placeholder,
         id: sessionRes.data.sessionId,
+        model: sessionRes.data.model ?? null,
         title: "新会话",
         updatedAt: Date.now(),
         isLoading: false,

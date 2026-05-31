@@ -198,6 +198,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         };
       }
       if (partType === "think" && isString(payload.think)) {
+        if (isKimixSyntheticThinking(payload.think)) return null;
         const id = generateId();
         const timestamp = eventTimestamp;
         return {
@@ -470,6 +471,13 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     default:
       return null;
   }
+}
+
+function isKimixSyntheticThinking(text: string) {
+  const trimmed = text.trim();
+  return trimmed.startsWith("【实时状态】") ||
+    trimmed.includes("当前 prompt-mode 尚未实时写出思考正文") ||
+    trimmed.includes("Kimix 会继续回放");
 }
 
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {

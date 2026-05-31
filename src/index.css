@@ -904,7 +904,7 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-connection-inner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
 }
 
@@ -940,7 +940,7 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-permission {
   display: flex;
   width: 100%;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -1019,6 +1019,18 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-input:disabled {
   background: var(--surface-hover);
   color: var(--text-muted);
+}
+
+.kimix-number-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.kimix-number-input::-webkit-outer-spin-button,
+.kimix-number-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .kimix-settings-hint {

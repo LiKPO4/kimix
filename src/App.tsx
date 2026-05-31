@@ -6,6 +6,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
+import { appendTuiInterruptedStatus, reduceTuiSemanticEvents } from "@/utils/tuiSemanticReducer";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -53,6 +54,110 @@ interface StartHandoffDetail {
   sourceSessionId: string;
   projectPath: string;
   recommendationEventId: string;
+}
+
+type TuiApprovalPreviewSnapshot = {
+  kind: "write" | "edit";
+  toolName: string;
+  filePath: string;
+  oldText: string;
+  newText: string;
+};
+
+type TuiChangeSummarySnapshot = {
+  kind: "write" | "edit";
+  filePath: string;
+  additions: number;
+  deletions: number;
+};
+
+type TuiQuestionSnapshot = {
+  questionId: string;
+  questionText: string;
+};
+
+function mergeTuiChangeSummaryEvents(events: TimelineEvent[], changeSummary?: TuiChangeSummarySnapshot | null) {
+  if (!changeSummary) return events;
+  return mergeTuiChangeSummaryListEvents(events, [changeSummary]);
+}
+
+function mergeTuiChangeSummaryListEvents(events: TimelineEvent[], changeSummaries: TuiChangeSummarySnapshot[]) {
+  if (changeSummaries.length === 0) return events;
+  let nextEvents = events;
+  for (const changeSummary of changeSummaries) {
+    nextEvents = mergeSingleTuiChangeSummaryEvent(nextEvents, changeSummary);
+  }
+  return nextEvents;
+}
+
+function mergeSingleTuiChangeSummaryEvent(events: TimelineEvent[], changeSummary: TuiChangeSummarySnapshot) {
+  const eventId = `tui-change:${changeSummary.kind}:${changeSummary.filePath}`;
+  if (events.some((event) => event.type === "change_summary" && event.id === eventId)) return events;
+  return [
+    ...events,
+    {
+      id: eventId,
+      type: "change_summary",
+      timestamp: Date.now(),
+      files: [{
+        path: changeSummary.filePath,
+        additions: changeSummary.additions,
+        deletions: changeSummary.deletions,
+      }],
+      additions: changeSummary.additions,
+      deletions: changeSummary.deletions,
+    } satisfies Extract<TimelineEvent, { type: "change_summary" }>,
+  ];
+}
+
+function mergeTuiApprovalPreviewEvents(events: TimelineEvent[], approvalPreview?: TuiApprovalPreviewSnapshot | null) {
+  if (!approvalPreview) return events;
+  const diffId = `tui-diff:${approvalPreview.kind}:${approvalPreview.filePath}`;
+  if (events.some((event) => event.type === "diff" && event.id === diffId)) return events;
+  return [
+    ...events,
+    {
+      id: diffId,
+      type: "diff",
+      timestamp: Date.now(),
+      filePath: approvalPreview.filePath,
+      oldText: approvalPreview.oldText,
+      newText: approvalPreview.newText,
+    } satisfies Extract<TimelineEvent, { type: "diff" }>,
+  ];
+}
+
+function mergeTuiQuestionRequestEvents(events: TimelineEvent[], sessionId: string, questionRequest?: TuiQuestionSnapshot | null) {
+  const questionText = questionRequest?.questionText.trim();
+  if (!questionRequest || !questionText) return events;
+  const requestId = `tui-question:${sessionId}:${questionRequest.questionId}`;
+  if (events.some((event) => event.type === "question_request" && event.requestId === requestId)) return events;
+  return [
+    ...events,
+    {
+      id: crypto.randomUUID(),
+      type: "question_request",
+      timestamp: Date.now(),
+      requestId,
+      rpcRequestId: "tui",
+      toolCallId: "tui-question",
+      questions: [{
+        question: questionText,
+        header: "TUI",
+        options: [],
+      }],
+      status: "pending",
+    },
+  ];
+}
+
+function buildTuiExitErrorMessage(session: { exitCode: number | null; signal: string | number | null; error: string | null }) {
+  if (session.error?.trim()) return session.error.trim();
+  const details = [
+    typeof session.exitCode === "number" ? `退出码 ${session.exitCode}` : "",
+    session.signal !== null && session.signal !== undefined ? `信号 ${session.signal}` : "",
+  ].filter(Boolean).join("，");
+  return details ? `TUI 进程异常退出（${details}）。` : "TUI 进程异常退出。";
 }
 
 function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string): Session | undefined {
@@ -233,6 +338,36 @@ function resolveRuntimeSessionId(sessionId: string): string {
   return getRuntimeSessionId(owner) ?? sessionId;
 }
 
+function buildLongTaskRecovery(
+  role: "executor" | "reviewer",
+  status: "error" | "interrupted" | "paused",
+  reason?: string,
+): NonNullable<Session["longTask"]>["recovery"] {
+  const roleLabel = role === "reviewer" ? "审查 agent" : "执行 agent";
+  if (status === "error") {
+    return {
+      status: "failed",
+      reason: reason || `${roleLabel} 运行失败`,
+      suggestedAction: `查看本轮错误后点击继续，Kimix 会从${roleLabel}继续；必要时先复制下一步 prompt 手动调整。`,
+      updatedAt: Date.now(),
+    };
+  }
+  if (status === "interrupted") {
+    return {
+      status: "interrupted",
+      reason: reason || `${roleLabel} 被中断`,
+      suggestedAction: `确认中断原因后点击继续，Kimix 会从${roleLabel}恢复当前 Step。`,
+      updatedAt: Date.now(),
+    };
+  }
+  return {
+    status: "paused",
+    reason: reason || "用户暂停了长程任务",
+    suggestedAction: "确认当前状态后点击继续，或复制下一步 prompt 手动恢复。",
+    updatedAt: Date.now(),
+  };
+}
+
 function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: string, status?: "running" | "error" | "interrupted" | "completed") {
   const store = useSessionStore.getState();
   const target = store.sessions.find((session) => session.id === uiSessionId);
@@ -242,12 +377,18 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
   store.updateSession(uiSessionId, (session) => {
     if (!session.longTask) return session;
     let stage = session.longTask.stage;
+    let recovery = session.longTask.recovery ?? null;
     if (status === "interrupted" || status === "error") {
       stage = "paused";
+      recovery = buildLongTaskRecovery(role, status);
     } else if (status === "running" && role === "reviewer") {
       stage = "reviewing";
+      recovery = null;
     } else if (status === "running" && role === "executor" && stage === "reviewing") {
       stage = "running";
+      recovery = null;
+    } else if (status === "running" || status === "completed") {
+      recovery = null;
     }
     return {
       ...session,
@@ -255,6 +396,7 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
         ...session.longTask,
         activeAgent: role,
         stage,
+        recovery,
       },
       updatedAt: Date.now(),
     };
@@ -267,6 +409,7 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
       patch: {
         activeAgent: latest.longTask.activeAgent,
         stage: latest.longTask.stage,
+        recovery: latest.longTask.recovery ?? null,
         currentStep: latest.longTask.currentStep,
         targetStep: latest.longTask.targetStep,
         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
@@ -431,6 +574,7 @@ function applyLongTaskProgressFromLatestOutput(uiSessionId: string, runtimeSessi
       patch: {
         activeAgent: latest.longTask.activeAgent,
         stage: latest.longTask.stage,
+        recovery: latest.longTask.recovery ?? null,
         currentStep: latest.longTask.currentStep,
         targetStep: latest.longTask.targetStep,
         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
@@ -572,7 +716,6 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
   const sessionStore = useSessionStore.getState();
   const sessionRes = await window.api.startSession({
     workDir: projectPath,
-    model: "kimi-code/kimi-for-coding",
     thinking: appState.defaultThinking,
     yoloMode: appState.permissionMode === "yolo",
     autoMode: appState.permissionMode === "auto",
@@ -582,6 +725,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
 
   const session = {
     id: sessionRes.data.sessionId,
+    model: sessionRes.data.model ?? null,
     title: "交接新会话",
     projectPath,
     createdAt: Date.now(),
@@ -635,6 +779,7 @@ function App() {
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
+  const setExperimentalTuiEngineEnabled = useAppStore((s) => s.setExperimentalTuiEngineEnabled);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
@@ -655,6 +800,8 @@ function App() {
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
+  const tuiIdleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingTuiQueueFlushRef = useRef<Set<string>>(new Set());
 
   useRendererLagDetector();
   useSettingsSync();
@@ -665,7 +812,13 @@ function App() {
     const sessionId = useAppStore.getState().runningSessionId ?? useAppStore.getState().currentSession?.id;
     if (sessionId) {
       setRunningSessionId(null);
-      window.api.stopTurn({ sessionId: resolveRuntimeSessionId(sessionId) }).catch(() => {});
+      const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId || item.runtimeSessionId === sessionId);
+      const runtimeSessionId = resolveRuntimeSessionId(sessionId);
+      if (session?.engine === "tui") {
+        window.api.stopTuiSession({ sessionId: runtimeSessionId }).catch(() => {});
+      } else {
+        window.api.stopTurn({ sessionId: runtimeSessionId }).catch(() => {});
+      }
     }
   }, [setRunningSessionId]);
 
@@ -683,6 +836,7 @@ function App() {
     setVoiceShortcut,
     setNotificationMode,
     setClarificationToolMode,
+    setExperimentalTuiEngineEnabled,
     setRecentProjects,
   });
 
@@ -695,6 +849,121 @@ function App() {
     }
   };
 
+  const flushNextTuiPendingMessage = (uiSessionId: string, runtimeSessionId: string) => {
+    pendingTuiQueueFlushRef.current.delete(`${uiSessionId}:${runtimeSessionId}`);
+    const next = useSessionStore.getState().shiftPendingMessage();
+    if (!next) return;
+    const now = Date.now();
+    updateSession(uiSessionId, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        {
+          id: crypto.randomUUID(),
+          type: "user_message",
+          timestamp: now,
+          content: next.content,
+          images: next.images,
+        },
+        {
+          id: crypto.randomUUID(),
+          type: "assistant_message",
+          timestamp: now,
+          content: "",
+          isThinking: true,
+          isComplete: false,
+        },
+      ],
+      updatedAt: now,
+    }));
+    setRunningSessionId(uiSessionId);
+    void window.api.sendTuiInput({
+      sessionId: runtimeSessionId,
+      text: next.content,
+      images: (next.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
+    }).then((res) => {
+      if (!res.success) {
+        setRunningSessionId(null);
+        updateSession(uiSessionId, (session) => ({
+          ...session,
+          events: [
+            ...session.events.map((event) => event.type === "assistant_message" && !event.isComplete
+              ? { ...event, isComplete: true, isThinking: false }
+              : event
+            ),
+            {
+              id: crypto.randomUUID(),
+              type: "error",
+              timestamp: Date.now(),
+              message: `TUI 队列发送失败：${res.error}`,
+              source: "ipc",
+            },
+          ],
+          updatedAt: Date.now(),
+        }));
+      }
+    });
+  };
+
+  const flushNextTuiPendingMessageWhenIdle = (uiSessionId: string, runtimeSessionId: string) => {
+    const key = `${uiSessionId}:${runtimeSessionId}`;
+    pendingTuiQueueFlushRef.current.add(key);
+    window.setTimeout(() => {
+      void window.api.listTuiSessions().then((res) => {
+        const runtime = res.success ? res.data.find((session) => session.sessionId === runtimeSessionId) : null;
+        if (runtime?.screen?.isInputIdle) {
+          flushNextTuiPendingMessage(uiSessionId, runtimeSessionId);
+          return;
+        }
+        const stillPending = pendingTuiQueueFlushRef.current.has(key);
+        const hasQueue = useSessionStore.getState().pendingMessages.length > 0;
+        if (stillPending && hasQueue) {
+          flushNextTuiPendingMessageWhenIdle(uiSessionId, runtimeSessionId);
+        } else {
+          pendingTuiQueueFlushRef.current.delete(key);
+        }
+      }).catch(() => {
+        pendingTuiQueueFlushRef.current.delete(key);
+      });
+    }, 240);
+  };
+
+  const finishTuiAssistantTurn = (uiSessionId: string, runtimeSessionId: string, options?: { flushQueue?: boolean }) => {
+    const key = `${uiSessionId}:${runtimeSessionId}`;
+    const currentTimer = tuiIdleTimersRef.current.get(key);
+    if (currentTimer) clearTimeout(currentTimer);
+    tuiIdleTimersRef.current.delete(key);
+    updateSession(uiSessionId, (session) => {
+      const lastOpenAssistantIndex = session.events.reduce((result, event, index) => (
+        event.type === "assistant_message" && !event.isComplete ? index : result
+      ), -1);
+      return {
+        ...session,
+        events: session.events.map((event, index) => (
+          index === lastOpenAssistantIndex && event.type === "assistant_message"
+            ? { ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, Date.now() - event.timestamp) }
+            : event
+        )),
+        updatedAt: Date.now(),
+      };
+    });
+    if (useAppStore.getState().runningSessionId === uiSessionId || useAppStore.getState().runningSessionId === runtimeSessionId) {
+      setRunningSessionId(null);
+    }
+    syncCurrentSessionFromStore(uiSessionId);
+    if (options?.flushQueue) {
+      flushNextTuiPendingMessageWhenIdle(uiSessionId, runtimeSessionId);
+    }
+  };
+
+  const scheduleTuiIdleCompletion = (uiSessionId: string, runtimeSessionId: string) => {
+    const key = `${uiSessionId}:${runtimeSessionId}`;
+    const currentTimer = tuiIdleTimersRef.current.get(key);
+    if (currentTimer) clearTimeout(currentTimer);
+    const timer = setTimeout(() => finishTuiAssistantTurn(uiSessionId, runtimeSessionId), 2800);
+    tuiIdleTimersRef.current.set(key, timer);
+  };
+
   const persistLongTaskMeta = (session: Session | undefined) => {
     if (!session?.longTask) return;
     void window.api.updateLongTaskState({
@@ -703,6 +972,7 @@ function App() {
       patch: {
         activeAgent: session.longTask.activeAgent,
         stage: session.longTask.stage,
+        recovery: session.longTask.recovery ?? null,
         currentStep: session.longTask.currentStep,
         targetStep: session.longTask.targetStep,
         reviewedReviewItems: session.longTask.reviewedReviewItems ?? [],
@@ -723,7 +993,6 @@ function App() {
 
     const startRes = await window.api.startSession({
       workDir: snapshot.projectPath,
-      model: "kimi-code/kimi-for-coding",
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
       autoMode: permissionMode === "auto",
@@ -738,6 +1007,7 @@ function App() {
       return {
         ...session,
         runtimeSessionId: startRes.data.sessionId,
+        model: session.model ?? startRes.data.model ?? null,
         longTask: {
           ...session.longTask,
           reviewerSessionId: startRes.data.sessionId,
@@ -946,6 +1216,7 @@ function App() {
         ...session.longTask,
         activeAgent: "reviewer",
         stage: "reviewing",
+        recovery: null,
       },
       updatedAt: Date.now(),
     } : session);
@@ -959,6 +1230,7 @@ function App() {
         patch: {
           activeAgent: latestForPrompt.longTask.activeAgent,
           stage: latestForPrompt.longTask.stage,
+          recovery: latestForPrompt.longTask.recovery ?? null,
           currentStep: latestForPrompt.longTask.currentStep,
           targetStep: latestForPrompt.longTask.targetStep,
           reviewedReviewItems: latestForPrompt.longTask.reviewedReviewItems ?? [],
@@ -996,6 +1268,7 @@ function App() {
           ...session.longTask,
           activeAgent: "reviewer",
           stage: "paused",
+          recovery: buildLongTaskRecovery("reviewer", "error", `启动审查 agent 失败：${err instanceof Error ? err.message : String(err)}`),
         } : session.longTask,
         events: [
           ...session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete && !event.content.trim())),
@@ -1017,6 +1290,7 @@ function App() {
           patch: {
             activeAgent: failedSession.longTask.activeAgent,
             stage: failedSession.longTask.stage,
+            recovery: failedSession.longTask.recovery ?? null,
             currentStep: failedSession.longTask.currentStep,
             targetStep: failedSession.longTask.targetStep,
             reviewedReviewItems: failedSession.longTask.reviewedReviewItems ?? [],
@@ -1176,6 +1450,7 @@ function App() {
           const session = hydrateLongTaskProgressFromHistory({
             ...runtimeOwner,
             runtimeSessionId: startRes.data.sessionId,
+            model: runtimeOwner.model ?? startRes.data.model ?? null,
             events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
             isLoading: false,
           });
@@ -1199,6 +1474,7 @@ function App() {
 
         const session = hydrateLongTaskProgressFromHistory({
           id: startRes.data.sessionId,
+          model: startRes.data.model ?? null,
           title: deriveSessionTitle(events, latest.brief || "新会话"),
           projectPath: payload.project.path,
           createdAt: latest.updatedAt,
@@ -1257,7 +1533,18 @@ function App() {
                 return { id: crypto.randomUUID(), content: item, createdAt: Date.now() };
               }
               if (item && typeof item === "object" && typeof item.id === "string" && typeof item.content === "string" && typeof item.createdAt === "number") {
-                return item;
+                const images = Array.isArray((item as { images?: unknown }).images)
+                  ? (item as { images: unknown[] }).images.filter((image): image is { id?: string; name: string; dataUrl?: string } => (
+                      image &&
+                      typeof image === "object" &&
+                      typeof (image as { name?: unknown }).name === "string" &&
+                      (
+                        typeof (image as { dataUrl?: unknown }).dataUrl === "undefined" ||
+                        typeof (image as { dataUrl?: unknown }).dataUrl === "string"
+                      )
+                    ))
+                  : undefined;
+                return { ...item, images };
               }
               return null;
             })
@@ -1331,7 +1618,6 @@ function App() {
       void (async () => {
         const startRes = await window.api.startSession({
           workDir: detail.projectPath,
-          model: "kimi-code/kimi-for-coding",
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
           autoMode: useAppStore.getState().permissionMode === "auto",
@@ -1451,7 +1737,8 @@ function App() {
       if (isReviewerTerminal && terminalStatus !== "completed") {
         upsertLongTaskAgentProxyMessage(uiSessionId, "reviewer", terminalStatus);
       }
-      if (useAppStore.getState().runningSessionId === uiSessionId) {
+      const activeRunningSessionId = useAppStore.getState().runningSessionId;
+      if (activeRunningSessionId === uiSessionId || activeRunningSessionId === payload.sessionId) {
         setRunningSessionId(null);
       }
 
@@ -1564,9 +1851,186 @@ function App() {
       }
     });
 
+    const unsubscribeTui = window.api.onTuiEvent((payload) => {
+      const uiSessionId = resolveUiSessionId(payload.sessionId);
+      const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+      if (targetSession?.engine !== "tui") return;
+
+      if (payload.kind === "started" || payload.kind === "status") {
+        const shouldKeepTuiRunning = Boolean(
+          payload.session.screen?.isBusy ||
+          payload.session.screen?.isAwaitingApproval ||
+          !payload.session.screen?.isInputIdle
+        );
+        if (shouldKeepTuiRunning) {
+          setRunningSessionId(uiSessionId);
+        } else if (useAppStore.getState().runningSessionId === uiSessionId || useAppStore.getState().runningSessionId === payload.sessionId) {
+          setRunningSessionId(null);
+        }
+      }
+
+      if (payload.kind === "semantic") {
+        const semanticEvents = payload.semanticEvents ?? [];
+        let shouldFinish = false;
+        let wasCancelled = false;
+        let hasRunningSemantic = false;
+        updateSession(uiSessionId, (session) => {
+          const reduced = reduceTuiSemanticEvents(session.events, semanticEvents);
+          shouldFinish = reduced.shouldFinish;
+          wasCancelled = reduced.wasCancelled;
+          hasRunningSemantic = reduced.hasRunningSemantic;
+          return {
+            ...session,
+            runtimeSessionId: payload.sessionId,
+            engine: "tui",
+            events: reduced.events,
+            updatedAt: Date.now(),
+          };
+        });
+        if (hasRunningSemantic) setRunningSessionId(uiSessionId);
+        if (wasCancelled) {
+          finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: false });
+          syncCurrentSessionFromStore(uiSessionId);
+          return;
+        }
+        if (shouldFinish) {
+          finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: true });
+          syncCurrentSessionFromStore(uiSessionId);
+          return;
+        }
+        syncCurrentSessionFromStore(uiSessionId);
+        return;
+      }
+
+      if (payload.kind === "output" || payload.kind === "screen") {
+        const approvalText = payload.session.screen?.approvalText.trim();
+        const approvalPreview = payload.session.screen?.approvalPreview;
+        const changeSummary = payload.session.screen?.changeSummary;
+        const changeSummaries = payload.session.screen?.changeSummaries ?? (changeSummary ? [changeSummary] : []);
+        const questionRequest = payload.session.screen?.questionRequest ?? null;
+        const tuiPermissionMode = payload.session.screen?.permissionMode ?? null;
+        const tuiModelName = payload.session.screen?.modelName?.trim() || null;
+        const isTuiMenuSnapshot = Boolean((payload.session.screen?.models?.length ?? 0) > 0 || (payload.session.screen?.plugins?.length ?? 0) > 0);
+        updateSession(uiSessionId, (session) => {
+          const lastOpenAssistantIndex = session.events.reduce((result, event, index) => (
+            event.type === "assistant_message" && !event.isComplete ? index : result
+          ), -1);
+          if (lastOpenAssistantIndex < 0) {
+            if (!tuiModelName || session.model === tuiModelName) return session;
+            return {
+              ...session,
+              runtimeSessionId: payload.sessionId,
+              engine: "tui",
+              model: tuiModelName,
+              updatedAt: Date.now(),
+            };
+          }
+          const approvalRequestId = `tui:${payload.sessionId}`;
+          const hasPendingApproval = approvalText && session.events.some((event) => (
+            event.type === "approval_request" &&
+            event.requestId === approvalRequestId &&
+            event.status === "pending"
+          ));
+          let nextEvents = session.events.map((event, index) => (
+            index === lastOpenAssistantIndex && event.type === "assistant_message"
+              ? {
+                  ...event,
+                  thinking: event.thinking,
+                  isThinking: isTuiMenuSnapshot ? event.isThinking : Boolean(payload.session.screen?.isBusy && !approvalText),
+                }
+              : event
+          ));
+          nextEvents = mergeTuiChangeSummaryListEvents(nextEvents, changeSummaries);
+          nextEvents = mergeTuiApprovalPreviewEvents(nextEvents, approvalPreview);
+          nextEvents = mergeTuiQuestionRequestEvents(nextEvents, payload.sessionId, questionRequest);
+          if (approvalText && !hasPendingApproval) {
+            nextEvents.push({
+              id: crypto.randomUUID(),
+              type: "approval_request",
+              timestamp: Date.now(),
+              requestId: approvalRequestId,
+              toolName: "TUI Command",
+              description: "Kimi TUI 请求执行命令",
+              details: approvalText,
+              riskLevel: "medium",
+              status: "pending",
+            });
+          }
+          return {
+            ...session,
+            runtimeSessionId: payload.sessionId,
+            engine: "tui",
+            model: tuiModelName ?? session.model,
+            events: nextEvents,
+            updatedAt: Date.now(),
+          };
+        });
+        if (tuiPermissionMode && useAppStore.getState().permissionMode !== tuiPermissionMode) {
+          setPermissionMode(tuiPermissionMode);
+        }
+        const shouldKeepTuiRunning = Boolean(
+          payload.session.screen?.isBusy ||
+          payload.session.screen?.isAwaitingApproval ||
+          !payload.session.screen?.isInputIdle
+        );
+        if (shouldKeepTuiRunning) {
+          setRunningSessionId(uiSessionId);
+        } else if (useAppStore.getState().runningSessionId === uiSessionId || useAppStore.getState().runningSessionId === payload.sessionId) {
+          setRunningSessionId(null);
+        }
+        if (payload.session.screen?.isAwaitingApproval) {
+          syncCurrentSessionFromStore(uiSessionId);
+          return;
+        }
+        if (questionRequest && payload.session.screen?.isInputIdle) {
+          finishTuiAssistantTurn(uiSessionId, payload.sessionId);
+          syncCurrentSessionFromStore(uiSessionId);
+          return;
+        }
+        syncCurrentSessionFromStore(uiSessionId);
+        return;
+      }
+
+      if (payload.kind === "exit" || payload.kind === "error") {
+        finishTuiAssistantTurn(uiSessionId, payload.sessionId);
+        if (payload.session.interrupted) {
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            events: appendTuiInterruptedStatus(settlePendingQuestions(session.events)),
+            updatedAt: Date.now(),
+          }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }
+        const hasAbnormalExit = payload.kind === "exit" && !payload.session.interrupted && (
+          payload.session.error || (typeof payload.session.exitCode === "number" && payload.session.exitCode !== 0)
+        );
+        if (payload.kind === "error" || payload.session.error || hasAbnormalExit) {
+          const errorMessage = payload.kind === "error"
+            ? payload.session.error ?? payload.message ?? "TUI engine 运行失败"
+            : buildTuiExitErrorMessage(payload.session);
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            events: [
+              ...settlePendingQuestions(session.events),
+              {
+                id: crypto.randomUUID(),
+                type: "error",
+                timestamp: Date.now(),
+                message: errorMessage,
+                source: "ipc",
+              },
+            ],
+            updatedAt: Date.now(),
+          }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }
+      }
+    });
+
     return () => {
       unsubscribeEvent();
       unsubscribeStatus();
+      unsubscribeTui();
       unsubscribeBootstrap();
       window.removeEventListener("kimix:startHandoff", handleStartHandoff);
       window.removeEventListener("focus", markRendererWindowFocused);
@@ -1575,6 +2039,9 @@ function App() {
       document.removeEventListener("keydown", markRendererWindowFocused, true);
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
+      tuiIdleTimersRef.current.forEach(clearTimeout);
+      tuiIdleTimersRef.current.clear();
+      pendingTuiQueueFlushRef.current.clear();
     };
   }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
 

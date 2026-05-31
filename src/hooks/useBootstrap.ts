@@ -15,6 +15,7 @@ interface BootstrapSetters {
   setVoiceShortcut: (v: string) => void;
   setNotificationMode: (v: NotificationMode) => void;
   setClarificationToolMode: (v: ClarificationToolMode) => void;
+  setExperimentalTuiEngineEnabled: (v: boolean) => void;
   setRecentProjects: (projects: Project[]) => void;
 }
 
@@ -38,6 +39,7 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setVoiceShortcut(res.data.voiceShortcut);
           setters.setNotificationMode(res.data.notificationMode);
           setters.setClarificationToolMode(res.data.clarificationToolMode);
+          setters.setExperimentalTuiEngineEnabled(Boolean(res.data.experimentalTuiEngineEnabled));
         }
       }).catch(() => {});
     }
