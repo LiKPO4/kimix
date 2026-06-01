@@ -500,7 +500,14 @@ export function Composer() {
           text: hookRes.data.text,
           images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
         });
-        if (!sendRes.success) throw new Error(sendRes.error);
+        if (!sendRes.success) {
+          if (sendRes.error === "TUI 进程未运行") {
+            // TUI 进程已退出（超时/崩溃），清理失效 ID 后自动重试一次
+            updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
+            return sendPromptContent(content, options);
+          }
+          throw new Error(sendRes.error);
+        }
         return;
       } catch (err) {
         console.error("TUI send failed:", err);
@@ -973,6 +980,9 @@ export function Composer() {
       submit: "steer",
     });
     if (!res.success) {
+      if (res.error === "TUI 进程未运行" && activeSession) {
+        updateSession(activeSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
+      }
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
