@@ -956,11 +956,11 @@ function App() {
     }
   };
 
-  const scheduleTuiIdleCompletion = (uiSessionId: string, runtimeSessionId: string) => {
+  const scheduleTuiIdleCompletion = (uiSessionId: string, runtimeSessionId: string, options?: { flushQueue?: boolean }) => {
     const key = `${uiSessionId}:${runtimeSessionId}`;
     const currentTimer = tuiIdleTimersRef.current.get(key);
     if (currentTimer) clearTimeout(currentTimer);
-    const timer = setTimeout(() => finishTuiAssistantTurn(uiSessionId, runtimeSessionId), 2800);
+    const timer = setTimeout(() => finishTuiAssistantTurn(uiSessionId, runtimeSessionId, options), 1500);
     tuiIdleTimersRef.current.set(key, timer);
   };
 
@@ -1865,6 +1865,12 @@ function App() {
         );
         if (shouldKeepTuiRunning) {
           setRunningSessionId(uiSessionId);
+          const key = `${uiSessionId}:${payload.sessionId}`;
+          const currentTimer = tuiIdleTimersRef.current.get(key);
+          if (currentTimer) {
+            clearTimeout(currentTimer);
+            tuiIdleTimersRef.current.delete(key);
+          }
         } else if (useAppStore.getState().runningSessionId === uiSessionId || useAppStore.getState().runningSessionId === payload.sessionId) {
           setRunningSessionId(null);
         }
@@ -1979,6 +1985,12 @@ function App() {
         );
         if (shouldKeepTuiRunning) {
           setRunningSessionId(uiSessionId);
+          const key = `${uiSessionId}:${payload.sessionId}`;
+          const currentTimer = tuiIdleTimersRef.current.get(key);
+          if (currentTimer) {
+            clearTimeout(currentTimer);
+            tuiIdleTimersRef.current.delete(key);
+          }
         } else if (useAppStore.getState().runningSessionId === uiSessionId || useAppStore.getState().runningSessionId === payload.sessionId) {
           setRunningSessionId(null);
         }
@@ -1997,6 +2009,10 @@ function App() {
           finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: true });
           syncCurrentSessionFromStore(uiSessionId);
           return;
+        }
+        // isInputIdle 解析不稳定时兜底：TUI 不忙且无审批/问题，1.5s 后强制 finish 并 flush queue
+        if (hasUnfinishedAssistant && !payload.session.screen?.isBusy && !payload.session.screen?.isAwaitingApproval) {
+          scheduleTuiIdleCompletion(uiSessionId, payload.sessionId, { flushQueue: true });
         }
         syncCurrentSessionFromStore(uiSessionId);
         return;
