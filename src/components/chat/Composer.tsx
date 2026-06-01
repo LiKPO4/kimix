@@ -976,6 +976,21 @@ export function Composer() {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
+    // 在对话时间线插入 steer_message，TUI 后续会通过 SteerInput semantic 事件将其状态更新为 sent
+    updateSession(activeSession.id, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        {
+          id: genId(),
+          type: "steer_message" as const,
+          timestamp: Date.now(),
+          content: pending.content,
+          status: "sending" as const,
+        },
+      ],
+      updatedAt: Date.now(),
+    }));
     removePendingMessage(id);
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已引导：插入当前任务，agent 将尽快处理" }));
   };
