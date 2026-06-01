@@ -86,6 +86,61 @@ const mentionBaseItems: CompletionItem[] = [
   { id: "plugin-chrome", label: "Chrome", detail: "Control Chrome with Codex", insertText: "@Chrome ", kind: "plugin" },
 ];
 
+// 官方 Kimi Code slash 命令全集，用于 TUI 引擎会话的输入框补全候选。
+// TUI 引擎下这些命令经 sendTuiInput 原样透传给真实 kimi TUI（不被前端拦截），
+// 补全候选只负责"可发现 + 一键插入"。清单源自 KIMIX_TUI_ENGINE_MIGRATION_PLAN.md 第 2.6 节实测。
+const tuiSlashCommandDefs: { name: string; detail: string; colon?: boolean }[] = [
+  // 会话生命周期（阶段 D 重点）
+  { name: "fork", detail: "从当前会话分叉出新会话" },
+  { name: "undo", detail: "撤销上一轮，回到上一个检查点" },
+  { name: "compact", detail: "压缩上下文（可附压缩指令）" },
+  { name: "import", detail: "导入会话存档或会话 ID" },
+  { name: "export", detail: "导出当前会话为存档" },
+  { name: "title", detail: "设置 / 重命名当前会话标题" },
+  { name: "rename", detail: "重命名当前会话（/title 别名）" },
+  { name: "add-dir", detail: "把目录加入工作区" },
+  { name: "new", detail: "新建会话" },
+  { name: "sessions", detail: "浏览 / 恢复历史会话" },
+  { name: "clear", detail: "清空当前会话上下文" },
+  { name: "btw", detail: "侧问题：隔离上下文、禁用工具的快速提问" },
+  // 计划 / 权限 / 任务
+  { name: "plan", detail: "计划模式：on｜off｜view｜clear" },
+  { name: "yolo", detail: "自动批准所有动作" },
+  { name: "afk", detail: "自动批准并自动消解提问" },
+  { name: "task", detail: "后台任务浏览器" },
+  // 模型 / 配置 / 集成
+  { name: "model", detail: "切换模型" },
+  { name: "mcp", detail: "查看 / 管理 MCP 服务" },
+  { name: "hooks", detail: "查看 Hooks 配置" },
+  { name: "editor", detail: "设置外部编辑器" },
+  { name: "theme", detail: "切换主题：dark｜light" },
+  { name: "reload", detail: "重新加载配置" },
+  // 技能 / 流程
+  { name: "skill:", detail: "加载技能：/skill:<name>", colon: true },
+  { name: "flow:", detail: "运行流程：/flow:<name>", colon: true },
+  // 账户
+  { name: "login", detail: "登录 Kimi" },
+  { name: "logout", detail: "退出登录" },
+  // 信息 / 项目 / 界面
+  { name: "usage", detail: "查看用量配额" },
+  { name: "init", detail: "生成 AGENTS.md" },
+  { name: "web", detail: "打开 Web 界面" },
+  { name: "vis", detail: "打开 Agent Tracing Visualizer" },
+  { name: "help", detail: "帮助" },
+  { name: "version", detail: "版本信息" },
+  { name: "changelog", detail: "更新日志" },
+  { name: "debug", detail: "调试信息" },
+];
+
+const tuiSlashItems: CompletionItem[] = tuiSlashCommandDefs.map((def) => ({
+  id: `tui-slash-${def.name}`,
+  label: `/${def.name}`,
+  detail: def.detail,
+  insertText: def.colon ? `/${def.name}` : `/${def.name} `,
+  commandName: def.name,
+  kind: "slash",
+}));
+
 function getActiveCompletion(value: string): { mode: CompletionMode; query: string; start: number } | null {
   const match = value.match(/(^|\s)([@/])([^\s]*)$/);
   if (!match || match.index === undefined) return null;
@@ -203,7 +258,9 @@ export function Composer() {
       return;
     }
     if (currentSession.engine === "tui") {
-      setSlashCommands([]);
+      // TUI 引擎会话：listSlashCommands 仅服务 SDK 会话，这里改用官方 slash 全集静态候选，
+      // 让 /fork /undo /compact /import /title /add-dir /btw 等命令可发现、可一键插入后直发 TUI。
+      setSlashCommands(tuiSlashItems);
       return;
     }
     let cancelled = false;
