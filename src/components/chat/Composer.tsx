@@ -87,10 +87,9 @@ const mentionBaseItems: CompletionItem[] = [
 ];
 
 // 官方 Kimi Code slash 命令全集，用于 TUI 引擎会话的输入框补全候选。
-// TUI 引擎下这些命令经 sendTuiInput 原样透传给真实 kimi TUI（不被前端拦截），
-// 补全候选只负责"可发现 + 一键插入"。清单源自 KIMIX_TUI_ENGINE_MIGRATION_PLAN.md 第 2.6 节实测。
+// TUI 引擎下这些命令经 sendTuiInput 原样透传给真实 kimi TUI（不被前端拦截），补全候选只负责"可发现 + 一键插入"。
 const tuiSlashCommandDefs: { name: string; detail: string; colon?: boolean }[] = [
-  // 会话生命周期（阶段 D 重点）
+  // 会话生命周期
   { name: "fork", detail: "从当前会话分叉出新会话" },
   { name: "undo", detail: "撤销上一轮，回到上一个检查点" },
   { name: "compact", detail: "压缩上下文（可附压缩指令）" },
@@ -258,8 +257,7 @@ export function Composer() {
       return;
     }
     if (currentSession.engine === "tui") {
-      // TUI 引擎会话：listSlashCommands 仅服务 SDK 会话，这里改用官方 slash 全集静态候选，
-      // 让 /fork /undo /compact /import /title /add-dir /btw 等命令可发现、可一键插入后直发 TUI。
+      // listSlashCommands 仅服务 SDK 会话；TUI 会话改用官方 slash 全集静态候选，直发真实 TUI。
       setSlashCommands(tuiSlashItems);
       return;
     }
@@ -801,19 +799,7 @@ export function Composer() {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
-    updateSession(activeSession.id, (session) => ({
-      ...session,
-      events: [
-        ...session.events,
-        {
-          id: genId(),
-          type: "status_update",
-          timestamp: Date.now(),
-          message: `已引导当前任务：${trimmed || "[图片]"}`,
-        },
-      ],
-      updatedAt: Date.now(),
-    }));
+    // 不向正式时间线写合成状态：steer 文本会经 wire 作为真实 turn.prompt 回流（计划 §1.1/§5）。
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: "已注入当前任务（Ctrl+S 引导）",
     }));

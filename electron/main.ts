@@ -4126,8 +4126,7 @@ ipcMain.handle("tui:sendKey", async (_, request: unknown) => {
   }
 });
 
-// 探针：把图片写入系统剪贴板后向隐藏 TUI 发 Ctrl+V，验证官方原生剪贴板粘贴路径。
-// 仅供调试页验证，不改动正式发送链路。
+// 调试页探针：写系统剪贴板后向 TUI 发 Ctrl+V，验证官方原生粘贴路径，不改动正式发送链路。
 ipcMain.handle("tui:probeClipboardImage", async (_, request: unknown) => {
   try {
     const payload = request && typeof request === "object" ? request as { sessionId?: unknown; dataUrl?: unknown } : {};
@@ -4149,7 +4148,6 @@ ipcMain.handle("tui:probeClipboardImage", async (_, request: unknown) => {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
-
 
 ipcMain.handle("tui:stopSession", async (_, request: unknown) => {
   try {
