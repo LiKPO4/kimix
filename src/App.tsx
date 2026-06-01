@@ -950,7 +950,9 @@ function App() {
     }
     syncCurrentSessionFromStore(uiSessionId);
     if (options?.flushQueue) {
-      flushNextTuiPendingMessageWhenIdle(uiSessionId, runtimeSessionId);
+      // Turn 已结束，直接延迟 flush；不再轮询 isInputIdle（屏幕解析的 idle 标志不稳定，
+      // 常因 answerText 清空或 prompt box 未显示而永远为 false，导致 queue 永远滞留）。
+      window.setTimeout(() => flushNextTuiPendingMessage(uiSessionId, runtimeSessionId), 200);
     }
   };
 
@@ -1989,14 +1991,14 @@ function App() {
           syncCurrentSessionFromStore(uiSessionId);
           return;
         }
-        // 兜底：input idle 且没有审批/问题时，若还有未完成的 assistant，直接 finish 并 flush queue
-        if (payload.session.screen?.isInputIdle) {
-          const hasUnfinishedAssistant = targetSession.events.some((e) => e.type === "assistant_message" && !e.isComplete);
-          if (hasUnfinishedAssistant) {
-            finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: true });
-            syncCurrentSessionFromStore(uiSessionId);
-            return;
-          }
+        // 兜底：input idle 且没有审批/问题时，若还有未完成的 assistant，直接 finish 并 flush queue。
+        // 不再依赖 isInputIdle——该标志由屏幕解析推断，常因 TUI 状态延迟而长期为 false，
+        // 导致 queue 永远滞留。finishTuiAssistantTurn 内部已改为直接延迟 flush。
+        const hasUnfinishedAssistant = targetSession.events.some((e) => e.type === "assistant_message" && !e.isComplete);
+        if (hasUnfinishedAssistant) {
+          finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: true });
+          syncCurrentSessionFromStore(uiSessionId);
+          return;
         }
         syncCurrentSessionFromStore(uiSessionId);
         return;
