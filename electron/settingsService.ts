@@ -23,7 +23,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
-  experimentalTuiEngineEnabled: true,
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,

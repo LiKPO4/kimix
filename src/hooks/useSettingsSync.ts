@@ -16,8 +16,7 @@ export function useSettingsSync() {
         state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
         state.voiceShortcut !== prev.voiceShortcut ||
       state.notificationMode !== prev.notificationMode ||
-      state.clarificationToolMode !== prev.clarificationToolMode ||
-      state.experimentalTuiEngineEnabled !== prev.experimentalTuiEngineEnabled
+      state.clarificationToolMode !== prev.clarificationToolMode
       ) {
         window.api.saveSettings({
           theme: state.theme,
@@ -32,7 +31,6 @@ export function useSettingsSync() {
           voiceShortcut: state.voiceShortcut,
         notificationMode: state.notificationMode,
         clarificationToolMode: state.clarificationToolMode,
-        experimentalTuiEngineEnabled: state.experimentalTuiEngineEnabled,
       }).catch(() => {});
       }
     });

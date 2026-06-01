@@ -1139,7 +1139,6 @@ export type AppSettings = {
   voiceShortcut: string;
   notificationMode: "never" | "unfocused" | "always";
   clarificationToolMode: "off" | "on" | "auto";
-  experimentalTuiEngineEnabled: boolean;
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;

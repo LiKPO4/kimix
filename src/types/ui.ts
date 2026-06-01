@@ -23,7 +23,6 @@ export interface AppState {
   voiceShortcut: string;
   notificationMode: NotificationMode;
   clarificationToolMode: ClarificationToolMode;
-  experimentalTuiEngineEnabled: boolean;
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
   diffPanelOpen: boolean;

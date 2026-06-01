@@ -64,7 +64,6 @@ const defaultBrowserPreviewSettings = {
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
-  experimentalTuiEngineEnabled: true,
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
