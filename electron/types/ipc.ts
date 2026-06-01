@@ -295,6 +295,24 @@ export type StartTuiSessionRequest = {
   args?: string[];
 };
 
+/**
+ * TUI 引擎发送前应用 Kimix 自有 UserPromptSubmit hooks（复用 SDK/prompt-mode 同一逻辑）。
+ * 返回经 hook 改写后的文本；无匹配 hook 时原样返回。hook 阻断时整体失败。
+ */
+export type ApplyPromptSubmitHooksRequest = {
+  sessionId: string;
+  text: string;
+  workDir: string;
+};
+
+export type ApplyPromptSubmitHooksResponse = {
+  success: true;
+  data: { text: string };
+} | {
+  success: false;
+  error: string;
+};
+
 export type StartTuiSessionResponse = {
   success: true;
   data: TuiSessionSummary;

@@ -986,7 +986,7 @@ function withPromptSubmitContext(content: string | ContentPart[], context: strin
   ));
 }
 
-async function applyPromptSubmitHooks(sessionId: string, content: string | ContentPart[], workDir: string): Promise<string | ContentPart[]> {
+export async function applyPromptSubmitHooks(sessionId: string, content: string | ContentPart[], workDir: string): Promise<string | ContentPart[]> {
   const target = getPromptSubmitTarget(content);
   const rules = (settingsService.loadSettings().hookRules ?? [])
     .filter((rule) => rule.event === "UserPromptSubmit")

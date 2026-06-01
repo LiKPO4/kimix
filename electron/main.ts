@@ -4110,6 +4110,24 @@ ipcMain.handle("tui:sendInput", async (_, request: unknown) => {
   }
 });
 
+// TUI 引擎发送链路在 sendTuiInput 注入前调用，复用 SDK/prompt-mode 同一套 UserPromptSubmit hooks。
+// 无匹配 hook 时原样返回文本（纯加性，不改默认行为）；hook 阻断时抛错由前端 try/catch 承接。
+ipcMain.handle("hooks:applyPromptSubmit", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; text?: unknown; workDir?: unknown } : {};
+    if (typeof payload.sessionId !== "string" || typeof payload.text !== "string" || typeof payload.workDir !== "string") {
+      return { success: false, error: "Invalid request" };
+    }
+    const result = await kimiBridge.applyPromptSubmitHooks(payload.sessionId, payload.text, payload.workDir);
+    const text = typeof result === "string"
+      ? result
+      : result.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+    return { success: true, data: { text } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("tui:sendKey", async (_, request: unknown) => {
   try {
     const payload = request && typeof request === "object" ? request as { sessionId?: unknown; key?: unknown } : {};

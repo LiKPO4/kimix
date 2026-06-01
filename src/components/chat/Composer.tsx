@@ -518,9 +518,17 @@ export function Composer() {
           }));
           if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
         }
-        const sendRes = await window.api.sendTuiInput({
+        // TUI 发送前应用 Kimix 自有 UserPromptSubmit hooks（与 SDK/prompt-mode 同源）。
+        // 无匹配 hook 时原样返回；hook 阻断时整体失败，由下方 catch 承接并写错误卡。
+        const hookRes = await window.api.applyPromptSubmitHooks({
           sessionId: tuiSessionId,
           text: outboundContent,
+          workDir: targetSession.projectPath,
+        });
+        if (!hookRes.success) throw new Error(hookRes.error);
+        const sendRes = await window.api.sendTuiInput({
+          sessionId: tuiSessionId,
+          text: hookRes.data.text,
           images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
         });
         if (!sendRes.success) throw new Error(sendRes.error);

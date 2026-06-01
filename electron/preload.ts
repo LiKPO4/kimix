@@ -103,6 +103,8 @@ import type {
   SendTuiKeyRequest,
   ProbeTuiClipboardImageRequest,
   SendTuiInputRequest,
+  ApplyPromptSubmitHooksRequest,
+  ApplyPromptSubmitHooksResponse,
   ResizeTuiSessionRequest,
   Project,
   VoidResponse,
@@ -235,6 +237,8 @@ const api = {
     ipcRenderer.invoke("tui:startSession", req),
   sendTuiInput: (req: SendTuiInputRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("tui:sendInput", req),
+  applyPromptSubmitHooks: (req: ApplyPromptSubmitHooksRequest): Promise<ApplyPromptSubmitHooksResponse> =>
+    ipcRenderer.invoke("hooks:applyPromptSubmit", req),
   sendTuiKey: (req: SendTuiKeyRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("tui:sendKey", req),
   probeTuiClipboardImage: (req: ProbeTuiClipboardImageRequest): Promise<VoidResponse> =>
