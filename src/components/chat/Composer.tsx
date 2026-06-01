@@ -1016,6 +1016,27 @@ export function Composer() {
     });
   };
 
+  const handleSteerPending = async (id: string) => {
+    const pending = pendingMessages.find((msg) => msg.id === id);
+    if (!pending || !canUseComposer) return;
+    const runtimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
+    if (!runtimeSessionId) return;
+    const res = await window.api.sendTuiInput({
+      sessionId: runtimeSessionId,
+      text: pending.content,
+      images: (pending.images ?? [])
+        .map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" }))
+        .filter((image) => image.dataUrl),
+      submit: "steer",
+    });
+    if (!res.success) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
+      return;
+    }
+    removePendingMessage(id);
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已引导：插入当前任务，agent 将尽快处理" }));
+  };
+
   const handleEditPending = (id: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending) return;
@@ -1153,10 +1174,17 @@ export function Composer() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
-                  <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title={isCurrentSessionRunning || hasUnfinishedAssistant ? "等待当前轮次结束后自动发送" : "发送这条队列消息"}>
-                    <Send size={13} />
-                    <span>{isCurrentSessionRunning || hasUnfinishedAssistant ? "等待" : "发送"}</span>
-                  </button>
+                  {isCurrentSessionRunning || hasUnfinishedAssistant ? (
+                    <button onClick={() => void handleSteerPending(msg.id)} className="kimix-icon-text-button is-compact text-[13px] text-accent-blue hover:bg-accent-blue/10" title="立即引导：把这条消息插入运行中的对话（官方 Ctrl+S steer），让 agent 尽快处理">
+                      <Zap size={13} />
+                      <span>引导</span>
+                    </button>
+                  ) : (
+                    <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title="发送这条队列消息">
+                      <Send size={13} />
+                      <span>发送</span>
+                    </button>
+                  )}
                   <button onClick={() => handleEditPending(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="撤回到输入框修改" aria-label="撤回到输入框修改">
                     <Edit2 size={13} />
                   </button>
