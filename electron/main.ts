@@ -3395,7 +3395,7 @@ function extractJsonObject(text: string): unknown {
 function buildHookRulePrompt(description: string) {
   return `你是 Kimix Hooks 规则创建 agent。请把用户的自然语言需求转换为一条可保存的 HookRule JSON。
 
-只允许输出一个 JSON 对象，不要 Markdown，不要解释。
+只允许输出一个 JSON 对象，不要 Markdown，不要解释，不要调用任何工具，不要读取任何文件。
 
 字段要求：
 - name: 简短中文名称，最多 20 个汉字。
@@ -3452,15 +3452,22 @@ ipcMain.handle("hooks:generateRule", async (_, request: unknown) => {
     const description = typeof req.description === "string" ? req.description.trim() : "";
     const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
     if (!description) return { success: false, error: "请先输入自然语言描述" };
-    const workDir = projectPath && fs.existsSync(projectPath) ? projectPath : app.getPath("home");
-    const output = await kimiBridge.runOneShotPrompt({
-      workDir,
-      sessionId: `kimix-hidden-hooks-${randomUUID()}`,
-      content: buildHookRulePrompt(description),
-      thinking: true,
-      yoloMode: false,
-      timeoutMs: 120000,
-    });
+    // 规则生成是纯 NL→JSON 转换，不能在项目目录跑：否则官方 -p agent 会把它当编码任务，
+    // 去翻代码库 / 读 AGENTS.md 绕远路，最终超时且无可解析 JSON。用空临时目录隔离。
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-hooks-gen-"));
+    let output: string;
+    try {
+      output = await kimiBridge.runOneShotPrompt({
+        workDir,
+        sessionId: `kimix-hidden-hooks-${randomUUID()}`,
+        content: buildHookRulePrompt(description),
+        thinking: true,
+        yoloMode: false,
+        timeoutMs: 120000,
+      });
+    } finally {
+      fs.rmSync(workDir, { recursive: true, force: true });
+    }
     const parsed = GeneratedHookRuleSchema.safeParse(extractJsonObject(output));
     if (!parsed.success) {
       return { success: false, error: "规则创建 Agent 返回的 JSON 不符合 HookRule 格式" };
