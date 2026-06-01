@@ -312,6 +312,7 @@ function installBrowserPreviewApi() {
     }),
     sendTuiInput: (_req: SendTuiInputRequest): Promise<VoidResponse> => fail("发送 TUI 输入"),
     sendTuiKey: (_req: SendTuiKeyRequest): Promise<VoidResponse> => fail("发送 TUI 按键"),
+    probeTuiClipboardImage: (): Promise<VoidResponse> => fail("剪贴板图片探针"),
     stopTuiSession: (_req: StopTuiSessionRequest): Promise<VoidResponse> => fail("停止 TUI"),
     resizeTuiSession: (_req: ResizeTuiSessionRequest): Promise<VoidResponse> => fail("调整 TUI 尺寸"),
 

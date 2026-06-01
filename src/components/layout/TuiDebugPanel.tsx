@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CirclePlay, Copy, CornerDownLeft, RefreshCw, Send, Square, TerminalSquare, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CirclePlay, Copy, CornerDownLeft, ImageIcon, RefreshCw, Send, Square, TerminalSquare, Trash2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import type { TuiKeyName, TuiPluginSnapshot, TuiSessionStatus, TuiSessionSummary } from "@electron/types/ipc";
 
@@ -66,12 +66,13 @@ export function TuiDebugPanel() {
   const [sessions, setSessions] = useState<TuiSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [draft, setDraft] = useState("只回复 OK");
-  const [busyAction, setBusyAction] = useState<"start" | "send" | "key" | "stop" | "refresh" | null>(null);
+  const [busyAction, setBusyAction] = useState<"start" | "send" | "key" | "stop" | "refresh" | "probe" | null>(null);
   const [message, setMessage] = useState("等待启动 TUI。");
   const [outputMode, setOutputMode] = useState<"screen" | "wire" | "semantic" | "text" | "ansi">("screen");
   const [terminalSize, setTerminalSize] = useState({ cols: 120, rows: 32 });
   const logRef = useRef<HTMLPreElement>(null);
   const lastResizeRef = useRef<string>("");
+  const probeFileRef = useRef<HTMLInputElement>(null);
 
   const workDir = currentProject?.path ?? currentSession?.projectPath ?? "";
   const activeSession = useMemo(
@@ -206,6 +207,33 @@ export function TuiDebugPanel() {
     const res = await window.api.sendTuiKey({ sessionId: activeSession.sessionId, key });
     setBusyAction(null);
     setMessage(res.success ? `已发送按键：${key}` : `发送按键失败：${res.error}`);
+  };
+
+  // 剪贴板图片探针：把选中的图片写入系统剪贴板后向 TUI 发 Ctrl+V，
+  // 验证官方是否走原生粘贴路径（屏幕出现 [image:…]、wire 出现 ReadMediaFile）。
+  const runClipboardImageProbe = async (file: File) => {
+    if (!activeSession) {
+      setMessage("请先启动 TUI。");
+      return;
+    }
+    if (busyAction) return;
+    setBusyAction("probe");
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(reader.error ?? new Error("读取图片失败"));
+        reader.readAsDataURL(file);
+      });
+      const res = await window.api.probeTuiClipboardImage({ sessionId: activeSession.sessionId, dataUrl });
+      setMessage(res.success
+        ? "已写入剪贴板并发送 Ctrl+V。请看 Screen 是否出现 [image:…]，Wire/Semantic 是否出现 ReadMediaFile。"
+        : `剪贴板图片探针失败：${res.error}`);
+    } catch (err) {
+      setMessage(`剪贴板图片探针失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const refreshSessions = async () => {
@@ -468,6 +496,21 @@ export function TuiDebugPanel() {
                   <Square size={13} />
                   停止
                 </button>
+                <button type="button" onClick={() => probeFileRef.current?.click()} disabled={busyAction === "probe" || !activeSession} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55" title="剪贴板图片探针：写入系统剪贴板后向 TUI 发 Ctrl+V，验证官方原生粘贴（[image:…] / ReadMediaFile）">
+                  <ImageIcon size={13} />
+                  剪贴板图片探针
+                </button>
+                <input
+                  ref={probeFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) void runClipboardImageProbe(file);
+                  }}
+                />
               </div>
             </div>
             {message && (

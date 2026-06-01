@@ -4090,7 +4090,7 @@ ipcMain.handle("tui:startSession", async (_, request: unknown) => {
 
 ipcMain.handle("tui:sendInput", async (_, request: unknown) => {
   try {
-    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; text?: unknown; images?: unknown } : {};
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; text?: unknown; images?: unknown; submit?: unknown } : {};
     if (typeof payload.sessionId !== "string" || typeof payload.text !== "string") {
       return { success: false, error: "Invalid request" };
     }
@@ -4103,7 +4103,8 @@ ipcMain.handle("tui:sendInput", async (_, request: unknown) => {
           (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
         ))
       : [];
-    return tuiHost.sendTuiInput({ sessionId: payload.sessionId, text: payload.text, images });
+    const submit = payload.submit === "steer" ? "steer" as const : "enter" as const;
+    return tuiHost.sendTuiInput({ sessionId: payload.sessionId, text: payload.text, images, submit });
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -4115,14 +4116,40 @@ ipcMain.handle("tui:sendKey", async (_, request: unknown) => {
     if (typeof payload.sessionId !== "string" || typeof payload.key !== "string") {
       return { success: false, error: "Invalid request" };
     }
-    if (!["escape", "enter", "space", "tab", "arrowUp", "arrowDown", "arrowLeft", "arrowRight", "ctrlO"].includes(payload.key)) {
+    const allowedKeys = ["escape", "enter", "space", "tab", "arrowUp", "arrowDown", "arrowLeft", "arrowRight", "ctrlO", "ctrlS", "ctrlV"] as const;
+    if (!(allowedKeys as readonly string[]).includes(payload.key)) {
       return { success: false, error: "Unsupported TUI key" };
     }
-    return tuiHost.sendTuiKey({ sessionId: payload.sessionId, key: payload.key as "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO" });
+    return tuiHost.sendTuiKey({ sessionId: payload.sessionId, key: payload.key as (typeof allowedKeys)[number] });
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
+
+// 探针：把图片写入系统剪贴板后向隐藏 TUI 发 Ctrl+V，验证官方原生剪贴板粘贴路径。
+// 仅供调试页验证，不改动正式发送链路。
+ipcMain.handle("tui:probeClipboardImage", async (_, request: unknown) => {
+  try {
+    const payload = request && typeof request === "object" ? request as { sessionId?: unknown; dataUrl?: unknown } : {};
+    if (typeof payload.sessionId !== "string") {
+      return { success: false, error: "Invalid request" };
+    }
+    if (typeof payload.dataUrl !== "string" || !payload.dataUrl.startsWith("data:image/")) {
+      return { success: false, error: "Invalid image data" };
+    }
+    const image = nativeImage.createFromDataURL(payload.dataUrl);
+    if (image.isEmpty()) {
+      return { success: false, error: "Image is empty" };
+    }
+    clipboard.writeImage(image);
+    // 给剪贴板写入留一拍，再发 Ctrl+V（\x16）。
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return tuiHost.sendTuiKey({ sessionId: payload.sessionId, key: "ctrlV" });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 
 ipcMain.handle("tui:stopSession", async (_, request: unknown) => {
   try {

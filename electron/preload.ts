@@ -101,6 +101,7 @@ import type {
   KimiStatusPayload,
   ListTuiSessionsResponse,
   SendTuiKeyRequest,
+  ProbeTuiClipboardImageRequest,
   SendTuiInputRequest,
   ResizeTuiSessionRequest,
   Project,
@@ -236,6 +237,8 @@ const api = {
     ipcRenderer.invoke("tui:sendInput", req),
   sendTuiKey: (req: SendTuiKeyRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("tui:sendKey", req),
+  probeTuiClipboardImage: (req: ProbeTuiClipboardImageRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("tui:probeClipboardImage", req),
   stopTuiSession: (req: StopTuiSessionRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("tui:stopSession", req),
   resizeTuiSession: (req: ResizeTuiSessionRequest): Promise<VoidResponse> =>

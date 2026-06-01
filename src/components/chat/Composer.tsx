@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Lock } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Lock, Zap } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -721,6 +721,47 @@ export function Composer() {
     await sendPromptContent(trimmed, { images: imagesToSend });
   };
 
+  // steer：把输入框内容立即注入当前运行中的 TUI turn（官方 Ctrl+S 行为），
+  // 与普通 Enter 排队严格区分。仅 TUI 引擎、且当前轮运行中时可用。
+  const handleSteer = async () => {
+    const trimmed = input.trim();
+    const imagesToSend = imageAttachments;
+    if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
+    if (!activeSession || activeSession.engine !== "tui") return;
+    const runtimeSessionId = getRuntimeSessionId(activeSession);
+    if (!runtimeSessionId) return;
+    setInput("");
+    setImageAttachments([]);
+    setEditingPendingId(null);
+    inputRef.current?.reset();
+    const res = await window.api.sendTuiInput({
+      sessionId: runtimeSessionId,
+      text: trimmed,
+      images: imagesToSend.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
+      submit: "steer",
+    });
+    if (!res.success) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
+      return;
+    }
+    updateSession(activeSession.id, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        {
+          id: genId(),
+          type: "status_update",
+          timestamp: Date.now(),
+          message: `已引导当前任务：${trimmed || "[图片]"}`,
+        },
+      ],
+      updatedAt: Date.now(),
+    }));
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: "已注入当前任务（Ctrl+S 引导）",
+    }));
+  };
+
   const handleStop = async () => {
     const stateRunningSessionId = useAppStore.getState().runningSessionId;
     const stateRunningMatchesActive = Boolean(activeSession && (
@@ -1361,9 +1402,23 @@ export function Composer() {
             </button>
 
             {shouldShowStopButton ? (
-              <button onClick={handleStop} className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:opacity-90" title="停止" aria-label="停止">
-                <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
-              </button>
+              <>
+                {activeSession?.engine === "tui" && canSendNow && (
+                  <button
+                    onClick={() => void handleSteer()}
+                    className="flex h-8 shrink-0 items-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark"
+                    style={{ gap: 6, paddingLeft: 12, paddingRight: 14 }}
+                    title="立即引导当前任务：把输入插入运行中的对话（官方 Ctrl+S steer），不进排队"
+                    aria-label="引导当前任务"
+                  >
+                    <Zap size={14} strokeWidth={2.5} className="shrink-0" />
+                    <span className="text-[13px]">引导</span>
+                  </button>
+                )}
+                <button onClick={handleStop} className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:opacity-90" title="停止" aria-label="停止">
+                  <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
+                </button>
+              </>
             ) : (
               <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
                 <ArrowUp size={17} strokeWidth={2.5} />

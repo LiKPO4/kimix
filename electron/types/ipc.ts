@@ -307,13 +307,29 @@ export type SendTuiInputRequest = {
   sessionId: string;
   text: string;
   images?: { name: string; dataUrl: string }[];
+  /**
+   * 提交方式。
+   * - "enter"（默认）：写入文本后发 Enter，运行中由官方 TUI 排队。
+   * - "steer"：写入文本后发 Ctrl+S，立即注入当前运行中的 turn（官方 steer 行为）。
+   */
+  submit?: "enter" | "steer";
 };
 
-export type TuiKeyName = "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO";
+export type TuiKeyName = "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO" | "ctrlS" | "ctrlV";
 
 export type SendTuiKeyRequest = {
   sessionId: string;
   key: TuiKeyName;
+};
+
+/**
+ * 探针：把一张图片写入系统剪贴板后，向隐藏 TUI 发送 Ctrl+V，
+ * 验证官方是否走原生剪贴板粘贴路径（出现 [image:…] 占位 / wire ReadMediaFile）。
+ * 仅用于调试页验证，不改动正式发送链路。
+ */
+export type ProbeTuiClipboardImageRequest = {
+  sessionId: string;
+  dataUrl: string;
 };
 
 export type StopTuiSessionRequest = {
