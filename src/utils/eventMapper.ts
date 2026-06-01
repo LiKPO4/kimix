@@ -483,22 +483,23 @@ function isKimixSyntheticThinking(text: string) {
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
-    const lastSubstantiveAssistantIndex = existing.findLastIndex(
-      (e) => e.type === "assistant_message" && (
-        e.isComplete ||
-        e.content.trim().length > 0 ||
-        Boolean(e.thinking?.trim())
-      )
-    );
-    const hasDuplicate = existing.some((e, index) => {
-      if (index <= lastSubstantiveAssistantIndex || e.type !== "user_message") return false;
-      const existingContent = normalizeUserContent(e.content);
-      const incomingContent = normalizeUserContent(incoming.content);
-      if (existingContent !== incomingContent) return false;
-      if (incomingContent.length > 0) return true;
-      return getUserImageSignature(e) === getUserImageSignature(incoming);
-    });
-    if (hasDuplicate) return existing;
+    // 取最近一条 user_message，若内容与 incoming 相同且在 10 秒内，则认为是重复
+    const lastUserMessageIndex = existing.findLastIndex((e) => e.type === "user_message");
+    if (lastUserMessageIndex >= 0) {
+      const lastUser = existing[lastUserMessageIndex] as Extract<TimelineEvent, { type: "user_message" }>;
+      if (Math.abs(lastUser.timestamp - incoming.timestamp) <= 10000) {
+        const lastContent = normalizeUserContent(lastUser.content);
+        const incomingContent = normalizeUserContent(incoming.content);
+        if (lastContent === incomingContent && incomingContent.length > 0) {
+          return existing;
+        }
+        if (lastContent === incomingContent && incomingContent.length === 0) {
+          if (getUserImageSignature(lastUser) === getUserImageSignature(incoming)) {
+            return existing;
+          }
+        }
+      }
+    }
   }
 
   // Merge streaming assistant messages
@@ -529,7 +530,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           ...event,
           isThinking: false,
           isComplete: true,
-          durationMs: Math.max(0, incoming.timestamp - (index === latestOpenIndex ? event.timestamp : incoming.timestamp)),
+          durationMs: Math.max(0, Date.now() - event.timestamp),
         };
       });
     }
