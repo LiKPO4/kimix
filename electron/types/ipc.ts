@@ -330,7 +330,7 @@ export type SendTuiInputRequest = {
    * - "enter"（默认）：写入文本后发 Enter，运行中由官方 TUI 排队。
    * - "steer"：写入文本后发 Ctrl+S，立即注入当前运行中的 turn（官方 steer 行为）。
    */
-  submit?: "enter" | "steer";
+  submit?: "enter" | "steer" | "raw";
 };
 
 export type TuiKeyName = "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO" | "ctrlS" | "ctrlV";

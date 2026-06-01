@@ -157,6 +157,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
         await window.api.sendTuiInput({
           sessionId: runtimeSessionId,
           text: scope === "session" ? "2" : "1",
+          submit: "raw",
         });
       } else {
         await window.api.approveRequest({
@@ -188,6 +189,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
         await window.api.sendTuiInput({
           sessionId: runtimeSessionId,
           text: "3",
+          submit: "raw",
         });
       } else {
         await window.api.approveRequest({

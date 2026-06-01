@@ -1402,16 +1402,18 @@ export async function sendTuiInput(request: SendTuiInputRequest) {
   try {
     const payload = normalizeInput(await materializeTuiInputImages(session, request));
     // steer：写入文本后发 Ctrl+S（\x13）立即注入当前运行中的 turn；
+    // raw：仅写入文本，不加任何后缀（用于 TUI 菜单选择等纯按键场景）；
     // 默认：写入文本后发 Enter，运行中由官方 TUI 排队。
-    const isSteer = request.submit === "steer";
+    const suffix = request.submit === "steer" ? "\x13" : request.submit === "raw" ? "" : "\r";
     if (session.ptyProcess) {
-      session.ptyProcess.write(`${payload}${isSteer ? "\x13" : "\r"}`);
+      session.ptyProcess.write(`${payload}${suffix}`);
     } else if (session.child) {
-      session.child.stdin.write(`${payload}${isSteer ? "\x13" : "\r\n"}`);
+      session.child.stdin.write(`${payload}${suffix}`);
     } else {
       return { success: false, error: "TUI 进程未运行" };
     }
-    updateSession(session, {}, "status", undefined, `已${isSteer ? "注入(steer)" : "发送输入"}到 ${session.backend}`);
+    const actionLabel = request.submit === "steer" ? "注入(steer)" : request.submit === "raw" ? "发送纯文本" : "发送输入";
+    updateSession(session, {}, "status", undefined, `已${actionLabel}到 ${session.backend}`);
     return { success: true, data: undefined };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };

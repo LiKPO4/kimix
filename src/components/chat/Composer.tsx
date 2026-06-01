@@ -464,12 +464,14 @@ export function Composer() {
           // 无存活 runtime：若该会话此前抓到过官方 sessionId，用 `kimi -S` 恢复上下文；
           // 官方 session 文件可能已删，启动失败时无参重试，至少保证能继续对话。
           const resumeId = targetSession.officialSessionId;
+          // 权限模式作为官方启动 flag 传给 hidden TUI：yolo→--yolo（全自动批准）、auto→--auto。
+          const permissionArgs = permissionMode === "yolo" ? ["--yolo"] : permissionMode === "auto" ? ["--auto"] : [];
           let startRes = await window.api.startTuiSession({
             workDir: targetSession.projectPath,
-            ...(resumeId ? { args: ["-S", resumeId] } : {}),
+            args: [...permissionArgs, ...(resumeId ? ["-S", resumeId] : [])],
           });
           if (!startRes.success && resumeId) {
-            startRes = await window.api.startTuiSession({ workDir: targetSession.projectPath });
+            startRes = await window.api.startTuiSession({ workDir: targetSession.projectPath, args: permissionArgs });
           }
           if (!startRes.success) throw new Error(startRes.error);
           tuiSessionId = startRes.data.sessionId;
@@ -847,12 +849,13 @@ export function Composer() {
       }));
     }
     setShowPermissionMenu(false);
-    if (!activeSession || activeSession.engine !== "tui" || (mode !== "manual" && mode !== "auto")) {
+    if (!activeSession || activeSession.engine !== "tui") {
       return;
     }
     const runtimeSessionId = getRuntimeSessionId(activeSession);
     if (!runtimeSessionId || previousMode === mode) return;
-    const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/auto" });
+    const command = mode === "yolo" ? "/yolo" : "/auto";
+    const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: command });
     if (!res.success) {
       setPermissionMode(previousMode);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
@@ -861,7 +864,7 @@ export function Composer() {
       return;
     }
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: mode === "auto" ? "已发送 /auto，等待 TUI 切到自动权限" : "已发送 /auto，等待 TUI 切回手动审批",
+      detail: mode === "yolo" ? "已发送 /yolo，等待 TUI 开启完全访问权限" : mode === "auto" ? "已发送 /auto，等待 TUI 切到自动权限" : "已发送 /auto，等待 TUI 切回手动审批",
     }));
   };
 
