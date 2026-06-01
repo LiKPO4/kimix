@@ -1989,6 +1989,15 @@ function App() {
           syncCurrentSessionFromStore(uiSessionId);
           return;
         }
+        // 兜底：input idle 且没有审批/问题时，若还有未完成的 assistant，直接 finish 并 flush queue
+        if (payload.session.screen?.isInputIdle) {
+          const hasUnfinishedAssistant = targetSession.events.some((e) => e.type === "assistant_message" && !e.isComplete);
+          if (hasUnfinishedAssistant) {
+            finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: true });
+            syncCurrentSessionFromStore(uiSessionId);
+            return;
+          }
+        }
         syncCurrentSessionFromStore(uiSessionId);
         return;
       }
