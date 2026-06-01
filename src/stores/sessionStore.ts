@@ -70,6 +70,7 @@ export const useSessionStore = create<SessionStore>((set) => ({
   deleteSession: (id) =>
     set((state) => ({
       sessions: state.sessions.filter((s) => s.id !== id),
+      pendingMessages: state.pendingMessages.filter((msg) => msg.sessionId !== id),
     })),
 
   archiveSession: (id) =>
