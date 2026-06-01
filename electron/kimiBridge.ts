@@ -1498,41 +1498,67 @@ export async function runOneShotPrompt(options: {
   sessionId?: string;
   timeoutMs?: number;
 }): Promise<string> {
-  const session = createSession({
-    workDir: options.workDir,
-    sessionId: options.sessionId,
-    model: options.model,
-    thinking: options.thinking ?? true,
-    yoloMode: options.yoloMode ?? false,
-    executable: "kimi",
-    agentFile: options.agentFile,
-    shareDir: resolveKimiShareDir(),
-  });
-  const turn = session.prompt(options.content);
-  const parts: string[] = [];
-  const timeoutMs = options.timeoutMs ?? 120000;
-  const timeout = setTimeout(() => {
-    void turn.interrupt().catch(() => {});
-  }, timeoutMs);
+  // kimi 0.6.0 不再支持 SDK 的 `--wire`/`--work-dir`，改走官方非交互 `-p` 单轮：
+  // `kimi --output-format stream-json -p <prompt>`，逐行解析 assistant content 聚合返回。
+  const promptText = typeof options.content === "string"
+    ? options.content
+    : await materializePromptModeImages(options.content, options.workDir);
+  const args: string[] = [];
+  if (options.model) args.push("--model", options.model);
+  if (options.yoloMode) args.push("--yolo");
+  args.push("--output-format", "stream-json", "-p", promptText);
 
-  try {
-    for await (const event of turn) {
-      const source = event && typeof event === "object" && "message" in event && event.message && typeof event.message === "object"
-        ? event.message as Record<string, unknown>
-        : event as Record<string, unknown>;
-      const payload = source.payload && typeof source.payload === "object" ? source.payload as Record<string, unknown> : {};
-      if (source.type === "ContentPart" && payload.type === "text" && typeof payload.text === "string") {
-        parts.push(payload.text);
-      }
-    }
-    await turn.result;
-    return parts.join("").trim();
-  } finally {
-    clearTimeout(timeout);
-    await session.close().catch((err) => {
-      console.error(`Failed to close one-shot session ${session.sessionId}:`, err);
+  return await new Promise<string>((resolve, reject) => {
+    const child = spawn("kimi", args, {
+      cwd: options.workDir,
+      windowsHide: true,
+      env: { ...process.env },
     });
-  }
+    let stdoutBuffer = "";
+    let stderr = "";
+    let assistantText = "";
+    let settled = false;
+    const timeoutMs = options.timeoutMs ?? 120000;
+    const timer = setTimeout(() => {
+      if (!child.killed) {
+        try { child.kill(); } catch {}
+      }
+    }, timeoutMs);
+    const flushLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      try {
+        const record = JSON.parse(trimmed) as { role?: string; content?: string };
+        if (record.role === "assistant" && typeof record.content === "string") {
+          assistantText += record.content;
+        }
+      } catch {
+        assistantText += `${trimmed}\n`;
+      }
+    };
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+    child.stdout.on("data", (data) => {
+      stdoutBuffer += data.toString();
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() ?? "";
+      for (const line of lines) flushLine(line);
+    });
+    child.stderr.on("data", (data) => { stderr += data.toString(); });
+    child.on("error", (err) => finish(() => reject(new Error(normalizePromptModeError(err.message)))));
+    child.on("exit", (code) => finish(() => {
+      if (stdoutBuffer.trim()) flushLine(stdoutBuffer);
+      if (code === 0) {
+        resolve(assistantText.trim());
+        return;
+      }
+      reject(new Error(normalizePromptModeError(stderr || `CLI exited with code ${code ?? "unknown"}`)));
+    }));
+  });
 }
 
 export function getActiveSessionIds(): string[] {
