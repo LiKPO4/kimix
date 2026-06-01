@@ -439,15 +439,17 @@ export function Composer() {
       isComplete: false,
     };
 
-    const shouldAppendEvents = options?.addUserEvent !== false;
-    if (shouldAppendEvents) {
-      updateSession(targetSession.id, (session) => ({
-        ...session,
-        events: [...session.events, userEvent, responsePlaceholder],
-        title: session.title,
-        updatedAt: Date.now(),
-      }));
-    }
+    const shouldAddUserEvent = options?.addUserEvent !== false;
+    updateSession(targetSession.id, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        ...(shouldAddUserEvent ? [userEvent] : []),
+        responsePlaceholder,
+      ],
+      title: session.title,
+      updatedAt: Date.now(),
+    }));
 
     const shouldUseTuiEngine = !targetSession.longTask;
     const outboundContent = targetSession.longTask

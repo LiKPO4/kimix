@@ -1992,10 +1992,8 @@ function App() {
           return;
         }
         // 兜底：input idle 且没有审批/问题时，若还有未完成的 assistant，直接 finish 并 flush queue。
-        // 不再依赖 isInputIdle——该标志由屏幕解析推断，常因 TUI 状态延迟而长期为 false，
-        // 导致 queue 永远滞留。finishTuiAssistantTurn 内部已改为直接延迟 flush。
         const hasUnfinishedAssistant = targetSession.events.some((e) => e.type === "assistant_message" && !e.isComplete);
-        if (hasUnfinishedAssistant) {
+        if (hasUnfinishedAssistant && payload.session.screen?.isInputIdle) {
           finishTuiAssistantTurn(uiSessionId, payload.sessionId, { flushQueue: true });
           syncCurrentSessionFromStore(uiSessionId);
           return;
