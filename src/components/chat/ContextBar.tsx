@@ -117,10 +117,8 @@ export function ContextBar() {
   const sessionModel = activeSession?.model ?? null;
   const executionLabel = isTuiSession
     ? `hidden TUI · ${tuiRuntimeSummary?.backend?.toUpperCase() ?? "PTY"} · ${formatTuiStatus(tuiRuntimeSummary?.status)}`
-    : "Prompt 兼容链路";
-  const executionTitle = isTuiSession
-    ? `当前对话底层执行层：真实隐藏 Kimi Code TUI${activeRuntimeSessionId ? `\nRuntime: ${activeRuntimeSessionId}` : ""}`
-    : "当前对话底层执行层：prompt-mode 兼容链路";
+    : "hidden TUI";
+  const executionTitle = `当前对话底层执行层：真实隐藏 Kimi Code TUI${activeRuntimeSessionId ? `\nRuntime: ${activeRuntimeSessionId}` : ""}`;
   const tuiPlugins = tuiRuntimeSummary?.screen?.plugins ?? [];
   const tuiModels = tuiRuntimeSummary?.screen?.models ?? [];
   const selectedTuiPlugin = tuiPlugins.find((plugin) => plugin.selected);
@@ -533,11 +531,11 @@ export function ContextBar() {
                 <div className="min-w-0">
                   <div className="text-[15px] font-semibold leading-5 text-[var(--kimix-panel-text)]">执行层</div>
                   <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>
-                    {isTuiSession ? "正式对话正在接管真实 hidden TUI。" : "当前对话仍在使用 prompt-mode 兼容链路。"}
+                    正式对话正在接管真实 hidden TUI。
                   </div>
                 </div>
                 <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                  {isTuiSession ? "TUI" : "Prompt"}
+                  TUI
                 </span>
               </div>
               <div className="flex flex-col" style={{ gap: 10, marginTop: 16 }}>

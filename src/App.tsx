@@ -851,7 +851,7 @@ function App() {
 
   const flushNextTuiPendingMessage = (uiSessionId: string, runtimeSessionId: string) => {
     pendingTuiQueueFlushRef.current.delete(`${uiSessionId}:${runtimeSessionId}`);
-    const next = useSessionStore.getState().shiftPendingMessage();
+    const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
     if (!next) return;
     const now = Date.now();
     updateSession(uiSessionId, (session) => ({
@@ -916,7 +916,7 @@ function App() {
           return;
         }
         const stillPending = pendingTuiQueueFlushRef.current.has(key);
-        const hasQueue = useSessionStore.getState().pendingMessages.length > 0;
+        const hasQueue = useSessionStore.getState().pendingMessages.some((msg) => msg.sessionId === uiSessionId);
         if (stillPending && hasQueue) {
           flushNextTuiPendingMessageWhenIdle(uiSessionId, runtimeSessionId);
         } else {
@@ -1532,10 +1532,8 @@ function App() {
         if (Array.isArray(parsed)) {
           const pendingMessages = parsed
             .map((item) => {
-              if (typeof item === "string") {
-                return { id: crypto.randomUUID(), content: item, createdAt: Date.now() };
-              }
-              if (item && typeof item === "object" && typeof item.id === "string" && typeof item.content === "string" && typeof item.createdAt === "number") {
+              // 排队消息现按会话隔离：缺少 sessionId 的旧持久化数据无法归属任何会话，丢弃。
+              if (item && typeof item === "object" && typeof item.id === "string" && typeof item.sessionId === "string" && typeof item.content === "string" && typeof item.createdAt === "number") {
                 const images = Array.isArray((item as { images?: unknown }).images)
                   ? (item as { images: unknown[] }).images.filter((image): image is { id?: string; name: string; dataUrl?: string } => (
                       image &&
@@ -1802,7 +1800,7 @@ function App() {
           return;
         }
 
-        const next = useSessionStore.getState().shiftPendingMessage();
+        const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
         if (next) {
           const userEventId = Math.random().toString(36).substring(2, 11);
           const placeholderId = Math.random().toString(36).substring(2, 11);

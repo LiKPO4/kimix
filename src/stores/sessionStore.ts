@@ -3,6 +3,7 @@ import type { Session, TimelineEvent, Project, UserMessageImage } from "@/types/
 
 export interface PendingMessage {
   id: string;
+  sessionId: string;
   content: string;
   createdAt: number;
   images?: UserMessageImage[];
@@ -20,18 +21,19 @@ export interface SessionStore {
   archiveSession: (id: string) => void;
   restoreSession: (id: string) => void;
   setRecentProjects: (projects: Project[]) => void;
-  addPendingMessage: (content: string, images?: UserMessageImage[]) => void;
+  addPendingMessage: (sessionId: string, content: string, images?: UserMessageImage[]) => void;
   updatePendingMessage: (id: string, content: string) => void;
   removePendingMessage: (id: string) => void;
   movePendingMessage: (id: string, direction: "up" | "down") => void;
   reorderPendingMessage: (dragId: string, targetId: string) => void;
   promotePendingMessage: (id: string) => void;
-  shiftPendingMessage: () => PendingMessage | undefined;
+  shiftPendingMessage: (sessionId: string) => PendingMessage | undefined;
 }
 
-function createPendingMessage(content: string, images: UserMessageImage[] = []): PendingMessage {
+function createPendingMessage(sessionId: string, content: string, images: UserMessageImage[] = []): PendingMessage {
   return {
     id: crypto.randomUUID(),
+    sessionId,
     content,
     createdAt: Date.now(),
     images,
@@ -86,16 +88,16 @@ export const useSessionStore = create<SessionStore>((set) => ({
 
   setRecentProjects: (projects) => set({ recentProjects: projects }),
 
-  addPendingMessage: (content, images = []) =>
+  addPendingMessage: (sessionId, content, images = []) =>
     set((state) => {
       const normalized = content.trim();
       const normalizedImages = images.filter((image) => Boolean(image.dataUrl));
       if (!normalized && normalizedImages.length === 0) return state;
-      const latest = state.pendingMessages.at(-1);
+      const latest = state.pendingMessages.filter((msg) => msg.sessionId === sessionId).at(-1);
       const imageSignature = normalizedImages.map((image) => image.dataUrl || image.name).join("|");
       const latestImageSignature = (latest?.images ?? []).map((image) => image.dataUrl || image.name).join("|");
       if (latest?.content.trim() === normalized && latestImageSignature === imageSignature) return state;
-      return { pendingMessages: [...state.pendingMessages, createPendingMessage(normalized, normalizedImages)] };
+      return { pendingMessages: [...state.pendingMessages, createPendingMessage(sessionId, normalized, normalizedImages)] };
     }),
 
   updatePendingMessage: (id, content) =>
@@ -144,11 +146,13 @@ export const useSessionStore = create<SessionStore>((set) => ({
       return { pendingMessages };
     }),
 
-  shiftPendingMessage: () => {
+  shiftPendingMessage: (sessionId) => {
     let result: PendingMessage | undefined;
     set((state) => {
-      result = state.pendingMessages[0];
-      return { pendingMessages: state.pendingMessages.slice(1) };
+      result = state.pendingMessages.find((msg) => msg.sessionId === sessionId);
+      if (!result) return state;
+      const removeId = result.id;
+      return { pendingMessages: state.pendingMessages.filter((msg) => msg.id !== removeId) };
     });
     return result;
   },

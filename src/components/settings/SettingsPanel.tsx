@@ -119,8 +119,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const notificationMode = useAppStore((s) => s.notificationMode);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
-  const experimentalTuiEngineEnabled = useAppStore((s) => s.experimentalTuiEngineEnabled);
-  const setExperimentalTuiEngineEnabled = useAppStore((s) => s.setExperimentalTuiEngineEnabled);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const archivedSessionsDigest = useSessionStore((s) => s.sessions
     .filter((session) => session.archivedAt)
@@ -560,37 +558,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>
-                </div>
-              </div>
-
-              <div className="kimix-settings-section">
-                <div className="kimix-settings-row-title">
-                  <div className="kimix-settings-section-title">
-                    <Terminal size={16} className="text-text-muted" />
-                    <span>TUI 引擎</span>
-                  </div>
-                </div>
-                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setExperimentalTuiEngineEnabled(!experimentalTuiEngineEnabled)}
-                    className={`kimix-settings-permission ${experimentalTuiEngineEnabled ? "is-active" : ""}`}
-                    style={{
-                      padding: "14px 14px",
-                      display: "grid",
-                      gridTemplateColumns: "auto minmax(0, 1fr)",
-                      gap: 12,
-                      alignItems: "center",
-                    }}
-                  >
-                    <SelectionIndicator selected={experimentalTuiEngineEnabled} />
-                    <div className="kimix-settings-permission-copy">
-                      <div className="kimix-settings-permission-label">hidden TUI 主链路</div>
-                      <div className="kimix-settings-permission-desc">
-                        默认开启；普通输入优先发送到真实隐藏 Kimi TUI，并把终端镜像回填到当前对话气泡。关闭后使用 prompt 兼容回退。
-                      </div>
-                    </div>
-                  </button>
                 </div>
               </div>
 
@@ -1076,7 +1043,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.225 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.226 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

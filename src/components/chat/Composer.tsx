@@ -70,11 +70,6 @@ type CompletionItem = {
   kind: "agent" | "plugin" | "file" | "slash";
 };
 
-const unsupportedSlashHints: Record<string, string> = {
-  status: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时和本周用量。",
-  usage: "套餐用量已移到底部“套餐用量”菜单，请从那里查看 5小时和本周用量。",
-};
-
 const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
 
 const mentionBaseItems: CompletionItem[] = [
@@ -182,14 +177,13 @@ export function Composer() {
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
-  const experimentalTuiEngineEnabled = useAppStore((s) => s.experimentalTuiEngineEnabled);
   const clarificationLockedByYolo = permissionMode === "yolo";
   const effectiveClarificationToolMode = clarificationLockedByYolo ? "off" : clarificationToolMode;
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const addSession = useSessionStore((s) => s.addSession);
   const addPendingMessage = useSessionStore((s) => s.addPendingMessage);
-  const pendingMessages = useSessionStore((s) => s.pendingMessages);
+  const allPendingMessages = useSessionStore((s) => s.pendingMessages);
   const removePendingMessage = useSessionStore((s) => s.removePendingMessage);
   const reorderPendingMessage = useSessionStore((s) => s.reorderPendingMessage);
   const liveSession = useLiveSession(currentSession?.id);
@@ -204,6 +198,9 @@ export function Composer() {
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
   const activeSession = liveSession ?? currentSession;
+  const pendingMessages = currentSession
+    ? allPendingMessages.filter((msg) => msg.sessionId === currentSession.id)
+    : [];
   const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
   const isCurrentSessionRunning = Boolean(activeSession && (
     runningSessionId === activeSession.id ||
@@ -214,7 +211,6 @@ export function Composer() {
   const shouldShowStopButton = Boolean(isCurrentSessionRunning || hasUnfinishedAssistant);
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
   const canTogglePlanMode = canUseComposer && !isCurrentSessionRunning && !hasUnfinishedAssistant;
-  const allowedSlashNames = new Set(slashCommands.flatMap((item) => item.commandName ? [item.commandName] : []));
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -405,39 +401,10 @@ export function Composer() {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
     }
     if (!currentProject) return null;
-    if (experimentalTuiEngineEnabled) {
-      const session = {
-        id: genId(),
-        engine: "tui" as const,
-        title: "新会话",
-        projectPath: currentProject.path,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        events: [],
-        isLoading: false,
-      };
-      addSession(session);
-      setCurrentSession(session);
-      return session;
-    }
-    const sessionRes = await window.api.startSession({
-      workDir: currentProject.path,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
-      planMode: defaultPlanMode,
-    });
-    if (!sessionRes.success) return null;
-    setSlashCommands((sessionRes.data.slashCommands ?? []).map((command) => ({
-      id: `slash-${command.name}`,
-      label: `/${command.name}`,
-      detail: command.description,
-      insertText: `/${command.name} `,
-      commandName: command.name,
-      kind: "slash",
-    })));
+    // 只有 TUI 引擎：仅创建本地会话对象，真实 hidden TUI 进程延迟到首条消息发送时再启动。
     const session = {
-      id: sessionRes.data.sessionId,
+      id: genId(),
+      engine: "tui" as const,
       title: "新会话",
       projectPath: currentProject.path,
       createdAt: Date.now(),
@@ -483,7 +450,7 @@ export function Composer() {
       updatedAt: Date.now(),
     }));
 
-    const shouldUseTuiEngine = experimentalTuiEngineEnabled && !targetSession.longTask;
+    const shouldUseTuiEngine = !targetSession.longTask;
     const outboundContent = targetSession.longTask
       ? content
       : shouldUseTuiEngine
@@ -740,7 +707,7 @@ export function Composer() {
       const applied = await applySkillCommand(skillName);
       if (applied && (restContent || imagesToSend.length > 0)) {
         if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
-          addPendingMessage(restContent, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
+          addPendingMessage(currentSession.id, restContent, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
           if (imagesToSend.length > 0) {
             window.dispatchEvent(new CustomEvent("kimix:toast", {
               detail: "当前轮次还没结束，文字和图片已加入队列，等待官方 TUI 完成后自动发送。",
@@ -752,33 +719,6 @@ export function Composer() {
       }
       return;
     }
-    const slashMatch = trimmed.match(/^\/([^\s/]+)(?:\s|$)/);
-    if (slashMatch) {
-      const slashName = slashMatch[1];
-      const isKnown = allowedSlashNames.has(slashName);
-      const shouldBlock = !experimentalTuiEngineEnabled && (unsupportedSlashHints[slashName] || (slashCommands.length > 0 && !isKnown));
-      if (shouldBlock) {
-        const targetSession = await ensureSession();
-        if (!targetSession) return;
-        const hint = unsupportedSlashHints[slashName] ?? "这个命令不是当前 Kimi SDK 会话可直接执行的原生命令，已拦截，避免发送后出现 Unknown slash command。";
-        updateSession(targetSession.id, (session) => ({
-          ...session,
-          events: [
-            ...session.events,
-            {
-              id: genId(),
-              type: "error",
-              timestamp: Date.now(),
-              message: `/${slashName} 暂不能在当前对话输入框中发送。${hint}`,
-              source: "ui",
-            },
-          ],
-          updatedAt: Date.now(),
-        }));
-        return;
-      }
-    }
-
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);
@@ -789,7 +729,7 @@ export function Composer() {
     }
 
     if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
-      addPendingMessage(trimmed, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
+      addPendingMessage(currentSession.id, trimmed, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
       return;
     }
     await sendPromptContent(trimmed, { images: imagesToSend });
@@ -907,7 +847,7 @@ export function Composer() {
       }));
     }
     setShowPermissionMenu(false);
-    if (!experimentalTuiEngineEnabled || !activeSession || activeSession.engine !== "tui" || (mode !== "manual" && mode !== "auto")) {
+    if (!activeSession || activeSession.engine !== "tui" || (mode !== "manual" && mode !== "auto")) {
       return;
     }
     const runtimeSessionId = getRuntimeSessionId(activeSession);
