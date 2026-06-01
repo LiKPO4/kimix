@@ -1514,16 +1514,21 @@ export async function runOneShotPrompt(options: {
       windowsHide: true,
       env: { ...process.env },
     });
+    // 非交互单轮：立刻关闭 stdin，避免 kimi 把未结束的管道当作待输入而阻塞。
+    try { child.stdin?.end(); } catch {}
     let stdoutBuffer = "";
     let stderr = "";
     let assistantText = "";
     let settled = false;
     const timeoutMs = options.timeoutMs ?? 120000;
-    const timer = setTimeout(() => {
-      if (!child.killed) {
+    const killTree = () => {
+      if (child.pid == null) return;
+      if (process.platform === "win32") {
+        try { spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true }); } catch {}
+      } else {
         try { child.kill(); } catch {}
       }
-    }, timeoutMs);
+    };
     const flushLine = (line: string) => {
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -1542,6 +1547,15 @@ export async function runOneShotPrompt(options: {
       clearTimeout(timer);
       fn();
     };
+    const timer = setTimeout(() => {
+      killTree();
+      // 不依赖 exit 兜底：超时直接 settle，避免子进程未退出导致前端永久卡在「生成中」。
+      finish(() => {
+        if (stdoutBuffer.trim()) flushLine(stdoutBuffer);
+        if (assistantText.trim()) { resolve(assistantText.trim()); return; }
+        reject(new Error(normalizePromptModeError(stderr || `规则生成超时（${Math.round(timeoutMs / 1000)}s）`)));
+      });
+    }, timeoutMs);
     child.stdout.on("data", (data) => {
       stdoutBuffer += data.toString();
       const lines = stdoutBuffer.split(/\r?\n/);
