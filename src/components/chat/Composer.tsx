@@ -439,16 +439,15 @@ export function Composer() {
       isComplete: false,
     };
 
-    updateSession(targetSession.id, (session) => ({
-      ...session,
-      events: [
-        ...session.events,
-        ...(options?.addUserEvent === false ? [] : [userEvent]),
-        responsePlaceholder,
-      ],
-      title: session.title,
-      updatedAt: Date.now(),
-    }));
+    const shouldAppendEvents = options?.addUserEvent !== false;
+    if (shouldAppendEvents) {
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        events: [...session.events, userEvent, responsePlaceholder],
+        title: session.title,
+        updatedAt: Date.now(),
+      }));
+    }
 
     const shouldUseTuiEngine = !targetSession.longTask;
     const outboundContent = targetSession.longTask
@@ -504,7 +503,7 @@ export function Composer() {
           if (sendRes.error === "TUI 进程未运行") {
             // TUI 进程已退出（超时/崩溃），清理失效 ID 后自动重试一次
             updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
-            return sendPromptContent(content, options);
+            return sendPromptContent(content, { ...options, addUserEvent: false });
           }
           throw new Error(sendRes.error);
         }
