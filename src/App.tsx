@@ -1512,6 +1512,9 @@ function App() {
           useSessionStore.setState({
             sessions: visibleSessions.map((session) => hydrateLongTaskProgressFromHistory({
               ...session,
+              // 重启后旧 TUI 进程必已退出，runtimeSessionId 是死句柄；清掉以便下次发消息时
+              // 用 officialSessionId 经 `kimi -S` 重建上下文（见 sendPromptContent）。
+              runtimeSessionId: session.engine === "tui" ? undefined : session.runtimeSessionId,
               events: sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []),
               isLoading: false,
             })),
@@ -1882,6 +1885,7 @@ function App() {
           return {
             ...session,
             runtimeSessionId: payload.sessionId,
+            officialSessionId: payload.session.officialSessionId ?? session.officialSessionId,
             engine: "tui",
             events: reduced.events,
             updatedAt: Date.now(),
@@ -1920,6 +1924,7 @@ function App() {
             return {
               ...session,
               runtimeSessionId: payload.sessionId,
+              officialSessionId: payload.session.officialSessionId ?? session.officialSessionId,
               engine: "tui",
               model: tuiModelName,
               updatedAt: Date.now(),
@@ -1959,6 +1964,7 @@ function App() {
           return {
             ...session,
             runtimeSessionId: payload.sessionId,
+            officialSessionId: payload.session.officialSessionId ?? session.officialSessionId,
             engine: "tui",
             model: tuiModelName ?? session.model,
             events: nextEvents,

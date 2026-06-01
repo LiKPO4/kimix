@@ -48,6 +48,8 @@ export interface Session {
   id: string;
   engine?: "prompt" | "tui";
   runtimeSessionId?: string;
+  /** 官方 kimi session id（从 wire/screen 抓取并持久化），用于重启后 `kimi -S` 恢复上下文。 */
+  officialSessionId?: string;
   model?: string | null;
   longTask?: LongTaskSessionMeta;
   title: string;

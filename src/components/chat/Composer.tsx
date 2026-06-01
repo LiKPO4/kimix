@@ -494,14 +494,25 @@ export function Composer() {
       try {
         let tuiSessionId = targetSession.engine === "tui" ? targetSession.runtimeSessionId : undefined;
         if (!tuiSessionId) {
-          const startRes = await window.api.startTuiSession({ workDir: targetSession.projectPath });
+          // 无存活 runtime：若该会话此前抓到过官方 sessionId，用 `kimi -S` 恢复上下文；
+          // 官方 session 文件可能已删，启动失败时无参重试，至少保证能继续对话。
+          const resumeId = targetSession.officialSessionId;
+          let startRes = await window.api.startTuiSession({
+            workDir: targetSession.projectPath,
+            ...(resumeId ? { args: ["-S", resumeId] } : {}),
+          });
+          if (!startRes.success && resumeId) {
+            startRes = await window.api.startTuiSession({ workDir: targetSession.projectPath });
+          }
           if (!startRes.success) throw new Error(startRes.error);
           tuiSessionId = startRes.data.sessionId;
-          targetSession = { ...targetSession, engine: "tui", runtimeSessionId: tuiSessionId };
+          const startedOfficialId = startRes.data.officialSessionId ?? targetSession.officialSessionId;
+          targetSession = { ...targetSession, engine: "tui", runtimeSessionId: tuiSessionId, officialSessionId: startedOfficialId ?? undefined };
           updateSession(targetSession.id, (session) => ({
             ...session,
             engine: "tui",
             runtimeSessionId: tuiSessionId,
+            officialSessionId: startedOfficialId ?? session.officialSessionId,
             model: "Kimi TUI",
             updatedAt: Date.now(),
           }));
