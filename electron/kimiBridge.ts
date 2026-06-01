@@ -103,26 +103,11 @@ async function resolveSessionModel(workDir: string, sessionId: string, requested
 let kimiWireSupportPromise: Promise<boolean> | null = null;
 
 function supportsKimiWireMode() {
+  // kimi 0.6.0 起不再支持 SDK 的 `--wire`，新消息一律走 Kimix 自有的非交互
+  // prompt-mode 链路，不再探测、不再回退到 SDK，避免 `--wire` 崩溃与启动探测
+  // 进程挂起。彻底删除 SDK 分支是后续工作，这里先用总闸门强制切换行为。
   if (kimiWireSupportPromise) return kimiWireSupportPromise;
-  kimiWireSupportPromise = new Promise((resolve) => {
-    const child = spawn("kimi", ["--wire"], { cwd: os.homedir(), windowsHide: true });
-    let output = "";
-    const done = (supported: boolean) => {
-      clearTimeout(timer);
-      child.removeAllListeners();
-      if (!child.killed) {
-        try { child.kill(); } catch {}
-      }
-      resolve(supported);
-    };
-    const timer = setTimeout(() => done(true), 1200);
-    child.stdout.on("data", (data) => { output += data.toString(); });
-    child.stderr.on("data", (data) => { output += data.toString(); });
-    child.on("error", () => done(false));
-    child.on("exit", () => {
-      done(!/unknown option ['"]?--wire/i.test(output));
-    });
-  });
+  kimiWireSupportPromise = Promise.resolve(false);
   return kimiWireSupportPromise;
 }
 
