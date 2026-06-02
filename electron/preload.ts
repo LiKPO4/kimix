@@ -17,8 +17,6 @@ import type {
   AppendLongTaskRoundResponse,
   StartSessionRequest,
   StartSessionResponse,
-  StartTuiSessionRequest,
-  StartTuiSessionResponse,
   CheckKimiCliRequest,
   CheckKimiCliResponse,
   GetKimiAuthStatusResponse,
@@ -47,7 +45,6 @@ import type {
   SteerPromptResponse,
   StopTurnRequest,
   StopTurnResponse,
-  StopTuiSessionRequest,
   ApproveRequest,
   ApproveResponse,
   RespondQuestionRequest,
@@ -99,16 +96,39 @@ import type {
   SaveSettingsRequest,
   KimiEventPayload,
   KimiStatusPayload,
-  ListTuiSessionsResponse,
-  SendTuiKeyRequest,
-  ProbeTuiClipboardImageRequest,
-  SendTuiInputRequest,
-  ApplyPromptSubmitHooksRequest,
-  ApplyPromptSubmitHooksResponse,
-  ResizeTuiSessionRequest,
+  KimiCodeApprovalResponseRequest,
+  KimiCodeCreateSessionRequest,
+  KimiCodeEventPayload,
+  KimiCodeBackgroundTaskOutputPathResponse,
+  KimiCodeBackgroundTaskOutputResponse,
+  KimiCodeBackgroundTaskRequest,
+  KimiCodeInstallPluginRequest,
+  KimiCodeListBackgroundTasksRequest,
+  KimiCodeListBackgroundTasksResponse,
+  KimiCodeListSessionsRequest,
+  KimiCodeListSessionsResponse,
+  KimiCodeListMcpServersResponse,
+  KimiCodeListPluginsResponse,
+  KimiCodeManagedUsageRequest,
+  KimiCodeManagedUsageResponse,
+  KimiCodeMcpServerRequest,
+  KimiCodeMcpStartupMetricsResponse,
+  KimiCodePluginResponse,
+  KimiCodePromptRequest,
+  KimiCodeQuestionResponseRequest,
+  KimiCodeResumeSessionRequest,
+  KimiCodeSessionRequest,
+  KimiCodeSessionResponse,
+  KimiCodeSetPluginEnabledRequest,
+  KimiCodeSetPluginMcpServerEnabledRequest,
+  KimiCodeSetPermissionRequest,
+  KimiCodeSetPlanModeRequest,
+  KimiCodeStatusPayload,
+  KimiCodeStatusResponse,
+  KimiCodeUsageResponse,
+  KimiCodeVoidResponse,
   Project,
   VoidResponse,
-  TuiEventPayload,
 } from "./types/ipc";
 
 const api = {
@@ -233,22 +253,6 @@ const api = {
     ipcRenderer.invoke("kimi:getUsage"),
   startKimiVis: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi:startVis"),
-  startTuiSession: (req?: StartTuiSessionRequest): Promise<StartTuiSessionResponse> =>
-    ipcRenderer.invoke("tui:startSession", req),
-  sendTuiInput: (req: SendTuiInputRequest): Promise<VoidResponse> =>
-    ipcRenderer.invoke("tui:sendInput", req),
-  applyPromptSubmitHooks: (req: ApplyPromptSubmitHooksRequest): Promise<ApplyPromptSubmitHooksResponse> =>
-    ipcRenderer.invoke("hooks:applyPromptSubmit", req),
-  sendTuiKey: (req: SendTuiKeyRequest): Promise<VoidResponse> =>
-    ipcRenderer.invoke("tui:sendKey", req),
-  probeTuiClipboardImage: (req: ProbeTuiClipboardImageRequest): Promise<VoidResponse> =>
-    ipcRenderer.invoke("tui:probeClipboardImage", req),
-  stopTuiSession: (req: StopTuiSessionRequest): Promise<VoidResponse> =>
-    ipcRenderer.invoke("tui:stopSession", req),
-  resizeTuiSession: (req: ResizeTuiSessionRequest): Promise<VoidResponse> =>
-    ipcRenderer.invoke("tui:resizeSession", req),
-  listTuiSessions: (): Promise<ListTuiSessionsResponse> =>
-    ipcRenderer.invoke("tui:listSessions"),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {
@@ -261,10 +265,65 @@ const api = {
     ipcRenderer.on("kimi:status", handler);
     return () => ipcRenderer.off("kimi:status", handler);
   },
-  onTuiEvent: (callback: (payload: TuiEventPayload) => void) => {
-    const handler = (_: unknown, payload: TuiEventPayload) => callback(payload);
-    ipcRenderer.on("tui:event", handler);
-    return () => ipcRenderer.off("tui:event", handler);
+  createKimiCodeSession: (req: KimiCodeCreateSessionRequest): Promise<KimiCodeSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:createSession", req),
+  resumeKimiCodeSession: (req: KimiCodeResumeSessionRequest): Promise<KimiCodeSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:resumeSession", req),
+  sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:sendPrompt", req),
+  steerKimiCode: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:steer", req),
+  cancelKimiCodeTurn: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:cancel", req),
+  setKimiCodePlanMode: (req: KimiCodeSetPlanModeRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:setPlanMode", req),
+  setKimiCodePermission: (req: KimiCodeSetPermissionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:setPermission", req),
+  respondKimiCodeApproval: (req: KimiCodeApprovalResponseRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:respondApproval", req),
+  respondKimiCodeQuestion: (req: KimiCodeQuestionResponseRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:respondQuestion", req),
+  getKimiCodeStatus: (req: KimiCodeSessionRequest): Promise<KimiCodeStatusResponse> =>
+    ipcRenderer.invoke("kimi-code:getStatus", req),
+  getKimiCodeUsage: (req: KimiCodeSessionRequest): Promise<KimiCodeUsageResponse> =>
+    ipcRenderer.invoke("kimi-code:getUsage", req),
+  getKimiCodeManagedUsage: (req?: KimiCodeManagedUsageRequest): Promise<KimiCodeManagedUsageResponse> =>
+    ipcRenderer.invoke("kimi-code:getManagedUsage", req),
+  listKimiCodeMcpServers: (req: KimiCodeSessionRequest): Promise<KimiCodeListMcpServersResponse> =>
+    ipcRenderer.invoke("kimi-code:listMcpServers", req),
+  getKimiCodeMcpStartupMetrics: (req: KimiCodeSessionRequest): Promise<KimiCodeMcpStartupMetricsResponse> =>
+    ipcRenderer.invoke("kimi-code:getMcpStartupMetrics", req),
+  reconnectKimiCodeMcpServer: (req: KimiCodeMcpServerRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:reconnectMcpServer", req),
+  listKimiCodeBackgroundTasks: (req: KimiCodeListBackgroundTasksRequest): Promise<KimiCodeListBackgroundTasksResponse> =>
+    ipcRenderer.invoke("kimi-code:listBackgroundTasks", req),
+  getKimiCodeBackgroundTaskOutput: (req: KimiCodeBackgroundTaskRequest): Promise<KimiCodeBackgroundTaskOutputResponse> =>
+    ipcRenderer.invoke("kimi-code:getBackgroundTaskOutput", req),
+  getKimiCodeBackgroundTaskOutputPath: (req: KimiCodeBackgroundTaskRequest): Promise<KimiCodeBackgroundTaskOutputPathResponse> =>
+    ipcRenderer.invoke("kimi-code:getBackgroundTaskOutputPath", req),
+  stopKimiCodeBackgroundTask: (req: KimiCodeBackgroundTaskRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:stopBackgroundTask", req),
+  listKimiCodeSessions: (req?: KimiCodeListSessionsRequest): Promise<KimiCodeListSessionsResponse> =>
+    ipcRenderer.invoke("kimi-code:listSessions", req),
+  closeKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:closeSession", req),
+  listKimiCodePlugins: (req: KimiCodeSessionRequest): Promise<KimiCodeListPluginsResponse> =>
+    ipcRenderer.invoke("kimi-code:listPlugins", req),
+  installKimiCodePlugin: (req: KimiCodeInstallPluginRequest): Promise<KimiCodePluginResponse> =>
+    ipcRenderer.invoke("kimi-code:installPlugin", req),
+  setKimiCodePluginEnabled: (req: KimiCodeSetPluginEnabledRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:setPluginEnabled", req),
+  setKimiCodePluginMcpServerEnabled: (req: KimiCodeSetPluginMcpServerEnabledRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:setPluginMcpServerEnabled", req),
+  onKimiCodeEvent: (callback: (payload: KimiCodeEventPayload) => void) => {
+    const handler = (_: unknown, payload: KimiCodeEventPayload) => callback(payload);
+    ipcRenderer.on("kimi-code:event", handler);
+    return () => ipcRenderer.off("kimi-code:event", handler);
+  },
+  onKimiCodeStatus: (callback: (payload: KimiCodeStatusPayload) => void) => {
+    const handler = (_: unknown, payload: KimiCodeStatusPayload) => callback(payload);
+    ipcRenderer.on("kimi-code:status", handler);
+    return () => ipcRenderer.off("kimi-code:status", handler);
   },
 
   // App

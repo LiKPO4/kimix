@@ -153,11 +153,12 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
     try {
-      if (currentSession.engine === "tui") {
-        await window.api.sendTuiInput({
+      if (currentSession.engine === "kimi-code") {
+        await window.api.respondKimiCodeApproval({
           sessionId: runtimeSessionId,
-          text: scope === "session" ? "2" : "1",
-          submit: "raw",
+          requestId: event.requestId,
+          approved: true,
+          scope,
         });
       } else {
         await window.api.approveRequest({
@@ -185,11 +186,11 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
     try {
-      if (currentSession.engine === "tui") {
-        await window.api.sendTuiInput({
+      if (currentSession.engine === "kimi-code") {
+        await window.api.respondKimiCodeApproval({
           sessionId: runtimeSessionId,
-          text: "3",
-          submit: "raw",
+          requestId: event.requestId,
+          approved: false,
         });
       } else {
         await window.api.approveRequest({

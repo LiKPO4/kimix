@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Upload } from "lucide-react";
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import type { TuiPluginSnapshot } from "@electron/types/ipc";
+import type { KimiCodePluginSummary } from "@electron/types/ipc";
 
 type SkillInfo = {
   name: string;
@@ -43,115 +43,40 @@ export function SkillsPanel({
   const [importing, setImporting] = useState(false);
   const [pluginUrl, setPluginUrl] = useState("");
   const [installingPlugin, setInstallingPlugin] = useState(false);
+  const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
+  const [sdkPluginRefreshing, setSdkPluginRefreshing] = useState(false);
+  const [sdkPluginToggling, setSdkPluginToggling] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [tuiPlugins, setTuiPlugins] = useState<TuiPluginSnapshot[]>([]);
-  const [tuiPluginRefreshing, setTuiPluginRefreshing] = useState(false);
-  const [tuiPluginNavigating, setTuiPluginNavigating] = useState<"installed" | "marketplace" | null>(null);
-  const [tuiPluginClosing, setTuiPluginClosing] = useState(false);
-  const [tuiPluginMoving, setTuiPluginMoving] = useState<"up" | "down" | null>(null);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
-  const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
-  const selectedTuiPlugin = tuiPlugins.find((plugin) => plugin.selected);
+  const sdkRuntimeSessionId = currentSession?.engine === "kimi-code" ? getRuntimeSessionId(currentSession) : null;
 
   useEffect(() => {
     setLocalActiveTab(activeTab);
   }, [activeTab]);
 
-  useEffect(() => {
-    if (!open || !runtimeSessionId) {
-      setTuiPlugins([]);
+  const refreshSdkPlugins = async (nextMessage?: string) => {
+    if (!sdkRuntimeSessionId) {
+      setSdkPlugins([]);
       return;
     }
-    let cancelled = false;
-    const syncPlugins = (plugins?: TuiPluginSnapshot[]) => {
-      if (cancelled) return;
-      setTuiPlugins(plugins?.length ? plugins : []);
-    };
-    void window.api.listTuiSessions().then((res) => {
-      if (!res.success) return;
-      syncPlugins(res.data.find((session) => session.sessionId === runtimeSessionId)?.screen?.plugins);
-    }).catch(() => {});
-    const unsubscribe = window.api.onTuiEvent((payload) => {
-      if (payload.sessionId !== runtimeSessionId) return;
-      syncPlugins(payload.session.screen?.plugins);
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [open, runtimeSessionId]);
-
-  const refreshTuiPluginMirror = async () => {
-    if (!runtimeSessionId) return;
-    setTuiPluginRefreshing(true);
-    try {
-      const res = await window.api.listTuiSessions();
-      if (!res.success) {
-        setMessage(`刷新 TUI 插件状态失败：${res.error}`);
-        return;
-      }
-      const plugins = res.data.find((session) => session.sessionId === runtimeSessionId)?.screen?.plugins ?? [];
-      setTuiPlugins(plugins);
-      setMessage(plugins.length > 0 ? `已刷新官方 TUI 插件状态：${plugins.length} 项` : "当前 TUI 还没有插件状态，请先打开官方 /plugins");
-    } finally {
-      setTuiPluginRefreshing(false);
+    setSdkPluginRefreshing(true);
+    const res = await window.api.listKimiCodePlugins({ sessionId: sdkRuntimeSessionId });
+    setSdkPluginRefreshing(false);
+    if (!res.success) {
+      setMessage(`刷新 SDK 插件状态失败：${res.error}`);
+      return;
     }
+    setSdkPlugins(res.data);
+    setMessage(nextMessage ?? (res.data.length > 0 ? `已从官方 SDK 读取 ${res.data.length} 个 Plugin` : "官方 SDK 当前没有已安装 Plugin"));
   };
 
-  const openTuiPluginScreen = async (target: "installed" | "marketplace") => {
-    if (!runtimeSessionId) return;
-    setTuiPluginNavigating(target);
-    try {
-      const escaped = await window.api.sendTuiKey({ sessionId: runtimeSessionId, key: "escape" });
-      if (!escaped.success) {
-        setMessage(`退出当前 TUI 菜单失败：${escaped.error}`);
-        return;
-      }
-      await new Promise((resolve) => window.setTimeout(resolve, 120));
-      const command = target === "marketplace" ? "/plugins marketplace" : "/plugins";
-      const sent = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: command });
-      if (!sent.success) {
-        setMessage(`打开官方 ${target === "marketplace" ? "Marketplace" : "/plugins"} 失败：${sent.error}`);
-        return;
-      }
-      setMessage(target === "marketplace" ? "已切到官方 Marketplace，等待 TUI 状态回传..." : "已切回官方 Installed，等待 TUI 状态回传...");
-    } finally {
-      setTuiPluginNavigating(null);
+  useEffect(() => {
+    if (!open || !sdkRuntimeSessionId) {
+      setSdkPlugins([]);
+      return;
     }
-  };
-
-  const closeTuiPluginMenu = async () => {
-    if (!runtimeSessionId) return;
-    setTuiPluginClosing(true);
-    try {
-      const closed = await window.api.sendTuiKey({ sessionId: runtimeSessionId, key: "escape" });
-      if (!closed.success) {
-        setMessage(`退出官方插件菜单失败：${closed.error}`);
-        return;
-      }
-      setMessage("已退出官方插件菜单。");
-    } finally {
-      window.setTimeout(() => setTuiPluginClosing(false), 180);
-    }
-  };
-
-  const moveTuiPluginSelection = async (direction: "up" | "down") => {
-    if (!runtimeSessionId) return;
-    setTuiPluginMoving(direction);
-    try {
-      const moved = await window.api.sendTuiKey({
-        sessionId: runtimeSessionId,
-        key: direction === "up" ? "arrowUp" : "arrowDown",
-      });
-      if (!moved.success) {
-        setMessage(`移动官方插件选中项失败：${moved.error}`);
-        return;
-      }
-      setMessage(direction === "up" ? "已向上移动官方插件菜单选中项。" : "已向下移动官方插件菜单选中项。");
-    } finally {
-      window.setTimeout(() => setTuiPluginMoving(null), 180);
-    }
-  };
+    void refreshSdkPlugins();
+  }, [open, sdkRuntimeSessionId]);
 
   const setSelectedTab = (tab: PluginPanelTab) => {
     setLocalActiveTab(tab);
@@ -231,14 +156,20 @@ export function SkillsPanel({
       return;
     }
     setInstallingPlugin(true);
-    setMessage("正在调用 Kimi Code 安装 Plugin...");
-    const res = await window.api.installKimiPlugin({ url });
+    setMessage(sdkRuntimeSessionId ? "正在通过官方 SDK 安装 Plugin..." : "正在调用 Kimi Code 安装 Plugin...");
+    const res = sdkRuntimeSessionId
+      ? await window.api.installKimiCodePlugin({ sessionId: sdkRuntimeSessionId, source: url })
+      : await window.api.installKimiPlugin({ url });
     setInstallingPlugin(false);
     if (!res.success) {
       setMessage(`Plugin 安装失败：${res.error}`);
       return;
     }
     setPluginUrl("");
+    if (sdkRuntimeSessionId) {
+      await refreshSdkPlugins(`Plugin 安装完成：${res.data.displayName}`);
+      return;
+    }
     setSkills(res.data.skills);
     setEnabledNames(res.data.enabledNames);
     setEnabledDir(res.data.enabledDir);
@@ -248,18 +179,43 @@ export function SkillsPanel({
   const installOfficialDatasourcePlugin = async () => {
     setPluginUrl(KIMI_DATASOURCE_PLUGIN_URL);
     setInstallingPlugin(true);
-    setMessage("正在安装官方插件 kimi-datasource...");
-    const res = await window.api.installKimiPlugin({ url: KIMI_DATASOURCE_PLUGIN_URL });
+    setMessage(sdkRuntimeSessionId ? "正在通过官方 SDK 安装官方插件 kimi-datasource..." : "正在安装官方插件 kimi-datasource...");
+    const res = sdkRuntimeSessionId
+      ? await window.api.installKimiCodePlugin({ sessionId: sdkRuntimeSessionId, source: KIMI_DATASOURCE_PLUGIN_URL })
+      : await window.api.installKimiPlugin({ url: KIMI_DATASOURCE_PLUGIN_URL });
     setInstallingPlugin(false);
     if (!res.success) {
       setMessage(`官方插件安装失败：${res.error}`);
       return;
     }
     setPluginUrl("");
+    if (sdkRuntimeSessionId) {
+      await refreshSdkPlugins(`官方插件安装完成：${res.data.displayName}`);
+      return;
+    }
     setSkills(res.data.skills);
     setEnabledNames(res.data.enabledNames);
     setEnabledDir(res.data.enabledDir);
     setMessage(res.data.output ? `${res.data.message}。CLI 输出：${res.data.output}` : res.data.message);
+  };
+
+  const toggleSdkPlugin = async (plugin: KimiCodePluginSummary) => {
+    if (!sdkRuntimeSessionId || sdkPluginToggling) return;
+    const nextEnabled = !plugin.enabled;
+    setSdkPluginToggling(plugin.id);
+    setSdkPlugins((items) => items.map((item) => item.id === plugin.id ? { ...item, enabled: nextEnabled } : item));
+    const res = await window.api.setKimiCodePluginEnabled({
+      sessionId: sdkRuntimeSessionId,
+      id: plugin.id,
+      enabled: nextEnabled,
+    });
+    setSdkPluginToggling(null);
+    if (!res.success) {
+      setSdkPlugins((items) => items.map((item) => item.id === plugin.id ? { ...item, enabled: plugin.enabled } : item));
+      setMessage(`切换 SDK Plugin 失败：${res.error}`);
+      return;
+    }
+    void refreshSdkPlugins(`${plugin.displayName} 已${nextEnabled ? "启用" : "停用"}`);
   };
 
   const openOfficialPluginStore = async () => {
@@ -313,36 +269,15 @@ export function SkillsPanel({
     }
   };
 
-  const tuiStatusLabel = (status: TuiPluginSnapshot["status"]) => {
-    switch (status) {
-      case "enabled":
-        return "已启用";
-      case "installed":
-        return "已安装";
-      case "disabled":
-        return "已停用";
-      case "available":
-        return "可安装";
-      default:
-        return "未知";
-    }
+  const sdkPluginSourceLabel = (source: KimiCodePluginSummary["source"]) => {
+    if (source === "github") return "GitHub";
+    if (source === "zip-url") return "ZIP";
+    return "本地";
   };
 
-  const tuiTrustLabel = (trustLevel: TuiPluginSnapshot["trustLevel"]) => {
-    switch (trustLevel) {
-      case "official":
-        return "官方";
-      case "curated":
-        return "精选";
-      case "third-party":
-        return "第三方";
-      default:
-        return "未知来源";
-    }
-  };
-
-  const tuiSourceLabel = (source: TuiPluginSnapshot["source"]) => {
-    return source === "marketplace" ? "Marketplace" : "Installed";
+  const sdkPluginStateLabel = (plugin: KimiCodePluginSummary) => {
+    if (plugin.hasErrors || plugin.state === "error") return "异常";
+    return plugin.enabled ? "已启用" : "已停用";
   };
 
   if (!open) return null;
@@ -463,167 +398,78 @@ export function SkillsPanel({
                   </button>
                 </div>
               </div>
-              {runtimeSessionId && (
+              {sdkRuntimeSessionId && (
                 <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
                   <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                    <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方 TUI 插件状态</div>
-                    <div className="shrink-0 rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                      {tuiPlugins[0]?.source === "marketplace" ? "Marketplace" : "Installed"}
-                    </div>
+                    <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方 SDK 插件状态</div>
+                    <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                      SDK
+                    </span>
                   </div>
-                  {selectedTuiPlugin && (
-                    <div
-                      className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
-                      style={{ marginTop: 10, padding: "10px 12px" }}
-                    >
-                      <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-[var(--kimix-panel-text)]">{selectedTuiPlugin.name}</div>
-                          <div className="truncate text-[12px]" style={{ marginTop: 2 }} title={selectedTuiPlugin.id}>
-                            {selectedTuiPlugin.id}
-                            {selectedTuiPlugin.version ? ` · v${selectedTuiPlugin.version}` : ""}
-                          </div>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                          当前选中
-                        </span>
-                      </div>
-                      <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
-                        <div className="rounded-md bg-[var(--kimix-panel-bg)] text-center" style={{ padding: "6px 8px" }}>
-                          <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">状态</div>
-                          <div className="truncate font-medium text-[var(--kimix-panel-text)]">{tuiStatusLabel(selectedTuiPlugin.status)}</div>
-                        </div>
-                        <div className="rounded-md bg-[var(--kimix-panel-bg)] text-center" style={{ padding: "6px 8px" }}>
-                          <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">来源</div>
-                          <div className="truncate font-medium text-[var(--kimix-panel-text)]">{tuiSourceLabel(selectedTuiPlugin.source)}</div>
-                        </div>
-                        <div className="rounded-md bg-[var(--kimix-panel-bg)] text-center" style={{ padding: "6px 8px" }}>
-                          <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">信任</div>
-                          <div className="truncate font-medium text-[var(--kimix-panel-text)]">{tuiTrustLabel(selectedTuiPlugin.trustLevel)}</div>
-                        </div>
-                      </div>
-                      <div className="text-[12px] leading-5" style={{ marginTop: 8 }}>
-                        {selectedTuiPlugin.skillsCount !== null ? `${selectedTuiPlugin.skillsCount} skills` : "skills 未声明"}
-                        {selectedTuiPlugin.mcpSummary ? ` · ${selectedTuiPlugin.mcpSummary}` : " · MCP 未声明"}
-                      </div>
-                    </div>
-                  )}
-                  <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
-                    <button
-                      type="button"
-                      onClick={() => void refreshTuiPluginMirror()}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <RefreshCw size={14} className={tuiPluginRefreshing ? "kimix-spin" : ""} />
-                      <span>刷新镜像</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void openTuiPluginScreen("installed")}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <ExternalLink size={14} />
-                      <span>{tuiPluginNavigating === "installed" ? "打开中" : "打开 /plugins"}</span>
-                    </button>
+                  <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
+                    直接读取官方 `Session.listPlugins()`，不再依赖旧菜单镜像。
                   </div>
-                  <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => void openTuiPluginScreen("marketplace")}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <ExternalLink size={14} />
-                      <span>{tuiPluginNavigating === "marketplace" ? "切换中" : "进入 Marketplace"}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void openTuiPluginScreen("installed")}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <ExternalLink size={14} />
-                      <span>{tuiPluginNavigating === "installed" ? "切换中" : "返回 Installed"}</span>
-                    </button>
-                  </div>
-                  <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => void moveTuiPluginSelection("up")}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <ArrowUp size={14} />
-                      <span>{tuiPluginMoving === "up" ? "移动中" : "上移选中"}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void moveTuiPluginSelection("down")}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <ArrowDown size={14} />
-                      <span>{tuiPluginMoving === "down" ? "移动中" : "下移选中"}</span>
-                    </button>
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => void closeTuiPluginMenu()}
-                      disabled={tuiPluginRefreshing || Boolean(tuiPluginNavigating) || tuiPluginClosing || Boolean(tuiPluginMoving)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                      style={{ width: "100%" }}
-                    >
-                      <X size={14} />
-                      <span>{tuiPluginClosing ? "退出中" : "退出插件菜单"}</span>
-                    </button>
-                  </div>
-                  {tuiPlugins.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void refreshSdkPlugins("已刷新官方 SDK 插件状态")}
+                    disabled={sdkPluginRefreshing || Boolean(sdkPluginToggling)}
+                    className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
+                    style={{ width: "100%", marginTop: 12 }}
+                  >
+                    <RefreshCw size={14} className={sdkPluginRefreshing ? "kimix-spin" : ""} />
+                    <span>{sdkPluginRefreshing ? "刷新中" : "刷新 SDK 状态"}</span>
+                  </button>
+                  {sdkPlugins.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
-                      {tuiPlugins.map((plugin) => (
+                      {sdkPlugins.map((plugin) => (
                         <div
-                          key={`${plugin.source}:${plugin.id}`}
-                          className={`rounded-lg border ${plugin.selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"}`}
+                          key={plugin.id}
+                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
                           style={{ padding: "10px 12px" }}
                         >
                           <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                             <div className="min-w-0">
-                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.name}</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.displayName}</div>
                               <div className="truncate text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 2 }} title={plugin.id}>
                                 {plugin.id}
                                 {plugin.version ? ` · v${plugin.version}` : ""}
-                                {plugin.skillsCount !== null ? ` · ${plugin.skillsCount} skills` : ""}
-                                {plugin.mcpSummary ? ` · ${plugin.mcpSummary}` : ""}
                               </div>
                             </div>
-                            <div className="flex shrink-0 flex-col items-end" style={{ gap: 6 }}>
-                              <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                {tuiTrustLabel(plugin.trustLevel)}
-                              </span>
-                              {plugin.selected && (
-                                <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                  当前
-                                </span>
-                              )}
-                              <span className="rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                {tuiStatusLabel(plugin.status)}
-                              </span>
+                            <button
+                              type="button"
+                              onClick={() => void toggleSdkPlugin(plugin)}
+                              disabled={Boolean(sdkPluginToggling)}
+                              className={`shrink-0 rounded-full text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
+                              style={{ paddingLeft: 9, paddingRight: 9 }}
+                            >
+                              {sdkPluginToggling === plugin.id ? "处理中" : sdkPluginStateLabel(plugin)}
+                            </button>
+                          </div>
+                          <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 9 }}>
+                            <div className="rounded-md bg-[var(--kimix-panel-soft-bg)] text-center" style={{ padding: "5px 7px" }}>
+                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">来源</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{sdkPluginSourceLabel(plugin.source)}</div>
+                            </div>
+                            <div className="rounded-md bg-[var(--kimix-panel-soft-bg)] text-center" style={{ padding: "5px 7px" }}>
+                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">Skills</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.skillCount}</div>
+                            </div>
+                            <div className="rounded-md bg-[var(--kimix-panel-soft-bg)] text-center" style={{ padding: "5px 7px" }}>
+                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">MCP</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.enabledMcpServerCount}/{plugin.mcpServerCount}</div>
                             </div>
                           </div>
+                          {plugin.originalSource && (
+                            <div className="truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 7 }} title={plugin.originalSource}>
+                              {plugin.originalSource}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
-                      打开官方 `/plugins` 或 Marketplace 后，这里会显示真实 TUI 状态。
+                      当前 SDK 会话没有已安装 Plugin，或尚未刷新。
                     </div>
                   )}
                 </div>

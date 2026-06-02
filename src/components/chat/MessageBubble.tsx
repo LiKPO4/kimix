@@ -14,6 +14,7 @@ interface MessageBubbleProps {
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[];
+  attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[];
   changedFiles?: string[];
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
@@ -38,7 +39,7 @@ function useCopyTimeout() {
 }
 
 function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.round(ms / 1000));
+  const seconds = ms > 0 ? Math.max(1, Math.round(ms / 1000)) : 0;
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
@@ -190,7 +191,9 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
 
 function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "steer_message" }> }) {
   const label = event.status === "sending"
-    ? "正在引导对话"
+    ? "已发送引导请求"
+    : event.status === "accepted"
+      ? "正在引导"
     : event.status === "failed"
       ? "引导失败"
       : "已引导对话";
@@ -510,7 +513,7 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -519,7 +522,11 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const mdArtifacts = Array.from(new Set(
     event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
   )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
-  const isActiveAssistant = Boolean(currentSession?.id && runningSessionId === currentSession.id && !event.isComplete);
+  const activeRuntimeSessionId = currentSession ? getRuntimeSessionId(currentSession) : undefined;
+  const isActiveAssistant = Boolean(currentSession?.id && !event.isComplete && (
+    runningSessionId === currentSession.id ||
+    Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
+  ));
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
   const hasThinkingDetails = Boolean(event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim().length > 0));
@@ -533,7 +540,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const roleLabel = formatAgentRole(event.agentRole);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const displayProcessLabel = event.isComplete
-    ? `已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
+    ? `（输出完成）已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
     : isActivelyThinking
       ? `正在思考${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
       : `执行中${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`;
@@ -543,6 +550,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {!hideProcessSummary && (
           <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={displayProcessLabel} />
+        )}
+
+        {attachedSteers.length > 0 && (
+          <div className="flex flex-col" style={{ gap: 10 }}>
+            {attachedSteers.map((steer) => <SteerMessageBubble key={steer.id} event={steer} />)}
+          </div>
         )}
 
         {shouldShowNoContentHint && (
@@ -608,12 +621,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   );
 }
 
-export function MessageBubble({ event, leadingTools, leadingSubagents, leadingHooks, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, leadingSubagents, leadingHooks, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }

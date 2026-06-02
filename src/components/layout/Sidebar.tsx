@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable, Download, FileText, TerminalSquare } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable, Download, FileText } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -32,9 +32,6 @@ interface SidebarProps {
 export function Sidebar({ width = 320 }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
-  const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
@@ -50,7 +47,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
-  const deleteSession = useSessionStore((s) => s.deleteSession);
   const archiveSession = useSessionStore((s) => s.archiveSession);
   const updateSession = useSessionStore((s) => s.updateSession);
 
@@ -63,16 +59,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const openPlugins = async () => {
-    const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
-    if (runtimeSessionId) {
-      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/plugins" });
-      if (res.success) {
-        setWorkspaceView("tui");
-        toast("已打开官方 TUI 插件菜单");
-        return;
-      }
-      toast(`打开 TUI 插件菜单失败：${res.error}`);
-    }
     setWorkspaceView("plugins");
   };
 
@@ -95,44 +81,31 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   const createSessionForProject = async (project: Project) => {
     if (useAppStore.getState().creatingSessionProjectPath) return;
-    const previousSession = useAppStore.getState().currentSession;
-    const placeholder = {
-      id: `creating-${crypto.randomUUID()}`,
-      title: "正在创建新会话",
-      projectPath: project.path,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      events: [],
-      isLoading: true,
-    };
     setCreatingSessionProjectPath(project.path);
-    addSession(placeholder);
-    setCurrentProject(project);
-    setWorkspaceView("chat");
-    setCurrentSession(placeholder);
-    setExpandedProject(project.id);
     try {
-      const sessionRes = await window.api.startSession({
-        workDir: project.path,
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
-        planMode: defaultPlanMode,
-      });
-      if (!sessionRes.success) {
-        deleteSession(placeholder.id);
-        setCurrentSession(previousSession?.id === placeholder.id ? null : previousSession);
-        return;
+      let model = "kimi-for-coding";
+      try {
+        const modelRes = await window.api.getKimiModelConfig();
+        if (modelRes.success) model = modelRes.data.defaultModel?.trim() || model;
+      } catch {
+        // Keep the official built-in default.
       }
       const session = {
-        ...placeholder,
-        id: sessionRes.data.sessionId,
+        id: crypto.randomUUID(),
+        engine: "kimi-code" as const,
+        model,
         title: "新会话",
+        projectPath: project.path,
+        createdAt: Date.now(),
         updatedAt: Date.now(),
+        events: [],
         isLoading: false,
       };
-      updateSession(placeholder.id, () => session);
+      addSession(session);
+      setCurrentProject(project);
+      setWorkspaceView("chat");
       setCurrentSession(session);
+      setExpandedProject(project.id);
     } finally {
       setCreatingSessionProjectPath(null);
     }
@@ -197,7 +170,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const exportSessionArchive = async (sessionId: string, title: string) => {
-    const res = await window.api.exportSession({ sessionId, title });
+    const target = sessions.find((session) => session.id === sessionId);
+    const exportSessionId = target ? getRuntimeSessionId(target) : sessionId;
+    if (!exportSessionId) {
+      toast("没有找到可导出的官方会话");
+      return;
+    }
+    const res = await window.api.exportSession({ sessionId: exportSessionId, title });
     if (!res.success) {
       toast(`导出失败：${res.error}`);
       return;
@@ -275,14 +254,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Cable size={17} />
         </button>
-        <button
-          onClick={() => setWorkspaceView("tui")}
-          className={`${collapsedNavItemClass} ${workspaceView === "tui" ? "bg-surface-hover text-text-primary" : ""}`}
-          title="TUI 调试"
-          aria-label="TUI 调试"
-        >
-          <TerminalSquare size={17} />
-        </button>
       </aside>
     );
   }
@@ -350,14 +321,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Cable size={17} className="shrink-0 text-text-secondary" />
           <span>Hooks</span>
-        </button>
-        <button
-          onClick={() => setWorkspaceView("tui")}
-          className={`${navItemClass} ${workspaceView === "tui" ? "bg-surface-hover text-text-primary" : ""}`}
-          title="TUI 调试"
-        >
-          <TerminalSquare size={17} className="shrink-0 text-text-secondary" />
-          <span>TUI 调试</span>
         </button>
         <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
           <span className="flex items-center gap-3">
@@ -580,7 +543,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.238</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.247</span>
         </button>
       </div>
     </aside>

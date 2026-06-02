@@ -19,7 +19,6 @@ export function QuestionCard({ event }: QuestionCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
-  const isTuiQuestion = event.rpcRequestId === "tui" || event.requestId.startsWith("tui-question:");
   const initialAnswers = useMemo<LocalAnswers>(() => {
     const next: LocalAnswers = {};
     event.questions.forEach((question) => {
@@ -123,13 +122,13 @@ export function QuestionCard({ event }: QuestionCardProps) {
     try {
       const runtimeSessionId = getRuntimeSessionId(currentSession);
       if (!runtimeSessionId) return;
-      const res = isTuiQuestion
-        ? await window.api.sendTuiInput({
-            sessionId: runtimeSessionId,
-            text: skip
-              ? "请按现有信息继续。"
-              : Object.values(answerPayload).map((value) => value.trim()).filter(Boolean).join("\n"),
-          })
+      const res = currentSession.engine === "kimi-code"
+          ? await window.api.respondKimiCodeQuestion({
+              sessionId: runtimeSessionId,
+              requestId: event.requestId,
+              answers: answerPayload,
+              skipped: skip,
+            })
         : await window.api.respondQuestion({
             sessionId: runtimeSessionId,
             rpcRequestId: event.rpcRequestId,
@@ -180,7 +179,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
         {!collapsed && (
           <>
         <div className="text-[13px] leading-5 text-text-secondary" style={{ marginTop: 8, marginBottom: 18, paddingLeft: 48 }}>
-          {isTuiQuestion ? "Kimi TUI 正在等待你的回复，提交后会继续执行。" : "Kimi 官方结构化提问会在你选择后继续执行。"}
+          Kimi 官方结构化提问会在你选择后继续执行。
         </div>
 
         <div className="flex flex-col" style={{ gap: 18 }}>

@@ -1,5 +1,5 @@
 import { AlertCircle, ClipboardCopy, LogIn, RefreshCw, RotateCcw, Settings, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 
@@ -39,11 +39,11 @@ function classifyError(message: string): { kind: ErrorRecoveryKind; title: strin
       suggestion: "建议保留当前输出，减少本轮上下文后重试；如果仍失败，可以先导出会话再新开会话继续。",
     };
   }
-  if (/TUI|PTY|ConPTY|hidden PTY|terminated|aborted|cancelled|canceled|SIGTERM|EPIPE|process.*exit|进程.*退出|异常退出|中断/i.test(message)) {
+  if (/terminated|aborted|cancelled|canceled|SIGTERM|EPIPE|process.*exit|进程.*退出|异常退出|中断/i.test(message)) {
     return {
       kind: "terminated",
       title: "请求已中断",
-      suggestion: "通常是 hidden TUI / CLI 进程退出或请求被中断。确认 Kimi Code 可正常启动、网络和登录状态后，可以重新发送上一条消息。",
+      suggestion: "通常是 Kimi Code 进程退出或请求被中断。确认 Kimi Code 可正常启动、网络和登录状态后，可以重新发送上一条消息。",
     };
   }
   return {
@@ -64,20 +64,47 @@ export function ErrorCard({ event, onRetry }: ErrorCardProps) {
   const recovery = classifyError(event.message);
   const isKimiLoginError = recovery.kind === "login";
   const canRetry = Boolean(onRetry) && (recovery.kind === "terminated" || recovery.kind === "generic");
+
+  useEffect(() => {
+    if (!isKimiLoginError || dismissed) return undefined;
+    let disposed = false;
+    const refresh = async () => {
+      const res = await window.api.getKimiAuthStatus().catch(() => null);
+      if (!disposed && res?.success && res.data.loggedIn) {
+        setDismissed(true);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5000);
+    const handleAuthChanged = () => void refresh();
+    window.addEventListener("kimix:kimi-auth-changed", handleAuthChanged);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("kimix:kimi-auth-changed", handleAuthChanged);
+    };
+  }, [dismissed, isKimiLoginError]);
+
   if (dismissed) return null;
 
   const handleLogin = async () => {
     setLoginState("running");
     setLoginMessage("");
-    const res = await window.api.loginKimi();
-    if (res.success) {
-      setLoginState("done");
-      setLoginMessage(res.data.message);
-      window.dispatchEvent(new CustomEvent("kimix:kimi-auth-changed"));
-      return;
+    try {
+      const res = await window.api.loginKimi();
+      if (res.success) {
+        setLoginState("done");
+        setLoginMessage(res.data.message);
+        if (res.data.loggedIn) setDismissed(true);
+        window.dispatchEvent(new CustomEvent("kimix:kimi-auth-changed"));
+        return;
+      }
+      setLoginState("error");
+      setLoginMessage(res.error);
+    } catch (err) {
+      setLoginState("error");
+      setLoginMessage(err instanceof Error ? err.message : String(err));
     }
-    setLoginState("error");
-    setLoginMessage(res.error);
   };
 
   const copyError = async () => {

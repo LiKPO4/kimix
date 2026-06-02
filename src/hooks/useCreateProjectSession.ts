@@ -1,25 +1,32 @@
 import { useCallback } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Project } from "@/types/ui";
+import type { Project, Session } from "@/types/ui";
+
+const FALLBACK_KIMI_MODEL = "kimi-for-coding";
 
 function projectNameFromPath(projectPath: string): string {
   return projectPath.split(/[\\/]/).filter(Boolean).at(-1) || "项目";
 }
 
+async function getDefaultKimiModel() {
+  try {
+    const res = await window.api.getKimiModelConfig();
+    if (res.success) return res.data.defaultModel?.trim() || FALLBACK_KIMI_MODEL;
+  } catch {
+    // Ignore and use the official built-in default below.
+  }
+  return FALLBACK_KIMI_MODEL;
+}
+
 export function useCreateProjectSession() {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
-  const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const permissionMode = useAppStore((s) => s.permissionMode);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
   const addSession = useSessionStore((s) => s.addSession);
-  const updateSession = useSessionStore((s) => s.updateSession);
-  const deleteSession = useSessionStore((s) => s.deleteSession);
 
   const createSession = useCallback(async (projectOverride?: Project) => {
     const projectPath = projectOverride?.path ?? currentProject?.path ?? currentSession?.projectPath;
@@ -30,47 +37,26 @@ export function useCreateProjectSession() {
       path: projectPath,
       lastOpenedAt: Date.now(),
     };
-    const previousSession = useAppStore.getState().currentSession;
-    const placeholder = {
-      id: `creating-${crypto.randomUUID()}`,
-      title: "新对话",
-      projectPath: project.path,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      events: [],
-      isLoading: true,
-    };
     setCreatingSessionProjectPath(project.path);
-    addSession(placeholder);
-    setCurrentProject(project);
-    setCurrentSession(placeholder);
     try {
-      const sessionRes = await window.api.startSession({
-        workDir: project.path,
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
-        planMode: defaultPlanMode,
-      });
-      if (!sessionRes.success) {
-        deleteSession(placeholder.id);
-        setCurrentSession(previousSession?.id === placeholder.id ? null : previousSession);
-        return;
-      }
-      const session = {
-        ...placeholder,
-        id: sessionRes.data.sessionId,
-        model: sessionRes.data.model ?? null,
+      const session: Session = {
+        id: crypto.randomUUID(),
+        engine: "kimi-code",
+        model: await getDefaultKimiModel(),
         title: "新会话",
+        projectPath: project.path,
+        createdAt: Date.now(),
         updatedAt: Date.now(),
+        events: [],
         isLoading: false,
       };
-      updateSession(placeholder.id, () => session);
+      addSession(session);
+      setCurrentProject(project);
       setCurrentSession(session);
     } finally {
       setCreatingSessionProjectPath(null);
     }
-  }, [addSession, currentProject, currentSession?.projectPath, defaultThinking, defaultPlanMode, deleteSession, permissionMode, setCreatingSessionProjectPath, setCurrentProject, setCurrentSession, updateSession]);
+  }, [addSession, currentProject, currentSession?.projectPath, setCreatingSessionProjectPath, setCurrentProject, setCurrentSession]);
 
   return {
     createSession,

@@ -18,7 +18,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
@@ -217,13 +217,13 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
+function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
       return <MessageBubble event={event} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -297,7 +297,7 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
-function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "tui"): RenderItem[] {
+function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "kimi-code"): RenderItem[] {
   const items: RenderItem[] = [];
 
   const pushStandaloneTools = (tools: ToolCallEvent[]) => {
@@ -306,7 +306,12 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "t
   };
 
   const mergeAssistantProcessEvents = (assistantEvents: Extract<TimelineEvent, { type: "assistant_message" }>[]) => {
-    const visible = assistantEvents.filter((event) => event.content.trim().length > 0 || event.thinking?.trim() || !event.isComplete);
+    const visible = assistantEvents.filter((event) => (
+      event.content.trim().length > 0 ||
+      Boolean(event.thinking?.trim()) ||
+      Boolean(event.thinkingParts?.some((part) => part.text.trim().length > 0)) ||
+      !event.isComplete
+    ));
     if (visible.length === 0) return undefined;
     const first = visible[0];
     const last = visible[visible.length - 1];
@@ -325,6 +330,7 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "t
 
   const renderTurnBody = (turnEvents: TimelineEvent[]) => {
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
+    const steerEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "steer_message" }> => event.type === "steer_message");
     const assistantEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
     const changedFiles = new Set(
       turnEvents
@@ -355,8 +361,20 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "t
     let changeSummaryAttached = false;
     let diffGroupAttached = false;
     let planPreviewAttached = false;
+    let steerAttached = false;
+    const getAttachedSteers = () => {
+      if (steerAttached) return [];
+      steerAttached = true;
+      return steerEvents;
+    };
+    const pushStandaloneSteers = () => {
+      if (steerAttached) return;
+      steerEvents.forEach((event) => items.push({ type: "event", event }));
+      steerAttached = true;
+    };
     for (const [eventIndex, event] of turnEvents.entries()) {
       const type = (event as { type?: unknown }).type;
+      if (type === "steer_message") continue;
       if (type === "tool_call" || type === "tool_result") continue;
       if (type === "subagent") continue;
       if (type === "hook") continue;
@@ -370,30 +388,16 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "t
           (mergedAssistantEvent.thinking?.trim() && !isKimixSyntheticThinking(mergedAssistantEvent.thinking)) ||
           mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0 && !isKimixSyntheticThinking(part.text))
         );
-        const hasSemanticThinkingParts = Boolean(
-          mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0 && !isKimixSyntheticThinking(part.text))
-        );
-        const shouldHideSettledTuiThinkingSummary = Boolean(
-          sessionEngine === "tui" &&
-          turnSettled &&
-          hasContent &&
-          hasOwnProcessDetails &&
-          !hasSemanticThinkingParts &&
-          tools.length === 0 &&
-          subagents.length === 0 &&
-          hooks.length === 0 &&
-          changedFiles.size === 0 &&
-          statusEvents.length === 0
-        );
         items.push({
           type: "event",
           event: mergedAssistantEvent,
           leadingTools: assistantAttached ? [] : tools,
           leadingSubagents: assistantAttached ? [] : subagents,
           leadingHooks: assistantAttached ? [] : hooks,
+          attachedSteers: getAttachedSteers(),
           changedFiles: assistantAttached ? [] : Array.from(changedFiles),
           trailingStatuses: [],
-          hideProcessSummary: shouldHideSettledTuiThinkingSummary || (assistantAttached && (hasContent || !hasOwnProcessDetails)),
+          hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
         });
         assistantAttached = true;
         toolsAttached = true;
@@ -445,6 +449,7 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "t
     }
 
     if (!toolsAttached) pushStandaloneTools(tools);
+    pushStandaloneSteers();
     if (mergedChangeSummary && !changeSummaryAttached) {
       items.push({ type: "event", event: mergedChangeSummary });
       changeSummaryAttached = true;
@@ -476,7 +481,7 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "t
 
   for (const event of events) {
     const type = (event as { type?: unknown }).type;
-    if (type === "user_message" || type === "steer_message") {
+    if (type === "user_message") {
       flushTurn();
       items.push(type === "approval_request" ? { type: "event", event, approvalDiffs: diffEvents.map((diff) => ({ path: diff.filePath, oldText: diff.oldText, newText: diff.newText })) } : { type: "event", event });
       continue;
@@ -767,7 +772,7 @@ export function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
+                    : <EventRenderer event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} attachedSteers={item.attachedSteers} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
               }
             </div>
           ))}

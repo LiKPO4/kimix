@@ -1,7 +1,48 @@
 # Kimix 长程任务状态
 
 ## 当前目标
-推进 hidden Kimi Code TUI 引擎迁移，逐步把原 Kimix 对话体验接到底层真实隐藏 TUI。
+停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。
+
+## 当前路线文档
+- `KIMI_CODE_SDK_MIGRATION_PLAN.md`：新版 Kimi Code SDK / Wire 迁移总计划与新窗口交接提示词。
+
+## 当前优先级 Todo（新路线）
+1. [x] P0：新增并运行 SDK / Wire 探针脚本，只验证官方新链路，不改正式 UI。
+2. [x] P0：产出 `docs/kimi-code-sdk-probe-result.md`，写清当前 CLI 版本、可用 SDK 包名/API、`prompt/steer/cancel/approval/question` 行为、sessionId 与 `wire.jsonl` 路径。
+3. [x] P1：基于 P0 结果新增 Electron 主进程 `KimiCodeHost`，以官方 session id 为唯一运行时 id。
+4. [x] P2：新增 SDK/Wire event -> Kimix timeline 的独立 mapper，正式消息流不再从 TUI screen parser 取正文。
+5. [x] P3：灰度接入 `engine: "kimi-code"`。
+6. [x] P4：重写队列与引导逻辑，彻底摆脱旧 runtime idle / screen 猜测。
+7. [x] P5：审批 / 提问 / 权限 / Plan 闭环接 SDK。
+8. [ ] P6：插件、MCP、模型、用量、后台任务、导出等官方能力 GUI 化盘点与迁移。
+   - [x] P6.1：会话导出走官方 SDK `KimiHarness.exportSession()`，旧 `kimi export` 仅作 fallback。
+   - [x] P6.2：插件页刷新状态不再必须打开 `/plugins` TUI 菜单。
+   - [x] P6.3：模型选择不再必须打开 `/model` TUI 菜单。
+   - [x] P6.4：MCP / usage / background tasks 能力接 SDK API 或明确 fallback。
+9. [x] P7：收口并移除旧 hidden runtime 主链路。
+   - [x] P7.1：正式聊天页不再通过旧 hidden runtime 发送 / steer / slash 遥控 / event 入库。
+   - [x] P7.2：移除侧栏旧调试入口、AppShell DebugPanel 渲染、ContextBar 旧状态订阅、插件页旧镜像/遥控面板和正式审批/问题旧回写分支。
+   - [x] P7.3：删除旧 runtime host、IPC/preload/types/browser fallback、孤立 DebugPanel、reducer/tests/依赖，以及旧 engine / workspace view 正式类型。
+   - [x] P7.4：连续验收普通发送 / 队列 / 引导 / 审批 / question。
+
+## 本轮证据（Kimi Code 新引擎）
+- P0：`scripts/probe-kimi-code-sdk.mjs` 与 `docs/kimi-code-sdk-probe-result.md` 已生成并运行。结论：`kimi --wire` 当前 CLI 0.6.0 原始启动不可用；npm `@moonshot-ai/kimi-code-sdk` 404；旧 `@moonshot-ai/kimi-agent-sdk@0.1.8` ProtocolClient 不能和当前 CLI wire 握手；官方源码 `packages/node-sdk` runtime 可用，create/resume/prompt/steer/cancel/approval/question 均已闭环，sessionId 可对齐 `~/.kimi-code/sessions/.../agents/main/wire.jsonl`。
+- P1：新增 `electron/kimiCodeHost.ts`、独立 `kimi-code:*` IPC / preload API、`scripts/probe-kimi-code-host.mjs`。`node scripts/probe-kimi-code-host.mjs` 通过：prompt completed、steer completed、cancel cancelled。`pnpm build` 通过；已按规则重启 dev 实例并确认 Electron 进程启动。
+- P2：新增 `src/utils/kimiCodeEventMapper.ts` 和 `src/utils/__tests__/kimiCodeEventMapper.test.ts`。独立映射官方 SDK event：`assistant.delta`、`thinking.delta`、`turn.ended`、`tool.call.*`、`tool.result`、`agent.status.updated`、`turn.step.*`、`subagent.*`、`compaction.*`、`error/warning`；同时把 SDK handler 的 approval/question request 映射为 Kimix timeline 卡片。已验证 `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过，`pnpm build` 通过；已按规则重启 dev 实例并确认 Electron 进程启动。
+- P3：renderer 已允许 `engine: "kimi-code"`；新建普通会话默认走 Kimi Code SDK host；`App.tsx` 消费 `kimi-code:event` / `kimi-code:status` 并通过 `kimiCodeEventMapper` 入库；`Composer.tsx` 的 prompt / steer / cancel / plan / permission 已按 `engine` 分流到 `kimi-code:*` IPC，已有 TUI 会话仍保留原调试链路。已验证 mapper 局部测试通过、`pnpm build` 通过。尚需用户做一次真实 UI 发送/停止/引导截图验收。
+- P4：SDK 队列和引导收敛到 `kimi-code:status` / `steerKimiCode`。运行中输入框对 `engine: "kimi-code"` 显示“引导”按钮；SDK steer 成功后本地 `steer_message` 立即标记 `sent`；pending queue 续发失败会把消息放回队列并写入错误卡，避免消息被 shift 后丢失。已验证 mapper 局部测试通过、`pnpm build` 通过。
+- P5：`electron/kimiCodeHost.ts` 已挂载官方 SDK `setApprovalHandler` / `setQuestionHandler`，把请求转为 `kimix.approval.request` / `kimix.question.request` 事件进入 timeline；`ApprovalCard` / `QuestionCard` 对 `engine: "kimi-code"` 回写 `respondKimiCodeApproval` / `respondKimiCodeQuestion`，由主进程 resolve 官方 handler promise。权限与 Plan 已继续走 `setKimiCodePermission` / `setKimiCodePlanMode`。已验证 mapper 局部测试通过、`pnpm build` 通过。
+- P6.1：`KimiCodeHost.exportSession()` 已接官方 `KimiHarness.exportSession()`；侧栏导出 Debug ZIP 会传 runtime/official sessionId；主进程导出优先走 SDK，失败才 fallback 到旧 `kimi export` CLI。新增 `scripts/probe-kimi-code-export.mjs`，已验证 SDK export 生成 ZIP：`entries=3`，manifest sessionId 与官方 sessionId 一致。`pnpm build` 通过。
+- P6.2：`KimiCodeHost` 已接官方 `Session.listPlugins()` / `installPlugin()` / `setPluginEnabled()` / `setPluginMcpServerEnabled()`；插件页在 `engine: "kimi-code"` 会话里显示 SDK 插件状态，刷新和启停不再依赖 `/plugins` TUI 菜单，安装入口优先走 SDK，旧 CLI 只保留给非 SDK 会话。新增 `scripts/probe-kimi-code-plugins.mjs`，已验证 SDK listPlugins 返回 2 个插件：`kimi-datasource`、`superpowers`。`pnpm build` 通过。
+- P6.3：`KimiCodeHost` 已接官方 `KimiHarness.getConfig()` / `setConfig()`；主进程 `kimi:getModelConfig`、`kimi:saveOpenAiProvider`、`kimi:setDefaultModel` 已改为 SDK 优先，旧 TOML parser/writer 只作 fallback。新增只读探针 `scripts/probe-kimi-code-model-config.mjs`，已验证 SDK getConfig 返回默认模型 `kimi-code/kimi-for-coding`、2 个 provider、2 个 model alias。`pnpm build` 通过。
+- P6.4：`KimiCodeHost` 已接官方 `Session.getUsage()`、`Session.listMcpServers()`、`Session.getMcpStartupMetrics()`、`Session.reconnectMcpServer()`、`Session.listBackgroundTasks()`、`Session.getBackgroundTaskOutput()`、`Session.getBackgroundTaskOutputPath()`、`Session.stopBackgroundTask()` 和 `KimiHarness.auth.getManagedUsage()`；preload 暴露对应 `kimi-code:*` API。新增 `scripts/probe-kimi-code-runtime-capabilities.mjs`，已验证这些 API 均可调用；当前临时会话 MCP/后台任务为空，managed usage 返回 Weekly limit 与 5h limit。`pnpm build` 通过。
+- P7.1/P7.2/P7.3：正式聊天页的旧 hidden runtime 主路径、可见前端入口、后端 host、IPC/preload/types/browser fallback、孤立 DebugPanel、reducer/tests 和终端依赖已删除；旧持久化会话在启动恢复时会作为未知旧 engine 迁到 `kimi-code`，未知 workspace view 迁回 `chat`。已验证 `pnpm install --lockfile-only --ignore-scripts`、`pnpm build` 通过；`rg -n "tui|TUI|PTY|ConPTY" src electron package.json pnpm-lock.yaml` 无结果。
+- P7.4：新增 `scripts/probe-kimi-code-p7-acceptance.mjs` 并验证通过。结果：同一个官方 session `session_b0e58915-d766-4a0d-8c40-a86e7b063a7a` 连续 10 轮普通 prompt 均 completed，turnId 0-9；steer same session completed；cancel turn ended reason 为 `cancelled`；approval handler roundtrip completed；question handler roundtrip completed。队列 UI 路径已由代码核对：运行中普通发送只入 pending queue，SDK completed 后 `shiftPendingMessage()` 再 `sendKimiCodePrompt()`，队列项“引导”先移除再 `steerKimiCode()`，失败恢复。
+- 本轮模型显示修正：新对话底部模型不再显示“未记录”，`ContextBar` 优先显示当前会话 `model`，无记录时读取官方 `getKimiModelConfig().defaultModel`，失败 fallback 到 `kimi-for-coding`；设置页切换/保存模型会广播刷新。`Composer` 与 `useCreateProjectSession` 创建本地 `kimi-code` 会话时写入同一默认模型，SDK create/resume 后不再写死 `Kimi Code SDK`；新对话按钮不再提前调用旧 `startSession`。已验证 `pnpm build` 通过。
+- 本轮引导渲染修正：运行中 `steer_message` 不再作为 assistant 正文合并边界；`mergeEvents` 会继续把 steer 后到达的 assistant delta 合并回当前未完成 assistant，`ChatThread` 将同一 turn 内的引导气泡附着到当前 assistant 项，`MessageBubble` 在“正在思考/执行中”消息头之后、正文之前渲染它，避免“正在引导”切断 AI 正文或压到思考消息头上方。已验证 `pnpm test:run -- src/utils/__tests__/eventMapper.test.ts src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventHelpers.test.ts` 通过，`pnpm build` 通过。
+- 本轮普通聊天入口归一：按 `KIMI_CODE_SDK_MIGRATION_PLAN.md` 收紧正式聊天入口，`Sidebar` 新对话、`EmptyState` 建议发送、`Composer` 普通发送 / 引导 / 停止 / 权限 / Plan 不再调用旧 `startSession` / `sendPrompt` / `stopTurn` / TUI IPC，而是只走 `createKimiCodeSession` / `resumeKimiCodeSession` / `sendKimiCodePrompt` / `steerKimiCode` / `cancelKimiCodeTurn` / SDK Plan/Permission。已验证 `pnpm build` 通过；`rg -n 'startSession\(|sendPrompt\(|stopTurn\(|startTui|sendTui|stopTui|TUI|Kimi Code SDK' src/components/chat/Composer.tsx src/components/chat/EmptyState.tsx src/components/layout/Sidebar.tsx src/hooks/useCreateProjectSession.ts` 无结果。剩余旧调用在长程任务、交接和 App 历史分支，需下一轮继续按计划归一。
+- 本轮修正重启方式：新增 `scripts/restart-kimix-dev.ps1`，只停止命令行匹配 Kimix 工作区或 Kimix user-data-dir 的 Electron / Node 进程，避免误杀 Codex/OpenAI 自身 Electron 后弹出 `Unable to find Electron app at C:\Program Files\WindowsApps\OpenAI...`。
+- 注意：服务端当前拒绝 `userAgentProduct: "kimix"` 使用 `kimi-code/kimi-for-coding`，P1 暂按 P0 验证可用的 `userAgentProduct: "kimi-code-cli"` 运行。后续若官方开放 host identity，再切回 Kimix 自身身份。
 
 ## 当前优先级 Todo
 1. [x] P0：确认官方 0.6.0 CLI 行为，验证 prompt-mode 是否可用 `--session` 续会话。
@@ -73,9 +114,18 @@
 - 验收标准：先完成官方能力盘点和最小原型；确认不会破坏当前长程任务执行 / 审查 / 暂停继续链路后再进入实现。
 
 ## 当前版本
-**v2.8.215** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.247** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
 
 ## 本轮证据
+- v2.8.247：修复 TUI assistant 完成后显示“已处理 0s”和运行中消息头不稳定的问题。`mergeEvents` 在 assistant 完成时改用 `Date.now() - placeholder.timestamp` 结算 duration，避免官方完成事件批量同 timestamp 导致 0s；`MessageBubble` 的 active 判断同时识别 UI session id 和 runtimeSessionId，运行中应能显示思考/执行头；完成态非零 duration 至少显示 1s。待验证：长时间思考后不再显示 0s，发送后能尽早看到消息头。
+- v2.8.246：修复同一官方 TUI 会话被 Kimix 侧栏拆成多个本地会话的问题。`resolveUiSessionId` 和 `findLocalSessionForRuntime` 增加 `officialSessionId` 匹配；TUI 事件入口传入 `payload.session.officialSessionId`，重启/恢复后即使 runtime id 改变，也能把事件归并回已有 UI session。待验证：同一个官方会话后续消息不再生成新的侧栏条目。
+- v2.8.245：修复引导气泡和 agent 事件顺序错位。`mergeEvents` 重新规定只有官方 `SteerInput` 确认后的 `sent` steer 才是新回合边界；本地刚点击后的 `sending` steer 不再切断上一轮 assistant，后续旧轮工具/思考/状态事件会插到 trailing sending steer 前面。引导气泡的 sending 文案改为“已发送引导请求”，避免已发出后仍显示“正在引导”。新增 eventMapper 测试覆盖未确认/已确认 steer 边界和 tool_call 顺序。
+- v2.8.244：修复排队消息点击“引导”后仍短暂或持续留在队列的问题。`handleSteerPending` 改为插入本地 steer 气泡后立即 `removePendingMessage(id)`，不再等待 `sendTuiInput` 返回；若发送失败，再恢复该 pending 并把 steer 气泡标记失败。待验证：引导按钮点击后队列项立即消失，失败时才回队列。
+- v2.8.243：修复 v2.8.242 后仍会把一条多行输入拆成多个 TUI turn/session 的问题。停止使用真实换行/bracketed paste 写入 TUI，`electron/tuiHost.ts` 统一把多行内容压成一条物理输入，用 `⏎` 标记原换行，避免 PTY/TUI 把换行当提交边界；本地时间线仍显示原始用户内容。pending 引导在 `sendTuiInput` 成功后立即从队列移除，但 steer 气泡状态仍等待官方 semantic 确认。待验证：多行普通发送和多行引导不再创建多个会话，agent 能看到完整内容。
+- v2.8.242：修复多行 steer 被 TUI 截断后重复显示片段的问题。`electron/tuiHost.ts` 对多行 TUI 输入改用 bracketed paste 再追加 Enter/Ctrl+S，避免换行被终端当成提前提交；`mergeEvents` 对官方 `SteerInput` 回流使用宽松匹配，若本地已有完整 `sending` steer，则只确认状态并保留完整内容，不再追加截断气泡；pending steer 移除也使用同一匹配。新增 eventMapper 测试覆盖“官方回流首行片段时不新增重复气泡”。待验证：多行引导完整送达，agent 不再反馈信息不全。
+- v2.8.241：修正 v2.8.240 的 steer 成功时机：Composer 只在发送前插入 `sending` 占位，API 成功只提示“已发送引导请求，等待 TUI 确认”，不再提前标记 `sent` 或移除 pending；App 在真实 semantic `SteerInput` 回流后才通过 `mergeEvents` 标记“已引导对话”，并按内容移除对应队列项。输入区运行态不再被 stale `runningSessionId` 单独撑起，只有存在未完成 assistant 时才显示停止/引导；TUI screen 分支也在无未完成 assistant 且无审批/问题时清掉运行态。已完成 assistant 的处理头改为“（输出完成）已处理 …”。待验证：真实 UI 中引导确认、队列移除、停止按钮消失和输出完成文案。
+- v2.8.240：修复 steer 引导状态和消息归属竞速。Composer 在发送 steer 前先插入本地 `steer_message` 占位，API 成功后立即标记 `sent`，失败标记 `failed`；pending 引导同样先占位，成功后再移除队列项。`mergeEvents` 将 `sending` 的 steer 也作为 assistant chunk 合并边界，避免引导尚未确认时 agent 回复被并入上一轮 assistant。新增 eventMapper 测试覆盖 pending steer 边界。已验证 `pnpm test:run -- src/utils/__tests__/eventMapper.test.ts src/utils/__tests__/tuiSemanticReducer.test.ts` 通过、`pnpm build` 通过；已按要求重启 dev 实例，真实 UI 待用户截图复验。
+- v2.8.239：修复 TUI idle 兜底 timer 被连续 screen 快照反复重置的问题。同一 `uiSessionId:runtimeSessionId` 已有 `scheduleTuiIdleCompletion` timer 时直接复用，避免“不 busy 但 isInputIdle 不稳定”的状态持续刷新导致 1.5s finish/queue flush 永远等不到，从而继续显示“引导”按钮。已验证 `pnpm test:run -- src/utils/__tests__/tuiSemanticReducer.test.ts src/utils/__tests__/eventMapper.test.ts` 通过、`pnpm build` 通过、`git diff --check` 仅 LF/CRLF warning。真实发送后 queue flush / 引导按钮消失仍待用户截图或实机反馈。
 - v2.8.215：补 hidden TUI 图片附件与排队链路的第一个官方能力闭环。先用真实 hidden TUI 探针验证：发送桌面图片路径后，官方 wire 出现 `ToolCall: ReadMediaFile`，并返回真实图片描述，说明官方 TUI 可通过本地图片路径触发官方媒体读取工具。随后 `sendTuiInput` 支持接收 Kimix 图片附件并保存为当前工作区 `.kimix-uploads/images` 文件，再把“图片附件：<路径>”随本轮输入写入真实 TUI；Composer / pending queue 同步保留图片附件，队列项显示图片数量，运行中按钮文案改为“等待”，队列自动 flush 时不再丢图。已验证 `pnpm test:run -- src/utils/__tests__/tuiSemanticReducer.test.ts` 通过、`pnpm build` 通过、`git diff --check` 通过（仅 LF/CRLF warning）；真实 UI 图片发送/排队待截图验收。
 - v2.8.214：把 hidden TUI 语义源迁移收口到独立 reducer。新增 `src/utils/tuiSemanticReducer.ts`，集中处理 semantic events -> Kimix timeline：正文只来自 `ContentPart(text)`，官方思考只来自 `ContentPart(think)`，Kimix 合成 prompt-mode 状态不进入 thinking，`TurnCancel` 统一标记当前 assistant 中断。`App.tsx` 的 TUI semantic 分支改为调用 reducer，只保留运行态、完成态和队列调度；新增 `tuiSemanticReducer.test.ts` 覆盖 text/think 分离、合成 thinking 过滤、TurnCancel 中断。已验证 `pnpm test:run -- src/utils/__tests__/tuiSemanticReducer.test.ts` 通过、`pnpm build` 通过、`git diff --check` 通过（仅 LF/CRLF warning）。
 - v2.8.213：补 hidden TUI 迁移诊断面板收口能力。`tuiHost` 在 session summary 中保留最近 raw `wire.jsonl` tail 和 semantic events tail；TUI 调试页输出区新增 `Screen / Wire / Semantic / 文本 / ANSI` 切换，显示 wire 文件路径与 semantic 事件数量，便于后续判断污染来自官方事件、semantic reducer 还是 UI 合并。已验证 `pnpm build` 通过、`git diff --check` 通过（仅 LF/CRLF warning）；真实 TUI Debug Panel 切换待截图验收。
@@ -1489,3 +1539,121 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - v2.8.56 将内部会话过滤抽为 `isHiddenInternalSession`，覆盖 `kimix-hidden-hooks-`、规则创建 prompt 标题和 HookRule JSON 标题；用于启动恢复、搜索加载、侧栏展示和 store 清理，避免 Hooks 规则创建 agent 会话暴露。
 ## 下一步
 等待用户验收 v2.8.56；确认侧栏不再显示规则创建 agent prompt/JSON 会话，主对话也不会打开这些内部会话。
+
+# 2026-06-02 Kimi Code SDK 登录入口修复
+## 已完成
+- 排查用户截图中的登录失败：旧 `@moonshot-ai/kimi-agent-sdk` 登录 helper 会调用当前 Kimi Code CLI 不支持的 `--json`，导致前端显示 `error: unknown option "--json"`。
+- `kimi:login` 改为优先启动新版 Kimi Code 交互进程并发送 `/login`，捕获官方授权链接后用系统浏览器打开；旧 SDK 登录 helper 只保留为 fallback。
+- 放宽授权链接匹配规则，兼容 `authorize_device` / `authorize` 类官方链接，降低 CLI 输出格式微调导致抓不到链接的风险。
+- 新增/使用 `scripts/restart-kimix-dev.ps1` 安全重启方式：只停止命令行中包含 Kimix 工作区或 Kimix userData 的 Electron/Node 进程，避免全局杀 `electron.exe` / `node.exe` 误伤 Codex/OpenAI 桌面壳。
+## 验证
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已完成构建、清理缓存并启动 Kimix；确认 Electron 进程来自当前 Kimix 工作区。
+- `kimix-dev.log` 暂未出现主进程启动错误。
+## 未完成
+- OAuth 授权本身需要用户点击“去登录”后在浏览器完成，当前未代替用户完成网页登录。
+## 下一步
+请在新启动的 Kimix 窗口里再次点击“去登录”；若浏览器没有打开或仍报错，回传新的错误文案。
+
+# 2026-06-02 Kimi Code SDK 登录二次修复
+## 已完成
+- 用户复验发现：消息错误卡登录按钮会卡在“打开中”，设置页登录按钮闪一下但没有跳转。
+- 根因修正：`kimi` 0.6.0 没有 `login` 子命令，普通 pipe 启动交互式 `/login` 不可靠；官方源码确认 `/login` 实际调用 `harness.auth.login("kimi-code", { onDeviceCode })`。
+- `electron/kimiCodeHost.ts` 新增 SDK auth login 封装：拿到 device-code 授权链接后立即返回给 IPC，同时后台继续等待浏览器授权写入 token。
+- `electron/main.ts` 的 `kimi:login` 改为 SDK auth 优先，并在 `onDeviceCode` 里立刻 `shell.openExternal()` 打开授权链接。
+- `ErrorCard` 和 `SettingsPanel` 的登录按钮增加 `try/catch/finally`，避免 IPC 异常或超时后按钮持续卡在 loading。
+## 验证
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建、清理缓存并启动 Kimix；确认 Electron 进程来自当前 Kimix 工作区。
+- `kimix-dev.log` 暂未出现主进程启动错误。
+## 未完成
+- 浏览器授权完成与 token 写入仍需用户实际点击登录并在浏览器授权后验收。
+## 下一步
+请在新窗口再次点击“去登录”；预期浏览器会打开 Kimi 授权页，按钮不再长期卡住。
+
+# 2026-06-02 Kimi Code SDK 登录 provider 修正
+## 已完成
+- 用户复验后出现 `No OAuth manager configured for provider "kimi-code"`。
+- 查官方源码确认 `KIMI_CODE_PROVIDER_NAME = "managed:kimi-code"`，裸 `kimi-code` 是平台 id，不是 OAuth provider name。
+- `electron/kimiCodeHost.ts` 的 SDK login 默认 provider 改为 `managed:kimi-code`。
+- `electron/main.ts` 的 `kimi:login` 调用同步改为 `managed:kimi-code`。
+## 验证
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建并启动 Kimix；确认 Electron 进程来自当前工作区。
+- `kimix-dev.log` 暂未出现启动错误。
+## 下一步
+请再次点击“去登录”；若仍失败，回传新错误文案。
+
+# 2026-06-02 登录成功后旧错误卡回收
+## 已完成
+- 用户复验确认登录已成功且后续消息能正常回复，但旧 `requires login` 错误卡仍停留在对话流中。
+- `ErrorCard` 对登录类错误增加认证状态监听：收到 `kimix:kimi-auth-changed` 或每 5 秒轮询 `getKimiAuthStatus()` 发现已登录时，自动隐藏旧登录错误卡。
+- 登录按钮自身收到 `loggedIn: true` 时也会立即隐藏当前错误卡。
+## 验证
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建并启动 Kimix；确认 Electron 进程来自当前工作区。
+- `kimix-dev.log` 暂未出现启动错误。
+## 下一步
+请在新窗口看旧登录错误卡是否会自动消失；若仍残留，先点击一次设置页刷新登录状态触发 auth changed。
+
+# 2026-06-02 DeepSeek V4 Flash 默认 Provider 草稿
+## 已完成
+- 设置页 OpenAI-compatible Provider 表单默认草稿从 OpenAI GPT-4.1 改为 DeepSeek V4 Flash。
+- 默认值：Provider `deepseek`，模型别名 `deepseek/deepseek-v4-flash`，Base URL `https://api.deepseek.com`，模型名 `deepseek-v4-flash`，Context `1000000`。
+- 浏览器预览 mock 中保存 / 设为默认后的模型配置也同步改为 DeepSeek V4 Flash，避免预览与桌面默认值不一致。
+## 验证
+- `rg` 确认 `SettingsPanel.tsx` 和 `src/main.tsx` 中不再残留旧 `kimix-openai` / `kimix/gpt-4.1` / `gpt-4.1` / `api.openai.com` 默认值。
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建并启动 Kimix；确认 Electron 进程来自当前工作区。
+- `kimix-dev.log` 暂未出现启动错误。
+## 下一步
+请打开设置页确认 OpenAI-compatible Provider 表单默认填入 DeepSeek V4 Flash。
+
+# 2026-06-02 SDK 引导状态延迟结算
+## 已完成
+- 用户反馈：运行中 steer 刚发出去就显示“已引导对话”，但应该等 agent 确实处理完后再显示。
+- `SteerMessageEvent.status` 新增 `accepted` 中间态：IPC 成功只表示 SDK 已接收引导请求，不代表 agent 已完成处理。
+- Composer 发送普通引导和队列项引导成功后改为 `accepted`，不再立即标记 `sent`。
+- MessageBubble 文案调整：`sending` 显示“已发送引导请求”，`accepted` 显示“正在引导”，只有 turn completed 后结算为 `sent` 才显示“已引导对话”。
+- App 终态结算会把 `sending` / `accepted` 的 steer 在 completed 时标为 `sent`，在 error/interrupted 时标为 `failed`。
+- eventMapper 把 `accepted` 和 `sent` 一样视为 steer 边界，保证 agent 回复仍出现在引导消息下面。
+## 验证
+- `pnpm test:run -- src/utils/__tests__/eventMapper.test.ts src/utils/__tests__/kimiCodeEventMapper.test.ts` 通过：2 个文件、45 个测试。
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建并启动 Kimix；确认 Electron 进程来自当前工作区。
+- `kimix-dev.log` 暂未出现启动错误。
+## 下一步
+请再次在运行中发送一条引导，确认发送后先显示“正在引导”，agent 完成后才变为“已引导对话”。
+
+# 2026-06-02 Kimi Code 更新源口径修正
+## 已完成
+- 用户反馈 Kimi Code “重新安装/更新”总失败，更新页显示当前 0.6.0、最新 0.7.0。
+- 排查确认：实际 `kimi` 路径为 `C:\Users\Administrator\.kimi-code\bin\kimi.exe`，版本 0.6.0；npm registry `@moonshot-ai/kimi-code` 返回 0.7.0；但官方 Windows 安装 CDN `https://code.kimi.com/kimi-code/latest` 当前仍返回 0.6.0，且 `https://code.kimi.com/kimi-code/0.7.0/manifest.json` 不存在。
+- 根因：Kimix 检查更新使用 npm registry 最新版本，安装器使用官方 CDN latest/manifest，两个源不一致导致 UI 要求安装 0.7.0，但安装器只能装回 0.6.0，最终被判定“仍未达到最新版本”。
+- `electron/main.ts` 的 Kimi Code 最新版本检查改为使用安装器同源的 CDN `latest`，与 Windows 安装 manifest 保持一致。
+- 更新弹窗文案从“最新”改为“最新可安装”，避免把 npm 已发布但安装器未上架的版本误认为可更新。
+## 验证
+- 本机验证：CDN latest = 0.6.0，npm latest = 0.7.0，实际 `kimi --version` = 0.6.0。
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建并启动 Kimix；确认 Electron 进程来自当前工作区。
+- `kimix-dev.log` 暂未出现启动错误。
+## 下一步
+请打开更新页重新点“检查 CLI”；预期 Kimi Code 不再提示可安装的 0.7.0，除非官方 CDN 后续补齐 0.7.0 manifest。
+
+# 2026-06-02 引导后 assistant 内容保留修复
+## 已完成
+- 用户反馈：运行中引导一条消息后，上次输出正文在 UI 中丢失，只剩完成态过程摘要。
+- 复查确认与引导状态中间态有关：`accepted` 应作为新 assistant 回合边界，但不能像 `sending` 一样把后续 assistant/status/tool 插回引导前。
+- `eventMapper` 保留 `accepted/sent` 作为 assistant 合并边界，但只有 `sending` 仍作为“尾部占位”回插保护；accepted 后的 assistant/status/tool 会留在引导消息下面。
+- 修复完成/持久化结算中只认 `thinking` 不认 `thinkingParts` 的漏洞，避免只有分段思考的 assistant 被当成空消息删除。
+- 修复 `ChatThread` 合并可见 assistant 时漏认 `thinkingParts` 的漏洞，避免只有分段思考/过程的消息在渲染时被跳过。
+- 新增 `eventHelpers.test.ts`，覆盖 settle 时保留只有 `thinkingParts` 的 assistant；补充 eventMapper accepted steer 边界测试。
+## 验证
+- `pnpm test:run -- src/utils/__tests__/eventMapper.test.ts src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventHelpers.test.ts` 通过：3 个文件、47 个测试。
+- `pnpm build` 通过。
+- `scripts/restart-kimix-dev.ps1` 已重新构建并启动 Kimix；确认 Electron 进程来自当前工作区。
+- `kimix-dev.log` 暂未出现启动错误。
+## 风险
+- 已经被旧逻辑过滤掉且没有持久化在本地事件里的历史正文，无法靠 UI 结算逻辑自动恢复；后续引导链路应不再复现同类丢失。
+## 下一步
+请再次在运行中发送一条引导，确认后续 assistant 正文仍保留在引导消息下方。

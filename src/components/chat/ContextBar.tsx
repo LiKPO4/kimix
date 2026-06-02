@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { BarChart3, Bot, ChevronDown, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import type { KimiUsageResponse, TuiSessionSummary, UsagePeriod } from "../../../electron/types/ipc";
+import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
+const FALLBACK_KIMI_MODEL = "kimi-for-coding";
+const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
+const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 
 function formatUsage(period: UsagePeriod) {
   if (!period.available || period.used === undefined || period.limit === undefined) {
@@ -85,80 +87,19 @@ export function ContextBar() {
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   const [workDirsOpen, setWorkDirsOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
-  const [modelNavigating, setModelNavigating] = useState<"up" | "down" | null>(null);
-  const [modelClosing, setModelClosing] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [usageLoginState, setUsageLoginState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [now, setNow] = useState(Date.now());
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const workDirsRef = useRef<HTMLDivElement>(null);
   const activeSession = session ?? currentSession;
-  const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
-  const isTuiSession = activeSession?.engine === "tui";
-  const [tuiRuntimeSummary, setTuiRuntimeSummary] = useState<TuiSessionSummary | null>(null);
-  const sessionModel = activeSession?.model ?? null;
-  const tuiPlugins = tuiRuntimeSummary?.screen?.plugins ?? [];
-  const tuiModels = tuiRuntimeSummary?.screen?.models ?? [];
-  const selectedTuiPlugin = tuiPlugins.find((plugin) => plugin.selected);
-  const selectedTuiModel = tuiModels.find((model) => model.selected);
-  const tuiScreenPreview = (tuiRuntimeSummary?.screen?.lines ?? [])
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0)
-    .slice(-5)
-    .join("\n");
-
-  const navigateTuiModel = async (direction: "up" | "down") => {
-    if (!activeRuntimeSessionId) return;
-    setModelNavigating(direction);
-    try {
-      const res = await window.api.sendTuiKey({
-        sessionId: activeRuntimeSessionId,
-        key: direction === "up" ? "arrowUp" : "arrowDown",
-      });
-      if (!res.success) {
-        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `移动 TUI 模型选中项失败：${res.error}` }));
-      }
-    } finally {
-      window.setTimeout(() => setModelNavigating(null), 180);
-    }
-  };
-
-  const closeTuiModelMenu = async () => {
-    if (!activeRuntimeSessionId) return;
-    setModelClosing(true);
-    try {
-      const res = await window.api.sendTuiKey({ sessionId: activeRuntimeSessionId, key: "escape" });
-      if (!res.success) {
-        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `退出 TUI 模型菜单失败：${res.error}` }));
-      }
-    } finally {
-      window.setTimeout(() => setModelClosing(false), 180);
-    }
-  };
-
-  useEffect(() => {
-    if (!isTuiSession || !activeRuntimeSessionId) {
-      setTuiRuntimeSummary(null);
-      return;
-    }
-    let cancelled = false;
-    const sync = (summary: TuiSessionSummary | null | undefined) => {
-      if (!cancelled) setTuiRuntimeSummary(summary ?? null);
-    };
-    void window.api.listTuiSessions().then((res) => {
-      if (!res.success) return;
-      sync(res.data.find((item) => item.sessionId === activeRuntimeSessionId));
-    }).catch(() => {});
-    const unsubscribe = window.api.onTuiEvent((payload) => {
-      if (payload.sessionId !== activeRuntimeSessionId) return;
-      sync(payload.session);
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [activeRuntimeSessionId, isTuiSession]);
+  const sessionModel = activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
+  const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
+  const modelTitle = sessionModel
+    ? `当前对话模型：${sessionModel}`
+    : `新对话将使用默认模型：${displayModel}`;
 
   const handleExport = () => {
     if (!session) return;
@@ -264,7 +205,7 @@ export function ContextBar() {
       return;
     }
     setUsageLoginState("done");
-    window.dispatchEvent(new CustomEvent("kimix:kimi-auth-changed"));
+    window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
     await loadUsage();
   };
   const toggleUsage = () => {
@@ -276,18 +217,6 @@ export function ContextBar() {
   };
 
   const openModelSettings = async () => {
-    const activeSession = currentSession?.engine === "tui" ? currentSession : session ?? currentSession;
-    const runtimeSessionId = activeSession?.engine === "tui" ? getRuntimeSessionId(activeSession) : null;
-    if (runtimeSessionId) {
-      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/model" });
-      if (res.success) {
-        setUsageOpen(false);
-        setWorkDirsOpen(false);
-        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已打开官方 TUI 模型菜单" }));
-        return;
-      }
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `打开 TUI 模型菜单失败：${res.error}` }));
-    }
     setWorkspaceView("settings");
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent("kimix:focus-model-settings"));
@@ -329,6 +258,28 @@ export function ContextBar() {
       cancelled = true;
     };
   }, [project?.path, project?.gitBranch]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDefaultModel = async () => {
+      try {
+        const res = await window.api.getKimiModelConfig();
+        if (cancelled) return;
+        setDefaultModel(res.success ? (res.data.defaultModel?.trim() || FALLBACK_KIMI_MODEL) : FALLBACK_KIMI_MODEL);
+      } catch {
+        if (!cancelled) setDefaultModel(FALLBACK_KIMI_MODEL);
+      }
+    };
+    void loadDefaultModel();
+    const handleModelConfigChanged = () => void loadDefaultModel();
+    window.addEventListener(KIMI_AUTH_CHANGED_EVENT, handleModelConfigChanged);
+    window.addEventListener(KIMI_MODEL_CONFIG_CHANGED_EVENT, handleModelConfigChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(KIMI_AUTH_CHANGED_EVENT, handleModelConfigChanged);
+      window.removeEventListener(KIMI_MODEL_CONFIG_CHANGED_EVENT, handleModelConfigChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (!usageOpen && !workDirsOpen) return;
@@ -491,12 +442,12 @@ export function ContextBar() {
           onClick={() => void openModelSettings()}
           className="kimix-muted-action hidden min-w-0 items-center rounded-lg lg:flex"
           style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
-          title={sessionModel ? `当前对话模型：${sessionModel}` : "当前对话模型未记录"}
-          aria-label={sessionModel ? `当前对话模型：${sessionModel}，打开模型设置` : "当前对话模型未记录，打开模型设置"}
+          title={modelTitle}
+          aria-label={`${modelTitle}，打开模型设置`}
         >
           <Bot size={16} className="shrink-0" />
           <span className="shrink-0">模型</span>
-          <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]">{sessionModel ?? "未记录"}</span>
+          <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]">{displayModel}</span>
         </button>
       </div>
 

@@ -4,7 +4,7 @@ export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending";
-export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "tui" | "settings";
+export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 
 export interface AppState {
   currentProject: Project | null;
@@ -45,7 +45,7 @@ export interface Project {
 
 export interface Session {
   id: string;
-  engine?: "prompt" | "tui";
+  engine?: "prompt" | "kimi-code";
   runtimeSessionId?: string;
   /** 官方 kimi session id（从 wire/screen 抓取并持久化），用于重启后 `kimi -S` 恢复上下文。 */
   officialSessionId?: string;
@@ -118,7 +118,7 @@ export interface SteerMessageEvent {
   type: "steer_message";
   timestamp: number;
   content: string;
-  status: "sending" | "sent" | "failed";
+  status: "sending" | "accepted" | "sent" | "failed";
   error?: string;
 }
 

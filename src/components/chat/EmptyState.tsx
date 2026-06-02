@@ -15,6 +15,16 @@ function genId(): string {
   return Math.random().toString(36).substring(2, 11);
 }
 
+async function getDefaultKimiModel() {
+  try {
+    const res = await window.api.getKimiModelConfig();
+    if (res.success) return res.data.defaultModel?.trim() || "kimi-for-coding";
+  } catch {
+    // Keep the official built-in default.
+  }
+  return "kimi-for-coding";
+}
+
 function storageKey(projectPath: string): string {
   return `kimix_project_suggestions:${projectPath}`;
 }
@@ -87,17 +97,10 @@ export function EmptyState() {
     if (currentSession) return currentSession;
     if (!project) return null;
 
-    const sessionRes = await window.api.startSession({
-      workDir: project.path,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
-      planMode: defaultPlanMode,
-    });
-    if (!sessionRes.success) return null;
-
     const session: Session = {
-      id: sessionRes.data.sessionId,
+      id: crypto.randomUUID(),
+      engine: "kimi-code",
+      model: await getDefaultKimiModel(),
       title: "新会话",
       projectPath: project.path,
       createdAt: Date.now(),
@@ -150,13 +153,34 @@ export function EmptyState() {
       }));
 
       setRunningSessionId(targetSession.id);
-      const sendRes = await window.api.sendPrompt({
-        sessionId: targetSession.id,
+      let runtimeSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
+      if (!runtimeSessionId) {
+        const createRes = await window.api.createKimiCodeSession({
+          workDir: targetSession.projectPath,
+          permission: permissionMode,
+          planMode: defaultPlanMode,
+        });
+        if (!createRes.success) throw new Error(createRes.error);
+        runtimeSessionId = createRes.data.sessionId;
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          engine: "kimi-code",
+          runtimeSessionId,
+          officialSessionId: runtimeSessionId,
+          updatedAt: Date.now(),
+        }));
+        targetSession = {
+          ...targetSession,
+          engine: "kimi-code",
+          runtimeSessionId,
+          officialSessionId: runtimeSessionId,
+        };
+        setCurrentSession(targetSession);
+      }
+      const sendRes = await window.api.sendKimiCodePrompt({
+        sessionId: runtimeSessionId,
         content: text,
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
-        planMode: defaultPlanMode,
+        images: [],
       });
       if (!sendRes.success) throw new Error(sendRes.error);
     } catch (err) {

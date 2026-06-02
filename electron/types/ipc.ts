@@ -188,203 +188,6 @@ export type StartSessionResponse = {
   error: string;
 };
 
-export type TuiSessionStatus = "starting" | "running" | "stopping" | "exited" | "error";
-
-export type TuiToolCallSnapshot = {
-  toolCallId: string;
-  toolName: string;
-  command: string;
-  status: "running" | "success" | "error";
-  output: string;
-};
-
-export type TuiApprovalPreviewSnapshot = {
-  kind: "write" | "edit";
-  toolName: string;
-  filePath: string;
-  oldText: string;
-  newText: string;
-};
-
-export type TuiChangeSummarySnapshot = {
-  kind: "write" | "edit";
-  filePath: string;
-  additions: number;
-  deletions: number;
-};
-
-export type TuiQuestionSnapshot = {
-  questionId: string;
-  questionText: string;
-};
-
-export type TuiPluginSnapshot = {
-  id: string;
-  name: string;
-  status: "enabled" | "installed" | "disabled" | "available" | "unknown";
-  trustLevel: "official" | "curated" | "third-party" | "unknown";
-  skillsCount: number | null;
-  mcpSummary: string | null;
-  version: string | null;
-  source: "installed" | "marketplace";
-  selected: boolean;
-};
-
-export type TuiModelOptionSnapshot = {
-  id: string;
-  name: string;
-  provider: string | null;
-  selected: boolean;
-  current: boolean;
-};
-
-export type TuiScreenSnapshot = {
-  cols: number;
-  rows: number;
-  cursorX: number;
-  cursorY: number;
-  viewportY: number;
-  baseY: number;
-  lines: string[];
-  assistantText: string;
-  answerText: string;
-  thinkingText: string;
-  approvalText: string;
-  approvalPreview: TuiApprovalPreviewSnapshot | null;
-  changeSummary: TuiChangeSummarySnapshot | null;
-  changeSummaries: TuiChangeSummarySnapshot[];
-  toolCalls: TuiToolCallSnapshot[];
-  questionRequest: TuiQuestionSnapshot | null;
-  permissionMode: "manual" | "auto" | null;
-  modelName: string | null;
-  models: TuiModelOptionSnapshot[];
-  plugins: TuiPluginSnapshot[];
-  isBusy: boolean;
-  isAwaitingApproval: boolean;
-  isInputIdle: boolean;
-  updatedAt: number;
-};
-
-export type TuiSessionSummary = {
-  sessionId: string;
-  workDir: string;
-  command: string;
-  args: string[];
-  backend: "pty" | "pipe";
-  status: TuiSessionStatus;
-  pid: number | null;
-  startedAt: number;
-  updatedAt: number;
-  exitCode: number | null;
-  signal: string | number | null;
-  interrupted: boolean;
-  error: string | null;
-  rawOutput: string;
-  output: string;
-  screen: TuiScreenSnapshot | null;
-  officialSessionId?: string | null;
-  sessionDir?: string | null;
-  wireFile?: string | null;
-  rawWireTail?: string;
-  semanticEventsTail?: TuiSemanticEvent[];
-};
-
-export type StartTuiSessionRequest = {
-  workDir?: string;
-  command?: string;
-  args?: string[];
-};
-
-/**
- * TUI 引擎发送前应用 Kimix 自有 UserPromptSubmit hooks（复用 SDK/prompt-mode 同一逻辑）。
- * 返回经 hook 改写后的文本；无匹配 hook 时原样返回。hook 阻断时整体失败。
- */
-export type ApplyPromptSubmitHooksRequest = {
-  sessionId: string;
-  text: string;
-  workDir: string;
-};
-
-export type ApplyPromptSubmitHooksResponse = {
-  success: true;
-  data: { text: string };
-} | {
-  success: false;
-  error: string;
-};
-
-export type StartTuiSessionResponse = {
-  success: true;
-  data: TuiSessionSummary;
-} | {
-  success: false;
-  error: string;
-};
-
-export type SendTuiInputRequest = {
-  sessionId: string;
-  text: string;
-  images?: { name: string; dataUrl: string }[];
-  /**
-   * 提交方式。
-   * - "enter"（默认）：写入文本后发 Enter，运行中由官方 TUI 排队。
-   * - "steer"：写入文本后发 Ctrl+S，立即注入当前运行中的 turn（官方 steer 行为）。
-   */
-  submit?: "enter" | "steer" | "raw";
-};
-
-export type TuiKeyName = "escape" | "enter" | "space" | "tab" | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight" | "ctrlO" | "ctrlS" | "ctrlV";
-
-export type SendTuiKeyRequest = {
-  sessionId: string;
-  key: TuiKeyName;
-};
-
-/**
- * 探针：把一张图片写入系统剪贴板后，向隐藏 TUI 发送 Ctrl+V，
- * 验证官方是否走原生剪贴板粘贴路径（出现 [image:…] 占位 / wire ReadMediaFile）。
- * 仅用于调试页验证，不改动正式发送链路。
- */
-export type ProbeTuiClipboardImageRequest = {
-  sessionId: string;
-  dataUrl: string;
-};
-
-export type StopTuiSessionRequest = {
-  sessionId: string;
-};
-
-export type ResizeTuiSessionRequest = {
-  sessionId: string;
-  cols: number;
-  rows: number;
-};
-
-export type ListTuiSessionsResponse = {
-  success: true;
-  data: TuiSessionSummary[];
-} | {
-  success: false;
-  error: string;
-};
-
-export type TuiEventPayload = {
-  sessionId: string;
-  kind: "started" | "output" | "screen" | "semantic" | "status" | "exit" | "error";
-  session: TuiSessionSummary;
-  chunk?: string;
-  message?: string;
-  semanticEvents?: TuiSemanticEvent[];
-};
-
-export type TuiSemanticEvent = {
-  type: string;
-  payload?: Record<string, unknown>;
-  time?: number;
-  turnId?: string;
-  toolCallId?: string;
-};
-
 export type SlashCommandInfo = {
   name: string;
   description: string;
@@ -1211,6 +1014,305 @@ export type KimiStatusPayload = {
   sessionId: string;
   status: "idle" | "running" | "error" | "interrupted" | "completed";
 }
+
+export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
+
+export type KimiCodeEngineStatus =
+  | "idle"
+  | "running"
+  | "waiting_approval"
+  | "waiting_question"
+  | "completed"
+  | "interrupted"
+  | "error";
+
+export type KimiCodePromptPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; imageUrl: { url: string; id?: string } };
+
+export type KimiCodeSessionInfo = {
+  sessionId: string;
+  workDir: string;
+  status: KimiCodeEngineStatus;
+};
+
+export type KimiCodeSessionStatus = {
+  model?: string;
+  thinkingLevel?: string;
+  permission?: KimiCodePermissionMode;
+  planMode?: boolean;
+  contextTokens?: number;
+  maxContextTokens?: number;
+  contextUsage?: number;
+  usage?: unknown;
+};
+
+export type KimiCodeMcpServerInfo = {
+  name: string;
+  transport: "stdio" | "http";
+  status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";
+  toolCount: number;
+  error?: string;
+};
+
+export type KimiCodeMcpStartupMetrics = {
+  durationMs: number;
+};
+
+export type KimiCodeBackgroundTaskInfo = {
+  taskId: string;
+  command: string;
+  description: string;
+  status: string;
+  pid: number;
+  exitCode: number | null;
+  startedAt: number;
+  endedAt: number | null;
+  approvalReason?: string;
+  timedOut?: boolean;
+  stopReason?: string;
+  timeoutMs?: number;
+  agentId?: string;
+  subagentType?: string;
+  failureReason?: string;
+};
+
+export type KimiCodePluginSummary = {
+  id: string;
+  displayName: string;
+  version?: string;
+  enabled: boolean;
+  state: "ok" | "error";
+  skillCount: number;
+  mcpServerCount: number;
+  enabledMcpServerCount: number;
+  hasErrors: boolean;
+  source: "local-path" | "zip-url" | "github";
+  originalSource?: string;
+  github?: unknown;
+};
+
+export type KimiCodeSessionSummary = {
+  id: string;
+  title?: string;
+  lastPrompt?: string;
+  workDir: string;
+  sessionDir: string;
+  createdAt: number;
+  updatedAt: number;
+  archived?: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+export type KimiCodeCreateSessionRequest = {
+  workDir: string;
+  id?: string;
+  model?: string;
+  thinking?: string;
+  permission?: KimiCodePermissionMode;
+  planMode?: boolean;
+};
+
+export type KimiCodeResumeSessionRequest = {
+  sessionId: string;
+};
+
+export type KimiCodePromptRequest = {
+  sessionId: string;
+  content: string;
+  images?: { name: string; dataUrl: string }[];
+};
+
+export type KimiCodeSetPlanModeRequest = {
+  sessionId: string;
+  enabled: boolean;
+};
+
+export type KimiCodeSetPermissionRequest = {
+  sessionId: string;
+  mode: KimiCodePermissionMode;
+};
+
+export type KimiCodeApprovalResponseRequest = {
+  sessionId: string;
+  requestId: string;
+  approved: boolean;
+  scope?: "once" | "session";
+  feedback?: string;
+};
+
+export type KimiCodeQuestionResponseRequest = {
+  sessionId: string;
+  requestId: string;
+  answers: Record<string, string | true>;
+  skipped?: boolean;
+};
+
+export type KimiCodePluginSessionRequest = {
+  sessionId: string;
+};
+
+export type KimiCodeManagedUsageRequest = {
+  providerName?: string;
+};
+
+export type KimiCodeMcpServerRequest = {
+  sessionId: string;
+  name: string;
+};
+
+export type KimiCodeListBackgroundTasksRequest = {
+  sessionId: string;
+  activeOnly?: boolean;
+  limit?: number;
+};
+
+export type KimiCodeBackgroundTaskRequest = {
+  sessionId: string;
+  taskId: string;
+  tail?: number;
+  reason?: string;
+};
+
+export type KimiCodeInstallPluginRequest = {
+  sessionId: string;
+  source: string;
+};
+
+export type KimiCodeSetPluginEnabledRequest = {
+  sessionId: string;
+  id: string;
+  enabled: boolean;
+};
+
+export type KimiCodeSetPluginMcpServerEnabledRequest = {
+  sessionId: string;
+  id: string;
+  server: string;
+  enabled: boolean;
+};
+
+export type KimiCodeSessionRequest = {
+  sessionId: string;
+};
+
+export type KimiCodeListSessionsRequest = {
+  workDir?: string;
+};
+
+export type KimiCodeSessionResponse = {
+  success: true;
+  data: KimiCodeSessionInfo;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeVoidResponse = {
+  success: true;
+  data: void;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeStatusResponse = {
+  success: true;
+  data: KimiCodeSessionStatus;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeUsageResponse = {
+  success: true;
+  data: Record<string, unknown>;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeManagedUsageResponse = {
+  success: true;
+  data: unknown;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeListMcpServersResponse = {
+  success: true;
+  data: KimiCodeMcpServerInfo[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeMcpStartupMetricsResponse = {
+  success: true;
+  data: KimiCodeMcpStartupMetrics;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeListBackgroundTasksResponse = {
+  success: true;
+  data: KimiCodeBackgroundTaskInfo[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeBackgroundTaskOutputResponse = {
+  success: true;
+  data: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeBackgroundTaskOutputPathResponse = {
+  success: true;
+  data?: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeListSessionsResponse = {
+  success: true;
+  data: KimiCodeSessionSummary[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeListPluginsResponse = {
+  success: true;
+  data: KimiCodePluginSummary[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodePluginResponse = {
+  success: true;
+  data: KimiCodePluginSummary;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeEventPayload = {
+  sessionId: string;
+  event: unknown;
+};
+
+export type KimiCodeStatusPayload = {
+  sessionId: string;
+  status: KimiCodeEngineStatus;
+};
 
 export type WindowControlResponse = {
   success: true;

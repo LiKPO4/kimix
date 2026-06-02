@@ -9,7 +9,6 @@ import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
 import { HooksPanel } from "./HooksPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
-import { TuiDebugPanel } from "./TuiDebugPanel";
 import {
   ClipboardList,
   LucideIcon,
@@ -619,30 +618,11 @@ export function AppShell() {
   };
 
   const openOfficialPluginMarketplace = async () => {
-    const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
-    if (!runtimeSessionId) return false;
-    const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/plugins marketplace" });
-    if (res.success) {
-      setWorkspaceView("tui");
-      showToast("已打开官方 TUI 插件商店");
-      return true;
-    }
-    showToast(`打开 TUI 插件商店失败：${res.error}`);
     return false;
   };
 
   const openPluginWorkspace = async (tab: "skills" | "mcp") => {
     setPluginPanelTab(tab);
-    const runtimeSessionId = currentSession?.engine === "tui" ? getRuntimeSessionId(currentSession) : null;
-    if (runtimeSessionId) {
-      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: tab === "skills" ? "/plugins marketplace" : "/plugins" });
-      if (res.success) {
-        setWorkspaceView("tui");
-        showToast(tab === "skills" ? "已打开官方 TUI 插件商店" : "已打开官方 TUI 插件菜单");
-        return;
-      }
-      showToast(`打开 TUI 插件入口失败：${res.error}`);
-    }
     setWorkspaceView("plugins");
   };
 
@@ -1211,9 +1191,11 @@ export function AppShell() {
         : updateState.message;
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
   const hooksWorkspaceActive = workspaceView === "hooks";
-  const tuiWorkspaceActive = workspaceView === "tui";
   const settingsWorkspaceActive = workspaceView === "settings";
   const chatWorkspaceActive = workspaceView === "chat";
+  useEffect(() => {
+    if (!["chat", "plugins", "hooks", "mcp", "settings"].includes(workspaceView as string)) setWorkspaceView("chat");
+  }, [setWorkspaceView, workspaceView]);
   const handlePluginTabChange = (tab: "skills" | "mcp") => {
     setPluginPanelTab(tab);
     if (workspaceView === "mcp") setWorkspaceView("plugins");
@@ -1269,8 +1251,6 @@ export function AppShell() {
             <SkillsPanel open activeTab={workspaceView === "mcp" ? "mcp" : pluginPanelTab} onActiveTabChange={handlePluginTabChange} onBackToChat={() => setWorkspaceView("chat")} onOpenOfficialMarketplace={openOfficialPluginMarketplace} />
           ) : hooksWorkspaceActive ? (
             <HooksPanel onBackToChat={() => setWorkspaceView("chat")} />
-          ) : tuiWorkspaceActive ? (
-            <TuiDebugPanel />
           ) : settingsWorkspaceActive ? (
             <SettingsPanel variant="workspace" onBackToChat={() => setWorkspaceView("chat")} />
           ) : (

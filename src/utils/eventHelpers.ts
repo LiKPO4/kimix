@@ -36,7 +36,10 @@ export function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
     }
     if (event.type !== "assistant_message" || event.isComplete) return [event];
     const hasContent = event.content.trim().length > 0;
-    const hasThinking = Boolean(event.thinking?.trim());
+    const hasThinking = Boolean(
+      event.thinking?.trim() ||
+      event.thinkingParts?.some((part) => part.text.trim().length > 0)
+    );
     if (!hasContent && !hasThinking) return [];
     return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, settledAt - event.timestamp) }];
   });

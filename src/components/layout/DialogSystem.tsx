@@ -437,7 +437,7 @@ function HelpDialogPanel({
                   )}
                   {cliUpdateState.info && (
                     <div className="mt-1 text-[13px] text-text-muted">
-                      当前：{cliUpdateState.info.currentVersion ?? "未安装"} · 最新：{cliUpdateState.info.latestVersion ?? "未知"}
+                      当前：{cliUpdateState.info.currentVersion ?? "未安装"} · 最新可安装：{cliUpdateState.info.latestVersion ?? "未知"}
                     </div>
                   )}
                   {cliUpdateState.info?.path && <div className="mt-1 truncate text-[12px] text-text-muted" title={cliUpdateState.info.path}>{cliUpdateState.info.path}</div>}

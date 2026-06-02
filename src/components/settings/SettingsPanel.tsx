@@ -21,6 +21,7 @@ type ArchivedSessionSummary = {
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
+const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 
 type KimiAuthStatus = {
   available: boolean;
@@ -156,12 +157,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigLoading, setModelConfigLoading] = useState(true);
   const [modelConfigMessage, setModelConfigMessage] = useState("");
   const [providerDraft, setProviderDraft] = useState({
-    providerName: "kimix-openai",
-    modelAlias: "kimix/gpt-4.1",
-    baseUrl: "https://api.openai.com/v1",
+    providerName: "deepseek",
+    modelAlias: "deepseek/deepseek-v4-flash",
+    baseUrl: "https://api.deepseek.com",
     apiKey: "",
-    model: "gpt-4.1",
-    maxContextSize: "1048576",
+    model: "deepseek-v4-flash",
+    maxContextSize: "1000000",
   });
   const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
   const [providerMessage, setProviderMessage] = useState("");
@@ -278,6 +279,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       setSelectedModelAlias(alias);
       setProviderDraft((current) => ({ ...current, modelAlias: alias }));
       setProviderMessage(res.data.message);
+      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
       return;
     }
     setProviderMessage(`设为默认失败：${res.error}`);
@@ -309,6 +311,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       setModelConfig(res.data);
       setModelConfigMessage("");
       setProviderMessage(res.data.message);
+      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
       return;
     }
     setProviderMessage(`保存失败：${res.error}`);
@@ -316,23 +319,37 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   const handleLogin = async () => {
     setAuthBusyAction("login");
-    const res = await window.api.loginKimi();
-    setAuthBusyAction(null);
-    if (res.success) {
-      setAuth(res.data);
-      window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
-      return;
+    try {
+      const res = await window.api.loginKimi();
+      if (res.success) {
+        setAuth(res.data);
+        window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
+        return;
+      }
+      setAuth((current) => ({
+        available: current?.available ?? false,
+        loggedIn: current?.loggedIn ?? false,
+        path: current?.path,
+        configPath: current?.configPath ?? "",
+        mcpConfigPath: current?.mcpConfigPath ?? "",
+        defaultModel: current?.defaultModel ?? null,
+        defaultThinking: current?.defaultThinking ?? false,
+        message: `登录失败：${res.error}`,
+      }));
+    } catch (err) {
+      setAuth((current) => ({
+        available: current?.available ?? false,
+        loggedIn: current?.loggedIn ?? false,
+        path: current?.path,
+        configPath: current?.configPath ?? "",
+        mcpConfigPath: current?.mcpConfigPath ?? "",
+        defaultModel: current?.defaultModel ?? null,
+        defaultThinking: current?.defaultThinking ?? false,
+        message: `登录失败：${err instanceof Error ? err.message : String(err)}`,
+      }));
+    } finally {
+      setAuthBusyAction(null);
     }
-    setAuth((current) => ({
-      available: current?.available ?? false,
-      loggedIn: current?.loggedIn ?? false,
-      path: current?.path,
-      configPath: current?.configPath ?? "",
-      mcpConfigPath: current?.mcpConfigPath ?? "",
-      defaultModel: current?.defaultModel ?? null,
-      defaultThinking: current?.defaultThinking ?? false,
-      message: `登录失败：${res.error}`,
-    }));
   };
 
   const handleLogout = async () => {
@@ -1043,7 +1060,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.238 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.247 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

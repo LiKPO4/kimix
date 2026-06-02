@@ -38,6 +38,7 @@ const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc
 ];
 
 const DRAWING_BOARD_RATIOS: DrawingBoardRequest["ratio"][] = ["1:1", "4:3", "3:4", "16:9", "9:16"];
+const FALLBACK_KIMI_MODEL = "kimi-for-coding";
 
 const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
   auto: "【Kimix 需求澄清工具：自动判断】\n请先判断用户需求是否足够明确。若当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，可以使用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；若当前处于 prompt/auto 等禁止向用户提问的模式，请不要调用 AskUserQuestion，也不要解释本规则，按官方要求做合理判断并继续。",
@@ -48,6 +49,16 @@ function withClarificationBehavior(content: string, mode: ClarificationToolMode)
   const trimmed = content.trim();
   if (!trimmed || mode === "off") return content;
   return `${CLARIFICATION_PROMPTS[mode]}\n\n用户原始需求：\n${content}`;
+}
+
+async function getDefaultKimiModel() {
+  try {
+    const res = await window.api.getKimiModelConfig();
+    if (res.success) return res.data.defaultModel?.trim() || FALLBACK_KIMI_MODEL;
+  } catch {
+    // Ignore and use the official built-in default below.
+  }
+  return FALLBACK_KIMI_MODEL;
 }
 
 const iconButtonClass =
@@ -80,60 +91,6 @@ const mentionBaseItems: CompletionItem[] = [
   { id: "plugin-browser", label: "浏览器", detail: "Control the in-app browser with Codex", insertText: "@浏览器 ", kind: "plugin" },
   { id: "plugin-chrome", label: "Chrome", detail: "Control Chrome with Codex", insertText: "@Chrome ", kind: "plugin" },
 ];
-
-// 官方 Kimi Code slash 命令全集，用于 TUI 引擎会话的输入框补全候选。
-// TUI 引擎下这些命令经 sendTuiInput 原样透传给真实 kimi TUI（不被前端拦截），补全候选只负责"可发现 + 一键插入"。
-const tuiSlashCommandDefs: { name: string; detail: string; colon?: boolean }[] = [
-  // 会话生命周期
-  { name: "fork", detail: "从当前会话分叉出新会话" },
-  { name: "undo", detail: "撤销上一轮，回到上一个检查点" },
-  { name: "compact", detail: "压缩上下文（可附压缩指令）" },
-  { name: "import", detail: "导入会话存档或会话 ID" },
-  { name: "export", detail: "导出当前会话为存档" },
-  { name: "title", detail: "设置 / 重命名当前会话标题" },
-  { name: "rename", detail: "重命名当前会话（/title 别名）" },
-  { name: "add-dir", detail: "把目录加入工作区" },
-  { name: "new", detail: "新建会话" },
-  { name: "sessions", detail: "浏览 / 恢复历史会话" },
-  { name: "clear", detail: "清空当前会话上下文" },
-  { name: "btw", detail: "侧问题：隔离上下文、禁用工具的快速提问" },
-  // 计划 / 权限 / 任务
-  { name: "plan", detail: "计划模式：on｜off｜view｜clear" },
-  { name: "yolo", detail: "自动批准所有动作" },
-  { name: "afk", detail: "自动批准并自动消解提问" },
-  { name: "task", detail: "后台任务浏览器" },
-  // 模型 / 配置 / 集成
-  { name: "model", detail: "切换模型" },
-  { name: "mcp", detail: "查看 / 管理 MCP 服务" },
-  { name: "hooks", detail: "查看 Hooks 配置" },
-  { name: "editor", detail: "设置外部编辑器" },
-  { name: "theme", detail: "切换主题：dark｜light" },
-  { name: "reload", detail: "重新加载配置" },
-  // 技能 / 流程
-  { name: "skill:", detail: "加载技能：/skill:<name>", colon: true },
-  { name: "flow:", detail: "运行流程：/flow:<name>", colon: true },
-  // 账户
-  { name: "login", detail: "登录 Kimi" },
-  { name: "logout", detail: "退出登录" },
-  // 信息 / 项目 / 界面
-  { name: "usage", detail: "查看用量配额" },
-  { name: "init", detail: "生成 AGENTS.md" },
-  { name: "web", detail: "打开 Web 界面" },
-  { name: "vis", detail: "打开 Agent Tracing Visualizer" },
-  { name: "help", detail: "帮助" },
-  { name: "version", detail: "版本信息" },
-  { name: "changelog", detail: "更新日志" },
-  { name: "debug", detail: "调试信息" },
-];
-
-const tuiSlashItems: CompletionItem[] = tuiSlashCommandDefs.map((def) => ({
-  id: `tui-slash-${def.name}`,
-  label: `/${def.name}`,
-  detail: def.detail,
-  insertText: def.colon ? `/${def.name}` : `/${def.name} `,
-  commandName: def.name,
-  kind: "slash",
-}));
 
 function getActiveCompletion(value: string): { mode: CompletionMode; query: string; start: number } | null {
   const match = value.match(/(^|\s)([@/])([^\s]*)$/);
@@ -208,9 +165,15 @@ export function Composer() {
   ));
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const hasUnfinishedAssistant = Boolean(activeSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
-  const shouldShowStopButton = Boolean(isCurrentSessionRunning || hasUnfinishedAssistant);
+  const hasActiveAssistantTurn = hasUnfinishedAssistant;
+  const canSteerActiveTurn = Boolean(
+    activeRuntimeSessionId &&
+    isCurrentSessionRunning &&
+    hasActiveAssistantTurn
+  );
+  const shouldShowStopButton = hasActiveAssistantTurn;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
-  const canTogglePlanMode = canUseComposer && !isCurrentSessionRunning && !hasUnfinishedAssistant;
+  const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -252,9 +215,8 @@ export function Composer() {
       setSlashCommands([]);
       return;
     }
-    if (currentSession.engine === "tui") {
-      // listSlashCommands 仅服务 SDK 会话；TUI 会话改用官方 slash 全集静态候选，直发真实 TUI。
-      setSlashCommands(tuiSlashItems);
+    if (currentSession.engine === "kimi-code") {
+      setSlashCommands([]);
       return;
     }
     let cancelled = false;
@@ -401,10 +363,12 @@ export function Composer() {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
     }
     if (!currentProject) return null;
-    // 只有 TUI 引擎：仅创建本地会话对象，真实 hidden TUI 进程延迟到首条消息发送时再启动。
+    const model = await getDefaultKimiModel();
+    // Kimi Code 主链路：仅创建本地会话对象，真实官方 session 延迟到首条消息发送时再创建。
     const session = {
       id: genId(),
-      engine: "tui" as const,
+      engine: "kimi-code" as const,
+      model,
       title: "新会话",
       projectPath: currentProject.path,
       createdAt: Date.now(),
@@ -451,67 +415,85 @@ export function Composer() {
       updatedAt: Date.now(),
     }));
 
-    const shouldUseTuiEngine = !targetSession.longTask;
+    const effectiveEngine = "kimi-code";
     const outboundContent = targetSession.longTask
       ? content
-      : shouldUseTuiEngine
-        ? content
-        : withClarificationBehavior(content, effectiveClarificationToolMode);
+      : withClarificationBehavior(content, effectiveClarificationToolMode);
     setRunningSessionId(targetSession.id);
-    if (shouldUseTuiEngine) {
-      try {
-        let tuiSessionId = targetSession.engine === "tui" ? targetSession.runtimeSessionId : undefined;
-        if (!tuiSessionId) {
-          // 无存活 runtime：若该会话此前抓到过官方 sessionId，用 `kimi -S` 恢复上下文；
-          // 官方 session 文件可能已删，启动失败时无参重试，至少保证能继续对话。
-          const resumeId = targetSession.officialSessionId;
-          // 权限模式作为官方启动 flag 传给 hidden TUI：yolo→--yolo（全自动批准）、auto→--auto。
-          const permissionArgs = permissionMode === "yolo" ? ["--yolo"] : permissionMode === "auto" ? ["--auto"] : [];
-          let startRes = await window.api.startTuiSession({
-            workDir: targetSession.projectPath,
-            args: [...permissionArgs, ...(resumeId ? ["-S", resumeId] : [])],
-          });
-          if (!startRes.success && resumeId) {
-            startRes = await window.api.startTuiSession({ workDir: targetSession.projectPath, args: permissionArgs });
-          }
-          if (!startRes.success) throw new Error(startRes.error);
-          tuiSessionId = startRes.data.sessionId;
-          const startedOfficialId = startRes.data.officialSessionId ?? targetSession.officialSessionId;
-          targetSession = { ...targetSession, engine: "tui", runtimeSessionId: tuiSessionId, officialSessionId: startedOfficialId ?? undefined };
+    if (effectiveEngine === "kimi-code") {
+      const imagesForApi = images.map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+      const ensureKimiCodeRuntime = async () => {
+        const knownSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
+        if (knownSessionId) {
+          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownSessionId });
+          if (!resumeRes.success) throw new Error(resumeRes.error);
+          const model = targetSession.model ?? await getDefaultKimiModel();
+          targetSession = {
+            ...targetSession,
+            engine: "kimi-code",
+            runtimeSessionId: resumeRes.data.sessionId,
+            officialSessionId: resumeRes.data.sessionId,
+            model,
+          };
           updateSession(targetSession.id, (session) => ({
             ...session,
-            engine: "tui",
-            runtimeSessionId: tuiSessionId,
-            officialSessionId: startedOfficialId ?? session.officialSessionId,
-            model: "Kimi TUI",
+            engine: "kimi-code",
+            runtimeSessionId: resumeRes.data.sessionId,
+            officialSessionId: resumeRes.data.sessionId,
+            model,
             updatedAt: Date.now(),
           }));
           if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+          return resumeRes.data.sessionId;
         }
-        // TUI 发送前应用 Kimix 自有 UserPromptSubmit hooks（与 SDK/prompt-mode 同源）。
-        // 无匹配 hook 时原样返回；hook 阻断时整体失败，由下方 catch 承接并写错误卡。
-        const hookRes = await window.api.applyPromptSubmitHooks({
-          sessionId: tuiSessionId,
-          text: outboundContent,
+
+        const createRes = await window.api.createKimiCodeSession({
           workDir: targetSession.projectPath,
+          permission: permissionMode,
+          planMode: defaultPlanMode,
         });
-        if (!hookRes.success) throw new Error(hookRes.error);
-        const sendRes = await window.api.sendTuiInput({
-          sessionId: tuiSessionId,
-          text: hookRes.data.text,
-          images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
+        if (!createRes.success) throw new Error(createRes.error);
+        const model = targetSession.model ?? await getDefaultKimiModel();
+        targetSession = {
+          ...targetSession,
+          engine: "kimi-code",
+          runtimeSessionId: createRes.data.sessionId,
+          officialSessionId: createRes.data.sessionId,
+          model,
+        };
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          engine: "kimi-code",
+          runtimeSessionId: createRes.data.sessionId,
+          officialSessionId: createRes.data.sessionId,
+          model,
+          updatedAt: Date.now(),
+        }));
+        if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+        return createRes.data.sessionId;
+      };
+
+      try {
+        let kimiCodeSessionId = await ensureKimiCodeRuntime();
+        let res = await window.api.sendKimiCodePrompt({
+          sessionId: kimiCodeSessionId,
+          content: outboundContent,
+          images: imagesForApi,
         });
-        if (!sendRes.success) {
-          if (sendRes.error === "TUI 进程未运行") {
-            // TUI 进程已退出（超时/崩溃），清理失效 ID 后自动重试一次
-            updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
-            return sendPromptContent(content, { ...options, addUserEvent: false });
-          }
-          throw new Error(sendRes.error);
+        if (!res.success && /not active|not found|session/i.test(res.error)) {
+          updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
+          targetSession = { ...targetSession, runtimeSessionId: undefined };
+          kimiCodeSessionId = await ensureKimiCodeRuntime();
+          res = await window.api.sendKimiCodePrompt({
+            sessionId: kimiCodeSessionId,
+            content: outboundContent,
+            images: imagesForApi,
+          });
         }
+        if (!res.success) throw new Error(res.error);
         return;
       } catch (err) {
-        console.error("TUI send failed:", err);
+        console.error("Kimi Code send failed:", err);
         setRunningSessionId(null);
         updateSession(targetSession.id, (session) => ({
           ...session,
@@ -532,61 +514,6 @@ export function Composer() {
         }));
         return;
       }
-    }
-    let runtimeSessionId = getRuntimeSessionId(targetSession);
-    if (!runtimeSessionId) {
-      setRunningSessionId(null);
-      return;
-    }
-    const sendToRuntime = (sessionId: string) => window.api.sendPrompt({
-      sessionId,
-      content: outboundContent,
-      images: images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
-      planMode: defaultPlanMode,
-    });
-    try {
-      let res = await sendToRuntime(runtimeSessionId);
-      if (!res.success && /session not found/i.test(res.error)) {
-        const startRes = await window.api.startSession({
-          workDir: targetSession.projectPath,
-          sessionId: targetSession.id,
-          thinking: defaultThinking,
-          yoloMode: permissionMode === "yolo",
-          autoMode: permissionMode === "auto",
-          planMode: defaultPlanMode,
-        });
-        if (!startRes.success) throw new Error(startRes.error);
-        runtimeSessionId = startRes.data.sessionId;
-        targetSession = { ...targetSession, runtimeSessionId };
-        updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId }));
-        if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
-        res = await sendToRuntime(runtimeSessionId);
-      }
-      if (!res.success) throw new Error(res.error);
-    } catch (err) {
-      console.error("Send failed:", err);
-      setRunningSessionId(null);
-      updateSession(targetSession.id, (session) => ({
-        ...session,
-        events: [
-          ...session.events.map((event) => event.type === "assistant_message" && !event.isComplete
-            ? { ...event, isComplete: true, isThinking: false }
-            : event
-          ),
-          {
-            id: genId(),
-            type: "error",
-            timestamp: Date.now(),
-            message: err instanceof Error ? err.message : String(err),
-            source: "ipc",
-          },
-        ],
-        updatedAt: Date.now(),
-      }));
-      return;
     }
   };
 
@@ -658,34 +585,7 @@ export function Composer() {
 
     const targetSession = await ensureSession();
     if (!targetSession) return false;
-    const startRes = await window.api.startSession({
-      workDir: targetSession.projectPath,
-      sessionId: getRuntimeSessionId(targetSession) ?? targetSession.id,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
-      planMode: defaultPlanMode,
-      skillsDir: saveRes.data.enabledDir,
-    });
-    if (!startRes.success) {
-      await appendLocalEvent({
-        id: genId(),
-        type: "error",
-        timestamp: Date.now(),
-        message: `Skill 已保存，但刷新当前会话失败：${startRes.error}`,
-        source: "ui",
-      });
-      return false;
-    }
-
-    setSlashCommands((startRes.data.slashCommands ?? []).map((command) => ({
-      id: `slash-${command.name}`,
-      label: `/${command.name}`,
-      detail: command.description,
-      insertText: `/${command.name} `,
-      commandName: command.name,
-      kind: "slash",
-    })));
+    setSlashCommands([]);
     updateSession(targetSession.id, (session) => ({
       ...session,
       events: [
@@ -716,11 +616,11 @@ export function Composer() {
       inputRef.current?.reset();
       const applied = await applySkillCommand(skillName);
       if (applied && (restContent || imagesToSend.length > 0)) {
-        if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
+        if (hasActiveAssistantTurn && currentSession) {
           addPendingMessage(currentSession.id, restContent, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
           if (imagesToSend.length > 0) {
             window.dispatchEvent(new CustomEvent("kimix:toast", {
-              detail: "当前轮次还没结束，文字和图片已加入队列，等待官方 TUI 完成后自动发送。",
+              detail: "当前轮次还没结束，文字和图片已加入队列，等待当前轮次结束后自动发送。",
             }));
           }
           return;
@@ -734,43 +634,79 @@ export function Composer() {
     setEditingPendingId(null);
     inputRef.current?.reset();
 
-    if (!isCurrentSessionRunning && !hasUnfinishedAssistant && activeSession) {
+    if (!hasActiveAssistantTurn && activeSession) {
       settlePendingClarifications(activeSession.id);
     }
 
-    if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
+    if (hasActiveAssistantTurn && currentSession) {
       addPendingMessage(currentSession.id, trimmed, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
       return;
     }
     await sendPromptContent(trimmed, { images: imagesToSend });
   };
 
-  // steer：把输入框内容立即注入当前运行中的 TUI turn（官方 Ctrl+S 行为），
-  // 与普通 Enter 排队严格区分。仅 TUI 引擎、且当前轮运行中时可用。
+  // steer：把输入框内容立即注入当前运行中的 turn，与普通 Enter 排队严格区分。
+  const updateSteerStatus = (sessionId: string, steerId: string, status: "accepted" | "sent" | "failed", error?: string) => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      events: session.events.map((event) => event.id === steerId && event.type === "steer_message"
+        ? { ...event, status, error: status === "failed" ? error : undefined }
+        : event
+      ),
+      updatedAt: Date.now(),
+    }));
+    const updated = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+    if (updated) setCurrentSession(updated);
+  };
+
+  const insertLocalSteerMessage = (sessionId: string, content: string): string => {
+    const steerId = genId();
+    updateSession(sessionId, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        {
+          id: steerId,
+          type: "steer_message" as const,
+          timestamp: Date.now(),
+          content,
+          status: "sending" as const,
+        },
+      ],
+      updatedAt: Date.now(),
+    }));
+    const updated = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+    if (updated) setCurrentSession(updated);
+    return steerId;
+  };
+
   const handleSteer = async () => {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
-    if (!activeSession || activeSession.engine !== "tui") return;
     const runtimeSessionId = getRuntimeSessionId(activeSession);
-    if (!runtimeSessionId) return;
+    if (!activeSession || !canSteerActiveTurn || !runtimeSessionId) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "当前没有可引导的 SDK 运行轮次，消息会留在队列里等待本轮结束。" }));
+      return;
+    }
+    const steerId = insertLocalSteerMessage(activeSession.id, trimmed || "[图片]");
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);
     inputRef.current?.reset();
-    const res = await window.api.sendTuiInput({
+    const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
-      text: trimmed,
+      content: trimmed,
       images: imagesToSend.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
-      submit: "steer",
     });
     if (!res.success) {
+      updateSteerStatus(activeSession.id, steerId, "failed", res.error);
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
-    // 不向正式时间线写合成状态：steer 文本会经 wire 作为真实 turn.prompt 回流（计划 §1.1/§5）。
+    updateSteerStatus(activeSession.id, steerId, "accepted");
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: "已注入当前任务（Ctrl+S 引导）",
+      detail: "已发送引导请求",
     }));
   };
 
@@ -814,9 +750,9 @@ export function Composer() {
     try {
       const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
       const runtimeSessionId = latest ? getRuntimeSessionId(latest) : sessionId;
-      const res = latest?.engine === "tui" && runtimeSessionId
-        ? await window.api.stopTuiSession({ sessionId: runtimeSessionId })
-        : await window.api.stopTurn({ sessionId: runtimeSessionId ?? sessionId });
+      const res = runtimeSessionId
+        ? await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId })
+        : { success: true as const, data: undefined };
       if (!res.success) {
         console.error("Stop failed:", res.error);
       }
@@ -857,22 +793,18 @@ export function Composer() {
       }));
     }
     setShowPermissionMenu(false);
-    if (!activeSession || activeSession.engine !== "tui") {
-      return;
-    }
     const runtimeSessionId = getRuntimeSessionId(activeSession);
     if (!runtimeSessionId || previousMode === mode) return;
-    const command = mode === "yolo" ? "/yolo" : "/auto";
-    const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: command });
+    const res = await window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode });
     if (!res.success) {
       setPermissionMode(previousMode);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: `TUI 权限切换失败：${res.error}`,
+        detail: `权限切换失败：${res.error}`,
       }));
       return;
     }
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: mode === "yolo" ? "已发送 /yolo，等待 TUI 开启完全访问权限" : mode === "auto" ? "已发送 /auto，等待 TUI 切到自动权限" : "已发送 /auto，等待 TUI 切回手动审批",
+      detail: "权限模式已切换",
     }));
   };
 
@@ -887,22 +819,7 @@ export function Composer() {
       }));
       return;
     }
-    if (activeSession?.engine === "tui") {
-      const res = await window.api.sendTuiInput({ sessionId: runtimeSessionId, text: "/plan" });
-      if (!res.success) {
-        setDefaultPlanMode(!next);
-        window.dispatchEvent(new CustomEvent("kimix:toast", {
-          detail: `TUI Plan 模式切换失败：${res.error}`,
-        }));
-        return;
-      }
-      setDefaultPlanMode(next);
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: next ? "已发送 /plan，等待 TUI 开启 Plan 模式" : "已发送 /plan，等待 TUI 关闭 Plan 模式",
-      }));
-      return;
-    }
-    const res = await window.api.setPlanMode({ sessionId: runtimeSessionId, enabled: next });
+    const res = await window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: next });
     if (!res.success) {
       setDefaultPlanMode(!next);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
@@ -951,9 +868,9 @@ export function Composer() {
   const handleSendPendingNow = async (id: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending || !canUseComposer) return;
-    if ((isCurrentSessionRunning || hasUnfinishedAssistant) && currentSession) {
+    if (hasActiveAssistantTurn && currentSession) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "当前轮次还没结束，这条消息会留在队列里，等待官方 TUI 完成后自动发送。",
+        detail: "当前轮次还没结束，这条消息会留在队列里，等待当前轮次结束后自动发送。",
       }));
       return;
     }
@@ -971,39 +888,32 @@ export function Composer() {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending || !canUseComposer) return;
     const runtimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
-    if (!runtimeSessionId) return;
-    const res = await window.api.sendTuiInput({
+    if (!runtimeSessionId || !activeSession || !canSteerActiveTurn) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "当前没有可引导的 SDK 运行轮次，这条消息会继续排队等待本轮结束。",
+      }));
+      return;
+    }
+    const steerId = insertLocalSteerMessage(activeSession.id, pending.content || "[图片]");
+    removePendingMessage(id);
+    const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
-      text: pending.content,
+      content: pending.content,
       images: (pending.images ?? [])
         .map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" }))
         .filter((image) => image.dataUrl),
-      submit: "steer",
     });
     if (!res.success) {
-      if (res.error === "TUI 进程未运行" && activeSession) {
+      if (/not active|not found|session/i.test(res.error) && activeSession) {
         updateSession(activeSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
       }
+      updateSteerStatus(activeSession.id, steerId, "failed", res.error);
+      addPendingMessage(activeSession.id, pending.content, pending.images);
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
-    // 在对话时间线插入 steer_message，TUI 后续会通过 SteerInput semantic 事件将其状态更新为 sent
-    updateSession(activeSession.id, (session) => ({
-      ...session,
-      events: [
-        ...session.events,
-        {
-          id: genId(),
-          type: "steer_message" as const,
-          timestamp: Date.now(),
-          content: pending.content,
-          status: "sending" as const,
-        },
-      ],
-      updatedAt: Date.now(),
-    }));
-    removePendingMessage(id);
-    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已引导：插入当前任务，agent 将尽快处理" }));
+    updateSteerStatus(activeSession.id, steerId, "accepted");
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已发送引导请求" }));
   };
 
   const handleEditPending = (id: string) => {
@@ -1099,7 +1009,7 @@ export function Composer() {
         >
           <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 12, paddingLeft: 20, paddingRight: 14 }}>
             <span className="min-w-0 truncate">{pendingMessages.length} 条消息正在排队</span>
-            {isCurrentSessionRunning && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">当前任务结束后继续</span>}
+            {hasActiveAssistantTurn && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">当前任务结束后继续</span>}
             <button
               type="button"
               onClick={() => hideComposerCard("pending", "排队消息")}
@@ -1143,11 +1053,15 @@ export function Composer() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
-                  {isCurrentSessionRunning || hasUnfinishedAssistant ? (
+                  {canSteerActiveTurn ? (
                     <button onClick={() => void handleSteerPending(msg.id)} className="kimix-icon-text-button is-compact text-[13px] text-accent-blue hover:bg-accent-blue/10" title="立即引导：把这条消息插入运行中的对话（官方 Ctrl+S steer），让 agent 尽快处理">
                       <Zap size={13} />
                       <span>引导</span>
                     </button>
+                  ) : hasActiveAssistantTurn ? (
+                    <span className="shrink-0 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                      等待
+                    </span>
                   ) : (
                     <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title="发送这条队列消息">
                       <Send size={13} />
@@ -1462,7 +1376,7 @@ export function Composer() {
 
             {shouldShowStopButton ? (
               <>
-                {activeSession?.engine === "tui" && canSendNow && (
+                {canSteerActiveTurn && canSendNow && (
                   <button
                     onClick={() => void handleSteer()}
                     className="flex h-8 shrink-0 items-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark"

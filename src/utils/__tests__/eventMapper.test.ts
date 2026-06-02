@@ -224,6 +224,72 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
   });
 
+  it("confirms local full steer message when official steer input is truncated", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "steer_message", timestamp: 1, content: "1、按照精确的\n2、输出在对话里就行", status: "sending" },
+    ];
+    const incoming: TimelineEvent = { id: "2", type: "steer_message", timestamp: 2, content: "1、按照精确的", status: "sent" };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    const steer = result[0] as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.content).toBe("1、按照精确的\n2、输出在对话里就行");
+    expect(steer.status).toBe("sent");
+  });
+
+  it("keeps assistant chunks before an unconfirmed steer boundary", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "Before", isThinking: false, isComplete: false },
+      { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "sending" },
+    ];
+    const incoming: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: "After", isThinking: false, isComplete: false };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("BeforeAfter");
+    expect(result[1].type).toBe("steer_message");
+  });
+
+  it("keeps assistant chunks in the active assistant after a confirmed steer", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "Before", isThinking: false, isComplete: false },
+      { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "sent" },
+    ];
+    const incoming: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: "After", isThinking: false, isComplete: false };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("BeforeAfter");
+    expect(result[1].type).toBe("steer_message");
+  });
+
+  it("keeps assistant chunks in the active assistant after an accepted steer", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "Before", isThinking: false, isComplete: false },
+      { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "accepted" },
+    ];
+    const incoming: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: "After", isThinking: false, isComplete: false };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("BeforeAfter");
+    expect(result[1].type).toBe("steer_message");
+  });
+
+  it("keeps tool calls before an unconfirmed trailing steer", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "steer_message", timestamp: 1, content: "Fix it", status: "sending" },
+    ];
+    const incoming: TimelineEvent = { id: "2", type: "tool_call", timestamp: 2, toolCallId: "t1", toolName: "read", status: "running", arguments: {}, rawArguments: "" };
+    const result = mergeEvents(existing, incoming);
+    expect(result.map((event) => event.type)).toEqual(["tool_call", "steer_message"]);
+  });
+
+  it("appends status updates after an accepted trailing steer", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "steer_message", timestamp: 1, content: "Fix it", status: "accepted" },
+    ];
+    const incoming: TimelineEvent = { id: "2", type: "status_update", timestamp: 2, message: "步骤开始" };
+    const result = mergeEvents(existing, incoming);
+    expect(result.map((event) => event.type)).toEqual(["steer_message", "status_update"]);
+  });
+
   it("merges question_request by requestId", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "question_request", timestamp: 1, requestId: "q1", toolCallId: "", questions: [], status: "pending" },

@@ -55,6 +55,25 @@ function appendAssistantContent(existingContent: string, incomingContent: string
   return `${existingContent}\n\n${incomingContent}`;
 }
 
+function normalizeComparableContent(content: string): string {
+  return content.trim().replace(/\s+/g, " ");
+}
+
+function isMatchingSteerContent(existing: string, incoming: string): boolean {
+  const existingContent = normalizeComparableContent(existing);
+  const incomingContent = normalizeComparableContent(incoming);
+  if (!existingContent || !incomingContent) return false;
+  return existingContent === incomingContent ||
+    existingContent.startsWith(incomingContent) ||
+    incomingContent.startsWith(existingContent);
+}
+
+function appendBeforeTrailingSendingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
+  const last = existing[existing.length - 1];
+  if (last?.type !== "steer_message" || last.status !== "sending") return [...existing, ...additions];
+  return [...existing.slice(0, -1), ...additions, last];
+}
+
 function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | null {
   if (items.length === 0) return null;
   return {
@@ -524,7 +543,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       return base.flatMap((event, index) => {
         if (event.type !== "assistant_message" || event.isComplete) return event;
         const hasContent = event.content.trim().length > 0;
-        const hasThinking = Boolean(event.thinking?.trim());
+        const hasThinking = Boolean(
+          event.thinking?.trim() ||
+          event.thinkingParts?.some((part) => part.text.trim().length > 0)
+        );
         if (!hasContent && !hasThinking && index !== latestOpenIndex) return [];
         return {
           ...event,
@@ -535,9 +557,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       });
     }
 
-    const latestSteerIndex = existing.findLastIndex((e) => e.type === "steer_message" && e.status === "sent");
     const lastIndex = existing.findLastIndex(
-      (e, index) => index > latestSteerIndex && e.type === "assistant_message" && !e.isComplete
+      (e) => e.type === "assistant_message" && !e.isComplete
     );
     if (lastIndex !== -1) {
       const last = existing[lastIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
@@ -558,7 +579,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           : last.thinkingParts,
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
-        durationMs: incoming.isComplete ? Math.max(0, incoming.timestamp - last.timestamp) : last.durationMs,
+        durationMs: incoming.isComplete ? Math.max(0, Date.now() - last.timestamp) : last.durationMs,
       };
       const result = [...existing];
       result[lastIndex] = updated;
@@ -597,7 +618,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
   if (incoming.type === "steer_message") {
     const duplicateIndex = existing.findLastIndex(
-      (e) => e.type === "steer_message" && e.content === incoming.content
+      (e) => e.type === "steer_message" && isMatchingSteerContent(e.content, incoming.content)
     );
     if (duplicateIndex !== -1) {
       const result = [...existing];
@@ -655,9 +676,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         result: incoming.result,
         durationMs: Math.max(0, incoming.timestamp - call.timestamp),
       };
-      return [...result, ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
+      return appendBeforeTrailingSendingSteer(result, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
     }
-    if (diffEvent || todoEvent) return [...existing, ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
+    if (diffEvent || todoEvent) return appendBeforeTrailingSendingSteer(existing, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
   }
 
   if (incoming.type === "subagent") {
@@ -678,6 +699,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     if (last?.type === "status_update") {
       return [...existing.slice(0, -1), incoming];
     }
+    return appendBeforeTrailingSendingSteer(existing, [incoming]);
   }
 
   if (incoming.type === "change_summary") {
@@ -687,10 +709,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const [statusEvent] = result.splice(lastStatusIndex, 1);
       result.push(statusEvent);
     }
-    return [...result, incoming];
+    return appendBeforeTrailingSendingSteer(result, [incoming]);
   }
 
-  return [...existing, incoming];
+  return appendBeforeTrailingSendingSteer(existing, [incoming]);
 }
 
 export function mapHistoryEvents(events: unknown[]): TimelineEvent[] {
