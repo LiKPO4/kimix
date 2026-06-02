@@ -1665,6 +1665,20 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 请再次在运行中发送一条引导，确认后续 assistant 正文仍保留在引导消息下方。
 
+# 2026-06-02 Kimi Code SDK 0.6.0 vendoring 收口
+## 已完成
+- `vendor/kimi-code-sdk/index.mjs` 已升级为官方 `packages/node-sdk@0.6.0` 的自包含 bundle，来源 commit `9143fdadf68c252ed4d84b16db0d8274390fa132`，对齐 CLI `kimi 0.8.0`。
+- `vendor/kimi-code-sdk/README.md` provenance 表已更新到 node-sdk 0.6.0 / CLI 0.8.0。
+- `docs/kimi-code-sdk-probe-result.md` 已重跑并记录 CLI 0.8.0 + node-sdk 0.6.0 结论。
+- 版本号三处同步到 v2.8.250。
+## 验证
+- `node scripts/probe-kimi-code-sdk.mjs`：15 通过 / 4 失败 / 1 跳过；主链路 `createSession`、`resumeSession`、prompt 流式、steer、cancel、approval/question handler 均通过。失败项为已知非主链路：`--wire` 不支持、SDK npm 404、旧 agent-sdk 不在当前依赖、官方源码 `build:dts` Windows `spawn EINVAL`。
+- 干净临时目录无 `node_modules` import `vendor/kimi-code-sdk/index.mjs` 并实例化 `KimiHarness` 通过。
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+- `pnpm build` 通过。
+## 下一步
+提交阶段 A 相关文件；用户确认后进入阶段 B，静态和动态盘点 node-sdk 0.6.0 新 API。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。
