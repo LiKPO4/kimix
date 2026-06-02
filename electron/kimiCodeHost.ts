@@ -43,6 +43,7 @@ type KimiCodeSessionLike = {
   workDir: string;
   prompt(input: string | KimiCodePromptPart[]): Promise<void>;
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
+  undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
   setPlanMode(enabled: boolean): Promise<void>;
   setPermission(mode: KimiCodePermissionMode): Promise<void>;
@@ -382,6 +383,12 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
 export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
   const managed = getManagedSession(sessionId);
   await managed.session.steer(input);
+}
+
+export async function undoHistory(sessionId: string, count: number): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.undoHistory) throw new Error("Official Kimi Code SDK does not expose undoHistory on this session");
+  await managed.session.undoHistory(count);
 }
 
 export async function cancel(sessionId: string): Promise<void> {

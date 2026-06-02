@@ -1232,6 +1232,11 @@ export type KimiCodeSessionRequest = {
   sessionId: string;
 };
 
+export type KimiCodeUndoHistoryRequest = {
+  sessionId: string;
+  count?: number;
+};
+
 export type KimiCodeMarketplacePlugin = {
   id: string;
   tier: string;

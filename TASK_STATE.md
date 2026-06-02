@@ -1746,6 +1746,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - C3 后台 ask 继续保持“待官方开放”状态；下一轮可做 C5 undoHistory 的撤销入口，范围建议限定在当前 Kimi 会话最近 1 步。
 
+# 2026-06-03 C5 官方 undoHistory 撤销入口
+## 当前目标
+- 继续推进 Kimi Code 0.8 GUI 接入阶段 C，完成 C5：接入 SDK `Session.undoHistory(count)`。
+## 已完成
+- `electron/kimiCodeHost.ts` 新增 `undoHistory(sessionId, count)` wrapper，要求当前 Session 暴露官方 `undoHistory` 方法。
+- `electron/main.ts` / `electron/preload.ts` / `electron/types/ipc.ts` 新增 `kimi-code:undoHistory` / `undoKimiCodeHistory`，默认撤销 1 步，IPC 侧限制 count 为 1-10。
+- `SessionToolbar` 新增“撤销官方历史上一轮”图标按钮：仅普通 Kimi Code 会话、非运行中、存在用户/steer 轮次时启用；长程任务会话禁用，避免误撤销编排器内部轮次。
+- 撤销流程先 resume 官方 session，再调用 `undoKimiCodeHistory({ count: 1 })`，随后用 `loadKimiCodeSession` 读取官方 wire 历史并用 `mapHistoryEvents` 刷新本地时间线，不做本地假删除。
+- 浏览器预览 mock 补齐 `undoKimiCodeHistory`。
+- 版本号三处同步到 v2.8.256。
+## 验证
+- `pnpm build` 通过。
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+## 下一步
+- 阶段 C 可接项已完成 C1/C2/C4/C5；C3 后台 ask 仍因 SDK `background-ask=false` 且缺非阻塞接续 API 暂不接。后续建议做真实窗口人工验收与必要 UI 微调。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

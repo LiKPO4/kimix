@@ -124,6 +124,7 @@ import type {
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
+  KimiCodeUndoHistoryRequest,
   KimiCodeSetPluginEnabledRequest,
   KimiCodeSetPluginMcpServerEnabledRequest,
   KimiCodeSetPermissionRequest,
@@ -286,6 +287,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
   steerKimiCode: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:steer", req),
+  undoKimiCodeHistory: (req: KimiCodeUndoHistoryRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:undoHistory", req),
   cancelKimiCodeTurn: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:cancel", req),
   setKimiCodePlanMode: (req: KimiCodeSetPlanModeRequest): Promise<KimiCodeVoidResponse> =>

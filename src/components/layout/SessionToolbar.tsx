@@ -21,6 +21,7 @@ import {
   Pin,
   Play,
   Pause,
+  RotateCcw,
   Square,
   SquareTerminal,
   type LucideIcon,
@@ -29,6 +30,10 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { Session } from "@/types/ui";
+import { mapHistoryEvents } from "@/utils/eventMapper";
+import { settleInactiveEvents } from "@/utils/eventHelpers";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 
 export type SessionMenuEntry =
@@ -97,6 +102,7 @@ export function SessionToolbar({
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [undoBusy, setUndoBusy] = useState(false);
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const archiveSession = useSessionStore((s) => s.archiveSession);
@@ -186,6 +192,75 @@ export function SessionToolbar({
       showToast(`启动失败：${res.error}`);
     }
   };
+
+  const undoKimiHistory = async () => {
+    if (!liveCurrentSession || liveCurrentSession.engine !== "kimi-code") {
+      showToast("当前不是 Kimi Code 会话");
+      return;
+    }
+    if (isCurrentSessionRunning) {
+      showToast("会话运行中，稍后再撤销");
+      return;
+    }
+    if (liveCurrentSession.longTask) {
+      showToast("长程任务会话暂不支持直接撤销官方历史");
+      return;
+    }
+    const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+    if (!runtimeSessionId) {
+      showToast("没有可撤销的官方会话");
+      return;
+    }
+    const workDir = liveCurrentSession.projectPath || projectPath || "";
+    if (!workDir) {
+      showToast("缺少工作目录，无法刷新官方历史");
+      return;
+    }
+    setUndoBusy(true);
+    try {
+      const resumed = await window.api.resumeKimiCodeSession({ sessionId: runtimeSessionId });
+      if (!resumed.success) {
+        showToast(`恢复会话失败：${resumed.error}`);
+        return;
+      }
+      const undone = await window.api.undoKimiCodeHistory({ sessionId: runtimeSessionId, count: 1 });
+      if (!undone.success) {
+        showToast(`撤销失败：${undone.error}`);
+        return;
+      }
+      const loaded = await window.api.loadKimiCodeSession({ workDir, sessionId: runtimeSessionId });
+      if (!loaded.success) {
+        showToast(`已撤销，但刷新历史失败：${loaded.error}`);
+        return;
+      }
+      const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
+      const updatedAt = Date.now();
+      updateSession(liveCurrentSession.id, (session) => ({
+        ...session,
+        events,
+        title: deriveSessionTitle(events, session.title),
+        isLoading: false,
+        updatedAt,
+      }));
+      setCurrentSession({
+        ...liveCurrentSession,
+        events,
+        title: deriveSessionTitle(events, liveCurrentSession.title),
+        isLoading: false,
+        updatedAt,
+      });
+      showToast("已撤销官方历史上一轮");
+    } finally {
+      setUndoBusy(false);
+    }
+  };
+
+  const canUndoKimiHistory = Boolean(
+    liveCurrentSession?.engine === "kimi-code" &&
+    !liveCurrentSession.longTask &&
+    !isCurrentSessionRunning &&
+    liveCurrentSession.events.some((event) => event.type === "user_message" || event.type === "steer_message")
+  );
 
   return (
     <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 12 }}>
@@ -397,6 +472,15 @@ export function SessionToolbar({
           aria-label="终端"
         >
           <SquareTerminal size={15} />
+        </button>
+        <button
+          onClick={() => void undoKimiHistory()}
+          disabled={!canUndoKimiHistory || undoBusy}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
+          title="撤销官方历史上一轮"
+          aria-label="撤销官方历史上一轮"
+        >
+          <RotateCcw size={15} className={undoBusy ? "kimix-spin" : ""} />
         </button>
         <button
           onClick={onToggleDiffPanel}

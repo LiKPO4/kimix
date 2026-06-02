@@ -4020,6 +4020,20 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:undoHistory", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const rawCount = typeof req.count === "number" ? req.count : 1;
+    const count = Number.isInteger(rawCount) ? Math.max(1, Math.min(rawCount, 10)) : 1;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    await kimiCodeHost.undoHistory(sessionId, count);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:cancel", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
