@@ -1679,6 +1679,19 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 提交阶段 A 相关文件；用户确认后进入阶段 B，静态和动态盘点 node-sdk 0.6.0 新 API。
 
+# 2026-06-02 Kimi Code 0.8.0 SDK 新 API 盘点
+## 已完成
+- 新增 `scripts/probe-kimi-code-0.8.mjs`，加载仓库内 vendored SDK，盘点导出面、`KimiHarness` / `Session` 方法、实验开关、provider catalog、undo、background tasks 和 goal 可用性。
+- `docs/kimi-code-sdk-probe-result.md` 已追加“0.8.0 新能力 SDK 可用性盘点”表，区分可接 / 部分可接 / TUI-core-only / 待官方开放 / 本轮不接。
+- 版本号三处同步到 v2.8.251。
+## 关键结论
+- 可接：后台 agent 真实终态 + 恢复提示、自适应思考开关、Provider catalog 导入、`Session.undoHistory(count)`。
+- 暂不接：后台结构化提问目前 `background-ask=false` 且缺独立非阻塞控制 API；审批生命周期事件未开放；cron/reminder 没有 SDK 管理 API；goal mode 虽有 SDK 方法但与 Kimix 长程任务冲突且当前 `goal-command=false`。
+## 验证
+- `node scripts/probe-kimi-code-0.8.mjs` 通过：catalog fetch 138 providers，内存 `applyCatalogProvider` 成功；fresh session `undoHistory(1)` 成功；background tasks 可列举；goal disabled 如预期。
+## 下一步
+进入阶段 C1：后台 agent 真实终态 + 恢复提示，先补 GUI 展示与操作，不扩大到 C2/C4/C5。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

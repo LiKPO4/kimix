@@ -15,6 +15,21 @@
 
 2026-06-02 重跑 P0 探针确认：vendored SDK 来源为官方 `packages/node-sdk@0.6.0`，研究仓库 HEAD 为 `9143fdadf68c252ed4d84b16db0d8274390fa132`，本机 CLI 为 `kimi 0.8.0`。主链路 `createSession` / `resumeSession` / prompt 流式 / steer 同会话 / cancel / approval handler / question handler 全部通过；`session.id` 与 `~/.kimi-code/sessions/.../agents/main/wire.jsonl` 对齐。失败项均为已知非主链路项：CLI 仍不支持 `--wire`、`@moonshot-ai/kimi-code-sdk` npm 仍 404、旧 `@moonshot-ai/kimi-agent-sdk` 已不在当前依赖中、官方源码 `build:dts` 在 Windows 上 `spawn EINVAL` 但 `tsdown` runtime bundle 已产出。
 
+### 0.8.0 新能力 SDK 可用性盘点
+
+2026-06-02 新增并运行 `node scripts/probe-kimi-code-0.8.mjs`，加载仓库内 vendored SDK。动态结果：`harness.getExperimentalFlags()` 返回 `goal-command=false`、`background-ask=false`、`micro-compaction=false`；`session.undoHistory(1)` 在新空会话中 no-op 成功；`session.listBackgroundTasks({ activeOnly: false })` 可调用且当前为空；`fetchCatalog(DEFAULT_CATALOG_URL)` 成功，catalog 138 个 provider，并可用 `applyCatalogProvider()` 在内存 config 中生成 provider/model/defaultModel。
+
+| 候选能力 | 判定 | 证据 | 下一步 |
+|---|---|---|---|
+| 后台 agent 真实终态 + 恢复提示 | 可接 | `Session.listBackgroundTasks()` / `getBackgroundTaskOutput()` / `stopBackgroundTask()` 已存在，事件类型导出 `background.task.started` / `background.task.terminated` | 优先做 C1，主要补 GUI 终态、失败原因、恢复/查看输出入口 |
+| 自适应思考开关 | 可接 | `KimiConfig.models[*].adaptiveThinking` 类型存在，`getConfig/setConfig` 已接；当前默认配置未出现 adaptive alias | 做 C2 前先确认写入 patch 的最小字段，避免覆盖 provider/model 配置 |
+| 后台结构化提问 | 部分可接 | `QuestionBackgroundTaskInfo` 类型存在，`background-ask` 实验开关当前为 false；`setQuestionHandler` 仍是 promise handler，未发现独立非阻塞 question 控制 API | 暂不做 C3，只登记；等官方开放或开关可用再接 |
+| Provider catalog/registry 导入 | 可接 | SDK 导出 `fetchCatalog` / `catalogProviderModels` / `inferWireType` / `catalogBaseUrl` / `applyCatalogProvider`，动态 fetch/apply 通过 | 可做 C4，但优先级低于 C1/C2 |
+| `/undo` 撤回上一条 prompt | 可接 | `Session.undoHistory(count)` 真 SDK 方法，动态空会话 no-op 成功 | 可做 C5；实现时必须刷新官方历史，不做本地假删除 |
+| 审批生命周期 hook 事件 | 待官方开放 | SDK 有 `setApprovalHandler`，但未发现 approval pending/completed event 或列表 API | 不做 GUI 新能力，仅保留现有审批闭环 |
+| 定时任务 / reminder / cron 管理 | TUI/core-only | `CronFiredEvent` 类型导出，agent-core 有 cron manager；`Session/KimiHarness` 无 list/create/delete cron API | 不接入，避免和 Kimix 长程任务做并行体系 |
+| Goal mode | 有 SDK 但本轮不接 | `Session.createGoal/getGoal/pauseGoal/resumeGoal/cancelGoal` 存在，但动态 `getGoal` 返回 `Goal command is disabled` | 明确不做，与 Kimix 长程任务冲突 |
+
 ## 结果明细
 
 ### 通过：git status --short
