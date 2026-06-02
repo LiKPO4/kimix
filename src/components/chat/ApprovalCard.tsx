@@ -153,21 +153,12 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
     try {
-      if (currentSession.engine === "kimi-code") {
-        await window.api.respondKimiCodeApproval({
-          sessionId: runtimeSessionId,
-          requestId: event.requestId,
-          approved: true,
-          scope,
-        });
-      } else {
-        await window.api.approveRequest({
-          sessionId: runtimeSessionId,
-          requestId: event.requestId,
-          approved: true,
-          scope,
-        });
-      }
+      await window.api.respondKimiCodeApproval({
+        sessionId: runtimeSessionId,
+        requestId: event.requestId,
+        approved: true,
+        scope,
+      });
       updateSession(currentSession.id, (session) => ({
         ...session,
         events: session.events.map((e) =>
@@ -186,19 +177,11 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
     try {
-      if (currentSession.engine === "kimi-code") {
-        await window.api.respondKimiCodeApproval({
-          sessionId: runtimeSessionId,
-          requestId: event.requestId,
-          approved: false,
-        });
-      } else {
-        await window.api.approveRequest({
-          sessionId: runtimeSessionId,
-          requestId: event.requestId,
-          approved: false,
-        });
-      }
+      await window.api.respondKimiCodeApproval({
+        sessionId: runtimeSessionId,
+        requestId: event.requestId,
+        approved: false,
+      });
       updateSession(currentSession.id, (session) => ({
         ...session,
         events: session.events.map((e) =>
@@ -347,7 +330,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
             </button>
             <button
               onClick={() => handleApprove("session")}
-              className="kimix-icon-text-button bg-accent-blue text-white text-sm hover:opacity-90"
+              className="kimix-icon-text-button bg-accent-primary text-text-inverse text-sm hover:bg-accent-primary-dark"
             >
               <ShieldCheck size={14} />
               <span>本会话允许</span>

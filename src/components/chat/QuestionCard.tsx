@@ -122,19 +122,12 @@ export function QuestionCard({ event }: QuestionCardProps) {
     try {
       const runtimeSessionId = getRuntimeSessionId(currentSession);
       if (!runtimeSessionId) return;
-      const res = currentSession.engine === "kimi-code"
-          ? await window.api.respondKimiCodeQuestion({
-              sessionId: runtimeSessionId,
-              requestId: event.requestId,
-              answers: answerPayload,
-              skipped: skip,
-            })
-        : await window.api.respondQuestion({
-            sessionId: runtimeSessionId,
-            rpcRequestId: event.rpcRequestId,
-            questionRequestId: event.requestId,
-            answers: answerPayload,
-          });
+      const res = await window.api.respondKimiCodeQuestion({
+        sessionId: runtimeSessionId,
+        requestId: event.requestId,
+        answers: answerPayload,
+        skipped: skip,
+      });
       if (!res.success) throw new Error(res.error);
       markSettled(skip ? "skipped" : "answered", answerPayload);
       setCollapsed(true);

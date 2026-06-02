@@ -539,6 +539,13 @@ button.bg-accent-primary:focus-visible:not(:disabled),
   color: var(--text-inverse) !important;
 }
 
+.bg-accent-primary:active:not(:disabled),
+button.bg-accent-primary:active:not(:disabled),
+.kimix-icon-text-button.bg-accent-primary:active:not(:disabled) {
+  background: var(--accent-primary-dark) !important;
+  color: var(--text-inverse) !important;
+}
+
 .bg-accent-primary:disabled,
 .bg-accent-primary:disabled:hover,
 button.bg-accent-primary:disabled,

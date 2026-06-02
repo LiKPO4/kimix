@@ -2,6 +2,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { app } from "electron";
 
 type JsonObject = Record<string, unknown>;
 
@@ -276,6 +277,7 @@ export type KimiCodeQuestionResult = null | Record<string, string | true> | {
 type ManagedSession = {
   session: KimiCodeSessionLike;
   status: KimiCodeEngineStatus;
+  permission: KimiCodePermissionMode;
   unsubscribe: () => void;
 };
 
@@ -313,7 +315,7 @@ export function setKimiCodeStatusSink(sink: StatusSink | null) {
 export async function createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
   const sdkHarness = await getHarness();
   const session = await sdkHarness.createSession(options);
-  return registerSession(session, "idle");
+  return registerSession(session, "idle", options.permission ?? "manual");
 }
 
 export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSession> {
@@ -322,7 +324,19 @@ export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSe
 
   const sdkHarness = await getHarness();
   const session = await sdkHarness.resumeSession({ id: sessionId });
-  return registerSession(session, "idle");
+  // The resumed session keeps whatever permission it was persisted with; read it
+  // back from the SDK so the yolo auto-approve guard reflects reality until the
+  // caller re-applies the UI permission mode via setPermission().
+  let resumedPermission: KimiCodePermissionMode = "manual";
+  try {
+    const status = await session.getStatus();
+    if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
+      resumedPermission = status.permission;
+    }
+  } catch {
+    // Best effort: fall back to "manual" if the status read fails.
+  }
+  return registerSession(session, "idle", resumedPermission);
 }
 
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
@@ -350,6 +364,7 @@ export async function setPlanMode(sessionId: string, enabled: boolean): Promise<
 export async function setPermission(sessionId: string, mode: KimiCodePermissionMode): Promise<void> {
   const managed = getManagedSession(sessionId);
   await managed.session.setPermission(mode);
+  managed.permission = mode;
 }
 
 export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatus> {
@@ -464,28 +479,54 @@ export async function stopBackgroundTask(sessionId: string, taskId: string, reas
   await managed.session.stopBackgroundTask(taskId, reason ? { reason } : {});
 }
 
-export async function listPlugins(sessionId: string): Promise<KimiCodePluginSummary[]> {
-  const managed = getManagedSession(sessionId);
-  if (!managed.session.listPlugins) throw new Error("Official Kimi Code SDK does not expose listPlugins on this session");
-  return [...await managed.session.listPlugins()];
+// Lazily-created session for plugin management when no chat session is active.
+let pluginSessionPromise: Promise<KimiCodeSessionLike> | null = null;
+
+async function getOrCreatePluginSession(): Promise<KimiCodeSessionLike> {
+  if (pluginSessionPromise) {
+    try { return await pluginSessionPromise; } catch { pluginSessionPromise = null; }
+  }
+  const sdkHarness = await getHarness();
+  const config = await sdkHarness.getConfig();
+  const workDir = path.join(os.tmpdir(), "kimix-plugin-mgmt");
+  fs.mkdirSync(workDir, { recursive: true });
+  pluginSessionPromise = sdkHarness.createSession({
+    workDir,
+    model: config.defaultModel,
+    permission: "manual",
+    planMode: false,
+    metadata: { source: "kimix-plugin-management" },
+  });
+  return pluginSessionPromise;
 }
 
-export async function installPlugin(sessionId: string, source: string): Promise<KimiCodePluginSummary> {
-  const managed = getManagedSession(sessionId);
-  if (!managed.session.installPlugin) throw new Error("Official Kimi Code SDK does not expose installPlugin on this session");
-  return managed.session.installPlugin(source);
+function resolvePluginSession(sessionId?: string): Promise<KimiCodeSessionLike> | KimiCodeSessionLike {
+  if (sessionId) return getManagedSession(sessionId).session;
+  return getOrCreatePluginSession();
 }
 
-export async function setPluginEnabled(sessionId: string, id: string, enabled: boolean): Promise<void> {
-  const managed = getManagedSession(sessionId);
-  if (!managed.session.setPluginEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginEnabled on this session");
-  await managed.session.setPluginEnabled(id, enabled);
+export async function listPlugins(sessionId?: string): Promise<KimiCodePluginSummary[]> {
+  const session = await resolvePluginSession(sessionId);
+  if (!session.listPlugins) throw new Error("Official Kimi Code SDK does not expose listPlugins on this session");
+  return [...await session.listPlugins()];
 }
 
-export async function setPluginMcpServerEnabled(sessionId: string, id: string, server: string, enabled: boolean): Promise<void> {
-  const managed = getManagedSession(sessionId);
-  if (!managed.session.setPluginMcpServerEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginMcpServerEnabled on this session");
-  await managed.session.setPluginMcpServerEnabled(id, server, enabled);
+export async function installPlugin(source: string, sessionId?: string): Promise<KimiCodePluginSummary> {
+  const session = await resolvePluginSession(sessionId);
+  if (!session.installPlugin) throw new Error("Official Kimi Code SDK does not expose installPlugin on this session");
+  return session.installPlugin(source);
+}
+
+export async function setPluginEnabled(id: string, enabled: boolean, sessionId?: string): Promise<void> {
+  const session = await resolvePluginSession(sessionId);
+  if (!session.setPluginEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginEnabled on this session");
+  await session.setPluginEnabled(id, enabled);
+}
+
+export async function setPluginMcpServerEnabled(id: string, server: string, enabled: boolean, sessionId?: string): Promise<void> {
+  const session = await resolvePluginSession(sessionId);
+  if (!session.setPluginMcpServerEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginMcpServerEnabled on this session");
+  await session.setPluginMcpServerEnabled(id, server, enabled);
 }
 
 export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
@@ -529,6 +570,87 @@ export async function closeAllSessions(): Promise<void> {
   }
 }
 
+/**
+ * Run an isolated one-shot prompt — creates a temporary session, sends content,
+ * collects the assistant's text response, then closes the session.
+ *
+ * This is intentionally separate from the normal session cache: it does NOT call
+ * registerSession(), does NOT fire the global eventSink, and does NOT touch the
+ * sessions Map. Events from this prompt will not leak into open chat windows.
+ */
+export async function runOneShotPrompt(options: {
+  workDir: string;
+  content: string | KimiCodePromptPart[];
+  model?: string;
+  thinking?: boolean;
+  yoloMode?: boolean;
+  timeoutMs?: number;
+}): Promise<string> {
+  const sdkHarness = await getHarness();
+  const config = await sdkHarness.getConfig();
+  const model = options.model ?? config.defaultModel;
+  if (!model) throw new Error("No model configured for one-shot prompt.");
+
+  const session = await sdkHarness.createSession({
+    workDir: options.workDir,
+    model,
+    permission: options.yoloMode ? "yolo" : "manual",
+    planMode: false,
+    metadata: { source: "kimix-one-shot", createdAt: new Date().toISOString() },
+  });
+
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  const startedAt = Date.now();
+  const parts: string[] = [];
+  let ended = false;
+  let endError: string | undefined;
+
+  const unsubscribe = session.onEvent((event) => {
+    if (event.type === "assistant.delta") {
+      if (typeof event.delta === "string") parts.push(event.delta);
+    }
+    if (event.type === "turn.ended") {
+      ended = true;
+      if (event.reason === "failed" || event.reason === "error") {
+        endError = event.error?.code
+          ? `${event.error.code}: ${event.error.message}`
+          : event.reason;
+      }
+    }
+    if (event.type === "error") {
+      ended = true;
+      endError = event.message ?? "Unknown SDK error";
+    }
+  });
+
+  try {
+    await session.prompt(options.content);
+
+    // Wait for the turn to complete or timeout.
+    while (!ended && Date.now() - startedAt < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    if (!ended) {
+      try { await session.cancel(); } catch { /* best effort */ }
+      throw new Error(`One-shot prompt timed out after ${timeoutMs}ms`);
+    }
+
+    if (endError) {
+      throw new Error(`One-shot prompt failed: ${endError}`);
+    }
+
+    return parts.join("");
+  } finally {
+    unsubscribe();
+    try { await session.close(); } catch { /* clean up quietly */ }
+  }
+}
+
+export function getSessionWorkDir(sessionId: string): string | undefined {
+  return sessions.get(sessionId)?.session.workDir;
+}
+
 export function getActiveSessionIds(): string[] {
   return [...sessions.keys()];
 }
@@ -567,14 +689,14 @@ export function respondQuestion(
   pending.resolve(skipped ? null : { answers, method: "enter" });
 }
 
-function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEngineStatus): KimiCodeEngineSession {
+function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEngineStatus, permission: KimiCodePermissionMode): KimiCodeEngineSession {
   sessions.get(session.id)?.unsubscribe();
   attachInteractionHandlers(session);
   const unsubscribe = session.onEvent((event) => {
     eventSink?.({ sessionId: session.id, event });
     updateStatusFromEvent(session.id, event);
   });
-  const managed: ManagedSession = { session, status: initialStatus, unsubscribe };
+  const managed: ManagedSession = { session, status: initialStatus, permission, unsubscribe };
   sessions.set(session.id, managed);
   emitStatus(session.id, initialStatus);
   return toEngineSession(session, initialStatus);
@@ -582,6 +704,12 @@ function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEn
 
 function attachInteractionHandlers(session: KimiCodeSessionLike) {
   session.setApprovalHandler?.(async (request) => {
+    // Full-access (yolo) bound: never bother the user with an approval card when
+    // the session is in full-access mode, even if the SDK still routes the
+    // request here (e.g. permission drift). Auto-approve for the whole session.
+    if (sessions.get(session.id)?.permission === "yolo") {
+      return { decision: "approved", scope: "session", selectedLabel: "Allow for session" };
+    }
     const requestId = getRequestId(request, "approval");
     const key = pendingKey(session.id, requestId);
     setStatus(session.id, "waiting_approval");
@@ -699,9 +827,27 @@ async function loadSdk(): Promise<KimiCodeSdkModule> {
 }
 
 function resolveSdkEntry(): string {
-  const configured = process.env.KIMIX_KIMI_CODE_SDK_ENTRY;
+  // Primary source is the vendored, self-contained bundle that ships with Kimix
+  // (vendor/kimi-code-sdk/index.mjs). See vendor/kimi-code-sdk/README.md for why the
+  // official SDK is vendored instead of taken from npm. The %TEMP% research-repo
+  // paths and KIMIX_KIMI_CODE_SDK_ENTRY are kept only as local-dev fallbacks for
+  // people iterating on the SDK source.
+  const vendoredRel = path.join("vendor", "kimi-code-sdk", "index.mjs");
+
+  // app.getAppPath() = project root in dev, …/resources/app.asar when packaged.
+  // process.resourcesPath = …/resources, where electron-builder copies extraResources.
+  let appPath: string | undefined;
+  try {
+    appPath = app?.getAppPath?.();
+  } catch {
+    // app may be unavailable in non-Electron contexts; fall through to other candidates.
+  }
+
   const candidates = [
-    configured,
+    process.env.KIMIX_KIMI_CODE_SDK_ENTRY,
+    process.resourcesPath ? path.join(process.resourcesPath, vendoredRel) : undefined,
+    appPath ? path.join(appPath, vendoredRel) : undefined,
+    // Dev-only fallbacks: load straight from a local research checkout's build output.
     path.join(os.homedir(), "AppData", "Local", "Temp", "kimix-kimi-code-research", "packages", "node-sdk", "dist", "index.mjs"),
     path.join(os.tmpdir(), "kimix-kimi-code-research", "packages", "node-sdk", "dist", "index.mjs"),
   ].filter((item): item is string => Boolean(item));
@@ -717,6 +863,7 @@ function resolveSdkEntry(): string {
   }
 
   throw new Error(
-    "Official Kimi Code SDK build was not found. Run `pnpm install && pnpm --filter @moonshot-ai/kimi-code-sdk build` in the research repo, or set KIMIX_KIMI_CODE_SDK_ENTRY.",
+    "Official Kimi Code SDK bundle was not found. Expected the vendored bundle at vendor/kimi-code-sdk/index.mjs " +
+      "(regenerate with `node scripts/vendor-kimi-code-sdk.mjs`), or set KIMIX_KIMI_CODE_SDK_ENTRY for local dev.",
   );
 }

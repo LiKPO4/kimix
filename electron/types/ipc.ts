@@ -28,6 +28,10 @@ export type Project = {
   path: string;
   lastOpenedAt: number;
   gitBranch?: string;
+  /** 用户置顶的项目固定显示在列表顶部区域。 */
+  pinned?: boolean;
+  /** 显式排序权重（同区域内升序）；用于拖动排序持久化。 */
+  sortOrder?: number;
 }
 
 export type LongTaskStage = "drafting" | "planning" | "ready" | "running" | "reviewing" | "paused" | "completed";
@@ -1175,18 +1179,18 @@ export type KimiCodeBackgroundTaskRequest = {
 };
 
 export type KimiCodeInstallPluginRequest = {
-  sessionId: string;
+  sessionId?: string;
   source: string;
 };
 
 export type KimiCodeSetPluginEnabledRequest = {
-  sessionId: string;
+  sessionId?: string;
   id: string;
   enabled: boolean;
 };
 
 export type KimiCodeSetPluginMcpServerEnabledRequest = {
-  sessionId: string;
+  sessionId?: string;
   id: string;
   server: string;
   enabled: boolean;
@@ -1196,8 +1200,42 @@ export type KimiCodeSessionRequest = {
   sessionId: string;
 };
 
+export type KimiCodeMarketplacePlugin = {
+  id: string;
+  tier: string;
+  displayName: string;
+  version: string;
+  description: string;
+  homepage?: string;
+  source: string;
+};
+
+export type KimiCodeListMarketplaceResponse = {
+  success: true;
+  data: KimiCodeMarketplacePlugin[];
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeListSessionsRequest = {
   workDir?: string;
+};
+
+export type KimiCodeLoadSessionRequest = {
+  workDir: string;
+  sessionId: string;
+};
+
+export type KimiCodeLoadSessionResponse = {
+  success: true;
+  data: {
+    sessionId: string;
+    events: Array<{ type: string; payload: unknown; time?: unknown }>;
+  };
+} | {
+  success: false;
+  error: string;
 };
 
 export type KimiCodeSessionResponse = {

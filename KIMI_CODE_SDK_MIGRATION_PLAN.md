@@ -1,3 +1,83 @@
+<!-- ===================== 全盘审计结论（置顶） ===================== -->
+
+# 审计结论：当前仓库相对本计划的偏差（2026-06-02，v2.8.247）
+
+> 审计范围：electron/、src/ 全盘，对照本文件 §2 迁移原则与 P0–P7 要义。下列每条均已用 file:line 实测确认。
+> 总评：主交互已切到官方 SDK 主链路（P0–P6 大体落地，TASK_STATE 自报 P7 完成），但仍有 **2 条严重 + 3 条中等 + 3 条轻微** 偏差未收口，其中“SDK 从临时目录加载”和“三套 session id 并存”直接违反计划核心要义。
+
+## 已达成（与计划一致，确认通过）
+
+- P0 探针齐全：`scripts/probe-kimi-code-sdk.mjs` 与 `docs/kimi-code-sdk-probe-result.md` 存在，确认 CLI `0.6.0`、官方 SDK `@moonshot-ai/kimi-code-sdk@0.4.0`、prompt 实时流式、steer 不裂 session、`sessionId` 与 `~/.kimi-code/sessions/.../agents/main/wire.jsonl` 一致。
+- P1：`electron/kimiCodeHost.ts`（约 723 行）实现官方 `KimiHarness`/`Session` 适配，内部 `Map<sessionId, Session>` 以官方 id 为 key；新 IPC `kimi-code:event` / `kimi-code:status` 与 26 个 `kimi-code:*` handler 齐全。
+- P2/P4：新 mapper `src/utils/kimiCodeEventMapper.ts` + 测试存在；正式 timeline 按 `engine === "kimi-code"` 分流，未从 screen/answerText 合并正文；队列在 `steer()` 成功后立即移除、失败回滚（`Composer.tsx`），普通排队在本轮 `completed` 后才 `prompt()`（`App.tsx:1602-1634`）。
+- P5：审批/提问/权限/Plan 全部走 SDK（`ApprovalCard.tsx`、`QuestionCard.tsx`、`Composer.tsx` 的 `setKimiCodePermission`/`setKimiCodePlanMode`），正式聊天链路无 `/plan`、`/model`、`/plugins` 文本下发。
+- P7 部分：`electron/tuiHost.ts`、`src/utils/tuiSemanticReducer.ts` 已删除；未发现 `isInputIdle` / `scheduleTuiIdleCompletion` / 1.5s 强制 finish 主逻辑；未发现 screen 文本进入正式消息流。
+
+## 仍不符合计划要义（待收口）
+
+### 🔴 严重
+
+1. ~~**官方 SDK 不是正式依赖，靠“临时研究目录”加载**~~ → **已收口（2026-06-02，vendoring 完成）**
+   - 历史问题：`electron/kimiCodeHost.ts` 把 SDK 入口解析到 `%TEMP%\kimix-kimi-code-research\…\dist\index.mjs`；该 Temp 目录在 CI/换机/安装包里不存在，发布版新引擎会 `Failed to load`。
+   - 官方真源：`@moonshot-ai/kimi-code-sdk` npm **404 未发布**，无法写 `dependencies`；且其 `dist/index.mjs` **本身不自包含**（实测缺 `zod`/`ajv`/`google-auth-library`/`@modelcontextprotocol/sdk` 等 bare import），只拷 `dist/` 仍会崩。
+   - **收口做法（vendoring 自包含单文件）**：
+     - 用 esbuild 把官方 `node-sdk/dist/index.mjs` 重打成 **自包含单文件** `vendor/kimi-code-sdk/index.mjs`（5.5MB，所有 JS 依赖内联；`bufferutil`/`utf-8-validate`/`canvas` 等可选原生标 external，消费库自带 try/catch；注入 `createRequire` banner 解决 ESM 下动态 require）。
+     - `resolveSdkEntry()` 改为**优先 vendored**（打包：`process.resourcesPath/vendor/…`；dev：`app.getAppPath()/vendor/…`），`%TEMP%`/`KIMIX_KIMI_CODE_SDK_ENTRY` 降为本地开发兜底。
+     - `electron-builder.yml` 经 `extraResources` 随包发布 `vendor/kimi-code-sdk`；新增 `scripts/vendor-kimi-code-sdk.mjs` + `esbuild` devDep + `pnpm vendor:kimi-code-sdk` 可复现重生成；`vendor/kimi-code-sdk/README.md` 记录来源 commit `121a6dd` / node-sdk `0.5.0` / CLI `0.7.0`。
+   - **验证**：干净目录（无 node_modules）导入 + `KimiHarness` 实例化 + `createSession` 均 OK；用真实 App 身份 `kimi-code-cli` 跑真实 prompt **流式 101 deltas、首 delta ~2.1s、`completed`**；`pnpm build` 通过；优先级实测在 Temp 目录仍存在时仍选中 vendored。
+   - 仍待：把旧 `@moonshot-ai/kimi-agent-sdk` 的 `extraResources` 一并移除——属第 3 条“清旧”分阶段迁移范围，留待后续。
+
+1b. **主引擎依赖的是官方“未公开”的内部包**（战略风险，违反 §0“以官方文档与仓库为真源”的精神）
+   - 官方文档 https://moonshotai.github.io/kimi-code/zh/ 当前 **完全未记载 Node SDK**，反而主打“单文件 CLI、毫秒级启动、无需 Node.js”；官方仓库 README 也只讲 CLI/终端用法。`packages/node-sdk` 在源码里仍是 `private: true`。
+   - 即：Kimix 把主交互押在一个 **官方文档未背书、未发布、private** 的内部包上。官方一旦调整该包结构或停更，Kimix 主链路会断。需在计划里明确登记此风险与应对（持续跟踪官方仓库、vendoring 锁定已验证 commit）。
+
+1c. ~~**CLI / SDK 版本已漂移，探针结论过期**~~ → **已重跑 P0 探针对齐（2026-06-02），兼容性确认通过**
+   - 历史问题：探针旧记录为 CLI `0.6.0`、SDK `0.4.0`（commit `42bb914`）；官方已漂移到 CLI `0.7.0`、node-sdk `0.5.0`（研究仓库 commit `121a6dd`）。
+   - **重跑结论（CLI 0.7.0 + node-sdk 0.5.0，16 通过 / 5 失败）**：新 SDK 主路全部通过——`createSession`/`resumeSession`、prompt 实时流式（首 delta ~1.0s）、**steer 不裂 session（before/after 会话数恒为 2）**、cancel、approval/question handler 回调全部命中；`session.id` 与 `~/.kimi-code/sessions/.../<id>/agents/main/wire.jsonl` 对齐且 `wireExists: true`。**迁移核心假设在最新版本依旧成立。**
+   - 5 个失败均与新主路无关、且强化既定结论：
+     - `kimi --wire` 在 CLI `0.7.0` 报 `unknown option '--wire'` → **旧 wire 协议已被官方移除**，旧 `@moonshot-ai/kimi-agent-sdk` 的 `ProtocolClient` 握手随之失败（探针 2 项失败）→ 第 3 条“删除旧 SDK”从“清理”升级为“旧链路已死、必须删”。
+     - `pnpm view @moonshot-ai/kimi-code-sdk` 仍 404 → 第 1 条 vendoring 仍是唯一现实路径。
+     - `official packages/node-sdk build`：`tsdown` 打包成功（dist 4.22MB），仅后续 `build:dts` 在 Windows `spawn EINVAL` 失败 → 只影响 `.d.ts` 生成，**运行时 `index.mjs` 正常**（`import from built source` + 全部 runtime smoke 通过）。vendoring 用预构建 `dist` 可完全绕开此构建问题。
+   - 探针完整明细见 `docs/kimi-code-sdk-probe-result.md`（已用本次重跑结果覆盖刷新）。
+
+2. **三套 session id 仍并存、仍在互相猜**（违反 §2 原则 3、P3、P7）
+   - `src/types/ui.ts:46-61`：`Session` 同时保留 `id`、`runtimeSessionId`、`officialSessionId`。
+   - `src/utils/runtimeSession.ts`：`runtimeSessionId ?? id` 的兜底猜测仍在。
+   - `src/App.tsx`：`resolveUiSessionId(payload.sessionId)`（1517、1543 行）与 `findLocalSessionForRuntime(...)`（约 59-65、258-264 行）仍做三路 id 匹配。
+   - 计划明确要求“Kimix UI session id 最终必须等于官方 `sessionId`，避免三套 id 互相猜”。当前仍是映射层在把官方 id 翻译回 UI id，未收敛为单一 id。
+
+### 🟡 中等
+
+3. **旧 SDK `@moonshot-ai/kimi-agent-sdk` 仍被 import、monkey-patch 并实际调用**（P7 未收口）
+   - `electron/kimiBridge.ts:2-14` 导入 `createSession` / `ProtocolClient`；`646-729` 对 `ProtocolClient.prototype` 打补丁；`1106` 仍调用 `createSession(...)`。`electron/main.ts:22-23` 也导入其类型/`ContentPart`。
+   - 虽被 `supportsKimiWireMode()`（`kimiBridge.ts:105-112`，永远返回 `false`）总闸门禁用，但依赖与代码未删除；且版本钉为 `"latest"`（不可复现，违反 AGENTS“新依赖须说明并可回滚”）。
+
+4. **仍存在完整的并行 “prompt” 引擎链路**（与 §2 原则 4“事件只来自一个主源”、P7“删除旧主链路”有距离）
+   - `src/types/ui.ts:48`：`engine?: "prompt" | "kimi-code"`；`electron/kimiBridge.ts` 保留整套 prompt-mode（`kimi -p`，`promptModeSessions`、`1200ms` thinking 轮询 `1237` 行附近、`563` 行“prompt-mode 尚未实时写出思考正文”等）。
+   - 现状：`kimi-code` 为新建会话默认（确认通过），`prompt` 为遗留兜底。需明确其定位并在计划中登记是“长期兜底”还是“P7 待删”，否则属于未交代的第二套主源。
+
+5. **kimi-code 路径 duration 仍可能显示 `0s`**（违反 §5 验收用例 2 的初衷）
+   - `src/utils/kimiCodeEventMapper.ts` 不计算 `durationMs`；kimi-code 事件经 `enqueueStreamEvent` 批处理（`App.tsx:1535`），**不经过** `eventMapper.ts` 的 `mergeEvents`（duration 是在那里算的）。`turn.ended` 产出的 assistant 完成事件没有 duration 来源。
+   - 需实测一轮长 thinking 确认是否回归 `0s`；若回归，应在 mapper 或 status 收尾处基于官方 `turn.started`/`turn.ended` 结算 duration。
+
+### ⚪ 轻微
+
+6. **Hook 事件未映射**（P2 列出的 `HookTriggered/HookResolved -> hook 提示`）：`kimiCodeEventMapper.ts` 无 hook 分支。若官方 SDK 会发 hook 事件，则当前会被静默丢弃。
+
+7. **`getSessionHistory` 未作为显式接口实现**（P1 接口清单列出）：当前历史依赖事件流回放，无独立历史 API；resume 后历史回放路径需确认。
+
+8. **TASK_STATE 自报 P7 完成，与第 1/2/3 条现状不一致**：建议把上述偏差回填到 `TASK_STATE.md`，避免下个窗口误以为已全部收口。
+
+## 建议下一步（最小增量，按严重度）
+
+- [x] ~~第 1 条：vendoring~~ **已完成（2026-06-02）**，并按 1c **已重跑 P0 探针对齐 CLI `0.7.0`**（兼容性通过）。
+- [ ] **第 3 条「清旧」分阶段迁移（已确认顺序：先 vendoring 后清旧）**：旧 `kimiBridge`（prompt 备用引擎 + 旧 `@moonshot-ai/kimi-agent-sdk`）经实测仍是**承重墙**——给含新引擎在内的所有会话承担 **列会话 / 重开会话 / 加载历史 / 长任务(executor+reviewer) / Hook 规则生成**。退役需先把这些迁到新引擎，再删旧依赖与 prompt-mode，最后移除其 `extraResources`。属多步真迁移，非清理。
+  - 待迁移消费点（实测 file:line）：UI 建会话 `App.tsx:651/809/1247/1438`、`AppShell.tsx:432`（仍走 `window.api.startSession`+`sendPrompt`）；后端 `main.ts:3086`(longTasks)、`main.ts:3569`(`runOneShotPrompt`)；历史 `kimi:loadSession`→`getSessionHistory`（读旧 `wire.jsonl`）。旧 SDK 真死码：`kimiBridge.ts` 的 `@moonshot-ai/kimi-agent-sdk` import / monkey-patch(646-750) / `supportsKimiWireMode()`(永远 false) / wire `createSession`(1106 不可达)；`kimi --wire` 在 CLI 0.7.0 已被移除。
+- [ ] 第 2 条：用一次性迁移把 UI session id 收敛到官方 `sessionId`，删除 `runtimeSessionId`/`officialSessionId` 与三路匹配。
+- [ ] 第 4/5 条：prompt-mode 定位随第 3 条一并清理；补一条长 thinking 实测确认 duration 不再 `0s`。
+
+<!-- ===================== 审计结论结束 ===================== -->
+
 # Kimix Kimi Code 新引擎迁移执行计划
 
 > 目标读者：下一个接手窗口 / agent。

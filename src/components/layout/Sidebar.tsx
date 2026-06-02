@@ -135,22 +135,48 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const pinProject = async (project: Project) => {
-    await window.api.addRecentProject({ ...project, lastOpenedAt: Date.now() });
-    await refreshRecentProjects();
     setOpenProjectMenu(null);
+    const res = await window.api.setProjectPinned({ id: project.id, pinned: true });
+    if (res.success) setRecentProjects(res.data);
     toast("已置顶项目");
   };
 
   const unpinProject = async (project: Project) => {
-    const nextProject = recentProjects.find((item) => item.path !== project.path);
     setOpenProjectMenu(null);
-    if (!nextProject) {
-      toast("只有一个项目，无法取消置顶");
-      return;
-    }
-    await window.api.addRecentProject({ ...nextProject, lastOpenedAt: Date.now() });
-    await refreshRecentProjects();
+    const res = await window.api.setProjectPinned({ id: project.id, pinned: false });
+    if (res.success) setRecentProjects(res.data);
     toast("已取消置顶项目");
+  };
+
+  const [dragProjectId, setDragProjectId] = useState<string | null>(null);
+  // Insertion marker: shows a line above/below the hovered row to indicate where the drop lands.
+  const [dropIndicator, setDropIndicator] = useState<{ id: string; position: "above" | "below" } | null>(null);
+
+  const sameRegion = (id: string, pinned: boolean) =>
+    (recentProjects.find((p) => p.id === id)?.pinned ?? false) === pinned;
+
+  // Reorder within the same region (pinned-with-pinned, unpinned-with-unpinned).
+  const handleProjectDrop = async () => {
+    const sourceId = dragProjectId;
+    const indicator = dropIndicator;
+    setDragProjectId(null);
+    setDropIndicator(null);
+    if (!sourceId || !indicator || sourceId === indicator.id) return;
+    const source = recentProjects.find((p) => p.id === sourceId);
+    const target = recentProjects.find((p) => p.id === indicator.id);
+    if (!source || !target || !!source.pinned !== !!target.pinned) return; // only reorder within same region
+
+    const ordered = [...recentProjects];
+    const fromIndex = ordered.findIndex((p) => p.id === sourceId);
+    const [moved] = ordered.splice(fromIndex, 1);
+    // Recompute target index after removal, then insert above/below the target row.
+    const targetIndex = ordered.findIndex((p) => p.id === indicator.id);
+    const insertAt = indicator.position === "below" ? targetIndex + 1 : targetIndex;
+    ordered.splice(insertAt, 0, moved);
+
+    setRecentProjects(ordered); // optimistic
+    const res = await window.api.reorderProjects({ orderedIds: ordered.map((p) => p.id) });
+    if (res.success) setRecentProjects(res.data);
   };
 
   const openProjectPath = async (project: Project) => {
@@ -344,17 +370,50 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          {recentProjects.map((project) => {
+          {recentProjects.map((project, projectIndex) => {
             const isExpanded = expandedProject === project.id;
             const isActive = currentProject?.id === project.id;
-            const isPinned = recentProjects[0]?.path === project.path;
+            const isPinned = project.pinned ?? false;
             const pSessions = projectSessions(project.path);
+            const prev = recentProjects[projectIndex - 1];
+            const showRegionDivider = !isPinned && (prev?.pinned ?? false);
+            const isDragging = dragProjectId === project.id;
+            const canDropHere = dragProjectId !== null && dragProjectId !== project.id && sameRegion(dragProjectId, isPinned);
+            const showLineAbove = canDropHere && dropIndicator?.id === project.id && dropIndicator.position === "above";
+            const showLineBelow = canDropHere && dropIndicator?.id === project.id && dropIndicator.position === "below";
 
             return (
               <section
                 key={project.id}
-                style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  marginTop: showRegionDivider ? 6 : 0,
+                  borderTop: showRegionDivider ? "1px solid var(--kimix-panel-divider, rgba(127,127,127,0.18))" : undefined,
+                  paddingTop: showRegionDivider ? 12 : 0,
+                  opacity: isDragging ? 0.4 : 1,
+                }}
+                draggable
+                onDragStart={(e) => { setDragProjectId(project.id); e.dataTransfer.effectAllowed = "move"; }}
+                onDragEnd={() => { setDragProjectId(null); setDropIndicator(null); }}
+                onDragOver={(e) => {
+                  if (!dragProjectId || dragProjectId === project.id || !sameRegion(dragProjectId, isPinned)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const position = e.clientY < rect.top + rect.height / 2 ? "above" : "below";
+                  setDropIndicator((cur) => (cur?.id === project.id && cur.position === position ? cur : { id: project.id, position }));
+                }}
+                onDrop={(e) => { e.preventDefault(); void handleProjectDrop(); }}
               >
+                {showLineAbove && (
+                  <div aria-hidden style={{ position: "absolute", left: 12, right: 12, top: showRegionDivider ? 6 : -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
+                )}
+                {showLineBelow && (
+                  <div aria-hidden style={{ position: "absolute", left: 12, right: 12, bottom: -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
+                )}
                 <div
                   style={{ paddingLeft: 20, paddingRight: 10 }}
                   className={`group/project relative flex h-9 w-full items-center gap-1 rounded-xl pl-3 pr-1 text-[15px] transition-colors ${
@@ -377,6 +436,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                   >
                     <FolderOpen size={16} className="shrink-0 text-text-muted" />
                     <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                   </button>
                   <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
                     <button
@@ -543,7 +603,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.247</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.249</span>
         </button>
       </div>
     </aside>

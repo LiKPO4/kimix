@@ -24,16 +24,41 @@ function readProjects(): Project[] {
     const data = fs.readFileSync(PROJECTS_FILE, "utf-8");
     const parsed = JSON.parse(data);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
+    const valid = parsed.filter(
       (p): p is Project =>
         p && typeof p === "object" &&
         typeof p.id === "string" &&
         typeof p.path === "string" &&
         typeof p.name === "string"
     );
+    return sortProjects(valid.map(normalizeProject));
   } catch {
     return [];
   }
+}
+
+function normalizeProject(project: Project, index = 0): Project {
+  return {
+    ...project,
+    pinned: project.pinned === true,
+    sortOrder: typeof project.sortOrder === "number" ? project.sortOrder : index,
+  };
+}
+
+/** Sort: pinned first, then by explicit sortOrder ascending (falls back to insertion order). */
+function sortProjects(projects: Project[]): Project[] {
+  return projects
+    .map((p, index) => ({ p, index }))
+    .sort((a, b) => {
+      const aPinned = a.p.pinned ? 0 : 1;
+      const bPinned = b.p.pinned ? 0 : 1;
+      if (aPinned !== bPinned) return aPinned - bPinned;
+      const aOrder = typeof a.p.sortOrder === "number" ? a.p.sortOrder : a.index;
+      const bOrder = typeof b.p.sortOrder === "number" ? b.p.sortOrder : b.index;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.index - b.index;
+    })
+    .map(({ p }) => p);
 }
 
 function writeProjects(projects: Project[]) {
@@ -52,14 +77,50 @@ export function getRecentProjects(): Project[] {
 
 export function addRecentProject(project: Project): void {
   const existing = readProjects();
+  const prior = existing.find((p) => p.path === project.path);
   const filtered = existing.filter((p) => p.path !== project.path);
-  const updated = [project, ...filtered].slice(0, 20);
-  writeProjects(updated);
+  if (prior) {
+    // Re-opening a known project: keep its place, pin state and sort order — don't
+    // yank it to the top. Only refresh metadata (name, lastOpenedAt, gitBranch).
+    const merged = normalizeProject({
+      ...prior,
+      ...project,
+      pinned: prior.pinned,
+      sortOrder: prior.sortOrder,
+    });
+    writeProjects(sortProjects([...filtered, merged]).slice(0, 20));
+    return;
+  }
+  // Brand-new project: append after existing ones (new sortOrder at the end of its region).
+  const maxOrder = existing.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
+  const added = normalizeProject({ ...project, pinned: project.pinned === true, sortOrder: maxOrder + 1 });
+  writeProjects(sortProjects([...filtered, added]).slice(0, 20));
 }
 
 export function removeRecentProject(id: string): void {
   const existing = readProjects();
   writeProjects(existing.filter((p) => p.id !== id));
+}
+
+export function setProjectPinned(id: string, pinned: boolean): Project[] {
+  const existing = readProjects();
+  const updated = existing.map((p) => (p.id === id ? { ...p, pinned } : p));
+  const sorted = sortProjects(updated);
+  writeProjects(sorted);
+  return sorted;
+}
+
+/** Persist an explicit ordering by assigning sortOrder from the given id sequence. */
+export function reorderProjects(orderedIds: string[]): Project[] {
+  const existing = readProjects();
+  const orderIndex = new Map(orderedIds.map((id, index) => [id, index]));
+  const updated = existing.map((p) => {
+    const idx = orderIndex.get(p.id);
+    return idx === undefined ? p : { ...p, sortOrder: idx };
+  });
+  const sorted = sortProjects(updated);
+  writeProjects(sorted);
+  return sorted;
 }
 
 export async function getGitBranch(projectPath: string): Promise<string | undefined> {

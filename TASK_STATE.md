@@ -114,7 +114,14 @@
 - 验收标准：先完成官方能力盘点和最小原型；确认不会破坏当前长程任务执行 / 审查 / 暂停继续链路后再进入实现。
 
 ## 当前版本
-**v2.8.247** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+**v2.8.248** — 三处同步：`package.json` + `src/components/layout/Sidebar.tsx` + `src/components/settings/SettingsPanel.tsx`。
+
+## 本轮证据（v2.8.248：审批卡按钮 / 路径不符 / yolo 仍弹审批 / 完成对话工具请求折叠）
+- 问题1：`ApprovalCard` "本会话允许" 由 legacy `bg-accent-blue` 改为统一主按钮 `bg-accent-primary text-text-inverse hover:bg-accent-primary-dark`；`index.css` 为 `.bg-accent-primary` 增加 `:active:not(:disabled)` → `--accent-primary-dark`（"按下变深蓝"成为全局规则）。
+- 问题2（路径绑错 temp/kimix-plugin-mgmt）：根因为 `sessionHistory.getKimiCodeSessionDirs` 扫描所有 bucket、把插件临时会话串进任意项目列表，bootstrap resume 后绑到 temp workDir。改为只扫描请求 workDir 的 bucket；`main.ts kimi:startSession` resume 后校验 workDir 不符则改新建；`Composer.ensureKimiCodeRuntime` resume 分支也加 workDir 守卫（覆盖旧持久化的错绑会话）。
+- 问题3（完全访问仍弹审批）：`kimiCodeHost` 的 `ManagedSession` 跟踪 `permission`，create/setPermission/resume(getStatus 回填) 同步；审批 handler 在 `permission==="yolo"` 时直接自动放行不打扰用户（最强兜底）。`Composer` resume 后用当前 `permissionMode` 调一次 `setKimiCodePermission`；`handleSetPermissionMode` 仅在存在真实 runtimeSessionId 时下发，避免运行时未建时误回滚 UI 模式。
+- 问题4（完成对话工具请求折叠）：`ChatThread.renderTurnBody` 把已解决(approved/rejected)审批挂到所属 assistant 的 `leadingApprovals`，pending 审批仍独立渲染保持可交互；`MessageBubble` 新增 `ApprovalProcessItem`（默认折叠）并入 `AssistantProcessSummary`，消息头 summary 追加 "N 个工具请求"。
+- 验收：`npx vitest run kimiCodeEventMapper/eventMapper/eventHelpers` 47/47 通过；`pnpm build` 通过（新 hash `index-CC82C73D.js`）；本次改动未引入新 tsc 错误（既有 `sessionTitle.test` 2 失败与 tsc 噪声无关）。待用户截图验收 4 项现象。
 
 ## 本轮证据
 - v2.8.247：修复 TUI assistant 完成后显示“已处理 0s”和运行中消息头不稳定的问题。`mergeEvents` 在 assistant 完成时改用 `Date.now() - placeholder.timestamp` 结算 duration，避免官方完成事件批量同 timestamp 导致 0s；`MessageBubble` 的 active 判断同时识别 UI session id 和 runtimeSessionId，运行中应能显示思考/执行头；完成态非零 duration 至少显示 1s。待验证：长时间思考后不再显示 0s，发送后能尽早看到消息头。
@@ -1657,3 +1664,36 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 已经被旧逻辑过滤掉且没有持久化在本地事件里的历史正文，无法靠 UI 结算逻辑自动恢复；后续引导链路应不再复现同类丢失。
 ## 下一步
 请再次在运行中发送一条引导，确认后续 assistant 正文仍保留在引导消息下方。
+
+# 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
+## 背景
+- 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。
+## 已完成
+- 实测当前真源：installed `kimi --version` = `0.7.0`；研究仓库 `packages/node-sdk` = `0.5.0`（commit `121a6dd`，仍 `private:true`）；`@moonshot-ai/kimi-code-sdk` npm 仍 404。
+- 重跑 `node scripts/probe-kimi-code-sdk.mjs`：16 通过 / 5 失败；`docs/kimi-code-sdk-probe-result.md` 已用本次结果覆盖刷新。
+- 把重跑结论回填进 `KIMI_CODE_SDK_MIGRATION_PLAN.md` 第 1c 条（标记已收口）。
+## 关键结论
+- 新 SDK 主路在 CLI 0.7.0 + node-sdk 0.5.0 上全绿：create/resume、prompt 实时流式（首 delta ~1.0s）、steer 不裂 session（会话数 before=after=2）、cancel、approval/question handler 全部命中；sessionId 与 wire.jsonl 对齐、wireExists=true。迁移核心假设依旧成立。
+- 5 个失败均无关新主路：`kimi --wire` 在 0.7.0 已被移除（→旧 ProtocolClient 握手 2 项失败，坐实旧 SDK 已死必删）；npm 仍 404（→vendoring 仍唯一）；node-sdk build 仅 `build:dts` 在 Windows spawn EINVAL 失败，运行时 index.mjs 正常（vendoring 用预构建 dist 可绕开）。
+## 未完成 / 下一步
+- 第 1 条 vendoring 尚未执行：兼容性已验证通过，等用户确认是否把研究仓库预构建 `node-sdk/dist` 拷进 `vendor/kimi-code-sdk/` 并改 `resolveSdkEntry` 去掉 %TEMP% 硬编码。
+
+# 2026-06-02 建新：vendoring 官方 Kimi Code SDK（审计 #1 收口）
+## 背景
+- 用户拍板顺序「先 vendoring 再分阶段清旧」。审计 #1：新主引擎从 %TEMP% 临时研究目录加载未发布的 private SDK，换机/CI/安装包必崩。
+## 关键发现
+- 官方 `node-sdk/dist/index.mjs` **不自包含**：干净目录导入实测缺 `zod` 等 bare import（今天能跑只因临时目录旁有 node_modules）。只拷 dist 不可行。
+## 已完成
+- esbuild 把官方 dist 重打成**自包含单文件** `vendor/kimi-code-sdk/index.mjs`（5.5MB；JS 依赖全内联；`bufferutil`/`utf-8-validate`/`canvas` 标 external；注入 `createRequire` banner 修 ESM 动态 require）。
+- `electron/kimiCodeHost.ts`：`import { app }`；`resolveSdkEntry()` 改为优先 vendored（打包 `process.resourcesPath/vendor/…`，dev `app.getAppPath()/vendor/…`），%TEMP%/env 降为开发兜底；错误文案更新。
+- `electron-builder.yml`：`extraResources` 增加 `vendor/kimi-code-sdk` 随包发布。
+- 新增 `scripts/vendor-kimi-code-sdk.mjs` + `pnpm vendor:kimi-code-sdk` + `esbuild` devDep(0.28.0)；`vendor/kimi-code-sdk/README.md` 记录来源 commit 121a6dd / node-sdk 0.5.0 / CLI 0.7.0 / 刷新步骤。
+## 验证
+- 干净目录（无 node_modules）：import OK、`KimiHarness` 实例化 OK、`createSession` 真实会话 id OK。
+- 用真实 App 身份 `kimi-code-cli` 跑真实 prompt：**101 deltas、首 delta ~2.1s、reason=completed**（流式/websocket 在原生外部化下正常）。
+- 过程中用非白名单身份会 403「Kimi For Coding 仅对编码 agent 开放」——与 vendoring 无关；已确认 `kimiCodeHost.ts:685` 真实用的是白名单 `kimi-code-cli`。
+- `pnpm build` 通过；优先级实测：%TEMP% 仍在时 resolveSdkEntry 仍选中仓库内 vendored。
+- 脚本重生成产物字节与手动一致（5521684），可复现。
+## 未完成 / 下一步
+- 旧 `@moonshot-ai/kimi-agent-sdk` 的 `extraResources` 与依赖未删——属第 3 条「清旧」分阶段迁移，下一阶段做。
+- 建议：在真实 Electron 窗口跑一次新建会话发消息，确认主进程从 vendored 加载（dev 路径）；打包一次确认 extraResources 落到 resources/vendor。

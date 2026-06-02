@@ -3,7 +3,7 @@ import { Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Uplo
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import type { KimiCodePluginSummary } from "@electron/types/ipc";
+import type { KimiCodePluginSummary, KimiCodeMarketplacePlugin } from "@electron/types/ipc";
 
 type SkillInfo = {
   name: string;
@@ -18,7 +18,6 @@ type SkillInfo = {
 type PluginPanelTab = "skills" | "mcp";
 const OFFICIAL_PLUGIN_STORE_URL = "https://moonshotai.github.io/kimi-code/zh/customization/plugins.html#安装与管理-plugins";
 const OFFICIAL_PLUGIN_DOCS_URL = "https://moonshotai.github.io/kimi-code/zh/customization/plugins.html#plugin-manifest";
-const KIMI_DATASOURCE_PLUGIN_URL = "https://cdn.kimi.com/kimi-code-plugins/kimi-datasource.zip";
 
 export function SkillsPanel({
   open,
@@ -46,21 +45,19 @@ export function SkillsPanel({
   const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
   const [sdkPluginRefreshing, setSdkPluginRefreshing] = useState(false);
   const [sdkPluginToggling, setSdkPluginToggling] = useState<string | null>(null);
+  const [marketplace, setMarketplace] = useState<KimiCodeMarketplacePlugin[]>([]);
+  const [installingMarketId, setInstallingMarketId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
-  const sdkRuntimeSessionId = currentSession?.engine === "kimi-code" ? getRuntimeSessionId(currentSession) : null;
+  const sdkRuntimeSessionId = currentSession?.engine === "kimi-code" ? getRuntimeSessionId(currentSession) : undefined;
 
   useEffect(() => {
     setLocalActiveTab(activeTab);
   }, [activeTab]);
 
   const refreshSdkPlugins = async (nextMessage?: string) => {
-    if (!sdkRuntimeSessionId) {
-      setSdkPlugins([]);
-      return;
-    }
     setSdkPluginRefreshing(true);
-    const res = await window.api.listKimiCodePlugins({ sessionId: sdkRuntimeSessionId });
+    const res = await window.api.listKimiCodePlugins(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {});
     setSdkPluginRefreshing(false);
     if (!res.success) {
       setMessage(`刷新 SDK 插件状态失败：${res.error}`);
@@ -71,12 +68,33 @@ export function SkillsPanel({
   };
 
   useEffect(() => {
-    if (!open || !sdkRuntimeSessionId) {
+    if (!open) {
       setSdkPlugins([]);
       return;
     }
     void refreshSdkPlugins();
   }, [open, sdkRuntimeSessionId]);
+
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const res = await window.api.listKimiCodeMarketplace();
+      if (res.success) setMarketplace(res.data);
+    })();
+  }, [open]);
+
+  const installMarketplacePlugin = async (plugin: KimiCodeMarketplacePlugin) => {
+    if (installingMarketId) return;
+    setInstallingMarketId(plugin.id);
+    setMessage(`正在安装官方插件 ${plugin.displayName}...`);
+    const res = await window.api.installKimiCodePlugin({ source: plugin.source, ...(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}) });
+    setInstallingMarketId(null);
+    if (!res.success) {
+      setMessage(`${plugin.displayName} 安装失败：${res.error}`);
+      return;
+    }
+    await refreshSdkPlugins(`${plugin.displayName} 安装完成`);
+  };
 
   const setSelectedTab = (tab: PluginPanelTab) => {
     setLocalActiveTab(tab);
@@ -156,58 +174,26 @@ export function SkillsPanel({
       return;
     }
     setInstallingPlugin(true);
-    setMessage(sdkRuntimeSessionId ? "正在通过官方 SDK 安装 Plugin..." : "正在调用 Kimi Code 安装 Plugin...");
-    const res = sdkRuntimeSessionId
-      ? await window.api.installKimiCodePlugin({ sessionId: sdkRuntimeSessionId, source: url })
-      : await window.api.installKimiPlugin({ url });
+    setMessage("正在通过官方 SDK 安装 Plugin...");
+    const res = await window.api.installKimiCodePlugin({ source: url, ...(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}) });
     setInstallingPlugin(false);
     if (!res.success) {
       setMessage(`Plugin 安装失败：${res.error}`);
       return;
     }
     setPluginUrl("");
-    if (sdkRuntimeSessionId) {
-      await refreshSdkPlugins(`Plugin 安装完成：${res.data.displayName}`);
-      return;
-    }
-    setSkills(res.data.skills);
-    setEnabledNames(res.data.enabledNames);
-    setEnabledDir(res.data.enabledDir);
-    setMessage(res.data.output ? `${res.data.message}。CLI 输出：${res.data.output}` : res.data.message);
-  };
-
-  const installOfficialDatasourcePlugin = async () => {
-    setPluginUrl(KIMI_DATASOURCE_PLUGIN_URL);
-    setInstallingPlugin(true);
-    setMessage(sdkRuntimeSessionId ? "正在通过官方 SDK 安装官方插件 kimi-datasource..." : "正在安装官方插件 kimi-datasource...");
-    const res = sdkRuntimeSessionId
-      ? await window.api.installKimiCodePlugin({ sessionId: sdkRuntimeSessionId, source: KIMI_DATASOURCE_PLUGIN_URL })
-      : await window.api.installKimiPlugin({ url: KIMI_DATASOURCE_PLUGIN_URL });
-    setInstallingPlugin(false);
-    if (!res.success) {
-      setMessage(`官方插件安装失败：${res.error}`);
-      return;
-    }
-    setPluginUrl("");
-    if (sdkRuntimeSessionId) {
-      await refreshSdkPlugins(`官方插件安装完成：${res.data.displayName}`);
-      return;
-    }
-    setSkills(res.data.skills);
-    setEnabledNames(res.data.enabledNames);
-    setEnabledDir(res.data.enabledDir);
-    setMessage(res.data.output ? `${res.data.message}。CLI 输出：${res.data.output}` : res.data.message);
+    await refreshSdkPlugins(`Plugin 安装完成：${res.data.displayName}`);
   };
 
   const toggleSdkPlugin = async (plugin: KimiCodePluginSummary) => {
-    if (!sdkRuntimeSessionId || sdkPluginToggling) return;
+    if (sdkPluginToggling) return;
     const nextEnabled = !plugin.enabled;
     setSdkPluginToggling(plugin.id);
     setSdkPlugins((items) => items.map((item) => item.id === plugin.id ? { ...item, enabled: nextEnabled } : item));
     const res = await window.api.setKimiCodePluginEnabled({
-      sessionId: sdkRuntimeSessionId,
       id: plugin.id,
       enabled: nextEnabled,
+      ...(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
     });
     setSdkPluginToggling(null);
     if (!res.success) {
@@ -365,8 +351,38 @@ export function SkillsPanel({
               <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
                 <div className="font-medium text-[var(--kimix-panel-text)]">官方插件商店</div>
                 <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                  官方插件现在由 Kimi Code Plugin 系统接管；Superpowers 请通过官方插件商店安装，不再使用 Kimix 旧接入。
+                  以下为官方 Marketplace 在架插件，可一键安装到 Kimi Code SDK（含 Superpowers）。
                 </div>
+                {marketplace.length > 0 && (
+                  <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
+                    {marketplace.map((plugin) => {
+                      const installed = sdkPlugins.some((p) => p.id === plugin.id);
+                      return (
+                        <div
+                          key={plugin.id}
+                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+                          style={{ padding: "10px 12px" }}
+                        >
+                          <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.displayName} <span className="text-[12px] text-[var(--kimix-panel-text-muted)]">v{plugin.version}</span></div>
+                              <div className="truncate text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 2 }} title={plugin.description}>{plugin.description}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void installMarketplacePlugin(plugin)}
+                              disabled={Boolean(installingMarketId) || installed}
+                              className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              style={{ paddingLeft: 10, paddingRight: 10 }}
+                            >
+                              {installed ? "已安装" : installingMarketId === plugin.id ? "安装中" : "安装"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
                   <button
                     type="button"
@@ -386,22 +402,11 @@ export function SkillsPanel({
                     <ExternalLink size={14} />
                     <span>自定义插件文档</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void installOfficialDatasourcePlugin()}
-                    disabled={installingPlugin}
-                    className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                    style={{ width: "100%" }}
-                  >
-                    <Plus size={14} />
-                    <span>{installingPlugin ? "安装中" : "安装 kimi-datasource"}</span>
-                  </button>
                 </div>
               </div>
-              {sdkRuntimeSessionId && (
-                <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
-                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                    <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方 SDK 插件状态</div>
+              <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
+                <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                  <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方 SDK 插件状态</div>
                     <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 8, paddingRight: 8 }}>
                       SDK
                     </span>
@@ -472,8 +477,7 @@ export function SkillsPanel({
                       当前 SDK 会话没有已安装 Plugin，或尚未刷新。
                     </div>
                   )}
-                </div>
-              )}
+              </div>
               <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
                 <div className="font-medium text-[var(--kimix-panel-text)]">安装 Kimi Plugin</div>
                 <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>

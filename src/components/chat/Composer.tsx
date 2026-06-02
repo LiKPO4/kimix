@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Lock, Zap } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -422,29 +422,40 @@ export function Composer() {
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = images.map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+      const sameWorkDir = (a?: string, b?: string) =>
+        Boolean(a && b) && a!.replace(/\\/g, "/").toLowerCase() === b!.replace(/\\/g, "/").toLowerCase();
+
       const ensureKimiCodeRuntime = async () => {
         const knownSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
         if (knownSessionId) {
           const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownSessionId });
-          if (!resumeRes.success) throw new Error(resumeRes.error);
-          const model = targetSession.model ?? await getDefaultKimiModel();
-          targetSession = {
-            ...targetSession,
-            engine: "kimi-code",
-            runtimeSessionId: resumeRes.data.sessionId,
-            officialSessionId: resumeRes.data.sessionId,
-            model,
-          };
-          updateSession(targetSession.id, (session) => ({
-            ...session,
-            engine: "kimi-code",
-            runtimeSessionId: resumeRes.data.sessionId,
-            officialSessionId: resumeRes.data.sessionId,
-            model,
-            updatedAt: Date.now(),
-          }));
-          if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
-          return resumeRes.data.sessionId;
+          // Only adopt the resumed runtime when it points at this project's
+          // workDir. A stale binding to the plugin-management temp session would
+          // otherwise make the assistant run against the wrong directory; drop it
+          // and fall through to create a fresh session at projectPath.
+          if (resumeRes.success && (!targetSession.projectPath || sameWorkDir(resumeRes.data.workDir, targetSession.projectPath))) {
+            const model = targetSession.model ?? await getDefaultKimiModel();
+            targetSession = {
+              ...targetSession,
+              engine: "kimi-code",
+              runtimeSessionId: resumeRes.data.sessionId,
+              officialSessionId: resumeRes.data.sessionId,
+              model,
+            };
+            updateSession(targetSession.id, (session) => ({
+              ...session,
+              engine: "kimi-code",
+              runtimeSessionId: resumeRes.data.sessionId,
+              officialSessionId: resumeRes.data.sessionId,
+              model,
+              updatedAt: Date.now(),
+            }));
+            if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+            // Re-apply the current UI permission mode so a resumed session honours
+            // full-access (yolo) instead of keeping its persisted permission.
+            await window.api.setKimiCodePermission({ sessionId: resumeRes.data.sessionId, mode: permissionMode }).catch(() => {});
+            return resumeRes.data.sessionId;
+          }
         }
 
         const createRes = await window.api.createKimiCodeSession({
@@ -793,7 +804,11 @@ export function Composer() {
       }));
     }
     setShowPermissionMenu(false);
-    const runtimeSessionId = getRuntimeSessionId(activeSession);
+    // Only push to the SDK when a real runtime session exists. Using the UI-id
+    // fallback here would hit "session not active" before the first message is
+    // sent and wrongly roll the UI mode back. New sessions carry permissionMode
+    // into createKimiCodeSession at send time, so the local update is enough.
+    const runtimeSessionId = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId;
     if (!runtimeSessionId || previousMode === mode) return;
     const res = await window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode });
     if (!res.success) {
@@ -1275,7 +1290,6 @@ export function Composer() {
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span>需求澄清</span>
-                          {clarificationLockedByYolo && <Lock size={12} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />}
                         </div>
                         <div
                           className="flex w-[132px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]"

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Brain, Cable, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, SquareTerminal } from "lucide-react";
+import { Bot, Brain, Cable, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, ShieldCheck, SquareTerminal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -14,11 +14,18 @@ interface MessageBubbleProps {
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[];
+  leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[];
   attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[];
   changedFiles?: string[];
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
 }
+
+// Horizontal breathing room for message content. The assistant body is indented
+// from the left so its start aligns just right of the process-summary collapse
+// icon (which keeps hanging at the column edge); user/steer bubbles get the same
+// gap from the right edge so left/right whitespace stays symmetric.
+const MESSAGE_SIDE_INDENT = 28;
 
 function useCopyTimeout() {
   const [copied, setCopied] = useState(false);
@@ -118,7 +125,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   };
 
   return (
-    <div className="group flex justify-end">
+    <div className="group flex justify-end" style={{ paddingRight: MESSAGE_SIDE_INDENT }}>
       <div className="flex max-w-[58%] flex-col items-end">
         {images.length > 0 && (
           <div
@@ -199,7 +206,7 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
       : "已引导对话";
 
   return (
-    <div className="group w-full">
+    <div className="group w-full" style={{ paddingRight: MESSAGE_SIDE_INDENT }}>
       <div className="flex justify-end">
         <div className="max-w-[58%]">
           <div
@@ -220,6 +227,7 @@ function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "
 
 type ToolEvent = Extract<TimelineEvent, { type: "tool_call" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
+type ApprovalEvent = Extract<TimelineEvent, { type: "approval_request" }>;
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 
 type ThinkingBlock = {
@@ -231,7 +239,8 @@ type ThinkingBlock = {
 type ProcessItem =
   | { type: "thinking"; block: ThinkingBlock }
   | { type: "tool"; tool: ToolEvent }
-  | { type: "subagent"; subagent: SubagentEvent };
+  | { type: "subagent"; subagent: SubagentEvent }
+  | { type: "approval"; approval: ApprovalEvent };
 
 function firstThinkingSentence(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -385,6 +394,46 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
   );
 }
 
+function ApprovalProcessItem({ approval }: { approval: ApprovalEvent }) {
+  const [expanded, setExpanded] = useState(false);
+  const approved = approval.status === "approved";
+  const decisionLabel = approved ? "已批准" : "已拒绝";
+  const detailText = [
+    `工具：${approval.toolName || "未知工具"}`,
+    approval.description ? `请求：${approval.description}` : "",
+    approval.details?.trim() ? `详情：\n${approval.details.trim()}` : "",
+  ].filter(Boolean).join("\n\n");
+  const canExpand = detailText.trim().length > 0;
+  return (
+    <div className="kimix-soft-card overflow-hidden rounded-xl text-[13.5px]">
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((value) => !value)}
+        disabled={!canExpand}
+        className="grid h-10 w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+      >
+        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+          <ShieldCheck size={14} />
+        </span>
+        <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">工具请求</span>
+        <span className="min-w-0 flex-1 truncate">{approval.description || approval.toolName || "工具请求"}</span>
+        <span className={`shrink-0 rounded-full text-[12px] leading-5 ${approved ? "text-accent-success" : "text-accent-danger"}`} style={{ paddingLeft: 8, paddingRight: 8 }}>
+          {decisionLabel}
+        </span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+        </span>
+      </button>
+      {expanded && (
+        <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13px] leading-6" style={{ padding: "12px 14px" }}>
+          {detailText}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = subagent.status === "running";
@@ -453,23 +502,31 @@ function getHookBadgeEvents(hooks: Extract<TimelineEvent, { type: "hook" }>[]) {
   });
 }
 
-function AssistantProcessSummary({ event, tools, subagents, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; label: string }) {
+function processItemTimestamp(item: ProcessItem) {
+  switch (item.type) {
+    case "thinking": return item.block.timestamp;
+    case "tool": return item.tool.timestamp;
+    case "subagent": return item.subagent.timestamp;
+    case "approval": return item.approval.timestamp;
+  }
+}
+
+function AssistantProcessSummary({ event, tools, subagents, approvals, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: string }) {
   const [expanded, setExpanded] = useState(false);
   const thinkingBlocks = getThinkingBlocks(event);
   const items: ProcessItem[] = [
     ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
     ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
     ...subagents.map((subagent): ProcessItem => ({ type: "subagent", subagent })),
-  ].sort((a, b) => (
-    (a.type === "thinking" ? a.block.timestamp : a.type === "tool" ? a.tool.timestamp : a.subagent.timestamp) -
-    (b.type === "thinking" ? b.block.timestamp : b.type === "tool" ? b.tool.timestamp : b.subagent.timestamp)
-  ));
+    ...approvals.map((approval): ProcessItem => ({ type: "approval", approval })),
+  ].sort((a, b) => processItemTimestamp(a) - processItemTimestamp(b));
   const hasDetails = items.length > 0;
   const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = joinSummaryParts([
     thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段${detailUnit}` : "",
     tools.length > 0 ? `${tools.length} 条命令` : "",
     subagents.length > 0 ? `${subagents.length} 个子代理` : "",
+    approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]);
 
   return (
@@ -496,7 +553,9 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
               ? <ThinkingProcessItem key={item.block.id || `thinking-${index}`} block={item.block} />
               : item.type === "tool"
                 ? <ToolProcessItem key={item.tool.id} tool={item.tool} />
-                : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />
+                : item.type === "approval"
+                  ? <ApprovalProcessItem key={item.approval.id} approval={item.approval} />
+                  : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />
           ))}
           <button
             type="button"
@@ -513,7 +572,7 @@ function AssistantProcessSummary({ event, tools, subagents, label }: { event: As
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -530,7 +589,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
   const hasThinkingDetails = Boolean(event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim().length > 0));
-  const hasProcessDetails = Boolean(hasThinkingDetails || leadingTools.length > 0 || leadingSubagents.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
+  const hasProcessDetails = Boolean(hasThinkingDetails || leadingTools.length > 0 || leadingSubagents.length > 0 || leadingApprovals.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
   const shouldShowNoContentHint = !hasContent && !hasProcessDetails && (event.isComplete || (isActiveAssistant && elapsed >= 8000));
   const durationLabel = event.isComplete
     ? formatDuration(Number.isFinite(event.durationMs) ? event.durationMs ?? 0 : 0)
@@ -549,70 +608,74 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {!hideProcessSummary && (
-          <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} label={displayProcessLabel} />
+          <AssistantProcessSummary event={event} tools={leadingTools} subagents={leadingSubagents} approvals={leadingApprovals} label={displayProcessLabel} />
         )}
 
         {attachedSteers.length > 0 && (
-          <div className="flex flex-col" style={{ gap: 10 }}>
+          <div className="flex flex-col" style={{ gap: 10, paddingRight: MESSAGE_SIDE_INDENT }}>
             {attachedSteers.map((steer) => <SteerMessageBubble key={steer.id} event={steer} />)}
           </div>
         )}
 
-        {shouldShowNoContentHint && (
-          <div
-            className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
-            style={{ padding: "12px 14px" }}
-          >
-            {event.isComplete
-              ? "本轮没有生成正文内容，Agent 只返回了思考过程、命令执行或文件变更。"
-              : "Agent 还没有生成正文内容，当前仍在思考或执行命令。"}
-          </div>
-        )}
+        {(shouldShowNoContentHint || hasContent || trailingStatuses.length > 0) && (
+          <div className="flex flex-col" style={{ gap: 20, paddingLeft: MESSAGE_SIDE_INDENT }}>
+            {shouldShowNoContentHint && (
+              <div
+                className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+                style={{ padding: "12px 14px" }}
+              >
+                {event.isComplete
+                  ? "本轮没有生成正文内容，Agent 只返回了思考过程、命令执行或文件变更。"
+                  : "Agent 还没有生成正文内容，当前仍在思考或执行命令。"}
+              </div>
+            )}
 
-        {hasContent && (
-          <>
-            <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-              <MarkdownRenderer content={event.content} />
-            </div>
-            {mdArtifacts.length > 0 && (
-              <div className="flex flex-col" style={{ gap: 12 }}>
-                {mdArtifacts.map((filePath) => (
-                  <FileCard key={filePath} filePath={filePath} fileType="文档 · MD" />
+            {hasContent && (
+              <>
+                <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
+                  <MarkdownRenderer content={event.content} />
+                </div>
+                {mdArtifacts.length > 0 && (
+                  <div className="flex flex-col" style={{ gap: 12 }}>
+                    {mdArtifacts.map((filePath) => (
+                      <FileCard key={filePath} filePath={filePath} fileType="文档 · MD" />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {trailingStatuses.length > 0 && (
+              <div className="flex flex-col" style={{ gap: 8 }}>
+                {trailingStatuses.map((status) => (
+                  <StatusCard key={status.id} event={status} />
                 ))}
               </div>
             )}
-          </>
-        )}
 
-        {trailingStatuses.length > 0 && (
-          <div className="flex flex-col" style={{ gap: 8 }}>
-            {trailingStatuses.map((status) => (
-              <StatusCard key={status.id} event={status} />
-            ))}
-          </div>
-        )}
-
-        {hasContent && (
-          <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              onClick={() => trigger(event.content)}
-              className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover"
-              title="复制"
-              aria-label="复制"
-            >
-              {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
-            </button>
-            {hookBadgeEvents.length > 0 && (
-              <button
-                type="button"
-                className="flex h-6 items-center rounded-md text-[12px] text-text-muted transition-colors hover:bg-bg-hover"
-                style={{ gap: 4, paddingLeft: 7, paddingRight: 7 }}
-                title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
-                aria-label="Hook 命中"
-              >
-                <Cable size={13} />
-                <span>钩子 {hookBadgeEvents.length}</span>
-              </button>
+            {hasContent && (
+              <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  onClick={() => trigger(event.content)}
+                  className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover"
+                  title="复制"
+                  aria-label="复制"
+                >
+                  {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+                </button>
+                {hookBadgeEvents.length > 0 && (
+                  <button
+                    type="button"
+                    className="flex h-6 items-center rounded-md text-[12px] text-text-muted transition-colors hover:bg-bg-hover"
+                    style={{ gap: 4, paddingLeft: 7, paddingRight: 7 }}
+                    title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
+                    aria-label="Hook 命中"
+                  >
+                    <Cable size={13} />
+                    <span>钩子 {hookBadgeEvents.length}</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -621,12 +684,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   );
 }
 
-export function MessageBubble({ event, leadingTools, leadingSubagents, leadingHooks, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export function MessageBubble({ event, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }

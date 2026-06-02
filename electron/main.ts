@@ -7,20 +7,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
-import * as kimiBridge from "./kimiBridge";
+import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
+import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
-import {
-  authMCP,
-  createKimiPaths,
-  login,
-  parseConfig,
-  resetAuthMCP,
-  testMCP,
-} from "@moonshot-ai/kimi-agent-sdk";
-import type { ContentPart } from "@moonshot-ai/kimi-agent-sdk";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -379,7 +371,11 @@ type McpServerRecord = {
 };
 
 function getKimiPaths() {
-  return createKimiPaths(resolveKimiShareDir());
+  const shareDir = resolveKimiShareDir();
+  return {
+    config: path.join(shareDir, "config.toml"),
+    mcpConfig: path.join(shareDir, "mcp.json"),
+  };
 }
 
 function defaultKimiCodeShareDir() {
@@ -456,10 +452,6 @@ function clearKimiCredential(shareDir: string) {
   if (!fs.existsSync(tokenPath)) return;
   backupFileIfExists(tokenPath);
   fs.rmSync(tokenPath, { force: true });
-}
-
-function isKimiCodeMissingAuthSubcommandError(error: string) {
-  return /too many arguments|unknown command|Expected 0 arguments|unknown option.*--json|--json/i.test(error);
 }
 
 function stripAnsi(input: string) {
@@ -542,7 +534,8 @@ async function getKimiAuthStatus() {
   const kimiPath = await resolveKimiCommand();
   const paths = getKimiPaths();
   const shareDir = resolveKimiShareDir();
-  const config = parseConfig(shareDir);
+  let defaultModel: string | undefined;
+  try { const c = await kimiCodeHost.getConfig(); defaultModel = c.defaultModel; } catch { /* use undefined */ }
   const loggedIn = hasUsableKimiCredential(shareDir);
   const needsRelogin = !loggedIn && hasKimiCodeOAuthReloginNotice();
   return {
@@ -551,8 +544,8 @@ async function getKimiAuthStatus() {
     loggedIn,
     configPath: paths.config,
     mcpConfigPath: paths.mcpConfig,
-    defaultModel: config.defaultModel,
-    defaultThinking: config.defaultThinking,
+    defaultModel,
+    defaultThinking: undefined as string | undefined,
     message: !kimiPath
       ? "未找到 Kimi Code，请先安装或检查 PATH"
       : loggedIn
@@ -981,9 +974,13 @@ function findPluginManifestFiles() {
       }
       if (!entry.isFile()) continue;
       const normalized = fullPath.replace(/\\/g, "/").toLowerCase();
+      // Only Kimi-specific manifests. A bare plugin.json also lives inside
+      // .claude-plugin / .codex-plugin / .cursor-plugin folders of multi-tool
+      // plugins (e.g. superpowers) — counting those would surface one card per
+      // tool variant. Restrict to kimi.plugin.json and .kimi-plugin/plugin.json.
       const isManifest = entry.name === "kimi.plugin.json"
-        || entry.name === "plugin.json"
-        || normalized.endsWith("/.kimi-plugin/plugin.json");
+        || normalized.endsWith("/.kimi-plugin/plugin.json")
+        || (entry.name === "plugin.json" && !normalized.includes("-plugin/plugin.json"));
       if (!isManifest) continue;
       const resolved = path.resolve(fullPath);
       if (seenFiles.has(resolved)) continue;
@@ -2023,6 +2020,13 @@ function listLocalSkills() {
       for (const manifestPath of findPluginManifestFiles().filter((item) => path.resolve(item).startsWith(normalizedRoot))) {
         const normalizedManifestPath = path.resolve(manifestPath);
         if (seen.has(normalizedManifestPath)) continue;
+        // SDK-managed plugins (plugins/managed/...) are surfaced and toggled in the
+        // dedicated "官方 SDK 插件状态" panel; don't duplicate them as un-toggleable
+        // local-skill cards here.
+        if (normalizedManifestPath.replace(/\\/g, "/").toLowerCase().includes("/plugins/managed/")) {
+          seen.add(normalizedManifestPath);
+          continue;
+        }
         try {
           const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
           const pluginPath = pluginRootFromManifest(manifestPath);
@@ -2777,14 +2781,19 @@ function createWindow() {
     icon: path.join(process.env.APP_ROOT, "..", "Kimix.png"),
   });
 
-  kimiBridge.setMainWindow(mainWindow);
+  // Event bridge: fans out kimiCodeHost events to both the old kimi:event/status
+  // channels (used by legacy renderer sessions without an engine field) and the
+  // new kimi-code:event/status channels. Each renderer handler filters by its own
+  // session IDs, so dual-emit is safe (no duplicate UI).
   kimiCodeHost.setKimiCodeEventSink((payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("kimi:event", payload);
       mainWindow.webContents.send("kimi-code:event", payload);
     }
   });
   kimiCodeHost.setKimiCodeStatusSink((payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("kimi:status", payload);
       mainWindow.webContents.send("kimi-code:status", payload);
     }
   });
@@ -2855,7 +2864,6 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
-    kimiBridge.setMainWindow(null);
     kimiCodeHost.setKimiCodeEventSink(null);
     kimiCodeHost.setKimiCodeStatusSink(null);
   });
@@ -2930,7 +2938,7 @@ ipcMain.handle("project:listRecent", async () => {
   if (projects.length === 0) {
     const defaultProject = getDefaultProject();
     projectService.addRecentProject(defaultProject);
-    projects = [defaultProject];
+    projects = projectService.getRecentProjects();
   }
   return { success: true, data: projects };
 });
@@ -3000,6 +3008,18 @@ ipcMain.handle("project:removeRecent", async (_, id: unknown) => {
   }
   projectService.removeRecentProject(id);
   return { success: true, data: undefined };
+});
+
+ipcMain.handle("project:setPinned", async (_, request: unknown) => {
+  const parsed = z.object({ id: z.string().min(1), pinned: z.boolean() }).safeParse(request);
+  if (!parsed.success) return { success: false, error: "Invalid pin request" };
+  return { success: true, data: projectService.setProjectPinned(parsed.data.id, parsed.data.pinned) };
+});
+
+ipcMain.handle("project:reorder", async (_, request: unknown) => {
+  const parsed = z.object({ orderedIds: z.array(z.string()) }).safeParse(request);
+  if (!parsed.success) return { success: false, error: "Invalid reorder request" };
+  return { success: true, data: projectService.reorderProjects(parsed.data.orderedIds) };
 });
 
 ipcMain.handle("longTasks:list", async (_, request: unknown) => {
@@ -3083,19 +3103,16 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     const yoloMode = parsed.data.yoloMode ?? false;
     const autoMode = parsed.data.autoMode ?? false;
 
-    const executor = await kimiBridge.startSession({
+    const permission = yoloMode ? "yolo" as const : autoMode ? "auto" as const : "manual" as const;
+    const executor = await kimiCodeHost.createSession({
       workDir: project.path,
-      thinking,
-      yoloMode,
-      autoMode,
+      permission,
     });
     executorSessionId = executor.sessionId;
 
-    const reviewer = await kimiBridge.startSession({
+    const reviewer = await kimiCodeHost.createSession({
       workDir: project.path,
-      thinking,
-      yoloMode,
-      autoMode,
+      permission,
     });
     reviewerSessionId = reviewer.sessionId;
 
@@ -3108,8 +3125,8 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     });
     return { success: true, data: task };
   } catch (err) {
-    if (executorSessionId) await kimiBridge.closeSession(executorSessionId).catch(() => {});
-    if (reviewerSessionId) await kimiBridge.closeSession(reviewerSessionId).catch(() => {});
+    if (executorSessionId) await kimiCodeHost.closeSession(executorSessionId).catch(() => {});
+    if (reviewerSessionId) await kimiCodeHost.closeSession(reviewerSessionId).catch(() => {});
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
@@ -3566,9 +3583,8 @@ ipcMain.handle("hooks:generateRule", async (_, request: unknown) => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-hooks-gen-"));
     let output: string;
     try {
-      output = await kimiBridge.runOneShotPrompt({
+      output = await kimiCodeHost.runOneShotPrompt({
         workDir,
-        sessionId: `kimix-hidden-hooks-${randomUUID()}`,
         content: buildHookRulePrompt(description),
         thinking: true,
         yoloMode: false,
@@ -3734,35 +3750,9 @@ ipcMain.handle("kimi:login", async () => {
         },
       };
     } catch (interactiveError) {
-      let verificationUrl = "";
-      const result = await login({
-        executable: kimiPath,
-        onUrl: (url) => {
-          verificationUrl = url;
-          void shell.openExternal(url).catch(() => {});
-        },
-      }).catch((error) => ({
-        success: false as const,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-      if (!result.success) {
-        const legacyError = result.error ?? "";
-        if (isKimiCodeMissingAuthSubcommandError(legacyError)) {
-          return {
-            success: false,
-            error: `新版 Kimi Code 登录入口启动失败：${interactiveError instanceof Error ? interactiveError.message : String(interactiveError)}`,
-          };
-        }
-        return { success: false, error: legacyError || "登录失败" };
-      }
-      const status = await getKimiAuthStatus();
       return {
-        success: true,
-        data: {
-          ...status,
-          verificationUrl: verificationUrl || undefined,
-          message: status.loggedIn ? "登录完成" : (verificationUrl ? "已打开登录链接，请在浏览器中继续完成授权" : status.message),
-        },
+        success: false,
+        error: `Kimi Code 登录启动失败：${interactiveError instanceof Error ? interactiveError.message : String(interactiveError)}`,
       };
     }
   } catch (err) {
@@ -3852,7 +3842,7 @@ ipcMain.handle("kimi:authMcpServer", async (_, request: unknown) => {
   try {
     const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
     const kimiPath = await requireKimiExecutable();
-    await authMCP(parsed.name, { executable: kimiPath });
+    await runCommand(kimiPath, ["mcp", "auth", parsed.name]);
     return { success: true, data: { message: `已完成 ${parsed.name} 的 MCP 授权` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -3863,7 +3853,7 @@ ipcMain.handle("kimi:resetMcpServerAuth", async (_, request: unknown) => {
   try {
     const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
     const kimiPath = await requireKimiExecutable();
-    await resetAuthMCP(parsed.name, { executable: kimiPath });
+    await runCommand(kimiPath, ["mcp", "reset-auth", parsed.name]);
     return { success: true, data: { message: `已重置 ${parsed.name} 的 MCP 授权` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -3874,8 +3864,8 @@ ipcMain.handle("kimi:testMcpServer", async (_, request: unknown) => {
   try {
     const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
     const kimiPath = await requireKimiExecutable();
-    const result = await testMCP(parsed.name, { executable: kimiPath });
-    return { success: true, data: result };
+    const result = await runCommand(kimiPath, ["mcp", "test", parsed.name]);
+    return { success: true, data: { success: true, output: result.stdout } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -3966,7 +3956,10 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
     if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
-    await kimiCodeHost.sendPrompt(sessionId, toKimiCodePromptInput(content, images));
+    const input = toKimiCodePromptInput(content, images);
+    const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
+    const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
+    await kimiCodeHost.sendPrompt(sessionId, finalInput);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4199,11 +4192,55 @@ ipcMain.handle("kimi-code:closeSession", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const workDir = typeof req.workDir === "string" ? req.workDir : "";
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!workDir || !sessionId) return { success: false, error: "Missing workDir or sessionId" };
+    const events = await sessionHistory.getSessionHistory(workDir, sessionId);
+    return { success: true, data: { sessionId, events } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+const KIMI_CODE_MARKETPLACE_URL = "https://code.kimi.com/kimi-code/plugins/marketplace.json";
+
+ipcMain.handle("kimi-code:listMarketplace", async () => {
+  try {
+    const res = await fetch(KIMI_CODE_MARKETPLACE_URL, { headers: { "User-Agent": "Kimix" } });
+    if (!res.ok) throw new Error(`官方插件市场返回 HTTP ${res.status}`);
+    const payload = await res.json() as { plugins?: unknown };
+    const baseUrl = KIMI_CODE_MARKETPLACE_URL.slice(0, KIMI_CODE_MARKETPLACE_URL.lastIndexOf("/") + 1);
+    const plugins = Array.isArray(payload.plugins)
+      ? payload.plugins
+          .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
+          .map((p) => {
+            const source = typeof p.source === "string" ? p.source : "";
+            const resolvedSource = source.startsWith("http") ? source : new URL(source, baseUrl).href;
+            return {
+              id: typeof p.id === "string" ? p.id : "",
+              tier: typeof p.tier === "string" ? p.tier : "",
+              displayName: typeof p.displayName === "string" ? p.displayName : (typeof p.id === "string" ? p.id : ""),
+              version: typeof p.version === "string" ? p.version : "",
+              description: typeof p.description === "string" ? p.description : "",
+              homepage: typeof p.homepage === "string" ? p.homepage : undefined,
+              source: resolvedSource,
+            };
+          })
+          .filter((p) => p.id && p.source)
+      : [];
+    return { success: true, data: plugins };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:listPlugins", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : undefined;
     return { success: true, data: await kimiCodeHost.listPlugins(sessionId) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4213,10 +4250,10 @@ ipcMain.handle("kimi-code:listPlugins", async (_, request: unknown) => {
 ipcMain.handle("kimi-code:installPlugin", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : undefined;
     const source = typeof req.source === "string" ? req.source.trim() : "";
-    if (!sessionId || !source) return { success: false, error: "Missing sessionId or source" };
-    return { success: true, data: await kimiCodeHost.installPlugin(sessionId, source) };
+    if (!source) return { success: false, error: "Missing source" };
+    return { success: true, data: await kimiCodeHost.installPlugin(source, sessionId) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -4225,11 +4262,11 @@ ipcMain.handle("kimi-code:installPlugin", async (_, request: unknown) => {
 ipcMain.handle("kimi-code:setPluginEnabled", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : undefined;
     const id = typeof req.id === "string" ? req.id.trim() : "";
     const enabled = typeof req.enabled === "boolean" ? req.enabled : null;
-    if (!sessionId || !id || enabled === null) return { success: false, error: "Missing sessionId, id or enabled" };
-    await kimiCodeHost.setPluginEnabled(sessionId, id, enabled);
+    if (!id || enabled === null) return { success: false, error: "Missing id or enabled" };
+    await kimiCodeHost.setPluginEnabled(id, enabled, sessionId);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4239,12 +4276,12 @@ ipcMain.handle("kimi-code:setPluginEnabled", async (_, request: unknown) => {
 ipcMain.handle("kimi-code:setPluginMcpServerEnabled", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : undefined;
     const id = typeof req.id === "string" ? req.id.trim() : "";
     const server = typeof req.server === "string" ? req.server.trim() : "";
     const enabled = typeof req.enabled === "boolean" ? req.enabled : null;
-    if (!sessionId || !id || !server || enabled === null) return { success: false, error: "Missing sessionId, id, server or enabled" };
-    await kimiCodeHost.setPluginMcpServerEnabled(sessionId, id, server, enabled);
+    if (!id || !server || enabled === null) return { success: false, error: "Missing id, server or enabled" };
+    await kimiCodeHost.setPluginMcpServerEnabled(id, server, enabled, sessionId);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4253,30 +4290,39 @@ ipcMain.handle("kimi-code:setPluginMcpServerEnabled", async (_, request: unknown
 
 ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string }) => {
   try {
-    const settings = settingsService.loadSettings();
-    const skillsDir = request.skillsDir || ((settings.enabledSkillNames ?? []).length > 0 ? settings.enabledSkillsDir || enabledSkillsDir() : undefined);
-    const agentFile = request.agentFile;
-    const result = await kimiBridge.startSession({ ...request, skillsDir, agentFile });
-    return { success: true, data: result };
+    const permission = request.yoloMode ? "yolo" as const : request.autoMode ? "auto" as const : "manual" as const;
+    const sameWorkDir = (a: string, b: string) =>
+      path.resolve(a).replace(/\\/g, "/").toLowerCase() === path.resolve(b).replace(/\\/g, "/").toLowerCase();
+    const createFresh = () => kimiCodeHost.createSession({
+      workDir: request.workDir,
+      model: request.model,
+      permission,
+      planMode: !!request.planMode,
+    });
+    let engineSession;
+    if (request.sessionId) {
+      const resumed = await kimiCodeHost.resumeSession(request.sessionId);
+      // Guard against resuming a session whose real workDir does not match the
+      // requested project (e.g. the plugin-management temp session). Adopting it
+      // would bind the chat to the wrong directory. Fall back to a fresh session.
+      if (request.workDir && !sameWorkDir(resumed.workDir, request.workDir)) {
+        engineSession = await createFresh();
+      } else {
+        engineSession = resumed;
+        // Keep the resumed session's permission in sync with the requested mode.
+        await kimiCodeHost.setPermission(resumed.sessionId, permission).catch(() => {});
+      }
+    } else {
+      engineSession = await createFresh();
+    }
+    return { success: true, data: { sessionId: engineSession.sessionId, workDir: engineSession.workDir, model: request.model ?? null, slashCommands: [] as const } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
 
-ipcMain.handle("kimi:listSlashCommands", async (_, request: { sessionId: string }) => {
-  try {
-    const sessionId = request && typeof request.sessionId === "string" ? request.sessionId : "";
-    if (!sessionId) {
-      return { success: false, error: "Missing sessionId" };
-    }
-    const commands = await Promise.race([
-      kimiBridge.getSlashCommands(sessionId),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("List slash commands timed out")), 6000)),
-    ]);
-    return { success: true, data: commands };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
+ipcMain.handle("kimi:listSlashCommands", async () => {
+  return { success: true, data: [] };
 });
 
 ipcMain.handle("kimi:setPlanMode", async (_, request: unknown) => {
@@ -4290,7 +4336,7 @@ ipcMain.handle("kimi:setPlanMode", async (_, request: unknown) => {
     if (!sessionId || enabled === null) {
       return { success: false, error: "Missing sessionId or enabled" };
     }
-    await kimiBridge.setPlanMode(sessionId, enabled);
+    await kimiCodeHost.setPlanMode(sessionId, enabled);
     return { success: true, data: { enabled } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4313,21 +4359,19 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
         (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
       )
     : [];
-  const thinking = typeof req.thinking === "boolean" ? req.thinking : undefined;
-  const yoloMode = typeof req.yoloMode === "boolean" ? req.yoloMode : undefined;
-  const autoMode = typeof req.autoMode === "boolean" ? req.autoMode : undefined;
-  const planMode = typeof req.planMode === "boolean" ? req.planMode : undefined;
   if (!sessionId || (!content && images.length === 0)) {
     return { success: false, error: "Missing sessionId or content" };
   }
-  const promptContent: string | ContentPart[] = images.length > 0
+  const input: string | KimiCodePromptPart[] = images.length > 0
     ? [
         ...(content ? [{ type: "text" as const, text: content }] : []),
-        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl, id: image.name } })),
+        ...images.map((image) => ({ type: "image_url" as const, imageUrl: { url: image.dataUrl, id: image.name } })),
       ]
     : content;
   try {
-    await kimiBridge.sendPrompt(sessionId, promptContent, { thinking, yoloMode, autoMode, planMode });
+    const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
+    const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
+    await kimiCodeHost.sendPrompt(sessionId, finalInput);
     return { success: true, data: { sessionId } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4353,14 +4397,14 @@ ipcMain.handle("kimi:steerPrompt", async (_, request: unknown) => {
   if (!sessionId || (!content && images.length === 0)) {
     return { success: false, error: "Missing sessionId or content" };
   }
-  const steerContent: string | ContentPart[] = images.length > 0
+  const steerContent: string | KimiCodePromptPart[] = images.length > 0
     ? [
         ...(content ? [{ type: "text" as const, text: content }] : []),
-        ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl, id: image.name } })),
+        ...images.map((image) => ({ type: "image_url" as const, imageUrl: { url: image.dataUrl, id: image.name } })),
       ]
     : content;
   try {
-    await kimiBridge.steerPrompt(sessionId, steerContent);
+    await kimiCodeHost.steer(sessionId, steerContent);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4369,7 +4413,7 @@ ipcMain.handle("kimi:steerPrompt", async (_, request: unknown) => {
 
 ipcMain.handle("kimi:stopTurn", async (_, request: { sessionId: string }) => {
   try {
-    await kimiBridge.stopTurn(request.sessionId);
+    await kimiCodeHost.cancel(request.sessionId);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4378,7 +4422,7 @@ ipcMain.handle("kimi:stopTurn", async (_, request: { sessionId: string }) => {
 
 ipcMain.handle("kimi:approveRequest", async (_, request: { sessionId: string; requestId: string; approved: boolean; scope?: "once" | "session" }) => {
   try {
-    await kimiBridge.approveRequest(request.sessionId, request.requestId, request.approved, request.scope);
+    kimiCodeHost.respondApproval(request.sessionId, request.requestId, request.approved, request.scope);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4392,15 +4436,18 @@ ipcMain.handle("kimi:respondQuestion", async (_, request: unknown) => {
     }
     const req = request as Record<string, unknown>;
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    const rpcRequestId = typeof req.rpcRequestId === "string" ? req.rpcRequestId : "";
-    const questionRequestId = typeof req.questionRequestId === "string" ? req.questionRequestId : "";
+    // The old handler used two IDs (rpcRequestId + questionRequestId); the new SDK
+    // handler uses a single requestId. The rpcRequestId is the canonical request key.
+    const requestId = typeof req.rpcRequestId === "string" ? req.rpcRequestId
+      : typeof req.questionRequestId === "string" ? req.questionRequestId
+      : "";
     const answers = req.answers && typeof req.answers === "object" && !Array.isArray(req.answers)
       ? Object.fromEntries(Object.entries(req.answers as Record<string, unknown>).filter(([, value]) => typeof value === "string")) as Record<string, string>
       : {};
-    if (!sessionId || !rpcRequestId || !questionRequestId) {
+    if (!sessionId || !requestId) {
       return { success: false, error: "Missing question response fields" };
     }
-    await kimiBridge.respondQuestion(sessionId, rpcRequestId, questionRequestId, answers);
+    kimiCodeHost.respondQuestion(sessionId, requestId, answers);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4409,7 +4456,7 @@ ipcMain.handle("kimi:respondQuestion", async (_, request: unknown) => {
 
 ipcMain.handle("kimi:closeSession", async (_, request: { sessionId: string }) => {
   try {
-    await kimiBridge.closeSession(request.sessionId);
+    await kimiCodeHost.closeSession(request.sessionId);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4418,7 +4465,7 @@ ipcMain.handle("kimi:closeSession", async (_, request: { sessionId: string }) =>
 
 ipcMain.handle("kimi:listSessions", async (_, request: { workDir: string }) => {
   try {
-    const sessions = await kimiBridge.getSessions(request.workDir);
+    const sessions = await sessionHistory.getSessions(request.workDir);
     return { success: true, data: sessions };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4530,7 +4577,7 @@ ipcMain.handle("kimi:startVis", async () => {
 
 ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; sessionId: string }) => {
   try {
-    const events = await kimiBridge.getSessionHistory(request.workDir, request.sessionId);
+    const events = await sessionHistory.getSessionHistory(request.workDir, request.sessionId);
     return { success: true, data: { sessionId: request.sessionId, events } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4862,12 +4909,12 @@ ipcMain.handle("window:close", () => {
 
 app.on("before-quit", (event) => {
   if (isQuitting) return;
-  const ids = kimiBridge.getActiveSessionIds();
+  const ids = kimiCodeHost.getActiveSessionIds();
   if (ids.length === 0) return;
   event.preventDefault();
   isQuitting = true;
   Promise.race([
-    Promise.all(ids.map((id) => kimiBridge.closeSession(id).catch(() => {}))),
+    Promise.all(ids.map((id) => kimiCodeHost.closeSession(id).catch(() => {}))),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 10000)),
   ]).then(() => {
     app.quit();

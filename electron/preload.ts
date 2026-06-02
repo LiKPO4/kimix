@@ -107,8 +107,11 @@ import type {
   KimiCodeListBackgroundTasksResponse,
   KimiCodeListSessionsRequest,
   KimiCodeListSessionsResponse,
+  KimiCodeLoadSessionRequest,
+  KimiCodeLoadSessionResponse,
   KimiCodeListMcpServersResponse,
   KimiCodeListPluginsResponse,
+  KimiCodeListMarketplaceResponse,
   KimiCodeManagedUsageRequest,
   KimiCodeManagedUsageResponse,
   KimiCodeMcpServerRequest,
@@ -143,6 +146,10 @@ const api = {
     ipcRenderer.invoke("project:addRecent", project),
   removeRecentProject: (id: string): Promise<void> =>
     ipcRenderer.invoke("project:removeRecent", id),
+  setProjectPinned: (req: { id: string; pinned: boolean }): Promise<ListRecentResponse> =>
+    ipcRenderer.invoke("project:setPinned", req),
+  reorderProjects: (req: { orderedIds: string[] }): Promise<ListRecentResponse> =>
+    ipcRenderer.invoke("project:reorder", req),
   getGitInfo: (projectPath: string): Promise<GitInfoResponse> =>
     ipcRenderer.invoke("project:getGitInfo", projectPath),
   openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
@@ -307,7 +314,11 @@ const api = {
     ipcRenderer.invoke("kimi-code:listSessions", req),
   closeKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:closeSession", req),
-  listKimiCodePlugins: (req: KimiCodeSessionRequest): Promise<KimiCodeListPluginsResponse> =>
+  loadKimiCodeSession: (req: KimiCodeLoadSessionRequest): Promise<KimiCodeLoadSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:loadSession", req),
+  listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> =>
+    ipcRenderer.invoke("kimi-code:listMarketplace"),
+  listKimiCodePlugins: (req: { sessionId?: string }): Promise<KimiCodeListPluginsResponse> =>
     ipcRenderer.invoke("kimi-code:listPlugins", req),
   installKimiCodePlugin: (req: KimiCodeInstallPluginRequest): Promise<KimiCodePluginResponse> =>
     ipcRenderer.invoke("kimi-code:installPlugin", req),

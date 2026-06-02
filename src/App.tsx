@@ -745,11 +745,7 @@ function App() {
       setRunningSessionId(null);
       const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId || item.runtimeSessionId === sessionId);
       const runtimeSessionId = resolveRuntimeSessionId(sessionId);
-      if (session?.engine === "kimi-code") {
-        window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => {});
-      } else {
-        window.api.stopTurn({ sessionId: runtimeSessionId }).catch(() => {});
-      }
+      window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => {});
     }
   }, [setRunningSessionId]);
 
@@ -1790,21 +1786,11 @@ function App() {
           const timer = setTimeout(() => {
             const runtimeSessionId = resolveRuntimeSessionId(uiSessionId);
             const latestForQueue = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-            const sendPromise = latestForQueue?.engine === "kimi-code"
-              ? window.api.sendKimiCodePrompt({
-                  sessionId: runtimeSessionId,
-                  content: next.content,
-                  images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
-                })
-              : window.api.sendPrompt({
-                  sessionId: runtimeSessionId,
-                  content: next.content,
-                  images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
-                  thinking: useAppStore.getState().defaultThinking,
-                  yoloMode: useAppStore.getState().permissionMode === "yolo",
-                  autoMode: useAppStore.getState().permissionMode === "auto",
-                  planMode: useAppStore.getState().defaultPlanMode,
-                });
+            const sendPromise = window.api.sendKimiCodePrompt({
+              sessionId: runtimeSessionId,
+              content: next.content,
+              images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
+            });
             sendPromise.then((res) => {
               if (res.success) return;
               throw new Error(res.error);

@@ -41,6 +41,8 @@ export interface Project {
   path: string;
   lastOpenedAt: number;
   gitBranch?: string;
+  pinned?: boolean;
+  sortOrder?: number;
 }
 
 export interface Session {

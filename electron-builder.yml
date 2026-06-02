@@ -13,8 +13,8 @@ files:
   - "!**/*.map"
   - "!**/dev.cjs"
 extraResources:
-  - from: node_modules/@moonshot-ai/kimi-agent-sdk
-    to: node_modules/@moonshot-ai/kimi-agent-sdk
+  - from: vendor/kimi-code-sdk
+    to: vendor/kimi-code-sdk
 asar: true
 asarUnpack:
   - "**/*.node"
