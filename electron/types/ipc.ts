@@ -295,6 +295,22 @@ export type SetKimiModelAdaptiveThinkingRequest = {
   adaptiveThinking: boolean;
 };
 
+export type KimiProviderCatalogModelSummary = {
+  id: string;
+  name: string | null;
+  maxContextSize: number | null;
+  thinking: boolean;
+  toolUse: boolean;
+};
+
+export type KimiProviderCatalogEntrySummary = {
+  providerId: string;
+  type: string;
+  baseUrl: string | null;
+  modelCount: number;
+  models: KimiProviderCatalogModelSummary[];
+};
+
 export type SaveKimiModelConfigResponse = {
   success: true;
   data: KimiModelConfigSummary & {
@@ -310,6 +326,16 @@ export type TestKimiModelConfigResponse = {
   data: {
     message: string;
     output: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type ListKimiProviderCatalogResponse = {
+  success: true;
+  data: {
+    providers: KimiProviderCatalogEntrySummary[];
   };
 } | {
   success: false;

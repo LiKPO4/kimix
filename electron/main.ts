@@ -3741,6 +3741,14 @@ ipcMain.handle("kimi:setModelAdaptiveThinking", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi:listProviderCatalog", async () => {
+  try {
+    return { success: true, data: { providers: await kimiCodeHost.listProviderCatalog() } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:testOpenAiProvider", async (_, request: unknown) => {
   try {
     return { success: true, data: await testOpenAiProviderConfig(request) };

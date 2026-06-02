@@ -13,6 +13,11 @@ type KimiCodeSdkModule = {
     uiMode?: string;
     skillDirs?: readonly string[];
   }) => KimiHarnessLike;
+  DEFAULT_CATALOG_URL?: string;
+  fetchCatalog?: (url: string, signal?: AbortSignal) => Promise<Record<string, unknown>>;
+  inferWireType?: (entry: unknown) => string | undefined;
+  catalogBaseUrl?: (entry: unknown, wire: string) => string | undefined;
+  catalogProviderModels?: (entry: unknown) => KimiCodeCatalogModel[];
 };
 
 type KimiHarnessLike = {
@@ -224,6 +229,35 @@ export type KimiCodeModelAlias = {
 };
 
 export type KimiCodeConfigPatch = Partial<KimiCodeConfig>;
+
+export type KimiCodeCatalogModel = {
+  id: string;
+  name?: string;
+  maxOutputSize?: number;
+  reasoningKey?: string;
+  capability?: {
+    image_in?: boolean;
+    video_in?: boolean;
+    audio_in?: boolean;
+    thinking?: boolean;
+    tool_use?: boolean;
+    max_context_tokens?: number;
+  };
+};
+
+export type KimiCodeProviderCatalogEntry = {
+  providerId: string;
+  type: string;
+  baseUrl: string | null;
+  modelCount: number;
+  models: {
+    id: string;
+    name: string | null;
+    maxContextSize: number | null;
+    thinking: boolean;
+    toolUse: boolean;
+  }[];
+};
 
 export type KimiCodeDeviceAuthorization = {
   userCode: string;
@@ -551,6 +585,41 @@ export async function getConfig(options?: { reload?: boolean }): Promise<KimiCod
 export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig> {
   const sdkHarness = await getHarness();
   return sdkHarness.setConfig(patch);
+}
+
+export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntry[]> {
+  const sdk = await loadSdk();
+  if (!sdk.fetchCatalog || !sdk.inferWireType || !sdk.catalogProviderModels || !sdk.catalogBaseUrl) {
+    throw new Error("当前 Kimi Code SDK 未暴露 Provider catalog API");
+  }
+  const catalogUrl = sdk.DEFAULT_CATALOG_URL ?? "https://models.dev/api.json";
+  const catalog = await sdk.fetchCatalog(catalogUrl);
+  return Object.entries(catalog)
+    .map(([providerId, provider]) => {
+      const wire = sdk.inferWireType?.(provider);
+      if (wire !== "openai") return null;
+      const baseUrl = sdk.catalogBaseUrl?.(provider, wire) ?? null;
+      const models = (sdk.catalogProviderModels?.(provider) ?? [])
+        .filter((model) => typeof model.id === "string" && model.id.length > 0)
+        .map((model) => ({
+          id: model.id,
+          name: typeof model.name === "string" && model.name.length > 0 ? model.name : null,
+          maxContextSize: typeof model.capability?.max_context_tokens === "number" ? model.capability.max_context_tokens : null,
+          thinking: Boolean(model.capability?.thinking),
+          toolUse: model.capability?.tool_use !== false,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
+      if (!baseUrl || models.length === 0) return null;
+      return {
+        providerId,
+        type: wire,
+        baseUrl,
+        modelCount: models.length,
+        models,
+      };
+    })
+    .filter((entry): entry is KimiCodeProviderCatalogEntry => Boolean(entry))
+    .sort((a, b) => a.providerId.localeCompare(b.providerId, "zh-CN"));
 }
 
 export async function closeSession(sessionId: string): Promise<void> {

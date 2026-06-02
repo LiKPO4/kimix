@@ -269,6 +269,30 @@ function installBrowserPreviewApi() {
         message: "浏览器预览已模拟更新自适应思考",
       },
     }),
+    listKimiProviderCatalog: () => Promise.resolve({
+      success: true,
+      data: {
+        providers: [{
+          providerId: "openai",
+          type: "openai",
+          baseUrl: "https://api.openai.com/v1",
+          modelCount: 2,
+          models: [{
+            id: "gpt-5.1-codex",
+            name: "GPT-5.1 Codex",
+            maxContextSize: 400000,
+            thinking: true,
+            toolUse: true,
+          }, {
+            id: "gpt-5.1",
+            name: "GPT-5.1",
+            maxContextSize: 400000,
+            thinking: true,
+            toolUse: true,
+          }],
+        }],
+      },
+    }),
     testKimiOpenAiProvider: () => Promise.resolve({
       success: true,
       data: {

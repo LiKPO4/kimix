@@ -56,6 +56,20 @@ type KimiModelConfigSummary = {
   }[];
 };
 
+type KimiProviderCatalogEntry = {
+  providerId: string;
+  type: string;
+  baseUrl: string | null;
+  modelCount: number;
+  models: {
+    id: string;
+    name: string | null;
+    maxContextSize: number | null;
+    thinking: boolean;
+    toolUse: boolean;
+  }[];
+};
+
 function parseFreezeReports() {
   const raw = localStorage.getItem(FREEZE_REPORTS_KEY);
   if (!raw) return [];
@@ -168,6 +182,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
   const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
   const [providerMessage, setProviderMessage] = useState("");
+  const [providerCatalog, setProviderCatalog] = useState<KimiProviderCatalogEntry[]>([]);
+  const [providerCatalogLoading, setProviderCatalogLoading] = useState(false);
+  const [selectedCatalogProviderId, setSelectedCatalogProviderId] = useState("");
+  const [selectedCatalogModelId, setSelectedCatalogModelId] = useState("");
   const [selectedModelAlias, setSelectedModelAlias] = useState("");
   const modelSettingsRef = useRef<HTMLDivElement>(null);
   const [connection, setConnection] = useState<{
@@ -260,6 +278,60 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       maxContextSize: String(model.maxContextSize ?? current.maxContextSize),
     }));
     setProviderMessage(model.isDefault ? "当前已是默认模型，可新建会话测试。" : "已选中模型；点击设为默认后，新会话会使用它。");
+  };
+
+  const fillProviderDraftFromCatalog = (provider: KimiProviderCatalogEntry, model: KimiProviderCatalogEntry["models"][number]) => {
+    setProviderDraft((current) => ({
+      ...current,
+      providerName: provider.providerId,
+      modelAlias: `${provider.providerId}/${model.id}`,
+      baseUrl: provider.baseUrl ?? current.baseUrl,
+      model: model.id,
+      maxContextSize: String(model.maxContextSize ?? 262144),
+    }));
+    setProviderMessage(`已从官方 catalog 填入 ${provider.providerId}/${model.id}，请补 API Key 后测试或保存。`);
+  };
+
+  const handleLoadProviderCatalog = async () => {
+    if (typeof window.api.listKimiProviderCatalog !== "function") {
+      setProviderMessage("Provider catalog 接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
+      return;
+    }
+    setProviderCatalogLoading(true);
+    setProviderMessage("正在读取官方 Provider catalog...");
+    const res = await window.api.listKimiProviderCatalog();
+    setProviderCatalogLoading(false);
+    if (!res.success) {
+      setProviderMessage(`读取 Provider catalog 失败：${res.error}`);
+      return;
+    }
+    setProviderCatalog(res.data.providers);
+    const firstProvider = res.data.providers[0];
+    const firstModel = firstProvider?.models[0];
+    if (firstProvider && firstModel) {
+      setSelectedCatalogProviderId(firstProvider.providerId);
+      setSelectedCatalogModelId(firstModel.id);
+      fillProviderDraftFromCatalog(firstProvider, firstModel);
+      return;
+    }
+    setSelectedCatalogProviderId("");
+    setSelectedCatalogModelId("");
+    setProviderMessage("官方 catalog 暂无可直接填入的 OpenAI-compatible Provider。");
+  };
+
+  const handleSelectCatalogProvider = (providerId: string) => {
+    const provider = providerCatalog.find((item) => item.providerId === providerId);
+    setSelectedCatalogProviderId(providerId);
+    const model = provider?.models[0];
+    setSelectedCatalogModelId(model?.id ?? "");
+    if (provider && model) fillProviderDraftFromCatalog(provider, model);
+  };
+
+  const handleSelectCatalogModel = (modelId: string) => {
+    const provider = providerCatalog.find((item) => item.providerId === selectedCatalogProviderId);
+    const model = provider?.models.find((item) => item.id === modelId);
+    setSelectedCatalogModelId(modelId);
+    if (provider && model) fillProviderDraftFromCatalog(provider, model);
   };
 
   const handleSetDefaultModel = async (modelAlias = selectedModelAlias || providerDraft.modelAlias.trim()) => {
@@ -862,6 +934,59 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
                   <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 16, paddingTop: 16 }}>
                     <div className="kimix-settings-permission-label">OpenAI-compatible Provider</div>
+                    <div className="kimix-settings-permission" style={{ padding: "12px 14px", marginTop: 12 }}>
+                      <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
+                        <div className="kimix-settings-permission-copy">
+                          <div className="kimix-settings-permission-label">官方 Provider catalog</div>
+                          <div className="kimix-settings-permission-desc">
+                            {providerCatalog.length > 0 ? `${providerCatalog.length} 个 OpenAI-compatible Provider 可填入` : "从 models.dev 拉取可用 Provider 和模型名"}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleLoadProviderCatalog()}
+                          disabled={providerCatalogLoading}
+                          className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                        >
+                          <RefreshCw size={13} className={providerCatalogLoading ? "kimix-spin" : ""} />
+                          {providerCatalog.length > 0 ? "刷新" : "载入"}
+                        </button>
+                      </div>
+                      {providerCatalog.length > 0 && (
+                        <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                          <label className="min-w-0">
+                            <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider</span>
+                            <select
+                              value={selectedCatalogProviderId}
+                              onChange={(event) => handleSelectCatalogProvider(event.target.value)}
+                              className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                              style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                            >
+                              {providerCatalog.map((provider) => (
+                                <option key={provider.providerId} value={provider.providerId}>
+                                  {provider.providerId} ({provider.modelCount})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="min-w-0">
+                            <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型</span>
+                            <select
+                              value={selectedCatalogModelId}
+                              onChange={(event) => handleSelectCatalogModel(event.target.value)}
+                              className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                              style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
+                            >
+                              {(providerCatalog.find((provider) => provider.providerId === selectedCatalogProviderId)?.models ?? []).map((model) => (
+                                <option key={model.id} value={model.id}>
+                                  {model.name ?? model.id}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      )}
+                    </div>
                     <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
                       <label className="min-w-0">
                         <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider 名称</span>
@@ -1100,7 +1225,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.254 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.255 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

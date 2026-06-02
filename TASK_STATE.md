@@ -1730,6 +1730,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 继续按阶段 B 结论推进 C4 Provider catalog；C3 后台 ask 仍因 SDK 缺少非阻塞接续 API 暂不接，C5 undoHistory 可在 C4 后做一个独立增量。
 
+# 2026-06-03 C4 Provider catalog 填表接入
+## 当前目标
+- 继续推进 Kimi Code 0.8 GUI 接入阶段 C，完成 C4 的低风险入口：从官方 catalog/registry 填入 OpenAI-compatible Provider。
+## 已完成
+- `electron/kimiCodeHost.ts` 新增 vendored SDK catalog wrapper，调用 `fetchCatalog` / `inferWireType` / `catalogBaseUrl` / `catalogProviderModels`，只返回 `wire=openai` 且存在可用模型和 baseUrl 的 Provider。
+- `electron/main.ts` / `electron/preload.ts` / `electron/types/ipc.ts` 新增 `kimi:listProviderCatalog` / `listKimiProviderCatalog`。
+- 设置页 OpenAI-compatible Provider 表单上方新增“官方 Provider catalog”区：载入后可选 Provider 和模型，并自动填入 Provider 名称、模型别名、Base URL、模型名、Context；保存/测试仍复用原按钮，API Key 不自动写入。
+- 浏览器预览 mock 补齐 catalog 模拟接口。
+- 版本号三处同步到 v2.8.255。
+## 验证
+- `pnpm build` 通过。
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+- 轻量动态校验 vendored SDK catalog：`providers=139`，其中 `wire=openai` 且可填表的 Provider 为 `109`。
+## 下一步
+- C3 后台 ask 继续保持“待官方开放”状态；下一轮可做 C5 undoHistory 的撤销入口，范围建议限定在当前 Kimi 会话最近 1 步。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。
