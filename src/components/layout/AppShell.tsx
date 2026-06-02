@@ -17,7 +17,7 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session } from "@/types/ui";
-import type { DownloadUpdateProgress, KimiCliUpdateInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
@@ -30,7 +30,7 @@ import { DialogSystem } from "./DialogSystem";
 import { SessionToolbar } from "./SessionToolbar";
 import { DiffPanel } from "./DiffPanel";
 import { ToastSystem } from "./ToastSystem";
-import { LongTaskInspectorPanel, type SessionPlanState } from "./LongTaskInspectorPanel";
+import { LongTaskInspectorPanel, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 
@@ -200,6 +200,9 @@ export function AppShell() {
   const [longTaskDetail, setLongTaskDetail] = useState<LongTaskDetail | null>(null);
   const [longTaskDetailLoading, setLongTaskDetailLoading] = useState(false);
   const [longTaskDetailError, setLongTaskDetailError] = useState<string | null>(null);
+  const [longTaskBackgroundTasks, setLongTaskBackgroundTasks] = useState<LongTaskBackgroundTaskView[]>([]);
+  const [longTaskBackgroundTasksLoading, setLongTaskBackgroundTasksLoading] = useState(false);
+  const [longTaskBackgroundTasksError, setLongTaskBackgroundTasksError] = useState<string | null>(null);
   const [targetStepDraft, setTargetStepDraft] = useState("");
   const [targetStepBusy, setTargetStepBusy] = useState(false);
   const [longTaskControlBusy, setLongTaskControlBusy] = useState(false);
@@ -1028,6 +1031,76 @@ export function AppShell() {
     });
   };
 
+  const refreshLongTaskBackgroundTasks = useCallback((options?: { silent?: boolean }) => {
+    const meta = liveCurrentSession?.longTask;
+    if (!longTaskInspectorOpen || !meta) {
+      setLongTaskBackgroundTasks([]);
+      setLongTaskBackgroundTasksLoading(false);
+      setLongTaskBackgroundTasksError(null);
+      return;
+    }
+    const targets = [
+      { role: "executor" as const, runtimeSessionId: meta.executorSessionId },
+      { role: "reviewer" as const, runtimeSessionId: meta.reviewerSessionId },
+    ].filter((target, index, list) => (
+      Boolean(target.runtimeSessionId) &&
+      list.findIndex((item) => item.runtimeSessionId === target.runtimeSessionId) === index
+    ));
+    if (!options?.silent) setLongTaskBackgroundTasksLoading(true);
+    setLongTaskBackgroundTasksError(null);
+    void Promise.all(targets.map(async (target) => {
+      const res = await window.api.listKimiCodeBackgroundTasks({
+        sessionId: target.runtimeSessionId,
+        activeOnly: false,
+        limit: 20,
+      });
+      if (!res.success) throw new Error(`${target.role === "reviewer" ? "审查" : "执行"} agent：${res.error}`);
+      return res.data.map((task: KimiCodeBackgroundTaskInfo): LongTaskBackgroundTaskView => ({
+        ...task,
+        role: target.role,
+        runtimeSessionId: target.runtimeSessionId,
+      }));
+    })).then((groups) => {
+      setLongTaskBackgroundTasks(groups.flat().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)));
+    }).catch((err: unknown) => {
+      setLongTaskBackgroundTasks([]);
+      setLongTaskBackgroundTasksError(err instanceof Error ? err.message : String(err));
+    }).finally(() => {
+      if (!options?.silent) setLongTaskBackgroundTasksLoading(false);
+    });
+  }, [
+    liveCurrentSession?.longTask?.executorSessionId,
+    liveCurrentSession?.longTask?.reviewerSessionId,
+    longTaskInspectorOpen,
+  ]);
+
+  const copyBackgroundTaskOutput = async (task: LongTaskBackgroundTaskView) => {
+    const res = await window.api.getKimiCodeBackgroundTaskOutput({
+      sessionId: task.runtimeSessionId,
+      taskId: task.taskId,
+      tail: 6000,
+    });
+    if (!res.success) {
+      showToast(`读取输出失败：${res.error}`);
+      return;
+    }
+    await copyToClipboard(res.data || "当前后台任务没有输出。", "已复制后台任务输出");
+  };
+
+  const stopBackgroundTask = async (task: LongTaskBackgroundTaskView) => {
+    const res = await window.api.stopKimiCodeBackgroundTask({
+      sessionId: task.runtimeSessionId,
+      taskId: task.taskId,
+      reason: "Kimix 用户在长程任务侧栏停止后台任务",
+    });
+    if (!res.success) {
+      showToast(`停止失败：${res.error}`);
+      return;
+    }
+    showToast("已请求停止后台任务");
+    refreshLongTaskBackgroundTasks({ silent: true });
+  };
+
   const refreshSessionPlan = useCallback((options?: { silent?: boolean }) => {
     if (!longTaskInspectorOpen || hasLongTaskMeta || !liveCurrentSessionProjectPath) {
       setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null, message: undefined });
@@ -1082,6 +1155,10 @@ export function AppShell() {
   }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
 
   useEffect(() => {
+    refreshLongTaskBackgroundTasks();
+  }, [refreshLongTaskBackgroundTasks]);
+
+  useEffect(() => {
     refreshSessionPlan();
   }, [refreshSessionPlan]);
 
@@ -1099,6 +1176,12 @@ export function AppShell() {
     const timer = window.setInterval(() => refreshLongTaskDetail({ silent: true }), 3000);
     return () => window.clearInterval(timer);
   }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
+
+  useEffect(() => {
+    if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) return;
+    const timer = window.setInterval(() => refreshLongTaskBackgroundTasks({ silent: true }), 5000);
+    return () => window.clearInterval(timer);
+  }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, refreshLongTaskBackgroundTasks]);
 
   useEffect(() => {
     if (!liveCurrentSession?.longTask) {
@@ -1298,6 +1381,9 @@ export function AppShell() {
             hiddenComposerCardEntries={hiddenComposerCardEntries}
             composerCardSessionId={composerCardSessionId}
             visibleSessionLongTasks={visibleSessionLongTasks}
+            backgroundTasks={longTaskBackgroundTasks}
+            backgroundTasksLoading={longTaskBackgroundTasksLoading}
+            backgroundTasksError={longTaskBackgroundTasksError}
             sessionDiffs={sessionDiffs}
             defaultPlanMode={defaultPlanMode}
             buildNextLongTaskPrompt={buildNextLongTaskPrompt}
@@ -1309,6 +1395,9 @@ export function AppShell() {
             onRefreshLongTaskDetail={refreshLongTaskDetail}
             onRefreshSessionPlan={refreshSessionPlan}
             onRefreshSessionLongTasks={refreshSessionLongTasks}
+            onRefreshBackgroundTasks={refreshLongTaskBackgroundTasks}
+            onCopyBackgroundTaskOutput={copyBackgroundTaskOutput}
+            onStopBackgroundTask={stopBackgroundTask}
             onSetTargetStepDraft={setTargetStepDraft}
             onSetShutdownAfterLongTaskId={setShutdownAfterLongTaskId}
             onSetComposerCardHidden={setComposerCardHidden}

@@ -1692,6 +1692,18 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 进入阶段 C1：后台 agent 真实终态 + 恢复提示，先补 GUI 展示与操作，不扩大到 C2/C4/C5。
 
+# 2026-06-02 C1 后台任务真实终态侧栏
+## 已完成
+- 长程任务右侧侧栏新增“SDK 后台任务”分区，会同时读取执行 agent / 审查 agent 的 SDK background tasks。
+- 后台任务 UI 展示真实状态：运行中、等待审批、已完成、失败、已终止、已失联；失败/终止/失联时展示 `failureReason`、`stopReason`、`timedOut` 或 `exitCode`。
+- 每个任务提供复制输出入口；非终态任务提供停止入口，调用现有 `stopKimiCodeBackgroundTask` IPC。
+- 版本号三处同步到 v2.8.252。
+## 验证
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+- `pnpm build` 通过。
+## 下一步
+等待用户用真实后台任务截图验收空态 / 运行态 / 失败或终止态；若显示信息不足，再补恢复按钮或输出查看细节。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

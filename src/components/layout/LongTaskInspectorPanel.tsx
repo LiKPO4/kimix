@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  AlertTriangle,
   CheckCircle2,
   ClipboardCopy,
   Copy,
@@ -8,10 +9,12 @@ import {
   Pause,
   RefreshCw,
   RotateCcw,
+  Square,
+  Terminal,
   X,
 } from "lucide-react";
 import type { Session } from "@/types/ui";
-import type { LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { formatReleaseDate } from "@/utils/format";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
@@ -30,6 +33,11 @@ export type SessionPlanState = {
   updatedAt: number | null;
   error: string | null;
   message?: string;
+};
+
+export type LongTaskBackgroundTaskView = KimiCodeBackgroundTaskInfo & {
+  runtimeSessionId: string;
+  role: "executor" | "reviewer";
 };
 
 interface LongTaskInspectorPanelProps {
@@ -57,6 +65,9 @@ interface LongTaskInspectorPanelProps {
   hiddenComposerCardEntries: HiddenComposerCardEntry[];
   composerCardSessionId: string;
   visibleSessionLongTasks: LongTaskSummary[];
+  backgroundTasks: LongTaskBackgroundTaskView[];
+  backgroundTasksLoading: boolean;
+  backgroundTasksError: string | null;
   sessionDiffs: { id: string; filePath: string; additions: number; deletions: number; timestamp: number }[];
   defaultPlanMode: boolean;
   buildNextLongTaskPrompt: () => string;
@@ -71,6 +82,9 @@ interface LongTaskInspectorPanelProps {
   onRefreshLongTaskDetail: () => void;
   onRefreshSessionPlan: () => void;
   onRefreshSessionLongTasks: () => void;
+  onRefreshBackgroundTasks: () => void;
+  onCopyBackgroundTaskOutput: (task: LongTaskBackgroundTaskView) => Promise<void>;
+  onStopBackgroundTask: (task: LongTaskBackgroundTaskView) => Promise<void>;
   onSetTargetStepDraft: (value: string) => void;
   onSetShutdownAfterLongTaskId: (taskId: string | null) => void;
   onSetComposerCardHidden: (sessionId: string, key: "todo" | "pending", hidden: boolean) => void;
@@ -102,6 +116,9 @@ export function LongTaskInspectorPanel({
   hiddenComposerCardEntries,
   composerCardSessionId,
   visibleSessionLongTasks,
+  backgroundTasks,
+  backgroundTasksLoading,
+  backgroundTasksError,
   sessionDiffs,
   defaultPlanMode,
   buildNextLongTaskPrompt,
@@ -112,6 +129,9 @@ export function LongTaskInspectorPanel({
   onCopyNextLongTaskPrompt,
   onRefreshSessionPlan,
   onRefreshSessionLongTasks,
+  onRefreshBackgroundTasks,
+  onCopyBackgroundTaskOutput,
+  onStopBackgroundTask,
   onSetTargetStepDraft,
   onSetShutdownAfterLongTaskId,
   onSetComposerCardHidden,
@@ -289,6 +309,105 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
               </div>
+            </section>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 1, padding: "16px 16px 18px" }}>
+              <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">SDK 后台任务</div>
+                  <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
+                    {backgroundTasks.length > 0 ? `${backgroundTasks.length} 个任务` : "当前没有后台任务"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={backgroundTasksLoading}
+                  onClick={() => onRefreshBackgroundTasks()}
+                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
+                  刷新
+                </button>
+              </div>
+              {backgroundTasksError ? (
+                <div className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  读取失败：{backgroundTasksError}
+                </div>
+              ) : backgroundTasksLoading && backgroundTasks.length === 0 ? (
+                <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  正在读取 SDK 后台任务...
+                </div>
+              ) : backgroundTasks.length > 0 ? (
+                <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                  {backgroundTasks.slice(0, 8).map((task) => {
+                    const tone = backgroundTaskTone(task);
+                    const isDanger = tone === "danger";
+                    const isSuccess = tone === "success";
+                    const isWarning = tone === "warning";
+                    const roleLabel = task.role === "reviewer" ? "审查" : "执行";
+                    const statusLabel = backgroundTaskStatusLabels[task.status] ?? task.status;
+                    return (
+                      <div
+                        key={`${task.runtimeSessionId}-${task.taskId}`}
+                        className={`rounded-lg border ${isDanger ? "border-accent-danger/30 bg-accent-danger-light" : isSuccess ? "border-accent-success/30 bg-accent-success-light" : isWarning ? "border-accent-warning/30 bg-accent-warning-light" : "border-border-subtle bg-surface-elevated"}`}
+                        style={{ padding: "12px 12px" }}
+                      >
+                        <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                              {isDanger ? (
+                                <AlertTriangle size={14} className="shrink-0 text-accent-danger" />
+                              ) : (
+                                <Terminal size={14} className={`shrink-0 ${isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} />
+                              )}
+                              <span className="truncate text-[13.5px] font-medium leading-5 text-text-primary">
+                                {task.description || task.command || task.taskId}
+                              </span>
+                            </div>
+                            <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 5 }}>
+                              {roleLabel} agent · {task.taskId}
+                            </div>
+                          </div>
+                          <span className={`shrink-0 rounded-full text-[12px] leading-5 ${isDanger ? "bg-white/60 text-accent-danger" : isSuccess ? "bg-white/60 text-accent-success" : isWarning ? "bg-white/60 text-accent-warning" : "bg-accent-primary-light text-accent-primary"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <div className={`text-[12.5px] leading-5 ${isDanger ? "text-accent-danger" : isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} style={{ marginTop: 9 }}>
+                          {backgroundTaskSummary(task)}
+                        </div>
+                        <div className="flex flex-wrap items-center" style={{ gap: 10, marginTop: 12 }}>
+                          <button
+                            type="button"
+                            onClick={() => void onCopyBackgroundTaskOutput(task)}
+                            className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-primary hover:bg-accent-primary-light"
+                          >
+                            <ClipboardCopy size={13} />
+                            输出
+                          </button>
+                          {!isBackgroundTaskTerminal(task.status) && (
+                            <button
+                              type="button"
+                              onClick={() => void onStopBackgroundTask(task)}
+                              className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-danger hover:bg-accent-danger-light"
+                            >
+                              <Square size={13} />
+                              停止
+                            </button>
+                          )}
+                          {task.exitCode !== null && (
+                            <span className="rounded-full bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                              exit {task.exitCode}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  后台 Shell / Agent 任务出现后会显示真实终态、失败原因和输出入口。
+                </div>
+              )}
             </section>
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 2, padding: "16px 16px 18px" }}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
@@ -680,4 +799,35 @@ export function LongTaskInspectorPanel({
       </div>
     </aside>
   );
+}
+
+const backgroundTaskStatusLabels: Record<string, string> = {
+  running: "运行中",
+  awaiting_approval: "等待审批",
+  completed: "已完成",
+  failed: "失败",
+  killed: "已终止",
+  lost: "已失联",
+};
+
+function isBackgroundTaskTerminal(status: string) {
+  return ["completed", "failed", "killed", "lost"].includes(status);
+}
+
+function backgroundTaskTone(task: LongTaskBackgroundTaskView) {
+  if (task.status === "completed") return "success";
+  if (["failed", "killed", "lost"].includes(task.status)) return "danger";
+  if (task.status === "awaiting_approval") return "warning";
+  return "primary";
+}
+
+function backgroundTaskSummary(task: LongTaskBackgroundTaskView) {
+  if (task.failureReason) return task.failureReason;
+  if (task.stopReason) return task.stopReason;
+  if (task.timedOut) return "任务执行超时";
+  if (task.exitCode !== null && task.exitCode !== 0) return `进程退出码 ${task.exitCode}`;
+  if (task.status === "lost") return "SDK 认为任务状态已失联，可查看输出后决定是否继续。";
+  if (task.status === "killed") return "任务已被停止。";
+  if (task.status === "completed") return "后台任务已正常结束。";
+  return task.description || task.command || "后台任务正在运行。";
 }
