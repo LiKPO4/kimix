@@ -256,6 +256,7 @@ export type KimiModelAliasSummary = {
   model: string | null;
   displayName: string | null;
   maxContextSize: number | null;
+  adaptiveThinking: boolean | null;
   isDefault: boolean;
 };
 
@@ -287,6 +288,11 @@ export type KimiOpenAiProviderConfigRequest = {
 
 export type SetKimiDefaultModelRequest = {
   modelAlias: string;
+};
+
+export type SetKimiModelAdaptiveThinkingRequest = {
+  modelAlias: string;
+  adaptiveThinking: boolean;
 };
 
 export type SaveKimiModelConfigResponse = {

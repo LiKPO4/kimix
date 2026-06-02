@@ -51,6 +51,7 @@ type KimiModelConfigSummary = {
     model: string | null;
     displayName: string | null;
     maxContextSize: number | null;
+    adaptiveThinking: boolean | null;
     isDefault: boolean;
   }[];
 };
@@ -165,6 +166,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     maxContextSize: "1000000",
   });
   const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
+  const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
   const [providerMessage, setProviderMessage] = useState("");
   const [selectedModelAlias, setSelectedModelAlias] = useState("");
   const modelSettingsRef = useRef<HTMLDivElement>(null);
@@ -284,6 +286,30 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }
     setProviderMessage(`设为默认失败：${res.error}`);
   };
+
+  const handleToggleAdaptiveThinking = async (model: KimiModelConfigSummary["models"][number]) => {
+    if (typeof window.api.setKimiModelAdaptiveThinking !== "function") {
+      setProviderMessage("自适应思考接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
+      return;
+    }
+    const next = !Boolean(model.adaptiveThinking);
+    setAdaptiveThinkingBusyAlias(model.alias);
+    setProviderMessage(`正在${next ? "开启" : "关闭"}自适应思考...`);
+    const res = await window.api.setKimiModelAdaptiveThinking({
+      modelAlias: model.alias,
+      adaptiveThinking: next,
+    });
+    setAdaptiveThinkingBusyAlias(null);
+    if (res.success) {
+      setModelConfig(res.data);
+      setSelectedModelAlias(model.alias);
+      setProviderMessage(`${res.data.message}：${model.alias} ${next ? "开启" : "关闭"}`);
+      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
+      return;
+    }
+    setProviderMessage(`更新自适应思考失败：${res.error}`);
+  };
+
   const handleTestProvider = async () => {
     const payload = buildProviderPayload();
     if (!payload) {
@@ -786,27 +812,41 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                 <div className="kimix-settings-permission-copy">
                                   <div className="kimix-settings-permission-label truncate">{model.displayName || model.alias}</div>
                                   <div className="kimix-settings-permission-desc">
-                                    {model.provider ?? "未绑定 provider"} · {model.model ?? model.alias}
+                                    {model.provider ?? "未绑定 provider"} · {model.model ?? model.alias} · 自适应思考{model.adaptiveThinking ? "开" : "关"}
                                   </div>
                                 </div>
-                                {model.isDefault ? (
-                                  <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                                    默认
-                                  </span>
-                                ) : (
+                                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                                   <button
                                     type="button"
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      void handleSetDefaultModel(model.alias);
+                                      void handleToggleAdaptiveThinking(model);
                                     }}
-                                    disabled={providerBusyAction === "default"}
+                                    disabled={adaptiveThinkingBusyAlias === model.alias}
                                     className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
                                   >
-                                    <Check size={13} />
-                                    设为默认
+                                    <Zap size={13} className={adaptiveThinkingBusyAlias === model.alias ? "kimix-spin" : ""} />
+                                    {model.adaptiveThinking ? "思考开" : "思考关"}
                                   </button>
-                                )}
+                                  {model.isDefault ? (
+                                    <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                                      默认
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleSetDefaultModel(model.alias);
+                                      }}
+                                      disabled={providerBusyAction === "default"}
+                                      className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
+                                    >
+                                      <Check size={13} />
+                                      设为默认
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
@@ -1060,7 +1100,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.253 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.254 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

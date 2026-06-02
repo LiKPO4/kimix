@@ -1716,6 +1716,20 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 重新创建一个长程任务或停止当前卡住任务后重发；确认正文 / 提问卡 / 工具事件能进入长程任务对话流。
 
+# 2026-06-03 C2 自适应思考开关接入
+## 当前目标
+- 继续推进 Kimi Code 0.8 GUI 接入阶段 C，完成 C2：把 SDK `models[alias].adaptiveThinking` 暴露到设置页。
+## 已完成
+- `electron/main.ts` 的 Kimi 模型摘要新增 `adaptiveThinking` 字段，并新增 `kimi:setModelAdaptiveThinking` IPC，通过官方 vendored SDK `getConfig` + `setConfig` 更新指定模型别名。
+- `electron/preload.ts` / `electron/types/ipc.ts` 暴露 `setKimiModelAdaptiveThinking`，设置页模型列表新增紧凑“思考开/关”按钮，点击后写入 SDK 配置并刷新摘要。
+- 浏览器预览 mock 补齐 `adaptiveThinking` 字段和模拟接口。
+- 版本号三处同步到 v2.8.254。
+## 验证
+- `pnpm build` 通过。
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+## 下一步
+- 继续按阶段 B 结论推进 C4 Provider catalog；C3 后台 ask 仍因 SDK 缺少非阻塞接续 API 暂不接，C5 undoHistory 可在 C4 后做一个独立增量。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

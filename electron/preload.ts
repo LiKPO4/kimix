@@ -28,6 +28,7 @@ import type {
   KimiLogoutResponse,
   SaveKimiModelConfigResponse,
   SetKimiDefaultModelRequest,
+  SetKimiModelAdaptiveThinkingRequest,
   ListMcpServersResponse,
   AddMcpServerRequest,
   ImportPluginMcpServerRequest,
@@ -206,6 +207,8 @@ const api = {
     ipcRenderer.invoke("kimi:saveOpenAiProvider", req),
   setKimiDefaultModel: (req: SetKimiDefaultModelRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:setDefaultModel", req),
+  setKimiModelAdaptiveThinking: (req: SetKimiModelAdaptiveThinkingRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:setModelAdaptiveThinking", req),
   testKimiOpenAiProvider: (req: KimiOpenAiProviderConfigRequest): Promise<TestKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:testOpenAiProvider", req),
   loginKimi: (): Promise<KimiLoginResponse> =>

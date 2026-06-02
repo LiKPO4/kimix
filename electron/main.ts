@@ -718,6 +718,7 @@ function kimiCodeConfigToModelSummary(config: kimiCodeHost.KimiCodeConfig) {
     model: model.model ?? null,
     displayName: model.displayName ?? null,
     maxContextSize: typeof model.maxContextSize === "number" ? model.maxContextSize : null,
+    adaptiveThinking: typeof model.adaptiveThinking === "boolean" ? model.adaptiveThinking : null,
     isDefault: alias === defaultModel,
   })).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN"));
 
@@ -851,6 +852,27 @@ async function setDefaultKimiModelWithSdk(input: unknown) {
     console.warn("[kimi-code] SDK setConfig(defaultModel) failed, falling back to TOML writer:", error);
     return setDefaultKimiModel(input);
   }
+}
+
+async function setKimiModelAdaptiveThinkingWithSdk(input: unknown) {
+  const req = z.object({
+    modelAlias: z.string().trim().min(1).max(160),
+    adaptiveThinking: z.boolean(),
+  }).parse(input);
+  const current = await kimiCodeHost.getConfig({ reload: true });
+  const existing = current.models?.[req.modelAlias];
+  if (!existing) {
+    throw new Error(`模型别名 ${req.modelAlias} 不存在，请先刷新模型配置`);
+  }
+  const updated = await kimiCodeHost.setConfig({
+    models: {
+      [req.modelAlias]: {
+        ...existing,
+        adaptiveThinking: req.adaptiveThinking,
+      },
+    },
+  });
+  return kimiCodeConfigToModelSummary(updated);
 }
 async function testOpenAiProviderConfig(input: unknown) {
   const config = TestOpenAiProviderConfigSchema.parse(input);
@@ -3709,6 +3731,16 @@ ipcMain.handle("kimi:setDefaultModel", async (_, request: unknown) => {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
+
+ipcMain.handle("kimi:setModelAdaptiveThinking", async (_, request: unknown) => {
+  try {
+    const config = await setKimiModelAdaptiveThinkingWithSdk(request);
+    return { success: true, data: { ...config, message: "已通过官方 SDK 更新自适应思考" } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:testOpenAiProvider", async (_, request: unknown) => {
   try {
     return { success: true, data: await testOpenAiProviderConfig(request) };
