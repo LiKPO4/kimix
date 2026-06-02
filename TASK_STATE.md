@@ -1704,6 +1704,18 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 等待用户用真实后台任务截图验收空态 / 运行态 / 失败或终止态；若显示信息不足，再补恢复按钮或输出查看细节。
 
+# 2026-06-03 长程任务 SDK 事件入库修复
+## 已完成
+- 修复长程任务前端 session 未标记 `engine: "kimi-code"`，导致 `onKimiCodeEvent` / `onKimiCodeStatus` 直接丢弃官方 SDK 事件的问题。
+- 新建长程任务的 kickoff 改为显式调用 `sendKimiCodePrompt`，不再走模糊的 legacy `sendPrompt` 入口。
+- SDK 事件处理对已有 longTask 会话增加兜底：即使历史会话缺少 `engine` 字段，也允许事件入库。
+- 版本号三处同步到 v2.8.253。
+## 验证
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+- `pnpm build` 通过。
+## 下一步
+重新创建一个长程任务或停止当前卡住任务后重发；确认正文 / 提问卡 / 工具事件能进入长程任务对话流。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

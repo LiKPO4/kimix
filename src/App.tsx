@@ -1512,7 +1512,7 @@ function App() {
     const unsubscribeKimiCodeEvent = window.api.onKimiCodeEvent((payload) => {
       const uiSessionId = resolveUiSessionId(payload.sessionId);
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      if (targetSession?.engine !== "kimi-code") return;
+      if (targetSession?.engine !== "kimi-code" && !targetSession?.longTask) return;
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
@@ -1538,7 +1538,7 @@ function App() {
     const unsubscribeKimiCodeStatus = window.api.onKimiCodeStatus((payload) => {
       const uiSessionId = resolveUiSessionId(payload.sessionId);
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      if (targetSession?.engine !== "kimi-code") return;
+      if (targetSession?.engine !== "kimi-code" && !targetSession?.longTask) return;
 
       if (payload.status === "running") {
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);

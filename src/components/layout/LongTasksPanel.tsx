@@ -37,7 +37,9 @@ function sessionFromTask(task: LongTaskSummary, events: TimelineEvent[]): Sessio
   const planningStage = ["drafting", "planning", "ready"].includes(task.stage);
   return {
     id: task.id,
+    engine: "kimi-code",
     runtimeSessionId: planningStage || task.activeAgent === "executor" ? task.executorSessionId : task.reviewerSessionId,
+    officialSessionId: task.executorSessionId,
     longTask: {
       taskId: task.id,
       title: task.title,
@@ -141,12 +143,9 @@ export function LongTasksPanel() {
       setCurrentSession(session);
       setRunningSessionId(session.id);
 
-      const kickoff = await window.api.sendPrompt({
+      const kickoff = await window.api.sendKimiCodePrompt({
         sessionId: res.data.executorSessionId,
         content: buildPlanningKickoffPrompt(res.data),
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
       });
       if (!kickoff.success) {
         setRunningSessionId(null);
