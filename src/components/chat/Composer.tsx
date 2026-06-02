@@ -10,6 +10,7 @@ import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -486,7 +487,7 @@ export function Composer() {
 
       try {
         let kimiCodeSessionId = await ensureKimiCodeRuntime();
-        let res = await window.api.sendKimiCodePrompt({
+        let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
           content: outboundContent,
           images: imagesForApi,
@@ -495,7 +496,7 @@ export function Composer() {
           updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
           targetSession = { ...targetSession, runtimeSessionId: undefined };
           kimiCodeSessionId = await ensureKimiCodeRuntime();
-          res = await window.api.sendKimiCodePrompt({
+          res = await sendKimiCodePromptWithRetry({
             sessionId: kimiCodeSessionId,
             content: outboundContent,
             images: imagesForApi,

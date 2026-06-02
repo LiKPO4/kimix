@@ -3,6 +3,7 @@ import { Bug, GitBranch, ListChecks, Sparkles } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
+import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 const FALLBACK_SUGGESTIONS = [
   { icon: Sparkles, text: "分析一下当前项目，并告诉我最应该先处理什么" },
@@ -177,7 +178,7 @@ export function EmptyState() {
         };
         setCurrentSession(targetSession);
       }
-      const sendRes = await window.api.sendKimiCodePrompt({
+      const sendRes = await sendKimiCodePromptWithRetry({
         sessionId: runtimeSessionId,
         content: text,
         images: [],

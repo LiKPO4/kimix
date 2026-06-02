@@ -11,6 +11,7 @@ import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import {
   settleInactiveEvents,
   sanitizePersistedEvents,
@@ -1623,7 +1624,7 @@ function App() {
       }));
       setRunningSessionId(uiSessionId);
       const timer = setTimeout(() => {
-        window.api.sendKimiCodePrompt({
+        sendKimiCodePromptWithRetry({
           sessionId: payload.sessionId,
           content: next.content,
           images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
@@ -1786,7 +1787,7 @@ function App() {
           const timer = setTimeout(() => {
             const runtimeSessionId = resolveRuntimeSessionId(uiSessionId);
             const latestForQueue = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-            const sendPromise = window.api.sendKimiCodePrompt({
+            const sendPromise = sendKimiCodePromptWithRetry({
               sessionId: runtimeSessionId,
               content: next.content,
               images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),

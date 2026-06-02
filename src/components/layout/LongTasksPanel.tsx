@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session, TimelineEvent } from "@/types/ui";
 import type { LongTaskSummary } from "@electron/types/ipc";
+import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 function defaultTitleFromRequest(value: string) {
   return value.trim().split(/\r?\n/)[0]?.slice(0, 42) ?? "";
@@ -143,7 +144,7 @@ export function LongTasksPanel() {
       setCurrentSession(session);
       setRunningSessionId(session.id);
 
-      const kickoff = await window.api.sendKimiCodePrompt({
+      const kickoff = await sendKimiCodePromptWithRetry({
         sessionId: res.data.executorSessionId,
         content: buildPlanningKickoffPrompt(res.data),
       });

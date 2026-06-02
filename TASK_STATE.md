@@ -1762,6 +1762,19 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 阶段 C 可接项已完成 C1/C2/C4/C5；C3 后台 ask 仍因 SDK `background-ask=false` 且缺非阻塞接续 API 暂不接。后续建议做真实窗口人工验收与必要 UI 微调。
 
+# 2026-06-03 修复同会话连续发送 active turn 竞态
+## 当前目标
+- 修复用户反馈的同会话连续提问时出现 `Cannot launch a new turn while another turn is active`，导致第二轮进入错误卡、看起来上下文丢失的问题。
+## 已完成
+- 新增 `src/utils/kimiCodeSendRetry.ts`，只针对官方 SDK 返回的 active-turn 释放延迟错误做短暂退避重试；其它发送错误仍原样返回。
+- 普通 Composer 发送、队列续发、空态建议发送、长程任务 kickoff 均改为使用 `sendKimiCodePromptWithRetry`。
+- 版本号三处同步到 v2.8.257。
+## 验证
+- `pnpm build` 通过。
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+## 下一步
+- 重启 dev 窗口后复测：连续发送“回复 1/2/3”应不再出现 active turn 错误卡；如仍出现，需要抓对应主进程日志确认 SDK 是否长时间未释放 turn。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。
