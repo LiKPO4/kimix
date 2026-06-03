@@ -1030,7 +1030,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 16, paddingTop: 16 }}>
                     <div className="kimix-settings-permission-label">OpenAI-compatible Provider</div>
                     <div className="kimix-settings-permission" style={{ padding: "14px 16px", marginTop: 12 }}>
-                      <div className="flex min-w-0 items-start justify-between" style={{ gap: 14 }}>
+                      <div
+                        className="grid min-w-0"
+                        style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, alignItems: "center", minHeight: 48 }}
+                      >
                         <div className="kimix-settings-permission-copy min-w-0">
                           <div className="kimix-settings-permission-label">官方 catalog</div>
                           <div className="kimix-settings-permission-desc">
@@ -1042,6 +1045,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           onClick={() => void handleLoadProviderCatalog()}
                           disabled={providerCatalogLoading}
                           className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                          style={{ alignSelf: "center" }}
                         >
                           <RefreshCw size={13} className={providerCatalogLoading ? "kimix-spin" : ""} />
                           {providerCatalog.length > 0 ? "刷新" : "载入"}
@@ -1315,7 +1319,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.284 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.285 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
