@@ -1904,6 +1904,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 等待用户用 v2.8.267 重新选择 DeepSeek 并测试。
 
+# 2026-06-03 降低 DeepSeek 简单请求长思考
+## 当前目标
+- 按用户截图反馈，排查 DeepSeek 默认模型下简单请求长时间只输出 thinking、不出正文的问题。
+## 已完成
+- 确认当前 Kimi Code 配置里 `deepseek/deepseek-v4-flash` 为默认模型，`default_thinking=true` 且模型 `adaptive_thinking=true`，简单请求会进入长思考链路。
+- `kimi:startSession` 创建官方 SDK session 时补传 thinking：DeepSeek 默认模型强制 `thinking: "off"`；其他模型在用户关闭输入区“思考”时也传 `off`。
+- `kimiCodeHost` 补官方 SDK `setThinking(level)`，恢复已有 DeepSeek runtime 时也会同步 `thinking: "off"`，避免旧会话继续长思考。
+- DeepSeek OpenAI-compatible Provider 的 catalog / 前端填入 / 后端测试保存 Context 默认从 393216 进一步收敛到 65536。
+- DeepSeek Provider 保存时写入 `adaptive_thinking = false`；设置页对 OpenAI-compatible Provider 不再展示自适应思考按钮，改为提示由输入区思考开关控制。
+- 版本号三处同步到 v2.8.268。
+## 验证
+- `pnpm build` 通过。
+- 真实命令行验证：`KIMI_MODEL_DEFAULT_THINKING=false` + `KIMI_MODEL_MAX_CONTEXT_SIZE=65536` 时，DeepSeek 执行 `只回复 q` 返回 `q`，耗时约 2.7s。
+## 下一步
+- 等待用户用 v2.8.268 停止当前运行中的旧轮次后复验 DeepSeek 简单请求是否快速出正文。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

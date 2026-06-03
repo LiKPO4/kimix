@@ -93,7 +93,7 @@ const settingsStatusCache: {
 
 function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
   const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
-  if (signature.includes("deepseek")) return 393216;
+  if (signature.includes("deepseek")) return 65536;
   return 1048576;
 }
 
@@ -211,7 +211,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     baseUrl: "https://api.deepseek.com",
     apiKey: "",
     model: "deepseek-v4-flash",
-    maxContextSize: "393216",
+    maxContextSize: "65536",
   });
   const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
   const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
@@ -408,6 +408,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   };
 
   const handleToggleAdaptiveThinking = async (model: KimiModelConfigSummary["models"][number]) => {
+    const provider = modelConfig?.providers.find((item) => item.name === model.provider);
+    const externalOpenAiProvider = provider?.type === "openai";
+    if (externalOpenAiProvider) {
+      setProviderMessage("OpenAI-compatible Provider 不使用 Kimi Code 的自适应思考开关；请用输入区“思考开/关”控制本轮。");
+      return;
+    }
     if (typeof window.api.setKimiModelAdaptiveThinking !== "function") {
       setProviderMessage("自适应思考接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
       return;
@@ -921,6 +927,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <div className="flex flex-col" style={{ gap: 8, marginTop: 2 }}>
                           {modelConfig.models.slice(0, 3).map((model) => {
                             const selected = selectedModelAlias === model.alias || (!selectedModelAlias && model.isDefault);
+                            const provider = modelConfig.providers.find((item) => item.name === model.provider);
+                            const externalOpenAiProvider = provider?.type === "openai";
                             return (
                               <div
                                 key={model.alias}
@@ -938,22 +946,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                 <div className="kimix-settings-permission-copy">
                                   <div className="kimix-settings-permission-label truncate">{model.displayName || model.alias}</div>
                                   <div className="kimix-settings-permission-desc">
-                                    {model.provider ?? "未绑定 provider"} · {model.model ?? model.alias} · 自适应思考{model.adaptiveThinking ? "开" : "关"}
+                                    {model.provider ?? "未绑定 provider"} · {model.model ?? model.alias} · {externalOpenAiProvider ? "思考由输入区控制" : `自适应思考${model.adaptiveThinking ? "开" : "关"}`}
                                   </div>
                                 </div>
                                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void handleToggleAdaptiveThinking(model);
-                                    }}
-                                    disabled={adaptiveThinkingBusyAlias === model.alias}
-                                    className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
-                                  >
-                                    <Zap size={13} className={adaptiveThinkingBusyAlias === model.alias ? "kimix-spin" : ""} />
-                                    {model.adaptiveThinking ? "思考开" : "思考关"}
-                                  </button>
+                                  {!externalOpenAiProvider && (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleToggleAdaptiveThinking(model);
+                                      }}
+                                      disabled={adaptiveThinkingBusyAlias === model.alias}
+                                      className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
+                                    >
+                                      <Zap size={13} className={adaptiveThinkingBusyAlias === model.alias ? "kimix-spin" : ""} />
+                                      {model.adaptiveThinking ? "思考开" : "思考关"}
+                                    </button>
+                                  )}
                                   {model.isDefault ? (
                                     <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>
                                       默认
@@ -1279,7 +1289,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.267 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.268 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

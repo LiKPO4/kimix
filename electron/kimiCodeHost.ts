@@ -45,6 +45,7 @@ type KimiCodeSessionLike = {
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
+  setThinking?(level: string): Promise<void>;
   setPlanMode(enabled: boolean): Promise<void>;
   setPermission(mode: KimiCodePermissionMode): Promise<void>;
   getStatus(): Promise<KimiCodeSessionStatus>;
@@ -402,6 +403,12 @@ export async function setPlanMode(sessionId: string, enabled: boolean): Promise<
   await managed.session.setPlanMode(enabled);
 }
 
+export async function setThinking(sessionId: string, level: string): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.setThinking) throw new Error("Official Kimi Code SDK does not expose setThinking on this session");
+  await managed.session.setThinking(level);
+}
+
 export async function setPermission(sessionId: string, mode: KimiCodePermissionMode): Promise<void> {
   const managed = getManagedSession(sessionId);
   await managed.session.setPermission(mode);
@@ -598,7 +605,7 @@ function normalizeCatalogMaxContextSize(providerId: string, baseUrl: string | nu
   const fallback = 262144;
   const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
   const signature = `${providerId} ${baseUrl ?? ""} ${modelId}`.toLowerCase();
-  const limit = signature.includes("deepseek") ? 393216 : 1048576;
+  const limit = signature.includes("deepseek") ? 65536 : 1048576;
   return Math.max(1, Math.min(limit, input));
 }
 

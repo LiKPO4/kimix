@@ -608,7 +608,7 @@ type SavedOpenAiProviderConfig = z.infer<typeof SaveOpenAiProviderConfigSchema> 
 
 function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
   const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
-  if (signature.includes("deepseek")) return 393216;
+  if (signature.includes("deepseek")) return 65536;
   return 1048576;
 }
 
@@ -617,6 +617,13 @@ function normalizeOpenAiProviderContextSize(config: Pick<z.infer<typeof OpenAiPr
   const input = typeof config.maxContextSize === "number" && Number.isFinite(config.maxContextSize) ? config.maxContextSize : fallback;
   const limit = getOpenAiProviderContextLimit(config.providerName, config.baseUrl, config.model);
   return Math.max(1, Math.min(limit, input));
+}
+
+function isDeepSeekModelConfig(summary: ReturnType<typeof readKimiModelConfig>, modelAlias?: string | null) {
+  const alias = modelAlias || summary.defaultModel || "";
+  const model = summary.models.find((item) => item.alias === alias);
+  const provider = summary.providers.find((item) => item.name === model?.provider);
+  return `${alias} ${model?.provider ?? ""} ${model?.model ?? ""} ${provider?.baseUrl ?? ""}`.toLowerCase().includes("deepseek");
 }
 
 function readTomlSectionBody(raw: string, sectionName: string) {
@@ -636,6 +643,7 @@ function resolveExistingManagedApiKey(raw: string, providerName: string) {
 
 function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
   const maxContextSize = normalizeOpenAiProviderContextSize(config);
+  const disableAdaptiveThinking = `${config.providerName} ${config.baseUrl} ${config.model}`.toLowerCase().includes("deepseek");
   const providerKey = toTomlTableKey(config.providerName);
   const modelKey = toTomlTableKey(config.modelAlias);
   return [
@@ -650,6 +658,7 @@ function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
     `model = "${escapeTomlString(config.model)}"`,
     `max_context_size = ${maxContextSize}`,
     `display_name = "${escapeTomlString(config.modelAlias)}"`,
+    ...(disableAdaptiveThinking ? ["adaptive_thinking = false"] : []),
     KIMIX_MODEL_CONFIG_END,
     "",
   ].join("\n");
@@ -826,6 +835,7 @@ async function saveOpenAiProviderConfigWithSdk(input: unknown) {
           model: config.model,
           maxContextSize: normalizeOpenAiProviderContextSize(config),
           displayName: config.modelAlias,
+          adaptiveThinking: `${config.providerName} ${config.baseUrl} ${config.model}`.toLowerCase().includes("deepseek") ? false : undefined,
         },
       },
       ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),
@@ -4362,9 +4372,17 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
     const permission = request.yoloMode ? "yolo" as const : request.autoMode ? "auto" as const : "manual" as const;
     const sameWorkDir = (a: string, b: string) =>
       path.resolve(a).replace(/\\/g, "/").toLowerCase() === path.resolve(b).replace(/\\/g, "/").toLowerCase();
+    const modelSummary = await readKimiModelConfigWithSdk().catch(() => readKimiModelConfig());
+    const selectedModelAlias = request.model || modelSummary.defaultModel || undefined;
+    const thinking = isDeepSeekModelConfig(modelSummary, selectedModelAlias)
+      ? "off"
+      : request.thinking === false
+        ? "off"
+        : undefined;
     const createFresh = () => kimiCodeHost.createSession({
       workDir: request.workDir,
       model: request.model,
+      thinking,
       permission,
       planMode: !!request.planMode,
     });
@@ -4380,6 +4398,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
         engineSession = resumed;
         // Keep the resumed session's permission in sync with the requested mode.
         await kimiCodeHost.setPermission(resumed.sessionId, permission).catch(() => {});
+        if (thinking) await kimiCodeHost.setThinking(resumed.sessionId, thinking).catch(() => {});
       }
     } else {
       engineSession = await createFresh();
