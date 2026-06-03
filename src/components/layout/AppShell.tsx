@@ -64,15 +64,15 @@ type KimiCliOnboardingState = {
 const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: string }> = {
   automations: {
     title: "自动化",
-    body: "Kimix 侧栏已预留自动化入口，但本地自动化任务、定时运行和结果回写还没有接入到桌面端。",
+    body: "自动化用于定时运行任务、跟踪结果，并把重要状态带回当前工作区。",
   },
   "local-environments": {
     title: "本地环境",
-    body: "当前版本会直接使用本机 Kimi Code 和项目目录。隔离环境、环境模板和一键初始化仍需后续接入。",
+    body: "Kimix 会使用本机 Kimi Code 和当前项目目录运行任务，请确认项目依赖和命令环境已经准备好。",
   },
   worktrees: {
     title: "工作树",
-    body: "工作树菜单先保留为说明入口。后续会基于 Git worktree 增加独立任务目录和分支隔离。",
+    body: "工作树用于为任务准备独立目录和分支，适合并行处理多个互不干扰的改动。",
   },
   skills: {
     title: "插件",

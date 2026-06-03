@@ -1019,7 +1019,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           })}
                         </div>
                         {modelConfig.models.length > 3 && (
-                          <div className="kimix-settings-permission-desc">另有 {modelConfig.models.length - 3} 个模型别名，后续 P0 写入入口会一并管理。</div>
+                          <div className="kimix-settings-permission-desc">另有 {modelConfig.models.length - 3} 个模型别名未展示。</div>
                         )}
                       </>
                     ) : (
@@ -1315,7 +1315,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.283 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.284 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
