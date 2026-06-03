@@ -766,27 +766,29 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-columns.is-workspace {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
+  display: grid;
+  width: min(920px, 100%);
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
 }
 
 .kimix-settings-columns.is-workspace .kimix-settings-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  display: contents;
 }
 
 .kimix-settings-columns.is-workspace .kimix-settings-section {
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--surface-elevated);
-  padding: 16px;
+  padding: 12px 16px;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-footer {
+  width: min(920px, 100%);
+  margin-left: auto;
+  margin-right: auto;
   margin-top: 18px;
 }
 
@@ -796,8 +798,86 @@ button.bg-accent-primary:disabled:hover,
 
 @media (max-width: 720px) {
   .kimix-settings-columns.is-workspace {
-    flex-direction: column;
+    width: 100%;
   }
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:first-child > .kimix-settings-section:nth-child(1) {
+  order: 5;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:first-child > .kimix-settings-section:nth-child(2) {
+  order: 4;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:first-child > .kimix-settings-section:nth-child(3) {
+  order: 7;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:first-child > .kimix-settings-section:nth-child(4) {
+  order: 8;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:first-child > .kimix-settings-section:nth-child(5) {
+  order: 11;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(1) {
+  order: 1;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(2) {
+  order: 2;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(3) {
+  order: 3;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(4) {
+  order: 6;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(5) {
+  order: 9;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(6) {
+  order: 10;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-col:nth-child(2) > .kimix-settings-section:nth-child(7) {
+  order: 12;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-section-title,
+.kimix-settings-panel.is-workspace .kimix-settings-row-title {
+  min-height: 30px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-section > .kimix-settings-section-title + *,
+.kimix-settings-panel.is-workspace .kimix-settings-section > .kimix-settings-row-title + * {
+  margin-top: 8px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-theme-grid {
+  margin-top: 8px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-theme {
+  height: 44px;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-permissions {
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-permission,
+.kimix-settings-panel.is-workspace .kimix-settings-connection {
+  padding: 10px 14px;
 }
 
 .kimix-settings-section + .kimix-settings-section {
