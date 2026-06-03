@@ -67,6 +67,15 @@ function isInterruptedStatus(event: Extract<TimelineEvent, { type: "status_updat
   return Boolean(event.message && /中断|打断|cancelled|canceled|interrupted/i.test(event.message));
 }
 
+function buildAssistantFullCopyText(event: Extract<TimelineEvent, { type: "assistant_message" }>) {
+  const thinkingText = getThinkingBlocks(event).map((block) => block.text.trim()).filter(Boolean).join("\n\n");
+  const content = event.content.trim();
+  return [
+    thinkingText ? `## 思考\n\n${thinkingText}` : "",
+    content ? `## 回复\n\n${content}` : "",
+  ].filter(Boolean).join("\n\n");
+}
+
 function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
@@ -578,6 +587,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
 
 function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
+  const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const hasContent = event.content.trim().length > 0;
@@ -603,6 +613,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   const roleLabel = formatAgentRole(event.agentRole);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
+  const fullCopyText = buildAssistantFullCopyText(event);
   const displayProcessLabel = event.isComplete
     ? `${isInterrupted ? "（输出打断）" : "（输出完成）"}已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
     : isActivelyThinking
@@ -667,6 +678,16 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
                   aria-label="复制"
                 >
                   {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+                </button>
+                <button
+                  onClick={() => triggerAll(fullCopyText || event.content)}
+                  className="flex h-6 items-center rounded-md text-[12px] text-text-muted transition-colors hover:bg-bg-hover"
+                  style={{ gap: 4, paddingLeft: 7, paddingRight: 7 }}
+                  title="全部复制（含思考）"
+                  aria-label="全部复制（含思考）"
+                >
+                  {copiedAll ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+                  <span>全部</span>
                 </button>
                 {hookBadgeEvents.length > 0 && (
                   <button
