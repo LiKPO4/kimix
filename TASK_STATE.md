@@ -1775,6 +1775,19 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 重启 dev 窗口后复测：连续发送“回复 1/2/3”应不再出现 active turn 错误卡；如仍出现，需要抓对应主进程日志确认 SDK 是否长时间未释放 turn。
 
+# 2026-06-03 修复 pending 队列双消费
+## 当前目标
+- 修复用户复测发现的连续发送仍出现 active turn 错误：本地队列可能在同一次完成状态后同时发送后续两条消息。
+## 已完成
+- `App.tsx` 新增 per-session pending 队列分发锁 `pendingQueueDispatchRef`，并把 `onKimiCodeStatus` 里的 pending 消费收敛到 `dispatchNextPendingKimiMessage()`。
+- 旧 `onKimiStatus` 对普通 Kimi Code 会话直接让路，不再和 `onKimiCodeStatus` 同时消费 pending 队列；长程任务和交接逻辑仍保留在旧 status 分支。
+- 版本号三处同步到 v2.8.258。
+## 验证
+- `pnpm build` 通过。
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过：2 个文件、46 个测试。
+## 下一步
+- 重启 dev 窗口后复测同会话快速输入 1/2/3。若仍复现，下一步把队列泵提升到主进程/SDK host 层，以 runtime session 为 key 串行化所有 `prompt()` 调用。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

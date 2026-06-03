@@ -733,6 +733,7 @@ function App() {
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
+  const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
 
   useRendererLagDetector();
@@ -1111,6 +1112,75 @@ function App() {
       }
       setRunningSessionId(null);
     });
+    return true;
+  };
+
+  const dispatchNextPendingKimiMessage = (uiSessionId: string, runtimeSessionId: string) => {
+    if (pendingQueueDispatchRef.current.has(uiSessionId)) return false;
+    const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (latestSession && hasPendingQuestion(latestSession.events)) {
+      persistLocalConversationState();
+      return false;
+    }
+    const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
+    if (!next) return false;
+
+    pendingQueueDispatchRef.current.add(uiSessionId);
+    const userEventId = Math.random().toString(36).substring(2, 11);
+    const placeholderId = Math.random().toString(36).substring(2, 11);
+    updateSession(uiSessionId, (session) => ({
+      ...session,
+      events: [
+        ...session.events,
+        {
+          id: userEventId,
+          type: "user_message" as const,
+          timestamp: Date.now(),
+          content: next.content,
+          images: next.images,
+        },
+        {
+          id: placeholderId,
+          type: "assistant_message" as const,
+          timestamp: Date.now(),
+          content: "",
+          isThinking: useAppStore.getState().defaultThinking,
+          isComplete: false,
+        },
+      ],
+      updatedAt: Date.now(),
+    }));
+    setRunningSessionId(uiSessionId);
+    const timer = setTimeout(() => {
+      sendKimiCodePromptWithRetry({
+        sessionId: runtimeSessionId,
+        content: next.content,
+        images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
+      }).then((res) => {
+        if (res.success) return;
+        throw new Error(res.error);
+      }).catch((err) => {
+        useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
+        updateSession(uiSessionId, (session) => ({
+          ...session,
+          events: [
+            ...session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
+            {
+              id: crypto.randomUUID(),
+              type: "error" as const,
+              timestamp: Date.now(),
+              message: err instanceof Error ? err.message : String(err),
+              source: "ipc" as const,
+            },
+          ],
+          updatedAt: Date.now(),
+        }));
+        setRunningSessionId(null);
+      }).finally(() => {
+        pendingQueueDispatchRef.current.delete(uiSessionId);
+      });
+    }, 300);
+    timersRef.current.push(timer);
     return true;
   };
 
@@ -1590,67 +1660,7 @@ function App() {
       notifyTurnComplete(uiSessionId, payload.sessionId, undefined, assistantContent);
       runtimeTurnStartRef.current.delete(payload.sessionId);
 
-      const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      if (latestSession && hasPendingQuestion(latestSession.events)) {
-        persistLocalConversationState();
-        return;
-      }
-
-      const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
-      if (!next) return;
-      const userEventId = Math.random().toString(36).substring(2, 11);
-      const placeholderId = Math.random().toString(36).substring(2, 11);
-      updateSession(uiSessionId, (session) => ({
-        ...session,
-        events: [
-          ...session.events,
-          {
-            id: userEventId,
-            type: "user_message" as const,
-            timestamp: Date.now(),
-            content: next.content,
-            images: next.images,
-          },
-          {
-            id: placeholderId,
-            type: "assistant_message" as const,
-            timestamp: Date.now(),
-            content: "",
-            isThinking: useAppStore.getState().defaultThinking,
-            isComplete: false,
-          },
-        ],
-        updatedAt: Date.now(),
-      }));
-      setRunningSessionId(uiSessionId);
-      const timer = setTimeout(() => {
-        sendKimiCodePromptWithRetry({
-          sessionId: payload.sessionId,
-          content: next.content,
-          images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
-        }).then((res) => {
-          if (res.success) return;
-          throw new Error(res.error);
-        }).catch((err) => {
-          useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
-          updateSession(uiSessionId, (session) => ({
-            ...session,
-            events: [
-              ...session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
-              {
-                id: crypto.randomUUID(),
-                type: "error" as const,
-                timestamp: Date.now(),
-                message: err instanceof Error ? err.message : String(err),
-                source: "ipc" as const,
-              },
-            ],
-            updatedAt: Date.now(),
-          }));
-          setRunningSessionId(null);
-        });
-      }, 300);
-      timersRef.current.push(timer);
+      dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
     });
 
     const unsubscribeStatus = window.api.onKimiStatus((payload) => {
@@ -1666,8 +1676,14 @@ function App() {
         }
       }
 
+      const statusUiSessionId = resolveUiSessionId(payload.sessionId);
+      const statusSession = useSessionStore.getState().sessions.find((session) => session.id === statusUiSessionId);
+      if (statusSession?.engine === "kimi-code" && !statusSession.longTask) {
+        return;
+      }
+
       if (payload.status === "running") {
-        const uiSessionId = resolveUiSessionId(payload.sessionId);
+        const uiSessionId = statusUiSessionId;
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         runtimeTurnStartRef.current.set(payload.sessionId, {
           eventStartIndex: runningSession?.events.length ?? 0,
@@ -1687,7 +1703,7 @@ function App() {
         return;
       }
 
-      const uiSessionId = resolveUiSessionId(payload.sessionId);
+      const uiSessionId = statusUiSessionId;
       const terminalStatus = payload.status as "completed" | "error" | "interrupted";
       const terminalSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       const isReviewerTerminal = terminalSession?.longTask?.reviewerSessionId === payload.sessionId;
