@@ -89,6 +89,7 @@ export function ContextRing() {
     return hasBegin;
   }, [session?.events]);
 
+  const hasContextStatus = Boolean(latestStatus);
   const contextSize = latestStatus?.contextSize ?? 0;
   const contextLimit = latestStatus?.contextLimit ?? 256000;
   const used = contextSize <= 1 ? contextSize * contextLimit : contextSize;
@@ -96,7 +97,7 @@ export function ContextRing() {
   const remaining = Math.max(0, 100 - percent);
   const recommendation = getSessionRecommendationMetrics(session, sessionRecommendationTurnLimit);
   const isCurrentSessionRunning = Boolean(currentSession && runningSessionId === currentSession.id);
-  const canCompact = Boolean(currentSession && !isCurrentSessionRunning && !isCompacting);
+  const canCompact = Boolean(currentSession && hasContextStatus && !isCurrentSessionRunning && !isCompacting);
   const compactingDots = useAnimatedDots(isCompacting);
 
   const handleEnter = () => {
@@ -129,7 +130,7 @@ export function ContextRing() {
     };
   }, []);
 
-  if (!latestStatus) return null;
+  if (!currentSession) return null;
 
   return (
     <div
@@ -171,12 +172,23 @@ export function ContextRing() {
               ) : "压缩"}
             </button>
           </div>
-          <div className="text-[14px] font-medium text-text-primary">
-            {percent.toFixed(0)}% 已用（剩余 {remaining.toFixed(0)}%）
-          </div>
-          <div className="text-[13px] text-text-muted" style={{ marginTop: 4 }}>
-            已用 {formatK(used)} 标记，共 {formatK(contextLimit)}
-          </div>
+          {hasContextStatus ? (
+            <>
+              <div className="text-[14px] font-medium text-text-primary">
+                {percent.toFixed(0)}% 已用（剩余 {remaining.toFixed(0)}%）
+              </div>
+              <div className="text-[13px] text-text-muted" style={{ marginTop: 4 }}>
+                已用 {formatK(used)} 标记，共 {formatK(contextLimit)}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[14px] font-medium text-text-primary">暂无上下文用量</div>
+              <div className="text-[13px] text-text-muted" style={{ marginTop: 4 }}>
+                发送消息后会显示 Tokens 和 Context。
+              </div>
+            </>
+          )}
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
             <div
               className="h-full rounded-full"

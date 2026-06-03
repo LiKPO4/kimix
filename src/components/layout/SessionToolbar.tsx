@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   CheckCircle2,
@@ -103,6 +103,9 @@ export function SessionToolbar({
   const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [undoBusy, setUndoBusy] = useState(false);
+  const sessionMenuRef = useRef<HTMLDivElement>(null);
+  const launchMenuRef = useRef<HTMLDivElement>(null);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const archiveSession = useSessionStore((s) => s.archiveSession);
@@ -110,6 +113,18 @@ export function SessionToolbar({
   const currentSession = useAppStore((s) => s.currentSession);
   const liveCurrentSessionFromHook = useLiveSession(currentSession?.id);
   const liveCurrentSession = liveCurrentSessionFromHook ?? currentSession;
+
+  useEffect(() => {
+    if (!sessionMenuOpen && !launchMenuOpen && !projectMenuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (sessionMenuOpen && !sessionMenuRef.current?.contains(target)) setSessionMenuOpen(false);
+      if (launchMenuOpen && !launchMenuRef.current?.contains(target)) setLaunchMenuOpen(false);
+      if (projectMenuOpen && !projectMenuRef.current?.contains(target)) setProjectMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [sessionMenuOpen, launchMenuOpen, projectMenuOpen]);
 
   const renameCurrentSession = () => {
     if (!liveCurrentSession) {
@@ -268,7 +283,7 @@ export function SessionToolbar({
         <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
           {title}
         </div>
-        <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+        <div ref={sessionMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
           <button
             onClick={() => setSessionMenuOpen((open) => !open)}
             className={`kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg ${sessionMenuOpen ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : ""}`}
@@ -341,7 +356,7 @@ export function SessionToolbar({
             </span>
           </button>
         ) : (
-          <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+          <div ref={launchMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
             <div className={`flex h-9 w-14 items-center rounded-xl border transition-colors ${launchMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"}`}>
               <button
                 onClick={() => void launchExecutable()}
@@ -413,7 +428,7 @@ export function SessionToolbar({
             )}
           </div>
         )}
-        <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+        <div ref={projectMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
           <div className={`flex h-9 w-14 items-center rounded-xl border transition-colors ${projectMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"} ${!projectPath ? "opacity-45" : ""}`}>
             <button
               onClick={openProjectPath}
