@@ -22,6 +22,7 @@ const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
+const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
 
 type KimiAuthStatus = {
   available: boolean;
@@ -597,10 +598,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   ];
   const archivedSessions = [...archivedSessionSummaries]
     .sort((a, b) => b.archivedAt - a.archivedAt);
-  const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, 8);
-  const hiddenArchivedCount = Math.max(0, archivedSessions.length - 8);
-  const visibleFreezeReports = freezeExpanded ? freezeReports : freezeReports.slice(0, 8);
-  const hiddenFreezeCount = Math.max(0, freezeReports.length - 8);
+  const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, SETTINGS_PREVIEW_ITEM_LIMIT);
+  const hiddenArchivedCount = Math.max(0, archivedSessions.length - SETTINGS_PREVIEW_ITEM_LIMIT);
+  const visibleFreezeReports = freezeExpanded ? freezeReports : freezeReports.slice(0, SETTINGS_PREVIEW_ITEM_LIMIT);
+  const hiddenFreezeCount = Math.max(0, freezeReports.length - SETTINGS_PREVIEW_ITEM_LIMIT);
 
   const handleRestoreSession = (sessionId: string) => {
     restoreSession(sessionId);
@@ -1314,7 +1315,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.281 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.282 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
