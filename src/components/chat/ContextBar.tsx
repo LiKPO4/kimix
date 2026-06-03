@@ -95,7 +95,8 @@ export function ContextBar() {
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const workDirsRef = useRef<HTMLDivElement>(null);
   const activeSession = session ?? currentSession;
-  const sessionModel = activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
+  const sessionHasStarted = Boolean(activeSession && activeSession.events.length > 0);
+  const sessionModel = sessionHasStarted && activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
   const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
   const modelTitle = sessionModel
     ? `当前对话模型：${sessionModel}`

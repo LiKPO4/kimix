@@ -63,6 +63,10 @@ function useElapsed(start: number, active: boolean) {
   return Math.max(0, now - start);
 }
 
+function isInterruptedStatus(event: Extract<TimelineEvent, { type: "status_update" }>) {
+  return Boolean(event.message && /中断|打断|cancelled|canceled|interrupted/i.test(event.message));
+}
+
 function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
@@ -598,8 +602,9 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
       : "";
   const roleLabel = formatAgentRole(event.agentRole);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
+  const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const displayProcessLabel = event.isComplete
-    ? `（输出完成）已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
+    ? `${isInterrupted ? "（输出打断）" : "（输出完成）"}已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
     : isActivelyThinking
       ? `正在思考${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
       : `执行中${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`;
