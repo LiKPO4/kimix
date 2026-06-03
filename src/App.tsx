@@ -384,7 +384,7 @@ function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSe
 }
 
 function shouldMirrorHiddenLongTaskEvent(event: TimelineEvent) {
-  return !["user_message", "steer_message", "question_request"].includes(event.type);
+  return ["approval_request", "question_request", "error"].includes(event.type);
 }
 
 function attachLongTaskAgentRole(event: TimelineEvent, role: "executor" | "reviewer" | null): TimelineEvent {
@@ -1596,11 +1596,32 @@ function App() {
           ? mapKimiCodeQuestionRequest({
               ...(rawEvent.request && typeof rawEvent.request === "object" && !Array.isArray(rawEvent.request) ? rawEvent.request as Record<string, unknown> : {}),
               toolCallId: typeof rawEvent.requestId === "string" ? rawEvent.requestId : undefined,
-            })
-          : mapKimiCodeEvent(payload.event);
+          })
+        : mapKimiCodeEvent(payload.event);
       if (!mapped) return;
-      enqueueStreamEvent(uiSessionId, mapped);
-      if (mapped.type === "question_request" || mapped.type === "approval_request" || mapped.type === "error") {
+      const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
+      const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
+      markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
+      if (mappedWithRole.type === "question_request" && mappedWithRole.status === "pending") {
+        const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedWithRole)}`;
+        if (!notifiedQuestionRequestRef.current.has(notifyKey)) {
+          notifiedQuestionRequestRef.current.add(notifyKey);
+          notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedWithRole));
+        }
+      }
+      if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
+        mergeHiddenLongTaskEvent(payload.sessionId, mappedWithRole);
+        if (shouldMirrorHiddenLongTaskEvent(mappedWithRole)) {
+          enqueueStreamEvent(uiSessionId, mappedWithRole);
+        }
+        if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
+          flushStreamEvents();
+          persistLocalConversationState();
+        }
+        return;
+      }
+      enqueueStreamEvent(uiSessionId, mappedWithRole);
+      if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
         flushStreamEvents();
         persistLocalConversationState();
       }

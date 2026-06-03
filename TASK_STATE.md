@@ -1835,6 +1835,19 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 等用户回传 v2.8.262 侧栏截图，确认 Hooks 图标是否符合预期。
 
+# 2026-06-03 修复审查 agent 输出路由
+## 当前目标
+- 按用户截图反馈，修复长程任务审查 agent 输出混入执行 agent 消息、终态读取不到可用结果的问题。
+## 已完成
+- 隐藏长程任务 runtime 只把审批 / 问题 / 错误镜像到主对话，不再把审查 agent 的 assistant / status 输出混进执行轮次。
+- `onKimiCodeEvent` 与旧 `onKimiEvent` 对齐：为长程任务事件附加 executor / reviewer 角色，审查 reviewer 事件写入隐藏缓冲，供审查完成后生成正确 agent 代理消息头和后续执行 prompt。
+- 版本号三处同步到 v2.8.263。
+## 验证
+- `pnpm test:run -- src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/eventMapper.test.ts` 通过。
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.263 复验审查 agent 是否单独显示并继续流转；如仍失败，下一步检查审查完成状态事件是否携带了 reviewer runtimeSessionId。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。
