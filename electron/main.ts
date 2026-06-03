@@ -139,7 +139,7 @@ function runLongCommand(command: string, args: string[], timeoutMs = 10 * 60 * 1
 }
 
 function extractKimiCliVersion(output: string): string | null {
-  const match = output.match(/(?:kimi-cli version:|kimi,\s*version)?\s*v?([0-9]+(?:\.[0-9]+){1,3})/i);
+  const match = output.match(/(?:kimi(?:-code|-cli)?(?:\s+code)?(?:\s+version)?[:,\s]*)?v?([0-9]+(?:\.[0-9]+){1,3})/i);
   return match?.[1] ?? null;
 }
 
@@ -202,9 +202,9 @@ async function checkKimiCliUpdate() {
     };
   }
   const currentVersion = installed.version;
-  const hasUpdate = currentVersion ? isVersionGreater(latestVersion, currentVersion) : true;
+  const hasUpdate = currentVersion ? isVersionGreater(latestVersion, currentVersion) : false;
   const migrationHint = installed.isLegacy
-    ? "检测到旧版 Kimi CLI。更新到 Kimi Code 后，请在终端运行 kimi migrate，并重新登录与授权 MCP。"
+    ? "检测到旧版 Kimi。更新到 Kimi Code 后，请在终端运行 kimi migrate，并重新登录与授权 MCP。"
     : undefined;
   return {
     available: true,
@@ -215,10 +215,12 @@ async function checkKimiCliUpdate() {
     migrationHint,
     path: installed.path,
     message: installed.isLegacy
-      ? `检测到旧版 Kimi CLI ${currentVersion ?? ""}，建议升级并迁移到 Kimi Code`
+      ? `检测到旧版 Kimi ${currentVersion ?? ""}，建议升级并迁移到 Kimi Code`
       : hasUpdate
         ? `发现 Kimi Code 新版本 ${latestVersion}`
-        : `Kimi Code 已是最新版本 ${currentVersion ?? latestVersion}`,
+        : currentVersion
+          ? `Kimi Code 已是最新版本 ${currentVersion}`
+          : `Kimi Code 已安装，最新可安装版本 ${latestVersion}`,
   };
 }
 
@@ -269,7 +271,7 @@ async function updateKimiCli() {
   }
 
   throw new Error(upgradeError || (checked.isLegacy
-    ? "安装器执行后仍检测到旧版 Kimi CLI，请确认新版安装目录已加入 PATH，或重启系统后再检查"
+    ? "安装器执行后仍检测到旧版 Kimi，请确认新版安装目录已加入 PATH，或重启系统后再检查"
     : `Kimi Code 更新后仍未达到最新版本 ${latestVersion}`));
 }
 
@@ -1837,14 +1839,14 @@ async function exportKimiSessionArchive(request: { sessionId?: string; title?: s
   } catch (sdkError) {
     fallbackKimiPath = await resolveKimiCommand();
     if (!fallbackKimiPath) {
-      throw new Error(`官方 SDK 导出失败，且未找到 Kimi Code CLI fallback：${sdkError instanceof Error ? sdkError.message : String(sdkError)}`);
+      throw new Error(`官方 SDK 导出失败，且未找到 Kimi Code fallback：${sdkError instanceof Error ? sdkError.message : String(sdkError)}`);
     }
     console.warn("[kimi-code] SDK export failed, falling back to CLI export:", sdkError);
   }
   const args = ["export", ...(exportSessionId ? [exportSessionId] : []), "-o", result.filePath, "-y"];
   const output = await runLongCommand(fallbackKimiPath, args, 2 * 60 * 1000);
   await shell.showItemInFolder(result.filePath);
-  return { path: result.filePath, output: `CLI fallback export completed\n${output}` };
+  return { path: result.filePath, output: `Kimi Code fallback export completed\n${output}` };
 }
 
 async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
@@ -2337,8 +2339,8 @@ function normalizePluginInstallError(output: string) {
   const text = output.trim();
   if (/unknown command|too many arguments|expected 0 arguments|invalid command|error: unknown/i.test(text)) {
     return [
-      "当前 Kimi Code CLI 未暴露 `kimi plugin install` 命令，请升级 Kimi Code 或等待官方 CLI 支持后重试。",
-      text ? `CLI 输出：\n${text}` : "",
+      "当前 Kimi Code 未暴露 `kimi plugin install` 命令，请升级 Kimi Code 或等待官方支持后重试。",
+      text ? `Kimi Code 输出：\n${text}` : "",
     ].filter(Boolean).join("\n\n");
   }
   return text || "安装 Kimi Plugin 失败";
@@ -2596,11 +2598,11 @@ function kimiCommonHeaders() {
 function readKimiOAuthToken(): KimiOAuthToken {
   const tokenPath = kimiCredentialsPath();
   if (!fs.existsSync(tokenPath)) {
-    throw new Error("未找到 Kimi 登录凭证，请先在 Kimi Code CLI 中完成登录");
+    throw new Error("未找到 Kimi 登录凭证，请先在 Kimi Code 中完成登录");
   }
   const raw = JSON.parse(fs.readFileSync(tokenPath, "utf-8")) as Partial<KimiOAuthToken>;
   if (!raw.access_token || !raw.refresh_token) {
-    throw new Error("Kimi 登录凭证不完整，请重新登录 Kimi Code CLI");
+    throw new Error("Kimi 登录凭证不完整，请重新登录 Kimi Code");
   }
   return {
     access_token: String(raw.access_token),
@@ -3673,7 +3675,7 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
           output,
           version,
           isLegacy,
-          message: isLegacy ? `检测到旧版 Kimi CLI ${version ?? ""}，建议升级并迁移到 Kimi Code` : output || "Kimi Code 响应正常",
+          message: isLegacy ? `检测到旧版 Kimi ${version ?? ""}，建议升级并迁移到 Kimi Code` : output || "Kimi Code 响应正常",
         },
       };
     }
@@ -3690,7 +3692,7 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
         output,
         version,
         isLegacy,
-        message: isLegacy ? `已找到旧版 Kimi CLI ${version ?? ""}，请升级并迁移` : "已找到 Kimi Code，点击检查验证响应",
+        message: isLegacy ? `已找到旧版 Kimi ${version ?? ""}，请升级并迁移` : "已找到 Kimi Code，点击检查验证响应",
       },
     };
   } catch (err) {
@@ -4540,7 +4542,7 @@ ipcMain.handle("kimi:getUsage", async () => {
       const detail = await res.text().catch(() => "");
       const summary = detail.trim() ? `：${detail.trim().slice(0, 220)}` : "";
       if (res.status === 401) {
-        throw new Error(`Kimi 授权失败，请重新登录 Kimi Code CLI${summary}`);
+        throw new Error(`Kimi 授权失败，请重新登录 Kimi Code${summary}`);
       }
       throw new Error(`Kimi 用量接口返回 HTTP ${res.status}${summary}`);
     }

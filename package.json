@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.8.264",
+  "version": "2.8.265",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -9,7 +9,7 @@
       "esbuild": true
     }
   },
-  "description": "A Codex-style desktop UI for Kimi Code CLI",
+  "description": "A Codex-style desktop UI for Kimi Code",
   "main": "./out/main/index.cjs",
   "author": "",
   "license": "MIT",

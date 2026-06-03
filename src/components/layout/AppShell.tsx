@@ -528,12 +528,12 @@ export function AppShell() {
   const handleCheckCliUpdate = async () => {
     setCliUpdateState((state) => ({ ...state, loading: true, message: "正在检查 Kimi Code 最新版本..." }));
     if (typeof window.api.checkKimiCliUpdate !== "function") {
-      setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: "CLI 更新检查接口尚未载入，请重启应用后再试", info: null, hasUpdate: false });
+      setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: "Kimi Code 更新检查接口尚未载入，请重启应用后再试", info: null, hasUpdate: false });
       return;
     }
     const res = await window.api.checkKimiCliUpdate();
     if (!res.success) {
-      setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `CLI 检查失败：${res.error}`, info: null, hasUpdate: false });
+      setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `Kimi Code 检查失败：${res.error}`, info: null, hasUpdate: false });
       return;
     }
     setCliUpdateState((state) => ({
@@ -549,12 +549,12 @@ export function AppShell() {
   const handleUpdateKimiCli = async () => {
     setCliUpdateState((state) => ({ ...state, updating: true, progressStartedAt: Date.now(), progressPercent: 0, progressPhase: null, message: state.info?.isLegacy ? "正在升级到 Kimi Code，准备下载安装包..." : "正在更新 Kimi Code，准备下载安装包..." }));
     if (typeof window.api.updateKimiCli !== "function") {
-      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: "CLI 更新接口尚未载入，请重启应用后再试" }));
+      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: "Kimi Code 更新接口尚未载入，请重启应用后再试" }));
       return;
     }
     const res = await window.api.updateKimiCli();
     if (!res.success) {
-      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `CLI 更新失败：${res.error}` }));
+      setCliUpdateState((state) => ({ ...state, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `Kimi Code 更新失败：${res.error}` }));
       return;
     }
     setCliUpdateState({
@@ -605,11 +605,11 @@ export function AppShell() {
           hasUpdate: cliRes.data.hasUpdate,
         }));
       } else if (cliRes && !cliRes.success) {
-        setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `CLI 检查失败：${cliRes.error}`, info: null, hasUpdate: false });
+        setCliUpdateState({ loading: false, updating: false, progressStartedAt: null, progressPercent: 0, progressPhase: null, message: `Kimi Code 检查失败：${cliRes.error}`, info: null, hasUpdate: false });
       }
       if (appRes?.success && appRes.data.hasUpdate) showToast(appRes.data.message);
       if (cliRes?.success && cliRes.data.hasUpdate) showToast(cliRes.data.message);
-      if (cliRes?.success && cliRes.data.isLegacy) showToast("检测到旧版 Kimi CLI，请升级并迁移到 Kimi Code");
+      if (cliRes?.success && cliRes.data.isLegacy) showToast("检测到旧版 Kimi，请升级并迁移到 Kimi Code");
     })();
   }, []);
 

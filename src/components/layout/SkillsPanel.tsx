@@ -346,7 +346,7 @@ export function SkillsPanel({
           <div className="grid w-full items-start" style={{ gridTemplateColumns: "320px minmax(0, 1fr)", gap: 18 }}>
             <aside className="flex flex-col" style={{ gap: 14 }}>
               <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6" style={{ padding: "14px 16px" }}>
-                勾选后全局启用 Skill；新建/恢复会话时通过官方 `--skills-dir` 传给 CLI。
+                勾选后全局启用 Skill；新建/恢复会话时通过官方 `--skills-dir` 传给 Kimi Code。
               </div>
               <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
                 <div className="font-medium text-[var(--kimix-panel-text)]">官方插件商店</div>

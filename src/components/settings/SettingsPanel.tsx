@@ -788,7 +788,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         {authLoading ? "正在读取登录状态" : auth?.loggedIn ? "Kimi Code 已登录" : "Kimi Code 未登录"}
                       </div>
                       <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
-                        {auth?.message ?? "登录状态会影响对话、MCP OAuth 授权和 CLI 调用。"}
+                        {auth?.message ?? "登录状态会影响对话、MCP OAuth 授权和 Kimi Code 调用。"}
                       </div>
                       {auth?.path && (
                         <div className="mt-2 break-all text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{auth.path}</div>
@@ -1225,7 +1225,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.264 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.265 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

@@ -1861,6 +1861,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 等用户用 v2.8.264 截图复验 Hooks 图标一致性。
 
+# 2026-06-03 修正 Kimi Code 更新误判与旧 CLI 文案
+## 当前目标
+- 按用户反馈，修复启动时已是新版 Kimi Code 却提示发现新版本/安装的问题，并清理界面里旧的 Kimi Code CLI 命名。
+## 已完成
+- Kimi Code 版本解析兼容纯版本号、`kimi-code 0.x`、`Kimi Code v0.x`、旧 `kimi-cli version` 等格式。
+- 已安装但版本解析失败时不再默认判定 `hasUpdate=true`，避免启动时误弹“发现新版本/安装”；旧版 Kimi 迁移仍会提示。
+- 用户可见文案中的 `Kimi Code CLI` / `Kimi CLI` / `CLI 检查` 等更新为 `Kimi Code` / `旧版 Kimi`。
+- 版本号三处同步到 v2.8.265。
+## 验证
+- 本机真实 `kimi --version` 为 `0.8.0`，官方 `https://code.kimi.com/kimi-code/latest` 返回 `0.8.0`。
+- Node 片段验证版本解析兼容 `0.8.0` / `kimi-code 0.8.0` / `Kimi Code v0.8.0` / `kimi, version 0.8.0` / `kimi-cli version: 0.7.0`。
+- `rg -n "Kimi Code CLI|Kimi CLI|CLI 更新|CLI 检查|检查 CLI|CLI 输出|CLI 调用|CLI fallback|官方 CLI|传给 CLI|面向 Kimi Code CLI|重新登录 Kimi Code CLI|旧版 Kimi CLI" src electron package.json` 无命中。
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.265 复验启动顶部提示不再误报 Kimi Code 新版本/安装，并确认旧 CLI 文案不再出现。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

@@ -354,7 +354,7 @@ function HelpDialogPanel({
                   <div className="text-text-muted">版本 v{appInfo.version}</div>
                 </div>
               </div>
-              <p>Kimix 是一个面向 Kimi Code CLI 的桌面客户端，目标是提供接近 Codex 的项目对话、队列、引导、工具调用和本地开发体验。</p>
+              <p>Kimix 是一个面向 Kimi Code 的桌面客户端，目标是提供接近 Codex 的项目对话、队列、引导、工具调用和本地开发体验。</p>
               <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
                 <div>开发者：{appInfo.author}</div>
                 <button className="kimix-icon-text-button is-compact mt-4 text-accent-primary hover:bg-accent-primary-light" onClick={() => window.api.openExternal(appInfo.repository)}>
@@ -445,7 +445,7 @@ function HelpDialogPanel({
                     <div className="mt-3 rounded-lg border border-accent-primary-soft bg-accent-primary-light text-[13px] leading-6 text-accent-primary-dark" style={{ padding: "12px 14px" }}>
                       {cliUpdateState.info?.available === false
                         ? "当前没有找到 kimi 命令。请先安装新版 Kimi Code，安装完成后打开终端运行 kimi /login。"
-                        : "当前是旧版 Kimi CLI。升级到新版 Kimi Code 后，请在终端运行 kimi migrate，并重新执行 /login 与 MCP 授权。"}
+                        : "当前是旧版 Kimi。升级到新版 Kimi Code 后，请在终端运行 kimi migrate，并重新执行 /login 与 MCP 授权。"}
                     </div>
                   )}
                   {cliUpdateState.info?.migrationHint && (
@@ -482,7 +482,7 @@ function HelpDialogPanel({
                     style={{ paddingLeft: 16, paddingRight: 18 }}
                   >
                     <RefreshCw size={14} className={cliUpdateState.loading ? "kimix-spin" : ""} />
-                    检查 CLI
+                    检查 Kimi Code
                   </button>
                 </div>
               </div>
