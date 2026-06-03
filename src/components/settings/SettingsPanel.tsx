@@ -716,21 +716,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <MessageSquare size={16} className="text-text-muted" />
                   <span>新对话建议</span>
                 </div>
-                <div className={`kimix-settings-card ${sessionRecommendationEnabled ? "is-active" : ""}`} style={{ padding: "18px 16px" }}>
+                <div
+                  className={`kimix-settings-card ${sessionRecommendationEnabled ? "is-active" : ""}`}
+                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 112px", gap: 16, alignItems: "center", padding: "14px 16px" }}
+                >
                   <button
                     type="button"
                     onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
-                    className="flex w-full items-center text-left"
+                    className="flex min-w-0 items-center text-left"
                     style={{ gap: 12 }}
                   >
                     <SelectionIndicator selected={sessionRecommendationEnabled} />
                     <div className="min-w-0 flex-1">
-                      <div className="kimix-settings-permission-label">达到推荐轮数后提示开启新对话</div>
+                      <label htmlFor="session-turn-limit" className="kimix-settings-permission-label block">达到推荐轮数后提示开启新对话</label>
                       <div className="kimix-settings-permission-desc">默认用于减少长会话里旧上下文和无用信息的干扰。</div>
                     </div>
                   </button>
-                  <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px", gap: 14, marginTop: 18, minHeight: 42 }}>
-                    <label htmlFor="session-turn-limit" className="min-w-0 text-[14px] leading-5 text-[var(--kimix-panel-text-secondary)]">推荐轮数上限</label>
+                  <div className="min-w-0">
+                    <div className="mb-1 text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">轮数上限</div>
                     <input
                       id="session-turn-limit"
                       type="number"
@@ -1231,30 +1234,25 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <Mic size={16} className="text-text-muted" />
                   <span>语音输入</span>
                 </div>
-                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
-                  <div className="flex items-start" style={{ gap: 12 }}>
+                <div className="kimix-settings-card" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 16, alignItems: "center", padding: "14px 16px" }}>
+                  <div className="flex min-w-0 items-start" style={{ gap: 12 }}>
                     <Keyboard size={18} className="mt-0.5 shrink-0 text-text-muted" />
                     <div className="min-w-0 flex-1">
                       <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">语音按钮触发快捷键</div>
                       <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
                     </div>
                   </div>
-                  <div className="min-w-0" style={{ marginTop: 18 }}>
-                    <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 14, minHeight: 36 }}>
-                      <label htmlFor="voice-shortcut" className="min-w-0 text-[14px] leading-5 text-[var(--kimix-panel-text-secondary)]">快捷键</label>
-                      <input
-                        id="voice-shortcut"
-                        type="text"
-                        value={voiceShortcut}
-                        onChange={(event) => setVoiceShortcut(event.target.value)}
-                        placeholder="Win+H"
-                        className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
-                      />
-                    </div>
-                    <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 14, marginTop: 6 }}>
-                      <div aria-hidden="true" />
-                      <div className="kimix-settings-hint text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V</div>
-                    </div>
+                  <div className="min-w-0">
+                    <label htmlFor="voice-shortcut" className="mb-1 block text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">快捷键</label>
+                    <input
+                      id="voice-shortcut"
+                      type="text"
+                      value={voiceShortcut}
+                      onChange={(event) => setVoiceShortcut(event.target.value)}
+                      placeholder="Win+H"
+                      className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                    />
+                    <div className="kimix-settings-hint mt-1 text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V</div>
                   </div>
                 </div>
               </div>
@@ -1316,7 +1314,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.280 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.281 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
