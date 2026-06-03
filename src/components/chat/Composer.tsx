@@ -65,6 +65,14 @@ async function getDefaultKimiModel() {
 const iconButtonClass =
   "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35";
 
+function getLatestUserTurnState(events: TimelineEvent[]) {
+  const latestUserIndex = events.findLastIndex((event) => event.type === "user_message");
+  const turnEvents = latestUserIndex >= 0 ? events.slice(latestUserIndex + 1) : events;
+  const hasCompletedAssistant = turnEvents.some((event) => event.type === "assistant_message" && event.isComplete);
+  const hasUnfinishedAssistant = turnEvents.some((event) => event.type === "assistant_message" && !event.isComplete);
+  return { hasCompletedAssistant, hasUnfinishedAssistant };
+}
+
 type ImageAttachment = {
   id: string;
   name: string;
@@ -165,8 +173,9 @@ export function Composer() {
     Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
   ));
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
-  const hasUnfinishedAssistant = Boolean(activeSession?.events.some((event) => event.type === "assistant_message" && !event.isComplete));
-  const hasActiveAssistantTurn = hasUnfinishedAssistant;
+  const latestUserTurnState = getLatestUserTurnState(activeSession?.events ?? []);
+  const hasUnfinishedAssistant = latestUserTurnState.hasUnfinishedAssistant && !latestUserTurnState.hasCompletedAssistant;
+  const hasActiveAssistantTurn = isCurrentSessionRunning && hasUnfinishedAssistant;
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
     isCurrentSessionRunning &&
@@ -192,6 +201,11 @@ export function Composer() {
   useEffect(() => {
     if (focusInputTrigger > 0) inputRef.current?.focus();
   }, [focusInputTrigger]);
+
+  useEffect(() => {
+    if (!activeSession || !isCurrentSessionRunning || !latestUserTurnState.hasCompletedAssistant) return;
+    setRunningSessionId(null);
+  }, [activeSession?.id, isCurrentSessionRunning, latestUserTurnState.hasCompletedAssistant, setRunningSessionId]);
 
   useEffect(() => {
     const handleAddDrawingImage = (event: Event) => {
