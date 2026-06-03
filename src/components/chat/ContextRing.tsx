@@ -63,7 +63,9 @@ const COMPACTION_STALE_MS = 5 * 60 * 1000;
 
 export function ContextRing() {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [compactStatus, setCompactStatus] = useState<"idle" | "pending" | "sent" | "failed">("idle");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const compactStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const sessionRecommendationEnabled = useAppStore((s) => s.sessionRecommendationEnabled);
@@ -97,8 +99,9 @@ export function ContextRing() {
   const remaining = Math.max(0, 100 - percent);
   const recommendation = getSessionRecommendationMetrics(session, sessionRecommendationTurnLimit);
   const isCurrentSessionRunning = Boolean(currentSession && runningSessionId === currentSession.id);
-  const canCompact = Boolean(currentSession && hasContextStatus && !isCurrentSessionRunning && !isCompacting);
-  const compactingDots = useAnimatedDots(isCompacting);
+  const compactRequestPending = compactStatus === "pending";
+  const canCompact = Boolean(currentSession && hasContextStatus && !isCurrentSessionRunning && !isCompacting && !compactRequestPending);
+  const compactingDots = useAnimatedDots(isCompacting || compactRequestPending);
 
   const handleEnter = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -111,22 +114,29 @@ export function ContextRing() {
   };
 
   const handleCompact = async () => {
-    if (!currentSession || isCurrentSessionRunning || isCompacting) return;
+    if (!currentSession || isCurrentSessionRunning || isCompacting || compactRequestPending) return;
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
     try {
+      if (compactStatusTimerRef.current) clearTimeout(compactStatusTimerRef.current);
+      setCompactStatus("pending");
       const res = await window.api.compactKimiCodeSession({
         sessionId: runtimeSessionId,
       });
       if (!res.success) throw new Error(res.error);
+      setCompactStatus("sent");
+      compactStatusTimerRef.current = setTimeout(() => setCompactStatus("idle"), 2200);
     } catch (err) {
       console.error("Compact failed:", err);
+      setCompactStatus("failed");
+      compactStatusTimerRef.current = setTimeout(() => setCompactStatus("idle"), 3200);
     }
   };
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (compactStatusTimerRef.current) clearTimeout(compactStatusTimerRef.current);
     };
   }, []);
 
@@ -161,15 +171,15 @@ export function ContextRing() {
               className="shrink-0 rounded-md text-[13px] transition-colors disabled:cursor-not-allowed"
               style={{
                 padding: "2px 8px",
-                color: isCompacting ? "var(--accent-warning)" : canCompact ? "var(--accent-primary)" : "var(--text-muted)",
+                color: isCompacting || compactRequestPending ? "var(--accent-warning)" : compactStatus === "failed" ? "var(--accent-danger)" : canCompact || compactStatus === "sent" ? "var(--accent-primary)" : "var(--text-muted)",
               }}
             >
-              {isCompacting ? (
+              {isCompacting || compactRequestPending ? (
                 <>
                   压缩中
                   <span className="inline-block w-[1.5em] text-left">{compactingDots}</span>
                 </>
-              ) : "压缩"}
+              ) : compactStatus === "sent" ? "已请求" : compactStatus === "failed" ? "压缩失败" : "压缩"}
             </button>
           </div>
           {hasContextStatus ? (

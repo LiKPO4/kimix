@@ -122,8 +122,8 @@ export function SessionToolbar({
       if (launchMenuOpen && !launchMenuRef.current?.contains(target)) setLaunchMenuOpen(false);
       if (projectMenuOpen && !projectMenuRef.current?.contains(target)) setProjectMenuOpen(false);
     };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
   }, [sessionMenuOpen, launchMenuOpen, projectMenuOpen]);
 
   const renameCurrentSession = () => {
