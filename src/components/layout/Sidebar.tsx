@@ -22,8 +22,8 @@ function formatRelativeTime(ts: number): string {
   return `${weeks} 周`;
 }
 
-const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-xl text-[15px] text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40";
-const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
+const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-lg text-[15px] text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
 
 interface SidebarProps {
   width?: number;
@@ -416,7 +416,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                 )}
                 <div
                   style={{ paddingLeft: 20, paddingRight: 10 }}
-                  className={`group/project relative flex h-9 w-full items-center gap-1 rounded-xl pl-3 pr-1 text-[15px] transition-colors ${
+                  className={`group/project relative flex h-9 w-full items-center gap-1 rounded-lg pl-3 pr-1 text-[15px] transition-colors ${
                     isActive
                       ? "bg-surface-hover text-text-primary"
                       : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
@@ -458,7 +458,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         await createSessionForProject(project);
                       }}
                       disabled={Boolean(creatingSessionProjectPath)}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
                       title="在该项目下新对话"
                       aria-label="在该项目下新对话"
                     >
@@ -598,12 +598,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
         <button
           onClick={() => setWorkspaceView("settings")}
-          className={`kimix-settings-entry flex w-full items-center gap-3 rounded-xl text-[16px] text-text-primary transition-colors ${workspaceView === "settings" ? "bg-surface-hover" : ""}`}
+          className={`kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors ${workspaceView === "settings" ? "bg-surface-hover" : ""}`}
           style={{ height: 36 }}
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.275</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.276</span>
         </button>
       </div>
     </aside>
