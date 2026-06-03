@@ -411,9 +411,6 @@ export function SkillsPanel({
                       SDK
                     </span>
                   </div>
-                  <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                    直接读取官方 `Session.listPlugins()`，不再依赖旧菜单镜像。
-                  </div>
                   <button
                     type="button"
                     onClick={() => void refreshSdkPlugins("已刷新官方 SDK 插件状态")}
