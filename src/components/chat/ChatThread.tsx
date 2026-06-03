@@ -588,6 +588,7 @@ export function ChatThread() {
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
+  const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
   const session = useLiveSession(currentSession?.id);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -606,6 +607,7 @@ export function ChatThread() {
     ),
     [session?.events, statusUpdateDisplay]
   );
+  const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(() => buildRenderItems(visibleEvents, session?.engine), [visibleEvents, session?.engine]);
   const contentVersion = useMemo(() => {
     return (session?.events ?? []).map((event) => {
@@ -760,7 +762,9 @@ export function ChatThread() {
     }
   };
 
-  if (!session || session.events.length === 0 || !hasVisibleConversation(session.events, runningSessionId, session.id)) {
+  const hasActiveTurn = Boolean(session && runningSessionId === session.id);
+  const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id));
+  if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;
   }
 
