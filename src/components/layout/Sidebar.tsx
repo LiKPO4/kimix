@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Cable, Download, FileText } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -278,7 +278,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           title="Hooks"
           aria-label="Hooks"
         >
-          <Cable size={17} />
+          <Webhook size={17} />
         </button>
       </aside>
     );
@@ -345,7 +345,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           className={`${navItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
           title="Hooks"
         >
-          <Cable size={17} className="shrink-0 text-text-secondary" />
+          <Webhook size={17} className="shrink-0 text-text-secondary" />
           <span>Hooks</span>
         </button>
         <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
@@ -603,7 +603,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.261</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.262</span>
         </button>
       </div>
     </aside>
