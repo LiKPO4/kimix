@@ -33,6 +33,13 @@ export function useStatePersistence() {
         useSessionStore.setState({ sessions: visibleSessions });
         return;
       }
+      const archiveOrDeletionChanged =
+        state.sessions.length !== prev.sessions.length ||
+        state.sessions.some((session) => prev.sessions.find((prevSession) => prevSession.id === session.id)?.archivedAt !== session.archivedAt);
+      if (archiveOrDeletionChanged) {
+        flushLocalConversationState();
+        return;
+      }
       scheduleLocalConversationPersist();
     });
 

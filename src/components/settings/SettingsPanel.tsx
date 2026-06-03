@@ -196,6 +196,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       .filter((session): session is ArchivedSessionSummary => Boolean(session));
   }, [archivedSessionsDigest]);
   const restoreSession = useSessionStore((s) => s.restoreSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
   const [freezeExpanded, setFreezeExpanded] = useState(false);
@@ -607,6 +608,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     if (restored) setCurrentSession({ ...restored, archivedAt: undefined });
   };
 
+  const handleDeleteArchivedSession = (session: ArchivedSessionSummary) => {
+    const ok = window.confirm(`彻底删除归档对话「${session.title}」？此操作不可恢复。`);
+    if (!ok) return;
+    deleteSession(session.id);
+    const current = useAppStore.getState().currentSession;
+    if (current?.id === session.id) setCurrentSession(null);
+  };
+
   const content = (
       <div className={variant === "workspace" ? "kimix-settings-panel is-workspace" : "kimix-settings-panel"} onClick={(e) => e.stopPropagation()}>
         <div className="kimix-settings-header">
@@ -750,20 +759,38 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   {archivedSessions.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 10 }}>
                       {visibleArchivedSessions.map((session) => (
-                        <div key={session.id} className="kimix-settings-list-item flex min-w-0 items-center" style={{ gap: 10, padding: "11px 11px" }}>
-                          <MessageSquare size={15} className="shrink-0 text-text-muted" />
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{session.title}</div>
-                            <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{session.projectPath}</div>
+                        <div
+                          key={session.id}
+                          className="kimix-settings-list-item grid min-w-0 items-center"
+                          style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12, padding: "12px 12px 12px 14px" }}
+                        >
+                          <div className="flex min-w-0 items-start" style={{ gap: 10 }}>
+                            <MessageSquare size={15} className="mt-0.5 shrink-0 text-text-muted" />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{session.title}</div>
+                              <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{session.projectPath}</div>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRestoreSession(session.id)}
-                            className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
-                          >
-                            <RotateCcw size={13} />
-                            恢复
-                          </button>
+                          <div className="flex shrink-0 items-center justify-end" style={{ gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRestoreSession(session.id)}
+                              className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
+                              style={{ minWidth: 70, justifyContent: "center" }}
+                            >
+                              <RotateCcw size={13} />
+                              恢复
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteArchivedSession(session)}
+                              className="kimix-icon-text-button is-compact shrink-0 text-accent-danger hover:bg-accent-danger-light"
+                              style={{ minWidth: 70, justifyContent: "center" }}
+                            >
+                              <Trash2 size={13} />
+                              删除
+                            </button>
+                          </div>
                         </div>
                       ))}
                       {hiddenArchivedCount > 0 && (
@@ -1289,7 +1316,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.274 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.275 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
