@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, Bot, ChevronDown, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, X } from "lucide-react";
+import { BarChart3, Bot, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
@@ -372,13 +372,12 @@ export function ContextBar() {
             type="button"
             onClick={toggleUsage}
             className="kimix-icon-text-button kimix-muted-action is-compact min-w-0"
-            style={{ height: 36 }}
+            style={{ height: 36, paddingLeft: 12, paddingRight: 12 }}
             title="套餐用量"
             aria-label="套餐用量"
           >
             <BarChart3 size={16} className="shrink-0" />
             <span className="truncate">套餐用量</span>
-            <ChevronDown size={14} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
           </button>
           {usageOpen && (
             <div
