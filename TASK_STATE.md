@@ -1890,6 +1890,20 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 等待用户用 v2.8.266 反复进出设置页复验三块不再闪烁。
 
+# 2026-06-03 修复 DeepSeek catalog Context 过大导致测试失败
+## 当前目标
+- 按用户截图反馈，修复从官方 catalog 填入 DeepSeek V4 后补 API Key 测试时报 `Invalid max_tokens value` 的问题。
+## 已完成
+- DeepSeek Provider / Base URL / Model 相关的 Context 上限收敛到 393216，避免 catalog 的 1000000 被传给 Kimi Code 测试命令后触发 DeepSeek 400。
+- 前端填入 catalog、手动测试、保存前都会归一化 Context；后端测试 / SDK 写配置 / TOML fallback 写配置也做同样收敛。
+- `kimiCodeHost.listProviderCatalog()` 返回 catalog 时已归一化 DeepSeek 模型 `maxContextSize`，后续 UI 首次填入不再显示 1000000。
+- 版本号三处同步到 v2.8.267。
+## 验证
+- `pnpm build` 通过。
+- `rg -n "393216|normalizeOpenAiProviderContextSize|normalizeCatalogMaxContextSize|KIMI_MODEL_MAX_CONTEXT_SIZE|maxContextSize" src/components/settings/SettingsPanel.tsx electron/main.ts electron/kimiCodeHost.ts` 确认前端填入 / 后端测试保存 / catalog 返回均覆盖 DeepSeek 上限收敛。
+## 下一步
+- 等待用户用 v2.8.267 重新选择 DeepSeek 并测试。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

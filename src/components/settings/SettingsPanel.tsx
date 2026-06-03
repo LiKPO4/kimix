@@ -91,6 +91,19 @@ const settingsStatusCache: {
   modelConfigMessage: "",
 };
 
+function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
+  const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
+  if (signature.includes("deepseek")) return 393216;
+  return 1048576;
+}
+
+function normalizeOpenAiProviderContextSize(providerName: string, baseUrl: string, model: string, value: number | null | undefined) {
+  const fallback = 262144;
+  const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  const limit = getOpenAiProviderContextLimit(providerName, baseUrl, model);
+  return Math.max(1, Math.min(limit, input));
+}
+
 function parseFreezeReports() {
   const raw = localStorage.getItem(FREEZE_REPORTS_KEY);
   if (!raw) return [];
@@ -198,7 +211,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     baseUrl: "https://api.deepseek.com",
     apiKey: "",
     model: "deepseek-v4-flash",
-    maxContextSize: "1000000",
+    maxContextSize: "393216",
   });
   const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
   const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
@@ -288,13 +301,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     if (!contextText || !Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1048576) {
       return null;
     }
+    const normalizedContextSize = normalizeOpenAiProviderContextSize(providerDraft.providerName, providerDraft.baseUrl, providerDraft.model, contextSize);
     return {
       providerName: providerDraft.providerName.trim(),
       modelAlias: providerDraft.modelAlias.trim(),
       baseUrl: providerDraft.baseUrl.trim(),
       apiKey: providerDraft.apiKey.trim() || undefined,
       model: providerDraft.model.trim(),
-      maxContextSize: contextSize,
+      maxContextSize: normalizedContextSize,
     };
   };
 
@@ -313,15 +327,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   };
 
   const fillProviderDraftFromCatalog = (provider: KimiProviderCatalogEntry, model: KimiProviderCatalogEntry["models"][number]) => {
+    const normalizedContextSize = normalizeOpenAiProviderContextSize(provider.providerId, provider.baseUrl ?? "", model.id, model.maxContextSize);
     setProviderDraft((current) => ({
       ...current,
       providerName: provider.providerId,
       modelAlias: `${provider.providerId}/${model.id}`,
       baseUrl: provider.baseUrl ?? current.baseUrl,
       model: model.id,
-      maxContextSize: String(model.maxContextSize ?? 262144),
+      maxContextSize: String(normalizedContextSize),
     }));
-    setProviderMessage(`已从官方 catalog 填入 ${provider.providerId}/${model.id}，请补 API Key 后测试或保存。`);
+    const capped = typeof model.maxContextSize === "number" && model.maxContextSize > normalizedContextSize;
+    setProviderMessage(`已从官方 catalog 填入 ${provider.providerId}/${model.id}${capped ? `，Context 已按服务商上限收敛到 ${normalizedContextSize}` : ""}，请补 API Key 后测试或保存。`);
   };
 
   const handleLoadProviderCatalog = async () => {
@@ -421,7 +437,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     setProviderBusyAction("test");
-    setProviderMessage("正在测试连接...");
+    if (payload.maxContextSize !== Number(providerDraft.maxContextSize.trim())) {
+      setProviderDraft((current) => ({ ...current, maxContextSize: String(payload.maxContextSize) }));
+    }
+    setProviderMessage(payload.maxContextSize !== Number(providerDraft.maxContextSize.trim()) ? `Context 已收敛到 ${payload.maxContextSize}，正在测试连接...` : "正在测试连接...");
     const res = await window.api.testKimiOpenAiProvider(payload);
     setProviderBusyAction(null);
     setProviderMessage(res.success ? `测试通过：${res.data.output || res.data.message}` : `测试失败：${res.error}`);
@@ -434,7 +453,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     setProviderBusyAction("save");
-    setProviderMessage("正在保存配置...");
+    if (payload.maxContextSize !== Number(providerDraft.maxContextSize.trim())) {
+      setProviderDraft((current) => ({ ...current, maxContextSize: String(payload.maxContextSize) }));
+    }
+    setProviderMessage(payload.maxContextSize !== Number(providerDraft.maxContextSize.trim()) ? `Context 已收敛到 ${payload.maxContextSize}，正在保存配置...` : "正在保存配置...");
     const res = await window.api.saveKimiOpenAiProvider(payload);
     setProviderBusyAction(null);
     if (res.success) {
@@ -1257,7 +1279,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.266 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.267 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

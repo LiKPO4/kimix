@@ -594,6 +594,14 @@ export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeCon
   return sdkHarness.setConfig(patch);
 }
 
+function normalizeCatalogMaxContextSize(providerId: string, baseUrl: string | null, modelId: string, value: number | null) {
+  const fallback = 262144;
+  const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  const signature = `${providerId} ${baseUrl ?? ""} ${modelId}`.toLowerCase();
+  const limit = signature.includes("deepseek") ? 393216 : 1048576;
+  return Math.max(1, Math.min(limit, input));
+}
+
 export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntry[]> {
   const sdk = await loadSdk();
   if (!sdk.fetchCatalog || !sdk.inferWireType || !sdk.catalogProviderModels || !sdk.catalogBaseUrl) {
@@ -608,13 +616,16 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
       const baseUrl = sdk.catalogBaseUrl?.(provider, wire) ?? null;
       const models = (sdk.catalogProviderModels?.(provider) ?? [])
         .filter((model) => typeof model.id === "string" && model.id.length > 0)
-        .map((model) => ({
-          id: model.id,
-          name: typeof model.name === "string" && model.name.length > 0 ? model.name : null,
-          maxContextSize: typeof model.capability?.max_context_tokens === "number" ? model.capability.max_context_tokens : null,
-          thinking: Boolean(model.capability?.thinking),
-          toolUse: model.capability?.tool_use !== false,
-        }))
+        .map((model) => {
+          const rawMaxContextSize = typeof model.capability?.max_context_tokens === "number" ? model.capability.max_context_tokens : null;
+          return {
+            id: model.id,
+            name: typeof model.name === "string" && model.name.length > 0 ? model.name : null,
+            maxContextSize: normalizeCatalogMaxContextSize(providerId, baseUrl, model.id, rawMaxContextSize),
+            thinking: Boolean(model.capability?.thinking),
+            toolUse: model.capability?.tool_use !== false,
+          };
+        })
         .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
       if (!baseUrl || models.length === 0) return null;
       return {

@@ -606,6 +606,19 @@ function setTopLevelTomlString(raw: string, key: string, value: string) {
 
 type SavedOpenAiProviderConfig = z.infer<typeof SaveOpenAiProviderConfigSchema> & { apiKey: string };
 
+function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
+  const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
+  if (signature.includes("deepseek")) return 393216;
+  return 1048576;
+}
+
+function normalizeOpenAiProviderContextSize(config: Pick<z.infer<typeof OpenAiProviderBaseConfigSchema>, "providerName" | "baseUrl" | "model" | "maxContextSize">) {
+  const fallback = 262144;
+  const input = typeof config.maxContextSize === "number" && Number.isFinite(config.maxContextSize) ? config.maxContextSize : fallback;
+  const limit = getOpenAiProviderContextLimit(config.providerName, config.baseUrl, config.model);
+  return Math.max(1, Math.min(limit, input));
+}
+
 function readTomlSectionBody(raw: string, sectionName: string) {
   const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
   const matches = Array.from(raw.matchAll(sectionPattern));
@@ -622,7 +635,7 @@ function resolveExistingManagedApiKey(raw: string, providerName: string) {
 }
 
 function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
-  const maxContextSize = Math.max(1, Math.min(1048576, config.maxContextSize ?? 262144));
+  const maxContextSize = normalizeOpenAiProviderContextSize(config);
   const providerKey = toTomlTableKey(config.providerName);
   const modelKey = toTomlTableKey(config.modelAlias);
   return [
@@ -811,7 +824,7 @@ async function saveOpenAiProviderConfigWithSdk(input: unknown) {
         [config.modelAlias]: {
           provider: config.providerName,
           model: config.model,
-          maxContextSize: config.maxContextSize ?? 262144,
+          maxContextSize: normalizeOpenAiProviderContextSize(config),
           displayName: config.modelAlias,
         },
       },
@@ -885,7 +898,7 @@ async function testOpenAiProviderConfig(input: unknown) {
     KIMI_MODEL_NAME: config.model,
     KIMI_MODEL_BASE_URL: config.baseUrl,
     KIMI_MODEL_API_KEY: config.apiKey,
-    KIMI_MODEL_MAX_CONTEXT_SIZE: String(config.maxContextSize ?? 262144),
+    KIMI_MODEL_MAX_CONTEXT_SIZE: String(normalizeOpenAiProviderContextSize(config)),
     KIMI_MODEL_DISPLAY_NAME: config.modelAlias,
   };
   const output = await new Promise<string>((resolve, reject) => {
