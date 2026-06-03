@@ -70,6 +70,27 @@ type KimiProviderCatalogEntry = {
   }[];
 };
 
+type KimiConnectionStatus = {
+  loading: boolean;
+  available: boolean | null;
+  verified: boolean;
+  message: string;
+  path?: string;
+  output?: string;
+};
+
+const settingsStatusCache: {
+  connection: KimiConnectionStatus | null;
+  auth: KimiAuthStatus | null;
+  modelConfig: KimiModelConfigSummary | null;
+  modelConfigMessage: string;
+} = {
+  connection: null,
+  auth: null,
+  modelConfig: null,
+  modelConfigMessage: "",
+};
+
 function parseFreezeReports() {
   const raw = localStorage.getItem(FREEZE_REPORTS_KEY);
   if (!raw) return [];
@@ -165,12 +186,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
   const [freezeExpanded, setFreezeExpanded] = useState(false);
-  const [auth, setAuth] = useState<KimiAuthStatus | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
+  const [authLoading, setAuthLoading] = useState(!settingsStatusCache.auth);
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
-  const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(null);
-  const [modelConfigLoading, setModelConfigLoading] = useState(true);
-  const [modelConfigMessage, setModelConfigMessage] = useState("");
+  const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(settingsStatusCache.modelConfig);
+  const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
+  const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [providerDraft, setProviderDraft] = useState({
     providerName: "deepseek",
     modelAlias: "deepseek/deepseek-v4-flash",
@@ -188,45 +209,49 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [selectedCatalogModelId, setSelectedCatalogModelId] = useState("");
   const [selectedModelAlias, setSelectedModelAlias] = useState("");
   const modelSettingsRef = useRef<HTMLDivElement>(null);
-  const [connection, setConnection] = useState<{
-    loading: boolean;
-    available: boolean | null;
-    verified: boolean;
-    message: string;
-    path?: string;
-    output?: string;
-  }>({ loading: true, available: null, verified: false, message: "正在查找 Kimi Code" });
+  const [connection, setConnection] = useState<KimiConnectionStatus>(
+    settingsStatusCache.connection ?? { loading: true, available: null, verified: false, message: "正在查找 Kimi Code" },
+  );
 
-  const checkConnection = async (verify = false) => {
-    setConnection((current) => ({
-      ...current,
-      loading: true,
-      message: verify ? "正在检查 Kimi Code 响应" : "正在查找 Kimi Code",
-    }));
+  const checkConnection = async (verify = false, options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? !settingsStatusCache.connection;
+    if (showLoading) {
+      setConnection((current) => ({
+        ...current,
+        loading: true,
+        message: verify ? "正在检查 Kimi Code 响应" : "正在查找 Kimi Code",
+      }));
+    }
     const res = await window.api.checkKimiCli({ verify });
     if (res.success) {
-      setConnection({
+      const next = {
         loading: false,
         available: res.data.available,
         verified: res.data.verified,
         message: res.data.message,
         path: res.data.path,
         output: res.data.output,
-      });
+      };
+      settingsStatusCache.connection = next;
+      setConnection(next);
       return;
     }
-    setConnection({ loading: false, available: false, verified: false, message: res.error });
+    const next = { loading: false, available: false, verified: false, message: res.error };
+    settingsStatusCache.connection = next;
+    setConnection(next);
   };
 
-  const refreshAuth = async () => {
-    setAuthLoading(true);
+  const refreshAuth = async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? !settingsStatusCache.auth;
+    if (showLoading) setAuthLoading(true);
     const res = await window.api.getKimiAuthStatus();
     setAuthLoading(false);
     if (res.success) {
+      settingsStatusCache.auth = res.data;
       setAuth(res.data);
       return;
     }
-    setAuth({
+    const next = {
       available: false,
       loggedIn: false,
       configPath: "",
@@ -234,20 +259,27 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       defaultModel: null,
       defaultThinking: false,
       message: `读取登录状态失败：${res.error}`,
-    });
+    };
+    settingsStatusCache.auth = next;
+    setAuth(next);
   };
 
-  const refreshModelConfig = async () => {
-    setModelConfigLoading(true);
+  const refreshModelConfig = async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? !settingsStatusCache.modelConfig;
+    if (showLoading) setModelConfigLoading(true);
     const res = await window.api.getKimiModelConfig();
     setModelConfigLoading(false);
     if (res.success) {
+      settingsStatusCache.modelConfig = res.data;
+      settingsStatusCache.modelConfigMessage = res.data.exists ? "" : "尚未找到 Kimi Code config.toml。";
       setModelConfig(res.data);
-      setModelConfigMessage(res.data.exists ? "" : "尚未找到 Kimi Code config.toml。");
+      setModelConfigMessage(settingsStatusCache.modelConfigMessage);
       return;
     }
+    settingsStatusCache.modelConfig = null;
+    settingsStatusCache.modelConfigMessage = `读取模型配置失败：${res.error}`;
     setModelConfig(null);
-    setModelConfigMessage(`读取模型配置失败：${res.error}`);
+    setModelConfigMessage(settingsStatusCache.modelConfigMessage);
   };
 
   const buildProviderPayload = () => {
@@ -488,9 +520,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   useEffect(() => {
     if (settingsOpen || variant === "workspace") {
-      void checkConnection(false);
-      void refreshAuth();
-      void refreshModelConfig();
+      if (!settingsStatusCache.connection) void checkConnection(false);
+      if (!settingsStatusCache.auth) void refreshAuth();
+      if (!settingsStatusCache.modelConfig) void refreshModelConfig();
       loadFreezeReports();
     }
   }, [settingsOpen, variant]);
@@ -498,8 +530,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   useEffect(() => {
     const handleAuthChanged = () => {
       if (settingsOpen || variant === "workspace") {
-        void refreshAuth();
-        void refreshModelConfig();
+        void refreshAuth({ showLoading: false });
+        void refreshModelConfig({ showLoading: false });
       }
     };
     window.addEventListener(KIMI_AUTH_CHANGED_EVENT, handleAuthChanged);
@@ -732,7 +764,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <Terminal size={16} className="text-text-muted" />
                     <span>连接情况</span>
                   </div>
-                  <button onClick={() => void checkConnection(Boolean(connection.path))} disabled={connection.loading} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "查找 Kimi Code"}>
+                  <button onClick={() => void checkConnection(Boolean(connection.path), { showLoading: true })} disabled={connection.loading} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "查找 Kimi Code"}>
                     <RefreshCw size={15} className={connection.loading ? "kimix-spin" : ""} />
                     <span>检查</span>
                   </button>
@@ -766,7 +798,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   </div>
                   <button
                     type="button"
-                    onClick={() => void refreshAuth()}
+                    onClick={() => void refreshAuth({ showLoading: true })}
                     disabled={authLoading || Boolean(authBusyAction)}
                     className="kimix-settings-check-button"
                   >
@@ -830,7 +862,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   </div>
                   <button
                     type="button"
-                    onClick={() => void refreshModelConfig()}
+                    onClick={() => void refreshModelConfig({ showLoading: true })}
                     disabled={modelConfigLoading}
                     className="kimix-settings-check-button"
                   >
@@ -1225,7 +1257,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.265 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.266 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
