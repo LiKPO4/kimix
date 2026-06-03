@@ -94,10 +94,6 @@ export const useSessionStore = create<SessionStore>((set) => ({
       const normalized = content.trim();
       const normalizedImages = images.filter((image) => Boolean(image.dataUrl));
       if (!normalized && normalizedImages.length === 0) return state;
-      const latest = state.pendingMessages.filter((msg) => msg.sessionId === sessionId).at(-1);
-      const imageSignature = normalizedImages.map((image) => image.dataUrl || image.name).join("|");
-      const latestImageSignature = (latest?.images ?? []).map((image) => image.dataUrl || image.name).join("|");
-      if (latest?.content.trim() === normalized && latestImageSignature === imageSignature) return state;
       return { pendingMessages: [...state.pendingMessages, createPendingMessage(sessionId, normalized, normalizedImages)] };
     }),
 

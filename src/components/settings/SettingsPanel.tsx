@@ -323,7 +323,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       model: model.model ?? model.alias,
       maxContextSize: String(model.maxContextSize ?? current.maxContextSize),
     }));
-    setProviderMessage(model.isDefault ? "当前已是默认模型，可新建会话测试。" : "已选中模型；点击设为默认后，新会话会使用它。");
+    setProviderMessage(model.isDefault ? "当前正在使用此模型，可新建会话测试。" : "已选中模型；点击使用后，新会话会使用它。");
   };
 
   const fillProviderDraftFromCatalog = (provider: KimiProviderCatalogEntry, model: KimiProviderCatalogEntry["models"][number]) => {
@@ -389,11 +389,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     if (typeof window.api.setKimiDefaultModel !== "function") {
-      setProviderMessage("默认模型接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
+      setProviderMessage("模型使用接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
       return;
     }
     setProviderBusyAction("default");
-    setProviderMessage("正在设为默认模型...");
+    setProviderMessage("正在切换使用模型...");
     const res = await window.api.setKimiDefaultModel({ modelAlias: alias });
     setProviderBusyAction(null);
     if (res.success) {
@@ -404,7 +404,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
       return;
     }
-    setProviderMessage(`设为默认失败：${res.error}`);
+    setProviderMessage(`切换使用失败：${res.error}`);
   };
 
   const handleToggleAdaptiveThinking = async (model: KimiModelConfigSummary["models"][number]) => {
@@ -915,7 +915,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     ) : modelConfig && modelConfig.exists ? (
                       <>
                         <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
-                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>默认模型</div>
+                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>当前使用</div>
                           <div className="kimix-settings-permission-label break-all text-[13px]">{modelConfig.defaultModel ?? "未设置"}</div>
                         </div>
                         <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
@@ -966,7 +966,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                   )}
                                   {model.isDefault ? (
                                     <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                                      默认
+                                      使用中
                                     </span>
                                   ) : (
                                     <button
@@ -979,7 +979,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                       className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
                                     >
                                       <Check size={13} />
-                                      设为默认
+                                      使用
                                     </button>
                                   )}
                                 </div>
@@ -1121,7 +1121,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
                         >
                           <Check size={13} />
-                          设为默认
+                          使用
                         </button>
                         <button
                           type="button"
@@ -1289,7 +1289,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.268 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.269 · 设置将自动保存到本地</div>
         </div>
       </div>
   );
