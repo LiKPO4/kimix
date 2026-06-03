@@ -1848,6 +1848,19 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 等用户用 v2.8.263 复验审查 agent 是否单独显示并继续流转；如仍失败，下一步检查审查完成状态事件是否携带了 reviewer runtimeSessionId。
 
+# 2026-06-03 补齐 Hooks 图标替换遗漏
+## 当前目标
+- 按用户截图反馈，补齐 Hooks 页面和对话 Hook 命中徽标里仍残留的旧钩子图标。
+## 已完成
+- `HooksPanel` 页面标题图标由 `Cable` 改为 `Webhook`，与侧栏 Hooks 入口一致。
+- `MessageBubble` 的 Hook 命中徽标图标由 `Cable` 改为 `Webhook`。
+- 版本号三处同步到 v2.8.264。
+## 验证
+- `rg -n "Cable|Webhook" src/components/layout/HooksPanel.tsx src/components/chat/MessageBubble.tsx src/components/layout/Sidebar.tsx src/components/layout/McpPanel.tsx src/components/layout/SkillsPanel.tsx` 确认 Hooks 入口 / 页面 / 徽标均为 `Webhook`，剩余 `Cable` 仅在 MCP / Skills 连接器语义中。
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.264 截图复验 Hooks 图标一致性。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。

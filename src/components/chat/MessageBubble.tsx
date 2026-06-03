@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Brain, Cable, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, ShieldCheck, SquareTerminal } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, ShieldCheck, SquareTerminal, Webhook } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -671,7 +671,7 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
                     title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
                     aria-label="Hook 命中"
                   >
-                    <Cable size={13} />
+                    <Webhook size={13} />
                     <span>钩子 {hookBadgeEvents.length}</span>
                   </button>
                 )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
-import { Activity, Bell, Cable, Check, Loader2, Play, Plus, ShieldAlert, Sparkles, TerminalSquare, Trash2, X, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Check, Loader2, Play, Plus, ShieldAlert, Sparkles, TerminalSquare, Trash2, Webhook, X, type LucideIcon } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import type { AppSettings, HookRule, HookRunLogEntry } from "@electron/types/ipc";
 
@@ -361,7 +361,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
       <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
         <div className="min-w-0">
           <div className="flex items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]">
-            <Cable size={20} />
+            <Webhook size={20} />
             <span>Hooks</span>
           </div>
           <div className="mt-1 text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
