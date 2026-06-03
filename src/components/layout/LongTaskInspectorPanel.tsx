@@ -367,7 +367,7 @@ export function LongTaskInspectorPanel({
                               {roleLabel} agent · {task.taskId}
                             </div>
                           </div>
-                          <span className={`shrink-0 rounded-full text-[12px] leading-5 ${isDanger ? "bg-white/60 text-accent-danger" : isSuccess ? "bg-white/60 text-accent-success" : isWarning ? "bg-white/60 text-accent-warning" : "bg-accent-primary-light text-accent-primary"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                          <span className={`shrink-0 rounded-lg text-[12px] leading-5 ${isDanger ? "bg-white/60 text-accent-danger" : isSuccess ? "bg-white/60 text-accent-success" : isWarning ? "bg-white/60 text-accent-warning" : "bg-accent-primary-light text-accent-primary"}`} style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
                             {statusLabel}
                           </span>
                         </div>
@@ -394,7 +394,7 @@ export function LongTaskInspectorPanel({
                             </button>
                           )}
                           {task.exitCode !== null && (
-                            <span className="rounded-full bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                            <span className="rounded-lg bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
                               exit {task.exitCode}
                             </span>
                           )}

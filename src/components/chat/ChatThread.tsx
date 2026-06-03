@@ -201,14 +201,14 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
         <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
           <button
             type="button"
-            className={`kimix-chat-banner-button kimix-icon-text-button is-compact hover:opacity-90 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`}
+            className={`kimix-chat-banner-button kimix-icon-text-button is-compact rounded-lg hover:opacity-90 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`}
             onClick={() => {
               void window.api.openFile({ projectPath, filePath: meta.bigPlanPath });
             }}
           >
             BIGPLAN
           </button>
-          <span className={`kimix-chat-banner-badge rounded-full text-[12px] leading-5 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`} style={{ padding: "5px 10px" }}>
+          <span className={`kimix-chat-banner-badge rounded-lg text-[12px] leading-5 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`} style={{ minHeight: 32, padding: "5px 10px" }}>
             {longTaskAgentLabels[meta.activeAgent]}
           </span>
         </div>
