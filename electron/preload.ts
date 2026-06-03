@@ -295,6 +295,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:setPlanMode", req),
   setKimiCodePermission: (req: KimiCodeSetPermissionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:setPermission", req),
+  compactKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:compact", req),
   respondKimiCodeApproval: (req: KimiCodeApprovalResponseRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:respondApproval", req),
   respondKimiCodeQuestion: (req: KimiCodeQuestionResponseRequest): Promise<KimiCodeVoidResponse> =>

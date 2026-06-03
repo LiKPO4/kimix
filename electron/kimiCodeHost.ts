@@ -48,6 +48,7 @@ type KimiCodeSessionLike = {
   setThinking?(level: string): Promise<void>;
   setPlanMode(enabled: boolean): Promise<void>;
   setPermission(mode: KimiCodePermissionMode): Promise<void>;
+  compact?(options?: { instruction?: string }): Promise<void>;
   getStatus(): Promise<KimiCodeSessionStatus>;
   getUsage?(): Promise<KimiCodeSessionUsage>;
   listMcpServers?(): Promise<readonly KimiCodeMcpServerInfo[]>;
@@ -413,6 +414,12 @@ export async function setPermission(sessionId: string, mode: KimiCodePermissionM
   const managed = getManagedSession(sessionId);
   await managed.session.setPermission(mode);
   managed.permission = mode;
+}
+
+export async function compactSession(sessionId: string): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.compact) throw new Error("Official Kimi Code SDK does not expose compact on this session");
+  await managed.session.compact();
 }
 
 export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatus> {

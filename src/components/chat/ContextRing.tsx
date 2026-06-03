@@ -115,10 +115,10 @@ export function ContextRing() {
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
     try {
-      await window.api.sendPrompt({
+      const res = await window.api.compactKimiCodeSession({
         sessionId: runtimeSessionId,
-        content: "/compact",
       });
+      if (!res.success) throw new Error(res.error);
     } catch (err) {
       console.error("Compact failed:", err);
     }
