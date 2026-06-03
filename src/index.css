@@ -871,6 +871,8 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-permissions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   margin-top: 8px;
   gap: 8px;
 }
@@ -878,6 +880,10 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-panel.is-workspace .kimix-settings-permission,
 .kimix-settings-panel.is-workspace .kimix-settings-connection {
   padding: 10px 14px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-permission {
+  min-height: 58px;
 }
 
 .kimix-settings-section + .kimix-settings-section {
