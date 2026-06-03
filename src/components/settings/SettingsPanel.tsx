@@ -934,10 +934,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
                   <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 16, paddingTop: 16 }}>
                     <div className="kimix-settings-permission-label">OpenAI-compatible Provider</div>
-                    <div className="kimix-settings-permission" style={{ padding: "12px 14px", marginTop: 12 }}>
-                      <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
-                        <div className="kimix-settings-permission-copy">
-                          <div className="kimix-settings-permission-label">官方 Provider catalog</div>
+                    <div className="kimix-settings-permission" style={{ padding: "14px 16px", marginTop: 12 }}>
+                      <div className="flex min-w-0 items-start justify-between" style={{ gap: 14 }}>
+                        <div className="kimix-settings-permission-copy min-w-0">
+                          <div className="kimix-settings-permission-label">官方 catalog</div>
                           <div className="kimix-settings-permission-desc">
                             {providerCatalog.length > 0 ? `${providerCatalog.length} 个 OpenAI-compatible Provider 可填入` : "从 models.dev 拉取可用 Provider 和模型名"}
                           </div>
@@ -953,7 +953,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         </button>
                       </div>
                       {providerCatalog.length > 0 && (
-                        <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                        <div className="flex min-w-0 flex-col" style={{ gap: 12, marginTop: 14 }}>
                           <label className="min-w-0">
                             <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider</span>
                             <select
@@ -1225,7 +1225,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.258 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.259 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

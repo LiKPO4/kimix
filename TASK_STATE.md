@@ -1788,6 +1788,18 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 下一步
 - 重启 dev 窗口后复测同会话快速输入 1/2/3。若仍复现，下一步把队列泵提升到主进程/SDK host 层，以 runtime session 为 key 串行化所有 `prompt()` 调用。
 
+# 2026-06-03 优化 Provider catalog 设置布局
+## 当前目标
+- 修复用户截图反馈的设置页官方 Provider catalog 区域过度挤压、标题和下拉框横向抢空间的问题。
+## 已完成
+- `SettingsPanel` 中 catalog 卡片改为上下分层布局：标题/说明/刷新按钮一行，Provider 与模型选择改为纵向两行。
+- catalog 卡片 padding 调整为 `14px 16px`，内部间距用 inline `gap: 14` / `gap: 12` / `marginTop: 14` 明确数值，避免 Tailwind spacing 缓存问题。
+- 版本号三处同步到 v2.8.259。
+## 验证
+- `pnpm build` 通过。
+## 下一步
+- 等用户回传 v2.8.259 设置页截图，确认右栏 catalog 卡片不再挤压；如仍偏挤，再把刷新按钮下移为独立行。
+
 # 2026-06-02 重跑 P0 探针对齐 CLI 0.7.0（迁移审计 1c 收口）
 ## 背景
 - 置顶审计第 1c 条指出探针结论过期（旧记录 CLI 0.6.0 / SDK 0.4.0）；用户选择"先重跑 P0 探针再决定"是否 vendoring。
