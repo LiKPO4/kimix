@@ -26,11 +26,12 @@ import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser
 import { sendDocumentCommand, isInputLike } from "@/utils/dom";
 import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
 import { clampWidth } from "@/utils/number";
+import { persistLocalConversationState } from "@/utils/persistence";
 import { DialogSystem } from "./DialogSystem";
 import { SessionToolbar } from "./SessionToolbar";
 import { DiffPanel } from "./DiffPanel";
 import { ToastSystem } from "./ToastSystem";
-import { LongTaskInspectorPanel, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
+import { LongTaskInspectorPanel, type BtwPanelState, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 
@@ -38,6 +39,18 @@ const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 440;
 const RIGHT_PANEL_MIN_WIDTH = 280;
 const RIGHT_PANEL_MAX_WIDTH = 560;
+const EMPTY_BTW_PANEL_STATE: BtwPanelState = {
+  input: "",
+  loading: false,
+  error: null,
+  rounds: [],
+};
+type BtwTransientState = Pick<BtwPanelState, "input" | "loading" | "error">;
+const EMPTY_BTW_TRANSIENT_STATE: BtwTransientState = {
+  input: "",
+  loading: false,
+  error: null,
+};
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -226,6 +239,7 @@ export function AppShell() {
     error: null,
     message: undefined,
   });
+  const [btwTransientBySessionId, setBtwTransientBySessionId] = useState<Record<string, BtwTransientState>>({});
 
   const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -731,6 +745,11 @@ export function AppShell() {
   );
   const latestTodos = useMemo(() => getVisibleTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
   const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
+  const btwSessionId = liveCurrentSession?.id ?? "__global__";
+  const btwTransientState = btwTransientBySessionId[btwSessionId] ?? EMPTY_BTW_TRANSIENT_STATE;
+  const btwState: BtwPanelState = liveCurrentSession
+    ? { ...btwTransientState, rounds: liveCurrentSession.btwRounds ?? [] }
+    : EMPTY_BTW_PANEL_STATE;
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
   const hiddenComposerCardEntries = [
     hiddenComposerCardList.includes("todo") && latestTodos.length > 0
@@ -1237,6 +1256,59 @@ export function AppShell() {
     await navigator.clipboard.writeText(text);
     showToast(successMessage);
   };
+  const updateBtwTransientState = (sessionId: string, patch: Partial<BtwTransientState>) => {
+    setBtwTransientBySessionId((current) => ({
+      ...current,
+      [sessionId]: { ...(current[sessionId] ?? EMPTY_BTW_TRANSIENT_STATE), ...patch },
+    }));
+  };
+  const updateSessionBtwRounds = (sessionId: string, updater: (rounds: NonNullable<Session["btwRounds"]>) => NonNullable<Session["btwRounds"]>) => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      btwRounds: updater(session.btwRounds ?? []),
+      updatedAt: Date.now(),
+    }));
+    window.setTimeout(() => persistLocalConversationState(), 0);
+  };
+  const setBtwInput = (value: string) => {
+    updateBtwTransientState(btwSessionId, { input: value, error: null });
+  };
+  const clearBtw = () => {
+    if (!liveCurrentSession) return;
+    updateSessionBtwRounds(liveCurrentSession.id, () => []);
+    updateBtwTransientState(liveCurrentSession.id, { error: null });
+  };
+  const askBtw = async () => {
+    if (!liveCurrentSession) {
+      showToast("请先选择一个会话");
+      return;
+    }
+    if (isCurrentSessionRunning) {
+      showToast("当前轮次结束后再侧问");
+      return;
+    }
+    const content = btwState.input.trim();
+    if (!content) return;
+    const sessionId = getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id;
+    const clientSessionId = liveCurrentSession.id;
+    const roundId = `btw-round-${Date.now()}`;
+    updateBtwTransientState(clientSessionId, { input: "", loading: true, error: null });
+    updateSessionBtwRounds(clientSessionId, (rounds) => [...rounds, { id: roundId, userContent: content, timestamp: Date.now() }]);
+    const res = await window.api.askKimiCodeBtw({ sessionId, content });
+    if (!res.success) {
+      updateBtwTransientState(clientSessionId, { loading: false, error: res.error });
+      showToast(`BTW 侧问失败：${res.error}`);
+      return;
+    }
+    updateBtwTransientState(clientSessionId, { loading: false, error: null });
+    updateSessionBtwRounds(clientSessionId, (rounds) => rounds.map((round) => round.id === roundId
+      ? {
+          ...round,
+          assistantContent: res.data.content || "没有返回正文。",
+          thinking: res.data.thinking || undefined,
+        }
+      : round));
+  };
   const openProjectTerminal = () => {
     if (projectPath) void window.api.openProjectTerminal({ path: projectPath });
   };
@@ -1385,6 +1457,8 @@ export function AppShell() {
             backgroundTasksLoading={longTaskBackgroundTasksLoading}
             backgroundTasksError={longTaskBackgroundTasksError}
             sessionDiffs={sessionDiffs}
+            btwState={btwState}
+            btwDisabled={!liveCurrentSession || isCurrentSessionRunning}
             defaultPlanMode={defaultPlanMode}
             buildNextLongTaskPrompt={buildNextLongTaskPrompt}
             onClose={() => setLongTaskInspectorOpen(false)}
@@ -1401,6 +1475,9 @@ export function AppShell() {
             onSetTargetStepDraft={setTargetStepDraft}
             onSetShutdownAfterLongTaskId={setShutdownAfterLongTaskId}
             onSetComposerCardHidden={setComposerCardHidden}
+            onSetBtwInput={setBtwInput}
+            onAskBtw={askBtw}
+            onClearBtw={clearBtw}
             showToast={showToast}
             copyToClipboard={copyToClipboard}
           />

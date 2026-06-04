@@ -1319,7 +1319,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.285 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.292 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

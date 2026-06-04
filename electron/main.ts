@@ -4031,6 +4031,20 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:askBtw", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const content = typeof req.content === "string" ? req.content.trim() : "";
+    const timeoutMs = typeof req.timeoutMs === "number" && Number.isFinite(req.timeoutMs) ? req.timeoutMs : undefined;
+    if (!sessionId || !content) return { success: false, error: "Missing sessionId or content" };
+    const data = await kimiCodeHost.askBtw(sessionId, content, { timeoutMs });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

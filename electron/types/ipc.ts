@@ -1159,6 +1159,25 @@ export type KimiCodePromptRequest = {
   images?: { name: string; dataUrl: string }[];
 };
 
+export type KimiCodeBtwRequest = {
+  sessionId: string;
+  content: string;
+  timeoutMs?: number;
+};
+
+export type KimiCodeBtwResponse = {
+  success: true;
+  data: {
+    agentId: string;
+    content: string;
+    thinking: string;
+    reason?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeSetPlanModeRequest = {
   sessionId: string;
   enabled: boolean;

@@ -377,21 +377,29 @@ function HelpDialogPanel({
                     </div>
                   )}
                 </div>
-                <div className="flex shrink-0 flex-col items-stretch self-center" style={{ gap: 8, minWidth: 156 }}>
-                  <div className="flex items-center justify-end" style={{ gap: 8 }}>
-                    {updateState.hasUpdate && (
-                      <button
-                        onClick={onDownloadUpdate}
-                        disabled={updateState.downloading || updateState.loading}
-                        className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
-                        style={{ paddingLeft: 16, paddingRight: 18 }}
-                      >
-                        <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
-                        {updateState.downloading
-                          ? `下载中 ${formatDownloadPercent(updateState.downloadProgress?.percent ?? 0)}`
-                          : "升级"}
-                      </button>
-                    )}
+                <div
+                  className="grid shrink-0 self-center"
+                  style={{
+                    gridTemplateColumns: updateState.hasUpdate ? "max-content max-content" : "max-content",
+                    justifyContent: "end",
+                    columnGap: 8,
+                    rowGap: 7,
+                    minWidth: updateState.hasUpdate ? 238 : 156,
+                  }}
+                >
+                  {updateState.hasUpdate && (
+                    <button
+                      onClick={onDownloadUpdate}
+                      disabled={updateState.downloading || updateState.loading}
+                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
+                      style={{ paddingLeft: 16, paddingRight: 18 }}
+                    >
+                      <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
+                      {updateState.downloading
+                        ? `下载中 ${formatDownloadPercent(updateState.downloadProgress?.percent ?? 0)}`
+                        : "升级"}
+                    </button>
+                  )}
                     <button
                       onClick={onCheckUpdates}
                       disabled={updateState.loading || updateState.downloading}
@@ -401,12 +409,11 @@ function HelpDialogPanel({
                       <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
                       检查本体
                     </button>
-                  </div>
                   <button
                     onClick={onOpenLatestRelease}
                     disabled={updateState.loading}
-                    className="self-start text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
-                    style={{ paddingLeft: 2, paddingRight: 2 }}
+                    className="text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
+                    style={{ justifySelf: "center", paddingLeft: 2, paddingRight: 2 }}
                   >
                     浏览器下载
                   </button>

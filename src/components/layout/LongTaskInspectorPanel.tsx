@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
@@ -5,15 +6,20 @@ import {
   ClipboardCopy,
   Copy,
   FileText,
+  MessageCircleQuestion,
+  ChevronDown,
+  ChevronUp,
   Play,
   Pause,
   RefreshCw,
   RotateCcw,
+  Send,
   Square,
   Terminal,
+  Trash2,
   X,
 } from "lucide-react";
-import type { Session } from "@/types/ui";
+import type { BtwRound, Session } from "@/types/ui";
 import type { KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { formatReleaseDate } from "@/utils/format";
@@ -38,6 +44,13 @@ export type SessionPlanState = {
 export type LongTaskBackgroundTaskView = KimiCodeBackgroundTaskInfo & {
   runtimeSessionId: string;
   role: "executor" | "reviewer";
+};
+
+export type BtwPanelState = {
+  input: string;
+  loading: boolean;
+  error: string | null;
+  rounds: BtwRound[];
 };
 
 interface LongTaskInspectorPanelProps {
@@ -69,6 +82,8 @@ interface LongTaskInspectorPanelProps {
   backgroundTasksLoading: boolean;
   backgroundTasksError: string | null;
   sessionDiffs: { id: string; filePath: string; additions: number; deletions: number; timestamp: number }[];
+  btwState: BtwPanelState;
+  btwDisabled: boolean;
   defaultPlanMode: boolean;
   buildNextLongTaskPrompt: () => string;
   onClose: () => void;
@@ -88,6 +103,9 @@ interface LongTaskInspectorPanelProps {
   onSetTargetStepDraft: (value: string) => void;
   onSetShutdownAfterLongTaskId: (taskId: string | null) => void;
   onSetComposerCardHidden: (sessionId: string, key: "todo" | "pending", hidden: boolean) => void;
+  onSetBtwInput: (value: string) => void;
+  onAskBtw: () => Promise<void>;
+  onClearBtw: () => void;
   showToast: (message: string) => void;
   copyToClipboard: (text: string, successMessage?: string) => Promise<void>;
 }
@@ -120,6 +138,8 @@ export function LongTaskInspectorPanel({
   backgroundTasksLoading,
   backgroundTasksError,
   sessionDiffs,
+  btwState,
+  btwDisabled,
   defaultPlanMode,
   buildNextLongTaskPrompt,
   onClose,
@@ -135,11 +155,30 @@ export function LongTaskInspectorPanel({
   onSetTargetStepDraft,
   onSetShutdownAfterLongTaskId,
   onSetComposerCardHidden,
+  onSetBtwInput,
+  onAskBtw,
+  onClearBtw,
   showToast,
   copyToClipboard,
 }: LongTaskInspectorPanelProps) {
+  const [collapsedBtwRoundIds, setCollapsedBtwRoundIds] = useState<Set<string>>(() => new Set());
   const openFile = (filePath: string) => {
     if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath });
+  };
+  const visibleBtwRounds = [...btwState.rounds].reverse().slice(0, 8);
+  const toggleBtwRoundCollapsed = (roundId: string) => {
+    setCollapsedBtwRoundIds((current) => {
+      const next = new Set(current);
+      if (next.has(roundId)) next.delete(roundId);
+      else next.add(roundId);
+      return next;
+    });
+  };
+  const handleBtwKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    if (btwDisabled || btwState.loading || !btwState.input.trim()) return;
+    void onAskBtw();
   };
 
   return (
@@ -657,7 +696,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </section>
             )}
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 4, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 5, padding: "16px 16px 18px" }}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">长程任务</div>
@@ -693,6 +732,95 @@ export function LongTaskInspectorPanel({
               )}
             </section>
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 1, padding: "16px 16px 18px" }}>
+              <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                  <MessageCircleQuestion size={15} className="shrink-0 text-accent-primary" />
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">BTW</div>
+                </div>
+                {btwState.rounds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onClearBtw}
+                    className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                  >
+                    <Trash2 size={13} />
+                    清空
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
+                <textarea
+                  value={btwState.input}
+                  onChange={(event) => onSetBtwInput(event.target.value)}
+                  onKeyDown={handleBtwKeyDown}
+                  placeholder="问一个不影响主轮次的问题"
+                  className="min-h-[72px] w-full resize-none rounded-lg border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-primary outline-none transition-colors placeholder:text-text-faint focus:border-accent-primary"
+                  style={{ padding: "12px 12px" }}
+                />
+                <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                  <span className="min-w-0 truncate text-[12.5px] leading-5 text-text-muted">
+                    {btwState.error ?? (btwState.rounds.length ? `${btwState.rounds.length} 轮侧问` : "暂无侧问记录")}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={btwDisabled || btwState.loading || !btwState.input.trim()}
+                    onClick={() => void onAskBtw()}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <Send size={13} />
+                    {btwState.loading ? "发送中" : "发送"}
+                  </button>
+                </div>
+                {btwState.rounds.length > 0 && (
+                  <div className="flex max-h-[360px] flex-col overflow-y-auto" style={{ gap: 10, marginTop: 2 }}>
+                    {visibleBtwRounds.map((round, index) => {
+                      const collapsed = collapsedBtwRoundIds.has(round.id);
+                      return (
+                        <div
+                          key={round.id}
+                          className="rounded-lg border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-secondary"
+                          style={{ padding: "11px 12px" }}
+                        >
+                          <div className="rounded-lg border border-accent-primary-soft bg-accent-primary-light/40 text-accent-primary" style={{ padding: "9px 10px" }}>
+                            <div className="whitespace-pre-wrap break-words">{round.userContent}</div>
+                          </div>
+                          <div style={{ marginTop: 10 }}>
+                            <button
+                              type="button"
+                              onClick={() => toggleBtwRoundCollapsed(round.id)}
+                              className="flex w-full items-center justify-between text-left text-[12.5px] leading-5 text-text-muted transition-colors hover:text-text-primary"
+                              style={{ gap: 10, minHeight: 24 }}
+                            >
+                              <span>{index === 0 ? "最新回复" : "回复"}</span>
+                              {collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                            </button>
+                            <div
+                              className={`min-w-0 overflow-hidden text-[13px] leading-6 text-text-secondary ${collapsed ? "line-clamp-2" : ""}`}
+                              style={{ marginTop: 6 }}
+                            >
+                              {round.assistantContent ? (
+                                <MarkdownRenderer content={round.assistantContent} wrapLongLines />
+                              ) : (
+                                <span className="text-text-muted">等待回复...</span>
+                              )}
+                            </div>
+                            {round.thinking && !collapsed && (
+                              <details style={{ marginTop: 8 }}>
+                                <summary className="cursor-pointer text-[12px] leading-5 text-text-muted">思考</summary>
+                                <div className="whitespace-pre-wrap break-words text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 6 }}>
+                                  {round.thinking}
+                                </div>
+                              </details>
+                            )}
+                          </div>
+                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 2, padding: "16px 16px 18px" }}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">Plan</div>
@@ -744,7 +872,7 @@ export function LongTaskInspectorPanel({
               )}
             </section>
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 2, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 3, padding: "16px 16px 18px" }}>
               <div className="text-[13px] font-medium leading-5 text-text-muted">会话信息</div>
               <div className="mt-3 flex flex-col text-[13px] leading-5 text-text-muted" style={{ gap: 10 }}>
                 <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "11px 12px" }}>
@@ -764,7 +892,7 @@ export function LongTaskInspectorPanel({
               </div>
             </section>
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 3, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 4, padding: "16px 16px 18px" }}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="text-[13px] font-medium leading-5 text-text-muted">最近变更</div>
                 <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>

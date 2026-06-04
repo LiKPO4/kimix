@@ -298,7 +298,9 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     void loadImage(request.source.dataUrl).then((image) => {
       if (cancelled) return;
       initCanvas(image.naturalWidth || image.width, image.naturalHeight || image.height);
-      drawCtx.drawImage(image, 0, 0, drawCanvas.width, drawCanvas.height);
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      bgCtx.drawImage(image, 0, 0, bgCanvas.width, bgCanvas.height);
+      appliedBackgroundRef.current = backgroundColor;
       setUndoStack([drawCanvas.toDataURL("image/png")]);
       setRedoStack([]);
     });
@@ -419,14 +421,18 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     const drawCanvas = canvasRef.current;
     if (!bgCanvas || !drawCanvas || !cropSelection) return;
 
-    const temp = document.createElement("canvas");
-    temp.width = cropSelection.width;
-    temp.height = cropSelection.height;
-    const tempCtx = temp.getContext("2d");
-    if (!tempCtx) return;
+    const bgTemp = document.createElement("canvas");
+    const drawTemp = document.createElement("canvas");
+    bgTemp.width = cropSelection.width;
+    bgTemp.height = cropSelection.height;
+    drawTemp.width = cropSelection.width;
+    drawTemp.height = cropSelection.height;
+    const bgTempCtx = bgTemp.getContext("2d");
+    const drawTempCtx = drawTemp.getContext("2d");
+    if (!bgTempCtx || !drawTempCtx) return;
 
-    tempCtx.drawImage(bgCanvas, cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height, 0, 0, cropSelection.width, cropSelection.height);
-    tempCtx.drawImage(drawCanvas, cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height, 0, 0, cropSelection.width, cropSelection.height);
+    bgTempCtx.drawImage(bgCanvas, cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height, 0, 0, cropSelection.width, cropSelection.height);
+    drawTempCtx.drawImage(drawCanvas, cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height, 0, 0, cropSelection.width, cropSelection.height);
 
     bgCanvas.width = cropSelection.width;
     bgCanvas.height = cropSelection.height;
@@ -436,14 +442,14 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
 
     const bgCtx = bgCanvas.getContext("2d");
     if (bgCtx) {
-      bgCtx.fillStyle = appliedBackgroundRef.current;
-      bgCtx.fillRect(0, 0, cropSelection.width, cropSelection.height);
+      bgCtx.clearRect(0, 0, cropSelection.width, cropSelection.height);
+      bgCtx.drawImage(bgTemp, 0, 0);
     }
 
     const drawCtx = drawCanvas.getContext("2d");
     if (drawCtx) {
       drawCtx.clearRect(0, 0, cropSelection.width, cropSelection.height);
-      drawCtx.drawImage(temp, 0, 0);
+      drawCtx.drawImage(drawTemp, 0, 0);
     }
 
     setCropSelection(null);

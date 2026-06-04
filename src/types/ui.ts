@@ -58,8 +58,17 @@ export interface Session {
   createdAt: number;
   updatedAt: number;
   archivedAt?: number;
+  btwRounds?: BtwRound[];
   events: TimelineEvent[];
   isLoading: boolean;
+}
+
+export interface BtwRound {
+  id: string;
+  userContent: string;
+  assistantContent?: string;
+  thinking?: string;
+  timestamp: number;
 }
 
 export interface LongTaskSessionMeta {

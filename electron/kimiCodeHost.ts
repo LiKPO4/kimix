@@ -7,7 +7,13 @@ import { app } from "electron";
 type JsonObject = Record<string, unknown>;
 
 type KimiCodeSdkModule = {
-  KimiHarness: new (options: {
+  KimiHarness?: new (options: {
+    homeDir?: string;
+    identity?: { userAgentProduct: string; version: string };
+    uiMode?: string;
+    skillDirs?: readonly string[];
+  }) => KimiHarnessLike;
+  createKimiHarness?: (options: {
     homeDir?: string;
     identity?: { userAgentProduct: string; version: string };
     uiMode?: string;
@@ -21,6 +27,7 @@ type KimiCodeSdkModule = {
 };
 
 type KimiHarnessLike = {
+  interactiveAgentId?: string;
   auth?: {
     login(providerName?: string, options?: {
       signal?: AbortSignal;
@@ -49,6 +56,7 @@ type KimiCodeSessionLike = {
   setPlanMode(enabled: boolean): Promise<void>;
   setPermission(mode: KimiCodePermissionMode): Promise<void>;
   compact?(options?: { instruction?: string }): Promise<void>;
+  startBtw?(): Promise<string>;
   getStatus(): Promise<KimiCodeSessionStatus>;
   getUsage?(): Promise<KimiCodeSessionUsage>;
   listMcpServers?(): Promise<readonly KimiCodeMcpServerInfo[]>;
@@ -311,11 +319,29 @@ export type KimiCodeQuestionResult = null | Record<string, string | true> | {
   method?: "enter" | "space" | "number_key";
 };
 
+export type KimiCodeBtwResult = {
+  agentId: string;
+  content: string;
+  thinking: string;
+  reason?: string;
+};
+
 type ManagedSession = {
   session: KimiCodeSessionLike;
   status: KimiCodeEngineStatus;
   permission: KimiCodePermissionMode;
   unsubscribe: () => void;
+  hiddenAgentIds: Set<string>;
+  btwRuns: Map<string, BtwRun>;
+};
+
+type BtwRun = {
+  agentId: string;
+  parts: string[];
+  thinkingParts: string[];
+  ended: boolean;
+  endReason?: string;
+  error?: string;
 };
 
 type PendingApproval = {
@@ -380,6 +406,43 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
   const managed = getManagedSession(sessionId);
   setStatus(sessionId, "running");
   await managed.session.prompt(input);
+}
+
+export async function askBtw(
+  sessionId: string,
+  input: string | KimiCodePromptPart[],
+  options: { timeoutMs?: number } = {},
+): Promise<KimiCodeBtwResult> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.startBtw) throw new Error("当前 Kimi Code SDK 不支持 BTW 侧问。");
+  if (managed.status !== "idle" && managed.status !== "completed" && managed.status !== "interrupted" && managed.status !== "error") {
+    throw new Error("当前轮次结束后再使用 BTW 侧问。");
+  }
+
+  const sdkHarness = await getHarness();
+  const previousAgentId = sdkHarness.interactiveAgentId;
+  const agentId = await managed.session.startBtw();
+  const run: BtwRun = { agentId, parts: [], thinkingParts: [], ended: false };
+  managed.hiddenAgentIds.add(agentId);
+  managed.btwRuns.set(agentId, run);
+
+  try {
+    sdkHarness.interactiveAgentId = agentId;
+    await managed.session.prompt(input);
+    await waitForBtwRun(run, options.timeoutMs ?? 120_000);
+    if (run.error) throw new Error(run.error);
+    return {
+      agentId,
+      content: run.parts.join("").trim(),
+      thinking: run.thinkingParts.join("").trim(),
+      reason: run.endReason,
+    };
+  } finally {
+    if (previousAgentId === undefined) delete sdkHarness.interactiveAgentId;
+    else sdkHarness.interactiveAgentId = previousAgentId;
+    managed.btwRuns.delete(agentId);
+    managed.hiddenAgentIds.delete(agentId);
+  }
 }
 
 export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
@@ -793,14 +856,79 @@ export function respondQuestion(
 function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEngineStatus, permission: KimiCodePermissionMode): KimiCodeEngineSession {
   sessions.get(session.id)?.unsubscribe();
   attachInteractionHandlers(session);
+  const hiddenAgentIds = new Set<string>();
+  const btwRuns = new Map<string, BtwRun>();
   const unsubscribe = session.onEvent((event) => {
+    const agentId = getEventAgentId(event);
+    if (agentId && hiddenAgentIds.has(agentId)) {
+      const run = btwRuns.get(agentId);
+      if (run) updateBtwRunFromEvent(run, event);
+      return;
+    }
     eventSink?.({ sessionId: session.id, event });
     updateStatusFromEvent(session.id, event);
   });
-  const managed: ManagedSession = { session, status: initialStatus, permission, unsubscribe };
+  const managed: ManagedSession = { session, status: initialStatus, permission, unsubscribe, hiddenAgentIds, btwRuns };
   sessions.set(session.id, managed);
   emitStatus(session.id, initialStatus);
   return toEngineSession(session, initialStatus);
+}
+
+function waitForBtwRun(run: BtwRun, timeoutMs: number): Promise<void> {
+  const startedAt = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      if (run.ended) {
+        resolve();
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        reject(new Error(`BTW 侧问超时（${Math.round(timeoutMs / 1000)} 秒）。`));
+        return;
+      }
+      setTimeout(tick, 120);
+    };
+    tick();
+  });
+}
+
+function updateBtwRunFromEvent(run: BtwRun, event: unknown) {
+  const type = event && typeof event === "object" ? (event as { type?: unknown }).type : undefined;
+  if (type === "assistant.delta") {
+    const delta = (event as { delta?: unknown }).delta;
+    if (typeof delta === "string") run.parts.push(delta);
+    return;
+  }
+  if (type === "thinking.delta") {
+    const delta = (event as { delta?: unknown }).delta;
+    if (typeof delta === "string") run.thinkingParts.push(delta);
+    return;
+  }
+  if (type === "turn.ended") {
+    const reason = (event as { reason?: unknown }).reason;
+    run.endReason = typeof reason === "string" ? reason : undefined;
+    if (run.endReason === "failed" || run.endReason === "error") {
+      const error = (event as { error?: { code?: unknown; message?: unknown } }).error;
+      const code = typeof error?.code === "string" ? error.code : "";
+      const message = typeof error?.message === "string" ? error.message : run.endReason;
+      run.error = code ? `${code}: ${message}` : message;
+    }
+    run.ended = true;
+    return;
+  }
+  if (type === "error") {
+    const message = (event as { message?: unknown }).message;
+    run.error = typeof message === "string" ? message : "BTW 侧问失败。";
+    run.ended = true;
+  }
+}
+
+function getEventAgentId(event: unknown): string | undefined {
+  if (!event || typeof event !== "object") return undefined;
+  const direct = (event as { agentId?: unknown }).agentId;
+  if (typeof direct === "string" && direct) return direct;
+  const agent = (event as { agent?: { id?: unknown } }).agent;
+  return typeof agent?.id === "string" && agent.id ? agent.id : undefined;
 }
 
 function attachInteractionHandlers(session: KimiCodeSessionLike) {
@@ -906,15 +1034,22 @@ function getManagedSession(sessionId: string): ManagedSession {
 
 async function getHarness(): Promise<KimiHarnessLike> {
   if (harness) return harness;
-  const { KimiHarness } = await loadSdk();
-  harness = new KimiHarness({
+  const sdk = await loadSdk();
+  const options = {
     homeDir: process.env.KIMI_CODE_HOME,
     identity: {
       userAgentProduct: "kimi-code-cli",
       version: process.env.KIMI_CODE_SMOKE_VERSION ?? process.env.npm_package_version ?? "0.0.0",
     },
     uiMode: "kimix",
-  });
+  };
+  if (sdk.createKimiHarness) {
+    harness = sdk.createKimiHarness(options);
+  } else if (sdk.KimiHarness) {
+    harness = new sdk.KimiHarness(options);
+  } else {
+    throw new Error("Official Kimi Code SDK does not export KimiHarness/createKimiHarness.");
+  }
   return harness;
 }
 

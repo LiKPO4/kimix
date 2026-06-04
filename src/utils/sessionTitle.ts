@@ -30,17 +30,6 @@ export function truncateSessionTitle(text: string): string {
 }
 
 export function deriveSessionTitle(events: TimelineEvent[], fallback = "新会话"): string {
-  const user = events.find((event) =>
-    event.type === "user_message" &&
-    typeof event.content === "string" &&
-    event.content.trim().length >= 2 &&
-    !isInternalPromptText(event.content)
-  );
-  if (user?.type === "user_message") {
-    const title = truncateSessionTitle(user.content);
-    if (title) return title;
-  }
-
   const assistant = events.find((event) =>
     event.type === "assistant_message" &&
     typeof event.content === "string" &&
@@ -48,6 +37,17 @@ export function deriveSessionTitle(events: TimelineEvent[], fallback = "新会�
   );
   if (assistant?.type === "assistant_message") {
     const title = truncateSessionTitle(assistant.content);
+    if (title) return title;
+  }
+
+  const user = events.find((event) =>
+    event.type === "user_message" &&
+    typeof event.content === "string" &&
+    event.content.trim().length >= 4 &&
+    !isInternalPromptText(event.content)
+  );
+  if (user?.type === "user_message" && fallback !== "新会话") {
+    const title = truncateSessionTitle(user.content);
     if (title) return title;
   }
 

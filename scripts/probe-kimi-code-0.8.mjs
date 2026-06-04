@@ -55,7 +55,8 @@ async function main() {
   await mkdir(workDir, { recursive: true });
 
   const mod = await import(pathToFileURL(sdkEntry).href);
-  const harness = new mod.KimiHarness({
+  const createHarness = mod.createKimiHarness ?? ((options) => new mod.KimiHarness(options));
+  const harness = createHarness({
     homeDir: process.env.KIMI_CODE_HOME,
     identity: {
       userAgentProduct: "kimi-code-cli",

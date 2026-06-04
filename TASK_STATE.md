@@ -2165,3 +2165,95 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 未完成 / 下一步
 - 旧 `@moonshot-ai/kimi-agent-sdk` 的 `extraResources` 与依赖未删——属第 3 条「清旧」分阶段迁移，下一阶段做。
 - 建议：在真实 Electron 窗口跑一次新建会话发消息，确认主进程从 vendored 加载（dev 路径）；打包一次确认 extraResources 落到 resources/vendor。
+
+# 2026-06-04 适配 Kimi Code 0.9.0 / BTW 侧问
+## 当前目标
+- 按官方 0.9.0 changelog 升级 vendored SDK，并把 `/btw` 对应的真 SDK 能力接到 Kimix 右侧栏。
+## 已完成
+- 研究仓库切到 `@moonshot-ai/kimi-code@0.9.0` tag，vendored SDK 刷新为 `packages/node-sdk@0.7.0`，来源 commit `6c0afc4d9c10e4d9001f2a891e20bf61e34ec754`。
+- `electron/kimiCodeHost.ts` 适配 0.9.0 新工厂 `createKimiHarness()`，保留旧 `new KimiHarness()` 兜底。
+- 新增 SDK `Session.startBtw()` 的主进程封装、IPC、preload 类型和右侧栏 BTW 侧问卡片；侧问事件按 `agentId` 静默收集，不进入主对话流。
+- `docs/kimi-code-sdk-probe-result.md` 和 `vendor/kimi-code-sdk/README.md` 已更新 0.9.0 / node-sdk 0.7.0 证据；版本三处同步到 v2.8.286。
+## 验证
+- `node scripts/probe-kimi-code-0.8.mjs` 通过，确认 vendored bundle 导出 `createKimiHarness`、`Session.startBtw`、catalog 139 个 provider。
+- vendored SDK 动态烟测通过：`startBtw()` 返回 `agent-0`，侧通道事件 39 条，独立收集正文 `侧问`。
+- `node scripts/probe-kimi-code-sdk.mjs`：15 通过 / 4 已知失败 / 1 跳过。失败项为本机 CLI 仍 0.8.0 且无 `--wire`、SDK npm 仍 404、旧 SDK 已移除；官方 runtime bundle 构建成功，`build:dts` 仍为 Windows `spawn EINVAL`。
+- `pnpm build` 通过。
+- `pnpm test:run` 未全绿：`src/utils/__tests__/sessionTitle.test.ts` 2 个既有标题推导断言失败，和本轮 SDK/BTW 改动无交集。
+## 下一步
+- 用户用 v2.8.286 回传右侧栏 BTW 侧问视觉和交互反馈。
+- 后续可单独处理标题推导测试期望，或等用户确认后提交/发布。
+
+# 2026-06-04 优化 BTW 侧问侧栏显示
+## 当前目标
+- 按用户反馈修正 BTW 侧问记录的 Markdown、排序、折叠和计数展示。
+## 已完成
+- 侧问状态从消息数组改为“轮次”结构，一轮对应一次用户提问和一次 agent 回复。
+- 侧问列表改为最新轮在上、旧轮向下排；计数从“x 条侧问记录”改为“x 轮侧问”。
+- Agent 回复改用 `MarkdownRenderer` 渲染，支持 Markdown 格式。
+- Agent 回复增加折叠按钮，折叠态只保留两行高度；思考内容仅在展开时显示。
+- 版本号三处同步到 v2.8.287。
+## 验证
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.287 回传 BTW 侧栏视觉反馈，重点看两行折叠高度和 Markdown 渲染是否舒适。
+
+# 2026-06-04 调整更新弹窗浏览器下载位置
+## 当前目标
+- 按用户反馈，更新弹窗内“浏览器下载”应始终位于对应主按钮正下方并水平居中。
+## 已完成
+- Kimix 本体操作区从横向 flex 改为小 grid：无更新时“浏览器下载”位于“检查本体”正下方；有更新时位于“升级”正下方。
+- 浏览器下载文本使用 `justifySelf: "center"`，和上方按钮水平居中对齐。
+- 版本号三处同步到 v2.8.288。
+## 验证
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.288 复验更新弹窗两种状态下的按钮对齐。
+
+# 2026-06-04 持久化 BTW 侧问轮次
+## 当前目标
+- 修复关闭并重新打开右侧栏后 BTW 侧问记录消失的问题，并澄清是否为官方 SDK 限制。
+## 已完成
+- 确认根因：官方 0.9.0 SDK 提供 `Session.startBtw()` 和侧通道事件，但 Kimix 之前只把侧问记录存放在 `AppShell` 内存 state，侧栏重建会丢失。
+- 新增 `Session.btwRounds`，把 BTW 一轮问答写入 Kimix 会话 store，并立即调用现有 `persistLocalConversationState()` 持久化到本地会话数据。
+- 输入框草稿、loading、error 仍保留为临时 UI 状态，不写入会话历史；清空按钮会清掉当前会话的持久化 BTW 轮次。
+- 版本号三处同步到 v2.8.289。
+## 验证
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.289 复验：侧问后关闭/重新打开右侧栏，记录应仍在；重启应用后也应随该会话恢复。
+
+# 2026-06-04 对齐 BTW 输入框发送快捷键
+## 当前目标
+- 按用户反馈，让右侧栏 BTW 输入框发送方式与主窗口一致。
+## 已完成
+- BTW textarea 新增键盘处理：`Enter` 和 `Ctrl+Enter` 发送，`Shift+Enter` 保持换行。
+- 版本号三处同步到 v2.8.290。
+## 验证
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.290 复验侧栏输入框快捷键。
+
+# 2026-06-04 修复画板原图被油漆桶填色
+## 当前目标
+- 按用户反馈，点击已有图片进入画板时，原图应作为背景层；油漆桶只作用于用户绘制层。
+## 已完成
+- 打开已有图片时，原图改为绘制到 `bgCanvas`，`drawCanvas` 保持透明，只承载用户后续绘制内容。
+- 裁剪逻辑改为分别裁剪背景层和绘制层，不再把背景与绘制合并后塞回绘制层。
+- 版本号三处同步到 v2.8.291。
+## 验证
+- `pnpm build` 通过。
+## 下一步
+- 等用户用 v2.8.291 复验：原图进画板后，油漆桶只填用户绘制层，不会污染原图背景。
+
+# 2026-06-04 发布前测试收口
+## 当前目标
+- 发布 Kimi Code 0.9.0 适配前，清理阻塞测试并准备 release。
+## 已完成
+- `deriveSessionTitle` 重新对齐既有策略：默认优先用 assistant 正文派生标题，不再用用户首句覆盖；保留非默认 fallback 的兜底能力。
+- 版本号三处同步到 v2.8.292。
+## 验证
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `pnpm build` 通过。
+## 下一步
+- 提交并推送 `master`，推送 `v2.8.292` tag，由 GitHub Actions 自动构建并发布 Release。

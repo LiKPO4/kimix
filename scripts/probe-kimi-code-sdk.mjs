@@ -445,9 +445,9 @@ async function probeOfficialSdkRuntime() {
     return;
   }
 
-  let KimiHarness;
+  let sdk;
   try {
-    ({ KimiHarness } = await import(`file://${sdkEntry.replaceAll("\\", "/")}`));
+    sdk = await import(`file://${sdkEntry.replaceAll("\\", "/")}`);
   } catch (error) {
     fail("official SDK import from built source", error);
     return;
@@ -457,7 +457,8 @@ async function probeOfficialSdkRuntime() {
   let harness;
   let session;
   try {
-    harness = new KimiHarness({
+    const createHarness = sdk.createKimiHarness ?? ((options) => new sdk.KimiHarness(options));
+    harness = createHarness({
       homeDir,
       identity: {
         userAgentProduct: "kimi-code-cli",
