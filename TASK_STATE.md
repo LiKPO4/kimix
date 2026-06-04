@@ -2299,3 +2299,19 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
 ## 下一步
 - 验证通过后，请用户复验思考展开内容中编号列表的换行。
+
+# 2026-06-04 修复 Release notes 来源
+## 当前目标
+- 修复最近两个 GitHub Release 复用旧版 `v2.8.106` Release notes 的问题，并避免后续 tag 继续复用旧说明。
+## 已完成
+- 确认根因：`.github/workflows/release.yml` 每次发布固定执行 `gh release edit "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md`，而根目录 `RELEASE_NOTES.md` 长期停留在 v2.8.106。
+- 新增 `docs/release-notes/v2.8.292.md` 和 `docs/release-notes/v2.8.295.md`，分别记录 0.9.0 适配版和后续体验修复版说明。
+- 更新 `RELEASE_NOTES.md` 为当前最新 `v2.8.295` 说明，作为 fallback。
+- 更新 release workflow：优先读取 `docs/release-notes/${GITHUB_REF_NAME}.md`，不存在时才回退到 `RELEASE_NOTES.md`。
+- 已用 `gh release edit` 修正 GitHub 上 `v2.8.292` 和 `v2.8.295` 的 Release notes。
+## 验证
+- `gh release view v2.8.292` 读回标题为 `Kimix v2.8.292 Release Notes`。
+- `gh release view v2.8.295` 读回标题为 `Kimix v2.8.295 Release Notes`。
+- `git diff --check` 通过。
+## 下一步
+- 提交并推送 release notes 来源修复。
