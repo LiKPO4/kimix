@@ -18,5 +18,10 @@ export async function sendKimiCodePromptWithRetry(req: SendKimiCodePromptRequest
     await sleep(delay);
     last = await window.api.sendKimiCodePrompt(req);
   }
+  if (!last.success && isKimiActiveTurnError(last.error)) {
+    await window.api.cancelKimiCodeTurn({ sessionId: req.sessionId }).catch(() => undefined);
+    await sleep(700);
+    last = await window.api.sendKimiCodePrompt(req);
+  }
   return last;
 }

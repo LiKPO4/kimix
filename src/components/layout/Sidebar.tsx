@@ -23,7 +23,10 @@ function formatRelativeTime(ts: number): string {
 }
 
 const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-lg text-[15px] text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40";
-const collapsedNavItemClass = "flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
+const collapsedNavItemClass = "flex items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
+const collapsedSettingsItemClass = "flex items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary";
+const collapsedNavButtonStyle = { width: 40, height: 40, minWidth: 40, minHeight: 40, padding: 0 } as const;
+const collapsedSettingsButtonStyle = { width: 40, height: 36, minWidth: 40, minHeight: 36, padding: 0 } as const;
 
 interface SidebarProps {
   width?: number;
@@ -242,44 +245,74 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   if (!sidebarOpen) {
     return (
-      <aside className="flex w-[52px] shrink-0 flex-col items-start bg-surface-ground" style={{ paddingLeft: 12, paddingRight: 4, paddingTop: 12, gap: 8 }}>
-        <button
-          onClick={async () => {
-            if (currentProject) {
-              await createSessionForProject(currentProject);
-            }
-          }}
-          disabled={!currentProject || Boolean(creatingSessionProjectPath)}
-          className={collapsedNavItemClass}
-          title={creatingSessionProjectPath ? "创建中" : "新对话"}
-          aria-label={creatingSessionProjectPath ? "创建中" : "新对话"}
-        >
-          {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin" /> : <SquarePen size={17} />}
-        </button>
-        <button
-          onClick={() => setSearchOpen(true)}
-          className={collapsedNavItemClass}
-          title="搜索"
-          aria-label="搜索"
-        >
-          <Search size={17} />
-        </button>
-        <button
-          onClick={() => void openPlugins()}
-          className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
-          title="插件"
-          aria-label="插件"
-        >
-          <LayoutGrid size={17} />
-        </button>
-        <button
-          onClick={() => setWorkspaceView("hooks")}
-          className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
-          title="Hooks"
-          aria-label="Hooks"
-        >
-          <Webhook size={17} />
-        </button>
+      <aside
+        className="kimix-sidebar shrink-0 bg-surface-ground"
+        style={{ display: "flex", flexDirection: "column", width: 52, height: "100%", minHeight: 0, paddingLeft: 10, paddingRight: 2, paddingTop: 0, paddingBottom: 18 }}
+      >
+        <div className="flex flex-col" style={{ gap: 4 }}>
+          <button
+            onClick={async () => {
+              if (currentProject) {
+                setWorkspaceView("chat");
+                await createSessionForProject(currentProject);
+              }
+            }}
+            disabled={!currentProject || Boolean(creatingSessionProjectPath)}
+            className={collapsedNavItemClass}
+            style={collapsedNavButtonStyle}
+            title={creatingSessionProjectPath ? "创建中" : "新对话"}
+            aria-label={creatingSessionProjectPath ? "创建中" : "新对话"}
+          >
+            {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin" /> : <SquarePen size={17} />}
+          </button>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className={collapsedNavItemClass}
+            style={collapsedNavButtonStyle}
+            title="搜索"
+            aria-label="搜索"
+          >
+            <Search size={17} />
+          </button>
+          <button
+            onClick={() => void openPlugins()}
+            className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
+            style={collapsedNavButtonStyle}
+            title="插件"
+            aria-label="插件"
+          >
+            <LayoutGrid size={17} />
+          </button>
+          <button
+            onClick={() => setWorkspaceView("hooks")}
+            className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
+            style={collapsedNavButtonStyle}
+            title="Hooks"
+            aria-label="Hooks"
+          >
+            <Webhook size={17} />
+          </button>
+          <button
+            onClick={() => setLongTasksOpen(true)}
+            className={collapsedNavItemClass}
+            style={collapsedNavButtonStyle}
+            title="长程任务"
+            aria-label="长程任务"
+          >
+            <Clock size={17} />
+          </button>
+        </div>
+        <div style={{ marginTop: "auto", height: 36 }}>
+          <button
+            onClick={() => setWorkspaceView("settings")}
+            className={`${collapsedSettingsItemClass} ${workspaceView === "settings" ? "bg-surface-hover text-text-primary" : ""}`}
+            style={collapsedSettingsButtonStyle}
+            title="设置"
+            aria-label="设置"
+          >
+            <Settings size={17} />
+          </button>
+        </div>
       </aside>
     );
   }
@@ -295,7 +328,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
     const loaded = await window.api.loadSession({
       workDir: session.projectPath,
-      sessionId: session.id,
+      sessionId: getRuntimeSessionId(session) ?? session.id,
     });
     if (!loaded.success) return;
     const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
@@ -306,7 +339,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     updateSession(session.id, (current) => ({
       ...current,
       events,
-      title: deriveSessionTitle(events, current.title),
+      title: current.titleLocked ? current.title : deriveSessionTitle(events, current.title),
       isLoading: false,
       updatedAt: Date.now(),
     }));
@@ -603,7 +636,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.295</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.310</span>
         </button>
       </div>
     </aside>

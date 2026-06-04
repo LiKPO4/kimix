@@ -3,7 +3,7 @@ import { Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Uplo
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import type { KimiCodePluginSummary, KimiCodeMarketplacePlugin } from "@electron/types/ipc";
+import type { KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
 
 type SkillInfo = {
   name: string;
@@ -43,6 +43,7 @@ export function SkillsPanel({
   const [pluginUrl, setPluginUrl] = useState("");
   const [installingPlugin, setInstallingPlugin] = useState(false);
   const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
+  const [sdkSkills, setSdkSkills] = useState<KimiCodeSkillSummary[]>([]);
   const [sdkPluginRefreshing, setSdkPluginRefreshing] = useState(false);
   const [sdkPluginToggling, setSdkPluginToggling] = useState<string | null>(null);
   const [marketplace, setMarketplace] = useState<KimiCodeMarketplacePlugin[]>([]);
@@ -57,19 +58,28 @@ export function SkillsPanel({
 
   const refreshSdkPlugins = async (nextMessage?: string) => {
     setSdkPluginRefreshing(true);
-    const res = await window.api.listKimiCodePlugins(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {});
+    const [pluginRes, skillRes] = await Promise.all([
+      window.api.listKimiCodePlugins(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
+      window.api.listKimiCodeSkills(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
+    ]);
     setSdkPluginRefreshing(false);
-    if (!res.success) {
-      setMessage(`刷新 SDK 插件状态失败：${res.error}`);
+    if (!pluginRes.success) {
+      setMessage(`刷新 SDK 插件状态失败：${pluginRes.error}`);
       return;
     }
-    setSdkPlugins(res.data);
-    setMessage(nextMessage ?? (res.data.length > 0 ? `已从官方 SDK 读取 ${res.data.length} 个 Plugin` : "官方 SDK 当前没有已安装 Plugin"));
+    if (!skillRes.success) {
+      setMessage(`刷新 SDK Skills 状态失败：${skillRes.error}`);
+      return;
+    }
+    setSdkPlugins(pluginRes.data);
+    setSdkSkills(skillRes.data);
+    setMessage(nextMessage ?? `已从官方 SDK 读取 ${pluginRes.data.length} 个 Plugin、${skillRes.data.length} 个 Skill`);
   };
 
   useEffect(() => {
     if (!open) {
       setSdkPlugins([]);
+      setSdkSkills([]);
       return;
     }
     void refreshSdkPlugins();
@@ -421,6 +431,36 @@ export function SkillsPanel({
                     <RefreshCw size={14} className={sdkPluginRefreshing ? "kimix-spin" : ""} />
                     <span>{sdkPluginRefreshing ? "刷新中" : "刷新 SDK 状态"}</span>
                   </button>
+                  <div
+                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+                    style={{ padding: "10px 12px", marginTop: 12 }}
+                  >
+                    <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                      <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">已加载 Skills</div>
+                      <span className="shrink-0 rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                        {sdkSkills.length}
+                      </span>
+                    </div>
+                    {sdkSkills.length > 0 ? (
+                      <div className="flex flex-col" style={{ gap: 7, marginTop: 9 }}>
+                        {sdkSkills.slice(0, 5).map((skill) => (
+                          <div key={`${skill.source}:${skill.name}`} className="min-w-0">
+                            <div className="truncate text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={skill.name}>{skill.name}</div>
+                            <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" title={skill.path}>
+                              {skill.type ?? "skill"} · {skill.source}
+                            </div>
+                          </div>
+                        ))}
+                        {sdkSkills.length > 5 && (
+                          <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">还有 {sdkSkills.length - 5} 个 Skill 未展示</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
+                        当前 SDK 会话没有加载 Skill，或尚未刷新。
+                      </div>
+                    )}
+                  </div>
                   {sdkPlugins.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
                       {sdkPlugins.map((plugin) => (

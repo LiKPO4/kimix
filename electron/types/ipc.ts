@@ -220,6 +220,8 @@ export type CheckKimiCliResponse = {
     output?: string;
     version?: string | null;
     isLegacy?: boolean;
+    shellPath?: string | null;
+    shellAvailable?: boolean;
     message: string;
   };
 } | {
@@ -336,6 +338,18 @@ export type ListKimiProviderCatalogResponse = {
   success: true;
   data: {
     providers: KimiProviderCatalogEntrySummary[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiDoctorConfigResponse = {
+  success: true;
+  data: {
+    ok: boolean;
+    output: string;
+    message: string;
   };
 } | {
   success: false;
@@ -1128,6 +1142,15 @@ export type KimiCodePluginSummary = {
   github?: unknown;
 };
 
+export type KimiCodeSkillSummary = {
+  name: string;
+  description: string;
+  path: string;
+  source: string;
+  type?: string;
+  disableModelInvocation?: boolean;
+};
+
 export type KimiCodeSessionSummary = {
   id: string;
   title?: string;
@@ -1151,6 +1174,17 @@ export type KimiCodeCreateSessionRequest = {
 
 export type KimiCodeResumeSessionRequest = {
   sessionId: string;
+};
+
+export type KimiCodeForkSessionRequest = {
+  sessionId: string;
+  forkId?: string;
+  title?: string;
+};
+
+export type KimiCodeRenameSessionRequest = {
+  sessionId: string;
+  title: string;
 };
 
 export type KimiCodePromptRequest = {
@@ -1385,6 +1419,14 @@ export type KimiCodeListSessionsResponse = {
 export type KimiCodeListPluginsResponse = {
   success: true;
   data: KimiCodePluginSummary[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeListSkillsResponse = {
+  success: true;
+  data: KimiCodeSkillSummary[];
 } | {
   success: false;
   error: string;

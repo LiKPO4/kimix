@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Square,
   SquareTerminal,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
@@ -103,10 +104,15 @@ export function SessionToolbar({
   const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [undoBusy, setUndoBusy] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const sessionMenuRef = useRef<HTMLDivElement>(null);
   const launchMenuRef = useRef<HTMLDivElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
+  const addSession = useSessionStore((s) => s.addSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const archiveSession = useSessionStore((s) => s.archiveSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -126,16 +132,45 @@ export function SessionToolbar({
     return () => document.removeEventListener("pointerdown", handlePointerDown, true);
   }, [sessionMenuOpen, launchMenuOpen, projectMenuOpen]);
 
-  const renameCurrentSession = () => {
+  const openRenameDialog = () => {
     if (!liveCurrentSession) {
       showToast("当前没有对话");
       return;
     }
-    const nextTitle = window.prompt("重命名对话", liveCurrentSession.title)?.trim();
+    setRenameDraft(liveCurrentSession.title);
+    setRenameError(null);
+    setRenameDialogOpen(true);
+  };
+
+  const submitRenameCurrentSession = async () => {
+    if (!liveCurrentSession) {
+      setRenameDialogOpen(false);
+      showToast("当前没有对话");
+      return;
+    }
+    const nextTitle = renameDraft.trim();
     if (!nextTitle || nextTitle === liveCurrentSession.title) return;
+    setRenameBusy(true);
+    setRenameError(null);
+    if (liveCurrentSession.engine === "kimi-code") {
+      const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+      if (!runtimeSessionId) {
+        setRenameBusy(false);
+        setRenameError("没有可重命名的官方会话");
+        return;
+      }
+      const renamed = await window.api.renameKimiCodeSession({ sessionId: runtimeSessionId, title: nextTitle });
+      if (!renamed.success) {
+        setRenameBusy(false);
+        setRenameError(`重命名失败：${renamed.error}`);
+        return;
+      }
+    }
     const updatedAt = Date.now();
-    updateSession(liveCurrentSession.id, (session) => ({ ...session, title: nextTitle, updatedAt }));
-    setCurrentSession({ ...liveCurrentSession, title: nextTitle, updatedAt });
+    updateSession(liveCurrentSession.id, (session) => ({ ...session, title: nextTitle, titleLocked: true, updatedAt }));
+    setCurrentSession({ ...liveCurrentSession, title: nextTitle, titleLocked: true, updatedAt });
+    setRenameBusy(false);
+    setRenameDialogOpen(false);
     showToast("已重命名");
   };
 
@@ -149,9 +184,84 @@ export function SessionToolbar({
     showToast("已归档对话");
   };
 
+  const forkCurrentSession = async () => {
+    if (!liveCurrentSession || liveCurrentSession.engine !== "kimi-code") {
+      showToast("当前不是 Kimi Code 会话");
+      return;
+    }
+    if (isCurrentSessionRunning) {
+      showToast("会话运行中，稍后再派生");
+      return;
+    }
+    if (liveCurrentSession.longTask) {
+      showToast("长程任务会话暂不支持直接派生");
+      return;
+    }
+    const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+    if (!runtimeSessionId) {
+      showToast("没有可派生的官方会话");
+      return;
+    }
+    const workDir = liveCurrentSession.projectPath || projectPath || "";
+    if (!workDir) {
+      showToast("缺少工作目录，无法读取派生历史");
+      return;
+    }
+
+    const titleBase = liveCurrentSession.title?.trim() || "新会话";
+    const now = new Date();
+    const timeLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const forkTitle = `${titleBase.replace(/\s·\s分支(?:\s\d{2}:\d{2})?$/, "")} · 分支 ${timeLabel}`;
+    const forkId = `fork-${crypto.randomUUID()}`;
+    const forked = await window.api.forkKimiCodeSession({ sessionId: runtimeSessionId, forkId, title: forkTitle });
+    if (!forked.success) {
+      showToast(`派生失败：${forked.error}`);
+      return;
+    }
+
+    const forkSessionId = forked.data.sessionId;
+    if (forkSessionId === runtimeSessionId || forkSessionId === liveCurrentSession.id) {
+      showToast("派生失败：官方返回了原会话 ID，已保留原对话不切换");
+      return;
+    }
+    await window.api.cancelKimiCodeTurn({ sessionId: forkSessionId }).catch(() => undefined);
+    const forkWorkDir = forked.data.workDir || workDir;
+    const forkUiSessionId = `local-fork-${crypto.randomUUID()}`;
+    const forkProjectPath = liveCurrentSession.projectPath || projectPath || forkWorkDir;
+    const loaded = await window.api.loadKimiCodeSession({ workDir: forkWorkDir, sessionId: forkSessionId });
+    const events = loaded.success
+      ? settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []))
+      : settleInactiveEvents(liveCurrentSession.events);
+    const updatedAt = Date.now();
+    const nextSession: Session = {
+      id: forkUiSessionId,
+      engine: "kimi-code",
+      runtimeSessionId: forkSessionId,
+      officialSessionId: forkSessionId,
+      model: liveCurrentSession.model,
+      title: forkTitle,
+      titleLocked: true,
+      projectPath: forkProjectPath,
+      events,
+      isLoading: false,
+      createdAt: updatedAt,
+      updatedAt,
+    };
+    addSession(nextSession);
+    setCurrentSession(nextSession);
+    showToast(loaded.success ? `已派生并切换到：${forkTitle}，原对话仍保留在左侧列表` : `已派生，但刷新历史失败：${loaded.error}`);
+  };
+
+  const canForkKimiSession = Boolean(
+    liveCurrentSession?.engine === "kimi-code" &&
+    !liveCurrentSession.longTask &&
+    !isCurrentSessionRunning &&
+    getRuntimeSessionId(liveCurrentSession)
+  );
+
   const sessionMenuItems: SessionMenuEntry[] = [
     { label: "置顶对话", hint: "Ctrl+Alt+P", icon: Pin, disabled: true, action: () => undefined },
-    { label: "重命名对话", hint: "Ctrl+Alt+R", icon: Pencil, action: renameCurrentSession },
+    { label: "重命名对话", hint: "Ctrl+Alt+R", icon: Pencil, action: openRenameDialog },
     { label: "归档对话", hint: "Ctrl+Shift+A", icon: Archive, action: archiveCurrentSession },
     { type: "separator" },
     { label: "复制工作目录", hint: "Ctrl+Shift+C", icon: ClipboardCopy, action: () => copyToClipboard(projectPath ?? liveCurrentSession?.projectPath ?? "", "已复制工作目录") },
@@ -160,7 +270,7 @@ export function SessionToolbar({
     { label: "复制为 Markdown", icon: FileText, action: () => liveCurrentSession ? copyToClipboard(sessionToMarkdown(liveCurrentSession), "已复制 Markdown") : showToast("当前没有对话") },
     { type: "separator" },
     { label: "打开侧边聊天", icon: MessageSquarePlus, disabled: true, action: () => undefined },
-    { label: "派生到本地", icon: Laptop, disabled: true, action: () => undefined },
+    { label: "派生到本地", icon: Laptop, disabled: !canForkKimiSession, action: forkCurrentSession },
     { label: "派生到新工作树", icon: GitFork, disabled: true, action: () => undefined },
     { label: "添加自动化...", icon: History, disabled: true, action: () => undefined },
     { type: "separator" },
@@ -253,14 +363,14 @@ export function SessionToolbar({
       updateSession(liveCurrentSession.id, (session) => ({
         ...session,
         events,
-        title: deriveSessionTitle(events, session.title),
+        title: session.titleLocked ? session.title : deriveSessionTitle(events, session.title),
         isLoading: false,
         updatedAt,
       }));
       setCurrentSession({
         ...liveCurrentSession,
         events,
-        title: deriveSessionTitle(events, liveCurrentSession.title),
+        title: liveCurrentSession.titleLocked ? liveCurrentSession.title : deriveSessionTitle(events, liveCurrentSession.title),
         isLoading: false,
         updatedAt,
       });
@@ -278,6 +388,7 @@ export function SessionToolbar({
   );
 
   return (
+    <>
     <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 12 }}>
       <div className="flex min-w-0 items-center gap-2.5">
         <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
@@ -523,5 +634,72 @@ export function SessionToolbar({
         </button>
       </div>
     </div>
+    {renameDialogOpen && (
+      <div
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-overlay-bg)]"
+        style={{ padding: 24 }}
+        onMouseDown={() => {
+          if (!renameBusy) setRenameDialogOpen(false);
+        }}
+      >
+        <form
+          className="kimix-floating-panel w-full max-w-[420px] rounded-[14px] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text)] shadow-xl"
+          style={{ padding: 22 }}
+          onMouseDown={(event) => event.stopPropagation()}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitRenameCurrentSession();
+          }}
+        >
+          <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+            <div className="min-w-0 text-[16px] font-semibold leading-6">重命名对话</div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!renameBusy) setRenameDialogOpen(false);
+              }}
+              className="kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg"
+              aria-label="关闭"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <input
+            value={renameDraft}
+            onChange={(event) => {
+              setRenameDraft(event.target.value);
+              setRenameError(null);
+            }}
+            autoFocus
+            className="h-10 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-[14px] outline-none focus:border-[var(--accent-blue)]"
+            style={{ marginTop: 16, paddingLeft: 14, paddingRight: 14 }}
+            placeholder="输入新的对话标题"
+          />
+          {renameError && (
+            <div className="rounded-lg bg-accent-danger-light text-[13px] leading-5 text-accent-danger" style={{ marginTop: 12, padding: "9px 12px" }}>
+              {renameError}
+            </div>
+          )}
+          <div className="flex justify-end" style={{ gap: 10, marginTop: 18 }}>
+            <button
+              type="button"
+              onClick={() => setRenameDialogOpen(false)}
+              disabled={renameBusy}
+              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={renameBusy || !renameDraft.trim() || renameDraft.trim() === liveCurrentSession?.title}
+              className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {renameBusy ? "保存中" : "保存"}
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
+    </>
   );
 }

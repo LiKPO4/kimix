@@ -29,6 +29,7 @@ import type {
   SaveKimiModelConfigResponse,
   SetKimiDefaultModelRequest,
   SetKimiModelAdaptiveThinkingRequest,
+  KimiDoctorConfigResponse,
   ListMcpServersResponse,
   ListKimiProviderCatalogResponse,
   AddMcpServerRequest,
@@ -113,6 +114,7 @@ import type {
   KimiCodeLoadSessionResponse,
   KimiCodeListMcpServersResponse,
   KimiCodeListPluginsResponse,
+  KimiCodeListSkillsResponse,
   KimiCodeListMarketplaceResponse,
   KimiCodeManagedUsageRequest,
   KimiCodeManagedUsageResponse,
@@ -121,8 +123,10 @@ import type {
   KimiCodePluginResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
+  KimiCodeForkSessionRequest,
   KimiCodePromptRequest,
   KimiCodeQuestionResponseRequest,
+  KimiCodeRenameSessionRequest,
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
@@ -215,6 +219,8 @@ const api = {
     ipcRenderer.invoke("kimi:setModelAdaptiveThinking", req),
   listKimiProviderCatalog: (): Promise<ListKimiProviderCatalogResponse> =>
     ipcRenderer.invoke("kimi:listProviderCatalog"),
+  doctorKimiConfig: (): Promise<KimiDoctorConfigResponse> =>
+    ipcRenderer.invoke("kimi:doctorConfig"),
   testKimiOpenAiProvider: (req: KimiOpenAiProviderConfigRequest): Promise<TestKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:testOpenAiProvider", req),
   loginKimi: (): Promise<KimiLoginResponse> =>
@@ -285,6 +291,10 @@ const api = {
     ipcRenderer.invoke("kimi-code:createSession", req),
   resumeKimiCodeSession: (req: KimiCodeResumeSessionRequest): Promise<KimiCodeSessionResponse> =>
     ipcRenderer.invoke("kimi-code:resumeSession", req),
+  forkKimiCodeSession: (req: KimiCodeForkSessionRequest): Promise<KimiCodeSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:forkSession", req),
+  renameKimiCodeSession: (req: KimiCodeRenameSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:renameSession", req),
   sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
@@ -335,6 +345,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:listMarketplace"),
   listKimiCodePlugins: (req: { sessionId?: string }): Promise<KimiCodeListPluginsResponse> =>
     ipcRenderer.invoke("kimi-code:listPlugins", req),
+  listKimiCodeSkills: (req: { sessionId?: string }): Promise<KimiCodeListSkillsResponse> =>
+    ipcRenderer.invoke("kimi-code:listSkills", req),
   installKimiCodePlugin: (req: KimiCodeInstallPluginRequest): Promise<KimiCodePluginResponse> =>
     ipcRenderer.invoke("kimi-code:installPlugin", req),
   setKimiCodePluginEnabled: (req: KimiCodeSetPluginEnabledRequest): Promise<KimiCodeVoidResponse> =>

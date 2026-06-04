@@ -173,8 +173,8 @@ export function TopMenuBar({
         <div className="flex items-center gap-2 text-text-muted">
           <button
             onClick={onToggleSidebar}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
-            style={{ marginLeft: 14 }}
+            className="flex items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+            style={{ width: 40, height: 40, minWidth: 40, padding: 0, marginLeft: sidebarOpen ? 8 : -2 }}
             aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}
             title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}
           >

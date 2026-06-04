@@ -22,7 +22,7 @@ export function useEventStream() {
         for (const item of items) {
           events = mergeEvents(events, item);
         }
-        const title = deriveSessionTitle(events, session.title);
+        const title = session.titleLocked ? session.title : deriveSessionTitle(events, session.title);
         return { ...session, events, title, updatedAt: Date.now() };
       });
     });

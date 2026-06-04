@@ -97,6 +97,28 @@ async function resolveKimiCommand(): Promise<string | null> {
   return resolveCommand("kimi");
 }
 
+async function resolveGitBashCommand(): Promise<string | null> {
+  if (process.platform !== "win32") return resolveCommand("bash");
+  const envShell = process.env.KIMI_SHELL_PATH?.trim();
+  if (envShell && fs.existsSync(envShell)) return envShell;
+  const fromPath = await checkCommand("bash");
+  if (fromPath) return fromPath;
+  const candidates = [
+    path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "bin", "bash.exe"),
+    path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "usr", "bin", "bash.exe"),
+    path.join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Git", "bin", "bash.exe"),
+    path.join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Git", "usr", "bin", "bash.exe"),
+    path.join(os.homedir(), "AppData", "Local", "Programs", "Git", "bin", "bash.exe"),
+    path.join(os.homedir(), "AppData", "Local", "Programs", "Git", "usr", "bin", "bash.exe"),
+  ];
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  if (found) {
+    prependProcessPath(path.dirname(found));
+    return found;
+  }
+  return null;
+}
+
 function checkCommand(command: string): Promise<string | null> {
   const lookup = process.platform === "win32" ? "where" : "which";
   return new Promise((resolve) => {
@@ -877,6 +899,31 @@ async function setDefaultKimiModelWithSdk(input: unknown) {
     console.warn("[kimi-code] SDK setConfig(defaultModel) failed, falling back to TOML writer:", error);
     return setDefaultKimiModel(input);
   }
+}
+
+async function reloadIdleKimiCodeSessionsAfterConfigChange() {
+  try {
+    return await kimiCodeHost.reloadIdleSessions();
+  } catch (error) {
+    console.warn("[kimi-code] reload idle sessions after config change failed:", error);
+    return { reloaded: [], skipped: [], errors: [{ sessionId: "", message: error instanceof Error ? error.message : String(error) }] };
+  }
+}
+
+function buildConfigReloadSuffix(result: Awaited<ReturnType<typeof reloadIdleKimiCodeSessionsAfterConfigChange>>) {
+  if (result.reloaded.length > 0) return `，已重载 ${result.reloaded.length} 个空闲会话`;
+  if (result.skipped.length > 0) return "，当前运行中的会话会在下一轮或新会话中使用新配置";
+  return "";
+}
+
+async function runKimiDoctor() {
+  const kimiPath = await requireKimiExecutable();
+  const output = await runLongCommand(kimiPath, ["doctor"], 30_000);
+  return {
+    ok: true,
+    output: output.trim(),
+    message: output.trim() || "Kimi Code 配置诊断通过",
+  };
 }
 
 async function setKimiModelAdaptiveThinkingWithSdk(input: unknown) {
@@ -3671,6 +3718,7 @@ ipcMain.handle("hooks:generateRule", async (_, request: unknown) => {
 ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
   try {
     const kimiPath = await resolveKimiCommand();
+    const shellPath = await resolveGitBashCommand();
     if (!kimiPath) {
       return {
         success: true,
@@ -3680,7 +3728,26 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
           command: "kimi",
           version: null,
           isLegacy: false,
+          shellPath,
+          shellAvailable: Boolean(shellPath),
           message: "未找到 Kimi Code，请检查 PATH",
+        },
+      };
+    }
+    if (!shellPath) {
+      return {
+        success: true,
+        data: {
+          available: true,
+          verified: false,
+          command: "kimi",
+          path: kimiPath,
+          output: "Kimi Code 已安装，但未找到 Git Bash。Windows 上 Kimi Code 需要 Git for Windows 提供 shell 环境。",
+          version: null,
+          isLegacy: false,
+          shellPath: null,
+          shellAvailable: false,
+          message: "请先安装 Git for Windows，或设置 KIMI_SHELL_PATH 指向 bash.exe",
         },
       };
     }
@@ -3698,6 +3765,8 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
           output,
           version,
           isLegacy,
+          shellPath,
+          shellAvailable: true,
           message: isLegacy ? `检测到旧版 Kimi ${version ?? ""}，建议升级并迁移到 Kimi Code` : output || "Kimi Code 响应正常",
         },
       };
@@ -3715,6 +3784,8 @@ ipcMain.handle("kimi:checkCli", async (_, request?: { verify?: boolean }) => {
         output,
         version,
         isLegacy,
+        shellPath,
+        shellAvailable: true,
         message: isLegacy ? `已找到旧版 Kimi ${version ?? ""}，请升级并迁移` : "已找到 Kimi Code，点击检查验证响应",
       },
     };
@@ -3742,7 +3813,8 @@ ipcMain.handle("kimi:getModelConfig", async () => {
 ipcMain.handle("kimi:saveOpenAiProvider", async (_, request: unknown) => {
   try {
     const config = await saveOpenAiProviderConfigWithSdk(request);
-    return { success: true, data: { ...config, message: "已通过官方 SDK 保存 OpenAI-compatible Provider" } };
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已通过官方 SDK 保存 OpenAI-compatible Provider${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -3751,7 +3823,8 @@ ipcMain.handle("kimi:saveOpenAiProvider", async (_, request: unknown) => {
 ipcMain.handle("kimi:setDefaultModel", async (_, request: unknown) => {
   try {
     const config = await setDefaultKimiModelWithSdk(request);
-    return { success: true, data: { ...config, message: "已通过官方 SDK 切换默认模型" } };
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已通过官方 SDK 切换使用模型${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -3760,9 +3833,18 @@ ipcMain.handle("kimi:setDefaultModel", async (_, request: unknown) => {
 ipcMain.handle("kimi:setModelAdaptiveThinking", async (_, request: unknown) => {
   try {
     const config = await setKimiModelAdaptiveThinkingWithSdk(request);
-    return { success: true, data: { ...config, message: "已通过官方 SDK 更新自适应思考" } };
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已通过官方 SDK 更新自适应思考${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:doctorConfig", async () => {
+  try {
+    return { success: true, data: await runKimiDoctor() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? normalizeModelConfigError(err.message) : String(err) };
   }
 });
 
@@ -4009,6 +4091,37 @@ ipcMain.handle("kimi-code:resumeSession", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!sessionId) return { success: false, error: "Missing sessionId" };
     return { success: true, data: await kimiCodeHost.resumeSession(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:forkSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const title = typeof req.title === "string" ? req.title.trim().slice(0, 200) : undefined;
+    const forkId = typeof req.forkId === "string" && req.forkId.trim() ? req.forkId.trim() : undefined;
+    const data = await kimiCodeHost.forkSession(sessionId, {
+      forkId,
+      title: title || undefined,
+      metadata: { source: "kimix-fork", forkedFrom: sessionId },
+    });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:renameSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const title = typeof req.title === "string" ? req.title.trim().slice(0, 200) : "";
+    if (!sessionId || !title) return { success: false, error: "Missing sessionId or title" };
+    await kimiCodeHost.renameSession(sessionId, title);
+    return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -4347,6 +4460,16 @@ ipcMain.handle("kimi-code:listPlugins", async (_, request: unknown) => {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : undefined;
     return { success: true, data: await kimiCodeHost.listPlugins(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:listSkills", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : undefined;
+    return { success: true, data: await kimiCodeHost.listSkills(sessionId) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

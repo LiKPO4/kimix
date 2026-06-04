@@ -206,6 +206,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
   const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(settingsStatusCache.modelConfig);
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
+  const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [providerDraft, setProviderDraft] = useState({
     providerName: "deepseek",
@@ -296,6 +297,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     settingsStatusCache.modelConfigMessage = `读取模型配置失败：${res.error}`;
     setModelConfig(null);
     setModelConfigMessage(settingsStatusCache.modelConfigMessage);
+  };
+
+  const handleDoctorModelConfig = async () => {
+    if (typeof window.api.doctorKimiConfig !== "function") {
+      setModelConfigMessage("配置诊断接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
+      return;
+    }
+    setModelDoctorLoading(true);
+    setModelConfigMessage("正在诊断 Kimi Code 配置...");
+    try {
+      const res = await window.api.doctorKimiConfig();
+      if (res.success) {
+        const detail = res.data.output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join("；");
+        settingsStatusCache.modelConfigMessage = detail || res.data.message;
+        setModelConfigMessage(settingsStatusCache.modelConfigMessage);
+        return;
+      }
+      settingsStatusCache.modelConfigMessage = `配置诊断失败：${res.error}`;
+      setModelConfigMessage(settingsStatusCache.modelConfigMessage);
+    } catch (error) {
+      settingsStatusCache.modelConfigMessage = `配置诊断失败：${error instanceof Error ? error.message : String(error)}`;
+      setModelConfigMessage(settingsStatusCache.modelConfigMessage);
+    } finally {
+      setModelDoctorLoading(false);
+    }
   };
 
   const buildProviderPayload = () => {
@@ -660,7 +686,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         <div className="kimix-settings-body">
           <div className={`kimix-settings-columns ${variant === 'workspace' ? 'is-workspace' : ''}`}>
             <div className="kimix-settings-col">
-              <div ref={authSettingsRef} className="kimix-settings-section">
+              <div className="kimix-settings-section">
                 <div className="kimix-settings-section-title">
                   <Sun size={16} className="text-text-muted" />
                   <span>主题</span>
@@ -861,7 +887,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div ref={authSettingsRef} className="kimix-settings-section">
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     {auth?.loggedIn ? <ShieldCheck size={16} className="text-accent-success" /> : <ShieldX size={16} className="text-text-muted" />}
@@ -931,15 +957,26 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <Terminal size={16} className="text-text-muted" />
                     <span>模型配置</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void refreshModelConfig({ showLoading: true })}
-                    disabled={modelConfigLoading}
-                    className="kimix-settings-check-button"
-                  >
-                    <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
-                    <span>刷新</span>
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end" style={{ gap: 8, paddingLeft: 12 }}>
+                    <button
+                      type="button"
+                      onClick={() => void handleDoctorModelConfig()}
+                      disabled={modelDoctorLoading}
+                      className="kimix-settings-check-button"
+                    >
+                      <Terminal size={15} className={modelDoctorLoading ? "kimix-spin" : ""} />
+                      <span>诊断</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void refreshModelConfig({ showLoading: true })}
+                      disabled={modelConfigLoading}
+                      className="kimix-settings-check-button"
+                    >
+                      <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
+                      <span>刷新</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   <div className="flex items-start" style={{ gap: 12 }}>
@@ -967,6 +1004,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasOauth).length} 个已配置凭据
                           </div>
                         </div>
+                        {modelConfigMessage && (
+                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>{modelConfigMessage}</div>
+                        )}
                         <div className="flex flex-col" style={{ gap: 8, marginTop: 2 }}>
                           {modelConfig.models.slice(0, 3).map((model) => {
                             const selected = selectedModelAlias === model.alias || (!selectedModelAlias && model.isDefault);
@@ -1331,7 +1371,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.295 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.310 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

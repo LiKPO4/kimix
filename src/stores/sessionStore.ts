@@ -46,7 +46,7 @@ export const useSessionStore = create<SessionStore>((set) => ({
   pendingMessages: [],
 
   addSession: (session) =>
-    set((state) => ({ sessions: [session, ...state.sessions] })),
+    set((state) => ({ sessions: [session, ...state.sessions.filter((item) => item.id !== session.id)] })),
 
   updateSession: (id, updater) =>
     set((state) => ({

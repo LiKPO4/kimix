@@ -6,6 +6,7 @@ import type { Session, TimelineEvent } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 type SearchMatch = {
   session: Session;
@@ -103,7 +104,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     let cancelled = false;
     setLoadingHistory(true);
     Promise.all(unloaded.map(async (session) => {
-      const loaded = await window.api.loadSession({ workDir: session.projectPath, sessionId: session.id });
+      const loaded = await window.api.loadSession({ workDir: session.projectPath, sessionId: getRuntimeSessionId(session) ?? session.id });
       if (!loaded.success || cancelled) return;
       const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
       if (isHiddenInternalSession({ ...session, events })) return;
@@ -112,14 +113,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
         updateSession(session.id, (current) => ({
           ...current,
           events,
-          title: deriveSessionTitle(events, current.title),
+          title: current.titleLocked ? current.title : deriveSessionTitle(events, current.title),
           isLoading: false,
         }));
         return;
       }
       setSearchOnlySessions((current) => current.map((item) => (
         item.id === session.id
-          ? { ...item, events, title: deriveSessionTitle(events, item.title), isLoading: false }
+          ? { ...item, events, title: item.titleLocked ? item.title : deriveSessionTitle(events, item.title), isLoading: false }
           : item
       )));
     })).finally(() => {

@@ -38,6 +38,8 @@ type KimiHarnessLike = {
   };
   createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeSessionLike>;
   resumeSession(input: { id: string }): Promise<KimiCodeSessionLike>;
+  forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
+  renameSession?(input: { id: string; title: string }): Promise<void>;
   listSessions(options?: { workDir?: string; sessionId?: string }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
@@ -50,6 +52,7 @@ type KimiCodeSessionLike = {
   workDir: string;
   prompt(input: string | KimiCodePromptPart[]): Promise<void>;
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
+  reloadSession?(): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
   setThinking?(level: string): Promise<void>;
@@ -66,6 +69,7 @@ type KimiCodeSessionLike = {
   getBackgroundTaskOutput?(taskId: string, options?: { tail?: number }): Promise<string>;
   getBackgroundTaskOutputPath?(taskId: string): Promise<string | undefined>;
   stopBackgroundTask?(taskId: string, options?: { reason?: string }): Promise<void>;
+  listSkills?(): Promise<readonly KimiCodeSkillSummary[]>;
   listPlugins?(): Promise<readonly KimiCodePluginSummary[]>;
   installPlugin?(source: string): Promise<KimiCodePluginSummary>;
   setPluginEnabled?(id: string, enabled: boolean): Promise<void>;
@@ -202,6 +206,15 @@ export type KimiCodePluginSummary = {
   source: KimiCodePluginSource;
   originalSource?: string;
   github?: unknown;
+};
+
+export type KimiCodeSkillSummary = {
+  name: string;
+  description: string;
+  path: string;
+  source: string;
+  type?: string;
+  disableModelInvocation?: boolean;
 };
 
 export type KimiCodeConfig = {
@@ -402,10 +415,74 @@ export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSe
   return registerSession(session, "idle", resumedPermission);
 }
 
+export async function forkSession(
+  sessionId: string,
+  options: { forkId?: string; title?: string; metadata?: JsonObject } = {},
+): Promise<KimiCodeEngineSession> {
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.forkSession) throw new Error("当前 Kimi Code SDK 不支持会话派生。");
+  const session = await sdkHarness.forkSession({
+    id: sessionId,
+    forkId: options.forkId,
+    title: options.title,
+    metadata: options.metadata,
+  });
+  let forkPermission: KimiCodePermissionMode = "manual";
+  try {
+    const status = await session.getStatus();
+    if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
+      forkPermission = status.permission;
+    }
+  } catch {
+    // Best effort: keep the fork usable even if status hydration is unavailable.
+  }
+  return registerSession(session, "idle", forkPermission);
+}
+
+export async function renameSession(sessionId: string, title: string): Promise<void> {
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.renameSession) throw new Error("当前 Kimi Code SDK 不支持会话重命名。");
+  await sdkHarness.renameSession({ id: sessionId, title });
+}
+
+export async function reloadSession(sessionId: string): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.reloadSession) throw new Error("当前 Kimi Code SDK 不支持会话重载。");
+  await managed.session.reloadSession();
+}
+
+export async function reloadIdleSessions(): Promise<{ reloaded: string[]; skipped: string[]; errors: { sessionId: string; message: string }[] }> {
+  const reloaded: string[] = [];
+  const skipped: string[] = [];
+  const errors: { sessionId: string; message: string }[] = [];
+  for (const [sessionId, managed] of sessions) {
+    if (!managed.session.reloadSession) {
+      skipped.push(sessionId);
+      continue;
+    }
+    if (managed.status === "running" || managed.status === "waiting_approval" || managed.status === "waiting_question") {
+      skipped.push(sessionId);
+      continue;
+    }
+    try {
+      await managed.session.reloadSession();
+      reloaded.push(sessionId);
+    } catch (error) {
+      errors.push({ sessionId, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { reloaded, skipped, errors };
+}
+
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
   const managed = getManagedSession(sessionId);
   setStatus(sessionId, "running");
-  await managed.session.prompt(input);
+  try {
+    await managed.session.prompt(input);
+  } catch (error) {
+    setStatus(sessionId, "error");
+    throw error;
+  }
 }
 
 export async function askBtw(
@@ -627,6 +704,12 @@ export async function listPlugins(sessionId?: string): Promise<KimiCodePluginSum
   const session = await resolvePluginSession(sessionId);
   if (!session.listPlugins) throw new Error("Official Kimi Code SDK does not expose listPlugins on this session");
   return [...await session.listPlugins()];
+}
+
+export async function listSkills(sessionId?: string): Promise<KimiCodeSkillSummary[]> {
+  const session = await resolvePluginSession(sessionId);
+  if (!session.listSkills) throw new Error("Official Kimi Code SDK does not expose listSkills on this session");
+  return [...await session.listSkills()];
 }
 
 export async function installPlugin(source: string, sessionId?: string): Promise<KimiCodePluginSummary> {

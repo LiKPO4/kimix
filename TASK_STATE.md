@@ -2315,3 +2315,246 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `git diff --check` 通过。
 ## 下一步
 - 提交并推送 release notes 来源修复。
+
+# 2026-06-04 修复 Markdown 代码块复制
+## 当前目标
+- 修复 Markdown 代码块点击“复制”后出现大量 `[object Object]`，复制内容不等于显示内容的问题。
+## 已完成
+- 确认根因在 Kimix：`MarkdownRenderer` 的 `CodeBlock` 使用 `String(children)` 生成复制文本；代码高亮后 `children` 是 React 节点数组，直接转字符串会得到 `[object Object]`。
+- 新增 `nodeText()` 递归提取 React 节点中的纯文本，代码块复制改用该纯文本。
+- 版本号三处同步到 v2.8.296。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-DqLGUpv2.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户复验 markdown/lua 等带高亮代码块的复制内容。
+
+# 2026-06-04 检查复制对象串残留风险
+## 当前目标
+- 全局检查是否还有其它复制入口可能把 React 节点复制成 `[object Object]`。
+## 已完成
+- 扫描 `navigator.clipboard.writeText` / `copyToClipboard` / `String(children)` 等路径。
+- 确认消息复制、全部复制、会话 Markdown 复制、Plan/后台任务复制、错误详情复制均传入原始字符串字段，不会出现 ReactNode 转字符串问题。
+- 将 `MarkdownRenderer` 内联 code 的 block 判断也从 `String(children)` 改为 `nodeText(children)`，消除同源残留风险。
+- 版本号三处同步到 v2.8.297。
+## 验证
+- `rg` 未再发现 `String(children)` 或把 `children` 直接写入剪贴板的路径。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-84Zkp01f.js`。
+## 下一步
+- 验证通过后，请用户复验代码块复制和普通 inline code 显示。
+
+# 2026-06-04 修复设置页登录聚焦位置
+## 当前目标
+- 修复安装 Kimi Code 后进入设置页时没有聚焦到 `Kimi 登录` 区块的问题。
+## 已完成
+- 确认根因：`authSettingsRef` 错挂到设置页其它区块，`kimix:focus-auth-settings` 事件会滚到错误位置。
+- 将 `authSettingsRef` 挪到 `Kimi 登录` 外层区块。
+- 版本号三处同步到 v2.8.298。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-BcWlv3GV.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户复验旧版升级并安装 Kimi Code 后，是否自动进入设置页并聚焦到 `Kimi 登录`。
+
+# 2026-06-04 修复左侧栏折叠态入口
+## 当前目标
+- 修复左侧栏折叠后图标列不齐、图标按钮高度和展开态不一致、长程任务与设置入口缺失的问题。
+## 已完成
+- 折叠态入口统一为 `40x40` 图标按钮，外层左侧 padding 调整到固定 10px，使图标列中心线与顶部折叠按钮一致。
+- 顶部折叠按钮在折叠态使用更小左边距，与左侧图标列水平对齐。
+- 折叠态恢复 `长程任务` 入口，并在底部恢复 `设置` 入口。
+- 版本号三处同步到 v2.8.299。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CIFS88JT.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户复验折叠态图标对齐、按钮高度，以及长程任务/设置入口是否可见可点。
+
+# 2026-06-04 微调左侧栏折叠/展开几何基准
+## 当前目标
+- 修复展开态顶部折叠按钮未与导航图标水平对齐、折叠态导航按钮纵向位置变化、折叠态设置入口未保持原底部高度的问题。
+## 已完成
+- 展开态顶部折叠按钮左边距改为 18px，对齐展开侧栏导航图标中心线。
+- 折叠态导航列移除额外顶部 padding，按钮仍保持 `40x40`，避免折叠前后顶部入口高度漂移。
+- 折叠态设置入口改为 `40x36`，底部 padding 调整为 18px，与展开态设置入口的底部中心位置一致。
+- 版本号三处同步到 v2.8.300。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-D-MzAhxU.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户复验展开/折叠两态的顶部折叠按钮、导航按钮和底部设置入口位置。
+
+# 2026-06-04 修正侧栏折叠态未生效根因
+## 当前目标
+- 判断 v2.8.300 侧栏对齐改动看起来未生效的原因，并修复真正的结构问题。
+## 已完成
+- 确认用户截图已显示 v2.8.300，因此不是旧版本缓存；根因是折叠态 `<aside>` 缺少 `h-full`，`mt-auto` 无法把设置入口压到底。
+- 折叠态侧栏补 `h-full`，导航按钮间距改为 4px，与展开态 `space-y-1` 一致。
+- 展开态顶部折叠按钮左边距改为 24px，按截图做视觉中心补偿。
+- 版本号三处同步到 v2.8.301。
+## 验证
+- 已清理 `out/`、`node_modules/.vite/`、`node_modules/.cache/` 后重跑 `pnpm build`，通过，renderer hash：`assets/index-BsVQGJi1.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户用 v2.8.301 复验展开/折叠态侧栏。
+
+# 2026-06-04 侧栏按钮改为显式盒模型
+## 当前目标
+- 修复 v2.8.301 中顶部折叠按钮仍未与侧栏按钮对齐、折叠态设置入口仍未贴底的问题。
+## 已完成
+- 顶部折叠按钮改为显式 `40x40` 热区，展开态按展开侧栏按钮左边界对齐，折叠态按折叠侧栏按钮左边界对齐。
+- 折叠态导航按钮去掉 Tailwind 高宽类，改用 inline `width/height/minHeight/padding` 固定为 `40x40`。
+- 折叠态设置按钮使用 inline `marginTop: auto` 和 `40x36`，避免 `mt-auto` 类名没有压到底。
+- 版本号三处同步到 v2.8.302。
+## 验证
+- 已清理 `out/`、`node_modules/.vite/`、`node_modules/.cache/` 后重跑 `pnpm build`，通过，renderer hash：`assets/index-BRBkvdCz.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户用 v2.8.302 复验展开和折叠两态。
+
+# 2026-06-04 接入官方会话派生
+## 当前目标
+- 按官方 Kimi Code 0.9 能力盘点顺序，先接入 SDK 已暴露的 `KimiHarness.forkSession()`，替代顶部会话菜单里的占位项。
+## 已完成
+- `electron/kimiCodeHost.ts` 新增 `forkSession()` 包装，并读取派生会话的权限状态后注册为 Kimix 托管会话。
+- `electron/main.ts` / `electron/preload.ts` / `electron/types/ipc.ts` 新增 `kimi-code:forkSession` / `forkKimiCodeSession` IPC 链路。
+- 顶部更多菜单的“派生到本地”改为真实动作：当前会话为 Kimi Code、非长程任务、非运行中且有官方 runtime session id 时可用；派生后创建并切换到新对话。
+- 版本号三处同步到 v2.8.303。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-BC5wBQMu.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验顶部更多菜单“派生到本地”是否生成新对话并保留原会话历史。
+
+# 2026-06-04 接入官方会话重命名
+## 当前目标
+- 将顶部更多菜单里的“重命名对话”接入官方 `KimiHarness.renameSession()`，对应官方标题能力。
+## 已完成
+- `electron/kimiCodeHost.ts` 新增 `renameSession()` 包装，调用官方 SDK 写入会话标题。
+- `electron/main.ts` / `electron/preload.ts` / `electron/types/ipc.ts` 新增 `kimi-code:renameSession` / `renameKimiCodeSession` IPC 链路。
+- Kimi Code 会话重命名改为先写官方标题，成功后再更新 Kimix 本地标题；非 Kimi Code 会话仍保持本地重命名。
+- 版本号三处同步到 v2.8.304。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-W_SDuD4s.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验重命名后重新打开会话列表/侧栏，标题是否保持一致。
+
+# 2026-06-04 增强官方 SDK Skills 状态
+## 当前目标
+- 按 Kimi Code 0.9 可接能力顺序，补齐插件页对官方 SDK 已加载 Skills 的直接展示。
+## 已完成
+- `electron/kimiCodeHost.ts` 新增 `listSkills()` 包装，调用官方 `Session.listSkills()`。
+- `electron/main.ts` / `electron/preload.ts` / `electron/types/ipc.ts` 新增 `kimi-code:listSkills` / `listKimiCodeSkills` IPC 链路。
+- 插件页“官方 SDK 插件状态”刷新时并行读取 Plugin 与 Skill，并在同一卡片内展示已加载 Skills 数量和前 5 个摘要。
+- 版本号三处同步到 v2.8.305。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-ddL1NBdg.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验插件页官方 SDK 状态卡，确认 Skills 摘要是否有助于判断当前会话加载能力。
+
+# 2026-06-04 修复重命名与 Markdown 回归
+## 当前目标
+- 修复 v2.8.305 验收反馈：旧对话打开时报 `React is not defined`，点击重命名时报 `prompt() is not supported`，派生到本地缺少可见反馈。
+## 已完成
+- `MarkdownRenderer` 显式导入 `React`，修复 `nodeText()` 使用 `React.isValidElement()` 时的运行时引用错误。
+- 顶部更多菜单“重命名对话”从原生 `window.prompt` 改为 Kimix 自有弹窗，避免 Electron 环境不支持 prompt。
+- “派生到本地”的新会话标题改为 `原标题 · 分支 HH:mm`，成功 toast 明确提示已切换到哪个分支会话。
+- 版本号三处同步到 v2.8.306。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-h-48lRzY.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验旧对话打开、重命名弹窗、派生到本地三处行为。
+
+# 2026-06-04 修复派生会话覆盖感
+## 当前目标
+- 修复“派生到本地”后原本对话像是消失/被替换的问题，确保派生一定生成独立新会话。
+## 已完成
+- 派生时显式生成 `kimix-fork-<uuid>` 作为 `forkId` 传给官方 `forkSession()`，不再依赖官方默认生成。
+- 派生返回后校验新会话 id 不得等于原 runtime session id 或当前本地 id；如果官方返回原 id，直接中止并提示，不切换会话。
+- `addSession` 改为按 id 去重后置顶新会话，避免重复 id 造成列表混乱。
+- 派生成功 toast 明确说明“原对话仍保留在左侧列表”。
+- 版本号三处同步到 v2.8.307。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CdMc2SiU.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验派生后左侧列表是否同时保留原对话和新分支对话。
+
+# 2026-06-04 修复派生列表与标题锁定
+## 当前目标
+- 修复派生后左侧只显示原对话、不显示分支对话，以及手动重命名标题在下一轮对话后回退的问题。
+## 已完成
+- 新增 `Session.titleLocked`，手动重命名和派生分支标题会锁定，事件流、侧栏历史加载、搜索历史加载、撤销刷新均尊重锁定标题。
+- 派生会话改为本地 UI id 与官方 runtime id 分离：左侧使用 `local-fork-<uuid>`，官方调用继续使用 `runtimeSessionId/officialSessionId`。
+- 派生会话强制挂到当前项目路径下显示，避免官方返回 workDir 格式差异导致跑到其它项目分组。
+- 侧栏和搜索加载空历史会话时改用 `getRuntimeSessionId(session)` 读取官方历史，兼容本地 UI id。
+- 版本号三处同步到 v2.8.308。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-B_w046hW.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验：派生后左侧同时显示原对话和分支对话；重命名后继续对话标题不再回退。
+
+# 2026-06-04 修复派生分支 active turn 残留
+## 当前目标
+- 修复派生分支第一次发消息出现无计时执行头、切换会话后再发报 `Cannot launch a new turn while another turn is active` 的问题。
+## 已完成
+- `electron/kimiCodeHost.ts` 的 `sendPrompt()` 在 SDK prompt 抛错时将托管会话状态置为 `error`，避免失败后 UI 残留执行中状态。
+- `sendKimiCodePromptWithRetry()` 多次遇到 active-turn 拒绝后，会对同一 runtime session 执行一次 cancel，再重发一次，清理官方残留 active turn。
+- 派生成功后、读取分支历史前，对 fork 出来的官方 runtime session 先 best-effort cancel 一次，避免新分支继承原会话的半活跃轮次。
+- 版本号三处同步到 v2.8.309。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-B3aT5L7-.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows 换行转换警告。
+## 下一步
+- 验证通过后，请用户复验：派生分支首次发送应正常出现计时与后续输出，不再报 active turn。
+
+# 2026-06-05 适配 Kimi Code 0.10.0 基础能力
+## 当前目标
+- 跟进官方 Kimi Code 0.10.0，先升级 vendored SDK 并接入可稳定落地的 P0/P1 能力。
+## 已完成
+- 研究仓库切到 `@moonshot-ai/kimi-code@0.10.0`，对应 commit `12d062d48e32f8c19626b7236278cba598e60c37`，`packages/node-sdk` 版本为 `0.8.0`。
+- 重生成 `vendor/kimi-code-sdk/index.mjs`，更新 `vendor/kimi-code-sdk/README.md` provenance 到 0.10.0 / node-sdk 0.8.0。
+- 重跑 `node scripts/probe-kimi-code-sdk.mjs`：15 通过 / 4 已知失败 / 1 跳过；本机 `kimi --version` 为 0.10.0，`--wire` 原始 CLI 启动仍不是公开入口，SDK npm 仍 404，官方 runtime bundle 可用，`build:dts` 仍是 Windows `spawn EINVAL`。
+- 接入官方 0.10.0 的 `Session.reloadSession()`：保存 OpenAI-compatible Provider、切换使用模型、更新自适应思考后，会 best-effort 重载空闲 Kimi Code 会话；运行中会话不打断。
+- 设置页模型配置新增 `诊断` 按钮，调用 `kimi doctor` 校验 Kimi Code 配置，并显示简短诊断结果。
+- Windows 连接检测新增 Git Bash 预检，覆盖 `bin\\bash.exe` 与 `usr\\bin\\bash.exe` 常见安装路径；缺失时提示安装 Git for Windows 或设置 `KIMI_SHELL_PATH`。
+- 版本号三处同步到 v2.8.310。
+## 未完成 / 暂不接
+- `/goal next` 属于官方实验目标队列，且官方文档明确是 TUI 专属队列；与 Kimix 自制长程任务冲突，暂不接入 GUI 主线。
+- `update-config` 是官方内置 Skill，本轮不另做 GUI 包装；Kimix 已通过模型配置表单和 doctor 覆盖主要配置路径。
+## 下一步
+- 跑 `pnpm build`、`pnpm test:run`、`git diff --check` 验证 v2.8.310。
+
+# 2026-06-05 v2.8.310 验证
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-B1mz8Ozn.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+- `kimi doctor` 通过：`config.toml` 与 `tui.toml` 均有效。
+## 下一步
+- 请用户在 v2.8.310 复验设置页“模型配置 -> 诊断”、配置保存/切换后的会话 reload 行为，以及 Windows 缺 Git Bash 场景的提示文案。
+
+# 2026-06-05 v2.8.310 提交前 review
+## Review 结论
+- 已全局 review 本轮 0.10.0 相关 diff：SDK host、IPC、设置页、会话派生/重命名、Skills 状态、标题锁定、Markdown 复制、侧栏折叠和文档记录。
+- 修复 review 中发现的设置页模型配置按钮组窄列挤压风险：诊断/刷新按钮组允许换行并保留右侧操作区留白。
+- 修复 `doctorKimiConfig` renderer 调用异常时可能残留 loading 的健壮性问题，改为 try/catch/finally。
+## 最终验证
+- `pnpm build` 通过，renderer hash：`assets/index-BKZKKait.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+- `kimi doctor` 通过：`config.toml` 与 `tui.toml` 均有效。
+## 下一步
+- 提交并推送 master；暂不打 tag、不发 release。

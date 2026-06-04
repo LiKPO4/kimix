@@ -153,13 +153,20 @@
 - **后果**：本地构建环境与 GitHub Actions 不一致，可能导致产物差异；手动上传覆盖 Actions 输出，造成 Release 混乱。
 - **正确做法**：只推送标签触发 GitHub Actions，让 CI 统一构建和发布。
 
+### 错误教训（2026-06-04）
+
+- **问题**：发布 `v2.8.292`、`v2.8.295` 时没有为对应 tag 更新专属 Release notes，GitHub Actions fallback 到根目录 `RELEASE_NOTES.md`，导致两个版本都复用了旧的 `v2.8.106` 说明。
+- **后果**：Release 页面展示内容与实际版本不一致，用户无法判断本次更新真实包含什么，也会误导后续排查。
+- **正确做法**：每次发 tag 前必须新增或更新 `docs/release-notes/vX.Y.Z.md`，内容对应本次版本；`RELEASE_NOTES.md` 只作为 fallback，不得作为长期唯一来源。
+
 ### 正确流程
 
 1. 确保版本号三处同步：`package.json` + `Sidebar.tsx` + `SettingsPanel.tsx`
-2. 提交并推送代码到 `master`
-3. 推送标签：`git tag vX.Y.Z && git push origin vX.Y.Z`
-4. GitHub Actions 会自动构建 Windows/Mac/Linux 并发布到 Release
-5. 构建状态查看：https://github.com/LiKPO4/kimix/actions
+2. 新增或更新对应版本的 Release notes：`docs/release-notes/vX.Y.Z.md`，并确认标题和内容不是旧版本复制残留
+3. 提交并推送代码到 `master`
+4. 推送标签：`git tag vX.Y.Z && git push origin vX.Y.Z`
+5. GitHub Actions 会自动构建 Windows/Mac/Linux，并优先用 `docs/release-notes/vX.Y.Z.md` 发布到 Release
+6. 构建状态查看：https://github.com/LiKPO4/kimix/actions
 
 ### GitHub Token
 

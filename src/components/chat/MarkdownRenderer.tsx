@@ -1,3 +1,4 @@
+import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -26,10 +27,20 @@ function updateHljsTheme() {
   hljsLinkEl.href = isDark ? githubDarkCssUrl : githubCssUrl;
 }
 
+function nodeText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return nodeText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+  }
+  return "";
+}
+
 function CodeBlock({ className, children, wrapLongLines }: { className?: string; children?: React.ReactNode; wrapLongLines: boolean }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const codeText = String(children ?? "").replace(/\n$/, "");
+  const codeText = nodeText(children).replace(/\n$/, "");
 
   useEffect(() => () => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
@@ -129,7 +140,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
       ),
       li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
       code: ({ className: codeClassName, children }: { className?: string; children?: React.ReactNode }) => {
-        const content = String(children ?? "");
+        const content = nodeText(children);
         const isBlock = Boolean(codeClassName) || content.includes("\n");
         if (!isBlock) {
           return (

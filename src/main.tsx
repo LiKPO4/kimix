@@ -23,6 +23,7 @@ import type {
   KimiCodeListMarketplaceResponse,
   KimiCodeLoadSessionResponse,
   KimiCodeListPluginsResponse,
+  KimiCodeListSkillsResponse,
   KimiCodePluginResponse,
   KimiCodeSessionResponse,
   KimiCodeStatusResponse,
@@ -293,6 +294,14 @@ function installBrowserPreviewApi() {
         }],
       },
     }),
+    doctorKimiConfig: () => Promise.resolve({
+      success: true,
+      data: {
+        ok: true,
+        output: "浏览器预览已模拟 Kimi Code 配置诊断通过",
+        message: "浏览器预览已模拟 Kimi Code 配置诊断通过",
+      },
+    }),
     testKimiOpenAiProvider: () => Promise.resolve({
       success: true,
       data: {
@@ -352,6 +361,8 @@ function installBrowserPreviewApi() {
     startKimiVis: (): Promise<VoidResponse> => fail("启动 Kimi Agent Tracing Visualizer"),
     createKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("创建 Kimi Code SDK 会话"),
     resumeKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("恢复 Kimi Code SDK 会话"),
+    forkKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("派生 Kimi Code SDK 会话"),
+    renameKimiCodeSession: (): Promise<VoidResponse> => fail("重命名 Kimi Code SDK 会话"),
     sendKimiCodePrompt: (): Promise<VoidResponse> => fail("发送 Kimi Code SDK 消息"),
     askKimiCodeBtw: () => Promise.resolve({ success: false, error: unsupported("使用 Kimi Code BTW 侧问") }),
     steerKimiCode: (): Promise<VoidResponse> => fail("发送 Kimi Code SDK 引导"),
@@ -373,6 +384,7 @@ function installBrowserPreviewApi() {
     stopKimiCodeBackgroundTask: (): Promise<VoidResponse> => fail("停止 Kimi Code SDK 后台任务"),
     listKimiCodeSessions: (): Promise<KimiCodeListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
     listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> => Promise.resolve({ success: true, data: [] }),
+    listKimiCodeSkills: (): Promise<KimiCodeListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
     loadKimiCodeSession: (): Promise<KimiCodeLoadSessionResponse> => fail("加载 Kimi Code SDK 会话历史"),
     closeKimiCodeSession: (): Promise<VoidResponse> => fail("关闭 Kimi Code SDK 会话"),
     listKimiCodePlugins: (): Promise<KimiCodeListPluginsResponse> => fail("读取 Kimi Code SDK 插件列表"),
