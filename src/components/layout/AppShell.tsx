@@ -345,7 +345,11 @@ export function AppShell() {
         output: res.data.output,
       });
       setKimiOnboardingDismissed(true);
-      showToast("Kimi Code 已安装，接下来请执行登录");
+      setWorkspaceView("settings");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings"));
+      }, 120);
+      showToast("Kimi Code 已安装，请在设置页完成登录");
       const cliRes = await window.api.checkKimiCliUpdate?.();
       if (cliRes?.success) {
         setCliUpdateState({
@@ -1506,7 +1510,12 @@ export function AppShell() {
         onKimiDismiss={() => setKimiOnboardingDismissed(true)}
         onKimiInstall={installKimiCliFromOnboarding}
         onKimiCheck={checkKimiForOnboarding}
-        onKimiOpenSettings={() => setWorkspaceView("settings")}
+        onKimiOpenSettings={() => {
+          setWorkspaceView("settings");
+          window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings"));
+          }, 80);
+        }}
         copyToClipboard={copyToClipboard}
         launchCommandOpen={launchCommandDialogOpen}
         launchCommandDraft={launchCommandDraft}

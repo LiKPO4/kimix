@@ -217,13 +217,13 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, sessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
   switch (event.type) {
     case "user_message":
     case "steer_message":
-      return <MessageBubble event={event} />;
+      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />;
     case "assistant_message":
-      return <MessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -535,7 +535,11 @@ function collapseCompletedCompactions(events: TimelineEvent[]): TimelineEvent[] 
   });
 }
 
-function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string): boolean {
+function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string, runtimeSessionId?: string): boolean {
+  const isRunningThisSession = Boolean(sessionId && (
+    runningSessionId === sessionId ||
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
+  ));
   return events.some((event) => {
     const type = (event as { type?: unknown }).type;
     if (type === "user_message") {
@@ -553,13 +557,13 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
       const hasText =
         (typeof content === "string" && content.trim().length > 0) ||
         (typeof thinking === "string" && thinking.trim().length > 0);
-      const isActiveThinking = Boolean(sessionId && runningSessionId === sessionId && event.isThinking && !event.isComplete);
+      const isActiveThinking = Boolean(isRunningThisSession && event.isThinking && !event.isComplete);
       return hasText || isActiveThinking;
     }
     if (type === "tool_result") return false;
     if (type === "status_update") {
       const message = (event as { message?: unknown }).message;
-      return (typeof message === "string" && message.trim().length > 0) || Boolean(runningSessionId === sessionId);
+      return (typeof message === "string" && message.trim().length > 0) || isRunningThisSession;
     }
     if (
       type === "tool_call" ||
@@ -762,8 +766,12 @@ export function ChatThread() {
     }
   };
 
-  const hasActiveTurn = Boolean(session && runningSessionId === session.id);
-  const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id));
+  const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
+  const hasActiveTurn = Boolean(session && (
+    runningSessionId === session.id ||
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
+  ));
+  const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;
   }
@@ -794,7 +802,7 @@ export function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
+                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
               }
             </div>
           ))}

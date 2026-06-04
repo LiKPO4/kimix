@@ -2257,3 +2257,45 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `pnpm build` 通过。
 ## 下一步
 - 提交并推送 `master`，推送 `v2.8.292` tag，由 GitHub Actions 自动构建并发布 Release。
+
+# 2026-06-04 修复安装后登录引导
+## 当前目标
+- 修复旧版 Kimix 更新后安装新版 Kimi Code，下一步登录没有明确跳转的问题。
+## 已完成
+- 安装 Kimi Code 成功后，Kimix 自动进入设置页并聚焦到 `Kimi 登录` 区域，toast 改为提示在设置页完成登录。
+- onboarding 和更新弹窗中“安装后登录”的文案改为引导用户使用设置页登录，不再要求用户自行去终端运行 `/login`。
+- 设置页新增 `kimix:focus-auth-settings` 聚焦事件，进入登录区时顺手刷新登录状态。
+- 版本号三处同步到 v2.8.293。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-yPuyDNsf.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 构建通过后，请用户用旧版更新到 v2.8.293 路径复验安装后是否自动跳到登录区域。
+
+# 2026-06-04 修复执行中本轮计时丢失
+## 当前目标
+- 修复 assistant 处于“执行中”时，状态行不显示本轮耗时的问题。
+## 已完成
+- `MessageBubble` 不再自行从全局 `currentSession` 推断活跃轮次，改由 `ChatThread` 显式传入当前渲染 session 的 `sessionId` 和 `runtimeSessionId`。
+- 活跃轮次判断同时兼容 Kimix 本地 session id 和官方 runtime session id，避免官方 SDK 回报 runtime id 时计时被隐藏。
+- `ChatThread` 空态判断也同步兼容 runtime session id，减少运行中误判。
+- 版本号三处同步到 v2.8.294。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CjBemWGb.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户复验执行中状态行应显示类似 `执行中 12s`。
+
+# 2026-06-04 修复思考内容编号粘连显示
+## 当前目标
+- 判断思考内容中编号列表偶发粘连换行是官方输出问题还是 Kimix 展示问题，并修复可控部分。
+## 已完成
+- 对照用户导出的 md，确认原始导出中的思考编号列表本身有换行，不属于必须忽略的官方输出问题。
+- `ThinkingProcessItem` 展开内容从 `<pre>` 纯文本改为 `MarkdownRenderer`，让编号列表按 Markdown 规则显示。
+- 新增窄范围显示层修正：仅对 `1. ...2. ...3. ...` 这类编号粘连补换行，不改原始会话数据和导出内容。
+- 版本号三处同步到 v2.8.295。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-BhgAitEU.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 验证通过后，请用户复验思考展开内容中编号列表的换行。

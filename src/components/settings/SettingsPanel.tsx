@@ -223,6 +223,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [selectedCatalogProviderId, setSelectedCatalogProviderId] = useState("");
   const [selectedCatalogModelId, setSelectedCatalogModelId] = useState("");
   const [selectedModelAlias, setSelectedModelAlias] = useState("");
+  const authSettingsRef = useRef<HTMLDivElement>(null);
   const modelSettingsRef = useRef<HTMLDivElement>(null);
   const [connection, setConnection] = useState<KimiConnectionStatus>(
     settingsStatusCache.connection ?? { loading: true, available: null, verified: false, message: "正在查找 Kimi Code" },
@@ -578,6 +579,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     return () => window.removeEventListener("kimix:focus-model-settings", handleFocusModelSettings);
   }, []);
 
+  useEffect(() => {
+    const handleFocusAuthSettings = () => {
+      void refreshAuth({ showLoading: false });
+      window.setTimeout(() => {
+        authSettingsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+    };
+    window.addEventListener("kimix:focus-auth-settings", handleFocusAuthSettings);
+    return () => window.removeEventListener("kimix:focus-auth-settings", handleFocusAuthSettings);
+  }, []);
+
   if (!settingsOpen && variant === "modal") return null;
 
   const themes: { value: Theme; label: string; icon: typeof Sun }[] = [
@@ -648,7 +660,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         <div className="kimix-settings-body">
           <div className={`kimix-settings-columns ${variant === 'workspace' ? 'is-workspace' : ''}`}>
             <div className="kimix-settings-col">
-              <div className="kimix-settings-section">
+              <div ref={authSettingsRef} className="kimix-settings-section">
                 <div className="kimix-settings-section-title">
                   <Sun size={16} className="text-text-muted" />
                   <span>主题</span>
@@ -1319,7 +1331,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.292 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.295 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

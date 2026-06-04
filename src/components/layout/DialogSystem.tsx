@@ -93,8 +93,8 @@ function KimiOnboardingDialog({
           <div className="text-[13px] font-medium leading-5 text-text-secondary">推荐步骤</div>
           <div className="mt-2 grid gap-2 text-[13.5px] leading-6 text-text-secondary">
             <div>1. 点击"一键安装"，或使用官方脚本安装 Kimi Code。</div>
-            <div>2. 安装完成后，在系统终端运行 <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 font-mono text-[12.5px] text-text-primary">kimi</span>，再输入 <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 font-mono text-[12.5px] text-text-primary">/login</span> 完成登录。</div>
-            <div>3. 重启 Kimix 或点击"重新检测"。</div>
+            <div>2. 安装完成后，进入设置页的 <span className="font-medium text-text-primary">Kimi 登录</span>，点击"登录"并在浏览器中完成授权。</div>
+            <div>3. 登录完成后返回 Kimix，点击"刷新"或重新发送消息。</div>
           </div>
           <div className="mt-4 rounded-lg border border-border-subtle bg-surface-elevated font-mono text-[12.5px] leading-5 text-text-primary" style={{ padding: "12px 12px" }}>
             {KIMI_CODE_WINDOWS_INSTALL_COMMAND}
@@ -452,7 +452,7 @@ function HelpDialogPanel({
                   {(cliUpdateState.info?.available === false || cliUpdateState.info?.isLegacy) && (
                     <div className="mt-3 rounded-lg border border-accent-primary-soft bg-accent-primary-light text-[13px] leading-6 text-accent-primary-dark" style={{ padding: "12px 14px" }}>
                       {cliUpdateState.info?.available === false
-                        ? "当前没有找到 kimi 命令。请先安装新版 Kimi Code，安装完成后打开终端运行 kimi /login。"
+                        ? "当前没有找到 kimi 命令。请先安装新版 Kimi Code，安装完成后进入设置页的 Kimi 登录完成授权。"
                         : "当前是旧版 Kimi。升级到新版 Kimi Code 后，请在终端运行 kimi migrate，并重新执行 /login 与 MCP 授权。"}
                     </div>
                   )}

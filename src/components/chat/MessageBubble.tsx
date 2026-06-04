@@ -11,6 +11,8 @@ import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
+  sessionId?: string;
+  runtimeSessionId?: string;
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[];
@@ -262,6 +264,12 @@ function firstThinkingSentence(text: string) {
   return normalized.length > first.length ? `${first}...` : first || "思考内容";
 }
 
+function normalizeThinkingMarkdown(text: string) {
+  return text
+    .replace(/([^\n])(\d+\.[^\d\s])/g, "$1\n$2")
+    .replace(/([^\n])(\d+\.\s)/g, "$1\n$2");
+}
+
 function describeTool(tool: ToolEvent) {
   const command = typeof tool.arguments.command === "string"
     ? tool.arguments.command
@@ -358,9 +366,9 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         )}
       </button>
       {expanded && (
-        <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
-          {block.text}
-        </pre>
+        <div className="kimix-soft-card-strong mt-1 min-w-0 rounded-lg text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
+          <MarkdownRenderer content={normalizeThinkingMarkdown(block.text)} wrapLongLines />
+        </div>
       )}
     </div>
   );
@@ -585,20 +593,18 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
   );
 }
 
-function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
-  const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const hasContent = event.content.trim().length > 0;
   const changedSet = new Set(changedFiles.map((f) => f.toLowerCase()));
   const mdArtifacts = Array.from(new Set(
     event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
   )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
-  const activeRuntimeSessionId = currentSession ? getRuntimeSessionId(currentSession) : undefined;
-  const isActiveAssistant = Boolean(currentSession?.id && !event.isComplete && (
-    runningSessionId === currentSession.id ||
-    Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
+  const isActiveAssistant = Boolean(sessionId && !event.isComplete && (
+    runningSessionId === sessionId ||
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
@@ -710,12 +716,12 @@ function AssistantMessageBubble({ event, leadingTools = [], leadingSubagents = [
   );
 }
 
-export function MessageBubble({ event, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }
