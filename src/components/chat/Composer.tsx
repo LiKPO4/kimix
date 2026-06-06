@@ -43,8 +43,8 @@ const DRAWING_BOARD_RATIOS: DrawingBoardRequest["ratio"][] = ["1:1", "4:3", "3:4
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
 
 const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
-  auto: "【Kimix 需求澄清工具：自动判断】\n请先判断用户需求是否足够明确。若当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，可以使用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；若当前处于 prompt/auto 等禁止向用户提问的模式，请不要调用 AskUserQuestion，也不要解释本规则，按官方要求做合理判断并继续。",
-  on: "【Kimix 需求澄清工具：开启】\n请在开始执行前做需求澄清检查。若当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，优先使用官方 AskUserQuestion 结构化提问能力提出 1-3 个简短问题；若当前处于 prompt/auto 等禁止向用户提问的模式，请不要调用 AskUserQuestion，也不要解释本规则，按官方要求做合理判断并继续。",
+  auto: "【Kimix 需求澄清：自动判断】\n请先判断用户需求是否足够明确。若缺少会影响目标、范围、验收或风险边界的关键信息，且当前环境允许提问，请使用官方结构化提问能力提出 1-3 个简短问题；若当前环境不允许提问，请基于最合理假设继续，并在回复中说明关键假设和风险。若需求已足够明确，直接执行，不要为了澄清而打断用户。",
+  on: "【Kimix 需求澄清：开启】\n请在开始执行前做需求澄清检查。若缺少会影响目标、范围、验收或风险边界的关键信息，且当前环境允许提问，请优先使用官方结构化提问能力提出 1-3 个简短问题；若当前环境不允许提问，请基于最合理假设继续，并在回复中说明关键假设和风险。若需求已足够明确，直接执行，不要为了澄清而打断用户。",
 };
 
 function withClarificationBehavior(content: string, mode: ClarificationToolMode): string {
@@ -63,11 +63,15 @@ function goalStatusLabel(status: string) {
 
 function buildGoalKickoffPrompt(objective: string) {
   return [
-    "继续执行当前官方 Goal。",
+    "【Kimix 官方 Goal：继续推进】",
     "",
     `Goal 目标：${objective}`,
     "",
-    "请先读取当前 Goal 状态并按 Goal mode 推进：如果目标需要多轮完成，本轮做一个完整、可验证的推进步骤；如果已经完成或受阻，请调用官方 Goal 工具更新状态。",
+    "请先读取当前 Goal 状态，再推进本轮工作。",
+    "- 本轮只做一个完整、可验证的推进步骤。",
+    "- 若需要继续多轮，完成本轮后说明验证证据和下一步。",
+    "- 若目标已完成，请调用官方 Goal 工具标记完成。",
+    "- 若受阻且无法自行推进，请调用官方 Goal 工具标记受阻，并说明阻塞原因。",
   ].join("\n");
 }
 
@@ -113,11 +117,21 @@ const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
 const slashCommandPattern = /^\/([a-zA-Z][\w:-]*)(?:\s+([\s\S]*))?$/;
 
 const sdkSlashCommandItems: CompletionItem[] = [
-  { id: "slash-goal", label: "/goal", detail: "官方 Goal：开始、查看、暂停、继续、取消", insertText: "/goal ", commandName: "goal", kind: "slash" },
-  { id: "slash-compact", label: "/compact", detail: "静默压缩当前上下文", insertText: "/compact", commandName: "compact", kind: "slash" },
+  { id: "slash-goal", label: "/goal", detail: "Goal 总入口；直接跟目标会启动", insertText: "/goal ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-status", label: "/goal status", detail: "查看当前 Goal 状态", insertText: "/goal status ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-show", label: "/goal show", detail: "显示当前 Goal 状态", insertText: "/goal show ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-start", label: "/goal start", detail: "启动一个新 Goal", insertText: "/goal start ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-replace", label: "/goal replace", detail: "替换当前 Goal", insertText: "/goal replace ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-pause", label: "/goal pause", detail: "暂停当前 Goal", insertText: "/goal pause ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-resume", label: "/goal resume", detail: "继续已暂停/受阻 Goal", insertText: "/goal resume ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-cancel", label: "/goal cancel", detail: "取消并清除当前 Goal", insertText: "/goal cancel ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-next", label: "/goal next", detail: "无当前 Goal 时启动；队列暂未接入", insertText: "/goal next ", commandName: "goal", kind: "slash" },
+  { id: "slash-compact", label: "/compact", detail: "静默压缩当前上下文", insertText: "/compact ", commandName: "compact", kind: "slash" },
   { id: "slash-plan", label: "/plan", detail: "切换 Plan 模式", insertText: "/plan ", commandName: "plan", kind: "slash" },
+  { id: "slash-plan-on", label: "/plan on", detail: "开启 Plan 模式", insertText: "/plan on ", commandName: "plan", kind: "slash" },
+  { id: "slash-plan-off", label: "/plan off", detail: "关闭 Plan 模式", insertText: "/plan off ", commandName: "plan", kind: "slash" },
   { id: "slash-btw", label: "/btw", detail: "侧问，不影响主轮次", insertText: "/btw ", commandName: "btw", kind: "slash" },
-  { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo", commandName: "undo", kind: "slash" },
+  { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo ", commandName: "undo", kind: "slash" },
   { id: "slash-skill", label: "/skill:", detail: "启用本地 Skill 后继续发送", insertText: "/skill:", commandName: "skill", kind: "slash" },
 ];
 
@@ -131,14 +145,20 @@ const mentionBaseItems: CompletionItem[] = [
 ];
 
 function getActiveCompletion(value: string): { mode: CompletionMode; query: string; start: number } | null {
-  const match = value.match(/(^|\s)([@/])([^\s]*)$/);
-  if (!match || match.index === undefined) return null;
-  const trigger = match[2];
-  const prefixLength = match[1].length;
+  const slashMatch = value.match(/(^|\s)\/([^\r\n]*)$/);
+  if (slashMatch && slashMatch.index !== undefined) {
+    return {
+      mode: "slash",
+      query: slashMatch[2] ?? "",
+      start: slashMatch.index + slashMatch[1].length,
+    };
+  }
+  const mentionMatch = value.match(/(^|\s)@([^\s]*)$/);
+  if (!mentionMatch || mentionMatch.index === undefined) return null;
   return {
-    mode: trigger === "@" ? "mention" : "slash",
-    query: match[3] ?? "",
-    start: match.index + prefixLength,
+    mode: "mention",
+    query: mentionMatch[2] ?? "",
+    start: mentionMatch.index + mentionMatch[1].length,
   };
 }
 
@@ -296,8 +316,21 @@ export function Composer() {
   const activeCompletion = getActiveCompletion(input);
   const filteredSlashItems = activeCompletion?.mode === "slash"
     ? slashCommands.filter((item) => {
-        const query = activeCompletion.query.toLowerCase();
-        return item.label.toLowerCase().includes(query) || item.detail?.toLowerCase().includes(query);
+        const rawQuery = activeCompletion.query.toLowerCase().trimStart();
+        const query = rawQuery.replace(/\s+/g, " ");
+        const commandText = item.label.replace(/^\//, "").toLowerCase().replace(/\s+/g, " ");
+        const detail = item.detail?.toLowerCase() ?? "";
+        const isSecondaryCommand = commandText.includes(" ");
+        const wantsSecondaryCommand = /\s/.test(rawQuery);
+        if (!wantsSecondaryCommand) {
+          return !isSecondaryCommand && (commandText.includes(query) || detail.includes(query));
+        }
+        if (!isSecondaryCommand) return false;
+        const rootCommand = query.trimStart().split(" ")[0] ?? "";
+        if (!rootCommand || !commandText.startsWith(`${rootCommand} `)) return false;
+        const subcommandQuery = query.slice(rootCommand.length).trimStart();
+        if (!subcommandQuery) return true;
+        return commandText.includes(`${rootCommand} ${subcommandQuery}`) || detail.includes(subcommandQuery);
       })
     : [];
   const filteredMentionBaseItems = activeCompletion?.mode === "mention"
@@ -311,6 +344,13 @@ export function Composer() {
     : activeCompletion?.mode === "mention"
       ? [...filteredMentionBaseItems, ...fileItems]
       : [];
+  const shouldShowCompletionPanel = Boolean(
+    activeCompletion && (
+      activeCompletion.mode === "mention" ||
+      completionItems.length > 0 ||
+      slashCommands.length === 0
+    ),
+  );
 
   useEffect(() => {
     setActiveCompletionIndex(0);
@@ -809,7 +849,7 @@ export function Composer() {
           ? false
           : !defaultPlanMode;
       setDefaultPlanMode(next);
-      const runtime = activeSession ? getRuntimeSessionId(activeSession) : null;
+      const runtime = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId ?? null;
       if (runtime) {
         const res = await window.api.setKimiCodePlanMode({ sessionId: runtime, enabled: next });
         if (!res.success) await appendStatusMessage(`Plan 模式切换失败：${res.error}`);
@@ -1139,10 +1179,10 @@ export function Composer() {
     if (!canTogglePlanMode) return;
     const next = !defaultPlanMode;
     setDefaultPlanMode(next);
-    const runtimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
+    const runtimeSessionId = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId ?? null;
     if (!runtimeSessionId) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: next ? "Plan 模式已开启" : "Plan 模式已关闭",
+        detail: next ? "Plan 模式已开启，新会话发送时生效" : "Plan 模式已关闭",
       }));
       return;
     }
@@ -1474,7 +1514,7 @@ export function Composer() {
             <span className="text-sm font-medium text-accent-primary">释放以添加附件</span>
           </div>
         )}
-        {activeCompletion && (
+        {shouldShowCompletionPanel && activeCompletion && (
           <div
             ref={completionListRef}
             className="kimix-floating-panel mb-3 max-h-[276px] overflow-y-auto rounded-[16px] text-[14px]"

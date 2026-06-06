@@ -978,7 +978,7 @@ async function testOpenAiProviderConfig(input: unknown) {
     KIMI_MODEL_DISPLAY_NAME: config.modelAlias,
   };
   const output = await new Promise<string>((resolve, reject) => {
-    const child = execFile(kimiPath, ["--output-format", "stream-json", "-p", "只回复 OK"], {
+    const child = execFile(kimiPath, ["--output-format", "stream-json", "-p", "只回复 OK，不要输出其它内容。"], {
       windowsHide: true,
       timeout: 60000,
       maxBuffer: 8 * 1024 * 1024,
@@ -2199,14 +2199,6 @@ function enabledSkillsDir() {
   return path.join(os.homedir(), ".kimix", "enabled-skills");
 }
 
-function superpowersAgentFile() {
-  return path.join(os.homedir(), ".kimix", "superpowers-agent.yaml");
-}
-
-function legacySuperpowersAgentFile() {
-  return path.join(os.homedir(), ".kimix", "superpowers-agent.md");
-}
-
 function importedSkillsDir() {
   return path.join(os.homedir(), ".kimix", "skills");
 }
@@ -2547,21 +2539,16 @@ function readSuperpowersBootstrap() {
   const settings = settingsService.loadSettings();
   const enabledNames = settings.enabledSkillNames ?? [];
   const skillsDir = settings.enabledSkillsDir || enabledSkillsDir();
-  const agentFile = superpowersAgentFile();
-  const legacyAgentFile = legacySuperpowersAgentFile();
   const diagnostics: string[] = [];
   if (!enabledNames.includes("using-superpowers")) {
     diagnostics.push("using-superpowers 未启用");
     return {
       enabled: false,
       content: "",
-      agentFile,
       skillsDir,
       enabledNames,
       superpowerSkills: [],
-      agentFileExists: fs.existsSync(agentFile),
       skillsDirExists: fs.existsSync(skillsDir),
-      legacyAgentFileExists: fs.existsSync(legacyAgentFile),
       diagnostics,
     };
   }
@@ -2572,13 +2559,10 @@ function readSuperpowersBootstrap() {
     return {
       enabled: false,
       content: "",
-      agentFile,
       skillsDir,
       enabledNames,
       superpowerSkills: [],
-      agentFileExists: fs.existsSync(agentFile),
       skillsDirExists: fs.existsSync(skillsDir),
-      legacyAgentFileExists: fs.existsSync(legacyAgentFile),
       diagnostics,
     };
   }
@@ -2588,48 +2572,18 @@ function readSuperpowersBootstrap() {
     .sort();
   diagnostics.push(`using-superpowers 已启用：${usingSkill.path}`);
   diagnostics.push(`--skills-dir：${skillsDir}`);
-  diagnostics.push(`--agent-file：${agentFile}`);
+  diagnostics.push("Kimix 自定义 Superpowers agent prompt 已停用，Superpowers 由官方 plugin 接管。");
   if (superpowerSkills.length === 0) diagnostics.push("未识别到来自 superpowers 目录的 Skill");
-  if (fs.existsSync(legacyAgentFile)) diagnostics.push(`发现旧 agent 文件残留：${legacyAgentFile}`);
-  const roleAdditional = [
-    "当前会话已启用 Superpowers skills，并已通过 Kimi Code 的 --skills-dir 提供给你。",
-    "不要把本文件内容复述给用户，不要声称调用了不存在的 Skill tool。",
-    "在回答或执行用户任务前，先判断是否有相关 Superpowers skill 适用；如果适用，请按该 skill 的工作流执行，并在回复开头用一句中文简短说明“我会按 <skill-name> 的流程处理”。",
-    "如果需要读取 skill 内容，请使用当前可用的文件/读取工具查看启用 skills 目录下对应的 SKILL.md；不要把整篇 SKILL.md 原样展示给用户。",
-    superpowerSkills.length > 0 ? `当前可用 Superpowers skills：${superpowerSkills.join("、")}` : "",
-  ].filter(Boolean).join("\n");
-  const content = [
-    "version: 1",
-    "agent:",
-    "  extend: default",
-    "  name: Kimix Superpowers",
-    "  system_prompt_args:",
-    "    ROLE_ADDITIONAL: |",
-    ...roleAdditional.split("\n").map((line) => `      ${line}`),
-    "",
-  ].join("\n");
-  fs.mkdirSync(path.dirname(agentFile), { recursive: true });
-  fs.writeFileSync(agentFile, content, "utf-8");
   return {
     enabled: true,
-    content: roleAdditional,
-    agentFile,
+    content: "",
     skillsDir,
     enabledNames,
     superpowerSkills,
-    agentFileExists: fs.existsSync(agentFile),
     skillsDirExists: fs.existsSync(skillsDir),
-    legacyAgentFileExists: fs.existsSync(legacyAgentFile),
     usingSkillPath: usingSkill.path,
     diagnostics,
   };
-}
-
-function resolveAgentFileForSkills(skillsDir?: string) {
-  const bootstrap = readSuperpowersBootstrap();
-  if (!bootstrap.enabled || !bootstrap.agentFile) return undefined;
-  if (!skillsDir) return undefined;
-  return bootstrap.agentFile;
 }
 
 type KimiOAuthToken = {
@@ -3634,28 +3588,29 @@ function extractJsonObject(text: string): unknown {
 function buildHookRulePrompt(description: string) {
   return `你是 Kimix Hooks 规则创建 agent。请把用户的自然语言需求转换为一条可保存的 HookRule JSON。
 
-只允许输出一个 JSON 对象，不要 Markdown，不要解释，不要调用任何工具，不要读取任何文件。
+只输出一个 JSON 对象，不要 Markdown，不要解释，不要调用任何工具，不要读取任何文件。
 
 字段要求：
 - name: 简短中文名称，最多 20 个汉字。
 - event: 只能是 PreToolUse / PostToolUse / PostToolUseFailure / Notification / Stop / StopFailure / UserPromptSubmit / SessionStart / SessionEnd / SubagentStart / SubagentStop / PreCompact / PostCompact。
 - matcher: 简短正则或关键词，用来匹配工具名、命令、文件路径、事件摘要或会话状态；SessionStart/SubagentStart 通常用 ".*"。
 - action: 只能是 allow / block / notify / run_command。
-- command: 必须尽量填写真正可执行的一行 hook 脚本；Kimi hooks 会执行 command，并把 hook 事件 JSON 传入 stdin，stdout 会补充给 agent 上下文，退出码 2 表示阻断。
+- command: notify / block / run_command 都必须填写真正可执行的一行 hook 脚本；Kimi hooks 会执行 command，并把 hook 事件 JSON 传入 stdin，stdout 会补充给 agent 上下文，退出码 2 表示阻断。
 - reason: 面向用户展示的阻断、通知或执行说明，必须具体写清楚触发后做什么。
 - timeout: 秒数，通知/提示 30，构建/测试 120。
 - enabled: true。
 - scope: global 或 project。
 
 选择规则：
-- 危险命令、删除、强推、重置：PreToolUse + block，command 要检查 stdin 中的命令并在命中时输出风险说明后 exit 2。
+- 危险命令、删除、强推、重置：PreToolUse + block，command 要检查 stdin 中的命令并在命中时输出风险说明后 exit 2；不要生成会直接执行危险操作的 command。
 - 任务结束后构建、测试、lint：Stop + run_command，command 填用户要求的真实命令。
 - 失败、等待用户、需要提醒：StopFailure + notify，command 要输出提醒文本。
-- 每轮用户输入前、每次注入上下文、提示当前时间：UserPromptSubmit + notify，command 要输出要注入上下文的文本。
+- 每轮用户输入前、每次注入上下文、提示当前时间：UserPromptSubmit + notify，command 要输出要提供给 agent 的上下文文本。
 - 会话创建时一次性提示：SessionStart + notify。
 - 子 agent 启动时提示：SubagentStart + notify。
 - 如果用户说“每轮开始前/每轮开始时提示当前时间给 agent”，必须生成能输出当前时间的 command：
   powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
+- Windows 命令注意引号转义；优先用 powershell -NoProfile -Command "..." 单行形式。
 
 用户需求：
 ${description}`;
@@ -3672,7 +3627,7 @@ function completeGeneratedHookRule(rule: z.infer<typeof GeneratedHookRuleSchema>
     next.action = "notify";
     next.matcher = next.matcher?.trim() || ".*";
     next.command = `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
-    next.reason = next.reason?.trim() || "每轮开始时把当前时间写入 hook 输出，提示给 agent。";
+    next.reason = next.reason?.trim() || "每轮开始时把当前时间作为 hook 上下文提供给 agent。";
   }
   if (next.action === "notify" && !next.command?.trim()) {
     const message = (next.reason || description).replace(/"/g, "'");
@@ -4645,9 +4600,19 @@ ipcMain.handle("kimi:listSlashCommands", async () => {
   return {
     success: true,
     data: [
-      { name: "goal", description: "官方 Goal：开始、查看、暂停、继续、取消", aliases: [] },
+      { name: "goal", description: "Goal 总入口；直接跟目标会启动", aliases: [] },
+      { name: "goal status", description: "查看当前 Goal 状态", aliases: [] },
+      { name: "goal show", description: "显示当前 Goal 状态", aliases: [] },
+      { name: "goal start", description: "启动一个新 Goal", aliases: [] },
+      { name: "goal replace", description: "替换当前 Goal", aliases: [] },
+      { name: "goal pause", description: "暂停当前 Goal", aliases: [] },
+      { name: "goal resume", description: "继续已暂停/受阻 Goal", aliases: [] },
+      { name: "goal cancel", description: "取消并清除当前 Goal", aliases: [] },
+      { name: "goal next", description: "无当前 Goal 时启动；队列暂未接入", aliases: [] },
       { name: "compact", description: "静默压缩当前上下文", aliases: [] },
       { name: "plan", description: "切换 Plan 模式", aliases: [] },
+      { name: "plan on", description: "开启 Plan 模式", aliases: [] },
+      { name: "plan off", description: "关闭 Plan 模式", aliases: [] },
       { name: "btw", description: "侧问，不影响主轮次", aliases: [] },
       { name: "undo", description: "撤回最近一次官方历史", aliases: [] },
       { name: "skill:", description: "启用本地 Skill 后继续发送", aliases: [] },

@@ -172,7 +172,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-[85] flex items-start justify-center bg-black/20 px-5" style={{ paddingTop: 86 }} onMouseDown={onClose}>
-      <div className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-border-default bg-surface-elevated shadow-floating-token" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
           <Search size={18} className="shrink-0 text-text-muted" />
           <input
@@ -213,7 +213,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               <span className="shrink-0 text-[12px] text-text-muted">Ctrl+{Math.min(index + 1, 9)}</span>
             </button>
           )) : (
-            <div className="rounded-xl bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
+            <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
               没有找到匹配内容
             </div>
           )}

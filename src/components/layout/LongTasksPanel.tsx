@@ -12,14 +12,20 @@ function defaultTitleFromRequest(value: string) {
 
 function buildPlanningKickoffPrompt(task: LongTaskSummary) {
   return `【Kimix 长程任务：澄清与规划启动】
-你正在作为 Kimix 长程任务的执行 agent 工作。
+你是本长程任务的执行 agent。
 
-请先阅读以下长程任务专属文件：
+请先阅读：
 - ${task.executorPromptPath}
 - ${task.bigPlanPath}
 
-然后基于用户初始需求开始澄清与规划阶段。你需要先判断是否还需要澄清；如果当前官方 Kimi Code 运行模式支持向用户提问，且系统/权限规则没有禁止提问，可以使用官方 AskUserQuestion/需求澄清工具提出 1-3 个关键问题，让界面显示结构化澄清卡片。若当前处于 prompt/auto 等禁止向用户提问的模式，不要调用 AskUserQuestion，改为做合理假设、记录风险并继续规划。可以多轮澄清，直到目标、范围、验收标准和风险边界足够明确。不要直接开始执行代码。
-规划阶段只和用户澄清并完善 BIGPLAN，不要交给审查 agent。进入执行阶段后，每轮执行完成需要审查时，只说明交给审查 agent 审查；不要自己调用 subagent、Reviewer 或其它子代理来模拟审查，Kimix 会用独立 reviewer session 接棒。
+工作顺序：
+1. 基于用户初始需求判断是否需要澄清。
+2. 若允许提问，只问 1-3 个会阻塞规划的关键问题。
+3. 若不能提问，记录合理假设和风险后继续规划。
+4. 只完善 BIGPLAN，不执行代码。
+5. 规划完成后请求用户确认进入执行阶段。
+
+规划阶段不要启动或模拟审查 agent。进入执行阶段后，每轮执行完成需要审查时，只说明交给审查 agent 审查，Kimix 会用独立 reviewer session 接棒。
 
 用户初始需求：
 ${task.initialRequest}`;
@@ -172,7 +178,7 @@ export function LongTasksPanel() {
       aria-labelledby="long-tasks-title"
     >
       <div
-        className="flex max-h-[84vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[18px] border border-border-default bg-surface-elevated shadow-floating-token"
+        className="flex max-h-[84vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "20px 24px" }}>
@@ -191,7 +197,7 @@ export function LongTasksPanel() {
         </div>
 
         <div className="min-h-0 overflow-y-auto" style={{ padding: 28 }}>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border-default bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
             <div className="min-w-0">
               <div className="text-[14.5px] font-medium leading-5 text-text-primary">项目</div>
               <div className="mt-1 truncate text-[13px] leading-5 text-text-secondary">{selectedProject?.path ?? "选择一个项目来创建长程任务"}</div>
@@ -210,7 +216,7 @@ export function LongTasksPanel() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border-default bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
+          <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
             <div className="flex items-center gap-2 text-[15px] font-medium leading-6 text-text-primary">
               <MessageSquareText size={16} className="text-text-secondary" />
               <span>创建长程任务</span>
@@ -219,14 +225,14 @@ export function LongTasksPanel() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="任务标题（可选）"
-              className="h-10 w-full rounded-xl border border-border-default bg-surface-base text-[14px] outline-none placeholder:text-text-muted focus:border-border-strong focus:bg-surface-elevated"
+              className="h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[14px] outline-none placeholder:text-text-muted focus:border-accent-primary focus:bg-surface-elevated"
               style={{ marginTop: 20, paddingLeft: 16, paddingRight: 16 }}
             />
             <textarea
               value={initialRequest}
               onChange={(event) => setInitialRequest(event.target.value)}
               placeholder="输入长程任务的初始需求，后续会进入多轮澄清和计划设计"
-              className="min-h-[120px] w-full resize-none rounded-xl border border-border-default bg-surface-base text-[14px] leading-6 outline-none placeholder:text-text-muted focus:border-border-strong focus:bg-surface-elevated"
+              className="min-h-[120px] w-full resize-none rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[14px] leading-6 outline-none placeholder:text-text-muted focus:border-accent-primary focus:bg-surface-elevated"
               style={{ marginTop: 16, padding: "14px 16px" }}
             />
             <div className="flex flex-wrap items-center justify-between" style={{ marginTop: 20, gap: 14 }}>

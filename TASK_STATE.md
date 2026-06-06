@@ -2959,3 +2959,36 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
 ## 下一步
 - stage 累计改动、提交、推送 `master`，再创建并推送 `v2.8.336` tag 触发 GitHub Actions。
+
+# 2026-06-06 v2.8.337 UI 全盘巡检前 6 项修复
+## 当前目标
+- 修复 UI 巡检清单中用户指定的 1-6 项：插件页崩溃、长程任务/搜索黑描边、更新弹窗 Kimi Code 卡片、Hooks 空态重心、Hooks 创建页密度。
+## 已完成
+- `SkillsPanel` 对 SDK Plugin/Skill、Marketplace、本地 Skill 列表返回值做数组归一，避免浏览器预览或异常数据下 `.length/.map` 崩溃。
+- `LongTasksPanel` 弹窗、项目卡、创建卡、输入框和 textarea 改用 Kimix 浅边框，焦点态使用主色细边。
+- `SearchOverlay` 弹窗外边框改为浅边框，空态补虚线浅边框，降低黑描边感。
+- `DialogSystem` 更新弹窗中的 Kimi Code 卡片改成单列信息 + 下方右对齐操作区，减少左侧提示框和右侧按钮列的割裂。
+- `HooksPanel` 创建页左右比例和间距微调，创建提示词高度收敛；普通空态右侧编辑区改为更完整的居中浅底空态。
+- 版本号三处同步到 v2.8.337。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-u-U4B-Zv.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+- 浏览器预览复验：插件页不再崩溃；长程任务、搜索、更新弹窗、Hooks 普通页和 Hooks 创建页均可打开并保存复验截图。
+## 下一步
+- 完成构建/测试后，用浏览器重新打开插件、长程任务、搜索、更新弹窗、Hooks 页面复验视觉效果。
+
+# 2026-06-06 v2.8.338 新会话 Plan 模式启动修复
+## 当前目标
+- 修复新窗口/新会话未创建官方 runtime session 时，直接点击输入框底部 Plan 模式会提示 session 不存在的问题。
+## 已完成
+- `Composer` 的 Plan 按钮切换不再使用 `getRuntimeSessionId()` 的 UI 会话 id fallback；只有存在 `runtimeSessionId` 或 `officialSessionId` 时才同步调用 SDK `setPlanMode()`。
+- 无官方 runtime 的新会话只更新本地默认 Plan 状态，首条消息创建 Kimi Code session 时通过 `createKimiCodeSession({ planMode })` 生效。
+- `/plan` 本地 slash 指令同样只在真实官方 runtime 存在时同步 SDK，避免新会话误报 session 不存在。
+- 版本号三处同步到 v2.8.338。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-D0o_Vweu.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.338 复验：新窗口/新会话直接点击 Plan，应只提示 Plan 已开启且不报 session 不存在；随后发送首条消息应以 Plan 模式开始。

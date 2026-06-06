@@ -113,7 +113,6 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
   帮助: [
     { label: "文档", action: "documentation" },
     { label: "更新", action: "whats-new" },
-    { label: "插件", action: "skills" },
     { type: "separator" },
     { label: "发送反馈", action: "send-feedback" },
     { label: "键盘快捷键", hint: "Ctrl+/", action: "keyboard-shortcuts" },

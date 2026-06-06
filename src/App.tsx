@@ -34,7 +34,10 @@ import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
 
-const HANDOFF_PROMPT = `请查看agent文档，给出用于交接下一个agent的提示词，注意回复内容中应该仅仅包含这段提示词。如果没有agent.md文档，请根据以下形式总结并给出提示词
+const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后生成可直接交给下一个 agent 的交接提示词。
+只输出一个 Markdown 代码块，不要输出解释。
+
+交接内容必须包含：
 - 项目背景
 - 当前目标
 - 已完成
@@ -247,7 +250,7 @@ function buildHandoffPrompt(sourceSession: Session | undefined): string {
     .join("\n\n") || "当前没有可用的可见聊天记录。";
   return `${HANDOFF_PROMPT}
 
-下面是 Kimix 当前窗口中可见的会话记录。请只基于这些记录生成交接提示词，不要把这次交接生成任务本身写进交接内容，不要输出解释。
+下面是 Kimix 当前窗口中可见的会话记录。请只基于这些记录生成交接提示词，不要编造，不要把这次交接生成任务本身写进交接内容，不要输出解释。
 
 会话标题：${sourceSession?.title ?? "未知会话"}
 工作目录：${sourceSession?.projectPath ?? "未知目录"}
@@ -578,12 +581,14 @@ function buildLongTaskReviewPrompt(session: Session) {
 - ${meta.bigPlanPath}
 
 审查目标：
-1. 检查本轮执行结果是否符合 BIGPLAN.md 中当前步骤的目标、范围和验收标准。
-2. 如果计划不可执行或步骤过大，请给出需修复的问题，后续由 Kimix 交回执行 agent 修复。
-3. 暂时无法自动确认的问题，请写入 ${meta.reviewQueuePath}。
-4. 不要直接执行代码修改；本轮只做执行结果审查。
-5. 不要询问用户是否继续下一步；如本轮可继续，请明确写出“结论：通过”，Kimix 会自动调度执行 agent 进入下一步。
-6. 你的最终正文第一行必须是“结论：通过”或“结论：需修复”或“结论：待人工审查”，不要只把结论写在思考过程里。
+1. 检查本轮执行结果是否符合 BIGPLAN.md 中当前步骤的目标、范围和验收标准，必须引用当前 Step 编号和验收标准。
+2. 检查执行 agent 是否提供实际验证证据；不能仅凭执行 agent 自述放行。
+3. 如果计划不可执行、步骤过大、缺少必要验证或存在必须先处理的问题，请给出需修复的问题，后续由 Kimix 交回执行 agent 修复。
+4. 暂时无法自动确认但不阻塞继续的事项，请写入 ${meta.reviewQueuePath}，并仍使用“结论：通过”。
+5. 只有无法安全继续、必须等用户或外部环境确认时，才使用“结论：待人工审查”；该结论会让 Kimix 暂停长程任务。
+6. 不要直接执行代码修改；本轮只做执行结果审查。
+7. 不要询问用户是否继续下一步；如本轮可继续，请明确写出“结论：通过”，Kimix 会自动调度执行 agent 进入下一步。
+8. 你的最终正文第一行必须且只能是“结论：通过”或“结论：需修复”或“结论：待人工审查”，不要只把结论写在思考过程里。
 
 执行 agent 最近输出：
 ${executorOutput || "暂无可用输出，请直接读取 BIGPLAN.md 审查。"}`;
@@ -620,28 +625,37 @@ function buildLongTaskExecutorPromptFromReview(session: Session, conclusion: Lon
 审查 agent 对 Step ${step} 的结论是“需修复”。
 
 请你作为执行 agent：
-1. 先阅读 ${meta.bigPlanPath} 和审查意见。
-2. 只修复审查指出的问题，不进入下一步。
+1. 先阅读 ${meta.bigPlanPath} 和下面的审查意见。
+2. 先提取审查问题清单，再逐项修复；只处理审查指出的问题，不进入下一步。
 3. 修复完成后更新必要文件，并把本轮修复、验证证据、残余风险写入 rounds/ 对应记录。
-4. 结束时明确写出“Step ${step} 修复完成，交给审查 agent 审查”。
+4. 如无法修复，请明确写出阻塞原因和需要用户提供的信息。
+5. 结束时明确写出“Step ${step} 修复完成，交给审查 agent 审查”。
 
 审查意见：
 ${reviewerOutput || "审查 agent 未给出可用正文，请读取任务文件后修复。"}`
   }
 
+  if (conclusion === "manual_review") {
+    return `【Kimix 长程任务：待人工审查，暂停继续执行】
+审查 agent 对 Step ${step} 的结论是“待人工审查”。
+
+请不要进入下一步。需要用户或外部环境确认后，才能继续调度执行 agent。
+
+审查意见：
+${reviewerOutput || "审查 agent 未给出可用正文，请读取任务文件后等待人工确认。"}`
+  }
+
   const nextStep = step + 1;
-  const reviewLabel = conclusion === "manual_review"
-    ? "审查 agent 已留下待人工审查项，但本轮从计划推进角度可以继续"
-    : "审查 agent 已通过";
   return `【Kimix 长程任务：审查可继续，请执行下一步】
-${reviewLabel} Step ${step}。现在请继续执行 Step ${nextStep}。
+审查 agent 已通过 Step ${step}。现在请继续执行 Step ${nextStep}。
 
 请你作为执行 agent：
 1. 这是 Kimix 内部调度指令，不要询问用户是否继续；除非缺少执行 Step ${nextStep} 的必要信息或遇到阻塞，否则直接开始执行。
-2. 先阅读 ${meta.bigPlanPath}，只执行 Step ${nextStep} 这一轮。
-3. 不要把后续多个 Step 合并执行；完成 Step ${nextStep} 后必须停止本轮，不能自行继续 Step ${nextStep + 1}。
-4. 完成后更新必要文件，并把本轮产出、验证证据、残余风险写入 rounds/ 对应记录。
-5. 结束时明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
+2. 先阅读 ${meta.bigPlanPath}，确认当前 Step ${step} 已通过、下一步确实是 Step ${nextStep}。
+3. 只执行 Step ${nextStep} 这一轮，不要把后续多个 Step 合并执行。
+4. 完成 Step ${nextStep} 后必须停止本轮，不能自行继续 Step ${nextStep + 1}。
+5. 完成后更新必要文件，并把本轮产出、验证证据、残余风险写入 rounds/ 对应记录。
+6. 结束时明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
 
 审查 agent 对上一轮的意见：
 ${reviewerOutput || "审查 agent 未给出可用正文，请按 BIGPLAN.md 继续。"}`
@@ -1252,7 +1266,25 @@ function App() {
       conclusion: longTaskConclusionLabel(conclusion),
       content: reviewerOutput,
     });
-    if ((conclusion === "pass" || conclusion === "manual_review") && targetStep && currentStep >= targetStep) {
+    if (conclusion === "manual_review") {
+      updateSession(uiSessionId, (session) => session.longTask ? {
+        ...session,
+        runtimeSessionId: session.longTask.reviewerSessionId,
+        longTask: {
+          ...session.longTask,
+          activeAgent: "reviewer",
+          stage: "paused",
+          recovery: buildLongTaskRecovery("reviewer", "paused", "审查 agent 标记为待人工审查，需要人工确认后再继续。"),
+        },
+        updatedAt: Date.now(),
+      } : session);
+      syncCurrentSessionFromStore(uiSessionId);
+      persistLongTaskMeta(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId));
+      setRunningSessionId(null);
+      return true;
+    }
+
+    if (conclusion === "pass" && targetStep && currentStep >= targetStep) {
       updateSession(uiSessionId, (session) => session.longTask ? {
         ...session,
         runtimeSessionId: session.longTask.executorSessionId,

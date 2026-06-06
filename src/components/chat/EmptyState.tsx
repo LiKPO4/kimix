@@ -6,10 +6,10 @@ import type { Session, TimelineEvent } from "@/types/ui";
 import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 const FALLBACK_SUGGESTIONS = [
-  { icon: Sparkles, text: "分析一下当前项目，并告诉我最应该先处理什么" },
-  { icon: ListChecks, text: "找出上次未完成的工作，整理下一步行动" },
-  { icon: GitBranch, text: "检查最近改动是否有风险，并给出验证建议" },
-  { icon: Bug, text: "帮我定位当前应用最可能影响使用的问题" },
+  { icon: Sparkles, text: "分析当前项目结构，列出最值得优先处理的 3 个问题，并说明验证方式" },
+  { icon: ListChecks, text: "读取最近会话和 Git 改动，整理未完成事项和下一步最小行动" },
+  { icon: GitBranch, text: "检查当前未提交改动的风险，按严重程度给出代码审查意见" },
+  { icon: Bug, text: "定位当前应用最可能影响使用的问题，并给出可复现检查步骤" },
 ];
 
 function genId(): string {
@@ -84,9 +84,9 @@ export function EmptyState() {
     const dynamic = [
       ...savedSuggestions,
       lastUserMessage?.type === "user_message" ? `接着上次这件事继续：${lastUserMessage.content.slice(0, 42)}` : "",
-      "找出上次未完成的工作，整理下一步行动",
-      "检查最近改动是否有风险，并给出验证建议",
-      "分析一下当前项目，并告诉我最应该先处理什么",
+      "读取最近会话和 Git 改动，整理未完成事项和下一步最小行动",
+      "检查当前未提交改动的风险，按严重程度给出代码审查意见",
+      "分析当前项目结构，列出最值得优先处理的 3 个问题，并说明验证方式",
     ].filter(Boolean);
 
     const unique = Array.from(new Set(dynamic)).slice(0, 4);

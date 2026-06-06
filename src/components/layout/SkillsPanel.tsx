@@ -19,6 +19,10 @@ type PluginPanelTab = "skills" | "mcp";
 const OFFICIAL_PLUGIN_STORE_URL = "https://moonshotai.github.io/kimi-code/zh/customization/plugins.html#安装与管理-plugins";
 const OFFICIAL_PLUGIN_DOCS_URL = "https://moonshotai.github.io/kimi-code/zh/customization/plugins.html#plugin-manifest";
 
+function asArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 export function SkillsPanel({
   open,
   onBackToChat,
@@ -71,9 +75,11 @@ export function SkillsPanel({
       setMessage(`刷新 SDK Skills 状态失败：${skillRes.error}`);
       return;
     }
-    setSdkPlugins(pluginRes.data);
-    setSdkSkills(skillRes.data);
-    setMessage(nextMessage ?? `已从官方 SDK 读取 ${pluginRes.data.length} 个 Plugin、${skillRes.data.length} 个 Skill`);
+    const nextPlugins = asArray(pluginRes.data);
+    const nextSkills = asArray(skillRes.data);
+    setSdkPlugins(nextPlugins);
+    setSdkSkills(nextSkills);
+    setMessage(nextMessage ?? `已从官方 SDK 读取 ${nextPlugins.length} 个 Plugin、${nextSkills.length} 个 Skill`);
   };
 
   useEffect(() => {
@@ -89,7 +95,7 @@ export function SkillsPanel({
     if (!open) return;
     void (async () => {
       const res = await window.api.listKimiCodeMarketplace();
-      if (res.success) setMarketplace(res.data);
+      if (res.success) setMarketplace(asArray(res.data));
     })();
   }, [open]);
 
@@ -118,10 +124,11 @@ export function SkillsPanel({
       setMessage(`扫描失败：${res.error}`);
       return;
     }
-    setSkills(res.data.skills);
-    setEnabledNames(res.data.enabledNames);
+    const nextSkills = asArray(res.data.skills);
+    setSkills(nextSkills);
+    setEnabledNames(asArray(res.data.enabledNames));
     setEnabledDir(res.data.enabledDir);
-    setMessage(nextMessage ?? (res.data.skills.length > 0 ? `已发现 ${res.data.skills.length} 个本地 Skill` : "未发现本地 Skill"));
+    setMessage(nextMessage ?? (nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill"));
   };
 
   useEffect(() => {
@@ -134,10 +141,11 @@ export function SkillsPanel({
         setMessage(`扫描失败：${res.error}`);
         return;
       }
-      setSkills(res.data.skills);
-      setEnabledNames(res.data.enabledNames);
+      const nextSkills = asArray(res.data.skills);
+      setSkills(nextSkills);
+      setEnabledNames(asArray(res.data.enabledNames));
       setEnabledDir(res.data.enabledDir);
-      setMessage(res.data.skills.length > 0 ? `已发现 ${res.data.skills.length} 个本地 Skill` : "未发现本地 Skill");
+      setMessage(nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill");
     });
     return () => {
       cancelled = true;
@@ -171,8 +179,8 @@ export function SkillsPanel({
       setMessage(`导入失败：${res.error}`);
       return;
     }
-    setSkills(res.data.skills);
-    const importedNames = res.data.imported.map((skill) => skill.name);
+    setSkills(asArray(res.data.skills));
+    const importedNames = asArray(res.data.imported).map((skill) => skill.name);
     setMessage(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : "已取消导入");
     void refreshSkills(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : undefined);
   };

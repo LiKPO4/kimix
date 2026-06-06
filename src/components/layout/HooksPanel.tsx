@@ -69,16 +69,16 @@ function formatLogResult(result: HookRunLogEntry["result"]) {
   return "允许";
 }
 
-const ruleCreatorPrompt = `你是 Kimix Hooks 规则创建 agent。请把用户的自然语言需求转换为一条 HookRule JSON。
-必须遵守：
-1. 只能选择 event: PreToolUse / PostToolUse / PostToolUseFailure / Notification / Stop / StopFailure / UserPromptSubmit / SessionStart / SessionEnd / SubagentStart / SubagentStop / PreCompact / PostCompact。
-2. 只能选择 action: allow / block / notify / run_command。
-3. matcher 使用简短正则或关键词，能匹配工具名、命令、文件路径或事件摘要。
-4. 危险命令、删除、强推、重置优先使用 PreToolUse + block。
-5. 自动构建、测试、lint 优先使用 Stop + run_command，并填写 command。
-6. 失败、等待用户、需要提醒优先使用 StopFailure + notify。
-7. 通知类 hook 必须填写可执行 command，stdout 会进入 agent 上下文，例如输出当前时间。
-8. 输出要包含 name、event、matcher、action、command、reason、timeout、enabled、scope。`;
+const ruleCreatorPrompt = `你是 Kimix Hooks 规则创建 agent。请把用户需求转换成一条 HookRule JSON。
+只输出一个 JSON 对象，不要 Markdown，不要解释，不要调用工具。
+
+字段：name、event、matcher、action、command、reason、timeout、enabled、scope。
+要求：
+- event/action 只能使用 Kimix 支持的枚举。
+- notify / block / run_command 都必须给出可执行的一行 command。
+- 危险命令优先生成 PreToolUse + block，命中后 exit 2。
+- 当前时间/每轮开始提醒使用 UserPromptSubmit + notify。
+- Windows 命令注意引号转义。`;
 
 function createRule(template?: HookTemplate): HookRule {
   const now = Date.now();
@@ -112,7 +112,7 @@ function completeHookRuleForDisplay(rule: HookRule, description: string): HookRu
     patch.action = "notify";
     patch.matcher = rule.matcher.trim() || ".*";
     patch.command = rule.command?.trim() || `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
-    patch.reason = rule.reason?.trim() || "每轮开始时把当前时间写入 hook 输出，提示给 agent。";
+    patch.reason = rule.reason?.trim() || "每轮开始时把当前时间作为 hook 上下文提供给 agent。";
   } else if (rule.action === "notify" && !rule.command?.trim()) {
     const message = (rule.reason || description || "Hook 规则已触发。").replace(/"/g, "'");
     patch.command = `powershell -NoProfile -Command "Write-Output '${message}'"`;
@@ -393,7 +393,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "22px 28px 30px" }}>
         {createMode ? (
-          <div className="grid w-full items-start" style={{ gridTemplateColumns: "minmax(320px, 0.92fr) minmax(0, 1.08fr)", gap: 18 }}>
+          <div className="grid w-full items-start" style={{ gridTemplateColumns: "minmax(320px, 0.86fr) minmax(0, 1.14fr)", gap: 20 }}>
             <section className="flex flex-col rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "18px 18px", gap: 16 }}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
@@ -422,7 +422,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
 
               <div className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "13px 14px" }}>
                 <div className="text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]">创建提示词</div>
-                <div className="mt-2 max-h-[150px] overflow-y-auto whitespace-pre-wrap text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">{ruleCreatorPrompt}</div>
+                <div className="mt-2 max-h-[96px] overflow-y-auto whitespace-pre-wrap text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">{ruleCreatorPrompt}</div>
               </div>
 
               <button
@@ -470,7 +470,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
             </section>
           </div>
         ) : (
-          <div className="grid w-full items-start" style={{ gridTemplateColumns: "320px minmax(0, 1fr)", gap: 18 }}>
+          <div className="grid w-full items-start" style={{ gridTemplateColumns: "330px minmax(0, 1fr)", gap: 20 }}>
             <aside className="flex flex-col" style={{ gap: 14 }}>
               <section className="kimix-soft-card rounded-xl" style={{ padding: "16px 16px" }}>
                 <div className="text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]">规则状态</div>
@@ -560,7 +560,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
               </section>
             </aside>
 
-            <section className="min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "18px 18px" }}>
+            <section className="min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ minHeight: 238, padding: "20px 20px" }}>
                 {selectedRule ? (
                   <>
                     <div className="mb-4 flex items-start justify-between" style={{ gap: 12 }}>
@@ -589,8 +589,10 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                     )}
                   </>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "18px 18px" }}>
-                    选择或创建一条规则后在这里编辑。创建规则时会暂时隐藏已有规则，只显示规则创建 Agent 和草稿编辑器。
+                  <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-center text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "22px 24px" }}>
+                    <div className="max-w-[520px]">
+                      选择或创建一条规则后在这里编辑。创建规则时会暂时隐藏已有规则，只显示规则创建 Agent 和草稿编辑器。
+                    </div>
                   </div>
                 )}
             </section>

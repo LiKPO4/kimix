@@ -948,9 +948,21 @@ export function AppShell() {
     const nextStep = Math.max(longTaskMeta.currentStep || 1, 1);
     const target = longTaskMeta.targetStep ?? nextStep;
     if (longTaskMeta.activeAgent === "reviewer" || longTaskMeta.stage === "reviewing") {
-      return `请作为审查 agent，阅读 ${longTaskMeta.bigPlanPath} 和 ${longTaskMeta.reviewQueuePath}，审查 Step ${nextStep} 的执行结果。输出必须包含“结论：通过 / 需修复 / 待人工审查”，并说明发现的问题、缺失验证和下一轮建议。`;
+      return `【Kimix 长程任务：手动审查 Step ${nextStep}】
+请作为审查 agent，先阅读：
+- ${longTaskMeta.bigPlanPath}
+- ${longTaskMeta.reviewQueuePath}
+
+审查 Step ${nextStep} 的执行结果。必须引用该 Step 的验收标准和实际验证证据，不能仅凭执行 agent 自述放行。
+最终正文第一行必须且只能是“结论：通过”或“结论：需修复”或“结论：待人工审查”，并说明发现的问题、缺失验证和下一轮建议。`;
     }
-    return `请作为执行 agent，阅读 ${longTaskMeta.bigPlanPath}，从 Step ${nextStep} 开始执行。本次目标是执行到 Step ${target}，一轮只执行一个 Step。完成后写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。`;
+    return `【Kimix 长程任务：手动执行 Step ${nextStep}】
+请作为执行 agent，先阅读 ${longTaskMeta.bigPlanPath}。
+
+本次整体目标是执行到 Step ${target}，但本轮只允许执行 Step ${nextStep}。
+若规划尚未完成，请先完善 BIGPLAN 并请求用户确认；若已经可以执行，请直接执行 Step ${nextStep}。
+完成后写入 rounds/ 记录，包含本轮产出、验证证据和残余风险，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
+不要自行继续 Step ${nextStep + 1}。`;
   };
 
   const copyNextLongTaskPrompt = async () => {
@@ -1015,7 +1027,18 @@ export function AppShell() {
       }
 
       const nextStep = Math.max(latestSession.longTask?.currentStep ?? 1, 1);
-      const prompt = `【Kimix 长程任务：执行到 Step ${target}】\n这是 Kimix 内部调度指令。请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}，然后从 Step ${nextStep} 开始。本次整体目标是最终执行到 Step ${target}，但本轮只允许执行 Step ${nextStep}。\n\n如果当前还没有完成规划，请先完善 BIGPLAN 并向用户确认；如果已经可以执行，请不要询问用户是否继续，直接执行 Step ${nextStep}。\n\n硬性停止条件：完成 Step ${nextStep} 后必须立刻停止本轮输出，写入 rounds/ 记录，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。即使 Step ${target} 还未达到，也不能自行继续执行 Step ${nextStep + 1}，必须等待 Kimix 启动审查 agent 审查通过后再接下一轮。`;
+      const prompt = `【Kimix 长程任务：执行到 Step ${target}】
+这是 Kimix 内部调度指令。请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}。
+
+本次整体目标是最终执行到 Step ${target}，但本轮只允许执行 Step ${nextStep}。
+
+执行规则：
+1. 如果当前还没有完成规划，请先完善 BIGPLAN，并请求用户确认进入执行阶段。
+2. 如果已经可以执行，请不要询问用户是否继续，直接执行 Step ${nextStep}。
+3. 只执行 Step ${nextStep}，不要合并后续多个 Step。
+4. 完成后必须写入 rounds/ 记录，包含本轮产出、验证证据和残余风险。
+5. 完成 Step ${nextStep} 后必须立刻停止本轮输出，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
+6. 即使 Step ${target} 还未达到，也不能自行继续 Step ${nextStep + 1}，必须等待 Kimix 启动审查 agent 审查通过后再接下一轮。`;
       updateSession(latestSession.id, (session) => ({
         ...session,
         events: [
