@@ -1,9 +1,9 @@
 ﻿import { useState, useRef, useEffect } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { TimelineEvent, PermissionMode, ClarificationToolMode } from "@/types/ui";
+import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot } from "@/types/ui";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
@@ -11,6 +11,7 @@ import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -52,6 +53,24 @@ function withClarificationBehavior(content: string, mode: ClarificationToolMode)
   return `${CLARIFICATION_PROMPTS[mode]}\n\n用户原始需求：\n${content}`;
 }
 
+function goalStatusLabel(status: string) {
+  if (status === "active") return "进行中";
+  if (status === "paused") return "已暂停";
+  if (status === "blocked") return "受阻";
+  if (status === "complete") return "已完成";
+  return status;
+}
+
+function buildGoalKickoffPrompt(objective: string) {
+  return [
+    "继续执行当前官方 Goal。",
+    "",
+    `Goal 目标：${objective}`,
+    "",
+    "请先读取当前 Goal 状态并按 Goal mode 推进：如果目标需要多轮完成，本轮做一个完整、可验证的推进步骤；如果已经完成或受阻，请调用官方 Goal 工具更新状态。",
+  ].join("\n");
+}
+
 async function getDefaultKimiModel() {
   try {
     const res = await window.api.getKimiModelConfig();
@@ -91,6 +110,16 @@ type CompletionItem = {
 };
 
 const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
+const slashCommandPattern = /^\/([a-zA-Z][\w:-]*)(?:\s+([\s\S]*))?$/;
+
+const sdkSlashCommandItems: CompletionItem[] = [
+  { id: "slash-goal", label: "/goal", detail: "官方 Goal：开始、查看、暂停、继续、取消", insertText: "/goal ", commandName: "goal", kind: "slash" },
+  { id: "slash-compact", label: "/compact", detail: "静默压缩当前上下文", insertText: "/compact", commandName: "compact", kind: "slash" },
+  { id: "slash-plan", label: "/plan", detail: "切换 Plan 模式", insertText: "/plan ", commandName: "plan", kind: "slash" },
+  { id: "slash-btw", label: "/btw", detail: "侧问，不影响主轮次", insertText: "/btw ", commandName: "btw", kind: "slash" },
+  { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo", commandName: "undo", kind: "slash" },
+  { id: "slash-skill", label: "/skill:", detail: "启用本地 Skill 后继续发送", insertText: "/skill:", commandName: "skill", kind: "slash" },
+];
 
 const mentionBaseItems: CompletionItem[] = [
   { id: "agent-explorer", label: "Explorer Fast", detail: "快速探索代码库", insertText: "@Explorer Fast ", kind: "agent" },
@@ -178,12 +207,11 @@ export function Composer() {
   const hasActiveAssistantTurn = isCurrentSessionRunning && hasUnfinishedAssistant;
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
-    isCurrentSessionRunning &&
-    hasActiveAssistantTurn
+    isCurrentSessionRunning
   );
-  const shouldShowStopButton = hasActiveAssistantTurn;
+  const shouldShowStopButton = isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
-  const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn;
+  const canTogglePlanMode = canUseComposer && !isCurrentSessionRunning;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -231,7 +259,7 @@ export function Composer() {
       return;
     }
     if (currentSession.engine === "kimi-code") {
-      setSlashCommands([]);
+      setSlashCommands(sdkSlashCommandItems);
       return;
     }
     let cancelled = false;
@@ -373,6 +401,14 @@ export function Composer() {
     setDrawingBoardRequest(null);
   };
 
+  const syncCurrentSessionFromStore = (sessionId: string) => {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+    if (latest && useAppStore.getState().currentSession?.id === sessionId) {
+      setCurrentSession(latest);
+    }
+    return latest;
+  };
+
   const ensureSession = async () => {
     if (currentSession) {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
@@ -396,7 +432,7 @@ export function Composer() {
     return session;
   };
 
-  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[] }) => {
+  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return;
     let targetSession = ensuredSession;
@@ -429,11 +465,12 @@ export function Composer() {
       title: session.title,
       updatedAt: Date.now(),
     }));
+    targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
 
     const effectiveEngine = "kimi-code";
-    const outboundContent = targetSession.longTask
+    const outboundContent = options?.outboundContent ?? (targetSession.longTask || options?.skipClarification
       ? content
-      : withClarificationBehavior(content, effectiveClarificationToolMode);
+      : withClarificationBehavior(content, effectiveClarificationToolMode));
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = images.map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
@@ -449,7 +486,7 @@ export function Composer() {
           // otherwise make the assistant run against the wrong directory; drop it
           // and fall through to create a fresh session at projectPath.
           if (resumeRes.success && (!targetSession.projectPath || sameWorkDir(resumeRes.data.workDir, targetSession.projectPath))) {
-            const model = targetSession.model ?? await getDefaultKimiModel();
+            const model = resumeRes.data.model ?? targetSession.model ?? await getDefaultKimiModel();
             targetSession = {
               ...targetSession,
               engine: "kimi-code",
@@ -465,7 +502,7 @@ export function Composer() {
               model,
               updatedAt: Date.now(),
             }));
-            if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+            targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
             // Re-apply the current UI permission mode so a resumed session honours
             // full-access (yolo) instead of keeping its persisted permission.
             await window.api.setKimiCodePermission({ sessionId: resumeRes.data.sessionId, mode: permissionMode }).catch(() => {});
@@ -479,7 +516,7 @@ export function Composer() {
           planMode: defaultPlanMode,
         });
         if (!createRes.success) throw new Error(createRes.error);
-        const model = targetSession.model ?? await getDefaultKimiModel();
+        const model = createRes.data.model ?? targetSession.model ?? await getDefaultKimiModel();
         targetSession = {
           ...targetSession,
           engine: "kimi-code",
@@ -495,7 +532,7 @@ export function Composer() {
           model,
           updatedAt: Date.now(),
         }));
-        if (currentSession?.id === targetSession.id) setCurrentSession(targetSession);
+        targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         return createRes.data.sessionId;
       };
 
@@ -563,7 +600,259 @@ export function Composer() {
       events: [...session.events, event],
       updatedAt: Date.now(),
     }));
-    return targetSession;
+    return syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+  };
+
+  const appendStatusMessage = async (message: string) => {
+    await appendLocalEvent({
+      id: genId(),
+      type: "status_update",
+      timestamp: Date.now(),
+      message,
+    });
+  };
+
+  const appendSlashNotice = async (command: string) => {
+    await appendLocalEvent({
+      id: genId(),
+      type: "status_update",
+      timestamp: Date.now(),
+      message: `已接收本地指令：${command}`,
+      source: "slash",
+      tone: "info",
+    });
+  };
+
+  const appendAssistantNotice = async (content: string) => {
+    await appendLocalEvent({
+      id: genId(),
+      type: "assistant_message",
+      timestamp: Date.now(),
+      content,
+      isThinking: false,
+      isComplete: true,
+      durationMs: 0,
+    });
+  };
+
+  const ensureOfficialRuntimeForSession = async () => {
+    const targetSession = await ensureSession();
+    if (!targetSession) return null;
+    const knownSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
+    if (knownSessionId) {
+      const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownSessionId });
+      if (resumeRes.success) {
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          engine: "kimi-code",
+          runtimeSessionId: resumeRes.data.sessionId,
+          officialSessionId: resumeRes.data.sessionId,
+          updatedAt: Date.now(),
+        }));
+        const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
+        if (updated) setCurrentSession(updated);
+        return { uiSessionId: targetSession.id, runtimeSessionId: resumeRes.data.sessionId };
+      }
+    }
+    const createRes = await window.api.createKimiCodeSession({
+      workDir: targetSession.projectPath,
+      permission: permissionMode,
+      planMode: defaultPlanMode,
+    });
+    if (!createRes.success) throw new Error(createRes.error);
+    updateSession(targetSession.id, (session) => ({
+      ...session,
+      engine: "kimi-code",
+      runtimeSessionId: createRes.data.sessionId,
+      officialSessionId: createRes.data.sessionId,
+      updatedAt: Date.now(),
+    }));
+    const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
+    if (updated) setCurrentSession(updated);
+    return { uiSessionId: targetSession.id, runtimeSessionId: createRes.data.sessionId };
+  };
+
+  const syncOfficialGoal = (uiSessionId: string, goal: unknown, error?: string | null) => {
+    updateSession(uiSessionId, (session) => ({
+      ...session,
+      officialGoal: {
+        goal: reconcileOfficialGoalSnapshot(goal && typeof goal === "object" ? goal as NonNullable<Session["officialGoal"]>["goal"] : null, session.officialGoal?.goal),
+        error: error ?? null,
+        updatedAt: Date.now(),
+      },
+      updatedAt: Date.now(),
+    }));
+    const updated = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (updated) setCurrentSession(updated);
+  };
+
+  const formatGoalStatusNotice = (goal: OfficialGoalSnapshot | null) => {
+    if (!goal) return "已刷新官方 Goal 状态：当前没有官方 Goal。";
+    const status = goalStatusLabel(goal.status);
+    const turns = typeof goal.turnsUsed === "number" ? ` · ${goal.turnsUsed} 轮` : "";
+    const objective = goal.objective.trim();
+    return [
+      `已刷新官方 Goal 状态：${status}${turns}`,
+      objective ? `目标：${objective}` : "",
+    ].filter(Boolean).join("\n\n");
+  };
+
+  const refreshOfficialGoal = async (options?: { feedback?: "status" | "assistant" }) => {
+    const runtime = await ensureOfficialRuntimeForSession();
+    if (!runtime) return false;
+    const res = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
+    if (!res.success) {
+      syncOfficialGoal(runtime.uiSessionId, null, res.error);
+      await appendStatusMessage(`官方 Goal 状态读取失败：${res.error}`);
+      return false;
+    }
+    syncOfficialGoal(runtime.uiSessionId, res.data.goal);
+    if (options?.feedback === "assistant") {
+      await appendAssistantNotice(formatGoalStatusNotice(res.data.goal));
+    } else {
+      await appendStatusMessage(res.data.goal ? `官方 Goal：${goalStatusLabel(res.data.goal.status)} · ${res.data.goal.objective}` : "当前没有官方 Goal。");
+    }
+    return true;
+  };
+
+  const handleGoalSlashCommand = async (rawCommand: string, rawArgs: string) => {
+    if (imageAttachments.length > 0) {
+      await appendStatusMessage("/goal 命令暂不接收图片附件，请先移除图片。");
+      return true;
+    }
+    const args = rawArgs.trim();
+    const [subcommandRaw, ...restParts] = args.split(/\s+/);
+    const subcommand = (subcommandRaw || "status").toLowerCase();
+    const rest = restParts.join(" ").trim();
+    const runtime = await ensureOfficialRuntimeForSession();
+    if (!runtime) return true;
+
+    const runGoalAction = async (message: string, action: () => Promise<{ success: true; data: { goal: unknown } } | { success: false; error: string }>) => {
+      const res = await action();
+      if (!res.success) {
+        syncOfficialGoal(runtime.uiSessionId, null, res.error);
+        await appendStatusMessage(`${message}失败：${res.error}`);
+        return true;
+      }
+      syncOfficialGoal(runtime.uiSessionId, res.data.goal);
+      await appendStatusMessage(message);
+      return true;
+    };
+
+    if (!args || subcommand === "status" || subcommand === "show") {
+      await refreshOfficialGoal({ feedback: "assistant" });
+      return true;
+    }
+    if (subcommand === "pause") {
+      return runGoalAction("已暂停官方 Goal。", () => window.api.pauseKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Paused from Kimix slash command" }));
+    }
+    if (subcommand === "resume" || subcommand === "continue") {
+      return runGoalAction("已继续官方 Goal。下一轮消息会按 Goal 模式推进。", () => window.api.resumeKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Resumed from Kimix slash command" }));
+    }
+    if (subcommand === "cancel" || subcommand === "clear") {
+      return runGoalAction("已取消官方 Goal。", () => window.api.cancelKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Cancelled from Kimix slash command" }));
+    }
+
+    const replace = subcommand === "replace";
+    const objective = ["start", "create", "new", "replace", "next"].includes(subcommand) ? rest : args;
+    if (!objective) {
+      await appendStatusMessage("请输入 Goal 目标，例如：/goal 完成项目构建并修复失败。");
+      return true;
+    }
+    if (subcommand === "next") {
+      const current = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
+      if (current.success && current.data.goal) {
+        syncOfficialGoal(runtime.uiSessionId, current.data.goal);
+        await appendStatusMessage("Kimi Code 0.11.0 已修复 TUI 目标队列，但当前 node-sdk 仍未公开 /goal next 队列 API；当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。");
+        return true;
+      }
+    }
+    const res = await window.api.createKimiCodeGoal({
+      sessionId: runtime.runtimeSessionId,
+      objective,
+      replace,
+    });
+    if (!res.success) {
+      syncOfficialGoal(runtime.uiSessionId, null, res.error);
+      await appendStatusMessage(`${replace ? "替换" : "启动"}官方 Goal 失败：${res.error}`);
+      return true;
+    }
+    syncOfficialGoal(runtime.uiSessionId, res.data.goal);
+    await sendPromptContent(rawCommand, {
+      outboundContent: buildGoalKickoffPrompt(objective),
+      skipClarification: true,
+    });
+    return true;
+  };
+
+  const handleSdkSlashCommand = async (content: string) => {
+    const match = content.trim().match(slashCommandPattern);
+    if (!match) return false;
+    const name = match[1].toLowerCase();
+    const args = (match[2] ?? "").trim();
+    if (name.startsWith("skill:")) return false;
+    if (!["goal", "compact", "plan", "btw", "undo"].includes(name)) return false;
+    await appendSlashNotice(args ? `/${name} ${args}` : `/${name}`);
+    if (name === "goal") return handleGoalSlashCommand(content.trim(), args);
+    if (name === "compact") {
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      const res = await window.api.compactKimiCodeSession({ sessionId: runtime.runtimeSessionId });
+      if (!res.success) await appendStatusMessage(`压缩失败：${res.error}`);
+      return true;
+    }
+    if (name === "plan") {
+      const normalized = args.toLowerCase();
+      const next = normalized === "on" || normalized === "true" || normalized === "1"
+        ? true
+        : normalized === "off" || normalized === "false" || normalized === "0"
+          ? false
+          : !defaultPlanMode;
+      setDefaultPlanMode(next);
+      const runtime = activeSession ? getRuntimeSessionId(activeSession) : null;
+      if (runtime) {
+        const res = await window.api.setKimiCodePlanMode({ sessionId: runtime, enabled: next });
+        if (!res.success) await appendStatusMessage(`Plan 模式切换失败：${res.error}`);
+        else await appendStatusMessage(next ? "Plan 模式已开启。" : "Plan 模式已关闭。");
+      } else {
+        await appendStatusMessage(next ? "Plan 模式已开启，新会话发送时生效。" : "Plan 模式已关闭。");
+      }
+      return true;
+    }
+    if (name === "btw") {
+      if (!args) {
+        await appendStatusMessage("请输入侧问内容，例如：/btw 这个函数是谁调用的？");
+        return true;
+      }
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      const roundId = `btw-round-${Date.now()}`;
+      updateSession(runtime.uiSessionId, (session) => ({
+        ...session,
+        btwRounds: [...(session.btwRounds ?? []), { id: roundId, userContent: args, timestamp: Date.now() }],
+        updatedAt: Date.now(),
+      }));
+      const res = await window.api.askKimiCodeBtw({ sessionId: runtime.runtimeSessionId, content: args });
+      updateSession(runtime.uiSessionId, (session) => ({
+        ...session,
+        btwRounds: (session.btwRounds ?? []).map((round) => round.id === roundId
+          ? { ...round, assistantContent: res.success ? res.data.content || "没有返回正文。" : `侧问失败：${res.error}`, thinking: res.success ? res.data.thinking || undefined : undefined }
+          : round),
+        updatedAt: Date.now(),
+      }));
+      await appendStatusMessage(res.success ? "BTW 侧问已完成，结果在右侧会话栏。" : `BTW 侧问失败：${res.error}`);
+      return true;
+    }
+    if (name === "undo") {
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      const rawCount = Number(args || "1");
+      const count = Number.isFinite(rawCount) ? Math.max(1, Math.min(Math.floor(rawCount), 10)) : 1;
+      const res = await window.api.undoKimiCodeHistory({ sessionId: runtime.runtimeSessionId, count });
+      await appendStatusMessage(res.success ? `已撤回最近 ${count} 次官方历史。` : `撤回失败：${res.error}`);
+      return true;
+    }
+    return false;
   };
 
   const applySkillCommand = async (skillName: string) => {
@@ -632,6 +921,14 @@ export function Composer() {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
+    const slashHandled = trimmed.startsWith("/") ? await handleSdkSlashCommand(trimmed) : false;
+    if (slashHandled) {
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      return;
+    }
     const skillMatch = trimmed.match(skillCommandPattern);
     if (skillMatch) {
       const skillName = skillMatch[1];
@@ -664,7 +961,7 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    if (hasActiveAssistantTurn && currentSession) {
+    if (isCurrentSessionRunning && currentSession) {
       addPendingMessage(currentSession.id, trimmed, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
       return;
     }
@@ -1011,8 +1308,17 @@ export function Composer() {
   const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
   const pendingHidden = hiddenCards.includes("pending");
+  const goalHidden = hiddenCards.includes("goal");
+  const currentGoal = activeSession?.officialGoal?.goal ?? null;
+  const goalStatus = currentGoal?.status ?? "";
+  const showGoalModeCard = Boolean(currentGoal && !goalHidden && !["complete", "cancelled", "canceled"].includes(goalStatus));
+  const goalToneClass = goalStatus === "blocked"
+    ? "text-accent-danger"
+    : goalStatus === "paused"
+      ? "text-accent-warning"
+      : "text-accent-primary";
   const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
-  const hideComposerCard = (card: "todo" | "pending", label: string) => {
+  const hideComposerCard = (card: ComposerDockCard, label: string) => {
     setComposerCardHidden(composerCardSessionId, card, true);
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
   };
@@ -1110,6 +1416,45 @@ export function Composer() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {showGoalModeCard && currentGoal && (
+        <div
+          className="kimix-floating-panel overflow-hidden rounded-[15px] text-[13px]"
+          style={{ marginBottom: 8 }}
+        >
+          <div
+            className="grid min-h-10 items-center text-[14px] text-[var(--kimix-panel-text-secondary)]"
+            style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10, paddingLeft: 20, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+          >
+            <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary-light ${goalToneClass}`}>
+                {goalStatus === "active" ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />}
+              </span>
+              <span className={`shrink-0 text-[13px] font-medium leading-5 ${goalToneClass}`}>
+                Goal {goalStatusLabel(goalStatus)}
+              </span>
+              <span className="min-w-0 truncate leading-5 text-[var(--kimix-panel-text)]">
+                {currentGoal.objective}
+              </span>
+            </div>
+            <span
+              className="shrink-0 rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]"
+              style={{ minHeight: 24, minWidth: 42, paddingLeft: 9, paddingRight: 9, textAlign: "center" }}
+            >
+              {currentGoal.turnsUsed ?? 0} 轮
+            </span>
+            <button
+              type="button"
+              onClick={() => hideComposerCard("goal", "官方 Goal")}
+              className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+              title="收起到侧栏"
+              aria-label="收起官方 Goal 状态"
+            >
+              <X size={13} />
+            </button>
           </div>
         </div>
       )}

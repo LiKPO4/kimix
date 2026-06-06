@@ -22,6 +22,7 @@ export function getLatestStatus(events: TimelineEvent[]) {
 }
 
 export function isEmptyStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {
+  if (event.message?.trim()) return false;
   return (event.inputTokenCount ?? 0) === 0 &&
     (event.tokenCount ?? 0) === 0 &&
     (event.contextSize ?? 0) === 0;

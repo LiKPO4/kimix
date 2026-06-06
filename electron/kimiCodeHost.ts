@@ -55,6 +55,7 @@ type KimiCodeSessionLike = {
   reloadSession?(): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
+  setModel?(model: string): Promise<void>;
   setThinking?(level: string): Promise<void>;
   setPlanMode(enabled: boolean): Promise<void>;
   setPermission(mode: KimiCodePermissionMode): Promise<void>;
@@ -69,6 +70,11 @@ type KimiCodeSessionLike = {
   getBackgroundTaskOutput?(taskId: string, options?: { tail?: number }): Promise<string>;
   getBackgroundTaskOutputPath?(taskId: string): Promise<string | undefined>;
   stopBackgroundTask?(taskId: string, options?: { reason?: string }): Promise<void>;
+  createGoal?(input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalSnapshot>;
+  getGoal?(): Promise<KimiCodeGoalState>;
+  pauseGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
+  resumeGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
+  cancelGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
   listSkills?(): Promise<readonly KimiCodeSkillSummary[]>;
   listPlugins?(): Promise<readonly KimiCodePluginSummary[]>;
   installPlugin?(source: string): Promise<KimiCodePluginSummary>;
@@ -339,6 +345,43 @@ export type KimiCodeBtwResult = {
   reason?: string;
 };
 
+export type KimiCodeGoalStatus = "active" | "paused" | "blocked" | "complete";
+
+export type KimiCodeGoalBudget = {
+  turnBudget?: number | null;
+  tokenBudget?: number | null;
+  wallClockBudgetMs?: number | null;
+  remainingTurns?: number | null;
+  remainingTokens?: number | null;
+  remainingWallClockMs?: number | null;
+};
+
+export type KimiCodeGoalSnapshot = {
+  goalId?: string;
+  objective: string;
+  completionCriterion?: string;
+  status: KimiCodeGoalStatus | string;
+  turnsUsed?: number;
+  tokensUsed?: number;
+  wallClockMs?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  terminalReason?: string;
+  budget?: KimiCodeGoalBudget;
+  [key: string]: unknown;
+};
+
+export type KimiCodeGoalState = {
+  goal: KimiCodeGoalSnapshot | null;
+  cancelledGoal?: KimiCodeGoalSnapshot;
+};
+
+export type KimiCodeCreateGoalInput = {
+  objective: string;
+  completionCriterion?: string;
+  replace?: boolean;
+};
+
 type ManagedSession = {
   session: KimiCodeSessionLike;
   status: KimiCodeEngineStatus;
@@ -451,6 +494,12 @@ export async function reloadSession(sessionId: string): Promise<void> {
   await managed.session.reloadSession();
 }
 
+export async function setModel(sessionId: string, model: string): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.setModel) throw new Error("当前 Kimi Code SDK 不支持会话模型切换。");
+  await managed.session.setModel(model);
+}
+
 export async function reloadIdleSessions(): Promise<{ reloaded: string[]; skipped: string[]; errors: { sessionId: string; message: string }[] }> {
   const reloaded: string[] = [];
   const skipped: string[] = [];
@@ -560,6 +609,40 @@ export async function compactSession(sessionId: string): Promise<void> {
   const managed = getManagedSession(sessionId);
   if (!managed.session.compact) throw new Error("Official Kimi Code SDK does not expose compact on this session");
   await managed.session.compact();
+}
+
+export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.createGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  const goal = await managed.session.createGoal(input);
+  return { goal };
+}
+
+export async function getGoal(sessionId: string): Promise<KimiCodeGoalState> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.getGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  return managed.session.getGoal();
+}
+
+export async function pauseGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.pauseGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  const goal = await managed.session.pauseGoal({ reason });
+  return { goal };
+}
+
+export async function resumeGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.resumeGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  const goal = await managed.session.resumeGoal({ reason });
+  return { goal };
+}
+
+export async function cancelGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.cancelGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  const goal = await managed.session.cancelGoal({ reason });
+  return { goal: null, cancelledGoal: goal };
 }
 
 export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatus> {
@@ -1117,6 +1200,11 @@ function getManagedSession(sessionId: string): ManagedSession {
 
 async function getHarness(): Promise<KimiHarnessLike> {
   if (harness) return harness;
+  // Official Kimi Code 0.10 exposes Goal lifecycle through the SDK, but gates it
+  // behind the same experimental flag used by the TUI /goal command.
+  process.env.KIMI_CODE_EXPERIMENTAL_GOAL_COMMAND = process.env.KIMI_CODE_EXPERIMENTAL_GOAL_COMMAND || "1";
+  process.env.KIMI_CODE_NO_AUTO_UPDATE = process.env.KIMI_CODE_NO_AUTO_UPDATE || "1";
+  process.env.KIMI_CLI_NO_AUTO_UPDATE = process.env.KIMI_CLI_NO_AUTO_UPDATE || "1";
   const sdk = await loadSdk();
   const options = {
     homeDir: process.env.KIMI_CODE_HOME,

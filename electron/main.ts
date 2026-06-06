@@ -133,9 +133,17 @@ function checkCommand(command: string): Promise<string | null> {
   });
 }
 
+function getKimiCodeCommandEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    KIMI_CODE_NO_AUTO_UPDATE: process.env.KIMI_CODE_NO_AUTO_UPDATE || "1",
+    KIMI_CLI_NO_AUTO_UPDATE: process.env.KIMI_CLI_NO_AUTO_UPDATE || "1",
+  };
+}
+
 function runCommand(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(command, args, { windowsHide: true, timeout: 5000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
+    const child = execFile(command, args, { windowsHide: true, timeout: 5000, maxBuffer: 8 * 1024 * 1024, env: getKimiCodeCommandEnv() }, (error, stdout, stderr) => {
       if (error) {
         reject(error);
         return;
@@ -148,7 +156,7 @@ function runCommand(command: string, args: string[]): Promise<string> {
 
 function runLongCommand(command: string, args: string[], timeoutMs = 10 * 60 * 1000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(command, args, { windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+    const child = execFile(command, args, { windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, env: getKimiCodeCommandEnv() }, (error, stdout, stderr) => {
       const output = [stdout, stderr].filter(Boolean).join("\n").trim();
       if (error) {
         reject(new Error(output || error.message));
@@ -862,8 +870,11 @@ async function saveOpenAiProviderConfigWithSdk(input: unknown) {
       },
       ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),
     };
-    const updated = await kimiCodeHost.setConfig(patch);
-    return kimiCodeConfigToModelSummary(updated);
+    await kimiCodeHost.setConfig(patch);
+    if (config.makeDefault) {
+      return await readKimiModelConfigAfterSdkSet(config.modelAlias);
+    }
+    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
   } catch (error) {
     console.warn("[kimi-code] SDK setConfig(provider) failed, falling back to TOML writer:", error);
     return saveOpenAiProviderConfig(input);
@@ -893,12 +904,20 @@ async function setDefaultKimiModelWithSdk(input: unknown) {
     if (!Object.keys(current.models ?? {}).includes(req.modelAlias)) {
       throw new Error(`模型别名 ${req.modelAlias} 不存在，请先保存或刷新模型配置`);
     }
-    const updated = await kimiCodeHost.setConfig({ defaultModel: req.modelAlias });
-    return kimiCodeConfigToModelSummary(updated);
+    await kimiCodeHost.setConfig({ defaultModel: req.modelAlias });
+    return await readKimiModelConfigAfterSdkSet(req.modelAlias);
   } catch (error) {
     console.warn("[kimi-code] SDK setConfig(defaultModel) failed, falling back to TOML writer:", error);
     return setDefaultKimiModel(input);
   }
+}
+
+async function readKimiModelConfigAfterSdkSet(expectedDefaultModel: string) {
+  const reloaded = kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+  if (reloaded.defaultModel === expectedDefaultModel) return reloaded;
+  const disk = readKimiModelConfig();
+  if (disk.defaultModel === expectedDefaultModel) return disk;
+  throw new Error(`Kimi Code SDK 未将默认模型持久化为 ${expectedDefaultModel}`);
 }
 
 async function reloadIdleKimiCodeSessionsAfterConfigChange() {
@@ -4236,6 +4255,69 @@ ipcMain.handle("kimi-code:compact", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:createGoal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const objective = typeof req.objective === "string" ? req.objective.trim() : "";
+    const completionCriterion = typeof req.completionCriterion === "string" && req.completionCriterion.trim()
+      ? req.completionCriterion.trim()
+      : undefined;
+    const replace = typeof req.replace === "boolean" ? req.replace : undefined;
+    if (!sessionId || !objective) return { success: false, error: "Missing sessionId or objective" };
+    return { success: true, data: await kimiCodeHost.createGoal(sessionId, { objective, completionCriterion, replace }) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:getGoal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.getGoal(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:pauseGoal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const reason = typeof req.reason === "string" && req.reason.trim() ? req.reason.trim() : undefined;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.pauseGoal(sessionId, reason) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:resumeGoal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const reason = typeof req.reason === "string" && req.reason.trim() ? req.reason.trim() : undefined;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.resumeGoal(sessionId, reason) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:cancelGoal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const reason = typeof req.reason === "string" && req.reason.trim() ? req.reason.trim() : undefined;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.cancelGoal(sessionId, reason) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:respondApproval", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -4530,7 +4612,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
         : undefined;
     const createFresh = () => kimiCodeHost.createSession({
       workDir: request.workDir,
-      model: request.model,
+      model: selectedModelAlias,
       thinking,
       permission,
       planMode: !!request.planMode,
@@ -4545,6 +4627,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
         engineSession = await createFresh();
       } else {
         engineSession = resumed;
+        if (selectedModelAlias) await kimiCodeHost.setModel(resumed.sessionId, selectedModelAlias);
         // Keep the resumed session's permission in sync with the requested mode.
         await kimiCodeHost.setPermission(resumed.sessionId, permission).catch(() => {});
         if (thinking) await kimiCodeHost.setThinking(resumed.sessionId, thinking).catch(() => {});
@@ -4552,14 +4635,24 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
     } else {
       engineSession = await createFresh();
     }
-    return { success: true, data: { sessionId: engineSession.sessionId, workDir: engineSession.workDir, model: request.model ?? null, slashCommands: [] as const } };
+    return { success: true, data: { sessionId: engineSession.sessionId, workDir: engineSession.workDir, model: selectedModelAlias ?? null, slashCommands: [] as const } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
 
 ipcMain.handle("kimi:listSlashCommands", async () => {
-  return { success: true, data: [] };
+  return {
+    success: true,
+    data: [
+      { name: "goal", description: "官方 Goal：开始、查看、暂停、继续、取消", aliases: [] },
+      { name: "compact", description: "静默压缩当前上下文", aliases: [] },
+      { name: "plan", description: "切换 Plan 模式", aliases: [] },
+      { name: "btw", description: "侧问，不影响主轮次", aliases: [] },
+      { name: "undo", description: "撤回最近一次官方历史", aliases: [] },
+      { name: "skill:", description: "启用本地 Skill 后继续发送", aliases: [] },
+    ],
+  };
 });
 
 ipcMain.handle("kimi:setPlanMode", async (_, request: unknown) => {

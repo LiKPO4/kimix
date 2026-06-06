@@ -12,6 +12,7 @@ import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetric
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import {
   settleInactiveEvents,
   sanitizePersistedEvents,
@@ -733,6 +734,8 @@ function App() {
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
+  const goalRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
 
@@ -775,6 +778,50 @@ function App() {
     if (active?.id === uiSessionId) {
       useAppStore.getState().setCurrentSession(latest);
     }
+  };
+
+  const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
+    const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (!target?.officialGoal) return;
+    try {
+      const res = await window.api.getKimiCodeGoal({ sessionId: runtimeSessionId });
+      useSessionStore.getState().updateSession(uiSessionId, (session) => ({
+        ...session,
+        officialGoal: {
+          goal: res.success ? reconcileOfficialGoalSnapshot(res.data.goal, session.officialGoal?.goal) : session.officialGoal?.goal ?? null,
+          error: res.success ? null : res.error,
+          updatedAt: Date.now(),
+        },
+        updatedAt: Date.now(),
+      }));
+      syncCurrentSessionFromStore(uiSessionId);
+    } catch (err) {
+      useSessionStore.getState().updateSession(uiSessionId, (session) => ({
+        ...session,
+        officialGoal: {
+          goal: session.officialGoal?.goal ?? null,
+          error: err instanceof Error ? err.message : String(err),
+          updatedAt: Date.now(),
+        },
+        updatedAt: Date.now(),
+      }));
+      syncCurrentSessionFromStore(uiSessionId);
+    }
+  };
+
+  const scheduleOfficialGoalRefresh = (uiSessionId: string, runtimeSessionId: string) => {
+    const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (!target?.officialGoal?.goal) return;
+    const key = `${uiSessionId}:${runtimeSessionId}`;
+    if (goalRefreshTimersRef.current.has(key)) return;
+    const elapsed = Date.now() - (goalLastRefreshRef.current.get(key) ?? 0);
+    const delay = Math.max(0, 1200 - elapsed);
+    const timer = window.setTimeout(() => {
+      goalRefreshTimersRef.current.delete(key);
+      goalLastRefreshRef.current.set(key, Date.now());
+      void refreshOfficialGoalState(uiSessionId, runtimeSessionId);
+    }, delay);
+    goalRefreshTimersRef.current.set(key, timer);
   };
 
   const persistLongTaskMeta = (session: Session | undefined) => {
@@ -1621,6 +1668,23 @@ function App() {
         return;
       }
       enqueueStreamEvent(uiSessionId, mappedWithRole);
+      scheduleOfficialGoalRefresh(uiSessionId, payload.sessionId);
+      if (mappedWithRole.type === "tool_call" || mappedWithRole.type === "tool_result") {
+        updateSession(uiSessionId, (session) => {
+          const terminalGoal = inferTerminalGoalFromEvent(mappedWithRole, session.officialGoal?.goal);
+          if (!terminalGoal) return session;
+          return {
+            ...session,
+            officialGoal: {
+              goal: terminalGoal,
+              error: null,
+              updatedAt: Date.now(),
+            },
+            updatedAt: Date.now(),
+          };
+        });
+        syncCurrentSessionFromStore(uiSessionId);
+      }
       if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
         flushStreamEvents();
         persistLocalConversationState();
@@ -1647,6 +1711,8 @@ function App() {
       if (!["completed", "error", "interrupted"].includes(payload.status)) return;
 
       flushStreamEvents();
+      void refreshOfficialGoalState(uiSessionId, payload.sessionId);
+      goalLastRefreshRef.current.set(`${uiSessionId}:${payload.sessionId}`, Date.now());
       const activeRunningSessionId = useAppStore.getState().runningSessionId;
       if (activeRunningSessionId === uiSessionId || activeRunningSessionId === payload.sessionId) {
         setRunningSessionId(null);
@@ -1869,6 +1935,9 @@ function App() {
       document.removeEventListener("keydown", markRendererWindowFocused, true);
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
+      goalRefreshTimersRef.current.forEach(clearTimeout);
+      goalRefreshTimersRef.current.clear();
+      goalLastRefreshRef.current.clear();
     };
   }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
 

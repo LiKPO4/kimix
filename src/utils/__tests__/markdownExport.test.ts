@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { sessionToMarkdown } from "../markdownExport";
+import type { Session } from "@/types/ui";
+
+describe("sessionToMarkdown", () => {
+  it("restores paragraphs for flattened assistant progress summaries", () => {
+    const session: Session = {
+      id: "s1",
+      title: "导出测试",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 2,
+      isLoading: false,
+      events: [
+        {
+          id: "a1",
+          type: "assistant_message",
+          timestamp: 1,
+          content: "本轮开始执行 P0/P1 修复 + 云端发布。先读取关键文件确认当前代码状态，然后按优先级批次修复。现在开始并行修复批次1的安全类P0问题：批次2完成。现在运行 flutter analyze 检查当前代码状态，同时继续修复关键P1问题：flutter analyze 通过！现在进入版本号递增 + 构建阶段。",
+          isThinking: false,
+          isComplete: true,
+        },
+      ],
+    };
+
+    const markdown = sessionToMarkdown(session);
+    expect(markdown).toContain("云端发布。\n\n先读取关键文件");
+    expect(markdown).toContain("批次2完成。\n\n现在运行");
+  });
+
+  it("repairs markdown table separators split across streamed lines", () => {
+    const session: Session = {
+      id: "s1",
+      title: "表格测试",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 2,
+      isLoading: false,
+      events: [
+        {
+          id: "a1",
+          type: "assistant_message",
+          timestamp: 1,
+          content: [
+            "### 方案 A（推荐）：倍速播放 + 定时关闭",
+            "",
+            "| 功能 | 实现方式 | 价值 |",
+            "|------",
+            "",
+            "|---------|------|",
+            "| **倍速播放** | JS bridge 控制 `video.playbackRate` | 高频刚需 |",
+          ].join("\n"),
+          isThinking: false,
+          isComplete: true,
+        },
+      ],
+    };
+
+    const markdown = sessionToMarkdown(session);
+    expect(markdown).toContain("|------|---------|------|");
+    expect(markdown).not.toContain("|------\n\n|---------|------|");
+  });
+});

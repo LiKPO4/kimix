@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { restoreAssistantProgressParagraphs } from "@/utils/assistantParagraphs";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -597,10 +598,11 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
-  const hasContent = event.content.trim().length > 0;
+  const displayContent = restoreAssistantProgressParagraphs(event.content);
+  const hasContent = displayContent.trim().length > 0;
   const changedSet = new Set(changedFiles.map((f) => f.toLowerCase()));
   const mdArtifacts = Array.from(new Set(
-    event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
+    displayContent.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
   )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
   const isActiveAssistant = Boolean(sessionId && !event.isComplete && (
     runningSessionId === sessionId ||
@@ -655,7 +657,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
             {hasContent && (
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-                  <MarkdownRenderer content={event.content} />
+                  <MarkdownRenderer content={displayContent} />
                 </div>
                 {mdArtifacts.length > 0 && (
                   <div className="flex flex-col" style={{ gap: 12 }}>

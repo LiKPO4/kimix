@@ -184,6 +184,25 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("Hello");
   });
 
+  it("separates assistant content resumed after a tool boundary", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "先读取关键文件确认当前代码状态。", isThinking: false, isComplete: false },
+      { id: "2", type: "tool_call", timestamp: 2, toolCallId: "tc-1", toolName: "Read", status: "completed", arguments: {}, rawArguments: "{}" },
+      { id: "3", type: "tool_result", timestamp: 3, toolCallId: "tc-1", toolName: "Read", result: "ok" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "4",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "现在开始并行修复批次1的安全类P0问题。",
+      isThinking: false,
+      isComplete: false,
+    };
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.content).toBe("先读取关键文件确认当前代码状态。\n\n现在开始并行修复批次1的安全类P0问题。");
+  });
+
   it("completes assistant message on TurnEnd", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Done", isThinking: false, isComplete: false },

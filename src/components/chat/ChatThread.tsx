@@ -15,6 +15,7 @@ import { QuestionCard } from "./QuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
@@ -302,6 +303,10 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "k
 
   const pushStandaloneTools = (tools: ToolCallEvent[]) => {
     if (tools.length === 0) return;
+    if (sessionEngine === "kimi-code") {
+      items.push({ type: "event", event: createToolOnlyAssistantEvent(tools), leadingTools: tools, trailingStatuses: [] });
+      return;
+    }
     items.push({ type: "tool_group", id: tools[0].id, tools });
   };
 
@@ -514,6 +519,7 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "k
 function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end" | "never"): TimelineEvent[] {
   return events.filter((event, index) => {
     if (event.type !== "status_update") return true;
+    if (event.source === "slash") return true;
     if (display === "never") return false;
     if (display === "each") return true;
     const nextTurnIndex = events.findIndex((candidate, candidateIndex) => (

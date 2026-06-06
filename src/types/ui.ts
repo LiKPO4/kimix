@@ -3,7 +3,7 @@ export type Theme = "dark" | "light" | "system";
 export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
-export type ComposerDockCard = "todo" | "pending";
+export type ComposerDockCard = "todo" | "pending" | "goal";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 
 export interface AppState {
@@ -60,8 +60,26 @@ export interface Session {
   updatedAt: number;
   archivedAt?: number;
   btwRounds?: BtwRound[];
+  officialGoal?: OfficialGoalState;
   events: TimelineEvent[];
   isLoading: boolean;
+}
+
+export interface OfficialGoalState {
+  goal: OfficialGoalSnapshot | null;
+  updatedAt: number;
+  error?: string | null;
+}
+
+export interface OfficialGoalSnapshot {
+  goalId?: string;
+  objective: string;
+  completionCriterion?: string;
+  status: string;
+  turnsUsed?: number;
+  tokensUsed?: number;
+  wallClockMs?: number;
+  terminalReason?: string;
 }
 
 export interface BtwRound {
@@ -256,6 +274,8 @@ export interface StatusUpdateEvent {
   contextLimit?: number;
   planMode?: boolean;
   message?: string;
+  source?: "runtime" | "slash" | "ui" | "ipc";
+  tone?: "default" | "info" | "success" | "warning" | "danger";
 }
 
 export interface FileArtifactEvent {

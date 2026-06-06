@@ -1,4 +1,5 @@
 import type { Session, TimelineEvent } from "@/types/ui";
+import { restoreAssistantProgressParagraphs } from "./assistantParagraphs";
 
 export function formatEventAsMarkdown(event: TimelineEvent): string {
   if (event.type === "user_message") {
@@ -10,7 +11,7 @@ export function formatEventAsMarkdown(event: TimelineEvent): string {
   if (event.type === "steer_message") return `## 用户引导\n\n${event.content}`;
   if (event.type === "assistant_message") {
     const thinking = event.thinking ? `\n\n<details>\n<summary>思考</summary>\n\n${event.thinking}\n\n</details>` : "";
-    return `## Kimi\n\n${event.content || ""}${thinking}`;
+    return `## Kimi\n\n${restoreAssistantProgressParagraphs(event.content || "")}${thinking}`;
   }
   if (event.type === "tool_call") return `> 命令：${event.toolName}\n>\n> ${event.rawArguments ?? JSON.stringify(event.arguments)}`;
   if (event.type === "status_update") return `> 状态：${event.message ?? "处理中"}`;

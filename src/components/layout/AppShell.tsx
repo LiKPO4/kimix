@@ -13,6 +13,7 @@ import {
   ClipboardList,
   LucideIcon,
   MessageSquarePlus,
+  Target,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -34,6 +35,7 @@ import { ToastSystem } from "./ToastSystem";
 import { LongTaskInspectorPanel, type BtwPanelState, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 440;
@@ -51,6 +53,14 @@ const EMPTY_BTW_TRANSIENT_STATE: BtwTransientState = {
   loading: false,
   error: null,
 };
+
+function goalStatusLabel(status: string) {
+  if (status === "active") return "进行中";
+  if (status === "paused") return "已暂停";
+  if (status === "blocked") return "受阻";
+  if (status === "complete") return "已完成";
+  return status;
+}
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -755,6 +765,10 @@ export function AppShell() {
     ? { ...btwTransientState, rounds: liveCurrentSession.btwRounds ?? [] }
     : EMPTY_BTW_PANEL_STATE;
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
+  const rawCurrentGoal = liveCurrentSession?.officialGoal?.goal ?? null;
+  const currentGoal = rawCurrentGoal && !isTerminalGoalStatus(rawCurrentGoal.status) ? rawCurrentGoal : null;
+  const currentGoalStatus = currentGoal?.status ?? "";
+  const hasVisibleGoalModeCard = Boolean(currentGoal && !["complete", "cancelled", "canceled"].includes(currentGoalStatus));
   const hiddenComposerCardEntries = [
     hiddenComposerCardList.includes("todo") && latestTodos.length > 0
       ? {
@@ -772,7 +786,15 @@ export function AppShell() {
           icon: MessageSquarePlus,
         }
       : null,
-  ].filter((item): item is { key: "todo" | "pending"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
+    hiddenComposerCardList.includes("goal") && hasVisibleGoalModeCard
+      ? {
+          key: "goal" as const,
+          title: "官方 Goal",
+          desc: `${currentGoalStatus ? goalStatusLabel(currentGoalStatus) : "进行中"} · ${currentGoal?.objective ?? ""}`,
+          icon: Target,
+        }
+      : null,
+  ].filter((item): item is { key: "todo" | "pending" | "goal"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
   const visibleSessionLongTasks = useMemo(() => {
     const archivedTaskIds = new Set(
       sessions
@@ -1260,6 +1282,129 @@ export function AppShell() {
     await navigator.clipboard.writeText(text);
     showToast(successMessage);
   };
+  const syncOfficialGoalState = (sessionId: string, goal: NonNullable<Session["officialGoal"]>["goal"], error?: string | null) => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      officialGoal: {
+        goal: reconcileOfficialGoalSnapshot(goal, session.officialGoal?.goal),
+        error: error ?? null,
+        updatedAt: Date.now(),
+      },
+      updatedAt: Date.now(),
+    }));
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
+    if (latest && currentSession?.id === sessionId) setCurrentSession(latest);
+  };
+  const ensureOfficialGoalRuntime = async () => {
+    if (!liveCurrentSession) {
+      showToast("请先选择一个会话");
+      return null;
+    }
+    const existing = getRuntimeSessionId(liveCurrentSession);
+    if (existing) {
+      const res = await window.api.resumeKimiCodeSession({ sessionId: existing });
+      if (!res.success) throw new Error(res.error);
+      updateSession(liveCurrentSession.id, (session) => ({
+        ...session,
+        engine: "kimi-code",
+        runtimeSessionId: res.data.sessionId,
+        officialSessionId: res.data.sessionId,
+        updatedAt: Date.now(),
+      }));
+      return { uiSessionId: liveCurrentSession.id, runtimeSessionId: res.data.sessionId };
+    }
+    const res = await window.api.createKimiCodeSession({
+      workDir: liveCurrentSession.projectPath,
+      permission: permissionMode,
+      planMode: defaultPlanMode,
+    });
+    if (!res.success) throw new Error(res.error);
+    updateSession(liveCurrentSession.id, (session) => ({
+      ...session,
+      engine: "kimi-code",
+      runtimeSessionId: res.data.sessionId,
+      officialSessionId: res.data.sessionId,
+      updatedAt: Date.now(),
+    }));
+    return { uiSessionId: liveCurrentSession.id, runtimeSessionId: res.data.sessionId };
+  };
+  const refreshOfficialGoal = async () => {
+    try {
+      const runtime = await ensureOfficialGoalRuntime();
+      if (!runtime) return;
+      const res = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
+      if (!res.success) {
+        syncOfficialGoalState(runtime.uiSessionId, null, res.error);
+        showToast(`官方 Goal 读取失败：${res.error}`);
+        return;
+      }
+      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
+      showToast(res.data.goal ? "已刷新官方 Goal" : "当前没有官方 Goal");
+    } catch (err) {
+      showToast(`官方 Goal 读取失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const createOfficialGoal = async (objective: string, replace?: boolean) => {
+    try {
+      const runtime = await ensureOfficialGoalRuntime();
+      if (!runtime) return;
+      const res = await window.api.createKimiCodeGoal({ sessionId: runtime.runtimeSessionId, objective, replace });
+      if (!res.success) {
+        syncOfficialGoalState(runtime.uiSessionId, null, res.error);
+        showToast(`官方 Goal 启动失败：${res.error}`);
+        return;
+      }
+      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
+      showToast(replace ? "已替换官方 Goal" : "已启动官方 Goal");
+    } catch (err) {
+      showToast(`官方 Goal 启动失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const pauseOfficialGoal = async () => {
+    try {
+      const runtime = await ensureOfficialGoalRuntime();
+      if (!runtime) return;
+      const res = await window.api.pauseKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Paused from Kimix sidebar" });
+      if (!res.success) {
+        showToast(`官方 Goal 暂停失败：${res.error}`);
+        return;
+      }
+      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
+      showToast("已暂停官方 Goal");
+    } catch (err) {
+      showToast(`官方 Goal 暂停失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const resumeOfficialGoal = async () => {
+    try {
+      const runtime = await ensureOfficialGoalRuntime();
+      if (!runtime) return;
+      const res = await window.api.resumeKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Resumed from Kimix sidebar" });
+      if (!res.success) {
+        showToast(`官方 Goal 继续失败：${res.error}`);
+        return;
+      }
+      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
+      showToast("已继续官方 Goal");
+    } catch (err) {
+      showToast(`官方 Goal 继续失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const cancelOfficialGoal = async () => {
+    try {
+      const runtime = await ensureOfficialGoalRuntime();
+      if (!runtime) return;
+      const res = await window.api.cancelKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Cancelled from Kimix sidebar" });
+      if (!res.success) {
+        showToast(`官方 Goal 取消失败：${res.error}`);
+        return;
+      }
+      syncOfficialGoalState(runtime.uiSessionId, null);
+      showToast("已取消官方 Goal");
+    } catch (err) {
+      showToast(`官方 Goal 取消失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
   const updateBtwTransientState = (sessionId: string, patch: Partial<BtwTransientState>) => {
     setBtwTransientBySessionId((current) => ({
       ...current,
@@ -1464,6 +1609,7 @@ export function AppShell() {
             btwState={btwState}
             btwDisabled={!liveCurrentSession || isCurrentSessionRunning}
             defaultPlanMode={defaultPlanMode}
+            officialGoal={liveCurrentSession?.officialGoal}
             buildNextLongTaskPrompt={buildNextLongTaskPrompt}
             onClose={() => setLongTaskInspectorOpen(false)}
             onPatchLongTaskMeta={patchLongTaskMeta}
@@ -1482,6 +1628,11 @@ export function AppShell() {
             onSetBtwInput={setBtwInput}
             onAskBtw={askBtw}
             onClearBtw={clearBtw}
+            onRefreshOfficialGoal={refreshOfficialGoal}
+            onCreateOfficialGoal={createOfficialGoal}
+            onPauseOfficialGoal={pauseOfficialGoal}
+            onResumeOfficialGoal={resumeOfficialGoal}
+            onCancelOfficialGoal={cancelOfficialGoal}
             showToast={showToast}
             copyToClipboard={copyToClipboard}
           />

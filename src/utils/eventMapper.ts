@@ -1,5 +1,6 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
 import { isLegacyKimiWorkDirError } from "./eventHelpers";
+import { restoreAssistantProgressParagraphs } from "./assistantParagraphs";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -52,7 +53,11 @@ function appendAssistantContent(existingContent: string, incomingContent: string
   ) {
     return existingContent + incomingContent;
   }
-  return `${existingContent}\n\n${incomingContent}`;
+  return restoreAssistantProgressParagraphs(`${existingContent}\n\n${incomingContent}`);
+}
+
+function isAssistantProcessBoundary(event: TimelineEvent): boolean {
+  return !["assistant_message", "status_update", "todo", "steer_message"].includes(event.type);
 }
 
 function normalizeComparableContent(content: string): string {
@@ -567,8 +572,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       if (hasQuestionBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
         return [...existing, incoming];
       }
-      const shouldBreakParagraph = !last.content.trim() &&
-        eventsAfterOpenAssistant.some((event) => !["assistant_message", "status_update", "todo"].includes(event.type));
+      const shouldBreakParagraph = eventsAfterOpenAssistant.some(isAssistantProcessBoundary);
       const updated: typeof last = {
         ...last,
         agentRole: incoming.agentRole ?? last.agentRole,

@@ -28,6 +28,16 @@ const collapsedSettingsItemClass = "flex items-center justify-center rounded-lg 
 const collapsedNavButtonStyle = { width: 40, height: 40, minWidth: 40, minHeight: 40, padding: 0 } as const;
 const collapsedSettingsButtonStyle = { width: 40, height: 36, minWidth: 40, minHeight: 36, padding: 0 } as const;
 
+function normalizeProjectPath(path: string | undefined) {
+  return (path ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function isSameProjectPath(a: string | undefined, b: string | undefined) {
+  const left = normalizeProjectPath(a);
+  const right = normalizeProjectPath(b);
+  return Boolean(left && right && left === right);
+}
+
 interface SidebarProps {
   width?: number;
 }
@@ -53,7 +63,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const archiveSession = useSessionStore((s) => s.archiveSession);
   const updateSession = useSessionStore((s) => s.updateSession);
 
-  const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
 
@@ -78,9 +88,57 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     }
     if (lastAutoExpandedProjectId.current !== currentProject.id) {
       lastAutoExpandedProjectId.current = currentProject.id;
-      setExpandedProject(currentProject.id);
+      setExpandedProjectIds((current) => new Set([...current, currentProject.id]));
     }
   }, [currentProject?.id]);
+
+  useEffect(() => {
+    if (!currentSession || currentSession.archivedAt || isHiddenInternalSession(currentSession)) return;
+    const existing = sessions.find((session) => session.id === currentSession.id);
+    if (!existing) {
+      addSession(currentSession);
+      return;
+    }
+    const currentHasMoreEvents = currentSession.events.length > existing.events.length;
+    const hasCurrentMetadataUpdate = currentSession.updatedAt >= existing.updatedAt && (
+      existing.title !== currentSession.title ||
+      existing.projectPath !== currentSession.projectPath ||
+      existing.engine !== currentSession.engine ||
+      existing.runtimeSessionId !== currentSession.runtimeSessionId ||
+      existing.officialSessionId !== currentSession.officialSessionId ||
+      existing.model !== currentSession.model ||
+      existing.titleLocked !== currentSession.titleLocked ||
+      existing.longTask !== currentSession.longTask ||
+      existing.btwRounds !== currentSession.btwRounds ||
+      existing.officialGoal !== currentSession.officialGoal ||
+      existing.isLoading !== currentSession.isLoading
+    );
+    if (!currentHasMoreEvents && !hasCurrentMetadataUpdate) return;
+
+    const nextSession = {
+      ...(hasCurrentMetadataUpdate ? { ...existing, ...currentSession } : existing),
+      events: currentHasMoreEvents ? currentSession.events : existing.events,
+      updatedAt: Math.max(existing.updatedAt, currentSession.updatedAt),
+    };
+
+    if (
+      nextSession.title === existing.title &&
+      nextSession.projectPath === existing.projectPath &&
+      nextSession.engine === existing.engine &&
+      nextSession.runtimeSessionId === existing.runtimeSessionId &&
+      nextSession.officialSessionId === existing.officialSessionId &&
+      nextSession.model === existing.model &&
+      nextSession.titleLocked === existing.titleLocked &&
+      nextSession.longTask === existing.longTask &&
+      nextSession.btwRounds === existing.btwRounds &&
+      nextSession.officialGoal === existing.officialGoal &&
+      nextSession.isLoading === existing.isLoading &&
+      nextSession.events === existing.events &&
+      nextSession.updatedAt === existing.updatedAt
+    ) return;
+
+    updateSession(currentSession.id, () => nextSession);
+  }, [addSession, currentSession, sessions, updateSession]);
 
   const createSessionForProject = async (project: Project) => {
     if (useAppStore.getState().creatingSessionProjectPath) return;
@@ -108,7 +166,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setCurrentProject(project);
       setWorkspaceView("chat");
       setCurrentSession(session);
-      setExpandedProject(project.id);
+      setExpandedProjectIds((current) => new Set([...current, project.id]));
     } finally {
       setCreatingSessionProjectPath(null);
     }
@@ -189,9 +247,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const archiveProjectSessions = (project: Project) => {
-    const targets = sessions.filter((session) => session.projectPath === project.path && !session.archivedAt && !isHiddenInternalSession(session));
+    const targets = sessions.filter((session) => isSameProjectPath(session.projectPath, project.path) && !session.archivedAt && !isHiddenInternalSession(session));
     targets.forEach((session) => archiveSession(session.id));
-    if (currentSession && currentSession.projectPath === project.path) {
+    if (currentSession && isSameProjectPath(currentSession.projectPath, project.path)) {
       setCurrentSession(null);
     }
     setOpenProjectMenu(null);
@@ -237,7 +295,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       const nextProject = nextProjects.find((item) => item.id !== project.id) ?? null;
       setCurrentProject(nextProject);
       setCurrentSession(null);
-      setExpandedProject(nextProject?.id ?? null);
+      setExpandedProjectIds((current) => {
+        const next = new Set(current);
+        next.delete(project.id);
+        if (nextProject?.id) next.add(nextProject.id);
+        return next;
+      });
     }
     setOpenProjectMenu(null);
     toast("已从侧栏移除项目");
@@ -317,11 +380,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     );
   }
 
+  const visibleSessions = currentSession && !sessions.some((session) => session.id === currentSession.id)
+    ? [currentSession, ...sessions]
+    : sessions;
+
   const projectSessions = (projectPath: string) =>
-    sessions.filter((s) => s.projectPath === projectPath && !s.archivedAt && !isHiddenInternalSession(s));
+    visibleSessions.filter((s) => isSameProjectPath(s.projectPath, projectPath) && !s.archivedAt && !isHiddenInternalSession(s));
 
   const selectSession = async (sessionId: string) => {
-    const session = sessions.find((s) => s.id === sessionId);
+    const session = visibleSessions.find((s) => s.id === sessionId);
     if (!session) return;
     setCurrentSession(session);
     if (session.events.some((event) => event.type === "user_message" || event.type === "assistant_message")) return;
@@ -343,6 +410,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       isLoading: false,
       updatedAt: Date.now(),
     }));
+    const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+    if (updated) setCurrentSession(updated);
   };
 
   return (
@@ -404,7 +473,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {recentProjects.map((project, projectIndex) => {
-            const isExpanded = expandedProject === project.id;
+            const isExpanded = expandedProjectIds.has(project.id);
             const isActive = currentProject?.id === project.id;
             const isPinned = project.pinned ?? false;
             const pSessions = projectSessions(project.path);
@@ -457,10 +526,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                 >
                   <button
                     onClick={async () => {
-                      const nextExpanded = isExpanded ? null : project.id;
+                      if (isExpanded) lastAutoExpandedProjectId.current = project.id;
                       if (!isActive) setCurrentProject(project);
-                      setExpandedProject(nextExpanded);
-                      const hasSession = sessions.some((s) => s.projectPath === project.path && !s.archivedAt && !isHiddenInternalSession(s));
+                      setExpandedProjectIds((current) => {
+                        const next = new Set(current);
+                        if (isExpanded) next.delete(project.id);
+                        else next.add(project.id);
+                        return next;
+                      });
+                      const hasSession = visibleSessions.some((s) => isSameProjectPath(s.projectPath, project.path) && !s.archivedAt && !isHiddenInternalSession(s));
                       if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
                         await createSessionForProject(project);
                       }
@@ -487,7 +561,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                       onClick={async (e) => {
                         e.stopPropagation();
                         setCurrentProject(project);
-                        setExpandedProject(project.id);
+                        setExpandedProjectIds((current) => new Set([...current, project.id]));
                         await createSessionForProject(project);
                       }}
                       disabled={Boolean(creatingSessionProjectPath)}
@@ -636,7 +710,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.310</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.336</span>
         </button>
       </div>
     </aside>

@@ -426,10 +426,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     const res = await window.api.setKimiDefaultModel({ modelAlias: alias });
     setProviderBusyAction(null);
     if (res.success) {
+      settingsStatusCache.modelConfig = res.data;
+      settingsStatusCache.modelConfigMessage = res.data.message ?? "";
       setModelConfig(res.data);
       setSelectedModelAlias(alias);
       setProviderDraft((current) => ({ ...current, modelAlias: alias }));
-      setProviderMessage(res.data.message);
+      setProviderMessage(settingsStatusCache.modelConfigMessage);
       window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
       return;
     }
@@ -456,9 +458,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     });
     setAdaptiveThinkingBusyAlias(null);
     if (res.success) {
+      settingsStatusCache.modelConfig = res.data;
+      settingsStatusCache.modelConfigMessage = `${res.data.message}：${model.alias} ${next ? "开启" : "关闭"}`;
       setModelConfig(res.data);
       setSelectedModelAlias(model.alias);
-      setProviderMessage(`${res.data.message}：${model.alias} ${next ? "开启" : "关闭"}`);
+      setProviderMessage(settingsStatusCache.modelConfigMessage);
       window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
       return;
     }
@@ -495,6 +499,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     const res = await window.api.saveKimiOpenAiProvider(payload);
     setProviderBusyAction(null);
     if (res.success) {
+      settingsStatusCache.modelConfig = res.data;
+      settingsStatusCache.modelConfigMessage = "";
       setModelConfig(res.data);
       setModelConfigMessage("");
       setProviderMessage(res.data.message);
@@ -1371,7 +1377,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.310 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.336 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

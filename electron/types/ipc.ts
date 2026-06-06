@@ -1212,6 +1212,57 @@ export type KimiCodeBtwResponse = {
   error: string;
 };
 
+export type KimiCodeGoalStatus = "active" | "paused" | "blocked" | "complete" | string;
+
+export type KimiCodeGoalBudget = {
+  turnBudget?: number | null;
+  tokenBudget?: number | null;
+  wallClockBudgetMs?: number | null;
+  remainingTurns?: number | null;
+  remainingTokens?: number | null;
+  remainingWallClockMs?: number | null;
+};
+
+export type KimiCodeGoalSnapshot = {
+  goalId?: string;
+  objective: string;
+  completionCriterion?: string;
+  status: KimiCodeGoalStatus;
+  turnsUsed?: number;
+  tokensUsed?: number;
+  wallClockMs?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  terminalReason?: string;
+  budget?: KimiCodeGoalBudget;
+  [key: string]: unknown;
+};
+
+export type KimiCodeGoalState = {
+  goal: KimiCodeGoalSnapshot | null;
+  cancelledGoal?: KimiCodeGoalSnapshot;
+};
+
+export type KimiCodeCreateGoalRequest = {
+  sessionId: string;
+  objective: string;
+  completionCriterion?: string;
+  replace?: boolean;
+};
+
+export type KimiCodeGoalActionRequest = {
+  sessionId: string;
+  reason?: string;
+};
+
+export type KimiCodeGoalResponse = {
+  success: true;
+  data: KimiCodeGoalState;
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeSetPlanModeRequest = {
   sessionId: string;
   enabled: boolean;

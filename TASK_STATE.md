@@ -2558,3 +2558,404 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `kimi doctor` 通过：`config.toml` 与 `tui.toml` 均有效。
 ## 下一步
 - 提交并推送 master；暂不打 tag、不发 release。
+
+# 2026-06-05 v2.8.312 默认模型切换修复
+## 已完成
+- 更新弹窗里“浏览器下载”改为“浏览器查看”，Kimi Code 卡片也新增“浏览器查看”，点击打开官方 Kimi Code 页面。
+- 修复设置页切换默认模型后可能被旧缓存覆盖的问题：切换默认模型、保存 Provider、切换自适应思考后同步刷新 `settingsStatusCache.modelConfig`。
+- 修复旧会话沿用旧模型的问题：启动/恢复 Kimi Code 会话时统一使用当前默认模型；恢复旧会话后显式调用官方 SDK `setModel()`。
+- 后端切换默认模型后增加复读校验：SDK `setConfig()` 返回后会 `getConfig({ reload: true })` 确认默认模型已持久化；否则回退到 TOML 写入。
+- 版本号三处同步到 v2.8.312。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-1Zk7oWtA.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户在 v2.8.312 复验：设置页从 Kimi 切到 DeepSeek 后，切出/切回设置仍保持 DeepSeek；进入旧 Kimi 对话发送新消息时，底部显示和实际回复模型都应跟随 DeepSeek。
+
+# 2026-06-05 v2.8.313 官方 Goal / 斜杠命令第一版接入
+## 已完成
+- 确认 Kimi Code 0.10.0 SDK 的 `Session.createGoal/getGoal/pauseGoal/resumeGoal/cancelGoal` 是真 SDK 能力，需要开启 `KIMI_CODE_EXPERIMENTAL_GOAL_COMMAND=1`。
+- Electron host、IPC、preload 和 renderer preview stub 接通官方 Goal API。
+- Composer 在 Kimi Code SDK 会话恢复斜杠建议，并拦截 `/goal`、`/compact`、`/plan`、`/btw`、`/undo`；这些命令不会作为普通用户文本发送给模型。
+- `/goal` 支持启动、查看、暂停、继续、取消、替换；右侧会话侧栏新增“官方 Goal”卡片，支持刷新、启动/替换、暂停/继续、取消。
+- `/goal next` 暂不作为真实队列接入：当前 SDK 未公开 next queue/list API；无当前 Goal 时按创建处理，有当前 Goal 时提示使用完成/取消/替换。
+- `/compact` 成功路径保持完全静默，不在对话里追加内部状态；失败时才显示错误。
+- 版本号三处同步到 v2.8.313。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-GRLNbX4b.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+- SDK Goal 专项探针通过：`createKimiHarness()` 创建会话后，`createGoal/getGoal/pauseGoal/resumeGoal/cancelGoal` 五个方法存在且均可调用。
+## 下一步
+- 请用户在 v2.8.313 复验：右侧“官方 Goal”卡片、`/goal <目标>`、`/goal status`、`/goal pause/resume/cancel/replace`，以及 `/compact` 静默压缩是否仍正常。
+
+# 2026-06-05 v2.8.314 Goal 执行流与模型显示修正
+## 当前目标
+- 修复 v2.8.313 验收反馈：`/goal` 只更新侧栏、不进消息流也不触发 agent 感知；Goal 运行中用户普通输入误发新 turn 导致 active turn 报错；Goal 完成后右侧状态长时间不刷新；底部模型显示与实际默认模型不一致。
+## 已完成
+- `/goal <目标>` / `/goal replace <目标>` 创建官方 Goal 后，会把原始 slash 命令作为用户消息显示在聊天流，并给 SDK 发送一条“继续执行当前官方 Goal”的 prompt，触发官方 Goal runtime 自动推进后续 turn。
+- 运行中普通发送统一进入 Kimix 队列，不再在 SDK active turn 中直接 `prompt()`，避免 `Cannot launch a new turn while another turn is active`。
+- Kimi Code 会话终态 `completed/error/interrupted` 时，如果当前会话有官方 Goal 卡片，会自动 `getGoal()` 刷新右侧状态，避免 Goal 已结束但侧栏仍挂“进行中”。
+- 底部模型显示优先跟随当前默认模型；创建/恢复 Kimi Code runtime 时也用 SDK 返回模型同步本地会话模型。
+- 版本号三处同步到 v2.8.314。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-Bhs6ixO9.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.314 复验 `/goal <目标>` 是否进入聊天流并自动执行、Goal 完成后侧栏是否刷新、运行中输入是否不再报 active turn、底部模型是否显示当前默认模型。
+
+# 2026-06-05 v2.8.315 空历史会话回填修复
+## 当前目标
+- 修复 v2.8.314 后用户点击刚才的 Project06 会话时主面板显示空态，像是刚才那轮 Goal 对话消息丢失的问题。
+## 已完成
+- 确认官方 Kimi Code 磁盘历史未丢：`~/.kimi-code/sessions/wd_project06_34246546ba20/session_84b8d2b5-9532-478c-9829-2b0a8fb9f6b7/agents/main/wire.jsonl` 有 341 行，末尾包含 `goal.update status=complete`、`goal.clear`、`usage.record model=deepseek/deepseek-v4-flash`，以及用户“现在goal完成了吗”的后续一轮。
+- 确认 UI 根因：`Sidebar.selectSession()` 对空事件会话先 `setCurrentSession(session)`，异步 `loadSession()` 后只 `updateSession()`，没有把回填后的会话同步到 `currentSession`，主面板继续拿旧空对象。
+- 修复 `Sidebar.selectSession()`：官方历史加载并映射后，立即从 store 取回更新后的会话并 `setCurrentSession(updated)`。
+- 版本号三处同步到 v2.8.315。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-fwSdiZKt.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.315 点击左侧 Project06 下刚才那条“新会话”，确认聊天流能从官方历史回填。
+
+# 2026-06-05 v2.8.316 当前会话左侧列表一致性修复
+## 当前目标
+- 修复 v2.8.315 后“对话能打开、聊天流已恢复，但左侧 Project06 列表里仍只显示旧的空新会话/不显示当前可打开对话”的问题。
+## 已完成
+- 确认根因不止历史回填：左侧列表只从 `sessionStore.sessions` 渲染，而当前打开内容可能存在于 `appStore.currentSession`；同时项目过滤使用 `session.projectPath === project.path` 精确字符串匹配，路径大小写、斜杠、尾斜杠差异会把能打开的会话过滤掉。
+- `Sidebar` 新增项目路径规范化比较：统一斜杠、去尾斜杠、忽略大小写，用于项目下会话列表、归档项目会话、自动创建空会话判断。
+- `Sidebar` 新增 currentSession -> sessions 回灌：当前打开且非隐藏/非归档的会话如果不在 `sessionStore.sessions`，自动加入；如果标题、更新时间、项目路径或事件数量更新，也同步回列表源。
+- 左侧列表的显示源和点击源统一为 `visibleSessions`，避免当前会话临时可见但点击时从 `sessions` 查不到。
+- 版本号三处同步到 v2.8.316。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-Cc2HunTZ.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.316 复验：当前打开的 Project06 Goal 对话应出现在左侧 Project06 会话列表中，且点击该列表项仍能打开同一条聊天流。
+
+# 2026-06-05 v2.8.317 左侧多项目同时展开
+## 当前目标
+- 支持左侧多个项目同时展开，方便多线程工作时同时观察不同项目下会话的运行/转圈状态。
+## 已完成
+- `Sidebar` 的展开状态从单个 `expandedProject` 改为 `expandedProjectIds: Set<string>`。
+- 点击项目头只切换该项目自身展开/收起，不再折叠其它已展开项目。
+- 当前项目自动展开、新建会话、项目菜单新建会话都会把项目追加到展开集合，而不是替换展开项。
+- 移除项目时只从展开集合删除该项目，并保留其它项目展开状态。
+- 版本号三处同步到 v2.8.317。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-BAZh80PD.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.317 复验：Project06、Project04、kimix 等多个项目可同时展开，并能看到各自会话的转圈/运行状态。
+
+# 2026-06-05 v2.8.318 Slash Goal 本地消息流同步
+## 当前目标
+- 修复发送 `/goal ...` 后右侧 Goal 卡片更新、SDK 运行，但聊天消息流里看不到用户发送的 slash 指令的问题。
+## 已完成
+- 确认根因：`/goal` 路径先 `syncOfficialGoal()`，会把 `appStore.currentSession` 刷成“只有 Goal 状态”的对象；随后 `sendPromptContent(rawCommand)` 虽然把 user message / assistant placeholder 追加到 `sessionStore`，但没有立即同步 `currentSession`，导致主消息区继续看旧对象。
+- `sendPromptContent()` 在追加本地 user message / assistant placeholder 后，立刻从 `sessionStore` 取回最新 session 并 `setCurrentSession()`。
+- `appendLocalEvent()` 也同步更新 `currentSession`，覆盖 `/goal status`、失败提示、`/plan` 等本地状态卡路径。
+- 版本号三处同步到 v2.8.318。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-DwN3LzqS.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.318 复验：发送 `/goal 全面review一下当前项目` 后，聊天流应立即出现这条用户消息，同时右侧 Goal 卡片更新并开始执行。
+
+# 2026-06-05 v2.8.319 多项目展开收起回归修复
+## 当前目标
+- 修复 v2.8.317 多项目同时展开后，点击已经展开的非当前项目时会闪烁一下但仍保持展开的问题。
+## 已完成
+- 确认根因：点击已展开的非当前项目时，点击逻辑先从 `expandedProjectIds` 删除该项目，同时 `setCurrentProject(project)` 触发“当前项目自动展开”的 effect；effect 看到 currentProject 变化后又把该项目加回展开集合。
+- 修复项目头点击逻辑：当用户主动收起已展开项目时，先把 `lastAutoExpandedProjectId` 同步为该项目 id，避免自动展开 effect 撤销用户的收起操作。
+- 版本号三处同步到 v2.8.319。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CwTNcDHt.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.319 复验：点击已展开项目应收起；点击未展开项目应展开；多个项目仍可同时保持展开。
+
+# 2026-06-05 v2.8.320 Slash Goal 消息流覆盖链路修复
+## 当前目标
+- 修复发送 `/goal ...` 后右侧官方 Goal 已进入进行中、底部按钮已变停止，但聊天消息流仍看不到用户 slash 指令的问题。
+## 已完成
+- 确认根因不是没有追加消息，而是 `/goal` 先 `syncOfficialGoal()` 刷新了 `currentSession`，随后 `sendPromptContent()` 写入 `sessionStore` 后，`ensureKimiCodeRuntime()` 又把写消息前的旧 `targetSession` 设置回 `currentSession`。
+- v2.8.316 为修复左侧列表一致性新增的 `currentSession -> sessions` 回灌，会在上述旧 `currentSession` 存在时把更少 events 的对象写回 `sessionStore`，导致刚追加的 user message / assistant placeholder 被覆盖。
+- `Composer` 新增 `syncCurrentSessionFromStore()`，在追加本地消息、恢复/创建 Kimi Code runtime、追加本地状态事件后，都从 `sessionStore` 取回最新会话再同步 `currentSession`。
+- `Sidebar` 的回灌逻辑增加保护：当 `currentSession.events` 少于 store 中已有 events 时，保留 store 的 events，不再用旧对象清空更完整的消息流。
+- 版本号三处同步到 v2.8.320。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-D4saw83F.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.320 复验：发送 `/goal 全面review一下当前项目` 后，聊天流应立即出现这条用户 slash 消息，同时右侧官方 Goal 卡片更新、底部按钮进入停止态。
+
+# 2026-06-05 v2.8.321 旧 Goal 会话打开循环修复
+## 当前目标
+- 修复 v2.8.320 后打开以前 Goal 会话时报 `Maximum update depth exceeded`，界面进入 React 循环更新错误页的问题。
+## 已完成
+- 确认根因在 `Sidebar` 的 `currentSession -> sessions` 回灌 effect：当 store 中旧 Goal 会话已经有更多 events 或更新的 `updatedAt` 时，effect 仍因为 `existing.updatedAt !== currentSession.updatedAt` 反复调用 `updateSession()`。
+- 调整回灌策略：只有当前会话事件数更多，或当前会话元数据不旧于 store 且确实不同，才写回 `sessionStore`。
+- 写回前按最终合并结果做无差异检查，避免 store 已是最新时仍触发新的 `sessions` 数组更新。
+- 版本号三处同步到 v2.8.321。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-U3S125d-.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 请用户用 v2.8.321 复验：点击以前的 Goal 会话应能正常打开，不再进入 `Maximum update depth exceeded` 错误页；新 `/goal ...` 发送后仍应出现在聊天流。
+
+# 2026-06-05 v2.8.322 输入框上方 Goal 状态条首版
+## 当前目标
+- 在输入框上方增加类似 TodoList/排队消息的小型官方 Goal 提示条，让用户随时知道当前对话正处于 Goal 模式。
+## 已完成
+- `Composer` 在存在未完成官方 Goal 时，在 TodoList/排队消息之后、输入框之前显示一行 Goal 状态条。
+- 状态条包含 Goal 图标/运行 spinner、状态文案、目标摘要和已用轮数；已完成/取消状态不显示，避免历史完成 Goal 长期占用输入区。
+- 首版不提供关闭按钮，避免用户收起后再次忘记当前处于 Goal mode。
+- 版本号三处同步到 v2.8.322。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-DofmW0Ai.js`。
+- `pnpm test:run` 通过：6 个测试文件、83 个测试全部通过。
+## 下一步
+- 请用户用 v2.8.322 复验：启动 `/goal ...` 后，输入框上方应出现一行 Goal 状态条；若空间、颜色或顺序不舒服，再按截图微调。
+
+# 2026-06-05 v2.8.323 Assistant 多段进度正文换行修复
+## 当前目标
+- 修复 Goal 运行过程里明显应分段的多轮进度正文被强行塞进一个段落，导致聊天流和导出的 Markdown 都难以阅读的问题。
+## 已完成
+- 按用户截图关键词只读取导出 Markdown 局部，确认问题段在导出文件第 4111 行，导出时已经是一整段连续正文。
+- 确认根因不在 Markdown 导出器删除换行，而在 `mergeEvents()`：工具调用之后的新 assistant 正文仍继续拼回同一个未完成 assistant event，缺少段落边界。
+- `eventMapper` 调整 assistant 正文合并：中间隔过工具/审批/文件等处理事件后，后续正文用段落分隔；普通 token 级流式拼接仍保持 `Hel` + `lo` -> `Hello`。
+- 新增 `restoreAssistantProgressParagraphs()` 作为旧会话兜底：对已经压平的长进度正文，在聊天气泡显示和 Markdown 导出时按保守状态句边界恢复段落。
+- 新增单测覆盖工具边界后的 assistant 分段，以及导出 Markdown 的旧压平进度段恢复。
+- 版本号三处同步到 v2.8.323。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-6C0s1q-v.js`。
+- `pnpm test:run` 通过：7 个测试文件、85 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.323 复验：截图中的 Goal 进度长段应在聊天流里分段显示；重新导出 Markdown 后，对应段落也应带空行分隔。
+
+# 2026-06-05 v2.8.324 Goal 状态条可收起/恢复
+## 当前目标
+- 给输入框上方的官方 Goal 状态条增加关闭按钮，点击后隐藏；右侧会话侧栏提供恢复入口，可再次显示到输入框上方。
+## 已完成
+- `ComposerDockCard` 增加 `goal` 类型，复用现有 hidden composer cards 机制。
+- 输入框上方 Goal 状态条右侧增加 `X` 图标按钮，点击后隐藏该状态条，不影响官方 Goal 本身继续运行。
+- 右侧会话侧栏“已收起卡片”加入“官方 Goal”恢复项，显示当前 Goal 状态和目标摘要，点击后恢复到输入框上方。
+- 版本号三处同步到 v2.8.324。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-GUrULSjH.js`。
+- `pnpm test:run` 通过：7 个测试文件、85 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.324 复验：点击输入框上方 Goal 条右侧关闭按钮后应隐藏；右侧“已收起卡片”里点击“官方 Goal”应恢复显示。
+
+# 2026-06-05 v2.8.325 更新弹窗按钮高度对齐
+## 当前目标
+- 修复“更新记录”弹窗里 Kimi Code 卡片的“重新安装/更新”和“检查 Kimi Code”按钮视觉高度/顶线不一致的问题，并检查 Kimix 本体卡片同类按钮。
+## 已完成
+- `DialogSystem` 增加更新弹窗共享操作列样式：主按钮固定 `height/minHeight: 40`，第二行链接/占位固定 `height/minHeight: 20`。
+- Kimi Code 卡片的安装/更新/检查操作统一为两行操作列，按钮第一行顶线和高度一致，浏览器查看留在第二行。
+- Kimix 本体卡片也改为同一套操作列，避免“升级/检查本体/浏览器查看”在有更新或无更新状态下出现同类错位。
+- 版本号三处同步到 v2.8.325。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-B6vBmaDg.js`。
+- `pnpm test:run` 通过：7 个测试文件、85 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.325 复验更新记录弹窗：Kimi Code 卡片两个主按钮应等高、顶线一致；Kimix 本体卡片按钮也应保持同样规则。
+
+# 2026-06-05 v2.8.326 Markdown 表格碎片恢复
+## 当前目标
+- 修复 assistant 原本输出 GFM 表格时，表格分隔行被流式/历史内容切成多行，导致聊天流把表头和分隔符当普通段落渲染的问题。
+## 已完成
+- 确认用户附件里的原始片段已经出现坏结构：`| 功能 | 实现方式 | 价值 |` 后的 separator 被拆成 `|------`、空行、`|---------|------|`，GFM 无法识别成表格。
+- `restoreAssistantProgressParagraphs()` 增加窄范围表格修复：只在疑似表头行后收集 Markdown separator 碎片，并恢复为合法的 `|------|---------|------|`。
+- 聊天气泡显示和 Markdown 导出共用该修复链路，不改历史原始事件。
+- 新增导出单测覆盖被拆开的表格 separator。
+- 版本号三处同步到 v2.8.326。
+## 验证
+- `pnpm vitest run src/utils/__tests__/markdownExport.test.ts` 通过：1 个测试文件、2 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-CDpAcmtG.js`。
+- `pnpm test:run` 通过：7 个测试文件、86 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.326 复验截图中的方案 A / 方案 B 表格是否恢复为真正表格；若仍有非 separator 类型的断行，再按具体片段扩展修复规则。
+
+# 2026-06-05 v2.8.327 Kimi Code 0.11.0 SDK 跟进
+## 当前目标
+- 按官方 Kimi Code 0.11.0 更新，刷新 Kimix vendored node-sdk 并确认 Goal 队列、子 Skill、自动更新相关影响。
+## 已完成
+- 本机 `kimi --version` 已确认是 `0.11.0`；npm `@moonshot-ai/kimi-code` latest 为 `0.11.0`。
+- 从官方 repo `84afaf42fc2fc1882fd6fc1b656bdc5189b62315` 重生成 `vendor/kimi-code-sdk/index.mjs`；`packages/node-sdk` 版本仍为 `0.8.0`。
+- SDK 探针确认 `createKimiHarness()` 仍可用，`Session.createGoal/getGoal/pauseGoal/resumeGoal/cancelGoal` 五个方法存在且可调用。
+- SDK 探针确认 0.11.0 仍未公开 `/goal next` 或 queue API；Kimix 继续不伪造真实队列，只把提示更新为“0.11.0 TUI 已修复队列，但 node-sdk 未公开”。
+- SDK 探针确认开启 `KIMI_CODE_EXPERIMENTAL_SUB_SKILL=1` 时，`listSkills()` 能看到 `sub-skill.review` / `sub-skill.consolidate`，但本轮暂未默认开启到产品 UI。
+- Kimix 启动 vendored SDK 和运行 Kimi CLI 检查命令时默认设置 `KIMI_CODE_NO_AUTO_UPDATE=1` 与旧别名 `KIMI_CLI_NO_AUTO_UPDATE=1`，避免官方自动更新预检干扰 Kimix 自己的更新弹窗。
+- 版本号三处同步到 v2.8.327。
+## 验证
+- 0.11.0 SDK 方法探针通过：`createKimiHarness()` 可创建 session；Goal 生命周期五个方法存在且可调用；未发现 `next` / queue 公开方法。
+- 0.11.0 SDK Skill 探针通过：开启 `KIMI_CODE_EXPERIMENTAL_SUB_SKILL=1` 后，`listSkills()` 可看到 `sub-skill.review` / `sub-skill.consolidate`。
+- `pnpm build` 通过，renderer hash：`assets/index-DIKVWFSS.js`。
+- `pnpm test:run` 通过：7 个测试文件、86 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 完整验证通过后，请用户用 v2.8.327 复验 Kimi Code 更新弹窗、`/goal next` 边界提示和普通 Goal 生命周期。
+
+# 2026-06-05 v2.8.328 Kimi Code 纯工具轮消息头修复
+## 当前目标
+- 修复发送 `/goal 是否收到?` 这类 Goal 状态/完成相关消息后，assistant 轮次只有 `UpdateGoal` 工具执行体、没有正常消息头的问题。
+## 已完成
+- 确认根因在聊天渲染分组：同一 turn 如果没有 assistant 正文/思考，只包含工具调用，会退化成 standalone tool group，绕过 `MessageBubble` 的 assistant process header。
+- `ChatThread` 在 `kimi-code` 会话中把纯工具轮包装为一个空正文 assistant 占位事件，并把工具挂到 `leadingTools`，从而显示正常“执行中 / 输出完成”消息头。
+- 旧 `prompt` 引擎仍保留原 standalone tool group 行为，避免扩大影响面。
+- 新增 `createToolOnlyAssistantEvent()` 和单测覆盖纯工具轮完成态、运行态。
+- 版本号三处同步到 v2.8.328。
+## 验证
+- `pnpm vitest run src/utils/__tests__/chatRenderItems.test.ts` 通过：1 个测试文件、2 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-_lF6m99b.js`。
+- `pnpm test:run` 通过：8 个测试文件、88 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.328 复验：发送 `/goal 是否收到?` 后，`UpdateGoal` 这类纯工具轮应出现在带“执行中/输出完成”头部的 assistant 消息内，而不是只剩工具执行体。
+
+# 2026-06-05 v2.8.329 /goal status 对话流反馈
+## 当前目标
+- 修复单独发送 `/goal status` / `/goal show` 时只刷新右侧 Goal 侧栏、对话流没有明确反馈的问题。
+## 已完成
+- `/goal status` / `/goal show` 仍作为 Kimix 本地查询命令处理，不作为用户消息发送给 agent。
+- 查询成功后追加一条完成态 assistant 本地反馈，展示“已刷新官方 Goal 状态”、状态标签、轮数和目标摘要。
+- 失败路径仍追加状态错误信息，避免误显示为正常 assistant 回复。
+- 版本号三处同步到 v2.8.329。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CBCgc_aW.js`。
+- `pnpm test:run` 通过：8 个测试文件、88 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.329 复验：输入 `/goal status` 后，右侧 Goal 卡片刷新，同时聊天流应出现一条本地 assistant 状态反馈。
+
+# 2026-06-05 v2.8.330 Goal 工具完成证据优先
+## 当前目标
+- 修复 agent 已调用 `UpdateGoal` 并返回 `Goal marked complete.` 后，右侧官方 Goal 和输入框上方 Goal 条仍显示旧 blocked 目标的问题。
+## 已完成
+- 新增 `officialGoalState` 工具：识别 terminal Goal 状态，并在 SDK 刷新返回同一目标旧状态时保留本地 terminal 证据。
+- `App` 的 Kimi Code event listener 识别 `UpdateGoal` 的 `tool_result` / 合并后 `tool_call` 成功结果；若结果包含 `Goal marked complete.` 或 `status: complete`，立即把本地 `officialGoal.goal.status` 标为 `complete`。
+- turn 结束自动 `getGoal()` 刷新、`/goal status` 刷新、右侧“刷新”按钮都改为通过同一合并规则，避免 SDK 返回旧 blocked 时把本地 complete 倒回去。
+- 右侧“官方 Goal”卡片和输入框上方 Goal 条不再把 terminal goal 当作活跃目标显示。
+- 新增单测覆盖：本地 complete 不被同目标 blocked 刷新覆盖；`UpdateGoal` 工具结果可推断 complete。
+- 版本号三处同步到 v2.8.330。
+## 验证
+- `pnpm vitest run src/utils/__tests__/officialGoalState.test.ts` 通过：1 个测试文件、2 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-BlkQF6L1.js`。
+- `pnpm test:run` 通过：9 个测试文件、90 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.330 复验：让 agent 调用 `UpdateGoal` 完成目标后，右侧 Goal 卡片应回到未启动/无活跃目标状态，输入框上方 Goal 条也应消失；手动点刷新不应恢复旧 blocked 目标。
+
+# 2026-06-06 v2.8.331 Goal 卡片消息流实时刷新
+## 当前目标
+- 让右侧官方 Goal 卡片和输入框上方 Goal 条在 Kimi Code 消息流持续变化时同步刷新轮次/状态，而不是只依赖手动刷新或 turn 结束刷新。
+## 已完成
+- `App` 增加按 runtime session 节流的 Goal 刷新调度：当前会话已有官方 Goal 时，每次 Kimi Code 事件入流都会尝试触发 `getGoal()`，同一 runtime 1.2 秒内最多刷新一次。
+- Kimi Code turn 终态仍立即刷新 Goal，并更新节流时间，避免终态显示滞后。
+- effect 清理时会清掉 Goal 刷新 timer 和最近刷新时间，避免旧会话 timer 残留。
+- 版本号三处同步到 v2.8.331。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CUAVopva.js`。
+- `pnpm test:run` 通过：9 个测试文件、90 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.331 复验：Goal 运行中随着消息/工具/状态事件推进，右侧卡片的轮次和状态应在约 1 秒级别内刷新；截图左下角需确认是 v2.8.331。
+
+# 2026-06-06 v2.8.332 Slash 本地指令中央提示
+## 当前目标
+- 发送 Kimix 本地处理的 slash 指令时，在屏幕中央追加一条非消息提示，让用户知道指令已被接收。
+## 已完成
+- `status_update` 增加 `source` / `tone` 字段；slash 确认提示使用 `source: "slash"`、`tone: "info"`。
+- `StatusCard` 复用轮次信息的中央胶囊形态，slash 提示使用浅蓝信息态。
+- `ChatThread` 对 `source === "slash"` 的状态提示不应用 turn-end 过滤，确保每条本地 slash 都可见。
+- `Composer` 对本地处理的 `/goal`、`/compact`、`/plan`、`/btw`、`/undo` 先追加“已接收本地指令：/xxx ...”提示；未知 slash 和 `/skill:` 不误标为本地指令。
+- `isEmptyStatusUpdate()` 认为带 `message` 的状态不是空状态，避免 slash 提示被空状态逻辑吞掉。
+- 版本号三处同步到 v2.8.332。
+## 验证
+- `pnpm vitest run src/utils/__tests__/sessionMetrics.test.ts` 通过：1 个测试文件、15 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-CoyMH2qz.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.332 复验：发送 `/goal status`、`/compact`、`/plan`、`/btw ...`、`/undo` 时，聊天流中央应立即出现浅蓝胶囊提示；未知 slash 不应出现本地指令提示。
+
+# 2026-06-06 v2.8.333 Kimi Code 更新说明链接修复
+## 当前目标
+- 修复“更新记录”弹窗里 Kimi Code 卡片的“浏览器查看”打开 403 页的问题。
+## 已完成
+- `DialogSystem` 中 Kimi Code 更新查看链接从 `https://code.kimi.com/kimi-code` 改为官方 changelog：`https://moonshotai.github.io/kimi-code/zh/release-notes/changelog.html`。
+- 版本号三处同步到 v2.8.333。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-oN2oadfS.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.333 复验：更新记录弹窗中 Kimi Code 卡片的“浏览器查看”应打开官方 changelog，不再进入 403 页。
+
+# 2026-06-06 v2.8.334 顶部工具栏 hover 动效统一
+## 当前目标
+- 修复顶部工具栏里项目打开、差异面板、会话侧栏等按钮悬停反馈不一致的问题。
+## 已完成
+- 新增 `kimix-toolbar-button` 通用交互类，统一 toolbar 图标按钮的 hover 阴影、轻微上移和 active 回落。
+- 将启动 split button、项目 split button、终端、撤销、差异面板、会话侧栏统一套用同一类，避免部分按钮只有颜色变化或无明显反馈。
+- 版本号三处同步到 v2.8.334。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-BWnpkjRt.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.334 复验：顶部工具栏项目打开、差异面板、会话侧栏 hover 时应与旁边按钮一样有轻微阴影/位移反馈。
+
+# 2026-06-06 v2.8.335 顶部工具栏图标 hover 加深
+## 当前目标
+- 补齐顶部工具栏按钮 hover 时中心图标加深的反馈，让项目打开、差异面板、会话侧栏与旁边按钮一致。
+## 已完成
+- `kimix-toolbar-button:hover` 增加主文字色，并对子级 `svg` 同步加深。
+- 版本号三处同步到 v2.8.335。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-BDGviyqi.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.335 复验：顶部工具栏这些按钮 hover 时外壳有反馈，中心图标也会明显加深。
+
+# 2026-06-06 v2.8.336 顶部项目图标颜色统一
+## 当前目标
+- 修复顶部项目文件夹图标原本为黄色、hover 后变黑导致状态跳变不一致的问题。
+## 已完成
+- 顶部工具栏项目文件夹图标去掉 `text-accent-warning`，改为继承工具栏统一图标颜色。
+- 下拉菜单里的文件夹语义图标保持黄色，不影响菜单信息层级。
+- 版本号三处同步到 v2.8.336。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-adrU9oWC.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 请用户用 v2.8.336 复验：顶部项目文件夹图标默认色应和其他工具按钮一致，hover 时只做统一加深。
+
+# 2026-06-06 v2.8.336 发布准备
+## 当前目标
+- 按用户要求推送 GitHub 并发布 Release，发版说明覆盖 v2.8.295 之后累计改动。
+## 已完成
+- 新增 `docs/release-notes/v2.8.336.md`，按 Kimi Code 0.11.0、官方 Goal、slash 命令、会话列表、模型设置、Markdown、UI 细节分组整理累计改动。
+- 发布前验证重新通过。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-adrU9oWC.js`。
+- `pnpm test:run` 通过：9 个测试文件、91 个测试全部通过。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- stage 累计改动、提交、推送 `master`，再创建并推送 `v2.8.336` tag 触发 GitHub Actions。

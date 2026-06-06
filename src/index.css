@@ -524,6 +524,33 @@ body::before {
   box-shadow: var(--shadow-hover);
 }
 
+.kimix-toolbar-button {
+  transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
+              transform var(--duration-base) var(--ease-hover);
+}
+
+.kimix-toolbar-button:hover:not(:disabled) {
+  color: var(--kimix-panel-text);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+.kimix-toolbar-button:hover:not(:disabled) svg {
+  color: var(--kimix-panel-text);
+}
+
+.kimix-toolbar-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.kimix-toolbar-button:disabled {
+  transform: none;
+  box-shadow: none;
+}
+
 .bg-accent-primary:hover:not(:disabled),
 button.bg-accent-primary:hover:not(:disabled),
 .kimix-icon-text-button.bg-accent-primary:hover:not(:disabled) {

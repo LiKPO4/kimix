@@ -62,6 +62,12 @@ describe("isEmptyStatusUpdate", () => {
       isEmptyStatusUpdate({ id: "1", type: "status_update", timestamp: 1, tokenCount: 1, inputTokenCount: 0, contextSize: 0, contextLimit: 256000 }),
     ).toBe(false);
   });
+
+  it("returns false when status only has a message", () => {
+    expect(
+      isEmptyStatusUpdate({ id: "1", type: "status_update", timestamp: 1, message: "已接收本地指令：/goal status", source: "slash" }),
+    ).toBe(false);
+  });
 });
 
 describe("getLatestMeaningfulStatus", () => {

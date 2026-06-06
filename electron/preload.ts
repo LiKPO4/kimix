@@ -123,6 +123,9 @@ import type {
   KimiCodePluginResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
+  KimiCodeCreateGoalRequest,
+  KimiCodeGoalActionRequest,
+  KimiCodeGoalResponse,
   KimiCodeForkSessionRequest,
   KimiCodePromptRequest,
   KimiCodeQuestionResponseRequest,
@@ -299,6 +302,16 @@ const api = {
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
     ipcRenderer.invoke("kimi-code:askBtw", req),
+  createKimiCodeGoal: (req: KimiCodeCreateGoalRequest): Promise<KimiCodeGoalResponse> =>
+    ipcRenderer.invoke("kimi-code:createGoal", req),
+  getKimiCodeGoal: (req: KimiCodeSessionRequest): Promise<KimiCodeGoalResponse> =>
+    ipcRenderer.invoke("kimi-code:getGoal", req),
+  pauseKimiCodeGoal: (req: KimiCodeGoalActionRequest): Promise<KimiCodeGoalResponse> =>
+    ipcRenderer.invoke("kimi-code:pauseGoal", req),
+  resumeKimiCodeGoal: (req: KimiCodeGoalActionRequest): Promise<KimiCodeGoalResponse> =>
+    ipcRenderer.invoke("kimi-code:resumeGoal", req),
+  cancelKimiCodeGoal: (req: KimiCodeGoalActionRequest): Promise<KimiCodeGoalResponse> =>
+    ipcRenderer.invoke("kimi-code:cancelGoal", req),
   steerKimiCode: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:steer", req),
   undoKimiCodeHistory: (req: KimiCodeUndoHistoryRequest): Promise<KimiCodeVoidResponse> =>

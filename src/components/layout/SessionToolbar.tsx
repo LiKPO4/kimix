@@ -468,7 +468,7 @@ export function SessionToolbar({
           </button>
         ) : (
           <div ref={launchMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={`flex h-9 w-14 items-center rounded-xl border transition-colors ${launchMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"}`}>
+            <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${launchMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"}`}>
               <button
                 onClick={() => void launchExecutable()}
                 className="flex h-full flex-1 items-center justify-center"
@@ -540,7 +540,7 @@ export function SessionToolbar({
           </div>
         )}
         <div ref={projectMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <div className={`flex h-9 w-14 items-center rounded-xl border transition-colors ${projectMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"} ${!projectPath ? "opacity-45" : ""}`}>
+          <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${projectMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"} ${!projectPath ? "opacity-45" : ""}`}>
             <button
               onClick={openProjectPath}
               disabled={!projectPath}
@@ -549,7 +549,7 @@ export function SessionToolbar({
               title={currentProject?.path ?? "工作区"}
               aria-label="在文件资源管理器中打开项目"
             >
-              <FolderOpen size={16} className="shrink-0 text-accent-warning" />
+              <FolderOpen size={16} className="shrink-0" />
             </button>
             <button
               type="button"
@@ -593,7 +593,7 @@ export function SessionToolbar({
         <button
           onClick={openProjectTerminal}
           disabled={!projectPath}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
           title="终端"
           aria-label="终端"
         >
@@ -602,7 +602,7 @@ export function SessionToolbar({
         <button
           onClick={() => void undoKimiHistory()}
           disabled={!canUndoKimiHistory || undoBusy}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
           title="撤销官方历史上一轮"
           aria-label="撤销官方历史上一轮"
         >
@@ -610,7 +610,7 @@ export function SessionToolbar({
         </button>
         <button
           onClick={onToggleDiffPanel}
-          className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+          className={`kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border ${
             diffPanelOpen
               ? "border-accent-primary bg-accent-primary-light text-accent-primary"
               : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
@@ -622,7 +622,7 @@ export function SessionToolbar({
         </button>
         <button
           onClick={onToggleLongTaskInspector}
-          className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+          className={`kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border ${
             longTaskInspectorOpen
               ? "border-accent-primary bg-accent-primary-light text-accent-primary"
               : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"

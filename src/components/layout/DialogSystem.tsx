@@ -34,7 +34,13 @@ const RELEASE_TIMELINE = [
   { version: "v2.4.18", date: "2026-05-10", text: "接入官方 slash 命令和项目文件候选。" },
 ];
 
+const updateActionColumnStyle = { display: "flex", flexDirection: "column", alignItems: "center", gap: 7 } as const;
+const updatePrimaryButtonStyle = { height: 40, minHeight: 40, paddingLeft: 16, paddingRight: 18 } as const;
+const updateLinkButtonStyle = { height: 20, minHeight: 20, paddingLeft: 2, paddingRight: 2 } as const;
+const updateActionSpacerStyle = { height: 20, minHeight: 20 } as const;
+
 const KIMI_CODE_DOCS_URL = "https://moonshotai.github.io/kimi-code/zh/guides/getting-started.html";
+const KIMI_CODE_UPDATE_PAGE_URL = "https://moonshotai.github.io/kimi-code/zh/release-notes/changelog.html";
 const KIMI_CODE_WINDOWS_INSTALL_COMMAND = "irm https://code.kimi.com/kimi-code/install.ps1 | iex";
 
 interface KimiOnboardingProps {
@@ -377,46 +383,42 @@ function HelpDialogPanel({
                     </div>
                   )}
                 </div>
-                <div
-                  className="grid shrink-0 self-center"
-                  style={{
-                    gridTemplateColumns: updateState.hasUpdate ? "max-content max-content" : "max-content",
-                    justifyContent: "end",
-                    columnGap: 8,
-                    rowGap: 7,
-                    minWidth: updateState.hasUpdate ? 238 : 156,
-                  }}
-                >
+                <div className="flex shrink-0 items-start justify-end self-center" style={{ gap: 8, minWidth: updateState.hasUpdate ? 238 : 156 }}>
                   {updateState.hasUpdate && (
-                    <button
-                      onClick={onDownloadUpdate}
-                      disabled={updateState.downloading || updateState.loading}
-                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
-                      style={{ paddingLeft: 16, paddingRight: 18 }}
-                    >
-                      <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
-                      {updateState.downloading
-                        ? `下载中 ${formatDownloadPercent(updateState.downloadProgress?.percent ?? 0)}`
-                        : "升级"}
-                    </button>
+                    <div style={updateActionColumnStyle}>
+                      <button
+                        onClick={onDownloadUpdate}
+                        disabled={updateState.downloading || updateState.loading}
+                        className="kimix-icon-text-button shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
+                        style={updatePrimaryButtonStyle}
+                      >
+                        <RefreshCw size={14} className={updateState.downloading ? "kimix-spin" : ""} />
+                        {updateState.downloading
+                          ? `下载中 ${formatDownloadPercent(updateState.downloadProgress?.percent ?? 0)}`
+                          : "升级"}
+                      </button>
+                      <span aria-hidden="true" style={updateActionSpacerStyle} />
+                    </div>
                   )}
+                  <div style={updateActionColumnStyle}>
                     <button
                       onClick={onCheckUpdates}
                       disabled={updateState.loading || updateState.downloading}
-                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
-                      style={{ paddingLeft: 16, paddingRight: 18 }}
+                      className="kimix-icon-text-button shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:opacity-45"
+                      style={updatePrimaryButtonStyle}
                     >
                       <RefreshCw size={14} className={updateState.loading ? "kimix-spin" : ""} />
                       检查本体
                     </button>
-                  <button
-                    onClick={onOpenLatestRelease}
-                    disabled={updateState.loading}
-                    className="text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
-                    style={{ justifySelf: "center", paddingLeft: 2, paddingRight: 2 }}
-                  >
-                    浏览器下载
-                  </button>
+                    <button
+                      onClick={onOpenLatestRelease}
+                      disabled={updateState.loading}
+                      className="text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
+                      style={updateLinkButtonStyle}
+                    >
+                      浏览器查看
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="grid rounded-xl border border-border-subtle bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
@@ -460,38 +462,54 @@ function HelpDialogPanel({
                     <div className="mt-2 text-[12.5px] leading-5 text-text-muted">{cliUpdateState.info.migrationHint}</div>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center self-center" style={{ gap: 8 }}>
+                <div className="flex shrink-0 items-start self-center" style={{ gap: 8 }}>
                   {cliUpdateState.info?.available === false && (
-                    <button
-                      onClick={onInstallKimiCli}
-                      disabled={kimiInstallBusy || cliUpdateState.loading || cliUpdateState.updating}
-                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
-                      style={{ paddingLeft: 16, paddingRight: 18 }}
-                    >
-                      <RefreshCw size={14} className={kimiInstallBusy ? "kimix-spin" : ""} />
-                      {kimiInstallBusy ? "安装中" : "安装"}
-                    </button>
+                    <div style={updateActionColumnStyle}>
+                      <button
+                        onClick={onInstallKimiCli}
+                        disabled={kimiInstallBusy || cliUpdateState.loading || cliUpdateState.updating}
+                        className="kimix-icon-text-button shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
+                        style={updatePrimaryButtonStyle}
+                      >
+                        <RefreshCw size={14} className={kimiInstallBusy ? "kimix-spin" : ""} />
+                        {kimiInstallBusy ? "安装中" : "安装"}
+                      </button>
+                      <span aria-hidden="true" style={updateActionSpacerStyle} />
+                    </div>
                   )}
                   {cliUpdateState.hasUpdate && (
-                    <button
-                      onClick={onUpdateKimiCli}
-                      disabled={cliUpdateState.updating || cliUpdateState.loading}
-                      className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
-                      style={{ paddingLeft: 16, paddingRight: 18 }}
-                    >
-                      <RefreshCw size={14} className={cliUpdateState.updating ? "kimix-spin" : ""} />
-                      {cliUpdateState.updating ? (cliUpdateState.info?.isLegacy ? "升级中" : "更新中") : cliUpdateState.info?.isLegacy ? "升级并迁移" : "重新安装/更新"}
-                    </button>
+                    <div style={updateActionColumnStyle}>
+                      <button
+                        onClick={onUpdateKimiCli}
+                        disabled={cliUpdateState.updating || cliUpdateState.loading}
+                        className="kimix-icon-text-button shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
+                        style={updatePrimaryButtonStyle}
+                      >
+                        <RefreshCw size={14} className={cliUpdateState.updating ? "kimix-spin" : ""} />
+                        {cliUpdateState.updating ? (cliUpdateState.info?.isLegacy ? "升级中" : "更新中") : cliUpdateState.info?.isLegacy ? "升级并迁移" : "重新安装/更新"}
+                      </button>
+                      <span aria-hidden="true" style={updateActionSpacerStyle} />
+                    </div>
                   )}
-                  <button
-                    onClick={onCheckCliUpdate}
-                    disabled={cliUpdateState.loading || cliUpdateState.updating}
-                    className="kimix-icon-text-button h-10 shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
-                    style={{ paddingLeft: 16, paddingRight: 18 }}
-                  >
-                    <RefreshCw size={14} className={cliUpdateState.loading ? "kimix-spin" : ""} />
-                    检查 Kimi Code
-                  </button>
+                  <div className="flex shrink-0 flex-col items-center" style={updateActionColumnStyle}>
+                    <button
+                      onClick={onCheckCliUpdate}
+                      disabled={cliUpdateState.loading || cliUpdateState.updating}
+                      className="kimix-icon-text-button shrink-0 bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
+                      style={updatePrimaryButtonStyle}
+                    >
+                      <RefreshCw size={14} className={cliUpdateState.loading ? "kimix-spin" : ""} />
+                      检查 Kimi Code
+                    </button>
+                    <button
+                      onClick={() => void window.api.openExternal(KIMI_CODE_UPDATE_PAGE_URL)}
+                      disabled={cliUpdateState.loading || cliUpdateState.updating}
+                      className="text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
+                      style={updateLinkButtonStyle}
+                    >
+                      浏览器查看
+                    </button>
+                  </div>
                 </div>
               </div>
               {updateState.latest && (
