@@ -24,6 +24,7 @@ import {
   getHiddenHandoffSessionIds,
   rememberHiddenHandoffSession,
   persistLocalConversationState,
+  readLocalActiveContext,
   LOCAL_SESSIONS_KEY,
   LOCAL_PENDING_KEY,
 } from "@/utils/persistence";
@@ -63,13 +64,37 @@ interface StartHandoffDetail {
 
 function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): Session | undefined {
   const ids = new Set([historySessionId, runtimeSessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
-  return useSessionStore.getState().sessions.find((session) => (
+  return useSessionStore.getState().sessions.find((session) => !session.archivedAt && (
     ids.has(session.id) ||
     Boolean(session.officialSessionId && ids.has(session.officialSessionId)) ||
     Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId)) ||
     Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
     Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
   ));
+}
+
+function hasArchivedLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): boolean {
+  const ids = new Set([historySessionId, runtimeSessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
+  return useSessionStore.getState().sessions.some((session) => (
+    Boolean(session.archivedAt) &&
+    (
+      ids.has(session.id) ||
+      Boolean(session.officialSessionId && ids.has(session.officialSessionId)) ||
+      Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId)) ||
+      Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
+      Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
+    )
+  ));
+}
+
+function normalizeLocalProjectPath(projectPath: string | undefined) {
+  return (projectPath ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function isSameLocalProjectPath(a: string | undefined, b: string | undefined) {
+  const left = normalizeLocalProjectPath(a);
+  const right = normalizeLocalProjectPath(b);
+  return Boolean(left && right && left === right);
 }
 
 function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: boolean, turnLimit: number): TimelineEvent[] {
@@ -282,7 +307,7 @@ function buildLongTaskRecovery(
   status: "error" | "interrupted" | "paused",
   reason?: string,
 ): NonNullable<Session["longTask"]>["recovery"] {
-  const roleLabel = role === "reviewer" ? "审查 agent" : "执行 agent";
+  const roleLabel = role === "reviewer" ? "用户审查流程" : "长程任务";
   if (status === "error") {
     return {
       status: "failed",
@@ -384,7 +409,11 @@ function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "an
 }
 
 function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSessionId: string) {
-  return Boolean(session?.longTask && session.longTask.reviewerSessionId === runtimeSessionId);
+  return Boolean(
+    session?.longTask &&
+    session.longTask.reviewerSessionId !== session.longTask.executorSessionId &&
+    session.longTask.reviewerSessionId === runtimeSessionId
+  );
 }
 
 function shouldMirrorHiddenLongTaskEvent(event: TimelineEvent) {
@@ -460,11 +489,83 @@ function extractLongTaskCurrentStep(content: string) {
   return numbers.length > 0 ? Math.max(...numbers) : null;
 }
 
+type LongTaskStatusBlock = {
+  role?: "executor" | "reviewer";
+  status?: string;
+  conclusion?: string;
+  step?: number;
+  totalSteps?: number;
+};
+
+function normalizeLongTaskRole(value: unknown): LongTaskStatusBlock["role"] {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "executor" || normalized === "执行" || normalized === "执行 agent") return "executor";
+  if (normalized === "reviewer" || normalized === "审查" || normalized === "审核" || normalized === "审查 agent") return "reviewer";
+  return undefined;
+}
+
+function normalizeLongTaskPositiveInt(value: unknown) {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : NaN;
+  return Number.isInteger(number) && number >= 0 ? number : undefined;
+}
+
+function extractLongTaskStatusBlock(content: string): LongTaskStatusBlock | null {
+  const blocks: string[] = [];
+  const fenceRegex = /```(?:kimix-long-task-status|kimix_long_task_status)\s*([\s\S]*?)```/gi;
+  for (const match of content.matchAll(fenceRegex)) {
+    if (match[1]?.trim()) blocks.push(match[1].trim());
+  }
+  const inlineRegex = /KIMIX_LONG_TASK_STATUS\s*({[\s\S]*?})/gi;
+  for (const match of content.matchAll(inlineRegex)) {
+    if (match[1]?.trim()) blocks.push(match[1].trim());
+  }
+  for (const raw of blocks.reverse()) {
+    try {
+      const parsed = JSON.parse(raw.replace(/^json\s*/i, "").trim()) as Record<string, unknown>;
+      return {
+        role: normalizeLongTaskRole(parsed.role ?? parsed.agent),
+        status: typeof parsed.status === "string" ? parsed.status.trim() : typeof parsed.state === "string" ? parsed.state.trim() : undefined,
+        conclusion: typeof parsed.conclusion === "string" ? parsed.conclusion.trim() : undefined,
+        step: normalizeLongTaskPositiveInt(parsed.step ?? parsed.currentStep),
+        totalSteps: normalizeLongTaskPositiveInt(parsed.totalSteps ?? parsed.targetStep ?? parsed.steps),
+      };
+    } catch {
+      // Ignore malformed machine blocks and fall back to human-readable parsing below.
+    }
+  }
+  return null;
+}
+
+function normalizeLongTaskExecutorStatus(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase().replace(/[\s-]+/g, "_") ?? "";
+  if (["planning", "clarifying", "needs_clarification", "drafting"].includes(normalized)) return "planning";
+  if (["ready", "planning_ready", "waiting_user", "awaiting_confirmation", "ready_for_execution"].includes(normalized)) return "ready";
+  if (["ready_for_review", "needs_review", "review", "handoff_to_reviewer", "awaiting_review"].includes(normalized)) return "ready_for_review";
+  if (["blocked", "manual_review", "paused", "needs_user"].includes(normalized)) return "blocked";
+  if (["running", "executing"].includes(normalized)) return "running";
+  if (["completed", "complete", "done"].includes(normalized)) return "completed";
+  return null;
+}
+
 function inferLongTaskProgressPatch(session: Session, runtimeSessionId: string) {
   const meta = session.longTask;
   if (!meta || meta.executorSessionId !== runtimeSessionId) return null;
   const content = latestAssistantContent(session.events);
   if (!content) return null;
+
+  const machineStatus = extractLongTaskStatusBlock(content);
+  const executorStatus = machineStatus?.role === "reviewer" ? null : normalizeLongTaskExecutorStatus(machineStatus?.status);
+  if (executorStatus) {
+    const patch: Partial<NonNullable<Session["longTask"]>> = {};
+    if (executorStatus === "planning") patch.stage = "planning";
+    if (executorStatus === "ready") patch.stage = "ready";
+    if (executorStatus === "ready_for_review" || executorStatus === "running") patch.stage = "running";
+    if (executorStatus === "blocked") patch.stage = "paused";
+    if (machineStatus?.step && machineStatus.step > 0) patch.currentStep = machineStatus.step;
+    if (machineStatus?.totalSteps && machineStatus.totalSteps > 0 && !meta.targetStep) patch.targetStep = machineStatus.totalSteps;
+    if (Object.keys(patch).length > 0) return patch;
+  }
 
   const stepNumbers = extractLongTaskStepNumbers(content);
   const maxStep = stepNumbers.length > 0 ? Math.max(...stepNumbers) : null;
@@ -525,10 +626,11 @@ function applyLongTaskProgressFromLatestOutput(uiSessionId: string, runtimeSessi
   return latest ?? current;
 }
 
-function isExecutionReviewHandoff(content: string) {
-  const asksReview = /审查\s*agent|reviewer\s*agent|审查意见|交给.*审查/i.test(content);
-  const executionEvidence = /执行完成|已写入执行记录|rounds\/step\d+\.md|待审查|当前步骤[：:\s]*\d+|Step\s*\d+.*执行完成/i.test(content);
-  return asksReview && executionEvidence;
+function isLongTaskExecutorTurnComplete(content: string) {
+  const machineStatus = extractLongTaskStatusBlock(content);
+  const executorStatus = machineStatus?.role === "reviewer" ? null : normalizeLongTaskExecutorStatus(machineStatus?.status);
+  if (executorStatus === "ready_for_review") return true;
+  return /执行完成|长程任务执行完成|已写入执行记录|rounds\/step\d+\.md|Step\s*\d+.*(?:完成|已完成|执行完成)|下一步状态[：:\s]*(?:继续下一步|全部完成)|交给.*审查/i.test(content);
 }
 
 function normalizeLongTaskPlanningSession<T extends Session>(session: T): T {
@@ -551,30 +653,30 @@ function hydrateLongTaskProgressFromHistory<T extends Session>(session: T): T {
   if (!patch) return normalized;
   return {
     ...normalized,
-    runtimeSessionId: patch.stage === "reviewing" ? normalized.longTask.reviewerSessionId : normalized.longTask.executorSessionId,
+    runtimeSessionId: normalized.longTask.executorSessionId,
     longTask: {
       ...normalized.longTask,
       ...patch,
+      activeAgent: "executor",
     },
   };
 }
 
-function shouldStartLongTaskReview(session: Session, runtimeSessionId: string) {
+function shouldContinueLongTaskExecution(session: Session, runtimeSessionId: string) {
   if (!session.longTask) return false;
   if (session.longTask.executorSessionId !== runtimeSessionId) return false;
-  if (session.longTask.stage === "reviewing" || session.longTask.activeAgent === "reviewer") return false;
   if (session.longTask.stage !== "running") return false;
   if (hasPendingQuestion(session.events)) return false;
   const content = latestAssistantContent(session.events);
-  return isExecutionReviewHandoff(content);
+  return isLongTaskExecutorTurnComplete(content);
 }
 
 function buildLongTaskReviewPrompt(session: Session) {
   const meta = session.longTask;
   if (!meta) return "";
   const executorOutput = latestAssistantContent(session.events);
-  return `【Kimix 长程任务：请审查执行 agent 的本轮执行结果】
-你正在作为 Kimix 长程任务的审查 agent 工作。
+  return `【Kimix 长程任务：请审查本轮执行结果】
+你正在处理 Kimix 长程任务的用户审查流程。
 
 请先阅读：
 - ${meta.reviewQueuePath}
@@ -582,21 +684,27 @@ function buildLongTaskReviewPrompt(session: Session) {
 
 审查目标：
 1. 检查本轮执行结果是否符合 BIGPLAN.md 中当前步骤的目标、范围和验收标准，必须引用当前 Step 编号和验收标准。
-2. 检查执行 agent 是否提供实际验证证据；不能仅凭执行 agent 自述放行。
-3. 如果计划不可执行、步骤过大、缺少必要验证或存在必须先处理的问题，请给出需修复的问题，后续由 Kimix 交回执行 agent 修复。
+2. 检查本轮是否提供实际验证证据；不能仅凭自述放行。
+3. 如果计划不可执行、步骤过大、缺少必要验证或存在必须先处理的问题，请给出需修复的问题，后续由 Kimix 交回任务执行流程修复。
 4. 暂时无法自动确认但不阻塞继续的事项，请写入 ${meta.reviewQueuePath}，并仍使用“结论：通过”。
 5. 只有无法安全继续、必须等用户或外部环境确认时，才使用“结论：待人工审查”；该结论会让 Kimix 暂停长程任务。
 6. 不要直接执行代码修改；本轮只做执行结果审查。
-7. 不要询问用户是否继续下一步；如本轮可继续，请明确写出“结论：通过”，Kimix 会自动调度执行 agent 进入下一步。
+7. 不要询问用户是否继续下一步；如本轮可继续，请明确写出“结论：通过”，Kimix 会自动调度任务进入下一步。
 8. 你的最终正文第一行必须且只能是“结论：通过”或“结论：需修复”或“结论：待人工审查”，不要只把结论写在思考过程里。
 
-执行 agent 最近输出：
+本轮最近输出：
 ${executorOutput || "暂无可用输出，请直接读取 BIGPLAN.md 审查。"}`;
 }
 
 type LongTaskReviewConclusion = "pass" | "needs_fix" | "manual_review" | "unknown";
 
 function inferLongTaskReviewConclusion(content: string): LongTaskReviewConclusion {
+  const machineStatus = extractLongTaskStatusBlock(content);
+  const machineConclusion = (machineStatus?.conclusion || machineStatus?.status || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["pass", "passed", "approved", "通过", "审查通过"].includes(machineConclusion)) return "pass";
+  if (["needs_fix", "fix", "failed", "fail", "reject", "rejected", "需修复", "需要修复", "不通过", "未通过"].includes(machineConclusion)) return "needs_fix";
+  if (["manual_review", "needs_user", "blocked", "人工审查", "待人工审查", "需要用户"].includes(machineConclusion)) return "manual_review";
+
   const conclusionLine = content.match(/结论[：:\s]*([^\n\r]+)/i)?.[1]?.trim() ?? "";
   const target = conclusionLine || content.slice(0, 1200);
   if (/需修复|需要修复|不通过|未通过|阻塞|问题必须先修复/i.test(target)) return "needs_fix";
@@ -621,44 +729,64 @@ function buildLongTaskExecutorPromptFromReview(session: Session, conclusion: Lon
   const reviewerOutput = reviewerOutputOverride ?? latestAssistantContent(session.events);
   const step = meta.currentStep || 1;
   if (conclusion === "needs_fix") {
-    return `【Kimix 长程任务：审查发现问题，请先修复】
-审查 agent 对 Step ${step} 的结论是“需修复”。
+    return `【Kimix 长程任务：用户审查发现问题，请先修复】
+用户审查流程对 Step ${step} 的结论是“需修复”。
 
-请你作为执行 agent：
+请按以下规则执行：
 1. 先阅读 ${meta.bigPlanPath} 和下面的审查意见。
 2. 先提取审查问题清单，再逐项修复；只处理审查指出的问题，不进入下一步。
 3. 修复完成后更新必要文件，并把本轮修复、验证证据、残余风险写入 rounds/ 对应记录。
 4. 如无法修复，请明确写出阻塞原因和需要用户提供的信息。
-5. 结束时明确写出“Step ${step} 修复完成，交给审查 agent 审查”。
+5. 结束时明确写出“Step ${step} 修复完成，继续下一步”。
 
 审查意见：
-${reviewerOutput || "审查 agent 未给出可用正文，请读取任务文件后修复。"}`
+${reviewerOutput || "用户审查流程未给出可用正文，请读取任务文件后修复。"}`
   }
 
   if (conclusion === "manual_review") {
     return `【Kimix 长程任务：待人工审查，暂停继续执行】
-审查 agent 对 Step ${step} 的结论是“待人工审查”。
+用户审查流程对 Step ${step} 的结论是“待人工审查”。
 
-请不要进入下一步。需要用户或外部环境确认后，才能继续调度执行 agent。
+请不要进入下一步。需要用户或外部环境确认后，才能继续调度任务。
 
 审查意见：
-${reviewerOutput || "审查 agent 未给出可用正文，请读取任务文件后等待人工确认。"}`
+${reviewerOutput || "用户审查流程未给出可用正文，请读取任务文件后等待人工确认。"}`
   }
 
   const nextStep = step + 1;
-  return `【Kimix 长程任务：审查可继续，请执行下一步】
-审查 agent 已通过 Step ${step}。现在请继续执行 Step ${nextStep}。
+    return `【Kimix 长程任务：用户审查可继续，请执行下一步】
+用户审查流程已通过 Step ${step}。现在请继续执行 Step ${nextStep}。
 
-请你作为执行 agent：
+请按以下规则执行：
 1. 这是 Kimix 内部调度指令，不要询问用户是否继续；除非缺少执行 Step ${nextStep} 的必要信息或遇到阻塞，否则直接开始执行。
 2. 先阅读 ${meta.bigPlanPath}，确认当前 Step ${step} 已通过、下一步确实是 Step ${nextStep}。
 3. 只执行 Step ${nextStep} 这一轮，不要把后续多个 Step 合并执行。
 4. 完成 Step ${nextStep} 后必须停止本轮，不能自行继续 Step ${nextStep + 1}。
 5. 完成后更新必要文件，并把本轮产出、验证证据、残余风险写入 rounds/ 对应记录。
-6. 结束时明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
+6. 结束时明确写出“Step ${nextStep} 执行完成，继续下一步”。
 
-审查 agent 对上一轮的意见：
-${reviewerOutput || "审查 agent 未给出可用正文，请按 BIGPLAN.md 继续。"}`
+用户审查流程对上一轮的意见：
+${reviewerOutput || "用户审查流程未给出可用正文，请按 BIGPLAN.md 继续。"}`
+}
+
+function buildLongTaskExecutorNextPrompt(session: Session, nextStep: number) {
+  const meta = session.longTask;
+  if (!meta) return "";
+  const targetStep = meta.targetStep ?? nextStep;
+  const isFinalStep = nextStep >= targetStep;
+  return `【Kimix 长程任务：继续执行 Step ${nextStep}】
+本任务按 BIGPLAN 自动自推进。
+
+请按以下规则执行：
+1. 先阅读 ${meta.bigPlanPath}，确认当前进度和 Step ${nextStep} 的目标、范围、验收标准、验证方式。
+2. 只执行 Step ${nextStep} 这一轮，不要合并后续多个 Step。
+3. 完成后更新必要文件，并把本轮产出、验证证据、残余风险写入 rounds/ 对应记录。
+4. 不要启动、模拟或等待额外审查流程；不要输出 \`kimix-long-task-status\` 或任何机器状态代码块。
+${isFinalStep
+  ? "5. 这是目标范围内最后一个 Step。完成后必须输出“最终结果”和“建议用户全盘审查的内容”，并明确写出“长程任务执行完成”。"
+  : `5. 完成后必须明确写出“Step ${nextStep} 执行完成，继续下一步”，然后停止本轮输出，等待 Kimix 自动调度 Step ${nextStep + 1}。`}
+
+如果发现必须由用户确认或外部环境处理的问题，请写入 ${meta.reviewQueuePath}，并明确说明阻塞原因。`;
 }
 
 async function createSessionAndSendPrompt(projectPath: string, content: string) {
@@ -863,7 +991,7 @@ function App() {
 
   const recoverLongTaskReviewerSession = async (uiSessionId: string, failedReviewerSessionId: string, prompt: string) => {
     const snapshot = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (!snapshot?.longTask) throw new Error("当前长程任务不存在，无法恢复审查 agent");
+    if (!snapshot?.longTask) throw new Error("当前长程任务不存在，无法恢复用户审查流程");
 
     const startRes = await window.api.startSession({
       workDir: snapshot.projectPath,
@@ -1069,10 +1197,122 @@ function App() {
     return latestAssistantVisibleOrThinkingContent(hiddenLongTaskEventsRef.current.get(runtimeSessionId) ?? []);
   };
 
+  const dispatchLongTaskExecutorNext = (uiSessionId: string, runtimeSessionId: string) => {
+    const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (!latestSession?.longTask || !shouldContinueLongTaskExecution(latestSession, runtimeSessionId)) {
+      return false;
+    }
+
+    const currentStep = Math.max(latestSession.longTask.currentStep || 1, 1);
+    const targetStep = latestSession.longTask.targetStep;
+    if (!targetStep) return false;
+    const executorOutput = latestAssistantContent(latestSession.events);
+    appendLongTaskRoundOnce(latestSession, {
+      step: currentStep,
+      role: "executor",
+      phase: "execution",
+      content: executorOutput,
+    });
+
+    if (targetStep && currentStep >= targetStep) {
+      updateSession(uiSessionId, (session) => session.longTask ? {
+        ...session,
+        runtimeSessionId: session.longTask.executorSessionId,
+        longTask: {
+          ...session.longTask,
+          activeAgent: "executor",
+          stage: "completed",
+          recovery: null,
+        },
+        updatedAt: Date.now(),
+      } : session);
+      syncCurrentSessionFromStore(uiSessionId);
+      persistLongTaskMeta(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId));
+      appendLongTaskRoundOnce(latestSession, {
+        step: currentStep,
+        role: "executor",
+        phase: "complete",
+        conclusion: "完成",
+        content: `目标 Step ${targetStep} 已达到。请用户根据最终输出和 ${latestSession.longTask.reviewQueuePath} 做全盘审查。`,
+      });
+      return true;
+    }
+
+    const nextStep = currentStep + 1;
+    const prompt = buildLongTaskExecutorNextPrompt(latestSession, nextStep);
+    appendLongTaskRoundOnce(latestSession, {
+      step: nextStep,
+      role: "executor",
+      phase: "handoff",
+      content: prompt,
+    });
+    updateSession(uiSessionId, (session) => session.longTask ? {
+      ...session,
+      runtimeSessionId: session.longTask.executorSessionId,
+      longTask: {
+        ...session.longTask,
+        activeAgent: "executor",
+        stage: "running",
+        currentStep: nextStep,
+        recovery: null,
+      },
+      events: [
+        ...session.events,
+        {
+          id: crypto.randomUUID(),
+          type: "assistant_message" as const,
+          timestamp: Date.now(),
+          content: "",
+          isThinking: true,
+          isComplete: false,
+        },
+      ],
+      updatedAt: Date.now(),
+    } : session);
+    syncCurrentSessionFromStore(uiSessionId);
+    persistLongTaskMeta(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId));
+    setRunningSessionId(uiSessionId);
+    void window.api.sendPrompt({
+      sessionId: latestSession.longTask.executorSessionId,
+      content: prompt,
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
+    }).then((res) => {
+      if (res.success) return;
+      throw new Error(res.error);
+    }).catch((err: unknown) => {
+      updateSession(uiSessionId, (session) => ({
+        ...session,
+        longTask: session.longTask ? {
+          ...session.longTask,
+          activeAgent: "executor",
+          stage: "paused",
+          recovery: buildLongTaskRecovery("executor", "error", `启动下一步执行失败：${err instanceof Error ? err.message : String(err)}`),
+        } : session.longTask,
+        events: [
+          ...session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete && !event.content.trim())),
+          {
+            id: crypto.randomUUID(),
+            type: "error" as const,
+            timestamp: Date.now(),
+            message: `启动下一步执行失败：${err instanceof Error ? err.message : String(err)}`,
+            canDismiss: false,
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+      syncCurrentSessionFromStore(uiSessionId);
+      persistLongTaskMeta(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId));
+      setRunningSessionId(null);
+    });
+    return true;
+  };
+
   const dispatchLongTaskReview = (uiSessionId: string, runtimeSessionId: string) => {
     const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     const reviewKey = `${uiSessionId}:${runtimeSessionId}:${latestSession?.events.length ?? 0}`;
-    if (!latestSession?.longTask || !shouldStartLongTaskReview(latestSession, runtimeSessionId) || longTaskReviewDispatchRef.current.has(reviewKey)) {
+    if (!latestSession?.longTask || !shouldContinueLongTaskExecution(latestSession, runtimeSessionId) || longTaskReviewDispatchRef.current.has(reviewKey)) {
       return false;
     }
     longTaskReviewDispatchRef.current.add(reviewKey);
@@ -1142,7 +1382,7 @@ function App() {
           ...session.longTask,
           activeAgent: "reviewer",
           stage: "paused",
-          recovery: buildLongTaskRecovery("reviewer", "error", `启动审查 agent 失败：${err instanceof Error ? err.message : String(err)}`),
+          recovery: buildLongTaskRecovery("reviewer", "error", `启动用户审查流程失败：${err instanceof Error ? err.message : String(err)}`),
         } : session.longTask,
         events: [
           ...session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete && !event.content.trim())),
@@ -1150,7 +1390,7 @@ function App() {
             id: crypto.randomUUID(),
             type: "error" as const,
             timestamp: Date.now(),
-            message: `启动审查 agent 失败：${err instanceof Error ? err.message : String(err)}`,
+            message: `启动用户审查流程失败：${err instanceof Error ? err.message : String(err)}`,
             canDismiss: false,
           },
         ],
@@ -1274,7 +1514,7 @@ function App() {
           ...session.longTask,
           activeAgent: "reviewer",
           stage: "paused",
-          recovery: buildLongTaskRecovery("reviewer", "paused", "审查 agent 标记为待人工审查，需要人工确认后再继续。"),
+          recovery: buildLongTaskRecovery("reviewer", "paused", "用户审查流程标记为待人工审查，需要人工确认后再继续。"),
         },
         updatedAt: Date.now(),
       } : session);
@@ -1364,7 +1604,7 @@ function App() {
             id: crypto.randomUUID(),
             type: "error" as const,
             timestamp: Date.now(),
-            message: `启动执行 agent 失败：${err instanceof Error ? err.message : String(err)}`,
+            message: `启动长程任务失败：${err instanceof Error ? err.message : String(err)}`,
           },
         ],
         updatedAt: Date.now(),
@@ -1380,31 +1620,115 @@ function App() {
     const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
       if (bootstrapDoneRef.current) return;
       bootstrapDoneRef.current = true;
-      useAppStore.setState({ currentProject: payload.project });
+      const activeContext = readLocalActiveContext();
+      const localSessions = useSessionStore.getState().sessions;
+      const latestLocalSession = [...localSessions]
+        .filter((session) => !session.archivedAt && !isHiddenInternalSession(session))
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      const activeLocalSession = activeContext?.sessionId
+        ? localSessions.find((session) => session.id === activeContext.sessionId && !session.archivedAt && !isHiddenInternalSession(session))
+        : latestLocalSession;
 
-      window.api.listRecentProjects().then((res) => {
-        if (res.success) setRecentProjects(res.data);
-      }).catch(() => {});
+      window.api.listRecentProjects().then(async (projectsRes) => {
+        const recentProjects = projectsRes.success ? projectsRes.data : [payload.project];
+        if (projectsRes.success) setRecentProjects(projectsRes.data);
+        const activeProject = activeLocalSession
+          ? recentProjects.find((project) => isSameLocalProjectPath(project.path, activeLocalSession.projectPath)) ?? activeContext?.project ?? payload.project
+          : activeContext?.project
+            ? recentProjects.find((project) => isSameLocalProjectPath(project.path, activeContext.project?.path)) ?? activeContext.project
+            : payload.project;
+        useAppStore.setState({
+          currentProject: activeProject,
+          currentSession: activeLocalSession ?? useAppStore.getState().currentSession,
+        });
 
-      window.api.listSessions({ workDir: payload.project.path }).then(async (res) => {
+        const res = await window.api.listSessions({ workDir: activeProject.path });
         if (!res.success) return;
         const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
-        const latest = res.data.find((session) => !hiddenHandoffSessionIds.has(session.id) && !isHiddenInternalSession(session));
+        const activeRuntimeIds = new Set([
+          activeLocalSession?.id,
+          activeLocalSession?.officialSessionId,
+          activeLocalSession?.runtimeSessionId,
+          activeLocalSession?.longTask?.executorSessionId,
+          activeLocalSession?.longTask?.reviewerSessionId,
+        ].filter((id): id is string => Boolean(id)));
+        const isUsableHistorySession = (session: (typeof res.data)[number]) => (
+          !hiddenHandoffSessionIds.has(session.id) &&
+          !isHiddenInternalSession(session) &&
+          !hasArchivedLocalSessionForRuntime(session.id)
+        );
+        const latest = (activeRuntimeIds.size > 0
+          ? res.data.find((session) => activeRuntimeIds.has(session.id) && isUsableHistorySession(session))
+          : undefined) ?? res.data.find(isUsableHistorySession);
+        const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
+        if (!latest && !sessionIdToStart) return;
         const startRes = await window.api.startSession({
-          workDir: payload.project.path,
-          sessionId: latest?.id,
+          workDir: activeProject.path,
+          sessionId: sessionIdToStart,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
           autoMode: useAppStore.getState().permissionMode === "auto",
           planMode: useAppStore.getState().defaultPlanMode,
         });
-        if (!startRes.success || !latest) return;
-        const runtimeOwner = findLocalSessionForRuntime(latest.id, startRes.data.sessionId);
+        if (!startRes.success) {
+          if (activeLocalSession) {
+            const errorSession = {
+              ...activeLocalSession,
+              events: [
+                ...activeLocalSession.events,
+                {
+                  id: crypto.randomUUID(),
+                  type: "error" as const,
+                  timestamp: Date.now(),
+                  message: `恢复上次 Kimi Code 会话失败：${startRes.error}`,
+                  canDismiss: false,
+                },
+              ],
+              isLoading: false,
+              updatedAt: Date.now(),
+            };
+            useSessionStore.setState((state) => ({
+              sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
+            }));
+            useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
+            setRunningSessionId(null);
+          } else {
+            window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `恢复 Kimi Code 会话失败：${startRes.error}` }));
+          }
+          return;
+        }
+        const historySessionId = latest?.id ?? sessionIdToStart ?? startRes.data.sessionId;
+        const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId);
         const loaded = await window.api.loadSession({
-          workDir: payload.project.path,
-          sessionId: latest.id,
+          workDir: activeProject.path,
+          sessionId: historySessionId,
         });
-        if (!loaded.success) return;
+        if (!loaded.success) {
+          if (activeLocalSession) {
+            const errorSession = {
+              ...activeLocalSession,
+              runtimeSessionId: startRes.data.sessionId,
+              events: [
+                ...activeLocalSession.events,
+                {
+                  id: crypto.randomUUID(),
+                  type: "error" as const,
+                  timestamp: Date.now(),
+                  message: `读取上次 Kimi Code 历史失败：${loaded.error}`,
+                  canDismiss: false,
+                },
+              ],
+              isLoading: false,
+              updatedAt: Date.now(),
+            };
+            useSessionStore.setState((state) => ({
+              sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
+            }));
+            useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
+            setRunningSessionId(null);
+          }
+          return;
+        }
         const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
 
         if (runtimeOwner) {
@@ -1423,11 +1747,11 @@ function App() {
           return;
         }
 
-        const longTasksRes = await window.api.listLongTasks({ projectPath: payload.project.path });
+        const longTasksRes = await window.api.listLongTasks({ projectPath: activeProject.path });
         const matchedLongTask = longTasksRes.success
           ? longTasksRes.data.find((task) => (
-            task.executorSessionId === latest.id ||
-            task.reviewerSessionId === latest.id ||
+            task.executorSessionId === historySessionId ||
+            task.reviewerSessionId === historySessionId ||
             task.executorSessionId === startRes.data.sessionId ||
             task.reviewerSessionId === startRes.data.sessionId
           ))
@@ -1436,10 +1760,10 @@ function App() {
         const session = hydrateLongTaskProgressFromHistory({
           id: startRes.data.sessionId,
           model: startRes.data.model ?? null,
-          title: deriveSessionTitle(events, latest.brief || "新会话"),
-          projectPath: payload.project.path,
-          createdAt: latest.updatedAt,
-          updatedAt: latest.updatedAt,
+          title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
+          projectPath: activeProject.path,
+          createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
+          updatedAt: latest?.updatedAt ?? activeLocalSession?.updatedAt ?? Date.now(),
           runtimeSessionId: startRes.data.sessionId,
           longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
           events,
@@ -1811,7 +2135,10 @@ function App() {
           ))),
         });
         markLongTaskRuntimeActivity(uiSessionId, payload.sessionId, "running");
-        if (runningSession?.longTask?.reviewerSessionId === payload.sessionId) {
+        if (
+          runningSession?.longTask?.reviewerSessionId !== runningSession?.longTask?.executorSessionId &&
+          runningSession?.longTask?.reviewerSessionId === payload.sessionId
+        ) {
           upsertLongTaskAgentProxyMessage(uiSessionId, "reviewer", "running");
         }
         setRunningSessionId(uiSessionId);
@@ -1825,7 +2152,11 @@ function App() {
       const uiSessionId = statusUiSessionId;
       const terminalStatus = payload.status as "completed" | "error" | "interrupted";
       const terminalSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      const isReviewerTerminal = terminalSession?.longTask?.reviewerSessionId === payload.sessionId;
+      const isReviewerTerminal = Boolean(
+        terminalSession?.longTask &&
+        terminalSession.longTask.reviewerSessionId !== terminalSession.longTask.executorSessionId &&
+        terminalSession.longTask.reviewerSessionId === payload.sessionId
+      );
       flushStreamEvents();
       markLongTaskRuntimeActivity(uiSessionId, payload.sessionId, terminalStatus);
       if (isReviewerTerminal && terminalStatus !== "completed") {
@@ -1870,10 +2201,7 @@ function App() {
         runtimeTurnStartRef.current.delete(payload.sessionId);
 
         applyLongTaskProgressFromLatestOutput(uiSessionId, payload.sessionId);
-        if (dispatchLongTaskReview(uiSessionId, payload.sessionId)) {
-          return;
-        }
-        if (dispatchLongTaskExecutorFromReview(uiSessionId, payload.sessionId)) {
+        if (dispatchLongTaskExecutorNext(uiSessionId, payload.sessionId)) {
           return;
         }
         if (isReviewerTerminal) {
@@ -1881,8 +2209,8 @@ function App() {
           pauseLongTaskReviewerWithError(
             uiSessionId,
             reviewerOutput.trim().length > 0
-              ? "审查 agent 已结束，但没有给出明确结论（通过 / 需修复 / 待人工审查），已暂停当前长程任务。"
-              : "审查 agent 已结束，但没有返回可用结果，已暂停当前长程任务。",
+              ? "用户审查流程已结束，但没有给出明确结论（通过 / 需修复 / 待人工审查），已暂停当前长程任务。"
+              : "用户审查流程已结束，但没有返回可用结果，已暂停当前长程任务。",
           );
           return;
         }
@@ -1990,8 +2318,7 @@ function App() {
           const active = useAppStore.getState().currentSession;
           if (active?.id === session.id) useAppStore.getState().setCurrentSession(hydrated);
         }
-        if (dispatchLongTaskReview(session.id, session.longTask.executorSessionId)) break;
-        if (dispatchLongTaskExecutorFromReview(session.id, session.longTask.reviewerSessionId)) break;
+        if (dispatchLongTaskExecutorNext(session.id, session.longTask.executorSessionId)) break;
       }
     }, 1400);
     return () => clearTimeout(timer);

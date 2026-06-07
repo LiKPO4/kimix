@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useAppStore } from "@/stores/appStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import {
   LOCAL_PERSIST_DEBOUNCE_MS,
+  persistLocalActiveContext,
   persistLocalConversationState,
 } from "@/utils/persistence";
 
@@ -42,18 +44,24 @@ export function useStatePersistence() {
       }
       scheduleLocalConversationPersist();
     });
+    const unsubscribeActiveContextPersistence = useAppStore.subscribe((state, prev) => {
+      if (state.currentProject === prev.currentProject && state.currentSession === prev.currentSession) return;
+      persistLocalActiveContext();
+    });
 
     const handleBeforeUnload = flushLocalConversationState;
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       unsubscribeSessionPersistence();
+      unsubscribeActiveContextPersistence();
       window.removeEventListener("beforeunload", handleBeforeUnload);
       if (persistenceTimerRef.current) {
         clearTimeout(persistenceTimerRef.current);
         persistenceTimerRef.current = null;
       }
       flushLocalConversationState();
+      persistLocalActiveContext();
     };
   }, []);
 }

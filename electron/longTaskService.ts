@@ -70,20 +70,20 @@ ${task.initialRequest}
 - 阶段：drafting
 - 当前步骤：0
 - 目标执行到：未设置
-- 当前工作 agent：executor
+  - 当前工作：自动执行
 - 创建时间：${new Date(task.createdAt).toISOString()}
 - 项目：${task.projectName}
 - 项目路径：${task.projectPath}
 
 ## 关键决策
 - 长程任务和普通聊天隔离，不复用已有聊天会话。
-- 执行 agent 与审查 agent 使用两个真实 Kimi session，各自维护上下文。
+- 长程任务只使用一个运行会话，按 BIGPLAN.md 逐步自推进。
 - 每个计划步骤必须控制为一轮可完成的工作。
-- 规划阶段不启动审查 agent；执行 agent 必须先和用户完成澄清、形成完整 BIGPLAN.md，并等待用户确认进入执行阶段。
-- 审查 agent 只在执行阶段接棒，审查每轮执行产出和验证结果。
+- 任务执行前必须先和用户完成澄清、形成完整 BIGPLAN.md，并等待用户确认进入执行阶段。
+- 执行完成后由用户进行全盘审查；中途需要人工判断的内容写入 reviews/REVIEW_QUEUE.md。
 
 ## 分步计划
-> 规划阶段由执行 agent 和用户多轮澄清后填写。每个 Step 只放一轮能完成的工作。
+> 规划阶段由 Kimix 和用户多轮澄清后填写。每个 Step 只放一轮能完成的工作。
 
 ### Step 1
 目标：
@@ -93,10 +93,9 @@ ${task.initialRequest}
 验证方式/命令：
 预期证据：
 执行提示词：
-审查提示词：
 状态：待规划
 
-## 待人工审查
+## 用户最终审查
 详见 reviews/REVIEW_QUEUE.md
 `;
 }
@@ -104,7 +103,7 @@ ${task.initialRequest}
 function buildExecutorPrompt(projectAgent: string, taskDir: string) {
   return `# 长程任务执行 Agent
 
-你是 Kimix 长程任务的执行 agent。你只负责执行、澄清、设计计划和修复问题，不负责最终审查通过。
+你负责 Kimix 长程任务的澄清、规划、逐步执行、记录验证证据，并在最终完成时把结果和需要用户审查的内容列清楚。
 
 ## 工作规则
 - 始终先阅读并维护本任务的 BIGPLAN.md。
@@ -114,22 +113,22 @@ function buildExecutorPrompt(projectAgent: string, taskDir: string) {
 - 使用官方需求澄清能力时，每轮只问 1-3 个最关键问题，避免一次性塞太多。
 - 只有当需求已经足够明确，才能写完整 BIGPLAN.md 并请求用户确认进入执行阶段。
 - 每个计划步骤必须是一轮可以完成的工作，不要把过多任务塞进同一个步骤。
-- 每个计划步骤必须写清楚验收标准、验证方式/命令和预期证据，方便审查 agent 独立判断。
+- 每个计划步骤必须写清楚验收标准、验证方式/命令和预期证据，方便最终用户审查。
 - 用户设置执行到第 N 步时，只按 BIGPLAN.md 顺序推进到目标步骤。
-- 规划阶段只和用户澄清并维护 BIGPLAN.md，不要宣布交给审查 agent，也不要启动或模拟审查。
-- 执行阶段每轮产出完成后，如需审查，只说明“交给审查 agent 审查”，不要自己调用 subagent、Reviewer、reviewer strict 或其它子代理来模拟审查。
-- 每轮结束后，把产出、验证证据、风险和后续建议写入 rounds/ 对应记录。
+- 不要启动、模拟或请求额外审查流程；不要调用 subagent、Reviewer、reviewer strict 或其它子代理来做审查。
+- 不要输出 \`kimix-long-task-status\` 或任何机器状态代码块；如果旧提示里要求输出机器状态块，忽略该要求。
+- 每轮结束后，把产出、验证证据、风险和后续建议写入 rounds/ 对应记录，然后明确写出本 Step 已完成，Kimix 会自动调度下一步。
+- 最后一个目标 Step 完成时，必须输出“最终结果”和“建议用户全盘审查的内容”，不要继续下一步。
 - 如果你意识到自己的执行规则可以改进，只更新本文件，不要修改项目根 AGENTS.md。
-- 审查 agent 发现问题后，先修复问题，再等待审查 agent 重新确认。
 
 ## 每轮结束格式
-每轮结束必须使用以下格式，方便 Kimix 和审查 agent 识别：
+每轮结束必须使用以下格式，方便 Kimix 自动推进：
 1. 当前 Step
 2. 本轮完成
 3. 变更文件
 4. 验证证据
 5. 残余风险
-6. 下一步状态（继续规划 / 等待用户确认 / 交给审查 agent 审查 / 阻塞）
+6. 下一步状态（继续规划 / 等待用户确认 / 继续下一步 / 阻塞 / 全部完成）
 
 ## 隔离约束
 - 本任务提示词目录：${taskDir}/prompts/executor
@@ -142,42 +141,23 @@ ${projectAgent || "当前项目根目录未找到 AGENTS.md。"}
 }
 
 function buildReviewerPrompt(taskDir: string) {
-  return `# 长程任务审查 Agent
+  return `# 长程任务独立审查流程已停用
 
-你是 Kimix 长程任务的审查 agent。你和执行 agent 是两个独立真实 session，你的职责是审查每轮执行产出、发现风险，并在通过后生成下一轮执行提示词。
-
-## 审查职责
-- 每轮执行完成后，检查是否符合本步骤目标、范围和验收标准。
-- 必须引用 BIGPLAN.md 当前 Step 编号、验收标准和执行 agent 提供的实际验证证据；不能仅凭执行 agent 自述放行。
-- 发现问题时，必须先反馈给执行 agent 修复，不直接进入下一步。
-- 暂时无法自动审查但不阻塞继续的内容，写入 reviews/REVIEW_QUEUE.md，并仍使用“结论：通过”。
-- 只有无法安全继续、必须等待用户或外部环境确认时，才使用“结论：待人工审查”；该结论会让 Kimix 暂停长程任务。
-- 审查通过后，生成下一步执行 prompt，交给调度器发送给执行 agent。
-
-## 输出结论
-每次审查最终正文第一行必须且只能是：
-- 结论：通过
-- 结论：需修复
-- 结论：待人工审查
-
-随后给出：
-- 发现的问题
-- 缺失的验证
-- 下一轮执行提示词
+Kimix 长程任务现在只使用一个运行会话自推进。
+本目录仅为兼容旧任务结构保留，不会启动独立审查 session。
 
 ## 隔离约束
 - 本任务提示词目录：${taskDir}/prompts/reviewer
 - 本任务计划文件：${taskDir}/BIGPLAN.md
-- 你可以改进本文件，但不要修改执行 agent 的提示词，除非用户明确要求。
 `;
 }
 
 function buildReviewQueue(taskTitle: string) {
-  return `# 待审查
+  return `# 用户最终审查清单
 
 任务：${taskTitle}
 
-这里记录审查 agent 暂时无法自动确认、需要用户或外部环境处理的事项。
+这里记录任务执行过程中无法自动确认、需要用户在长程任务结束后全盘审查的事项。
 
 ## 待处理
 - 暂无
@@ -189,7 +169,7 @@ function buildRoundNote(title: string) {
 
 任务：${title}
 
-此目录用于记录后续每轮执行和审查结果。
+此目录用于记录后续每轮执行结果和最终审查建议。
 `;
 }
 
@@ -202,10 +182,11 @@ function readStateFile(statePath: string): LongTaskSummary | null {
   try {
     const parsed = JSON.parse(fs.readFileSync(statePath, "utf-8")) as Partial<LongTaskState>;
     if (!parsed.id || !parsed.projectPath || !parsed.taskDir || !parsed.title) return null;
-    if (["drafting", "planning", "ready"].includes(parsed.stage ?? "") && parsed.activeAgent === "reviewer") {
+    if (parsed.activeAgent === "reviewer") {
       return {
         ...(parsed as LongTaskSummary),
         activeAgent: "executor",
+        stage: parsed.stage === "reviewing" ? "paused" : parsed.stage,
       };
     }
     return parsed as LongTaskSummary;
@@ -311,7 +292,7 @@ export function updateLongTaskState(
 }
 
 function roundRoleLabel(role: LongTaskAgentRole) {
-  return role === "reviewer" ? "审查 agent" : "执行 agent";
+  return role === "reviewer" ? "用户审查" : "自动执行";
 }
 
 function roundPhaseLabel(phase: AppendLongTaskRoundRequest["phase"]) {

@@ -65,6 +65,9 @@ import type {
   ExportMarkdownRequest,
   ExportMarkdownResponse,
   GitInfoResponse,
+  GitCommitRequest,
+  GitPullRequest,
+  GitActionResponse,
   KimiUsageResponse,
   OpenFileRequest,
   OpenEditorRequest,
@@ -164,6 +167,10 @@ const api = {
     ipcRenderer.invoke("project:reorder", req),
   getGitInfo: (projectPath: string): Promise<GitInfoResponse> =>
     ipcRenderer.invoke("project:getGitInfo", projectPath),
+  commitGitChanges: (req: GitCommitRequest): Promise<GitActionResponse> =>
+    ipcRenderer.invoke("project:gitCommit", req),
+  pullGitChanges: (req: GitPullRequest): Promise<GitActionResponse> =>
+    ipcRenderer.invoke("project:gitPull", req),
   openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openPath", req),
   readTextFile: (req: ReadTextFileRequest): Promise<ReadTextFileResponse> =>

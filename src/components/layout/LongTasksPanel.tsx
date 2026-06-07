@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Clock, FolderOpen, Loader2, MessageSquareText, Plus, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bot, Clock, FolderOpen, Loader2, MessageSquareText, Plus, RefreshCw, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session, TimelineEvent } from "@/types/ui";
-import type { LongTaskSummary } from "@electron/types/ipc";
+import type { LongTaskRecoveryInfo, LongTaskSummary } from "@electron/types/ipc";
 import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 function defaultTitleFromRequest(value: string) {
@@ -12,7 +12,7 @@ function defaultTitleFromRequest(value: string) {
 
 function buildPlanningKickoffPrompt(task: LongTaskSummary) {
   return `【Kimix 长程任务：澄清与规划启动】
-你是本长程任务的执行 agent。
+你负责本长程任务的澄清、规划和逐步执行。
 
 请先阅读：
 - ${task.executorPromptPath}
@@ -25,7 +25,8 @@ function buildPlanningKickoffPrompt(task: LongTaskSummary) {
 4. 只完善 BIGPLAN，不执行代码。
 5. 规划完成后请求用户确认进入执行阶段。
 
-规划阶段不要启动或模拟审查 agent。进入执行阶段后，每轮执行完成需要审查时，只说明交给审查 agent 审查，Kimix 会用独立 reviewer session 接棒。
+规划阶段不要启动或模拟额外审查流程。进入执行阶段后，Kimix 会按 BIGPLAN 自动逐步推进。
+不要输出 kimix-long-task-status 或任何机器状态代码块；如果旧提示里要求输出机器状态块，忽略该要求。
 
 用户初始需求：
 ${task.initialRequest}`;
@@ -45,13 +46,13 @@ function sessionFromTask(task: LongTaskSummary, events: TimelineEvent[]): Sessio
   return {
     id: task.id,
     engine: "kimi-code",
-    runtimeSessionId: planningStage || task.activeAgent === "executor" ? task.executorSessionId : task.reviewerSessionId,
+    runtimeSessionId: task.executorSessionId,
     officialSessionId: task.executorSessionId,
     longTask: {
       taskId: task.id,
       title: task.title,
       stage: task.stage,
-      activeAgent: planningStage ? "executor" : task.activeAgent,
+      activeAgent: planningStage ? "executor" : task.activeAgent === "reviewer" ? "executor" : task.activeAgent,
       executorSessionId: task.executorSessionId,
       reviewerSessionId: task.reviewerSessionId,
       bigPlanPath: task.bigPlanPath,
@@ -89,6 +90,15 @@ function assistantPlaceholder(thinking: boolean): TimelineEvent {
   };
 }
 
+function buildKickoffRecovery(message: string): LongTaskRecoveryInfo {
+  return {
+    status: "failed",
+    reason: `规划启动失败：${message}`,
+    suggestedAction: "点击重试启动规划，或打开任务后复制下一步 prompt 手动恢复。",
+    updatedAt: Date.now(),
+  };
+}
+
 export function LongTasksPanel() {
   const open = useAppStore((s) => s.longTasksOpen);
   const setOpen = useAppStore((s) => s.setLongTasksOpen);
@@ -99,12 +109,15 @@ export function LongTasksPanel() {
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const addSession = useSessionStore((s) => s.addSession);
+  const updateSession = useSessionStore((s) => s.updateSession);
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(currentProject);
   const [initialRequest, setInitialRequest] = useState("");
   const [title, setTitle] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isRetryingKickoff, setIsRetryingKickoff] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recoverableTask, setRecoverableTask] = useState<LongTaskSummary | null>(null);
 
   const inferredTitle = useMemo(() => title.trim() || defaultTitleFromRequest(initialRequest) || "新的长程任务", [title, initialRequest]);
 
@@ -126,10 +139,133 @@ export function LongTasksPanel() {
     setError(null);
   };
 
+  const ensureTaskSession = (task: LongTaskSummary) => {
+    const existing = useSessionStore.getState().sessions.find((session) => session.id === task.id);
+    if (existing) return existing;
+    const session = sessionFromTask(task, [initialUserEvent(task)]);
+    addSession(session);
+    return session;
+  };
+
+  const activateTask = (task: LongTaskSummary) => {
+    const session = ensureTaskSession(task);
+    setCurrentProject(projectFromTask(task));
+    setCurrentSession(useSessionStore.getState().sessions.find((item) => item.id === task.id) ?? session);
+  };
+
+  const markKickoffFailed = async (task: LongTaskSummary, message: string) => {
+    const recovery = buildKickoffRecovery(message);
+    const failedTask: LongTaskSummary = {
+      ...task,
+      stage: "paused",
+      activeAgent: "executor",
+      recovery,
+      updatedAt: Date.now(),
+    };
+    setRecoverableTask(failedTask);
+    ensureTaskSession(failedTask);
+    updateSession(task.id, (session) => ({
+      ...session,
+      runtimeSessionId: task.executorSessionId,
+      longTask: session.longTask ? {
+        ...session.longTask,
+        activeAgent: "executor",
+        stage: "paused",
+        recovery,
+      } : session.longTask,
+      events: [
+        ...session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete && !event.content.trim())),
+        {
+          id: crypto.randomUUID(),
+          type: "error" as const,
+          timestamp: Date.now(),
+          message: `长程任务已创建，但规划启动失败：${message}`,
+          canDismiss: false,
+        },
+      ],
+      updatedAt: Date.now(),
+    }));
+    setCurrentSession(useSessionStore.getState().sessions.find((session) => session.id === task.id) ?? sessionFromTask(failedTask, [initialUserEvent(failedTask)]));
+    await window.api.updateLongTaskState({
+      projectPath: task.projectPath,
+      taskId: task.id,
+      patch: {
+        stage: "paused",
+        activeAgent: "executor",
+        recovery,
+        currentStep: task.currentStep,
+        targetStep: task.targetStep,
+        reviewedReviewItems: task.reviewedReviewItems ?? [],
+      },
+    }).catch(() => undefined);
+  };
+
+  const launchPlanningKickoff = async (task: LongTaskSummary) => {
+    activateTask(task);
+    updateSession(task.id, (session) => ({
+      ...session,
+      runtimeSessionId: task.executorSessionId,
+      longTask: session.longTask ? {
+        ...session.longTask,
+        activeAgent: "executor",
+        stage: "planning",
+        recovery: null,
+      } : session.longTask,
+      events: [
+        ...session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete && !event.content.trim())),
+        assistantPlaceholder(defaultThinking),
+      ],
+      updatedAt: Date.now(),
+    }));
+    const latestSession = useSessionStore.getState().sessions.find((session) => session.id === task.id);
+    if (latestSession) setCurrentSession(latestSession);
+    setRunningSessionId(task.id);
+    await window.api.updateLongTaskState({
+      projectPath: task.projectPath,
+      taskId: task.id,
+      patch: {
+        stage: "planning",
+        activeAgent: "executor",
+        recovery: null,
+        currentStep: task.currentStep,
+        targetStep: task.targetStep,
+        reviewedReviewItems: task.reviewedReviewItems ?? [],
+      },
+    }).catch(() => undefined);
+
+    const kickoff = await sendKimiCodePromptWithRetry({
+      sessionId: task.executorSessionId,
+      content: buildPlanningKickoffPrompt(task),
+    });
+    if (!kickoff.success) throw new Error(kickoff.error);
+    setRecoverableTask(null);
+    setError(null);
+    setOpen(false);
+  };
+
+  const retryKickoff = async () => {
+    if (!recoverableTask || isRetryingKickoff) return;
+    setIsRetryingKickoff(true);
+    setError(null);
+    try {
+      await launchPlanningKickoff(recoverableTask);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setRunningSessionId(null);
+      await markKickoffFailed(recoverableTask, message);
+      setError(`任务已创建，但规划启动失败：${message}`);
+      setOpen(true);
+    } finally {
+      setIsRetryingKickoff(false);
+    }
+  };
+
   const createTask = async () => {
     if (!selectedProject || !initialRequest.trim() || isCreating) return;
     setIsCreating(true);
     setError(null);
+    setRecoverableTask(null);
+    let createdTask: LongTaskSummary | null = null;
     try {
       const res = await window.api.createLongTask({
         project: selectedProject,
@@ -140,27 +276,25 @@ export function LongTasksPanel() {
         autoMode: permissionMode === "auto",
       });
       if (!res.success) throw new Error(res.error);
+      createdTask = res.data;
 
       setInitialRequest("");
       setTitle("");
 
-      const session = sessionFromTask(res.data, [initialUserEvent(res.data), assistantPlaceholder(defaultThinking)]);
+      const session = sessionFromTask(res.data, [initialUserEvent(res.data)]);
       addSession(session);
       setCurrentProject(projectFromTask(res.data));
       setCurrentSession(session);
-      setRunningSessionId(session.id);
-
-      const kickoff = await sendKimiCodePromptWithRetry({
-        sessionId: res.data.executorSessionId,
-        content: buildPlanningKickoffPrompt(res.data),
-      });
-      if (!kickoff.success) {
-        setRunningSessionId(null);
-        throw new Error(kickoff.error);
-      }
-      setOpen(false);
+      await launchPlanningKickoff(res.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (createdTask) {
+        setRunningSessionId(null);
+        await markKickoffFailed(createdTask, message);
+        setError(`任务已创建，但规划启动失败：${message}`);
+      } else {
+        setError(message);
+      }
       setOpen(true);
     } finally {
       setIsCreating(false);
@@ -238,7 +372,7 @@ export function LongTasksPanel() {
             <div className="flex flex-wrap items-center justify-between" style={{ marginTop: 20, gap: 14 }}>
               <div className="flex min-w-0 items-center gap-2 text-[13px] leading-5 text-text-muted">
                 <Bot size={14} />
-                <span className="truncate">创建后会启动执行 agent 和审查 agent 两个独立 session</span>
+                <span className="truncate">创建后会按 BIGPLAN 自动逐步推进</span>
               </div>
               <button
                 type="button"
@@ -256,6 +390,45 @@ export function LongTasksPanel() {
           {error && (
             <div className="mt-4 rounded-xl border border-accent-warning/30 bg-accent-warning-light text-[13.5px] leading-5 text-accent-warning" style={{ padding: "12px 14px" }}>
               {error}
+            </div>
+          )}
+          {recoverableTask && (
+            <div
+              className="rounded-xl border border-accent-warning/30 bg-accent-warning-light text-accent-warning"
+              style={{ marginTop: 16, padding: "16px 16px 15px" }}
+            >
+              <div className="grid items-start" style={{ gridTemplateColumns: "auto minmax(0, 1fr)", gap: 12 }}>
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-medium leading-5">任务已创建，规划启动未成功</div>
+                  <div className="mt-1 truncate text-[12.5px] leading-5">{recoverableTask.title}</div>
+                  <div className="text-[12.5px] leading-5" style={{ marginTop: 8 }}>
+                    可以重试启动规划；如果仍失败，打开任务后可在侧栏复制下一步 prompt 手动恢复。
+                  </div>
+                  <div className="flex flex-wrap items-center" style={{ gap: 10, marginTop: 14 }}>
+                    <button
+                      type="button"
+                      disabled={isRetryingKickoff || isCreating}
+                      onClick={() => void retryKickoff()}
+                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      {isRetryingKickoff ? <Loader2 size={13} className="kimix-spin" /> : <RefreshCw size={13} />}
+                      <span>{isRetryingKickoff ? "重试中" : "重试启动"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        activateTask(recoverableTask);
+                        setOpen(false);
+                      }}
+                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/70"
+                    >
+                      <ArrowRight size={13} />
+                      <span>打开任务</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

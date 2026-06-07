@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, Bot, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, CheckCircle2, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
@@ -80,6 +80,7 @@ function formatPluginSource(source: string | undefined) {
 export function ContextBar() {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
+  const runningSessionId = useAppStore((s) => s.runningSessionId);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
@@ -101,6 +102,22 @@ export function ContextBar() {
   const modelTitle = sessionModel && sessionModel === displayModel
     ? `当前对话模型：${displayModel}`
     : `当前默认模型：${displayModel}`;
+  const pendingApprovalCount = activeSession?.events.filter((event) => event.type === "approval_request" && event.status === "pending").length ?? 0;
+  const pendingQuestionCount = activeSession?.events.filter((event) => event.type === "question_request" && event.status === "pending").length ?? 0;
+  const latestError = [...(activeSession?.events ?? [])].reverse().find((event) => event.type === "error");
+  const isSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
+  const kimiStatus = pendingApprovalCount > 0
+    ? { label: "待审批", tone: "warning" as const, icon: PauseCircle, detail: `${pendingApprovalCount} 个权限请求等待处理` }
+    : pendingQuestionCount > 0
+      ? { label: "待回答", tone: "warning" as const, icon: PauseCircle, detail: `${pendingQuestionCount} 个问题等待回答` }
+      : isSessionRunning
+        ? { label: "运行中", tone: "active" as const, icon: Loader2, detail: `Kimi Code 正在执行当前轮次` }
+        : latestError
+          ? { label: "有错误", tone: "danger" as const, icon: AlertCircle, detail: latestError.message }
+          : activeSession?.engine === "kimi-code" || activeSession?.runtimeSessionId
+            ? { label: "已连接", tone: "success" as const, icon: CheckCircle2, detail: `runtime: ${activeSession.runtimeSessionId ?? activeSession.id}` }
+            : { label: "未连接", tone: "muted" as const, icon: Radio, detail: "当前没有 Kimi Code 运行会话" };
+  const KimiStatusIcon = kimiStatus.icon;
 
   const handleExport = () => {
     if (!session) return;
@@ -221,6 +238,13 @@ export function ContextBar() {
     setWorkspaceView("settings");
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent("kimix:focus-model-settings"));
+    }, 80);
+  };
+
+  const openKimiStatusSettings = async () => {
+    setWorkspaceView("settings");
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(latestError ? "kimix:focus-auth-settings" : "kimix:focus-model-settings"));
     }, 80);
   };
 
@@ -448,6 +472,17 @@ export function ContextBar() {
           <Bot size={16} className="shrink-0" />
           <span className="shrink-0">模型</span>
           <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]">{displayModel}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => void openKimiStatusSettings()}
+          className={`kimix-kimi-status-text is-${kimiStatus.tone} hidden min-w-0 items-center md:flex`}
+          style={{ gap: 7, height: 36, paddingLeft: 4, paddingRight: 4 }}
+          title={kimiStatus.detail}
+          aria-label={`Kimi Code 状态：${kimiStatus.label}`}
+        >
+          <KimiStatusIcon size={16} className={`shrink-0 ${isSessionRunning ? "animate-spin" : ""}`} />
+          <span className="truncate">{kimiStatus.label}</span>
         </button>
       </div>
 

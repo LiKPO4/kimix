@@ -1,5 +1,36 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, WorkspaceView } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView } from "@/types/ui";
+
+const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
+const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "session", "diffs"];
+
+function readRightSidebarCardOrder(): RightSidebarCardId[] {
+  try {
+    if (typeof localStorage === "undefined") return DEFAULT_RIGHT_SIDEBAR_CARD_ORDER;
+    const parsed = JSON.parse(localStorage.getItem(RIGHT_SIDEBAR_CARD_ORDER_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return DEFAULT_RIGHT_SIDEBAR_CARD_ORDER;
+    const known = new Set<RightSidebarCardId>(DEFAULT_RIGHT_SIDEBAR_CARD_ORDER);
+    const filtered = parsed.filter((item): item is RightSidebarCardId => known.has(item));
+    if (!filtered.includes("longTaskStatus")) {
+      return [
+        "longTaskStatus",
+        ...filtered,
+        ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => item !== "longTaskStatus" && !filtered.includes(item)),
+      ];
+    }
+    return [...filtered, ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => !filtered.includes(item))];
+  } catch {
+    return DEFAULT_RIGHT_SIDEBAR_CARD_ORDER;
+  }
+}
+
+function writeRightSidebarCardOrder(order: RightSidebarCardId[]) {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(RIGHT_SIDEBAR_CARD_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // Ignore local persistence errors; the in-memory order still updates.
+  }
+}
 
 export interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
@@ -22,6 +53,7 @@ export interface AppStore extends AppState {
   setLongTaskInspectorOpen: (open: boolean) => void;
   setDiffPanelOpen: (open: boolean) => void;
   setComposerCardHidden: (sessionId: string, card: ComposerDockCard, hidden: boolean) => void;
+  setRightSidebarCardOrder: (order: RightSidebarCardId[]) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
   setWorkspaceView: (view: WorkspaceView) => void;
   toggleSidebar: () => void;
@@ -57,6 +89,7 @@ export const useAppStore = create<AppStore>((set) => ({
   longTaskInspectorOpen: false,
   diffPanelOpen: false,
   hiddenComposerCards: {},
+  rightSidebarCardOrder: readRightSidebarCardOrder(),
   handoffSessionId: null,
   workspaceView: "chat",
   sidebarOpen: true,
@@ -97,6 +130,15 @@ export const useAppStore = create<AppStore>((set) => ({
       },
     };
   }),
+  setRightSidebarCardOrder: (order) => {
+    const known = new Set<RightSidebarCardId>(DEFAULT_RIGHT_SIDEBAR_CARD_ORDER);
+    const normalized = [
+      ...order.filter((item): item is RightSidebarCardId => known.has(item)),
+      ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => !order.includes(item)),
+    ];
+    writeRightSidebarCardOrder(normalized);
+    set({ rightSidebarCardOrder: normalized });
+  },
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   setWorkspaceView: (view) => set({ workspaceView: view }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),

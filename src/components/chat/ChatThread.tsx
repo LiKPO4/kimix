@@ -48,14 +48,14 @@ const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   planning: "计划设计",
   ready: "等待执行",
   running: "执行中",
-  reviewing: "审查中",
+  reviewing: "已暂停",
   paused: "已暂停",
   completed: "已完成",
 };
 
 const longTaskAgentLabels: Record<LongTaskSessionMeta["activeAgent"], string> = {
-  executor: "执行 agent",
-  reviewer: "审查 agent",
+  executor: "长程任务",
+  reviewer: "长程任务",
 };
 
 const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi(?:-code)?\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi(?:-code)?\/plans\/[^\s"'<>|]+\.md|\.kimi(?:-code)?[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/i;
@@ -186,10 +186,9 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
 }
 
 function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; projectPath: string }) {
-  const isReviewer = meta.activeAgent === "reviewer";
   return (
     <div
-      className={`kimix-chat-banner rounded-2xl shadow-[0_10px_26px_rgba(74,132,190,0.10)] ${isReviewer ? "is-reviewer" : ""}`}
+      className="kimix-chat-banner rounded-2xl shadow-[0_10px_26px_rgba(74,132,190,0.10)]"
       style={{ padding: "16px 18px" }}
     >
       <div className="flex flex-wrap items-center justify-between" style={{ gap: 12 }}>
@@ -202,15 +201,15 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
         <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
           <button
             type="button"
-            className={`kimix-chat-banner-button kimix-icon-text-button is-compact rounded-lg hover:opacity-90 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`}
+            className="kimix-chat-banner-button kimix-icon-text-button is-compact rounded-lg text-[var(--kimix-info-text)] hover:opacity-90"
             onClick={() => {
               void window.api.openFile({ projectPath, filePath: meta.bigPlanPath });
             }}
           >
             BIGPLAN
           </button>
-          <span className={`kimix-chat-banner-badge rounded-lg text-[12px] leading-5 ${isReviewer ? "text-[var(--kimix-warning-text)]" : "text-[var(--kimix-info-text)]"}`} style={{ minHeight: 32, padding: "5px 10px" }}>
-            {longTaskAgentLabels[meta.activeAgent]}
+          <span className="kimix-chat-banner-badge rounded-lg text-[12px] leading-5 text-[var(--kimix-info-text)]" style={{ minHeight: 32, padding: "5px 10px" }}>
+            自动执行
           </span>
         </div>
       </div>

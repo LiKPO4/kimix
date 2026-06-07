@@ -2969,7 +2969,7 @@ ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) => 
   const project = {
     id: randomUUID(),
     path: p,
-    name: path.basename(p),
+    name: projectService.getProjectDisplayName(p),
     lastOpenedAt: Date.now(),
     gitBranch: await projectService.getGitBranch(p),
   };
@@ -3154,7 +3154,6 @@ ipcMain.handle("longTasks:appendRound", async (_, request: unknown) => {
 
 ipcMain.handle("longTasks:create", async (_, request: unknown) => {
   let executorSessionId: string | null = null;
-  let reviewerSessionId: string | null = null;
   try {
     const parsed = CreateLongTaskSchema.safeParse(request);
     if (!parsed.success) {
@@ -3177,31 +3176,56 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     });
     executorSessionId = executor.sessionId;
 
-    const reviewer = await kimiCodeHost.createSession({
-      workDir: project.path,
-      permission,
-    });
-    reviewerSessionId = reviewer.sessionId;
-
     const task = longTaskService.createLongTask({
       project,
       title,
       initialRequest,
       executorSessionId,
-      reviewerSessionId,
+      reviewerSessionId: executorSessionId,
     });
     return { success: true, data: task };
   } catch (err) {
     if (executorSessionId) await kimiCodeHost.closeSession(executorSessionId).catch(() => {});
-    if (reviewerSessionId) await kimiCodeHost.closeSession(reviewerSessionId).catch(() => {});
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
 
 ipcMain.handle("project:getGitInfo", async (_, projectPath: string) => {
-  const branch = await projectService.getGitBranch(projectPath);
-  const status = await projectService.getGitStatus(projectPath);
-  return { success: true, data: { branch, status } };
+  try {
+    const snapshot = await projectService.getGitSnapshot(projectPath);
+    return { success: true, data: snapshot };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:gitCommit", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({
+      projectPath: z.string().min(1).max(4096),
+      message: z.string().min(1).max(500),
+    }).safeParse(request);
+    if (!parsed.success) return { success: false, error: "Invalid git commit request" };
+    if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
+    const result = await projectService.commitGitChanges(parsed.data.projectPath, parsed.data.message);
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:gitPull", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({
+      projectPath: z.string().min(1).max(4096),
+    }).safeParse(request);
+    if (!parsed.success) return { success: false, error: "Invalid git pull request" };
+    if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
+    const result = await projectService.pullGit(parsed.data.projectPath);
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("project:openPath", async (_, request: unknown) => {

@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
+  AlertCircle,
   AlertTriangle,
+  ArrowDownToLine,
   CheckCircle2,
   ClipboardCopy,
   Copy,
   FileText,
+  FolderSearch,
+  GitBranch,
+  GitCommitHorizontal,
+  GripVertical,
+  Loader2,
   MessageCircleQuestion,
   ChevronDown,
   ChevronUp,
@@ -18,14 +26,19 @@ import {
   Target,
   Terminal,
   Trash2,
+  LogIn,
+  Wrench,
   X,
 } from "lucide-react";
-import type { BtwRound, ComposerDockCard, Session } from "@/types/ui";
+import { useAppStore } from "@/stores/appStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import type { BtwRound, ComposerDockCard, RightSidebarCardId, Session } from "@/types/ui";
 import type { KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { formatReleaseDate } from "@/utils/format";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 export type HiddenComposerCardEntry = {
   key: ComposerDockCard;
@@ -54,6 +67,16 @@ export type BtwPanelState = {
   error: string | null;
   rounds: BtwRound[];
 };
+
+function countGitChanges(status: string) {
+  return status.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
+}
+
+function gitSummaryText(status: string) {
+  const count = countGitChanges(status);
+  if (count === 0) return "工作区干净";
+  return `${count} 个改动`;
+}
 
 interface LongTaskInspectorPanelProps {
   width: number;
@@ -88,7 +111,6 @@ interface LongTaskInspectorPanelProps {
   btwDisabled: boolean;
   defaultPlanMode: boolean;
   officialGoal: Session["officialGoal"] | null | undefined;
-  buildNextLongTaskPrompt: () => string;
   onClose: () => void;
   onPatchLongTaskMeta: (
     patch: Partial<NonNullable<Session["longTask"]>>,
@@ -150,7 +172,6 @@ export function LongTaskInspectorPanel({
   btwDisabled,
   defaultPlanMode,
   officialGoal,
-  buildNextLongTaskPrompt,
   onClose,
   onPatchLongTaskMeta,
   onApplyTargetStep,
@@ -175,11 +196,310 @@ export function LongTaskInspectorPanel({
   showToast,
   copyToClipboard,
 }: LongTaskInspectorPanelProps) {
+  const rightSidebarCardOrder = useAppStore((state) => state.rightSidebarCardOrder);
+  const setRightSidebarCardOrder = useAppStore((state) => state.setRightSidebarCardOrder);
+  const setWorkspaceView = useAppStore((state) => state.setWorkspaceView);
+  const setCurrentSession = useAppStore((state) => state.setCurrentSession);
+  const defaultThinking = useAppStore((state) => state.defaultThinking);
+  const defaultPlanModeSetting = useAppStore((state) => state.defaultPlanMode);
+  const permissionMode = useAppStore((state) => state.permissionMode);
+  const additionalWorkDirs = useAppStore((state) => state.additionalWorkDirs);
+  const updateSession = useSessionStore((state) => state.updateSession);
   const [collapsedBtwRoundIds, setCollapsedBtwRoundIds] = useState<Set<string>>(() => new Set());
   const [goalDraft, setGoalDraft] = useState("");
   const [goalBusy, setGoalBusy] = useState<"refresh" | "create" | "replace" | "pause" | "resume" | "cancel" | null>(null);
+  const [dragRightCardId, setDragRightCardId] = useState<RightSidebarCardId | null>(null);
+  const [rightCardDrop, setRightCardDrop] = useState<{ id: RightSidebarCardId; position: "above" | "below" } | null>(null);
+  const [kimiHealthOpen, setKimiHealthOpen] = useState(false);
+  const [kimiHealthLoading, setKimiHealthLoading] = useState(false);
+  const [kimiHealth, setKimiHealth] = useState<{
+    cli: "ok" | "warning" | "error";
+    auth: "ok" | "warning" | "error";
+    model: "ok" | "warning" | "error";
+    git: "ok" | "warning" | "error";
+    session: "ok" | "warning" | "error";
+    summary: string;
+    details: string[];
+  } | null>(null);
+  const [gitBranch, setGitBranch] = useState<string | undefined>(undefined);
+  const [gitStatus, setGitStatus] = useState("");
+  const [gitError, setGitError] = useState<string | null>(null);
+  const [gitBusy, setGitBusy] = useState<"refresh" | "commit" | "pull" | null>(null);
+  const [gitCommitMessage, setGitCommitMessage] = useState("");
+  const rightCardRefs = useRef(new Map<RightSidebarCardId, HTMLElement>());
   const openFile = (filePath: string) => {
     if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath });
+  };
+  const projectPathForKimi = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
+  const loadKimiHealth = async () => {
+    setKimiHealthLoading(true);
+    try {
+      const [cliRes, authRes, modelRes, gitRes] = await Promise.all([
+        window.api.checkKimiCli({ verify: false }).catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
+        window.api.getKimiAuthStatus().catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
+        window.api.getKimiModelConfig().catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
+        projectPathForKimi
+          ? window.api.getGitInfo(projectPathForKimi).catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }))
+          : Promise.resolve({ success: false as const, error: "未选择项目" }),
+      ]);
+      const runtimeId = liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : undefined;
+      const cliOk = cliRes.success && cliRes.data.available;
+      const authOk = authRes.success && authRes.data.loggedIn;
+      const modelOk = modelRes.success && (modelRes.data.defaultModel || modelRes.data.models.length > 0);
+      const gitOk = gitRes.success && Boolean(gitRes.data.branch || gitRes.data.gitRoot);
+      const sessionOk = Boolean(liveCurrentSession?.engine === "kimi-code" && runtimeId);
+      const details = [
+        cliRes.success ? cliRes.data.message : `CLI 检测失败：${cliRes.error}`,
+        authRes.success ? authRes.data.message : `登录状态失败：${authRes.error}`,
+        modelRes.success ? `模型：${modelRes.data.defaultModel ?? "未设置默认模型"}` : `模型配置失败：${modelRes.error}`,
+        gitRes.success ? (gitOk ? `Git：${gitRes.data.branch ?? "已检测仓库"}` : "Git：当前项目不是 Git 仓库") : `Git：${gitRes.error}`,
+        liveCurrentSession ? `会话：${runtimeId ? "已绑定 Kimi Code" : "缺少 runtime id"}` : "会话：未选择会话",
+      ];
+      const issueCount = [cliOk, authOk, modelOk, projectPathForKimi ? gitOk : true, liveCurrentSession ? sessionOk : true].filter((ok) => !ok).length;
+      setKimiHealth({
+        cli: cliOk ? "ok" : "error",
+        auth: authOk ? "ok" : "warning",
+        model: modelOk ? "ok" : "warning",
+        git: projectPathForKimi ? (gitOk ? "ok" : "warning") : "warning",
+        session: liveCurrentSession ? (sessionOk ? "ok" : "warning") : "warning",
+        summary: issueCount === 0 ? "状态正常" : `${issueCount} 项需关注`,
+        details,
+      });
+    } finally {
+      setKimiHealthLoading(false);
+    }
+  };
+  const reconnectCurrentKimiSession = async () => {
+    if (!liveCurrentSession) {
+      showToast("当前没有可重连的会话");
+      return;
+    }
+    if (!projectPathForKimi) {
+      showToast("当前会话缺少项目目录");
+      return;
+    }
+    setKimiHealthLoading(true);
+    const res = await window.api.startSession({
+      workDir: projectPathForKimi,
+      sessionId: liveCurrentSession.officialSessionId ?? liveCurrentSession.runtimeSessionId ?? liveCurrentSession.id,
+      thinking: defaultThinking,
+      yoloMode: permissionMode === "yolo",
+      autoMode: permissionMode === "auto",
+      planMode: defaultPlanModeSetting,
+      additionalWorkDirs,
+    });
+    setKimiHealthLoading(false);
+    if (!res.success) {
+      showToast(`重连失败：${res.error}`);
+      await loadKimiHealth();
+      return;
+    }
+    const nextSession = {
+      ...liveCurrentSession,
+      engine: "kimi-code" as const,
+      runtimeSessionId: res.data.sessionId,
+      model: res.data.model ?? liveCurrentSession.model ?? null,
+      isLoading: false,
+      updatedAt: Date.now(),
+    };
+    updateSession(liveCurrentSession.id, () => nextSession);
+    setCurrentSession(nextSession);
+    showToast("已重连当前 Kimi Code 会话");
+    await loadKimiHealth();
+  };
+  const openKimiAuthSettings = () => {
+    setWorkspaceView("settings");
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings")), 80);
+  };
+  const openKimiModelSettings = () => {
+    setWorkspaceView("settings");
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-model-settings")), 80);
+  };
+  useEffect(() => {
+    void loadKimiHealth();
+  }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, runningSessionId]);
+  const projectPathForGit = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
+  const refreshGitInfo = async (mode: "silent" | "manual" = "manual") => {
+    if (!projectPathForGit) {
+      setGitBranch(undefined);
+      setGitStatus("");
+      setGitError(null);
+      return;
+    }
+    if (mode === "manual") setGitBusy("refresh");
+    try {
+      const res = await window.api.getGitInfo(projectPathForGit);
+      if (!res.success) {
+        setGitError(res.error);
+        return;
+      }
+      setGitBranch(res.data.branch);
+      setGitStatus(res.data.status);
+      setGitError(null);
+    } finally {
+      if (mode === "manual") setGitBusy(null);
+    }
+  };
+  useEffect(() => {
+    void refreshGitInfo("silent");
+  }, [projectPathForGit]);
+  const commitGit = async () => {
+    if (!projectPathForGit || gitBusy) return;
+    const message = gitCommitMessage.trim();
+    if (!message) {
+      showToast("请输入提交说明");
+      return;
+    }
+    setGitBusy("commit");
+    try {
+      const res = await window.api.commitGitChanges({ projectPath: projectPathForGit, message });
+      if (!res.success) {
+        setGitError(res.error);
+        showToast(`提交失败：${res.error}`);
+        return;
+      }
+      setGitBranch(res.data.branch);
+      setGitStatus(res.data.status);
+      setGitError(null);
+      setGitCommitMessage("");
+      showToast("Git 提交完成");
+    } finally {
+      setGitBusy(null);
+    }
+  };
+  const pullGit = async () => {
+    if (!projectPathForGit || gitBusy) return;
+    setGitBusy("pull");
+    try {
+      const res = await window.api.pullGitChanges({ projectPath: projectPathForGit });
+      if (!res.success) {
+        setGitError(res.error);
+        showToast(`拉取失败：${res.error}`);
+        return;
+      }
+      setGitBranch(res.data.branch);
+      setGitStatus(res.data.status);
+      setGitError(null);
+      showToast("Git 拉取完成");
+    } finally {
+      setGitBusy(null);
+    }
+  };
+  const rightCardOrderValue = (id: RightSidebarCardId, fallback: number) => {
+    const index = rightSidebarCardOrder.indexOf(id);
+    return index >= 0 ? index : fallback;
+  };
+  const applyRightCardDrop = (source: RightSidebarCardId | null, indicator: { id: RightSidebarCardId; position: "above" | "below" } | null) => {
+    if (!source || !indicator || source === indicator.id) return;
+    const ordered = [...rightSidebarCardOrder];
+    const fromIndex = ordered.indexOf(source);
+    if (fromIndex < 0) return;
+    const [moved] = ordered.splice(fromIndex, 1);
+    const targetIndex = ordered.indexOf(indicator.id);
+    if (targetIndex < 0) return;
+    ordered.splice(indicator.position === "below" ? targetIndex + 1 : targetIndex, 0, moved);
+    setRightSidebarCardOrder(ordered);
+    showToast("已保存右侧卡片顺序");
+  };
+  const getRightCardDropAtPoint = (source: RightSidebarCardId, clientY: number) => {
+    const visibleCards = Array.from(rightCardRefs.current.entries())
+      .filter(([id, element]) => id !== source && element.offsetParent !== null)
+      .map(([id, element]) => ({ id, rect: element.getBoundingClientRect() }))
+      .sort((a, b) => a.rect.top - b.rect.top);
+    if (visibleCards.length === 0) return null;
+    const first = visibleCards[0];
+    const last = visibleCards[visibleCards.length - 1];
+    if (clientY <= first.rect.top) return { id: first.id, position: "above" as const };
+    if (clientY >= last.rect.bottom) return { id: last.id, position: "below" as const };
+    for (const card of visibleCards) {
+      if (clientY >= card.rect.top && clientY <= card.rect.bottom) {
+        return {
+          id: card.id,
+          position: clientY < card.rect.top + card.rect.height / 2 ? "above" as const : "below" as const,
+        };
+      }
+      if (clientY < card.rect.top) return { id: card.id, position: "above" as const };
+    }
+    return { id: last.id, position: "below" as const };
+  };
+  const rightCardProps = (id: RightSidebarCardId, fallbackOrder: number) => {
+    const dropActive = rightCardDrop?.id === id ? rightCardDrop.position : null;
+    return {
+      ref: (element: HTMLElement | null) => {
+        if (element) rightCardRefs.current.set(id, element);
+        else rightCardRefs.current.delete(id);
+      },
+      "data-right-sidebar-card-id": id,
+      "data-right-sidebar-drop-position": dropActive ?? undefined,
+      style: {
+        order: rightCardOrderValue(id, fallbackOrder),
+        position: "relative" as const,
+        opacity: dragRightCardId === id ? 0.55 : 1,
+      },
+    };
+  };
+  const rightCardDragHandle = (id: RightSidebarCardId, label: string) => (
+    <button
+      type="button"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setDragRightCardId(id);
+        let latestDrop: { id: RightSidebarCardId; position: "above" | "below" } | null = null;
+        const previousUserSelect = document.body.style.userSelect;
+        const previousCursor = document.body.style.cursor;
+        document.body.style.userSelect = "none";
+        document.body.style.cursor = "grabbing";
+        const updateDrop = (clientY: number) => {
+          const nextDrop = getRightCardDropAtPoint(id, clientY);
+          latestDrop = nextDrop;
+          setRightCardDrop((current) => (
+            current?.id === nextDrop?.id && current?.position === nextDrop?.position ? current : nextDrop
+          ));
+        };
+        const handlePointerMove = (moveEvent: PointerEvent) => {
+          moveEvent.preventDefault();
+          updateDrop(moveEvent.clientY);
+        };
+        const finishDrag = (upEvent: PointerEvent) => {
+          upEvent.preventDefault();
+          window.removeEventListener("pointermove", handlePointerMove);
+          window.removeEventListener("pointerup", finishDrag);
+          window.removeEventListener("pointercancel", cancelDrag);
+          document.body.style.userSelect = previousUserSelect;
+          document.body.style.cursor = previousCursor;
+          setDragRightCardId(null);
+          setRightCardDrop(null);
+          applyRightCardDrop(id, latestDrop);
+        };
+        const cancelDrag = () => {
+          window.removeEventListener("pointermove", handlePointerMove);
+          window.removeEventListener("pointerup", finishDrag);
+          window.removeEventListener("pointercancel", cancelDrag);
+          document.body.style.userSelect = previousUserSelect;
+          document.body.style.cursor = previousCursor;
+          setDragRightCardId(null);
+          setRightCardDrop(null);
+        };
+        updateDrop(event.clientY);
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", finishDrag);
+        window.addEventListener("pointercancel", cancelDrag);
+      }}
+      className="flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary active:cursor-grabbing"
+      title="长按拖动调整位置"
+      aria-label={`拖动${label}卡片`}
+    >
+      <GripVertical size={14} />
+    </button>
+  );
+  const rightCardSectionProps = (id: RightSidebarCardId, fallbackOrder: number, style: React.CSSProperties) => {
+    const props = rightCardProps(id, fallbackOrder);
+    return {
+      ...props,
+      style: { ...props.style, ...style },
+    };
   };
   const visibleBtwRounds = [...btwState.rounds].reverse().slice(0, 8);
   const toggleBtwRoundCollapsed = (roundId: string) => {
@@ -237,10 +557,13 @@ export function LongTaskInspectorPanel({
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
         {longTaskMeta ? (
           <div className="flex flex-col" style={{ gap: 16 }}>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ padding: "18px 16px 20px" }}>
-              <div className="text-[13px] font-medium leading-5 text-text-muted">当前状态</div>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("longTaskStatus", 0, { padding: "18px 16px 20px" })}>
+              <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                <div className="text-[13px] font-medium leading-5 text-text-muted">当前状态</div>
+                {rightCardDragHandle("longTaskStatus", "当前状态")}
+              </div>
               <div className="mt-2 text-[14px] leading-6 text-text-primary">
-                {longTaskMeta.activeAgent === "reviewer" ? "审查 agent" : "执行 agent"} · {longTaskMeta.stage}
+                长程任务 · {longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage}
               </div>
               <div className="mt-1 text-[13px] leading-5 text-text-muted">
                 步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
@@ -278,30 +601,8 @@ export function LongTaskInspectorPanel({
               )}
               <div className="flex flex-col" style={{ gap: 18, marginTop: 22 }}>
                 <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "20px 16px 18px" }}>
-                  <div className="flex flex-col" style={{ gap: 16 }}>
-                    <span className="text-[13px] font-medium leading-5 text-accent-primary">工作 agent</span>
-                    <div className="flex w-full items-center rounded-lg bg-surface-elevated" style={{ gap: 10, padding: 7 }}>
-                      <button
-                        type="button"
-                        disabled={longTaskControlBusy}
-                        onClick={() => void onPatchLongTaskMeta({ activeAgent: "executor", stage: longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage }, { message: "已切换到执行 agent" })}
-                        className={`h-9 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "executor" ? "bg-accent-primary-light text-accent-primary" : "text-text-muted hover:bg-accent-primary-light"}`}
-                        style={{ paddingLeft: 14, paddingRight: 14 }}
-                      >
-                        执行
-                      </button>
-                      <button
-                        type="button"
-                        disabled={longTaskControlBusy}
-                        onClick={() => void onPatchLongTaskMeta({ activeAgent: "reviewer", stage: longTaskMeta.stage === "running" ? "paused" : longTaskMeta.stage }, { message: "已切换到审查 agent" })}
-                        className={`h-9 flex-1 rounded-md text-[12.5px] leading-5 transition-colors disabled:cursor-wait disabled:opacity-60 ${longTaskMeta.activeAgent === "reviewer" ? "bg-accent-warning-light text-accent-warning" : "text-text-muted hover:bg-accent-primary-light"}`}
-                        style={{ paddingLeft: 14, paddingRight: 14 }}
-                      >
-                        审查
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center" style={{ gap: 14, marginTop: 22 }}>
+                  <div className="text-[13px] font-medium leading-5 text-accent-primary">执行控制</div>
+                  <div className="flex items-center" style={{ gap: 14, marginTop: 16 }}>
                     <button
                       type="button"
                       disabled={longTaskControlBusy || longTaskMeta.stage === "paused" || longTaskMeta.stage === "completed"}
@@ -367,25 +668,9 @@ export function LongTaskInspectorPanel({
                     </button>
                   </div>
                 </div>
-                <div className="rounded-lg bg-surface-elevated text-[13px] leading-5 text-text-muted" style={{ padding: "13px 12px" }}>
-                  <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                    <span className="font-medium text-accent-primary">下一步 prompt</span>
-                    <button
-                      type="button"
-                      onClick={() => void onCopyNextLongTaskPrompt()}
-                      className="kimix-icon-text-button is-compact shrink-0 bg-surface-elevated text-accent-primary hover:bg-accent-primary-light"
-                    >
-                      <ClipboardCopy size={13} />
-                      复制
-                    </button>
-                  </div>
-                  <div className="mt-3 line-clamp-4 whitespace-pre-wrap text-text-muted">
-                    {buildNextLongTaskPrompt()}
-                  </div>
-                </div>
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 1, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">SDK 后台任务</div>
@@ -393,15 +678,18 @@ export function LongTaskInspectorPanel({
                     {backgroundTasks.length > 0 ? `${backgroundTasks.length} 个任务` : "当前没有后台任务"}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  disabled={backgroundTasksLoading}
-                  onClick={() => onRefreshBackgroundTasks()}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
-                  刷新
-                </button>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={backgroundTasksLoading}
+                    onClick={() => onRefreshBackgroundTasks()}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
+                    刷新
+                  </button>
+                  {rightCardDragHandle("background", "SDK 后台任务")}
+                </div>
               </div>
               {backgroundTasksError ? (
                 <div className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
@@ -484,19 +772,22 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 2, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("bigPlan", 3, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">BIGPLAN</div>
                   <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">{longTaskMeta.bigPlanPath}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openFile(longTaskMeta.bigPlanPath)}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70"
-                >
-                  打开
-                </button>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => openFile(longTaskMeta.bigPlanPath)}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70"
+                  >
+                    打开
+                  </button>
+                  {rightCardDragHandle("bigPlan", "BIGPLAN")}
+                </div>
               </div>
               {longTaskDetailLoading ? (
                 <div className="mt-4 rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
@@ -545,22 +836,25 @@ export function LongTaskInspectorPanel({
                     })}
                     {parsedLongTaskDetail.steps.length === 0 && (
                       <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
-                        BIGPLAN 还没有解析到 Step，等待执行 agent 完成规划。
+                        BIGPLAN 还没有解析到 Step，等待规划完成。
                       </div>
                     )}
                   </div>
                 </div>
               ) : null}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 3, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("rounds", 4, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">轮次记录</div>
                   <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">rounds/step-XXX.md</div>
                 </div>
-                <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                  {parsedLongTaskDetail?.rounds.length ?? 0}
-                </span>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <span className="rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                    {parsedLongTaskDetail?.rounds.length ?? 0}
+                  </span>
+                  {rightCardDragHandle("rounds", "轮次记录")}
+                </div>
               </div>
               {longTaskDetailLoading ? (
                 <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
@@ -617,23 +911,26 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 1, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("review", 5, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium leading-5 text-text-muted">待审查</div>
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">用户审查清单</div>
                   <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">{longTaskMeta.reviewQueuePath}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openFile(longTaskMeta.reviewQueuePath)}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70"
-                >
-                  打开
-                </button>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => openFile(longTaskMeta.reviewQueuePath)}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70"
+                  >
+                    打开
+                  </button>
+                  {rightCardDragHandle("review", "用户审查清单")}
+                </div>
               </div>
               {longTaskDetailLoading ? (
                 <div className="mt-4 rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ padding: "13px 12px" }}>
-                  正在读取待审查队列...
+                  正在读取用户审查清单...
                 </div>
               ) : parsedLongTaskDetail && parsedLongTaskDetail.reviewItems.length > 0 ? (
                 <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
@@ -644,7 +941,7 @@ export function LongTaskInspectorPanel({
                       onClick={() => onSetReviewItemChecked(item, true)}
                       className="flex w-full items-start rounded-lg border border-accent-warning/30 bg-accent-warning-light text-left text-[13px] leading-5 text-accent-warning transition-colors hover:bg-accent-warning-light/70"
                       style={{ gap: 10, padding: "12px 12px" }}
-                      title="点击标记为已审查"
+                      title="点击标记为已确认"
                     >
                       <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-accent-warning/50 text-transparent">
                         <CheckCircle2 size={12} />
@@ -654,26 +951,29 @@ export function LongTaskInspectorPanel({
                   ))}
                   {pendingReviewItems.length === 0 && (
                     <div className="rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ padding: "13px 12px" }}>
-                      待审查项都已确认。
+                      审查项都已确认。
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="mt-4 rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ padding: "13px 12px" }}>
-                  暂无待人工审查项。
+                  暂无需要用户审查的事项。
                 </div>
               )}
             </section>
             {completedReviewItems.length > 0 && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 4, padding: "16px 16px 18px" }}>
+              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("confirmed", 6, { padding: "16px 16px 18px" })}>
                 <div className="flex items-center justify-between" style={{ gap: 10 }}>
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium leading-5 text-text-muted">已审查</div>
-                    <div className="mt-1 text-[13px] leading-5 text-text-muted">点击条目可撤回到待审查</div>
+                    <div className="text-[13px] font-medium leading-5 text-text-muted">已确认</div>
+                    <div className="mt-1 text-[13px] leading-5 text-text-muted">点击条目可撤回到审查清单</div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                    {completedReviewItems.length}
-                  </span>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <span className="rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                      {completedReviewItems.length}
+                    </span>
+                    {rightCardDragHandle("confirmed", "已确认")}
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
                   {completedReviewItems.map((item, index) => (
@@ -683,7 +983,7 @@ export function LongTaskInspectorPanel({
                       onClick={() => onSetReviewItemChecked(item, false)}
                       className="flex w-full items-start rounded-lg border border-accent-success/30 bg-accent-success-light text-left text-[13px] leading-5 text-accent-success transition-colors hover:bg-accent-success-light/70"
                       style={{ gap: 10, padding: "12px 12px" }}
-                      title="点击撤回到待审查"
+                      title="点击撤回到审查清单"
                     >
                       <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-accent-success" />
                       <span className="min-w-0 flex-1 line-through decoration-accent-success/50 decoration-1">{item}</span>
@@ -697,15 +997,18 @@ export function LongTaskInspectorPanel({
         ) : (
           <div className="flex flex-col" style={{ gap: 14 }}>
             {hiddenComposerCardEntries.length > 0 && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 0, padding: "16px 16px 18px" }}>
+              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("hidden", 0, { padding: "16px 16px 18px" })}>
                 <div className="flex items-start justify-between" style={{ gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5 text-text-muted">已收起卡片</div>
                     <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">可恢复到输入框上方</div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                    {hiddenComposerCardEntries.length}
-                  </span>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <span className="rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                      {hiddenComposerCardEntries.length}
+                    </span>
+                    {rightCardDragHandle("hidden", "已收起卡片")}
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
                   {hiddenComposerCardEntries.map((entry) => (
@@ -732,56 +1035,227 @@ export function LongTaskInspectorPanel({
                 </div>
               </section>
             )}
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 5, padding: "16px 16px 18px" }}>
-              <div className="flex items-start justify-between" style={{ gap: 12 }}>
-                <div className="min-w-0">
-                  <div className="text-[13px] font-medium leading-5 text-text-muted">长程任务</div>
-                  <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
-                    {visibleSessionLongTasks.length > 0 ? `${visibleSessionLongTasks.length} 个任务` : "当前项目暂无任务"}
+            {longTaskMeta && (
+              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("longTask", 1, { padding: "16px 16px 18px" })}>
+                <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium leading-5 text-text-muted">长程任务</div>
+                    <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
+                      {visibleSessionLongTasks.length > 0 ? `${visibleSessionLongTasks.length} 个任务` : "当前会话暂无其他任务"}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <button
+                      type="button"
+                      disabled={sessionLongTasksLoading || !(liveCurrentSession?.projectPath ?? currentProject?.path)}
+                      onClick={() => onRefreshSessionLongTasks()}
+                      className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      <RefreshCw size={13} className={sessionLongTasksLoading ? "animate-spin" : ""} />
+                      刷新
+                    </button>
+                    {rightCardDragHandle("longTask", "长程任务")}
                   </div>
                 </div>
+                {visibleSessionLongTasks.length > 0 ? (
+                  <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                    {visibleSessionLongTasks.slice(0, 3).map((task) => (
+                      <div key={task.id} className="rounded-lg border border-border-subtle bg-surface-elevated" style={{ padding: "12px 12px" }}>
+                        <div className="truncate text-[13.5px] font-medium leading-5 text-text-primary">{task.title}</div>
+                        <div className="mt-1 text-[12.5px] leading-5 text-text-muted">
+                          Step {task.currentStep}{task.targetStep ? ` / ${task.targetStep}` : ""} · {task.stage}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                    当前长程任务会话没有其他未归档任务。
+                  </div>
+                )}
+              </section>
+            )}
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("kimi", 2, { padding: "16px 16px 18px" })}>
+              <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <button
                   type="button"
-                  disabled={sessionLongTasksLoading || !(liveCurrentSession?.projectPath ?? currentProject?.path)}
-                  onClick={() => onRefreshSessionLongTasks()}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  onClick={() => setKimiHealthOpen((value) => !value)}
+                  className="flex min-w-0 items-center text-left"
+                  style={{ gap: 8 }}
+                  title="Kimi Code 健康状态"
                 >
-                  <RefreshCw size={13} className={sessionLongTasksLoading ? "animate-spin" : ""} />
-                  刷新
+                  {kimiHealthLoading ? (
+                    <Loader2 size={15} className="kimix-spin shrink-0 text-text-muted" />
+                  ) : kimiHealth?.summary === "状态正常" ? (
+                    <CheckCircle2 size={15} className="shrink-0 text-accent-success" />
+                  ) : (
+                    <AlertCircle size={15} className="shrink-0 text-accent-warning" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-medium leading-5 text-text-muted">Kimi Code</div>
+                    <div className="truncate text-[12.5px] leading-5 text-text-muted">{kimiHealth?.summary ?? "正在检测"}</div>
+                  </div>
                 </button>
-              </div>
-              {visibleSessionLongTasks.length > 0 ? (
-                <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                  {visibleSessionLongTasks.slice(0, 3).map((task) => (
-                    <div key={task.id} className="rounded-lg border border border-border-subtle bg-surface-elevated" style={{ padding: "12px 12px" }}>
-                      <div className="truncate text-[13.5px] font-medium leading-5 text-text-primary">{task.title}</div>
-                      <div className="mt-1 text-[12.5px] leading-5 text-text-muted">
-                        Step {task.currentStep}{task.targetStep ? ` / ${task.targetStep}` : ""} · {task.stage}
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => void loadKimiHealth()}
+                    disabled={kimiHealthLoading}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
+                    title="刷新 Kimi Code 状态"
+                    aria-label="刷新 Kimi Code 状态"
+                  >
+                    <RefreshCw size={13} className={kimiHealthLoading ? "kimix-spin" : ""} />
+                  </button>
+                  {rightCardDragHandle("kimi", "Kimi Code")}
                 </div>
-              ) : (
-                <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
-                  如果这个对话已经关联长程任务，刷新后这里会显示任务卡片。
+              </div>
+              {kimiHealthOpen && (
+                <div style={{ marginTop: 14 }}>
+                  <div className="grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 6 }}>
+                    {([
+                      ["CLI", kimiHealth?.cli],
+                      ["登录", kimiHealth?.auth],
+                      ["模型", kimiHealth?.model],
+                      ["Git", kimiHealth?.git],
+                      ["会话", kimiHealth?.session],
+                    ] as const).map(([label, status]) => (
+                      <div
+                        key={label}
+                        className={`rounded-lg text-center text-[11.5px] leading-5 ${
+                          status === "ok"
+                            ? "bg-accent-success-light text-accent-success"
+                            : status === "error"
+                              ? "bg-accent-danger-light text-accent-danger"
+                              : "bg-accent-warning-light text-accent-warning"
+                        }`}
+                        style={{ minHeight: 24, paddingLeft: 4, paddingRight: 4 }}
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-col" style={{ gap: 7, marginTop: 10 }}>
+                    {(kimiHealth?.details ?? ["正在检测 Kimi Code 状态..."]).slice(0, 5).map((detail, index) => (
+                      <div key={`${index}-${detail}`} className="truncate text-[12px] leading-5 text-text-muted" title={detail}>
+                        {detail}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+                    <button
+                      type="button"
+                      onClick={openKimiAuthSettings}
+                      className="kimix-icon-text-button is-compact justify-center text-text-secondary hover:bg-surface-hover"
+                    >
+                      <LogIn size={13} />
+                      登录
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openKimiModelSettings}
+                      className="kimix-icon-text-button is-compact justify-center text-text-secondary hover:bg-surface-hover"
+                    >
+                      <Wrench size={13} />
+                      模型
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => projectPathForKimi && void window.api.openProjectPath({ path: projectPathForKimi })}
+                      disabled={!projectPathForKimi}
+                      className="kimix-icon-text-button is-compact justify-center text-text-secondary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <FolderSearch size={13} />
+                      项目
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void reconnectCurrentKimiSession()}
+                      disabled={kimiHealthLoading || !liveCurrentSession}
+                      className="kimix-icon-text-button is-compact justify-center bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      <Activity size={13} />
+                      重连
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 1, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("git", 3, { padding: "16px 16px 18px" })}>
+              <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                  <GitBranch size={15} className="shrink-0 text-accent-primary" />
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">Git</div>
+                </div>
+                {rightCardDragHandle("git", "Git")}
+              </div>
+              <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
+                <div className="rounded-lg bg-surface-base text-[13px] leading-5" style={{ padding: "12px 12px" }}>
+                  <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                    <span className="min-w-0 truncate text-text-primary">{gitBranch ?? "未检测到分支"}</span>
+                    <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                      {gitSummaryText(gitStatus)}
+                    </span>
+                  </div>
+                  {gitError && <div className="mt-2 line-clamp-2 text-[12.5px] leading-5 text-accent-danger">{gitError}</div>}
+                </div>
+                <input
+                  value={gitCommitMessage}
+                  onChange={(event) => setGitCommitMessage(event.target.value)}
+                  disabled={!projectPathForGit || gitBusy !== null}
+                  placeholder="提交说明"
+                  className="h-9 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ paddingLeft: 12, paddingRight: 12 }}
+                />
+                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <button
+                    type="button"
+                    disabled={!projectPathForGit || gitBusy !== null}
+                    onClick={() => void pullGit()}
+                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {gitBusy === "pull" ? <Loader2 size={14} className="animate-spin" /> : <ArrowDownToLine size={14} />}
+                    <span>拉取</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!projectPathForGit || gitBusy !== null || !gitCommitMessage.trim() || countGitChanges(gitStatus) === 0}
+                    onClick={() => void commitGit()}
+                    className="kimix-icon-text-button is-compact justify-center bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {gitBusy === "commit" ? <Loader2 size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
+                    <span>提交</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  disabled={!projectPathForGit || gitBusy !== null}
+                  onClick={() => void refreshGitInfo()}
+                  className="kimix-icon-text-button is-compact w-full justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  {gitBusy === "refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  <span>刷新状态</span>
+                </button>
+              </div>
+            </section>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("goal", 4, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <Target size={15} className="shrink-0 text-accent-primary" />
                   <div className="text-[13px] font-medium leading-5 text-text-muted">官方 Goal</div>
                 </div>
-                <button
-                  type="button"
-                  disabled={!liveCurrentSession || Boolean(goalBusy)}
-                  onClick={() => void runGoalAction("refresh", onRefreshOfficialGoal)}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  <RefreshCw size={13} className={goalBusy === "refresh" ? "animate-spin" : ""} />
-                  刷新
-                </button>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={!liveCurrentSession || Boolean(goalBusy)}
+                    onClick={() => void runGoalAction("refresh", onRefreshOfficialGoal)}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <RefreshCw size={13} className={goalBusy === "refresh" ? "animate-spin" : ""} />
+                    刷新
+                  </button>
+                  {rightCardDragHandle("goal", "官方 Goal")}
+                </div>
               </div>
               <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
                 <div
@@ -867,22 +1341,25 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 1, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("btw", 5, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <MessageCircleQuestion size={15} className="shrink-0 text-accent-primary" />
                   <div className="text-[13px] font-medium leading-5 text-text-muted">BTW</div>
                 </div>
-                {btwState.rounds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={onClearBtw}
-                    className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                  >
-                    <Trash2 size={13} />
-                    清空
-                  </button>
-                )}
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  {btwState.rounds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={onClearBtw}
+                      className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                    >
+                      <Trash2 size={13} />
+                      清空
+                    </button>
+                  )}
+                  {rightCardDragHandle("btw", "BTW")}
+                </div>
               </div>
               <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
                 <textarea
@@ -956,7 +1433,7 @@ export function LongTaskInspectorPanel({
                 )}
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 2, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("plan", 6, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">Plan</div>
@@ -964,15 +1441,18 @@ export function LongTaskInspectorPanel({
                     {sessionPlanState.path || (sessionPlanPath === "__latest_kimi_plan__" ? "最近官方 Plan 文件" : sessionPlanPath) || "当前会话还没有捕获到官方 Plan 文件"}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  disabled={!liveCurrentSession || sessionPlanState.loading}
-                  onClick={() => onRefreshSessionPlan()}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  <RefreshCw size={13} className={sessionPlanState.loading ? "animate-spin" : ""} />
-                  刷新
-                </button>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={!liveCurrentSession || sessionPlanState.loading}
+                    onClick={() => onRefreshSessionPlan()}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <RefreshCw size={13} className={sessionPlanState.loading ? "animate-spin" : ""} />
+                    刷新
+                  </button>
+                  {rightCardDragHandle("plan", "Plan")}
+                </div>
               </div>
               {sessionPlanState.loading ? (
                 <div className="mt-4 rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
@@ -1008,8 +1488,11 @@ export function LongTaskInspectorPanel({
               )}
             </section>
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 3, padding: "16px 16px 18px" }}>
-              <div className="text-[13px] font-medium leading-5 text-text-muted">会话信息</div>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("session", 7, { padding: "16px 16px 18px" })}>
+              <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                <div className="text-[13px] font-medium leading-5 text-text-muted">会话信息</div>
+                {rightCardDragHandle("session", "会话信息")}
+              </div>
               <div className="mt-3 flex flex-col text-[13px] leading-5 text-text-muted" style={{ gap: 10 }}>
                 <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "11px 12px" }}>
                   <div className="font-medium text-accent-primary">Session</div>
@@ -1028,12 +1511,15 @@ export function LongTaskInspectorPanel({
               </div>
             </section>
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ order: 4, padding: "16px 16px 18px" }}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("diffs", 8, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="text-[13px] font-medium leading-5 text-text-muted">最近变更</div>
-                <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                  {sessionDiffs.length}
-                </span>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <span className="rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                    {sessionDiffs.length}
+                  </span>
+                  {rightCardDragHandle("diffs", "最近变更")}
+                </div>
               </div>
               {sessionDiffs.length > 0 ? (
                 <div className="mt-4 flex flex-col" style={{ gap: 10 }}>

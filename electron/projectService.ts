@@ -37,9 +37,18 @@ function readProjects(): Project[] {
   }
 }
 
+export function getProjectDisplayName(projectPath: string): string {
+  const resolved = path.resolve(projectPath);
+  const baseName = path.basename(resolved).trim();
+  if (baseName) return baseName;
+  const rootName = path.parse(resolved).root.trim();
+  return rootName || projectPath.trim() || "未命名项目";
+}
+
 function normalizeProject(project: Project, index = 0): Project {
   return {
     ...project,
+    name: project.name.trim() || getProjectDisplayName(project.path),
     pinned: project.pinned === true,
     sortOrder: typeof project.sortOrder === "number" ? project.sortOrder : index,
   };
@@ -147,6 +156,53 @@ export async function getGitStatus(projectPath: string): Promise<string> {
   } catch {
     return "";
   }
+}
+
+async function requireGitRoot(projectPath: string): Promise<string> {
+  const gitRoot = await findGitRoot(projectPath);
+  if (!gitRoot) throw new Error("当前项目不是 Git 仓库");
+  return gitRoot;
+}
+
+async function runGit(gitRoot: string, args: string[], timeout = 30000): Promise<string> {
+  const { stdout, stderr } = await execFileAsync("git", args, {
+    cwd: gitRoot,
+    encoding: "utf-8",
+    timeout,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return [stdout, stderr].filter(Boolean).join("\n").trim();
+}
+
+export async function getGitSnapshot(projectPath: string): Promise<{ branch?: string; status: string; gitRoot?: string }> {
+  const gitRoot = await findGitRoot(projectPath);
+  if (!gitRoot) return { branch: undefined, status: "" };
+  const [branch, status] = await Promise.all([
+    getGitBranch(gitRoot),
+    getGitStatus(gitRoot),
+  ]);
+  return { branch, status, gitRoot };
+}
+
+export async function commitGitChanges(projectPath: string, message: string): Promise<{ branch?: string; status: string; output: string }> {
+  const trimmedMessage = message.trim();
+  if (!trimmedMessage) throw new Error("请输入提交说明");
+  const gitRoot = await requireGitRoot(projectPath);
+  const beforeStatus = await getGitStatus(gitRoot);
+  if (!beforeStatus.trim()) throw new Error("当前没有可提交的改动");
+  await runGit(gitRoot, ["add", "-A"], 30000);
+  const staged = await runGit(gitRoot, ["diff", "--cached", "--name-only"], 10000);
+  if (!staged.trim()) throw new Error("当前没有已暂存的改动");
+  const output = await runGit(gitRoot, ["commit", "-m", trimmedMessage], 60000);
+  const snapshot = await getGitSnapshot(gitRoot);
+  return { branch: snapshot.branch, status: snapshot.status, output };
+}
+
+export async function pullGit(projectPath: string): Promise<{ branch?: string; status: string; output: string }> {
+  const gitRoot = await requireGitRoot(projectPath);
+  const output = await runGit(gitRoot, ["pull", "--ff-only"], 120000);
+  const snapshot = await getGitSnapshot(gitRoot);
+  return { branch: snapshot.branch, status: snapshot.status, output };
 }
 
 export type GitStatusFile = {

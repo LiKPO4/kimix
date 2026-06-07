@@ -4,6 +4,7 @@ export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending" | "goal";
+export type RightSidebarCardId = "longTaskStatus" | "background" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "git" | "goal" | "btw" | "plan" | "session" | "diffs";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 
 export interface AppState {
@@ -27,6 +28,7 @@ export interface AppState {
   longTaskInspectorOpen: boolean;
   diffPanelOpen: boolean;
   hiddenComposerCards: Record<string, ComposerDockCard[]>;
+  rightSidebarCardOrder: RightSidebarCardId[];
   handoffSessionId: string | null;
   workspaceView: WorkspaceView;
   sidebarOpen: boolean;

@@ -752,7 +752,7 @@ export function AppShell() {
   const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
   const isCurrentSessionRunning = Boolean(liveCurrentSession && runningSessionId === liveCurrentSession.id);
-  const longTaskStatusTone = longTaskMeta?.activeAgent === "reviewer" || longTaskMeta?.stage === "reviewing" ? "reviewer" : "executor";
+  const longTaskStatusTone = "executor";
   const sessionDiffs = useMemo(
     () => collectSessionDiffs(liveCurrentSession?.events ?? []),
     [liveCurrentSession?.events],
@@ -796,19 +796,13 @@ export function AppShell() {
       : null,
   ].filter((item): item is { key: "todo" | "pending" | "goal"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
   const visibleSessionLongTasks = useMemo(() => {
-    const archivedTaskIds = new Set(
-      sessions
-        .filter((session) => session.archivedAt && session.longTask)
-        .map((session) => session.longTask?.taskId)
-        .filter((taskId): taskId is string => Boolean(taskId)),
-    );
     const activeTaskIds = new Set(
       sessions
         .filter((session) => !session.archivedAt && session.longTask)
         .map((session) => session.longTask?.taskId)
         .filter((taskId): taskId is string => Boolean(taskId)),
     );
-    return sessionLongTasks.filter((task) => !archivedTaskIds.has(task.id) || activeTaskIds.has(task.id));
+    return sessionLongTasks.filter((task) => activeTaskIds.has(task.id));
   }, [sessionLongTasks, sessions]);
   const sessionPlanPath = useMemo(
     () => {
@@ -910,6 +904,7 @@ export function AppShell() {
         const nextMeta = {
           ...session.longTask,
           ...patch,
+          activeAgent: "executor" as const,
           recovery: patch.recovery !== undefined
             ? patch.recovery
             : options?.stopRunning
@@ -921,7 +916,7 @@ export function AppShell() {
                 }
               : session.longTask.recovery,
         };
-        const runtimeSessionId = nextMeta.activeAgent === "reviewer" ? nextMeta.reviewerSessionId : nextMeta.executorSessionId;
+        const runtimeSessionId = nextMeta.executorSessionId;
         latestSession = {
           ...session,
           runtimeSessionId,
@@ -947,22 +942,17 @@ export function AppShell() {
     if (!longTaskMeta) return "";
     const nextStep = Math.max(longTaskMeta.currentStep || 1, 1);
     const target = longTaskMeta.targetStep ?? nextStep;
-    if (longTaskMeta.activeAgent === "reviewer" || longTaskMeta.stage === "reviewing") {
-      return `【Kimix 长程任务：手动审查 Step ${nextStep}】
-请作为审查 agent，先阅读：
-- ${longTaskMeta.bigPlanPath}
-- ${longTaskMeta.reviewQueuePath}
-
-审查 Step ${nextStep} 的执行结果。必须引用该 Step 的验收标准和实际验证证据，不能仅凭执行 agent 自述放行。
-最终正文第一行必须且只能是“结论：通过”或“结论：需修复”或“结论：待人工审查”，并说明发现的问题、缺失验证和下一轮建议。`;
-    }
+    const isFinalStep = nextStep >= target;
     return `【Kimix 长程任务：手动执行 Step ${nextStep}】
-请作为执行 agent，先阅读 ${longTaskMeta.bigPlanPath}。
+请先阅读 ${longTaskMeta.bigPlanPath}。
 
 本次整体目标是执行到 Step ${target}，但本轮只允许执行 Step ${nextStep}。
 若规划尚未完成，请先完善 BIGPLAN 并请求用户确认；若已经可以执行，请直接执行 Step ${nextStep}。
-完成后写入 rounds/ 记录，包含本轮产出、验证证据和残余风险，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
-不要自行继续 Step ${nextStep + 1}。`;
+完成后写入 rounds/ 记录，包含本轮产出、验证证据和残余风险。
+不要启动、模拟或等待额外审查流程；不要输出 kimix-long-task-status 或任何机器状态代码块。
+${isFinalStep
+  ? "这是目标范围内最后一个 Step。完成后请输出最终结果和建议用户全盘审查的内容，并明确写出“长程任务执行完成”。"
+  : `完成后明确写出“Step ${nextStep} 执行完成，继续下一步”，然后停止本轮输出，等待 Kimix 自动调度 Step ${nextStep + 1}。`}`;
   };
 
   const copyNextLongTaskPrompt = async () => {
@@ -1027,8 +1017,9 @@ export function AppShell() {
       }
 
       const nextStep = Math.max(latestSession.longTask?.currentStep ?? 1, 1);
+      const isFinalStep = nextStep >= target;
       const prompt = `【Kimix 长程任务：执行到 Step ${target}】
-这是 Kimix 内部调度指令。请你作为执行 agent，先阅读 ${latestSession.longTask?.bigPlanPath}。
+这是 Kimix 内部调度指令。请先阅读 ${latestSession.longTask?.bigPlanPath}。
 
 本次整体目标是最终执行到 Step ${target}，但本轮只允许执行 Step ${nextStep}。
 
@@ -1037,8 +1028,10 @@ export function AppShell() {
 2. 如果已经可以执行，请不要询问用户是否继续，直接执行 Step ${nextStep}。
 3. 只执行 Step ${nextStep}，不要合并后续多个 Step。
 4. 完成后必须写入 rounds/ 记录，包含本轮产出、验证证据和残余风险。
-5. 完成 Step ${nextStep} 后必须立刻停止本轮输出，并明确写出“Step ${nextStep} 执行完成，交给审查 agent 审查”。
-6. 即使 Step ${target} 还未达到，也不能自行继续 Step ${nextStep + 1}，必须等待 Kimix 启动审查 agent 审查通过后再接下一轮。`;
+5. 不要启动、模拟或等待额外审查流程；不要输出 kimix-long-task-status 或任何机器状态代码块。
+${isFinalStep
+  ? "6. 这是目标范围内最后一个 Step。完成后请输出最终结果和建议用户全盘审查的内容，并明确写出“长程任务执行完成”。"
+  : `6. 完成 Step ${nextStep} 后必须立刻停止本轮输出，并明确写出“Step ${nextStep} 执行完成，继续下一步”。即使 Step ${target} 还未达到，也等待 Kimix 自动调度 Step ${nextStep + 1}。`}`;
       updateSession(latestSession.id, (session) => ({
         ...session,
         events: [
@@ -1109,7 +1102,6 @@ export function AppShell() {
     }
     const targets = [
       { role: "executor" as const, runtimeSessionId: meta.executorSessionId },
-      { role: "reviewer" as const, runtimeSessionId: meta.reviewerSessionId },
     ].filter((target, index, list) => (
       Boolean(target.runtimeSessionId) &&
       list.findIndex((item) => item.runtimeSessionId === target.runtimeSessionId) === index
@@ -1122,7 +1114,7 @@ export function AppShell() {
         activeOnly: false,
         limit: 20,
       });
-      if (!res.success) throw new Error(`${target.role === "reviewer" ? "审查" : "执行"} agent：${res.error}`);
+      if (!res.success) throw new Error(`长程任务：${res.error}`);
       return res.data.map((task: KimiCodeBackgroundTaskInfo): LongTaskBackgroundTaskView => ({
         ...task,
         role: target.role,
@@ -1138,7 +1130,6 @@ export function AppShell() {
     });
   }, [
     liveCurrentSession?.longTask?.executorSessionId,
-    liveCurrentSession?.longTask?.reviewerSessionId,
     longTaskInspectorOpen,
   ]);
 
@@ -1633,7 +1624,6 @@ export function AppShell() {
             btwDisabled={!liveCurrentSession || isCurrentSessionRunning}
             defaultPlanMode={defaultPlanMode}
             officialGoal={liveCurrentSession?.officialGoal}
-            buildNextLongTaskPrompt={buildNextLongTaskPrompt}
             onClose={() => setLongTaskInspectorOpen(false)}
             onPatchLongTaskMeta={patchLongTaskMeta}
             onApplyTargetStep={applyTargetStep}

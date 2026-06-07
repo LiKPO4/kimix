@@ -55,7 +55,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
-
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const addSession = useSessionStore((s) => s.addSession);
@@ -473,225 +472,225 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {recentProjects.map((project, projectIndex) => {
-            const isExpanded = expandedProjectIds.has(project.id);
-            const isActive = currentProject?.id === project.id;
-            const isPinned = project.pinned ?? false;
-            const pSessions = projectSessions(project.path);
-            const prev = recentProjects[projectIndex - 1];
-            const showRegionDivider = !isPinned && (prev?.pinned ?? false);
-            const isDragging = dragProjectId === project.id;
-            const canDropHere = dragProjectId !== null && dragProjectId !== project.id && sameRegion(dragProjectId, isPinned);
-            const showLineAbove = canDropHere && dropIndicator?.id === project.id && dropIndicator.position === "above";
-            const showLineBelow = canDropHere && dropIndicator?.id === project.id && dropIndicator.position === "below";
+                    const isExpanded = expandedProjectIds.has(project.id);
+                    const isActive = currentProject?.id === project.id;
+                    const isPinned = project.pinned ?? false;
+                    const pSessions = projectSessions(project.path);
+                    const prev = recentProjects[projectIndex - 1];
+                    const showRegionDivider = !isPinned && (prev?.pinned ?? false);
+                    const isDragging = dragProjectId === project.id;
+                    const canDropHere = dragProjectId !== null && dragProjectId !== project.id && sameRegion(dragProjectId, isPinned);
+                    const showLineAbove = canDropHere && dropIndicator?.id === project.id && dropIndicator.position === "above";
+                    const showLineBelow = canDropHere && dropIndicator?.id === project.id && dropIndicator.position === "below";
 
-            return (
-              <section
-                key={project.id}
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                  marginTop: showRegionDivider ? 6 : 0,
-                  borderTop: showRegionDivider ? "1px solid var(--kimix-panel-divider, rgba(127,127,127,0.18))" : undefined,
-                  paddingTop: showRegionDivider ? 12 : 0,
-                  opacity: isDragging ? 0.4 : 1,
-                }}
-                draggable
-                onDragStart={(e) => { setDragProjectId(project.id); e.dataTransfer.effectAllowed = "move"; }}
-                onDragEnd={() => { setDragProjectId(null); setDropIndicator(null); }}
-                onDragOver={(e) => {
-                  if (!dragProjectId || dragProjectId === project.id || !sameRegion(dragProjectId, isPinned)) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const position = e.clientY < rect.top + rect.height / 2 ? "above" : "below";
-                  setDropIndicator((cur) => (cur?.id === project.id && cur.position === position ? cur : { id: project.id, position }));
-                }}
-                onDrop={(e) => { e.preventDefault(); void handleProjectDrop(); }}
-              >
-                {showLineAbove && (
-                  <div aria-hidden style={{ position: "absolute", left: 12, right: 12, top: showRegionDivider ? 6 : -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
-                )}
-                {showLineBelow && (
-                  <div aria-hidden style={{ position: "absolute", left: 12, right: 12, bottom: -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
-                )}
-                <div
-                  style={{ paddingLeft: 20, paddingRight: 10 }}
-                  className={`group/project relative flex h-9 w-full items-center gap-1 rounded-lg pl-3 pr-1 text-[15px] transition-colors ${
-                    isActive
-                      ? "bg-surface-hover text-text-primary"
-                      : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                  }`}
-                >
-                  <button
-                    onClick={async () => {
-                      if (isExpanded) lastAutoExpandedProjectId.current = project.id;
-                      if (!isActive) setCurrentProject(project);
-                      setExpandedProjectIds((current) => {
-                        const next = new Set(current);
-                        if (isExpanded) next.delete(project.id);
-                        else next.add(project.id);
-                        return next;
-                      });
-                      const hasSession = visibleSessions.some((s) => isSameProjectPath(s.projectPath, project.path) && !s.archivedAt && !isHiddenInternalSession(s));
-                      if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
-                        await createSessionForProject(project);
-                      }
-                    }}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                  >
-                    <FolderOpen size={16} className="shrink-0 text-text-muted" />
-                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                    {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
-                  </button>
-                  <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenProjectMenu((current) => current === project.id ? null : project.id);
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
-                      title="项目菜单"
-                      aria-label="项目菜单"
-                    >
-                      <MoreHorizontal size={15} />
-                    </button>
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setCurrentProject(project);
-                        setExpandedProjectIds((current) => new Set([...current, project.id]));
-                        await createSessionForProject(project);
-                      }}
-                      disabled={Boolean(creatingSessionProjectPath)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
-                      title="在该项目下新对话"
-                      aria-label="在该项目下新对话"
-                    >
-                      {creatingSessionProjectPath === project.path ? <Loader2 size={15} className="kimix-spin" /> : <SquarePen size={15} />}
-                    </button>
-                  </div>
-                  {openProjectMenu === project.id && (
-                    <div
-                      className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-border-subtle bg-surface-elevated py-1.5 text-[13px] text-text-primary shadow-floating-token"
-                      onMouseDown={(e) => e.stopPropagation()}
-                    >
-                      <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <Pin size={14} className="text-text-secondary" />
-                        <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
-                      </button>
-                      <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <FolderSearch size={14} className="text-text-secondary" />
-                        <span>在资源管理器中打开</span>
-                      </button>
-                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <GitBranch size={14} className="text-text-secondary" />
-                        <span>创建永久工作树</span>
-                      </button>
-                      <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <SquarePen size={14} className="text-text-secondary" />
-                        <span>重命名项目</span>
-                      </button>
-                      <button onClick={() => archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <Archive size={14} className="text-text-secondary" />
-                        <span>归档对话</span>
-                      </button>
-                      <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-accent-danger transition-colors hover:bg-accent-danger-light" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                        <X size={14} />
-                        <span>移除</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {isExpanded && pSessions.length > 0 && (
-                  <div
-                    style={{
-                      paddingLeft: 20,
-                      paddingRight: 4,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 5,
-                    }}
-                  >
-                    {pSessions.map((s) => {
-                      const isSessionBusy = runningSessionId === s.id || s.isLoading;
-                      const isLongTaskSession = Boolean(s.longTask);
-
-                      return (
+                    return (
+                      <section
+                        key={project.id}
+                        style={{
+                          position: "relative",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                          marginTop: showRegionDivider ? 6 : 0,
+                          borderTop: showRegionDivider ? "1px solid var(--kimix-panel-divider, rgba(127,127,127,0.18))" : undefined,
+                          paddingTop: showRegionDivider ? 12 : 0,
+                          opacity: isDragging ? 0.4 : 1,
+                        }}
+                        draggable
+                        onDragStart={(e) => { setDragProjectId(project.id); e.dataTransfer.effectAllowed = "move"; }}
+                        onDragEnd={() => { setDragProjectId(null); setDropIndicator(null); }}
+                        onDragOver={(e) => {
+                          if (!dragProjectId || dragProjectId === project.id || !sameRegion(dragProjectId, isPinned)) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const position = e.clientY < rect.top + rect.height / 2 ? "above" : "below";
+                          setDropIndicator((cur) => (cur?.id === project.id && cur.position === position ? cur : { id: project.id, position }));
+                        }}
+                        onDrop={(e) => { e.preventDefault(); void handleProjectDrop(); }}
+                      >
+                        {showLineAbove && (
+                          <div aria-hidden style={{ position: "absolute", left: 12, right: 12, top: showRegionDivider ? 6 : -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
+                        )}
+                        {showLineBelow && (
+                          <div aria-hidden style={{ position: "absolute", left: 12, right: 12, bottom: -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
+                        )}
                         <div
-                          key={s.id}
-                          style={{ paddingLeft: 16, paddingRight: 10 }}
-                          className={`group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
-                            currentSession?.id === s.id
-                              ? isLongTaskSession
-                                ? "bg-accent-primary-light text-accent-primary-dark"
-                                : "bg-surface-hover text-text-primary"
-                              : isLongTaskSession
-                                ? "bg-accent-primary-light/60 text-accent-primary hover:bg-accent-primary-light hover:text-accent-primary-dark"
-                                : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                          style={{ paddingLeft: 20, paddingRight: 10 }}
+                          className={`group/project relative flex h-9 w-full items-center gap-1 rounded-lg text-[15px] transition-colors ${
+                            isActive
+                              ? "bg-surface-hover text-text-primary"
+                              : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                           }`}
                         >
                           <button
-                            onClick={() => {
-                              setWorkspaceView("chat");
-                              void selectSession(s.id);
-                            }}
-                            className="min-w-0 flex-1 truncate text-left"
-                          >
-                            {s.title}
-                          </button>
-                          <span className="flex h-5 min-w-[34px] shrink-0 items-center justify-end text-[12px] text-text-muted">
-                            {isSessionBusy ? (
-                              <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
-                            ) : (
-                              formatRelativeTime(s.updatedAt)
-                            )}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void exportSessionMarkdown(s.id);
-                            }}
-                            className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
-                            title="导出 Markdown"
-                            aria-label="导出 Markdown"
-                          >
-                            <FileText size={11} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void exportSessionArchive(s.id, s.title);
-                            }}
-                            className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
-                            title="导出 Kimi Debug ZIP"
-                            aria-label="导出 Kimi Debug ZIP"
-                          >
-                            <Download size={11} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              archiveSession(s.id);
-                              if (currentSession?.id === s.id) {
-                                setCurrentSession(null);
+                            onClick={async () => {
+                              if (isExpanded) lastAutoExpandedProjectId.current = project.id;
+                              if (!isActive) setCurrentProject(project);
+                              setExpandedProjectIds((current) => {
+                                const next = new Set(current);
+                                if (isExpanded) next.delete(project.id);
+                                else next.add(project.id);
+                                return next;
+                              });
+                              const hasSession = visibleSessions.some((s) => isSameProjectPath(s.projectPath, project.path) && !s.archivedAt && !isHiddenInternalSession(s));
+                              if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
+                                await createSessionForProject(project);
                               }
                             }}
-                            className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-accent-danger/10 hover:text-accent-danger group-hover:opacity-100"
-                            title="归档会话"
-                            aria-label="归档会话"
+                            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                           >
-                            <Archive size={11} />
+                            <FolderOpen size={16} className="shrink-0 text-text-muted" />
+                            <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                            {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                           </button>
+                          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenProjectMenu((current) => current === project.id ? null : project.id);
+                              }}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+                              title="项目菜单"
+                              aria-label="项目菜单"
+                            >
+                              <MoreHorizontal size={15} />
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setCurrentProject(project);
+                                setExpandedProjectIds((current) => new Set([...current, project.id]));
+                                await createSessionForProject(project);
+                              }}
+                              disabled={Boolean(creatingSessionProjectPath)}
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
+                              title="在该项目下新对话"
+                              aria-label="在该项目下新对话"
+                            >
+                              {creatingSessionProjectPath === project.path ? <Loader2 size={15} className="kimix-spin" /> : <SquarePen size={15} />}
+                            </button>
+                          </div>
+                          {openProjectMenu === project.id && (
+                            <div
+                              className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-border-subtle bg-surface-elevated py-1.5 text-[13px] text-text-primary shadow-floating-token"
+                              onMouseDown={(e) => e.stopPropagation()}
+                            >
+                              <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                <Pin size={14} className="text-text-secondary" />
+                                <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
+                              </button>
+                              <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                <FolderSearch size={14} className="text-text-secondary" />
+                                <span>在资源管理器中打开</span>
+                              </button>
+                              <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                <GitBranch size={14} className="text-text-secondary" />
+                                <span>创建永久工作树</span>
+                              </button>
+                              <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                <SquarePen size={14} className="text-text-secondary" />
+                                <span>重命名项目</span>
+                              </button>
+                              <button onClick={() => archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                <Archive size={14} className="text-text-secondary" />
+                                <span>归档对话</span>
+                              </button>
+                              <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-accent-danger transition-colors hover:bg-accent-danger-light" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                <X size={14} />
+                                <span>移除</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            );
+
+                        {isExpanded && pSessions.length > 0 && (
+                          <div
+                            style={{
+                              paddingLeft: 20,
+                              paddingRight: 4,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 5,
+                            }}
+                          >
+                            {pSessions.map((s) => {
+                              const isSessionBusy = runningSessionId === s.id || s.isLoading;
+                              const isLongTaskSession = Boolean(s.longTask);
+
+                              return (
+                                <div
+                                  key={s.id}
+                                  style={{ paddingLeft: 16, paddingRight: 10 }}
+                                  className={`group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
+                                    currentSession?.id === s.id
+                                      ? isLongTaskSession
+                                        ? "bg-accent-primary-light text-accent-primary-dark"
+                                        : "bg-surface-hover text-text-primary"
+                                      : isLongTaskSession
+                                        ? "bg-accent-primary-light/60 text-accent-primary hover:bg-accent-primary-light hover:text-accent-primary-dark"
+                                        : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => {
+                                      setWorkspaceView("chat");
+                                      void selectSession(s.id);
+                                    }}
+                                    className="min-w-0 flex-1 truncate text-left"
+                                  >
+                                    {s.title}
+                                  </button>
+                                  <span className="flex h-5 min-w-[34px] shrink-0 items-center justify-end text-[12px] text-text-muted">
+                                    {isSessionBusy ? (
+                                      <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
+                                    ) : (
+                                      formatRelativeTime(s.updatedAt)
+                                    )}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void exportSessionMarkdown(s.id);
+                                    }}
+                                    className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
+                                    title="导出 Markdown"
+                                    aria-label="导出 Markdown"
+                                  >
+                                    <FileText size={11} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void exportSessionArchive(s.id, s.title);
+                                    }}
+                                    className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
+                                    title="导出 Kimi Debug ZIP"
+                                    aria-label="导出 Kimi Debug ZIP"
+                                  >
+                                    <Download size={11} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      archiveSession(s.id);
+                                      if (currentSession?.id === s.id) {
+                                        setCurrentSession(null);
+                                      }
+                                    }}
+                                    className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-accent-danger/10 hover:text-accent-danger group-hover:opacity-100"
+                                    title="归档会话"
+                                    aria-label="归档会话"
+                                  >
+                                    <Archive size={11} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+                    );
           })}
         </div>
 
@@ -700,6 +699,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             尚未选择项目
           </div>
         )}
+
       </div>
 
       <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
@@ -710,7 +710,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.338</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.345</span>
         </button>
       </div>
     </aside>

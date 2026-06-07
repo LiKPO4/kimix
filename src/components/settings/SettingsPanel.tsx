@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp } from "lucide-react";
+import type { RefObject } from "react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode } from "@/types/ui";
@@ -19,10 +20,40 @@ type ArchivedSessionSummary = {
 };
 
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
+const SETTINGS_SECTION_ORDER_KEY = "kimix_settings_section_order";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
+
+type SettingsSectionId =
+  | "connection"
+  | "auth"
+  | "model"
+  | "theme"
+  | "permission"
+  | "context"
+  | "message"
+  | "newSession"
+  | "notification"
+  | "voice"
+  | "archived"
+  | "freeze";
+
+const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
+  "connection",
+  "auth",
+  "model",
+  "theme",
+  "permission",
+  "context",
+  "message",
+  "newSession",
+  "notification",
+  "voice",
+  "archived",
+  "freeze",
+];
 
 type KimiAuthStatus = {
   available: boolean;
@@ -103,6 +134,32 @@ function normalizeOpenAiProviderContextSize(providerName: string, baseUrl: strin
   const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
   const limit = getOpenAiProviderContextLimit(providerName, baseUrl, model);
   return Math.max(1, Math.min(limit, input));
+}
+
+function normalizeSettingsSectionOrder(order: unknown[]): SettingsSectionId[] {
+  const known = new Set<SettingsSectionId>(DEFAULT_SETTINGS_SECTION_ORDER);
+  const filtered = order.filter((item): item is SettingsSectionId => typeof item === "string" && known.has(item as SettingsSectionId));
+  return [...filtered, ...DEFAULT_SETTINGS_SECTION_ORDER.filter((item) => !filtered.includes(item))];
+}
+
+function readSettingsSectionOrder(): SettingsSectionId[] {
+  try {
+    const raw = localStorage.getItem(SETTINGS_SECTION_ORDER_KEY);
+    if (!raw) return DEFAULT_SETTINGS_SECTION_ORDER;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_SETTINGS_SECTION_ORDER;
+    return normalizeSettingsSectionOrder(parsed);
+  } catch {
+    return DEFAULT_SETTINGS_SECTION_ORDER;
+  }
+}
+
+function writeSettingsSectionOrder(order: SettingsSectionId[]) {
+  try {
+    localStorage.setItem(SETTINGS_SECTION_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // The in-memory order still updates if local persistence is unavailable.
+  }
 }
 
 function parseFreezeReports() {
@@ -226,8 +283,129 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [selectedModelAlias, setSelectedModelAlias] = useState("");
   const authSettingsRef = useRef<HTMLDivElement>(null);
   const modelSettingsRef = useRef<HTMLDivElement>(null);
+  const settingsSectionRefs = useRef(new Map<SettingsSectionId, HTMLElement>());
+  const [settingsSectionOrder, setSettingsSectionOrder] = useState<SettingsSectionId[]>(() => readSettingsSectionOrder());
+  const [dragSettingsSectionId, setDragSettingsSectionId] = useState<SettingsSectionId | null>(null);
+  const [settingsSectionDrop, setSettingsSectionDrop] = useState<{ id: SettingsSectionId; position: "above" | "below" } | null>(null);
   const [connection, setConnection] = useState<KimiConnectionStatus>(
     settingsStatusCache.connection ?? { loading: true, available: null, verified: false, message: "正在查找 Kimi Code" },
+  );
+
+  const settingsSectionOrderValue = (id: SettingsSectionId, fallback: number) => {
+    const index = settingsSectionOrder.indexOf(id);
+    return index >= 0 ? index : fallback;
+  };
+  const setPersistedSettingsSectionOrder = (order: SettingsSectionId[]) => {
+    const normalized = normalizeSettingsSectionOrder(order);
+    writeSettingsSectionOrder(normalized);
+    setSettingsSectionOrder(normalized);
+  };
+  const applySettingsSectionDrop = (source: SettingsSectionId | null, indicator: { id: SettingsSectionId; position: "above" | "below" } | null) => {
+    if (!source || !indicator || source === indicator.id) return;
+    const ordered = [...settingsSectionOrder];
+    const fromIndex = ordered.indexOf(source);
+    if (fromIndex < 0) return;
+    const [moved] = ordered.splice(fromIndex, 1);
+    const targetIndex = ordered.indexOf(indicator.id);
+    if (targetIndex < 0) return;
+    ordered.splice(indicator.position === "below" ? targetIndex + 1 : targetIndex, 0, moved);
+    setPersistedSettingsSectionOrder(ordered);
+  };
+  const getSettingsSectionDropAtPoint = (source: SettingsSectionId, clientY: number) => {
+    const visibleSections = Array.from(settingsSectionRefs.current.entries())
+      .filter(([id, element]) => id !== source && element.offsetParent !== null)
+      .map(([id, element]) => ({ id, rect: element.getBoundingClientRect() }))
+      .sort((a, b) => a.rect.top - b.rect.top);
+    if (visibleSections.length === 0) return null;
+    const first = visibleSections[0];
+    const last = visibleSections[visibleSections.length - 1];
+    if (clientY <= first.rect.top) return { id: first.id, position: "above" as const };
+    if (clientY >= last.rect.bottom) return { id: last.id, position: "below" as const };
+    for (const section of visibleSections) {
+      if (clientY >= section.rect.top && clientY <= section.rect.bottom) {
+        return {
+          id: section.id,
+          position: clientY < section.rect.top + section.rect.height / 2 ? "above" as const : "below" as const,
+        };
+      }
+      if (clientY < section.rect.top) return { id: section.id, position: "above" as const };
+    }
+    return { id: last.id, position: "below" as const };
+  };
+  const settingsSectionProps = (id: SettingsSectionId, fallbackOrder: number, forwardedRef?: RefObject<HTMLDivElement | null>) => {
+    const dropActive = settingsSectionDrop?.id === id ? settingsSectionDrop.position : null;
+    return {
+      ref: (element: HTMLDivElement | null) => {
+        if (forwardedRef) {
+          (forwardedRef as { current: HTMLDivElement | null }).current = element;
+        }
+        if (element) settingsSectionRefs.current.set(id, element);
+        else settingsSectionRefs.current.delete(id);
+      },
+      "data-settings-section-id": id,
+      "data-settings-drop-position": dropActive ?? undefined,
+      style: {
+        order: settingsSectionOrderValue(id, fallbackOrder),
+        position: "relative" as const,
+        opacity: dragSettingsSectionId === id ? 0.55 : 1,
+      },
+    };
+  };
+  const settingsDragHandle = (id: SettingsSectionId, label: string) => (
+    <button
+      type="button"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setDragSettingsSectionId(id);
+        let latestDrop: { id: SettingsSectionId; position: "above" | "below" } | null = null;
+        const previousUserSelect = document.body.style.userSelect;
+        const previousCursor = document.body.style.cursor;
+        document.body.style.userSelect = "none";
+        document.body.style.cursor = "grabbing";
+        const updateDrop = (clientY: number) => {
+          const nextDrop = getSettingsSectionDropAtPoint(id, clientY);
+          latestDrop = nextDrop;
+          setSettingsSectionDrop((current) => (
+            current?.id === nextDrop?.id && current?.position === nextDrop?.position ? current : nextDrop
+          ));
+        };
+        const handlePointerMove = (moveEvent: PointerEvent) => {
+          moveEvent.preventDefault();
+          updateDrop(moveEvent.clientY);
+        };
+        const finishDrag = (upEvent: PointerEvent) => {
+          upEvent.preventDefault();
+          window.removeEventListener("pointermove", handlePointerMove);
+          window.removeEventListener("pointerup", finishDrag);
+          window.removeEventListener("pointercancel", cancelDrag);
+          document.body.style.userSelect = previousUserSelect;
+          document.body.style.cursor = previousCursor;
+          setDragSettingsSectionId(null);
+          setSettingsSectionDrop(null);
+          applySettingsSectionDrop(id, latestDrop);
+        };
+        const cancelDrag = () => {
+          window.removeEventListener("pointermove", handlePointerMove);
+          window.removeEventListener("pointerup", finishDrag);
+          window.removeEventListener("pointercancel", cancelDrag);
+          document.body.style.userSelect = previousUserSelect;
+          document.body.style.cursor = previousCursor;
+          setDragSettingsSectionId(null);
+          setSettingsSectionDrop(null);
+        };
+        updateDrop(event.clientY);
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", finishDrag);
+        window.addEventListener("pointercancel", cancelDrag);
+      }}
+      className="kimix-settings-drag-handle"
+      title="长按拖动调整位置"
+      aria-label={`拖动${label}设置分区`}
+    >
+      <GripVertical size={14} />
+    </button>
   );
 
   const checkConnection = async (verify = false, options: { showLoading?: boolean } = {}) => {
@@ -692,10 +870,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         <div className="kimix-settings-body">
           <div className={`kimix-settings-columns ${variant === 'workspace' ? 'is-workspace' : ''}`}>
             <div className="kimix-settings-col">
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("theme", 3)}>
                 <div className="kimix-settings-section-title">
                   <Sun size={16} className="text-text-muted" />
                   <span>主题</span>
+                  {settingsDragHandle("theme", "主题")}
                 </div>
                 <div className="kimix-settings-theme-grid">
                   {themes.map((t) => (
@@ -707,10 +886,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("permission", 4)}>
                 <div className="kimix-settings-section-title">
                   <Shield size={16} className="text-text-muted" />
                   <span>权限模式</span>
+                  {settingsDragHandle("permission", "权限模式")}
                 </div>
                 <div className="kimix-settings-permissions">
                   {permissions.map((p) => (
@@ -726,10 +906,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("message", 6)}>
                 <div className="kimix-settings-section-title">
                   <MessageSquare size={16} className="text-text-muted" />
                   <span>消息信息</span>
+                  {settingsDragHandle("message", "消息信息")}
                 </div>
                 <div className="kimix-settings-permissions">
                   <button onClick={() => setStatusUpdateDisplay("turn_end")} className={`kimix-settings-permission ${statusUpdateDisplay === "turn_end" ? "is-active" : ""}`}>
@@ -756,10 +937,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("newSession", 7)}>
                 <div className="kimix-settings-section-title">
                   <MessageSquare size={16} className="text-text-muted" />
                   <span>新对话建议</span>
+                  {settingsDragHandle("newSession", "新对话建议")}
                 </div>
                 <div
                   className={`kimix-settings-card ${sessionRecommendationEnabled ? "is-active" : ""}`}
@@ -793,15 +975,18 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("archived", 10)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Archive size={16} className="text-text-muted" />
                     <span>归档对话</span>
                   </div>
-                  <span className="kimix-settings-badge text-[12.5px] leading-5" style={{ paddingLeft: 10, paddingRight: 10 }}>
-                    {archivedSessions.length}
-                  </span>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <span className="kimix-settings-badge text-[12.5px] leading-5" style={{ paddingLeft: 10, paddingRight: 10 }}>
+                      {archivedSessions.length}
+                    </span>
+                    {settingsDragHandle("archived", "归档对话")}
+                  </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   {archivedSessions.length > 0 ? (
@@ -861,16 +1046,19 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
 
             <div className="kimix-settings-col">
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("connection", 0)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Terminal size={16} className="text-text-muted" />
                     <span>连接情况</span>
                   </div>
-                  <button onClick={() => void checkConnection(Boolean(connection.path), { showLoading: true })} disabled={connection.loading} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "查找 Kimi Code"}>
-                    <RefreshCw size={15} className={connection.loading ? "kimix-spin" : ""} />
-                    <span>检查</span>
-                  </button>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <button onClick={() => void checkConnection(Boolean(connection.path), { showLoading: true })} disabled={connection.loading} className="kimix-settings-check-button" title={connection.path ? "检查 Kimi Code 响应" : "查找 Kimi Code"}>
+                      <RefreshCw size={15} className={connection.loading ? "kimix-spin" : ""} />
+                      <span>检查</span>
+                    </button>
+                    {settingsDragHandle("connection", "连接情况")}
+                  </div>
                 </div>
                 <div className={`kimix-settings-connection ${connection.verified ? "is-verified" : connection.available ? "is-found" : "is-missing"}`}>
                   <div className="kimix-settings-connection-inner">
@@ -893,21 +1081,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div ref={authSettingsRef} className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("auth", 1, authSettingsRef)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     {auth?.loggedIn ? <ShieldCheck size={16} className="text-accent-success" /> : <ShieldX size={16} className="text-text-muted" />}
                     <span>Kimi 登录</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void refreshAuth({ showLoading: true })}
-                    disabled={authLoading || Boolean(authBusyAction)}
-                    className="kimix-settings-check-button"
-                  >
-                    <RefreshCw size={15} className={authLoading ? "kimix-spin" : ""} />
-                    <span>刷新</span>
-                  </button>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => void refreshAuth({ showLoading: true })}
+                      disabled={authLoading || Boolean(authBusyAction)}
+                      className="kimix-settings-check-button"
+                    >
+                      <RefreshCw size={15} className={authLoading ? "kimix-spin" : ""} />
+                      <span>刷新</span>
+                    </button>
+                    {settingsDragHandle("auth", "Kimi 登录")}
+                  </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   <div className="flex items-start" style={{ gap: 12 }}>
@@ -957,7 +1148,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div ref={modelSettingsRef} className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("model", 2, modelSettingsRef)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Terminal size={16} className="text-text-muted" />
@@ -982,6 +1173,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
                       <span>刷新</span>
                     </button>
+                    {settingsDragHandle("model", "模型配置")}
                   </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
@@ -1244,10 +1436,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("context", 5)}>
                 <div className="kimix-settings-section-title">
                   <Terminal size={16} className="text-text-muted" />
                   <span>上下文显示</span>
+                  {settingsDragHandle("context", "上下文显示")}
                 </div>
                 <div className="kimix-settings-permissions">
                   <button onClick={() => setDetailedContext(false)} className={`kimix-settings-permission ${!detailedContext ? "is-active" : ""}`}>
@@ -1269,10 +1462,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("notification", 8)}>
                 <div className="kimix-settings-section-title">
                   <Bell size={16} className="text-text-muted" />
                   <span>完成通知</span>
+                  {settingsDragHandle("notification", "完成通知")}
                 </div>
                 <div className="kimix-settings-permissions">
                   {notificationModes.map((mode) => (
@@ -1292,10 +1486,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("voice", 9)}>
                 <div className="kimix-settings-section-title">
                   <Mic size={16} className="text-text-muted" />
                   <span>语音输入</span>
+                  {settingsDragHandle("voice", "语音输入")}
                 </div>
                 <div className="kimix-settings-card" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 16, alignItems: "center", padding: "14px 16px" }}>
                   <div className="flex min-w-0 items-start" style={{ gap: 12 }}>
@@ -1320,7 +1515,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section">
+              <div className="kimix-settings-section" {...settingsSectionProps("freeze", 11)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <AlertCircle size={16} className="text-text-muted" />
@@ -1338,6 +1533,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <Trash2 size={13} />
                       清空
                     </button>
+                    {settingsDragHandle("freeze", "卡死诊断")}
                   </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
@@ -1377,7 +1573,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.338 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v2.8.345 · 设置将自动保存到本地</div>
         </div>
       </div>
   );

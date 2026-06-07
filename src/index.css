@@ -785,7 +785,9 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-columns {
-  display: contents;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .kimix-settings-col {
@@ -914,7 +916,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-section + .kimix-settings-section {
-  margin-top: 20px;
+  margin-top: 0;
 }
 
 .kimix-settings-section-title,
@@ -930,6 +932,51 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-row-title {
   justify-content: space-between;
+}
+
+.kimix-settings-drag-handle {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover);
+}
+
+.kimix-settings-drag-handle:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-settings-drag-handle:active {
+  cursor: grabbing;
+}
+
+.kimix-settings-section[data-settings-drop-position]::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-blue);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.kimix-settings-section[data-settings-drop-position="above"]::before {
+  top: -5px;
+}
+
+.kimix-settings-section[data-settings-drop-position="below"]::before {
+  bottom: -5px;
 }
 
 .kimix-settings-section > .kimix-settings-section-title + *,
@@ -1318,6 +1365,26 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--radius-lg) !important;
 }
 
+.kimix-longtask-inspector [data-right-sidebar-drop-position]::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-blue);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.kimix-longtask-inspector [data-right-sidebar-drop-position="above"]::before {
+  top: -5px;
+}
+
+.kimix-longtask-inspector [data-right-sidebar-drop-position="below"]::before {
+  bottom: -5px;
+}
+
 .kimix-modal-card,
 .kimix-onboarding-card {
   border-color: var(--border-default);
@@ -1344,6 +1411,35 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-entry:hover {
   background: rgba(0, 0, 0, 0.05);
   box-shadow: var(--shadow-hover);
+}
+
+.kimix-kimi-status-text {
+  color: var(--text-muted);
+  transition: color var(--duration-base) var(--ease-hover);
+}
+
+.kimix-kimi-status-text:hover {
+  color: var(--text-primary);
+}
+
+.kimix-kimi-status-text.is-success {
+  color: var(--accent-success);
+}
+
+.kimix-kimi-status-text.is-active {
+  color: var(--accent-primary);
+}
+
+.kimix-kimi-status-text.is-warning {
+  color: var(--accent-warning);
+}
+
+.kimix-kimi-status-text.is-danger {
+  color: var(--accent-danger);
+}
+
+.kimix-kimi-status-text.is-muted {
+  color: var(--text-muted);
 }
 
 /* ── Spin Animation ── */

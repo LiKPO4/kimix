@@ -684,6 +684,28 @@ export type GitInfoResponse = {
   data: {
     branch?: string;
     status: string;
+    gitRoot?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type GitCommitRequest = {
+  projectPath: string;
+  message: string;
+};
+
+export type GitPullRequest = {
+  projectPath: string;
+};
+
+export type GitActionResponse = {
+  success: true;
+  data: {
+    branch?: string;
+    status: string;
+    output: string;
   };
 } | {
   success: false;

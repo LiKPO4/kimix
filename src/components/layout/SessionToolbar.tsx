@@ -49,7 +49,7 @@ const longTaskStageLabels: Record<LongTaskStage, string> = {
   planning: "规划中",
   ready: "待执行",
   running: "执行中",
-  reviewing: "审查中",
+  reviewing: "已暂停",
   paused: "已暂停",
   completed: "已完成",
 };
@@ -64,7 +64,7 @@ function longTaskRecoveryLabel(recovery?: Session["longTask"] extends infer T ? 
 
 const longTaskAgentLabels: Record<LongTaskAgent, string> = {
   executor: "执行",
-  reviewer: "审查",
+  reviewer: "执行",
 };
 
 interface SessionToolbarProps {
@@ -439,8 +439,6 @@ export function SessionToolbar({
             onClick={onOpenLongTaskInspector}
             className={`flex h-9 min-w-[148px] items-center rounded-xl border bg-surface-elevated text-left transition-colors ${
               longTaskMeta.recovery && longTaskMeta.recovery.status !== "none"
-                ? "border-accent-warning text-accent-warning hover:bg-accent-warning-light"
-                : longTaskStatusTone === "reviewer"
                 ? "border-accent-warning text-accent-warning hover:bg-accent-warning-light"
                 : "border-accent-primary-soft text-accent-primary hover:bg-accent-primary-light"
             }`}
