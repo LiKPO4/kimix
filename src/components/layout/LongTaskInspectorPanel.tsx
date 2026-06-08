@@ -175,6 +175,11 @@ function suggestGitCommitMessage(files: GitStatusFile[]) {
   return "更新 Git 工作区改动";
 }
 
+function projectNameFromPath(projectPath: string) {
+  const normalized = projectPath.replace(/[\\/]+$/, "");
+  return normalized.split(/[\\/]/).pop() || projectPath;
+}
+
 interface LongTaskInspectorPanelProps {
   width: number;
   title: string;
@@ -196,7 +201,7 @@ interface LongTaskInspectorPanelProps {
   sessionPlanState: SessionPlanState;
   sessionPlanPath: string | null;
   liveCurrentSession: Session | null;
-  currentProject: { path?: string } | null;
+  currentProject: { name?: string; path?: string } | null;
   hiddenComposerCardEntries: HiddenComposerCardEntry[];
   composerCardSessionId: string;
   visibleSessionLongTasks: LongTaskSummary[];
@@ -430,7 +435,12 @@ export function LongTaskInspectorPanel({
   useEffect(() => {
     void loadKimiHealth();
   }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, runningSessionId]);
-  const projectPathForGit = currentProject?.path ?? liveCurrentSession?.projectPath ?? "";
+  const projectPathForGit = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
+  const gitProjectLabel = projectPathForGit && currentProject?.path === projectPathForGit
+    ? currentProject.name || projectNameFromPath(projectPathForGit)
+    : projectPathForGit
+      ? projectNameFromPath(projectPathForGit)
+      : "";
   const displaySessionDiffs = useMemo(
     () => alignSessionDiffsToGitStatus(sessionDiffs, gitStatus),
     [sessionDiffs, gitStatus],
@@ -1452,10 +1462,13 @@ export function LongTaskInspectorPanel({
               )}
             </section>
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("git", 3, { padding: "16px 16px 18px" })}>
-              <div className="flex items-center justify-between" style={{ gap: 10 }}>
+              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 96px) auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <GitBranch size={15} className="shrink-0 text-accent-primary" />
                   <div className="text-[13px] font-medium leading-5 text-text-muted">Git</div>
+                </div>
+                <div className="min-w-0 truncate text-right text-[13px] font-medium leading-5 text-text-muted" title={projectPathForGit}>
+                  {gitProjectLabel}
                 </div>
                 {rightCardDragHandle("git", "Git")}
               </div>
