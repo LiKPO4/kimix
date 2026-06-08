@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildUnifiedDiff, collectSessionDiffs } from "../diff";
+import { alignSessionDiffsToGitStatus, buildUnifiedDiff, collectSessionDiffs } from "../diff";
 import type { TimelineEvent } from "@/types/ui";
 
 describe("buildUnifiedDiff", () => {
@@ -93,5 +93,55 @@ describe("collectSessionDiffs", () => {
     ];
     const diffs = collectSessionDiffs(events);
     expect(diffs.map((d) => d.filePath)).toEqual(["b.ts", "c.ts", "a.ts"]);
+  });
+});
+
+describe("alignSessionDiffsToGitStatus", () => {
+  it("aligns a stale first path segment to the current git status path", () => {
+    const diffs = [{
+      id: "d1",
+      filePath: "v_browser/android/app/src/main/kotlin/com/linjianglu/tvbrowser/MainActivity.kt",
+      timestamp: 100,
+      oldText: "",
+      newText: "",
+      additions: 0,
+      deletions: 0,
+    }];
+    const gitStatus = " M tv_browser/android/app/src/main/kotlin/com/linjianglu/tvbrowser/MainActivity.kt";
+
+    expect(alignSessionDiffsToGitStatus(diffs, gitStatus)[0].filePath).toBe(
+      "tv_browser/android/app/src/main/kotlin/com/linjianglu/tvbrowser/MainActivity.kt",
+    );
+  });
+
+  it("handles a porcelain status line whose leading status column was trimmed by an older build", () => {
+    const diffs = [{
+      id: "d1",
+      filePath: "v_browser/android/app/src/main/kotlin/com/linjianglu/tvbrowser/MainActivity.kt",
+      timestamp: 100,
+      oldText: "",
+      newText: "",
+      additions: 0,
+      deletions: 0,
+    }];
+    const gitStatus = "M tv_browser/android/app/src/main/kotlin/com/linjianglu/tvbrowser/MainActivity.kt";
+
+    expect(alignSessionDiffsToGitStatus(diffs, gitStatus)[0].filePath).toBe(
+      "tv_browser/android/app/src/main/kotlin/com/linjianglu/tvbrowser/MainActivity.kt",
+    );
+  });
+
+  it("keeps the original diff path when git status has no unique match", () => {
+    const diffs = [{
+      id: "d1",
+      filePath: "src/app.ts",
+      timestamp: 100,
+      oldText: "",
+      newText: "",
+      additions: 0,
+      deletions: 0,
+    }];
+
+    expect(alignSessionDiffsToGitStatus(diffs, "")[0].filePath).toBe("src/app.ts");
   });
 });

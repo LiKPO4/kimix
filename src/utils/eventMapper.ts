@@ -49,11 +49,19 @@ function appendAssistantContent(existingContent: string, incomingContent: string
     !paragraphBreak ||
     existingContent.endsWith("\n") ||
     incomingContent.startsWith("\n") ||
+    isInsideUnclosedInlineCode(existingContent) ||
     incomingContent.trim().length < 8
   ) {
     return existingContent + incomingContent;
   }
   return restoreAssistantProgressParagraphs(`${existingContent}\n\n${incomingContent}`);
+}
+
+function isInsideUnclosedInlineCode(content: string) {
+  const currentLine = content.split(/\r?\n/).pop() ?? "";
+  const withoutFences = currentLine.replace(/```/g, "");
+  const inlineBackticks = withoutFences.match(/`/g)?.length ?? 0;
+  return inlineBackticks % 2 === 1;
 }
 
 function isAssistantProcessBoundary(event: TimelineEvent): boolean {

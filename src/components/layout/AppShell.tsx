@@ -54,6 +54,16 @@ const EMPTY_BTW_TRANSIENT_STATE: BtwTransientState = {
   error: null,
 };
 
+function normalizeProjectPath(path: string | undefined) {
+  return (path ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function isSameProjectPath(a: string | undefined, b: string | undefined) {
+  const left = normalizeProjectPath(a);
+  const right = normalizeProjectPath(b);
+  return Boolean(left && right && left === right);
+}
+
 function goalStatusLabel(status: string) {
   if (status === "active") return "进行中";
   if (status === "paused") return "已暂停";
@@ -499,9 +509,16 @@ export function AppShell() {
   };
 
   const sortedSessions = useMemo(
-    () => sessions.filter((session) => !session.archivedAt && !isHiddenInternalSession(session) && (!currentProject || session.projectPath === currentProject.path)),
+    () => sessions.filter((session) => !session.archivedAt && !isHiddenInternalSession(session) && (!currentProject || isSameProjectPath(session.projectPath, currentProject.path))),
     [sessions, currentProject],
   );
+
+  useEffect(() => {
+    if (!currentSession || currentSession.archivedAt || isHiddenInternalSession(currentSession)) return;
+    if (isSameProjectPath(currentProject?.path, currentSession.projectPath)) return;
+    const sessionProject = recentProjects.find((project) => isSameProjectPath(project.path, currentSession.projectPath));
+    if (sessionProject) setCurrentProject(sessionProject);
+  }, [currentSession?.id, currentSession?.projectPath, currentProject?.path, recentProjects, setCurrentProject]);
 
   const moveChat = (direction: "previous" | "next") => {
     if (sortedSessions.length === 0) return;

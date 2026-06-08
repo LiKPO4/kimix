@@ -203,6 +203,34 @@ describe("mergeEvents", () => {
     expect(assistant.content).toBe("先读取关键文件确认当前代码状态。\n\n现在开始并行修复批次1的安全类P0问题。");
   });
 
+  it("keeps inline code path fragments together across tool boundaries", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "- `lib", isThinking: false, isComplete: false },
+      { id: "2", type: "tool_call", timestamp: 2, toolCallId: "tc-1", toolName: "Read", status: "completed", arguments: {}, rawArguments: "{}" },
+      { id: "3", type: "tool_result", timestamp: 3, toolCallId: "tc-1", toolName: "Read", result: "ok" },
+    ];
+    const firstIncoming: TimelineEvent = {
+      id: "4",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "/features/run/p",
+      isThinking: false,
+      isComplete: false,
+    };
+    const firstResult = mergeEvents(existing, firstIncoming);
+    const secondIncoming: TimelineEvent = {
+      id: "5",
+      type: "assistant_message",
+      timestamp: 5,
+      content: "resentation/run_page.dart`：新增按钮。",
+      isThinking: false,
+      isComplete: false,
+    };
+    const secondResult = mergeEvents(firstResult, secondIncoming);
+    const assistant = secondResult[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.content).toBe("- `lib/features/run/presentation/run_page.dart`：新增按钮。");
+  });
+
   it("completes assistant message on TurnEnd", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Done", isThinking: false, isComplete: false },

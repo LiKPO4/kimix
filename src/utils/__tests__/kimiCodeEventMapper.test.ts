@@ -32,6 +32,27 @@ describe("mapKimiCodeEvent", () => {
     expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("完成");
   });
 
+  it("maps Kimi Code wire content parts to assistant_message chunks", () => {
+    const options = testOptions();
+    const thinking = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      time: 2000,
+      event: { type: "content.part", part: { type: "think", think: "先想一下" } },
+    }, options);
+    const assistant = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      time: 3000,
+      event: { type: "content.part", part: { type: "text", text: "正文结果" } },
+    }, options);
+
+    expect(thinking?.type).toBe("assistant_message");
+    expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinking).toBe("先想一下");
+    expect(thinking?.timestamp).toBe(2000);
+    expect(assistant?.type).toBe("assistant_message");
+    expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("正文结果");
+    expect(assistant?.timestamp).toBe(3000);
+  });
+
   it("maps tool call streaming and result events", () => {
     const options = testOptions();
     const delta = mapKimiCodeEvent({
@@ -58,6 +79,28 @@ describe("mapKimiCodeEvent", () => {
     expect((started as Extract<TimelineEvent, { type: "tool_call" }>).toolName).toBe("Bash");
     expect(result?.type).toBe("tool_result");
     expect((result as Extract<TimelineEvent, { type: "tool_result" }>).result).toBe("D:/WORKS");
+  });
+
+  it("maps Kimi Code wire tool calls and final step end", () => {
+    const options = testOptions();
+    const tool = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      event: { type: "tool.call", toolCallId: "call-1", name: "Bash", args: { command: "pwd" } },
+    }, options);
+    const intermediateStepEnd = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      event: { type: "step.end", finishReason: "tool_use" },
+    }, options);
+    const finalStepEnd = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      event: { type: "step.end", finishReason: "end_turn" },
+    }, options);
+
+    expect(tool?.type).toBe("tool_call");
+    expect((tool as Extract<TimelineEvent, { type: "tool_call" }>).toolName).toBe("Bash");
+    expect(intermediateStepEnd).toBeNull();
+    expect(finalStepEnd?.type).toBe("assistant_message");
+    expect((finalStepEnd as Extract<TimelineEvent, { type: "assistant_message" }>).isComplete).toBe(true);
   });
 
   it("maps SDK status, cancel, compaction and error events", () => {
@@ -154,6 +197,45 @@ describe("reduceKimiCodeEvents", () => {
     expect(assistant.content).toBe("你好，完成");
     expect(assistant.isComplete).toBe(true);
     expect(assistant.isThinking).toBe(false);
+  });
+
+  it("reduces Kimi Code wire loop events without losing the final text body", () => {
+    const events = reduceKimiCodeEvents([], [
+      {
+        type: "context.append_loop_event",
+        event: { type: "content.part", part: { type: "think", think: "先检查一下" } },
+      },
+      {
+        type: "context.append_loop_event",
+        event: { type: "tool.call", toolCallId: "call-1", name: "ReadFile", args: { path: "a.ts" } },
+      },
+      {
+        type: "context.append_loop_event",
+        event: { type: "tool.result", toolCallId: "call-1", result: { output: "内容" } },
+      },
+      {
+        type: "context.append_loop_event",
+        event: { type: "step.end", finishReason: "tool_use" },
+      },
+      {
+        type: "context.append_loop_event",
+        event: { type: "content.part", part: { type: "text", text: "最终正文" } },
+      },
+      {
+        type: "context.append_loop_event",
+        event: { type: "step.end", finishReason: "end_turn" },
+      },
+    ], testOptions());
+
+    expect(events).toHaveLength(2);
+    const assistant = events[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    const tool = events[1] as Extract<TimelineEvent, { type: "tool_call" }>;
+    expect(assistant.type).toBe("assistant_message");
+    expect(assistant.thinking).toBe("先检查一下");
+    expect(assistant.content).toBe("最终正文");
+    expect(assistant.isComplete).toBe(true);
+    expect(tool.type).toBe("tool_call");
+    expect(tool.status).toBe("success");
   });
 
   it("keeps assistant chunks after an accepted steer boundary in the same session timeline", () => {

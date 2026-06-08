@@ -22,9 +22,9 @@ function hasDraggedFiles(event: React.DragEvent): boolean {
 }
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; tooltip: string }[] = [
-  { value: "manual", label: "手动审批", desc: "每次操作都需要确认", tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
-  { value: "auto", label: "自动权限", desc: "自动处理审批", tooltip: "自动权限：使用官方 auto 权限模式，自动处理工具审批，且 Agent 不再向用户提问。" },
-  { value: "yolo", label: "完全访问权限", desc: "无需确认，直接执行", tooltip: "完全访问权限：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
+  { value: "manual", label: "手动审批", desc: "高风险操作会先问你", tooltip: "手动审批：高风险工具调用会暂停确认。" },
+  { value: "auto", label: "自动权限", desc: "少提问，自动继续推进", tooltip: "自动权限：少问用户，Plan 和问题会尽量自动继续。" },
+  { value: "yolo", label: "完全访问权限", desc: "工具权限最高", tooltip: "完全访问：自动批准所有工具请求，最少触发工具审批。" },
 ];
 
 const permissionMenuIcons = {

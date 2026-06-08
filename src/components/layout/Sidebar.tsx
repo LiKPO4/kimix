@@ -386,9 +386,17 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const projectSessions = (projectPath: string) =>
     visibleSessions.filter((s) => isSameProjectPath(s.projectPath, projectPath) && !s.archivedAt && !isHiddenInternalSession(s));
 
+  const syncProjectForSession = (session: { projectPath: string }) => {
+    const project = recentProjects.find((item) => isSameProjectPath(item.path, session.projectPath));
+    if (!project) return;
+    setCurrentProject(project);
+    setExpandedProjectIds((current) => new Set([...current, project.id]));
+  };
+
   const selectSession = async (sessionId: string) => {
     const session = visibleSessions.find((s) => s.id === sessionId);
     if (!session) return;
+    syncProjectForSession(session);
     setCurrentSession(session);
     if (session.events.some((event) => event.type === "user_message" || event.type === "assistant_message")) return;
 
@@ -410,7 +418,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       updatedAt: Date.now(),
     }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-    if (updated) setCurrentSession(updated);
+    if (updated) {
+      syncProjectForSession(updated);
+      setCurrentSession(updated);
+    }
   };
 
   return (
@@ -526,7 +537,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           <button
                             onClick={async () => {
                               if (isExpanded) lastAutoExpandedProjectId.current = project.id;
-                              if (!isActive) setCurrentProject(project);
+                              if (!isActive) {
+                                setCurrentProject(project);
+                                const latestSession = [...pSessions].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+                                if (latestSession) {
+                                  setWorkspaceView("chat");
+                                  void selectSession(latestSession.id);
+                                }
+                              }
                               setExpandedProjectIds((current) => {
                                 const next = new Set(current);
                                 if (isExpanded) next.delete(project.id);
@@ -710,7 +728,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.345</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.8.363</span>
         </button>
       </div>
     </aside>

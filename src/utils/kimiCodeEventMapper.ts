@@ -50,6 +50,20 @@ function normalizeResult(event: Record<string, unknown>): unknown {
   return result ?? "";
 }
 
+function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, unknown> {
+  if (event.type === "context.append_loop_event" && isRecord(event.event)) {
+    return {
+      ...event.event,
+      time: isNumber(event.event.time) ? event.event.time : event.time,
+    };
+  }
+  return event;
+}
+
+function getContentPart(event: Record<string, unknown>): Record<string, unknown> {
+  return isRecord(event.part) ? event.part : event;
+}
+
 function usageOutput(usage: unknown): number | undefined {
   if (!isRecord(usage)) return undefined;
   return isNumber(usage.output) ? usage.output : undefined;
@@ -85,15 +99,18 @@ export function mapKimiCodeEvent(
 ): TimelineEvent | null {
   if (!isRecord(rawEvent) || !isString(rawEvent.type)) return null;
 
-  const timestamp = getTimestamp(rawEvent, options);
-  const type = rawEvent.type;
+  const event = normalizeKimiCodeEvent(rawEvent);
+  if (!isString(event.type)) return null;
+
+  const timestamp = getTimestamp(event, options);
+  const type = event.type;
 
   switch (type) {
     case "turn.started":
       return null;
 
     case "assistant.delta": {
-      const delta = isString(rawEvent.delta) ? rawEvent.delta : "";
+      const delta = isString(event.delta) ? event.delta : "";
       if (!delta) return null;
       return {
         id: getId(options),
@@ -105,8 +122,39 @@ export function mapKimiCodeEvent(
       };
     }
 
+    case "content.part": {
+      const part = getContentPart(event);
+      if (part.type === "text") {
+        const text = isString(part.text) ? part.text : "";
+        if (!text) return null;
+        return {
+          id: getId(options),
+          type: "assistant_message",
+          timestamp,
+          content: text,
+          isThinking: false,
+          isComplete: false,
+        };
+      }
+      if (part.type === "think") {
+        const think = isString(part.think) ? part.think : "";
+        if (!think) return null;
+        return {
+          id: getId(options),
+          type: "assistant_message",
+          timestamp,
+          content: "",
+          thinking: think,
+          thinkingParts: [{ id: getId(options), timestamp, text: think }],
+          isThinking: true,
+          isComplete: false,
+        };
+      }
+      return null;
+    }
+
     case "thinking.delta": {
-      const delta = isString(rawEvent.delta) ? rawEvent.delta : "";
+      const delta = isString(event.delta) ? event.delta : "";
       if (!delta) return null;
       return {
         id: getId(options),
@@ -130,30 +178,44 @@ export function mapKimiCodeEvent(
         isComplete: true,
       };
 
+    case "step.end": {
+      const finishReason = isString(event.finishReason) ? event.finishReason : "";
+      if (finishReason !== "end_turn") return null;
+      return {
+        id: getId(options),
+        type: "assistant_message",
+        timestamp,
+        content: "",
+        isThinking: false,
+        isComplete: true,
+      };
+    }
+
     case "tool.call.delta": {
-      const toolCallId = isString(rawEvent.toolCallId) ? rawEvent.toolCallId : "";
-      const rawArguments = isString(rawEvent.argumentsPart) ? rawEvent.argumentsPart : "";
+      const toolCallId = isString(event.toolCallId) ? event.toolCallId : "";
+      const rawArguments = isString(event.argumentsPart) ? event.argumentsPart : "";
       if (!toolCallId && !rawArguments) return null;
       return {
         id: getId(options),
         type: "tool_call",
         timestamp,
         toolCallId,
-        toolName: isString(rawEvent.name) ? rawEvent.name : "unknown",
+        toolName: isString(event.name) ? event.name : "unknown",
         status: "running",
         arguments: parseJsonObject(rawArguments),
         rawArguments,
       };
     }
 
+    case "tool.call":
     case "tool.call.started": {
-      const args = isRecord(rawEvent.args) ? rawEvent.args : {};
+      const args = isRecord(event.args) ? event.args : {};
       return {
         id: getId(options),
         type: "tool_call",
         timestamp,
-        toolCallId: isString(rawEvent.toolCallId) ? rawEvent.toolCallId : "",
-        toolName: isString(rawEvent.name) ? rawEvent.name : "unknown",
+        toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
+        toolName: isString(event.name) ? event.name : "unknown",
         status: "running",
         arguments: args,
         rawArguments: Object.keys(args).length > 0 ? JSON.stringify(args) : undefined,
@@ -165,14 +227,14 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "tool_result",
         timestamp,
-        toolCallId: isString(rawEvent.toolCallId) ? rawEvent.toolCallId : "",
-        toolName: isString(rawEvent.name) ? rawEvent.name : "unknown",
-        result: normalizeResult(rawEvent),
+        toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
+        toolName: isString(event.name) ? event.name : "unknown",
+        result: normalizeResult(event),
       };
 
     case "agent.status.updated": {
-      const currentTurnUsage = isRecord(rawEvent.usage) && isRecord(rawEvent.usage.currentTurn)
-        ? rawEvent.usage.currentTurn
+      const currentTurnUsage = isRecord(event.usage) && isRecord(event.usage.currentTurn)
+        ? event.usage.currentTurn
         : undefined;
       return {
         id: getId(options),
@@ -180,10 +242,10 @@ export function mapKimiCodeEvent(
         timestamp,
         tokenCount: usageOutput(currentTurnUsage),
         inputTokenCount: usageInput(currentTurnUsage),
-        contextSize: isNumber(rawEvent.contextTokens) ? rawEvent.contextTokens : undefined,
-        contextLimit: isNumber(rawEvent.maxContextTokens) ? rawEvent.maxContextTokens : undefined,
-        planMode: typeof rawEvent.planMode === "boolean" ? rawEvent.planMode : undefined,
-        message: isString(rawEvent.model) ? `模型：${rawEvent.model}` : undefined,
+        contextSize: isNumber(event.contextTokens) ? event.contextTokens : undefined,
+        contextLimit: isNumber(event.maxContextTokens) ? event.maxContextTokens : undefined,
+        planMode: typeof event.planMode === "boolean" ? event.planMode : undefined,
+        message: isString(event.model) ? `模型：${event.model}` : undefined,
       };
     }
 
@@ -195,8 +257,8 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "status_update",
         timestamp,
-        step: isNumber(rawEvent.step) ? rawEvent.step : undefined,
-        message: statusMessageForStep(type, rawEvent),
+        step: isNumber(event.step) ? event.step : undefined,
+        message: statusMessageForStep(type, event),
       };
 
     case "subagent.spawned":
@@ -204,7 +266,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "subagent",
         timestamp,
-        agentName: isString(rawEvent.subagentName) ? rawEvent.subagentName : "subagent",
+        agentName: isString(event.subagentName) ? event.subagentName : "subagent",
         status: "running",
         events: [],
       };
@@ -214,7 +276,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "subagent",
         timestamp,
-        agentName: isString(rawEvent.subagentName) ? rawEvent.subagentName : (isString(rawEvent.subagentId) ? rawEvent.subagentId : "subagent"),
+        agentName: isString(event.subagentName) ? event.subagentName : (isString(event.subagentId) ? event.subagentId : "subagent"),
         status: "completed",
         events: [],
       };
@@ -224,7 +286,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "subagent",
         timestamp,
-        agentName: isString(rawEvent.subagentName) ? rawEvent.subagentName : (isString(rawEvent.subagentId) ? rawEvent.subagentId : "subagent"),
+        agentName: isString(event.subagentName) ? event.subagentName : (isString(event.subagentId) ? event.subagentId : "subagent"),
         status: "error",
         events: [],
       };
@@ -251,7 +313,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "error",
         timestamp,
-        message: isString(rawEvent.message) ? rawEvent.message : "Kimi Code SDK error",
+        message: isString(event.message) ? event.message : "Kimi Code SDK error",
         source: "sdk",
         canDismiss: true,
       };
@@ -261,7 +323,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "status_update",
         timestamp,
-        message: isString(rawEvent.message) ? rawEvent.message : "Kimi Code SDK warning",
+        message: isString(event.message) ? event.message : "Kimi Code SDK warning",
       };
 
     default:

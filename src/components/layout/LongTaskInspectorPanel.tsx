@@ -1,18 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   AlertCircle,
   AlertTriangle,
   ArrowDownToLine,
+  ArrowUpFromLine,
   CheckCircle2,
   ClipboardCopy,
   Copy,
+  ExternalLink,
   FileText,
   FolderSearch,
   GitBranch,
   GitCommitHorizontal,
   GripVertical,
+  ListChecks,
   Loader2,
   MessageCircleQuestion,
   ChevronDown,
@@ -22,6 +25,7 @@ import {
   RefreshCw,
   RotateCcw,
   Send,
+  ShieldAlert,
   Square,
   Target,
   Terminal,
@@ -33,12 +37,13 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { BtwRound, ComposerDockCard, RightSidebarCardId, Session } from "@/types/ui";
-import type { KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { GitStatusFile, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { formatReleaseDate } from "@/utils/format";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { alignSessionDiffsToGitStatus } from "@/utils/diff";
 
 export type HiddenComposerCardEntry = {
   key: ComposerDockCard;
@@ -72,10 +77,102 @@ function countGitChanges(status: string) {
   return status.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
 }
 
+function parseGitStatusFiles(status: string): GitStatusFile[] {
+  return status
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map((line) => {
+      const rawPath = line[2] === " " ? line.slice(3).trim() : line.slice(2).trim();
+      const pathPart = rawPath.includes(" -> ") ? rawPath.split(" -> ").pop() ?? rawPath : rawPath;
+      return {
+        status: line.slice(0, 2).trim(),
+        path: pathPart.replace(/^"|"$/g, ""),
+      };
+    })
+    .filter((file) => file.path.length > 0);
+}
+
+function normalizeGitUiPath(path: string) {
+  return path.replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
+function mergeGitFilesFromStatus(status: string, files: GitStatusFile[]) {
+  const parsed = parseGitStatusFiles(status);
+  if (parsed.length === 0) return [];
+  const byPath = new Map(files.map((file) => [normalizeGitUiPath(file.path), file]));
+  return parsed.map((file) => ({
+    ...file,
+    additions: byPath.get(normalizeGitUiPath(file.path))?.additions ?? file.additions ?? 0,
+    deletions: byPath.get(normalizeGitUiPath(file.path))?.deletions ?? file.deletions ?? 0,
+  }));
+}
+
 function gitSummaryText(status: string) {
   const count = countGitChanges(status);
   if (count === 0) return "工作区干净";
   return `${count} 个改动`;
+}
+
+function gitRemoteTargetText(upstream?: string, remoteName?: string) {
+  if (upstream) return upstream;
+  if (remoteName) return `${remoteName}（未跟踪）`;
+  return "未配置远端";
+}
+
+function gitRemoteSummary(upstream?: string, ahead = 0, behind = 0, remoteName?: string) {
+  if (!upstream) return remoteName ? "未设置跟踪" : "无法同步";
+  if (ahead === 0 && behind === 0) return "已同步";
+  return [`领先 ${ahead}`, `落后 ${behind}`].filter((part) => !part.endsWith(" 0")).join(" / ");
+}
+
+function gitStatusLabel(status: string) {
+  if (status === "??") return "新增";
+  if (status.includes("D")) return "删除";
+  if (status.includes("R")) return "重命名";
+  if (status.includes("A")) return "新增";
+  if (status.includes("M")) return "修改";
+  return status || "改动";
+}
+
+function formatGitErrorForUser(error: string) {
+  if (/pathspec .* did not match any files/i.test(error) || error.includes("Git 无法找到该路径")) {
+    return "所选文件路径已失效，请刷新 Git 状态后重新选择文件。";
+  }
+  if (error.includes("所选文件都无法暂存")) {
+    return "所选文件无法暂存，请刷新 Git 状态后重新选择文件。";
+  }
+  if (error.includes("当前没有已暂存的改动") || error.includes("当前没有可提交的改动")) {
+    return "当前没有可提交的改动。";
+  }
+  if (error.includes("upstream")) {
+    return "当前分支没有远端跟踪分支，请先设置 upstream。";
+  }
+  if (error.includes("未配置 Git 远端") || error.includes("添加 origin")) {
+    return "当前仓库未配置 Git 远端，请先添加 origin。";
+  }
+  const firstLine = error.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+  return firstLine && firstLine.length <= 120 ? firstLine : "Git 操作失败，请刷新状态后重试。";
+}
+
+function gitFileRisks(files: GitStatusFile[]) {
+  const risks: string[] = [];
+  if (files.length >= 20) risks.push(`本次包含 ${files.length} 个文件，建议确认范围是否过大。`);
+  if (files.some((file) => file.status.includes("D"))) risks.push("包含删除文件，提交前请确认不是误删。");
+  if (files.some((file) => file.status === "??")) risks.push("包含未跟踪文件，注意不要提交临时文件或构建产物。");
+  if (files.some((file) => /(^|[/\\])\.env($|[._-])|key|token|secret/i.test(file.path))) {
+    risks.push("文件名疑似包含密钥、Token 或环境配置，请确认没有敏感信息。");
+  }
+  return risks;
+}
+
+function suggestGitCommitMessage(files: GitStatusFile[]) {
+  if (files.length === 0) return "";
+  if (files.some((file) => file.status.includes("D"))) return "清理无用文件";
+  if (files.some((file) => /test|spec/i.test(file.path))) return "补充测试覆盖";
+  if (files.every((file) => /\.(md|mdx|txt)$/i.test(file.path))) return "更新文档说明";
+  if (files.every((file) => /\.(css|scss|less|tsx|jsx)$/i.test(file.path))) return "优化界面交互";
+  return "更新 Git 工作区改动";
 }
 
 interface LongTaskInspectorPanelProps {
@@ -223,12 +320,27 @@ export function LongTaskInspectorPanel({
   } | null>(null);
   const [gitBranch, setGitBranch] = useState<string | undefined>(undefined);
   const [gitStatus, setGitStatus] = useState("");
+  const [gitUpstream, setGitUpstream] = useState<string | undefined>(undefined);
+  const [gitRemoteName, setGitRemoteName] = useState<string | undefined>(undefined);
+  const [gitRemoteUrl, setGitRemoteUrl] = useState<string | undefined>(undefined);
+  const [gitAhead, setGitAhead] = useState(0);
+  const [gitBehind, setGitBehind] = useState(0);
+  const [gitRemoteLoaded, setGitRemoteLoaded] = useState(false);
   const [gitError, setGitError] = useState<string | null>(null);
-  const [gitBusy, setGitBusy] = useState<"refresh" | "commit" | "pull" | null>(null);
+  const [gitBusy, setGitBusy] = useState<"refresh" | "commit" | "pull" | "push" | null>(null);
   const [gitCommitMessage, setGitCommitMessage] = useState("");
+  const [gitDetailsOpen, setGitDetailsOpen] = useState(false);
+  const [gitDetailsLoading, setGitDetailsLoading] = useState(false);
+  const [gitFiles, setGitFiles] = useState<GitStatusFile[]>([]);
+  const [gitTotalFileCount, setGitTotalFileCount] = useState(0);
+  const [gitFilesTruncated, setGitFilesTruncated] = useState(false);
+  const [selectedGitFiles, setSelectedGitFiles] = useState<Set<string>>(() => new Set());
   const rightCardRefs = useRef(new Map<RightSidebarCardId, HTMLElement>());
-  const openFile = (filePath: string) => {
-    if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath });
+  const gitInfoRequestIdRef = useRef(0);
+  const gitDetailsRequestIdRef = useRef(0);
+  const projectPathForSession = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
+  const openFile = (filePath: string, projectPath = projectPathForSession) => {
+    if (projectPath) void window.api.openFile({ projectPath, filePath });
   };
   const projectPathForKimi = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const loadKimiHealth = async () => {
@@ -318,69 +430,216 @@ export function LongTaskInspectorPanel({
   useEffect(() => {
     void loadKimiHealth();
   }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, runningSessionId]);
-  const projectPathForGit = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
+  const projectPathForGit = currentProject?.path ?? liveCurrentSession?.projectPath ?? "";
+  const displaySessionDiffs = useMemo(
+    () => alignSessionDiffsToGitStatus(sessionDiffs, gitStatus),
+    [sessionDiffs, gitStatus],
+  );
   const refreshGitInfo = async (mode: "silent" | "manual" = "manual") => {
+    const requestId = ++gitInfoRequestIdRef.current;
     if (!projectPathForGit) {
       setGitBranch(undefined);
       setGitStatus("");
+      setGitUpstream(undefined);
+      setGitRemoteName(undefined);
+      setGitRemoteUrl(undefined);
+      setGitAhead(0);
+      setGitBehind(0);
+      setGitRemoteLoaded(false);
       setGitError(null);
       return;
     }
     if (mode === "manual") setGitBusy("refresh");
     try {
       const res = await window.api.getGitInfo(projectPathForGit);
+      if (requestId !== gitInfoRequestIdRef.current) return;
       if (!res.success) {
         setGitError(res.error);
         return;
       }
       setGitBranch(res.data.branch);
       setGitStatus(res.data.status);
+      setGitUpstream(res.data.upstream);
+      setGitRemoteName(res.data.remoteName);
+      setGitRemoteUrl(res.data.remoteUrl);
+      setGitAhead(res.data.ahead ?? 0);
+      setGitBehind(res.data.behind ?? 0);
+      setGitRemoteLoaded(true);
       setGitError(null);
     } finally {
-      if (mode === "manual") setGitBusy(null);
+      if (mode === "manual" && requestId === gitInfoRequestIdRef.current) setGitBusy(null);
     }
   };
+  const loadGitDetails = async () => {
+    const requestId = ++gitDetailsRequestIdRef.current;
+    if (!projectPathForGit) {
+      setGitFiles([]);
+      setGitTotalFileCount(0);
+      setGitFilesTruncated(false);
+      setSelectedGitFiles(new Set());
+      return;
+    }
+    setGitDetailsLoading(true);
+    try {
+      const res = await window.api.getGitDetails(projectPathForGit);
+      if (requestId !== gitDetailsRequestIdRef.current) return;
+      if (!res.success) {
+        const userMessage = formatGitErrorForUser(res.error);
+        setGitError(userMessage);
+        setGitFiles([]);
+        setGitTotalFileCount(0);
+        setGitFilesTruncated(false);
+        setSelectedGitFiles(new Set());
+        showToast(`读取 Git 详情失败：${userMessage}`);
+        return;
+      }
+      setGitBranch(res.data.branch);
+      setGitStatus(res.data.status);
+      setGitUpstream(res.data.upstream);
+      setGitRemoteName(res.data.remoteName);
+      setGitRemoteUrl(res.data.remoteUrl);
+      setGitAhead(res.data.ahead ?? 0);
+      setGitBehind(res.data.behind ?? 0);
+      setGitRemoteLoaded(true);
+      const normalizedFiles = mergeGitFilesFromStatus(res.data.status, res.data.files);
+      setGitFiles(normalizedFiles);
+      setGitTotalFileCount(res.data.totalFileCount ?? normalizedFiles.length);
+      setGitFilesTruncated(Boolean(res.data.truncated));
+      setSelectedGitFiles(new Set(normalizedFiles.map((file) => file.path)));
+      setGitError(null);
+    } finally {
+      if (requestId === gitDetailsRequestIdRef.current) setGitDetailsLoading(false);
+    }
+  };
+  const openGitDetails = () => {
+    setGitDetailsOpen(true);
+    void loadGitDetails();
+  };
   useEffect(() => {
-    void refreshGitInfo("silent");
+    gitInfoRequestIdRef.current += 1;
+    gitDetailsRequestIdRef.current += 1;
+    setGitBranch(undefined);
+    setGitStatus("");
+    setGitUpstream(undefined);
+    setGitRemoteName(undefined);
+    setGitRemoteUrl(undefined);
+    setGitAhead(0);
+    setGitBehind(0);
+    setGitRemoteLoaded(false);
+    setGitError(null);
+    setGitFiles([]);
+    setGitTotalFileCount(0);
+    setGitFilesTruncated(false);
+    setSelectedGitFiles(new Set());
+    if (gitDetailsOpen) void loadGitDetails();
+    else void refreshGitInfo("silent");
   }, [projectPathForGit]);
-  const commitGit = async () => {
+  const commitSelectedGitFiles = async () => {
     if (!projectPathForGit || gitBusy) return;
     const message = gitCommitMessage.trim();
     if (!message) {
       showToast("请输入提交说明");
       return;
     }
+    const files = gitFiles.filter((file) => selectedGitFiles.has(file.path)).map((file) => file.path);
+    if (files.length === 0) {
+      showToast("请选择要提交的文件");
+      return;
+    }
     setGitBusy("commit");
     try {
-      const res = await window.api.commitGitChanges({ projectPath: projectPathForGit, message });
+      const res = await window.api.commitGitChanges({ projectPath: projectPathForGit, message, files });
       if (!res.success) {
-        setGitError(res.error);
-        showToast(`提交失败：${res.error}`);
+        const userMessage = formatGitErrorForUser(res.error);
+        showToast(`提交失败：${userMessage}`);
+        await loadGitDetails();
+        if (userMessage.includes("路径已失效") || userMessage.includes("无法暂存")) {
+          const invalid = new Set(files.map(normalizeGitUiPath));
+          setGitFiles((current) => current.filter((file) => !invalid.has(normalizeGitUiPath(file.path))));
+          setSelectedGitFiles((current) => {
+            const next = new Set(current);
+            current.forEach((file) => {
+              if (invalid.has(normalizeGitUiPath(file))) next.delete(file);
+            });
+            return next;
+          });
+        }
+        setGitError(userMessage);
         return;
       }
       setGitBranch(res.data.branch);
       setGitStatus(res.data.status);
+      setGitUpstream(res.data.upstream);
+      setGitRemoteName(res.data.remoteName);
+      setGitRemoteUrl(res.data.remoteUrl);
+      setGitAhead(res.data.ahead ?? 0);
+      setGitBehind(res.data.behind ?? 0);
+      setGitRemoteLoaded(true);
       setGitError(null);
       setGitCommitMessage("");
       showToast("Git 提交完成");
+      await loadGitDetails();
     } finally {
       setGitBusy(null);
     }
   };
   const pullGit = async () => {
     if (!projectPathForGit || gitBusy) return;
+    if (countGitChanges(gitStatus) > 0) {
+      showToast("工作区有未提交改动，请先提交或处理后再拉取");
+      openGitDetails();
+      return;
+    }
     setGitBusy("pull");
     try {
       const res = await window.api.pullGitChanges({ projectPath: projectPathForGit });
       if (!res.success) {
-        setGitError(res.error);
-        showToast(`拉取失败：${res.error}`);
+        const userMessage = formatGitErrorForUser(res.error);
+        setGitError(userMessage);
+        showToast(`拉取失败：${userMessage}`);
         return;
       }
       setGitBranch(res.data.branch);
       setGitStatus(res.data.status);
+      setGitUpstream(res.data.upstream);
+      setGitRemoteName(res.data.remoteName);
+      setGitRemoteUrl(res.data.remoteUrl);
+      setGitAhead(res.data.ahead ?? 0);
+      setGitBehind(res.data.behind ?? 0);
+      setGitRemoteLoaded(true);
       setGitError(null);
       showToast("Git 拉取完成");
+      if (gitDetailsOpen) await loadGitDetails();
+    } finally {
+      setGitBusy(null);
+    }
+  };
+  const pushGit = async () => {
+    if (!projectPathForGit || gitBusy) return;
+    if (!gitUpstream && !gitRemoteName) {
+      showToast("当前仓库未配置 Git 远端，请先添加 origin");
+      return;
+    }
+    setGitBusy("push");
+    try {
+      const res = await window.api.pushGitChanges({ projectPath: projectPathForGit });
+      if (!res.success) {
+        const userMessage = formatGitErrorForUser(res.error);
+        setGitError(userMessage);
+        showToast(`推送失败：${userMessage}`);
+        return;
+      }
+      setGitBranch(res.data.branch);
+      setGitStatus(res.data.status);
+      setGitUpstream(res.data.upstream);
+      setGitRemoteName(res.data.remoteName);
+      setGitRemoteUrl(res.data.remoteUrl);
+      setGitAhead(res.data.ahead ?? 0);
+      setGitBehind(res.data.behind ?? 0);
+      setGitRemoteLoaded(true);
+      setGitError(null);
+      showToast("Git 推送完成");
+      if (gitDetailsOpen) await loadGitDetails();
     } finally {
       setGitBusy(null);
     }
@@ -536,8 +795,19 @@ export function LongTaskInspectorPanel({
       setGoalBusy(null);
     }
   };
+  const selectedGitFileCount = gitFiles.filter((file) => selectedGitFiles.has(file.path)).length;
+  const selectedGitFileList = gitFiles.filter((file) => selectedGitFiles.has(file.path));
+  const selectedGitFileRisks = gitFileRisks(selectedGitFileList);
+  const allGitFilesSelected = gitFiles.length > 0 && selectedGitFileCount === gitFiles.length;
+  const gitCommitTemplates = [
+    suggestGitCommitMessage(selectedGitFileList),
+    "修复已知问题",
+    "优化交互体验",
+    "更新项目配置",
+  ].filter((item, index, items) => item && items.indexOf(item) === index);
 
   return (
+    <>
     <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] border border-border-subtle shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle" style={{ paddingLeft: 18, paddingRight: 14 }}>
         <div className="min-w-0">
@@ -1197,17 +1467,24 @@ export function LongTaskInspectorPanel({
                       {gitSummaryText(gitStatus)}
                     </span>
                   </div>
+                  <div className="mt-2 grid text-[12px] leading-5 text-text-muted" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                    <span className="min-w-0 truncate" title={gitRemoteUrl}>
+                      {gitRemoteLoaded ? gitRemoteTargetText(gitUpstream, gitRemoteName) : "正在读取远端"}
+                    </span>
+                    <span className="shrink-0">{gitRemoteLoaded ? gitRemoteSummary(gitUpstream, gitAhead, gitBehind, gitRemoteName) : "未加载"}</span>
+                  </div>
                   {gitError && <div className="mt-2 line-clamp-2 text-[12.5px] leading-5 text-accent-danger">{gitError}</div>}
                 </div>
-                <input
-                  value={gitCommitMessage}
-                  onChange={(event) => setGitCommitMessage(event.target.value)}
-                  disabled={!projectPathForGit || gitBusy !== null}
-                  placeholder="提交说明"
-                  className="h-9 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ paddingLeft: 12, paddingRight: 12 }}
-                />
-                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={!projectPathForGit || gitBusy !== null}
+                    onClick={openGitDetails}
+                    className="kimix-icon-text-button is-compact justify-center bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <ListChecks size={14} />
+                    <span>详情</span>
+                  </button>
                   <button
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
@@ -1219,12 +1496,12 @@ export function LongTaskInspectorPanel({
                   </button>
                   <button
                     type="button"
-                    disabled={!projectPathForGit || gitBusy !== null || !gitCommitMessage.trim() || countGitChanges(gitStatus) === 0}
-                    onClick={() => void commitGit()}
-                    className="kimix-icon-text-button is-compact justify-center bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55"
+                    disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
+                    onClick={() => void pushGit()}
+                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
                   >
-                    {gitBusy === "commit" ? <Loader2 size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
-                    <span>提交</span>
+                    {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
+                    <span>推送</span>
                   </button>
                 </div>
                 <button
@@ -1516,20 +1793,18 @@ export function LongTaskInspectorPanel({
                 <div className="text-[13px] font-medium leading-5 text-text-muted">最近变更</div>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                   <span className="rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                    {sessionDiffs.length}
+                    {displaySessionDiffs.length}
                   </span>
                   {rightCardDragHandle("diffs", "最近变更")}
                 </div>
               </div>
-              {sessionDiffs.length > 0 ? (
+              {displaySessionDiffs.length > 0 ? (
                 <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
-                  {sessionDiffs.slice(0, 4).map((diff) => (
+                  {displaySessionDiffs.slice(0, 4).map((diff) => (
                     <button
                       key={diff.id}
                       type="button"
-                      onClick={() => {
-                        if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath: diff.filePath });
-                      }}
+                      onClick={() => openFile(diff.filePath)}
                       className="w-full rounded-lg border border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-accent-primary-light/40"
                       style={{ padding: "12px 12px" }}
                     >
@@ -1548,6 +1823,210 @@ export function LongTaskInspectorPanel({
         )}
       </div>
     </aside>
+    {gitDetailsOpen && (
+      <div className="fixed inset-0 z-[86] flex items-start justify-center bg-black/20" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={() => setGitDetailsOpen(false)}>
+        <div
+          className="w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
+            <GitBranch size={18} className="shrink-0 text-accent-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-semibold leading-5 text-text-primary">{gitBranch ?? "Git 详情"}</div>
+              <div className="truncate text-[12.5px] leading-5 text-text-muted">
+                {gitSummaryText(gitStatus)} · {gitRemoteLoaded ? gitRemoteTargetText(gitUpstream, gitRemoteName) : "正在读取远端"} · {gitRemoteLoaded ? gitRemoteSummary(gitUpstream, gitAhead, gitBehind, gitRemoteName) : "未加载"}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
+              onClick={() => void pushGit()}
+              className="kimix-icon-text-button is-compact shrink-0 bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
+              推送
+            </button>
+            <button
+              type="button"
+              disabled={!projectPathForGit || gitDetailsLoading}
+              onClick={() => void loadGitDetails()}
+              className="kimix-icon-text-button is-compact shrink-0 bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              {gitDetailsLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              刷新
+            </button>
+            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={() => setGitDetailsOpen(false)} aria-label="关闭 Git 详情">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="max-h-[640px] overflow-y-auto" style={{ padding: 18 }}>
+            <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ padding: "14px 16px" }}>
+              <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium leading-5 text-text-primary">待提交文件</div>
+                  <div className="mt-1 text-[12.5px] leading-5 text-text-muted">
+                    已选择 {selectedGitFileCount} / {gitTotalFileCount || gitFiles.length} 个文件{gitFilesTruncated ? "，仅显示前 300 个" : ""}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={gitFiles.length === 0 || gitDetailsLoading || gitBusy !== null}
+                  onClick={() => setSelectedGitFiles(allGitFilesSelected ? new Set() : new Set(gitFiles.map((file) => file.path)))}
+                  className="kimix-icon-text-button is-compact shrink-0 bg-surface-elevated text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  <ListChecks size={14} />
+                  {allGitFilesSelected ? "取消全选" : "全选"}
+                </button>
+              </div>
+              <div className="flex flex-col" style={{ gap: 9, marginTop: 14 }}>
+                {gitDetailsLoading ? (
+                  <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ padding: 28 }}>
+                    正在读取 Git 改动...
+                  </div>
+                ) : gitFiles.length > 0 ? gitFiles.map((file) => (
+                  <div
+                    key={`${file.status}-${file.path}`}
+                    className="grid items-center rounded-lg border border-border-subtle bg-surface-elevated transition-colors hover:bg-surface-hover"
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto auto", gap: 12, padding: "11px 12px" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedGitFiles.has(file.path)}
+                      onChange={(event) => {
+                        setSelectedGitFiles((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(file.path);
+                          else next.delete(file.path);
+                          return next;
+                        });
+                      }}
+                      disabled={gitBusy !== null}
+                      className="h-4 w-4 accent-[var(--kimix-accent-primary)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openFile(file.path, projectPathForGit)}
+                      className="min-w-0 text-left"
+                      title={file.path}
+                    >
+                      <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{file.path}</span>
+                      <span className="mt-1 block text-[12px] leading-5 text-text-muted">{gitStatusLabel(file.status)}</span>
+                    </button>
+                    <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ minWidth: 58, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
+                      +{file.additions ?? 0} / -{file.deletions ?? 0}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openFile(file.path, projectPathForGit)}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                      title="打开文件"
+                      aria-label={`打开 ${file.path}`}
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                  </div>
+                )) : (
+                  <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ padding: 28 }}>
+                    当前没有可提交的文件
+                  </div>
+                )}
+              </div>
+            </div>
+            {selectedGitFileRisks.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900" style={{ marginTop: 14, padding: "13px 16px" }}>
+                <div className="flex items-center text-[13px] font-medium leading-5" style={{ gap: 8 }}>
+                  <ShieldAlert size={15} />
+                  提交前提示
+                </div>
+                <div className="flex flex-col text-[12.5px] leading-5" style={{ gap: 6, marginTop: 9 }}>
+                  {selectedGitFileRisks.map((risk) => <div key={risk}>{risk}</div>)}
+                </div>
+              </div>
+            )}
+            <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
+              <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium leading-5 text-text-primary">会话最近变更</div>
+                  <div className="mt-1 text-[12.5px] leading-5 text-text-muted">来自当前对话捕获的结构化 diff</div>
+                </div>
+                <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ minWidth: 28, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
+                  {displaySessionDiffs.length}
+                </span>
+              </div>
+              {displaySessionDiffs.length > 0 ? (
+                <div className="flex flex-col" style={{ gap: 9, marginTop: 14 }}>
+                  {displaySessionDiffs.slice(0, 5).map((diff) => (
+                    <button
+                      key={diff.id}
+                      type="button"
+                      onClick={() => openFile(diff.filePath)}
+                      className="grid w-full items-center rounded-lg border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-surface-hover"
+                      style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "11px 12px" }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{diff.filePath}</span>
+                        <span className="mt-1 block text-[12px] leading-5 text-text-muted">{formatReleaseDate(new Date(diff.timestamp).toISOString())}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-surface-base text-[12px] leading-5 text-text-muted" style={{ minWidth: 58, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
+                        +{diff.additions} / -{diff.deletions}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: 22 }}>
+                  当前会话还没有结构化 diff 记录
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
+              <div className="text-[13px] font-medium leading-5 text-text-primary">提交说明</div>
+              <div className="flex flex-wrap" style={{ gap: 8, marginTop: 10 }}>
+                {gitCommitTemplates.map((template) => (
+                  <button
+                    key={template}
+                    type="button"
+                    disabled={gitBusy !== null}
+                    onClick={() => setGitCommitMessage(template)}
+                    className="kimix-icon-text-button is-compact bg-surface-elevated text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {template}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={gitCommitMessage}
+                onChange={(event) => setGitCommitMessage(event.target.value)}
+                disabled={!projectPathForGit || gitBusy !== null}
+                placeholder="输入本次提交说明"
+                className="h-10 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-elevated text-[13px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ marginTop: 10, paddingLeft: 12, paddingRight: 12 }}
+              />
+              {gitError && <div className="mt-3 rounded-lg bg-red-50 text-[12.5px] leading-5 text-accent-danger" style={{ padding: "10px 12px" }}>{gitError}</div>}
+              <div className="flex items-center justify-end" style={{ gap: 10, marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => setGitDetailsOpen(false)}
+                  className="kimix-icon-text-button is-compact bg-surface-elevated text-text-muted hover:bg-surface-hover"
+                >
+                  关闭
+                </button>
+                <button
+                  type="button"
+                  disabled={!projectPathForGit || gitBusy !== null || !gitCommitMessage.trim() || selectedGitFileCount === 0}
+                  onClick={() => void commitSelectedGitFiles()}
+                  className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  {gitBusy === "commit" ? <Loader2 size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
+                  提交所选
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

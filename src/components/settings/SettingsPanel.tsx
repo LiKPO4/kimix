@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode } from "@/types/ui";
@@ -10,6 +10,9 @@ type FreezeReport = {
   lagMs: number;
   sessionId: string | null;
   runningSessionId: string | null;
+  snapshot?: unknown;
+  recentConsole?: unknown[];
+  recentLongTasks?: unknown[];
 };
 
 type ArchivedSessionSummary = {
@@ -25,6 +28,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
+const KIMIX_VERSION = "2.8.363";
 
 type SettingsSectionId =
   | "connection"
@@ -191,6 +195,129 @@ function formatFreezeTime(value: string) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function getFreezeVisibilityState(report: FreezeReport) {
+  const snapshot = report.snapshot;
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const value = (snapshot as { visibilityState?: unknown }).visibilityState;
+  return typeof value === "string" ? value : null;
+}
+
+function getFreezeVisibilityLabel(report: FreezeReport) {
+  const visibility = getFreezeVisibilityState(report);
+  if (visibility === "hidden") return "后台";
+  if (visibility === "visible") return "前台";
+  return "未知";
+}
+
+function freezeLagBadgeClass(report: FreezeReport) {
+  return getFreezeVisibilityState(report) === "hidden"
+    ? "bg-amber-50 text-amber-700"
+    : "bg-accent-danger-light text-accent-danger";
+}
+
+function sanitizeFilenamePart(value: string) {
+  return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-").replace(/\s+/g, "-").slice(0, 80);
+}
+
+function safeJsonStringify(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    return JSON.stringify({
+      error: "无法序列化完整诊断对象",
+      message: error instanceof Error ? error.message : String(error),
+    }, null, 2);
+  }
+}
+
+function downloadTextFile(filename: string, content: string, mime = "application/json") {
+  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function buildFreezeReportExport(report: FreezeReport, reports: FreezeReport[]) {
+  const appState = useAppStore.getState();
+  const sessionState = useSessionStore.getState();
+  const currentSession = appState.currentSession;
+  const relatedSession = sessionState.sessions.find((session) => session.id === report.sessionId);
+  return {
+    exportedAt: new Date().toISOString(),
+    appVersion: KIMIX_VERSION,
+    report,
+    relatedReports: reports
+      .filter((item) => item.sessionId === report.sessionId || item.runningSessionId === report.runningSessionId)
+      .slice(0, 20),
+    currentState: {
+      workspaceView: appState.workspaceView,
+      currentProject: appState.currentProject ? {
+        id: appState.currentProject.id,
+        name: appState.currentProject.name,
+        path: appState.currentProject.path,
+        gitBranch: appState.currentProject.gitBranch,
+      } : null,
+      currentSession: currentSession ? {
+        id: currentSession.id,
+        title: currentSession.title,
+        engine: currentSession.engine,
+        runtimeSessionId: currentSession.runtimeSessionId,
+        officialSessionId: currentSession.officialSessionId,
+        projectPath: currentSession.projectPath,
+        eventCount: currentSession.events.length,
+        isLoading: currentSession.isLoading,
+        updatedAt: currentSession.updatedAt,
+      } : null,
+      runningSessionId: appState.runningSessionId,
+      panels: {
+        settingsOpen: appState.settingsOpen,
+        searchOpen: appState.searchOpen,
+        longTasksOpen: appState.longTasksOpen,
+        longTaskInspectorOpen: appState.longTaskInspectorOpen,
+        diffPanelOpen: appState.diffPanelOpen,
+        sidebarOpen: appState.sidebarOpen,
+      },
+      modes: {
+        permissionMode: appState.permissionMode,
+        statusUpdateDisplay: appState.statusUpdateDisplay,
+      },
+    },
+    relatedSession: relatedSession ? {
+      id: relatedSession.id,
+      title: relatedSession.title,
+      engine: relatedSession.engine,
+      runtimeSessionId: relatedSession.runtimeSessionId,
+      officialSessionId: relatedSession.officialSessionId,
+      projectPath: relatedSession.projectPath,
+      eventCount: relatedSession.events.length,
+      isLoading: relatedSession.isLoading,
+      updatedAt: relatedSession.updatedAt,
+      lastEvents: relatedSession.events.slice(-12).map((event) => ({
+        id: event.id,
+        type: event.type,
+        timestamp: event.timestamp,
+      })),
+    } : null,
+    browser: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      visibilityState: document.visibilityState,
+      focused: document.hasFocus(),
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio,
+      },
+    },
+  };
 }
 
 function SelectionIndicator({ selected }: { selected: boolean }) {
@@ -759,6 +886,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setFreezeReports([]);
   };
 
+  const exportFreezeReport = (report: FreezeReport, index: number) => {
+    const date = new Date(report.at);
+    const stamp = Number.isNaN(date.getTime()) ? sanitizeFilenamePart(report.at) : date.toISOString().replace(/[:.]/g, "-");
+    const sessionPart = sanitizeFilenamePart(report.sessionId ?? "no-session");
+    const filename = `kimix-freeze-${stamp}-${sessionPart}-${index + 1}.json`;
+    downloadTextFile(filename, safeJsonStringify(buildFreezeReportExport(report, freezeReports)));
+  };
+
   useEffect(() => {
     if (settingsOpen || variant === "workspace") {
       if (!settingsStatusCache.connection) void checkConnection(false);
@@ -809,9 +944,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   ];
 
   const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
-    { value: "manual", label: "手动审批", desc: "每次工具调用都需要确认", icon: Shield, tooltip: "手动审批：每次工具调用都会停下来等你确认，适合高风险修改。" },
-    { value: "auto", label: "自动权限", desc: "自动处理审批，不再向用户提问", icon: Zap, tooltip: "自动权限：使用官方 auto 权限模式，自动处理工具审批，且 Agent 不再向用户提问。" },
-    { value: "yolo", label: "完全访问", desc: "自动批准所有工具请求（谨慎使用）", icon: GitBranch, tooltip: "完全访问：自动批准所有工具请求，适合可信任务，请谨慎开启。" },
+    { value: "manual", label: "手动审批", desc: "高风险操作会先问你", icon: Shield, tooltip: "手动审批：高风险工具调用会暂停确认。" },
+    { value: "auto", label: "自动权限", desc: "少提问，自动继续推进", icon: Zap, tooltip: "自动权限：少问用户，Plan 和问题会尽量自动继续。" },
+    { value: "yolo", label: "完全访问", desc: "工具权限最高，谨慎使用", icon: GitBranch, tooltip: "完全访问：自动批准所有工具请求，最少触发工具审批。" },
   ];
   const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [
     { value: "never", label: "永不弹出", desc: "不显示系统通知，也不显示任务栏红点" },
@@ -1279,7 +1414,18 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
                   <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 16, paddingTop: 16 }}>
                     <div className="kimix-settings-permission-label">OpenAI-compatible Provider</div>
-                    <div className="kimix-settings-permission" style={{ padding: "14px 16px", marginTop: 12 }}>
+                    <div
+                      className="kimix-settings-permission"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: providerCatalog.length > 0 ? "minmax(0, 1fr) minmax(260px, 456px)" : "minmax(0, 1fr)",
+                        columnGap: 18,
+                        rowGap: 14,
+                        alignItems: "center",
+                        padding: "14px 16px",
+                        marginTop: 12,
+                      }}
+                    >
                       <div
                         className="grid min-w-0"
                         style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, alignItems: "center", minHeight: 48 }}
@@ -1302,7 +1448,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         </button>
                       </div>
                       {providerCatalog.length > 0 && (
-                        <div className="flex min-w-0 flex-col" style={{ gap: 12, marginTop: 14 }}>
+                        <div className="flex min-w-0 flex-col" style={{ gap: 12, justifySelf: "end", width: "100%", maxWidth: 456 }}>
                           <label className="min-w-0">
                             <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider</span>
                             <select
@@ -1398,7 +1544,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
                       />
                     </label>
-                    <div className="flex min-w-0 justify-end" style={{ gap: 8, marginTop: 14 }}>
+                    <div
+                      className="grid min-w-0 items-center"
+                      style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, marginTop: 14 }}
+                    >
+                      <div className="min-w-0 break-all text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                        {providerMessage}
+                      </div>
+                      <div className="flex min-w-0 justify-end" style={{ gap: 8 }}>
                         <button
                           type="button"
                           onClick={() => void handleSetDefaultModel()}
@@ -1426,12 +1579,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <Check size={13} />
                           保存
                         </button>
-                    </div>
-                    {providerMessage && (
-                      <div className="break-all text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
-                        {providerMessage}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1543,13 +1692,25 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <div key={`${report.at}-${index}`} className="kimix-settings-list-item" style={{ padding: "12px 12px" }}>
                           <div className="flex min-w-0 items-center justify-between" style={{ gap: 10 }}>
                             <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{formatFreezeTime(report.at)}</div>
-                            <span className="shrink-0 rounded-full bg-accent-danger-light text-[12.5px] leading-5 text-accent-danger" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                              {report.lagMs} ms
-                            </span>
+                            <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                              <span className={`rounded-full text-[12.5px] leading-5 ${freezeLagBadgeClass(report)}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                                {report.lagMs} ms
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => exportFreezeReport(report, index)}
+                                className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+                                title="导出这条卡死诊断日志"
+                              >
+                                <Download size={13} />
+                                导出
+                              </button>
+                            </div>
                           </div>
                           <div className="mt-2 text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
                             <div className="truncate">当前会话：{report.sessionId ?? "无"}</div>
                             <div className="mt-1 truncate">运行会话：{report.runningSessionId ?? "无"}</div>
+                            <div className="mt-1 truncate">窗口状态：{getFreezeVisibilityLabel(report)}</div>
                           </div>
                         </div>
                       ))}
@@ -1573,7 +1734,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v2.8.345 · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v{KIMIX_VERSION} · 设置将自动保存到本地</div>
         </div>
       </div>
   );

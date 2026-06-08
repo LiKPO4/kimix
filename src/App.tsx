@@ -97,6 +97,73 @@ function isSameLocalProjectPath(a: string | undefined, b: string | undefined) {
   return Boolean(left && right && left === right);
 }
 
+function assistantBodySize(events: TimelineEvent[]) {
+  return events
+    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
+    .reduce((sum, event) => sum + event.content.trim().length, 0);
+}
+
+function hasPossiblyLostAssistantBody(session: Session) {
+  return session.engine === "kimi-code" &&
+    !session.longTask &&
+    !session.archivedAt &&
+    Boolean(session.projectPath) &&
+    session.events.some((event) => (
+      event.type === "assistant_message" &&
+      event.isComplete &&
+      event.content.trim().length === 0
+    ));
+}
+
+function getKimiHistorySessionIds(session: Session) {
+  return Array.from(new Set([
+    session.runtimeSessionId,
+    session.officialSessionId,
+    session.id.startsWith("local-") ? undefined : session.id,
+  ].filter((id): id is string => Boolean(id))));
+}
+
+async function repairKimiCodeHistoryBodies(sessions: Session[]) {
+  const candidates = sessions.filter(hasPossiblyLostAssistantBody).slice(0, 12);
+  for (const session of candidates) {
+    const sessionIds = getKimiHistorySessionIds(session);
+    if (sessionIds.length === 0 || !session.projectPath) continue;
+    for (const sessionId of sessionIds) {
+      const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
+      if (!loaded?.success) continue;
+      const historyEvents = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
+      if (assistantBodySize(historyEvents) <= assistantBodySize(session.events)) break;
+      const updatedAt = Date.now();
+      useSessionStore.setState((state) => ({
+        sessions: state.sessions.map((item) => item.id === session.id
+          ? {
+              ...item,
+              events: historyEvents,
+              title: item.titleLocked ? item.title : deriveSessionTitle(historyEvents, item.title),
+              isLoading: false,
+              updatedAt,
+            }
+          : item
+        ),
+      }));
+      const current = useAppStore.getState().currentSession;
+      if (current?.id === session.id) {
+        useAppStore.setState({
+          currentSession: {
+            ...current,
+            events: historyEvents,
+            title: current.titleLocked ? current.title : deriveSessionTitle(historyEvents, current.title),
+            isLoading: false,
+            updatedAt,
+          },
+        });
+      }
+      persistLocalConversationState();
+      break;
+    }
+  }
+}
+
 function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: boolean, turnLimit: number): TimelineEvent[] {
   const sessionLike = {
     id: "",
@@ -1794,19 +1861,19 @@ function App() {
           if (JSON.stringify(visibleSessions) !== storedSessions) {
             localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
           }
-          useSessionStore.setState({
-            sessions: visibleSessions.map((session) => {
-              const rawEngine = (session as { engine?: unknown }).engine;
-              const knownEngine = rawEngine === "prompt" || rawEngine === "kimi-code";
-              return hydrateLongTaskProgressFromHistory({
-                ...session,
-                engine: knownEngine ? rawEngine : "kimi-code",
-                runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
-                events: sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []),
-                isLoading: false,
-              });
-            }),
+          const restoredSessions = visibleSessions.map((session) => {
+            const rawEngine = (session as { engine?: unknown }).engine;
+            const knownEngine = rawEngine === "prompt" || rawEngine === "kimi-code";
+            return hydrateLongTaskProgressFromHistory({
+              ...session,
+              engine: knownEngine ? rawEngine : "kimi-code",
+              runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
+              events: sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []),
+              isLoading: false,
+            });
           });
+          useSessionStore.setState({ sessions: restoredSessions });
+          void repairKimiCodeHistoryBodies(restoredSessions);
         }
       } catch {
         // ignore parse error

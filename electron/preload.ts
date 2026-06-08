@@ -65,8 +65,10 @@ import type {
   ExportMarkdownRequest,
   ExportMarkdownResponse,
   GitInfoResponse,
+  GitDetailsResponse,
   GitCommitRequest,
   GitPullRequest,
+  GitPushRequest,
   GitActionResponse,
   KimiUsageResponse,
   OpenFileRequest,
@@ -95,6 +97,7 @@ import type {
   LaunchCommandRequest,
   TriggerShortcutRequest,
   TurnCompleteNotificationRequest,
+  RendererHeartbeatPayload,
   ScheduleShutdownRequest,
   GenerateHookRuleRequest,
   GenerateHookRuleResponse,
@@ -167,10 +170,14 @@ const api = {
     ipcRenderer.invoke("project:reorder", req),
   getGitInfo: (projectPath: string): Promise<GitInfoResponse> =>
     ipcRenderer.invoke("project:getGitInfo", projectPath),
+  getGitDetails: (projectPath: string): Promise<GitDetailsResponse> =>
+    ipcRenderer.invoke("project:getGitDetails", projectPath),
   commitGitChanges: (req: GitCommitRequest): Promise<GitActionResponse> =>
     ipcRenderer.invoke("project:gitCommit", req),
   pullGitChanges: (req: GitPullRequest): Promise<GitActionResponse> =>
     ipcRenderer.invoke("project:gitPull", req),
+  pushGitChanges: (req: GitPushRequest): Promise<GitActionResponse> =>
+    ipcRenderer.invoke("project:gitPush", req),
   openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openPath", req),
   readTextFile: (req: ReadTextFileRequest): Promise<ReadTextFileResponse> =>
@@ -412,6 +419,8 @@ const api = {
     ipcRenderer.invoke("app:triggerShortcut", req),
   notifyTurnComplete: (req: TurnCompleteNotificationRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:notifyTurnComplete", req),
+  reportRendererHeartbeat: (payload: RendererHeartbeatPayload): void =>
+    ipcRenderer.send("app:rendererHeartbeat", payload),
   clearTaskbarAttention: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:clearTaskbarAttention"),
   scheduleShutdown: (req: ScheduleShutdownRequest): Promise<VoidResponse> =>

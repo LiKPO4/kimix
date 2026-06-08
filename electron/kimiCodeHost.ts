@@ -1097,6 +1097,13 @@ function getEventAgentId(event: unknown): string | undefined {
   return typeof agent?.id === "string" && agent.id ? agent.id : undefined;
 }
 
+function getLoopEvent(event: unknown): Record<string, unknown> | undefined {
+  if (!event || typeof event !== "object") return undefined;
+  const record = event as { type?: unknown; event?: unknown };
+  if (record.type !== "context.append_loop_event" || !record.event || typeof record.event !== "object") return undefined;
+  return record.event as Record<string, unknown>;
+}
+
 function attachInteractionHandlers(session: KimiCodeSessionLike) {
   session.setApprovalHandler?.(async (request) => {
     // Full-access (yolo) bound: never bother the user with an approval card when
@@ -1166,6 +1173,11 @@ function updateStatusFromEvent(sessionId: string, event: unknown) {
   if (type === "turn.ended") {
     const reason = (event as { reason?: unknown }).reason;
     setStatus(sessionId, reason === "cancelled" ? "interrupted" : "completed");
+    return;
+  }
+  const loopEvent = getLoopEvent(event);
+  if (loopEvent?.type === "step.end" && loopEvent.finishReason === "end_turn") {
+    setStatus(sessionId, "completed");
     return;
   }
   if (type === "error") {

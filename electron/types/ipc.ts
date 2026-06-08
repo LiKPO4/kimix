@@ -685,6 +685,38 @@ export type GitInfoResponse = {
     branch?: string;
     status: string;
     gitRoot?: string;
+    upstream?: string;
+    remoteName?: string;
+    remoteUrl?: string;
+    ahead?: number;
+    behind?: number;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type GitStatusFile = {
+  path: string;
+  status: string;
+  additions?: number;
+  deletions?: number;
+};
+
+export type GitDetailsResponse = {
+  success: true;
+  data: {
+    branch?: string;
+    status: string;
+    gitRoot?: string;
+    upstream?: string;
+    remoteName?: string;
+    remoteUrl?: string;
+    ahead?: number;
+    behind?: number;
+    files: GitStatusFile[];
+    totalFileCount?: number;
+    truncated?: boolean;
   };
 } | {
   success: false;
@@ -694,9 +726,14 @@ export type GitInfoResponse = {
 export type GitCommitRequest = {
   projectPath: string;
   message: string;
+  files?: string[];
 };
 
 export type GitPullRequest = {
+  projectPath: string;
+};
+
+export type GitPushRequest = {
   projectPath: string;
 };
 
@@ -705,6 +742,11 @@ export type GitActionResponse = {
   data: {
     branch?: string;
     status: string;
+    upstream?: string;
+    remoteName?: string;
+    remoteUrl?: string;
+    ahead?: number;
+    behind?: number;
     output: string;
   };
 } | {
@@ -977,6 +1019,46 @@ export type TurnCompleteNotificationRequest = {
   body?: string;
   windowFocused?: boolean;
   pageVisible?: boolean;
+}
+
+export type RendererHeartbeatPayload = {
+  at: string;
+  performanceNow: number;
+  visibilityState: string;
+  focused: boolean;
+  url?: string;
+  runningSessionId?: string | null;
+  currentProject?: {
+    id: string;
+    name: string;
+    path: string;
+  } | null;
+  currentSession?: {
+    id: string;
+    title?: string;
+    engine?: string;
+    runtimeSessionId?: string;
+    officialSessionId?: string;
+    projectPath?: string;
+    eventCount: number;
+    isLoading?: boolean;
+    updatedAt?: number;
+    lastEventType?: string;
+    lastEventTimestamp?: number;
+  } | null;
+  panels?: {
+    workspaceView?: string;
+    settingsOpen?: boolean;
+    searchOpen?: boolean;
+    longTasksOpen?: boolean;
+    longTaskInspectorOpen?: boolean;
+    diffPanelOpen?: boolean;
+  };
+  memory?: {
+    usedJSHeapSize?: number;
+    totalJSHeapSize?: number;
+    jsHeapSizeLimit?: number;
+  } | null;
 }
 
 export type ScheduleShutdownRequest = {

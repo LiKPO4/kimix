@@ -13,6 +13,7 @@ import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
+import type { RendererHeartbeatPayload } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -1579,6 +1580,12 @@ let isQuitting = false;
 let rendererReloadedAfterBlank = false;
 let taskbarAttentionActive = false;
 let taskbarOverlayIcon: Electron.NativeImage | null = null;
+let lastRendererHeartbeat: { receivedAt: number; payload: RendererHeartbeatPayload | null } | null = null;
+let rendererWatchdogTimer: NodeJS.Timeout | null = null;
+let rendererWatchdogReported = false;
+
+const RENDERER_WATCHDOG_CHECK_MS = 3000;
+const RENDERER_WATCHDOG_TIMEOUT_MS = 12000;
 
 const FILE_SEARCH_IGNORES = new Set([
   ".git",
@@ -1701,6 +1708,104 @@ function ensureDirectoryExists(dir: string) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+function sanitizeFileNamePart(value: string) {
+  return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-").replace(/\s+/g, "-").slice(0, 80);
+}
+
+function getRendererWatchdogLogDir() {
+  const desktop = app.getPath("desktop");
+  if (desktop && fs.existsSync(desktop)) return desktop;
+  return app.getPath("userData");
+}
+
+function writeRendererWatchdogReport(stalledMs: number) {
+  const win = mainWindow;
+  const heartbeat = lastRendererHeartbeat;
+  const sessionId = heartbeat?.payload?.currentSession?.id ?? heartbeat?.payload?.runningSessionId ?? "no-session";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `kimix-watchdog-freeze-${stamp}-${sanitizeFileNamePart(sessionId)}.json`;
+  const filePath = path.join(getRendererWatchdogLogDir(), filename);
+  const report = {
+    source: "main-process-renderer-watchdog",
+    reason: "renderer heartbeat timeout",
+    createdAt: new Date().toISOString(),
+    stalledMs: Math.round(stalledMs),
+    thresholds: {
+      checkMs: RENDERER_WATCHDOG_CHECK_MS,
+      timeoutMs: RENDERER_WATCHDOG_TIMEOUT_MS,
+    },
+    app: {
+      version: app.getVersion(),
+      name: app.getName(),
+      isPackaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      userData: app.getPath("userData"),
+    },
+    process: {
+      platform: process.platform,
+      arch: process.arch,
+      pid: process.pid,
+      uptime: Math.round(process.uptime()),
+      memoryUsage: process.memoryUsage(),
+    },
+    window: win && !win.isDestroyed() ? {
+      id: win.id,
+      visible: win.isVisible(),
+      focused: win.isFocused(),
+      minimized: win.isMinimized(),
+      maximized: win.isMaximized(),
+      fullscreen: win.isFullScreen(),
+      bounds: win.getBounds(),
+      webContentsDestroyed: win.webContents.isDestroyed(),
+      rendererProcessId: win.webContents.getOSProcessId(),
+      url: win.webContents.getURL(),
+      title: win.webContents.getTitle(),
+    } : null,
+    kimiCode: {
+      activeSessionIds: kimiCodeHost.getActiveSessionIds(),
+    },
+    lastHeartbeat: heartbeat ? {
+      receivedAt: new Date(heartbeat.receivedAt).toISOString(),
+      ageMs: Math.max(0, Date.now() - heartbeat.receivedAt),
+      payload: heartbeat.payload,
+    } : null,
+  };
+  ensureDirectoryExists(path.dirname(filePath));
+  fs.writeFileSync(filePath, JSON.stringify(report, null, 2), "utf-8");
+  console.warn(`[watchdog] renderer heartbeat stalled for ${Math.round(stalledMs)}ms, report written: ${filePath}`);
+  return filePath;
+}
+
+function checkRendererHeartbeat() {
+  if (!mainWindow || mainWindow.isDestroyed() || isQuitting) return;
+  if (!lastRendererHeartbeat) return;
+  const stalledMs = Date.now() - lastRendererHeartbeat.receivedAt;
+  if (stalledMs < RENDERER_WATCHDOG_TIMEOUT_MS) {
+    rendererWatchdogReported = false;
+    return;
+  }
+  if (rendererWatchdogReported) return;
+  rendererWatchdogReported = true;
+  try {
+    writeRendererWatchdogReport(stalledMs);
+  } catch (error) {
+    console.error("[watchdog] failed to write renderer freeze report:", error);
+  }
+}
+
+function startRendererWatchdog() {
+  if (rendererWatchdogTimer) clearInterval(rendererWatchdogTimer);
+  rendererWatchdogReported = false;
+  lastRendererHeartbeat = null;
+  rendererWatchdogTimer = setInterval(checkRendererHeartbeat, RENDERER_WATCHDOG_CHECK_MS);
+}
+
+function stopRendererWatchdog() {
+  if (!rendererWatchdogTimer) return;
+  clearInterval(rendererWatchdogTimer);
+  rendererWatchdogTimer = null;
 }
 
 function parseVersion(version: string): number[] {
@@ -2842,6 +2947,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
     autoHideMenuBar: true,
     frame: false,
@@ -2878,6 +2984,7 @@ function createWindow() {
     void restoreLastContext();
     emitWindowState();
     verifyRendererContent();
+    startRendererWatchdog();
   });
 
   mainWindow.on("focus", clearTaskbarAttention);
@@ -2930,6 +3037,7 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => {
+    stopRendererWatchdog();
     mainWindow = null;
     kimiCodeHost.setKimiCodeEventSink(null);
     kimiCodeHost.setKimiCodeStatusSink(null);
@@ -3192,8 +3300,17 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
 
 ipcMain.handle("project:getGitInfo", async (_, projectPath: string) => {
   try {
-    const snapshot = await projectService.getGitSnapshot(projectPath);
+    const snapshot = await projectService.getGitSnapshot(projectPath, { includeRemote: true });
     return { success: true, data: snapshot };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:getGitDetails", async (_, projectPath: string) => {
+  try {
+    const details = await projectService.getGitDetails(projectPath);
+    return { success: true, data: details };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -3204,10 +3321,11 @@ ipcMain.handle("project:gitCommit", async (_, request: unknown) => {
     const parsed = z.object({
       projectPath: z.string().min(1).max(4096),
       message: z.string().min(1).max(500),
+      files: z.array(z.string().min(1).max(4096)).max(500).optional(),
     }).safeParse(request);
     if (!parsed.success) return { success: false, error: "Invalid git commit request" };
     if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
-    const result = await projectService.commitGitChanges(parsed.data.projectPath, parsed.data.message);
+    const result = await projectService.commitGitChanges(parsed.data.projectPath, parsed.data.message, parsed.data.files);
     return { success: true, data: result };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -3222,6 +3340,20 @@ ipcMain.handle("project:gitPull", async (_, request: unknown) => {
     if (!parsed.success) return { success: false, error: "Invalid git pull request" };
     if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
     const result = await projectService.pullGit(parsed.data.projectPath);
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:gitPush", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({
+      projectPath: z.string().min(1).max(4096),
+    }).safeParse(request);
+    if (!parsed.success) return { success: false, error: "Invalid git push request" };
+    if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
+    const result = await projectService.pushGit(parsed.data.projectPath);
     return { success: true, data: result };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -5107,6 +5239,14 @@ ipcMain.handle("app:notifyTurnComplete", async (_, request: unknown) => {
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
+});
+
+ipcMain.on("app:rendererHeartbeat", (_, payload: unknown) => {
+  lastRendererHeartbeat = {
+    receivedAt: Date.now(),
+    payload: payload && typeof payload === "object" ? payload as RendererHeartbeatPayload : null,
+  };
+  rendererWatchdogReported = false;
 });
 
 ipcMain.handle("app:clearTaskbarAttention", async () => {

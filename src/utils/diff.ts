@@ -22,6 +22,41 @@ function countDiffLines(value: string) {
   return value.split("\n").length;
 }
 
+function normalizePath(value: string) {
+  return value.replace(/\\/g, "/").replace(/^\/+/, "").replace(/^"|"$/g, "");
+}
+
+function stripFirstPathSegment(value: string) {
+  const normalized = normalizePath(value);
+  const index = normalized.indexOf("/");
+  return index === -1 ? normalized : normalized.slice(index + 1);
+}
+
+function parseGitStatusPaths(status: string) {
+  return status
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map((line) => {
+      const rawPath = line[2] === " " ? line.slice(3).trim() : line.slice(2).trim();
+      const pathPart = rawPath.includes(" -> ") ? rawPath.split(" -> ").pop() ?? rawPath : rawPath;
+      return normalizePath(pathPart);
+    })
+    .filter(Boolean);
+}
+
+function alignPathToGitStatus(filePath: string, gitStatusPaths: string[]) {
+  const normalized = normalizePath(filePath);
+  if (gitStatusPaths.includes(normalized)) return normalized;
+
+  const innerPath = stripFirstPathSegment(normalized);
+  const sameInnerPathMatches = gitStatusPaths.filter((path) => stripFirstPathSegment(path) === innerPath);
+  if (sameInnerPathMatches.length === 1) return sameInnerPathMatches[0];
+
+  const suffixMatches = gitStatusPaths.filter((path) => path.endsWith(normalized) || normalized.endsWith(path));
+  return suffixMatches.length === 1 ? suffixMatches[0] : normalized;
+}
+
 export function buildUnifiedDiff(oldText = "", newText = ""): DiffLine[] {
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
@@ -76,4 +111,13 @@ export function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[]
       deletions: Math.max(0, countDiffLines(event.oldText) - countDiffLines(event.newText)),
     }))
     .sort((a, b) => b.timestamp - a.timestamp);
+}
+
+export function alignSessionDiffsToGitStatus(diffs: SessionDiffEntry[], gitStatus: string): SessionDiffEntry[] {
+  const gitStatusPaths = parseGitStatusPaths(gitStatus);
+  if (gitStatusPaths.length === 0) return diffs;
+  return diffs.map((diff) => ({
+    ...diff,
+    filePath: alignPathToGitStatus(diff.filePath, gitStatusPaths),
+  }));
 }

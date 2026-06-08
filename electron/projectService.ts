@@ -147,12 +147,12 @@ export async function getGitBranch(projectPath: string): Promise<string | undefi
 
 export async function getGitStatus(projectPath: string): Promise<string> {
   try {
-    const { stdout } = await execAsync("git status --short", {
+    const { stdout } = await execFileAsync("git", ["status", "--porcelain=v1", "-uall"], {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
     });
-    return stdout.trim();
+    return stdout.replace(/(?:\r?\n)+$/, "");
   } catch {
     return "";
   }
@@ -174,35 +174,192 @@ async function runGit(gitRoot: string, args: string[], timeout = 30000): Promise
   return [stdout, stderr].filter(Boolean).join("\n").trim();
 }
 
-export async function getGitSnapshot(projectPath: string): Promise<{ branch?: string; status: string; gitRoot?: string }> {
+const MAX_GIT_DETAIL_FILES = 300;
+
+type GitRemoteState = {
+  upstream?: string;
+  remoteName?: string;
+  remoteUrl?: string;
+  ahead?: number;
+  behind?: number;
+};
+
+async function getGitRemoteInfo(gitRoot: string): Promise<Pick<GitRemoteState, "remoteName" | "remoteUrl">> {
+  try {
+    const output = await runGit(gitRoot, ["remote", "-v"], 5000);
+    const rows = output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^(\S+)\s+(\S+)\s+\((fetch|push)\)$/);
+        return match ? { name: match[1], url: match[2], kind: match[3] } : null;
+      })
+      .filter((row): row is { name: string; url: string; kind: string } => row !== null);
+    const preferred = rows.find((row) => row.name === "origin" && row.kind === "push")
+      ?? rows.find((row) => row.name === "origin")
+      ?? rows.find((row) => row.kind === "push")
+      ?? rows[0];
+    return preferred ? { remoteName: preferred.name, remoteUrl: preferred.url } : {};
+  } catch {
+    return {};
+  }
+}
+
+async function getGitRemoteState(gitRoot: string): Promise<GitRemoteState> {
+  const remoteInfo = await getGitRemoteInfo(gitRoot);
+  try {
+    const upstream = await runGit(gitRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], 5000);
+    const counts = await runGit(gitRoot, ["rev-list", "--left-right", "--count", "HEAD...@{u}"], 10000);
+    const [aheadRaw, behindRaw] = counts.split(/\s+/);
+    const ahead = Number.parseInt(aheadRaw ?? "0", 10);
+    const behind = Number.parseInt(behindRaw ?? "0", 10);
+    return {
+      ...remoteInfo,
+      upstream: upstream || undefined,
+      ahead: Number.isFinite(ahead) ? ahead : 0,
+      behind: Number.isFinite(behind) ? behind : 0,
+    };
+  } catch {
+    return { ...remoteInfo, ahead: 0, behind: 0 };
+  }
+}
+
+export async function getGitSnapshot(projectPath: string, options?: { includeRemote?: boolean }): Promise<{ branch?: string; status: string; gitRoot?: string } & GitRemoteState> {
   const gitRoot = await findGitRoot(projectPath);
   if (!gitRoot) return { branch: undefined, status: "" };
   const [branch, status] = await Promise.all([
     getGitBranch(gitRoot),
     getGitStatus(gitRoot),
   ]);
-  return { branch, status, gitRoot };
+  const remote = options?.includeRemote ? await getGitRemoteState(gitRoot) : {};
+  return { branch, status, gitRoot, ...remote };
 }
 
-export async function commitGitChanges(projectPath: string, message: string): Promise<{ branch?: string; status: string; output: string }> {
+function normalizeGitPath(gitRoot: string, filePath: string): string {
+  const normalized = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const absolutePath = path.resolve(gitRoot, normalized);
+  const relativePath = path.relative(gitRoot, absolutePath).replace(/\\/g, "/");
+  if (!relativePath || relativePath.startsWith("../") || path.isAbsolute(relativePath)) {
+    throw new Error(`文件不在 Git 仓库内：${filePath}`);
+  }
+  return relativePath;
+}
+
+function normalizeGitStatusPath(value: string) {
+  return value.replace(/\\/g, "/").replace(/^\/+/, "").replace(/^"|"$/g, "");
+}
+
+function stripLeadingGitRootName(gitRoot: string, value: string) {
+  const normalized = normalizeGitStatusPath(value);
+  const rootName = path.basename(gitRoot).replace(/\\/g, "/");
+  return rootName && normalized.toLowerCase().startsWith(`${rootName.toLowerCase()}/`)
+    ? normalized.slice(rootName.length + 1)
+    : normalized;
+}
+
+function stripFirstGitPathSegment(value: string) {
+  const normalized = normalizeGitStatusPath(value);
+  const index = normalized.indexOf("/");
+  return index === -1 ? normalized : normalized.slice(index + 1);
+}
+
+function formatGitPathError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/pathspec .* did not match any files/i.test(message)) {
+    return "Git 无法找到该路径，可能文件已移动或状态已过期，请刷新 Git 状态后重试";
+  }
+  const firstUsefulLine = message
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("Command failed:") && !line.startsWith("git "));
+  return firstUsefulLine ?? "暂存失败，请刷新 Git 状态后重试";
+}
+
+function resolveSelectedGitStatusPath(gitRoot: string, selectedPath: string, statusFiles: GitStatusFile[]): GitStatusFile | null {
+  const normalized = normalizeGitStatusPath(selectedPath);
+  const strippedRootName = stripLeadingGitRootName(gitRoot, normalized);
+  const withoutFirstSegment = stripFirstGitPathSegment(strippedRootName);
+  const exact = statusFiles.find((file) => file.path === normalized || file.path === strippedRootName);
+  if (exact) return exact;
+  const sameInnerPathMatches = statusFiles.filter((file) => stripFirstGitPathSegment(file.path) === withoutFirstSegment);
+  if (sameInnerPathMatches.length === 1) return sameInnerPathMatches[0];
+  const suffixMatches = statusFiles.filter((file) => (
+    file.path.endsWith(normalized) ||
+    normalized.endsWith(file.path) ||
+    file.path.endsWith(strippedRootName) ||
+    strippedRootName.endsWith(file.path)
+  ));
+  return suffixMatches.length === 1 ? suffixMatches[0] : null;
+}
+
+async function stageGitFiles(gitRoot: string, selectedFiles: string[]): Promise<{ stagedFiles: string[]; skippedFiles: string[] }> {
+  const statusFiles = parseGitStatus(await getGitStatus(gitRoot));
+  const stagedFiles: string[] = [];
+  const skippedFiles: string[] = [];
+  const uniqueFiles = Array.from(new Set(selectedFiles));
+  for (const selectedFile of uniqueFiles) {
+    const statusFile = resolveSelectedGitStatusPath(gitRoot, selectedFile, statusFiles);
+    if (!statusFile) {
+      skippedFiles.push(`${selectedFile}：当前 Git 状态中未找到`);
+      continue;
+    }
+    const normalizedPath = normalizeGitPath(gitRoot, statusFile.path);
+    try {
+      await runGit(gitRoot, ["add", "--", normalizedPath], 30000);
+      stagedFiles.push(normalizedPath);
+    } catch (error) {
+      skippedFiles.push(`${normalizedPath}：${formatGitPathError(error)}`);
+    }
+  }
+  return { stagedFiles, skippedFiles };
+}
+
+export async function commitGitChanges(projectPath: string, message: string, files?: string[]): Promise<{ branch?: string; status: string; output: string } & GitRemoteState> {
   const trimmedMessage = message.trim();
   if (!trimmedMessage) throw new Error("请输入提交说明");
   const gitRoot = await requireGitRoot(projectPath);
   const beforeStatus = await getGitStatus(gitRoot);
   if (!beforeStatus.trim()) throw new Error("当前没有可提交的改动");
-  await runGit(gitRoot, ["add", "-A"], 30000);
+  const selectedFiles = files?.map((file) => normalizeGitStatusPath(file));
+  if (selectedFiles && selectedFiles.length === 0) throw new Error("请选择要提交的文件");
+  const stageResult = selectedFiles ? await stageGitFiles(gitRoot, selectedFiles) : { stagedFiles: [], skippedFiles: [] };
+  if (selectedFiles && stageResult.stagedFiles.length === 0) {
+    const reason = stageResult.skippedFiles.length > 0 ? `：${stageResult.skippedFiles.join("；")}` : "";
+    throw new Error(`所选文件都无法暂存${reason}`);
+  }
+  if (!selectedFiles) await runGit(gitRoot, ["add", "-A"], 30000);
   const staged = await runGit(gitRoot, ["diff", "--cached", "--name-only"], 10000);
   if (!staged.trim()) throw new Error("当前没有已暂存的改动");
-  const output = await runGit(gitRoot, ["commit", "-m", trimmedMessage], 60000);
-  const snapshot = await getGitSnapshot(gitRoot);
-  return { branch: snapshot.branch, status: snapshot.status, output };
+  const output = await runGit(gitRoot, selectedFiles ? ["commit", "-m", trimmedMessage, "--", ...stageResult.stagedFiles] : ["commit", "-m", trimmedMessage], 60000);
+  const snapshot = await getGitSnapshot(gitRoot, { includeRemote: true });
+  const skippedOutput = stageResult.skippedFiles.length > 0 ? `\nSkipped files:\n${stageResult.skippedFiles.join("\n")}` : "";
+  return { branch: snapshot.branch, status: snapshot.status, upstream: snapshot.upstream, remoteName: snapshot.remoteName, remoteUrl: snapshot.remoteUrl, ahead: snapshot.ahead, behind: snapshot.behind, output: `${output}${skippedOutput}` };
 }
 
-export async function pullGit(projectPath: string): Promise<{ branch?: string; status: string; output: string }> {
+export async function pullGit(projectPath: string): Promise<{ branch?: string; status: string; output: string } & GitRemoteState> {
   const gitRoot = await requireGitRoot(projectPath);
+  const status = await getGitStatus(gitRoot);
+  if (status.trim()) throw new Error("工作区有未提交改动，请先提交或处理后再拉取");
   const output = await runGit(gitRoot, ["pull", "--ff-only"], 120000);
-  const snapshot = await getGitSnapshot(gitRoot);
-  return { branch: snapshot.branch, status: snapshot.status, output };
+  const snapshot = await getGitSnapshot(gitRoot, { includeRemote: true });
+  return { branch: snapshot.branch, status: snapshot.status, upstream: snapshot.upstream, remoteName: snapshot.remoteName, remoteUrl: snapshot.remoteUrl, ahead: snapshot.ahead, behind: snapshot.behind, output };
+}
+
+export async function pushGit(projectPath: string): Promise<{ branch?: string; status: string; output: string } & GitRemoteState> {
+  const gitRoot = await requireGitRoot(projectPath);
+  const snapshotBefore = await getGitSnapshot(gitRoot, { includeRemote: true });
+  if (!snapshotBefore.upstream && !snapshotBefore.remoteName) {
+    throw new Error("当前仓库未配置 Git 远端，请先添加 origin");
+  }
+  if (!snapshotBefore.upstream && !snapshotBefore.branch) {
+    throw new Error("当前分支名不可用，无法设置远端跟踪分支");
+  }
+  const output = snapshotBefore.upstream
+    ? await runGit(gitRoot, ["push"], 120000)
+    : await runGit(gitRoot, ["push", "-u", snapshotBefore.remoteName as string, snapshotBefore.branch as string], 120000);
+  const snapshot = await getGitSnapshot(gitRoot, { includeRemote: true });
+  return { branch: snapshot.branch, status: snapshot.status, upstream: snapshot.upstream, remoteName: snapshot.remoteName, remoteUrl: snapshot.remoteUrl, ahead: snapshot.ahead, behind: snapshot.behind, output };
 }
 
 export type GitStatusFile = {
@@ -222,7 +379,7 @@ export function parseGitStatus(status: string): GitStatusFile[] {
     .map((line) => line.trimEnd())
     .filter(Boolean)
     .map((line) => {
-      const rawPath = line.slice(3).trim();
+      const rawPath = line[2] === " " ? line.slice(3).trim() : line.slice(2).trim();
       const pathPart = rawPath.includes(" -> ") ? rawPath.split(" -> ").pop() ?? rawPath : rawPath;
       return {
         status: line.slice(0, 2).trim(),
@@ -239,27 +396,55 @@ export async function getGitStatusFiles(projectPath: string): Promise<GitStatusF
 export async function getGitLineStats(projectPath: string, files: string[]): Promise<Record<string, { additions: number; deletions: number }>> {
   const stats: Record<string, { additions: number; deletions: number }> = {};
   if (files.length === 0) return stats;
-  try {
-    const { stdout } = await execAsync("git diff --numstat -- " + files.map((file) => `"${file.replace(/"/g, '\\"')}"`).join(" "), {
-      cwd: projectPath,
-      encoding: "utf-8",
-      timeout: 5000,
-    });
+  const collect = (stdout: string) => {
     stdout.split(/\r?\n/).filter(Boolean).forEach((line) => {
       const parts = line.split(/\t/);
       const additions = Number.parseInt(parts[0] ?? "0", 10);
       const deletions = Number.parseInt(parts[1] ?? "0", 10);
       const file = parts.slice(2).join("\t");
       if (!file) return;
+      const current = stats[file] ?? { additions: 0, deletions: 0 };
       stats[file] = {
-        additions: Number.isFinite(additions) ? additions : 0,
-        deletions: Number.isFinite(deletions) ? deletions : 0,
+        additions: current.additions + (Number.isFinite(additions) ? additions : 0),
+        deletions: current.deletions + (Number.isFinite(deletions) ? deletions : 0),
       };
     });
+  };
+  try {
+    const { stdout } = await execFileAsync("git", ["diff", "--numstat", "--", ...files], {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    collect(stdout);
+    const { stdout: cachedStdout } = await execFileAsync("git", ["diff", "--cached", "--numstat", "--", ...files], {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    collect(cachedStdout);
   } catch {
     // Binary files or non-git projects can fail; callers still get file names.
   }
   return stats;
+}
+
+export async function getGitDetails(projectPath: string): Promise<{ branch?: string; status: string; gitRoot?: string; files: Array<GitStatusFile & { additions?: number; deletions?: number }>; totalFileCount?: number; truncated?: boolean } & GitRemoteState> {
+  const snapshot = await getGitSnapshot(projectPath, { includeRemote: true });
+  if (!snapshot.gitRoot) return { ...snapshot, files: [], totalFileCount: 0, truncated: false };
+  const allFiles = parseGitStatus(snapshot.status);
+  const files = allFiles.slice(0, MAX_GIT_DETAIL_FILES);
+  const stats = await getGitLineStats(snapshot.gitRoot, files.map((file) => file.path));
+  return {
+    ...snapshot,
+    totalFileCount: allFiles.length,
+    truncated: allFiles.length > files.length,
+    files: files.map((file) => ({
+      ...file,
+      additions: stats[file.path]?.additions ?? 0,
+      deletions: stats[file.path]?.deletions ?? 0,
+    })),
+  };
 }
 
 async function findGitRoot(startPath: string): Promise<string | null> {
