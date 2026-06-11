@@ -26,6 +26,8 @@ const recentConsoleLogs: RendererConsoleLog[] = [];
 const recentLongTasks: RendererLongTaskEntry[] = [];
 let consoleCaptureInstalled = false;
 let longTaskObserverInstalled = false;
+let longTaskObserver: PerformanceObserver | null = null;
+const originalConsoleMethods: Partial<Record<RendererConsoleLog["level"], typeof console.log>> = {};
 
 function truncate(value: string, maxLength = MAX_SERIALIZED_ARG_LENGTH) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
@@ -55,11 +57,22 @@ function installConsoleCapture() {
   consoleCaptureInstalled = true;
   (["log", "info", "warn", "error"] as const).forEach((level) => {
     const original = console[level].bind(console);
+    originalConsoleMethods[level] = original;
     console[level] = (...args: unknown[]) => {
       pushConsoleLog(level, args);
       original(...args);
     };
   });
+}
+
+function uninstallConsoleCapture() {
+  if (!consoleCaptureInstalled) return;
+  (["log", "info", "warn", "error"] as const).forEach((level) => {
+    const original = originalConsoleMethods[level];
+    if (original) console[level] = original;
+    delete originalConsoleMethods[level];
+  });
+  consoleCaptureInstalled = false;
 }
 
 function installLongTaskObserver() {
@@ -79,9 +92,17 @@ function installLongTaskObserver() {
       recentLongTasks.splice(0, Math.max(0, recentLongTasks.length - MAX_RECENT_LONG_TASKS));
     });
     observer.observe({ entryTypes: ["longtask"] });
+    longTaskObserver = observer;
   } catch {
+    longTaskObserverInstalled = false;
     // Some Electron/Chromium builds do not expose the longtask entry type.
   }
+}
+
+function uninstallLongTaskObserver() {
+  longTaskObserver?.disconnect();
+  longTaskObserver = null;
+  longTaskObserverInstalled = false;
 }
 
 function getPerformanceMemory() {
@@ -237,6 +258,8 @@ export function useRendererLagDetector() {
       window.clearInterval(heartbeatTimer);
       document.removeEventListener("visibilitychange", resetTick);
       window.removeEventListener("focus", resetTick);
+      uninstallLongTaskObserver();
+      uninstallConsoleCapture();
     };
   }, []);
 }

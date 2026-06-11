@@ -343,12 +343,17 @@ export function LongTaskInspectorPanel({
   const [gitFilesTruncated, setGitFilesTruncated] = useState(false);
   const [selectedGitFiles, setSelectedGitFiles] = useState<Set<string>>(() => new Set());
   const rightCardRefs = useRef(new Map<RightSidebarCardId, HTMLElement>());
+  const rightCardDragCleanupRef = useRef<(() => void) | null>(null);
   const gitInfoRequestIdRef = useRef(0);
   const gitDetailsRequestIdRef = useRef(0);
   const projectPathForSession = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const openFile = (filePath: string, projectPath = projectPathForSession) => {
     if (projectPath) void window.api.openFile({ projectPath, filePath });
   };
+  useEffect(() => () => {
+    rightCardDragCleanupRef.current?.();
+    rightCardDragCleanupRef.current = null;
+  }, []);
   const projectPathForKimi = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const loadKimiHealth = async () => {
     setKimiHealthLoading(true);
@@ -723,6 +728,7 @@ export function LongTaskInspectorPanel({
         if (event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
+        rightCardDragCleanupRef.current?.();
         setDragRightCardId(id);
         let latestDrop: { id: RightSidebarCardId; position: "above" | "below" } | null = null;
         const previousUserSelect = document.body.style.userSelect;
@@ -740,26 +746,25 @@ export function LongTaskInspectorPanel({
           moveEvent.preventDefault();
           updateDrop(moveEvent.clientY);
         };
-        const finishDrag = (upEvent: PointerEvent) => {
-          upEvent.preventDefault();
+        const cleanupDrag = () => {
           window.removeEventListener("pointermove", handlePointerMove);
           window.removeEventListener("pointerup", finishDrag);
           window.removeEventListener("pointercancel", cancelDrag);
           document.body.style.userSelect = previousUserSelect;
           document.body.style.cursor = previousCursor;
+          rightCardDragCleanupRef.current = null;
           setDragRightCardId(null);
           setRightCardDrop(null);
+        };
+        const finishDrag = (upEvent: PointerEvent) => {
+          upEvent.preventDefault();
+          cleanupDrag();
           applyRightCardDrop(id, latestDrop);
         };
         const cancelDrag = () => {
-          window.removeEventListener("pointermove", handlePointerMove);
-          window.removeEventListener("pointerup", finishDrag);
-          window.removeEventListener("pointercancel", cancelDrag);
-          document.body.style.userSelect = previousUserSelect;
-          document.body.style.cursor = previousCursor;
-          setDragRightCardId(null);
-          setRightCardDrop(null);
+          cleanupDrag();
         };
+        rightCardDragCleanupRef.current = cleanupDrag;
         updateDrop(event.clientY);
         window.addEventListener("pointermove", handlePointerMove);
         window.addEventListener("pointerup", finishDrag);

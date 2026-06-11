@@ -42,7 +42,7 @@ export interface KimiThemePreset {
 export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
-export type ComposerDockCard = "todo" | "pending" | "goal";
+export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm";
 export type RightSidebarCardId = "longTaskStatus" | "background" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "git" | "goal" | "btw" | "plan" | "session" | "diffs";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 
@@ -183,8 +183,10 @@ export interface UserMessageEvent {
 
 export interface UserMessageImage {
   id?: string;
+  kind?: "image" | "file";
   name: string;
   dataUrl?: string;
+  filePath?: string;
 }
 
 export interface SteerMessageEvent {
@@ -201,6 +203,7 @@ export interface AssistantMessageEvent {
   id: string;
   type: "assistant_message";
   timestamp: number;
+  agentId?: string;
   agentRole?: "executor" | "reviewer";
   content: string;
   thinking?: string;
@@ -220,6 +223,7 @@ export interface ToolCallEvent {
   id: string;
   type: "tool_call";
   timestamp: number;
+  agentId?: string;
   toolCallId: string;
   toolName: string;
   status: "running" | "success" | "error";
@@ -233,6 +237,7 @@ export interface ToolResultEvent {
   id: string;
   type: "tool_result";
   timestamp: number;
+  agentId?: string;
   toolCallId: string;
   toolName: string;
   result: unknown;
@@ -310,6 +315,7 @@ export interface StatusUpdateEvent {
   id: string;
   type: "status_update";
   timestamp: number;
+  agentId?: string;
   agentRole?: "executor" | "reviewer";
   step?: number;
   totalSteps?: number;
@@ -364,8 +370,14 @@ export interface SubagentEvent {
   id: string;
   type: "subagent";
   timestamp: number;
+  agentId?: string;
+  parentToolCallId?: string;
+  swarmIndex?: number;
+  description?: string;
   agentName: string;
-  status: "running" | "completed" | "error";
+  status: "queued" | "running" | "suspended" | "completed" | "error";
+  resultSummary?: string;
+  error?: string;
   events: TimelineEvent[];
 }
 

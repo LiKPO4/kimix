@@ -551,17 +551,22 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 if (latestSession) {
                                   setWorkspaceView("chat");
                                   void selectSession(latestSession.id);
+                                } else {
+                                  setCurrentSession(null);
                                 }
-                              }
-                              setExpandedProjectIds((current) => {
-                                const next = new Set(current);
-                                if (isExpanded) next.delete(project.id);
-                                else next.add(project.id);
-                                return next;
-                              });
-                              const hasSession = visibleSessions.some((s) => isSameProjectPath(s.projectPath, project.path) && !s.archivedAt && !isHiddenInternalSession(s));
-                              if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
-                                await createSessionForProject(project);
+                              } else {
+                                // Only toggle expansion when clicking the already-active project.
+                                // Clicking an expanded-but-inactive project should just select it.
+                                setExpandedProjectIds((current) => {
+                                  const next = new Set(current);
+                                  if (isExpanded) next.delete(project.id);
+                                  else next.add(project.id);
+                                  return next;
+                                });
+                                const hasSession = visibleSessions.some((s) => isSameProjectPath(s.projectPath, project.path) && !s.archivedAt && !isHiddenInternalSession(s));
+                                if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
+                                  await createSessionForProject(project);
+                                }
                               }
                             }}
                             className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
@@ -736,7 +741,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.9.20</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.9.24</span>
         </button>
       </div>
     </aside>

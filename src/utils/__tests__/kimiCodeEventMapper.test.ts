@@ -81,6 +81,15 @@ describe("mapKimiCodeEvent", () => {
     expect((result as Extract<TimelineEvent, { type: "tool_result" }>).result).toBe("D:/WORKS");
   });
 
+  it("preserves non-main agent ids on assistant and tool events", () => {
+    const options = testOptions();
+    const assistant = mapKimiCodeEvent({ type: "assistant.delta", agentId: "agent-1", delta: "正在检查" }, options);
+    const tool = mapKimiCodeEvent({ type: "tool.call.started", agentId: "agent-1", toolCallId: "call-1", name: "ReadFile", args: { path: "a.ts" } }, options);
+
+    expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).agentId).toBe("agent-1");
+    expect((tool as Extract<TimelineEvent, { type: "tool_call" }>).agentId).toBe("agent-1");
+  });
+
   it("maps Kimi Code wire tool calls and final step end", () => {
     const options = testOptions();
     const tool = mapKimiCodeEvent({
@@ -160,6 +169,49 @@ describe("mapKimiCodeEvent", () => {
     expect(steer.type).toBe("steer_message");
     expect(steer.status).toBe("sent");
     expect(steer.content).toBe("改一下方向");
+  });
+
+  it("maps subagent lifecycle fields for swarm progress", () => {
+    const options = testOptions();
+    const spawned = mapKimiCodeEvent({
+      type: "subagent.spawned",
+      subagentId: "agent-1",
+      parentToolCallId: "call-swarm",
+      subagentName: "worker",
+      swarmIndex: 2,
+      description: "检查样式",
+    }, options) as Extract<TimelineEvent, { type: "subagent" }>;
+    const started = mapKimiCodeEvent({
+      type: "subagent.started",
+      subagentId: "agent-1",
+      parentToolCallId: "call-swarm",
+      subagentName: "worker",
+      swarmIndex: 2,
+    }, options) as Extract<TimelineEvent, { type: "subagent" }>;
+    const suspended = mapKimiCodeEvent({
+      type: "subagent.suspended",
+      subagentId: "agent-1",
+      parentToolCallId: "call-swarm",
+      subagentName: "worker",
+      reason: "rate limited",
+    }, options) as Extract<TimelineEvent, { type: "subagent" }>;
+    const completed = mapKimiCodeEvent({
+      type: "subagent.completed",
+      subagentId: "agent-1",
+      parentToolCallId: "call-swarm",
+      subagentName: "worker",
+      resultSummary: "样式检查完成",
+    }, options) as Extract<TimelineEvent, { type: "subagent" }>;
+
+    expect(spawned.status).toBe("queued");
+    expect(spawned.agentId).toBe("agent-1");
+    expect(spawned.parentToolCallId).toBe("call-swarm");
+    expect(spawned.swarmIndex).toBe(2);
+    expect(spawned.description).toBe("检查样式");
+    expect(started.status).toBe("running");
+    expect(suspended.status).toBe("suspended");
+    expect(completed.status).toBe("completed");
+    expect(completed.resultSummary).toBe("样式检查完成");
   });
 });
 
@@ -306,5 +358,59 @@ describe("reduceKimiCodeEvents", () => {
     expect(tool.type).toBe("tool_call");
     expect(tool.status).toBe("success");
     expect(tool.result).toBe("content");
+  });
+
+  it("reduces swarm subagent lifecycle updates by agent id", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "subagent.spawned", subagentId: "agent-1", parentToolCallId: "call-swarm", subagentName: "worker", swarmIndex: 1, description: "检查 UI" },
+      { type: "subagent.started", subagentId: "agent-1", parentToolCallId: "call-swarm", subagentName: "worker", swarmIndex: 1 },
+      { type: "subagent.spawned", subagentId: "agent-2", parentToolCallId: "call-swarm", subagentName: "worker", swarmIndex: 2, description: "检查测试" },
+      { type: "subagent.completed", subagentId: "agent-1", parentToolCallId: "call-swarm", subagentName: "worker", resultSummary: "UI 完成" },
+    ], testOptions());
+
+    expect(events).toHaveLength(2);
+    const first = events[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    const second = events[1] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(first.agentId).toBe("agent-1");
+    expect(first.status).toBe("completed");
+    expect(first.resultSummary).toBe("UI 完成");
+    expect(second.agentId).toBe("agent-2");
+    expect(second.status).toBe("queued");
+  });
+
+  it("keeps swarm descriptions and nests scoped agent activity", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "subagent.spawned", subagentId: "agent-1", parentToolCallId: "call-swarm", subagentName: "worker", swarmIndex: 1, description: "检查 layout" },
+      { type: "subagent.started", subagentId: "agent-1", parentToolCallId: "call-swarm", subagentName: "worker", swarmIndex: 1 },
+      { type: "tool.call.started", agentId: "agent-1", toolCallId: "call-read", name: "ReadFile", args: { path: "src/layout.tsx" } },
+      { type: "assistant.delta", agentId: "agent-1", delta: "发现侧栏间距异常" },
+    ], testOptions());
+
+    expect(events).toHaveLength(1);
+    const agent = events[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(agent.description).toBe("检查 layout");
+    expect(agent.status).toBe("running");
+    expect(agent.events).toHaveLength(2);
+    expect((agent.events[0] as Extract<TimelineEvent, { type: "tool_call" }>).toolName).toBe("ReadFile");
+    expect((agent.events[1] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("发现侧栏间距异常");
+  });
+
+  it("does not force queued or suspended subagents completed on turn end", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "subagent.spawned", subagentId: "agent-queued", subagentName: "worker", swarmIndex: 1, description: "排队任务" },
+      { type: "subagent.spawned", subagentId: "agent-suspended", subagentName: "worker", swarmIndex: 2, description: "限流任务" },
+      { type: "subagent.suspended", subagentId: "agent-suspended", subagentName: "worker", swarmIndex: 2 },
+      { type: "turn.ended" },
+      { type: "subagent.failed", subagentId: "agent-suspended", subagentName: "worker", error: "rate limit" },
+    ], testOptions());
+
+    expect(events).toHaveLength(2);
+    const queued = events[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    const suspended = events[1] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(queued.agentId).toBe("agent-queued");
+    expect(queued.status).toBe("queued");
+    expect(suspended.agentId).toBe("agent-suspended");
+    expect(suspended.status).toBe("error");
+    expect(suspended.error).toBe("rate limit");
   });
 });

@@ -47,7 +47,7 @@ const hookTemplates: HookTemplate[] = [
   },
 ];
 
-const hookEvents: HookRule["event"][] = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"];
+const hookEvents: HookRule["event"][] = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "Interrupt", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"];
 const hookActions: HookRule["action"][] = ["allow", "block", "notify", "run_command"];
 
 function formatLogTime(timestamp: number) {

@@ -54,10 +54,15 @@ function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, 
   if (event.type === "context.append_loop_event" && isRecord(event.event)) {
     return {
       ...event.event,
+      agentId: isString(event.event.agentId) ? event.event.agentId : event.agentId,
       time: isNumber(event.event.time) ? event.event.time : event.time,
     };
   }
   return event;
+}
+
+function getAgentId(event: Record<string, unknown>): string | undefined {
+  return isString(event.agentId) && event.agentId !== "main" ? event.agentId : undefined;
 }
 
 function getContentPart(event: Record<string, unknown>): Record<string, unknown> {
@@ -116,6 +121,28 @@ function statusMessageForStep(type: string, event: Record<string, unknown>): str
   return "状态更新";
 }
 
+function mapSubagentEvent(
+  event: Record<string, unknown>,
+  status: Extract<TimelineEvent, { type: "subagent" }>["status"],
+  options: KimiCodeEventMapperOptions,
+): TimelineEvent {
+  const subagentId = isString(event.subagentId) ? event.subagentId : undefined;
+  return {
+    id: getId(options),
+    type: "subagent",
+    timestamp: getTimestamp(event, options),
+    agentId: subagentId,
+    parentToolCallId: isString(event.parentToolCallId) ? event.parentToolCallId : undefined,
+    swarmIndex: isNumber(event.swarmIndex) ? event.swarmIndex : undefined,
+    description: isString(event.description) ? event.description : undefined,
+    agentName: isString(event.subagentName) ? event.subagentName : (subagentId ?? "subagent"),
+    status,
+    resultSummary: isString(event.resultSummary) ? event.resultSummary : undefined,
+    error: isString(event.error) ? event.error : undefined,
+    events: [],
+  };
+}
+
 export function mapKimiCodeEvent(
   rawEvent: unknown,
   options: KimiCodeEventMapperOptions = {},
@@ -139,6 +166,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        agentId: getAgentId(event),
         content: delta,
         isThinking: false,
         isComplete: false,
@@ -154,6 +182,7 @@ export function mapKimiCodeEvent(
           id: getId(options),
           type: "assistant_message",
           timestamp,
+          agentId: getAgentId(event),
           content: text,
           isThinking: false,
           isComplete: false,
@@ -166,6 +195,7 @@ export function mapKimiCodeEvent(
           id: getId(options),
           type: "assistant_message",
           timestamp,
+          agentId: getAgentId(event),
           content: "",
           thinking: think,
           thinkingParts: [{ id: getId(options), timestamp, text: think }],
@@ -183,6 +213,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        agentId: getAgentId(event),
         content: "",
         thinking: delta,
         thinkingParts: [{ id: getId(options), timestamp, text: delta }],
@@ -221,6 +252,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        agentId: getAgentId(event),
         content: "",
         isThinking: false,
         isComplete: true,
@@ -233,6 +265,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        agentId: getAgentId(event),
         content: "",
         isThinking: false,
         isComplete: true,
@@ -247,6 +280,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "tool_call",
         timestamp,
+        agentId: getAgentId(event),
         toolCallId,
         toolName: isString(event.name) ? event.name : "unknown",
         status: "running",
@@ -262,6 +296,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "tool_call",
         timestamp,
+        agentId: getAgentId(event),
         toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
         toolName: isString(event.name) ? event.name : "unknown",
         status: "running",
@@ -275,6 +310,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "tool_result",
         timestamp,
+        agentId: getAgentId(event),
         toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
         toolName: isString(event.name) ? event.name : "unknown",
         result: normalizeResult(event),
@@ -288,6 +324,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "status_update",
         timestamp,
+        agentId: getAgentId(event),
         tokenCount: usageOutput(currentTurnUsage),
         inputTokenCount: usageInput(currentTurnUsage),
         contextSize: isNumber(event.contextTokens) ? event.contextTokens : undefined,
@@ -307,39 +344,25 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "status_update",
         timestamp,
+        agentId: getAgentId(event),
         step: isNumber(event.step) ? event.step : undefined,
         message: statusMessageForStep(type, event),
       };
 
     case "subagent.spawned":
-      return {
-        id: getId(options),
-        type: "subagent",
-        timestamp,
-        agentName: isString(event.subagentName) ? event.subagentName : "subagent",
-        status: "running",
-        events: [],
-      };
+      return mapSubagentEvent(event, "queued", options);
+
+    case "subagent.started":
+      return mapSubagentEvent(event, "running", options);
+
+    case "subagent.suspended":
+      return mapSubagentEvent(event, "suspended", options);
 
     case "subagent.completed":
-      return {
-        id: getId(options),
-        type: "subagent",
-        timestamp,
-        agentName: isString(event.subagentName) ? event.subagentName : (isString(event.subagentId) ? event.subagentId : "subagent"),
-        status: "completed",
-        events: [],
-      };
+      return mapSubagentEvent(event, "completed", options);
 
     case "subagent.failed":
-      return {
-        id: getId(options),
-        type: "subagent",
-        timestamp,
-        agentName: isString(event.subagentName) ? event.subagentName : (isString(event.subagentId) ? event.subagentId : "subagent"),
-        status: "error",
-        events: [],
-      };
+      return mapSubagentEvent(event, "error", options);
 
     case "compaction.started":
       return {

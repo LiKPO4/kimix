@@ -16,6 +16,7 @@ import { ErrorCard } from "./ErrorCard";
 import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
+import { reliableAssistantDurationMs } from "@/utils/duration";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
@@ -39,6 +40,18 @@ function useAnimatedDots(active: boolean) {
   }, [active]);
 
   return ".".repeat(count);
+}
+
+function useRunningClock(active: boolean) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => {
+      setTick((value) => value + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [active]);
 }
 
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
@@ -385,7 +398,7 @@ function buildRenderItems(
       thinkingParts: visible.flatMap((event) => event.thinkingParts ?? []),
       isThinking: visible.some((event) => event.isThinking && !event.isComplete),
       isComplete: visible.every((event) => event.isComplete),
-      durationMs: last.durationMs ?? Math.max(0, last.timestamp - first.timestamp),
+      durationMs: reliableAssistantDurationMs(last.durationMs),
     } satisfies Extract<TimelineEvent, { type: "assistant_message" }>;
   };
 
@@ -417,7 +430,7 @@ function buildRenderItems(
     const turnSettled = (
       !assistantEvents.some((event) => !event.isComplete) &&
       !tools.some((event) => event.status === "running") &&
-      !subagents.some((event) => event.status === "running")
+      !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
     const diffEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff");
     const mergedChangeSummary = mergeChangeSummaryEvents(turnEvents.filter((event): event is Extract<TimelineEvent, { type: "change_summary" }> => event.type === "change_summary"));
@@ -442,15 +455,14 @@ function buildRenderItems(
       steerAttached = true;
     };
     for (const [eventIndex, event] of turnEvents.entries()) {
-      const type = (event as { type?: unknown }).type;
-      if (type === "steer_message") continue;
-      if (type === "tool_call" || type === "tool_result") continue;
-      if (type === "subagent") continue;
-      if (type === "hook") continue;
-      if (type === "status_update") continue;
-      if (type === "change_summary") continue;
-      if (type === "diff") continue;
-      if (type === "assistant_message") {
+      if (event.type === "steer_message") continue;
+      if (event.type === "tool_call" || event.type === "tool_result") continue;
+      if (event.type === "subagent") continue;
+      if (event.type === "hook") continue;
+      if (event.type === "status_update") continue;
+      if (event.type === "change_summary") continue;
+      if (event.type === "diff") continue;
+      if (event.type === "assistant_message") {
         if (assistantAttached || !mergedAssistantEvent) continue;
         const hasContent = mergedAssistantEvent.content.trim().length > 0;
         const hasOwnProcessDetails = Boolean(
@@ -474,20 +486,20 @@ function buildRenderItems(
         continue;
       }
       if (
-        (type !== "assistant_message" || assistantEventIds.has(event.id)) &&
-        type !== "assistant_message" &&
-        type !== "approval_request" &&
-        type !== "question_request" &&
-        type !== "file_artifact" &&
-        type !== "change_summary" &&
-        type !== "session_recommendation" &&
-        type !== "diff" &&
-        type !== "error" &&
-        type !== "compaction"
+        (event.type !== "assistant_message" || assistantEventIds.has(event.id)) &&
+        event.type !== "assistant_message" &&
+        event.type !== "approval_request" &&
+        event.type !== "question_request" &&
+        event.type !== "file_artifact" &&
+        event.type !== "change_summary" &&
+        event.type !== "session_recommendation" &&
+        event.type !== "diff" &&
+        event.type !== "error" &&
+        event.type !== "compaction"
       ) {
         continue;
       }
-      if (type === "assistant_message" && !toolsAttached) {
+      if (event.type === "assistant_message" && !toolsAttached) {
         items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), trailingStatuses: [] });
         toolsAttached = true;
         assistantAttached = true;
@@ -499,11 +511,11 @@ function buildRenderItems(
           toolsAttached = true;
         }
       }
-      if ((type === "question_request" || type === "approval_request") && mergedChangeSummary && !changeSummaryAttached) {
+      if ((event.type === "question_request" || event.type === "approval_request") && mergedChangeSummary && !changeSummaryAttached) {
         items.push({ type: "event", event: mergedChangeSummary });
         changeSummaryAttached = true;
       }
-      if ((type === "question_request" || type === "approval_request") && standaloneDiffEvents.length > 0 && !diffGroupAttached) {
+      if ((event.type === "question_request" || event.type === "approval_request") && standaloneDiffEvents.length > 0 && !diffGroupAttached) {
         items.push({
           type: "change_group",
           id: `diff-group-${standaloneDiffEvents.map((diff) => diff.id).join(":")}`,
@@ -511,11 +523,11 @@ function buildRenderItems(
         });
         diffGroupAttached = true;
       }
-      if ((type === "question_request" || type === "approval_request") && planPath && !planPreviewAttached) {
+      if ((event.type === "question_request" || event.type === "approval_request") && planPath && !planPreviewAttached) {
         items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
         planPreviewAttached = true;
       }
-      if (type === "approval_request") {
+      if (event.type === "approval_request") {
         // Resolved approvals are folded into the assistant process summary; do
         // not render them as standalone cards below the body.
         if (foldApprovals && (event as Extract<TimelineEvent, { type: "approval_request" }>).status !== "pending") {
@@ -559,13 +571,12 @@ function buildRenderItems(
   };
 
   for (const event of events) {
-    const type = (event as { type?: unknown }).type;
-    if (type === "user_message") {
+    if (event.type === "user_message") {
       flushTurn();
       items.push({ type: "event", event, attachedUserStatuses: attachedUserStatuses?.get(event.id) });
       continue;
     }
-    if (type === "steer_message") {
+    if (event.type === "steer_message") {
       flushTurn();
       items.push({ type: "event", event });
       continue;
@@ -608,41 +619,34 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
   return events.some((event) => {
-    const type = (event as { type?: unknown }).type;
-    if (type === "user_message") {
-      const content = (event as { content?: unknown }).content;
-      const images = (event as { images?: unknown }).images;
-      return (typeof content === "string" && content.trim().length > 0) || (Array.isArray(images) && images.length > 0);
+    if (event.type === "user_message") {
+      return event.content.trim().length > 0 || Boolean(event.images && event.images.length > 0);
     }
-    if (type === "steer_message") {
-      const content = (event as { content?: unknown }).content;
-      return typeof content === "string" && content.trim().length > 0;
+    if (event.type === "steer_message") {
+      return event.content.trim().length > 0;
     }
-    if (type === "assistant_message") {
-      const content = (event as { content?: unknown }).content;
-      const thinking = (event as { thinking?: unknown }).thinking;
+    if (event.type === "assistant_message") {
       const hasText =
-        (typeof content === "string" && content.trim().length > 0) ||
-        (typeof thinking === "string" && thinking.trim().length > 0);
+        event.content.trim().length > 0 ||
+        Boolean(event.thinking && event.thinking.trim().length > 0);
       const isActiveThinking = Boolean(isRunningThisSession && event.isThinking && !event.isComplete);
       return hasText || isActiveThinking;
     }
-    if (type === "tool_result") return false;
-    if (type === "status_update") {
-      const message = (event as { message?: unknown }).message;
-      return (typeof message === "string" && message.trim().length > 0) || isRunningThisSession;
+    if (event.type === "tool_result") return false;
+    if (event.type === "status_update") {
+      return Boolean(event.message && event.message.trim().length > 0) || isRunningThisSession;
     }
     if (
-      type === "tool_call" ||
-      type === "approval_request" ||
-      type === "question_request" ||
-      type === "file_artifact" ||
-      type === "change_summary" ||
-      type === "session_recommendation" ||
-      type === "diff" ||
-      type === "error" ||
-      type === "subagent" ||
-      type === "compaction"
+      event.type === "tool_call" ||
+      event.type === "approval_request" ||
+      event.type === "question_request" ||
+      event.type === "file_artifact" ||
+      event.type === "change_summary" ||
+      event.type === "session_recommendation" ||
+      event.type === "diff" ||
+      event.type === "error" ||
+      event.type === "subagent" ||
+      event.type === "compaction"
     ) {
       return true;
     }
@@ -842,6 +846,7 @@ export function ChatThread() {
     runningSessionId === session.id ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
+  useRunningClock(hasActiveTurn);
   const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;

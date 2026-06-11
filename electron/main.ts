@@ -42,7 +42,7 @@ const SUPERPOWERS_SKILL_NAMES = [
   "writing-skills",
 ];
 
-const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
+const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "Interrupt", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
 const HOOK_ACTIONS = ["allow", "block", "notify", "run_command"] as const;
 let activeKimiLoginProcess: ReturnType<typeof spawn> | null = null;
 
@@ -812,9 +812,11 @@ function applyImportFromCcCodexPlan(plan: ImportCcCodexPlan) {
       } else if (item.kind === "skill") {
         fs.mkdirSync(path.dirname(path.dirname(item.target)), { recursive: true });
         if (item.skillSourceDir) {
+          backupOnce(path.dirname(item.target));
           copyDirectorySafe(item.skillSourceDir, path.dirname(item.target));
         } else if (item.flatSkillFile) {
           fs.mkdirSync(path.dirname(item.target), { recursive: true });
+          backupOnce(item.target);
           fs.copyFileSync(item.flatSkillFile, item.target);
         } else {
           throw new Error("缺少 Skill 来源");
@@ -3555,8 +3557,62 @@ function parseKimiUsagePayload(payload: Record<string, unknown>) {
   };
 }
 
+function getPackagedUserDataDir(): string {
+  const platform = process.platform;
+  const home = os.homedir();
+  if (platform === "win32") {
+    return path.join(home, "AppData", "Roaming", "Kimix");
+  }
+  if (platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "Kimix");
+  }
+  return path.join(home, ".config", "Kimix");
+}
+
+function copyDirSync(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+function mergeDirSync(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      mergeDirSync(srcPath, destPath);
+    } else if (!fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
 function getDefaultProject() {
-  const workDir = path.join(app.getPath("userData"), "default-project");
+  const packagedUserData = getPackagedUserDataDir();
+  const workDir = path.join(packagedUserData, "default-project");
+
+  // Dev builds historically stored data under Electron's userData directory.
+  // One-time merge into the packaged Kimix location so dev and packaged builds share data.
+  if (!app.isPackaged) {
+    const devWorkDir = path.join(app.getPath("userData"), "default-project");
+    if (fs.existsSync(devWorkDir) && devWorkDir !== workDir) {
+      try {
+        fs.mkdirSync(packagedUserData, { recursive: true });
+        mergeDirSync(devWorkDir, workDir);
+      } catch {
+        // If merge fails, ensureDirectoryExists below still creates the target dir.
+      }
+    }
+  }
+
   ensureDirectoryExists(workDir);
   return {
     id: "default-kimi-project",
@@ -4379,7 +4435,7 @@ function buildHookRulePrompt(description: string) {
 
 字段要求：
 - name: 简短中文名称，最多 20 个汉字。
-- event: 只能是 PreToolUse / PostToolUse / PostToolUseFailure / Notification / Stop / StopFailure / UserPromptSubmit / SessionStart / SessionEnd / SubagentStart / SubagentStop / PreCompact / PostCompact。
+- event: 只能是 PreToolUse / PostToolUse / PostToolUseFailure / Notification / Stop / StopFailure / Interrupt / UserPromptSubmit / SessionStart / SessionEnd / SubagentStart / SubagentStop / PreCompact / PostCompact。
 - matcher: 简短正则或关键词，用来匹配工具名、命令、文件路径、事件摘要或会话状态；SessionStart/SubagentStart 通常用 ".*"。
 - action: 只能是 allow / block / notify / run_command。
 - command: notify / block / run_command 都必须填写真正可执行的一行 hook 脚本；Kimi hooks 会执行 command，并把 hook 事件 JSON 传入 stdin，stdout 会补充给 agent 上下文，退出码 2 表示阻断。
@@ -4392,6 +4448,7 @@ function buildHookRulePrompt(description: string) {
 - 危险命令、删除、强推、重置：PreToolUse + block，command 要检查 stdin 中的命令并在命中时输出风险说明后 exit 2；不要生成会直接执行危险操作的 command。
 - 任务结束后构建、测试、lint：Stop + run_command，command 填用户要求的真实命令。
 - 失败、等待用户、需要提醒：StopFailure + notify，command 要输出提醒文本。
+- 用户主动中断输出或按 Esc 停止时提醒：Interrupt + notify，command 要输出提醒文本。
 - 每轮用户输入前、每次注入上下文、提示当前时间：UserPromptSubmit + notify，command 要输出要提供给 agent 的上下文文本。
 - 会话创建时一次性提示：SessionStart + notify。
 - 子 agent 启动时提示：SubagentStart + notify。
@@ -4929,6 +4986,28 @@ ipcMain.handle("kimi-code:askBtw", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:swarm", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const content = typeof req.content === "string" ? req.content.trim() : "";
+    const enabled = typeof req.enabled === "boolean" ? req.enabled : undefined;
+    const trigger = req.trigger === "task" ? "task" : "manual";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    if (typeof enabled === "boolean") {
+      await kimiCodeHost.setSwarmMode(sessionId, enabled, trigger);
+      return { success: true, data: undefined };
+    }
+    if (!content) return { success: false, error: "Missing content" };
+    const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
+    const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, content, workDir) : content;
+    await kimiCodeHost.swarm(sessionId, finalInput);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -5410,10 +5489,10 @@ ipcMain.handle("kimi:listSlashCommands", async () => {
       { name: "goal cancel", description: "取消并清除当前 Goal", aliases: [] },
       { name: "goal next", description: "排队后续 Goal；Kimix 在 SDK 暴露队列 API 前仅提示边界", aliases: [] },
       { name: "goal next 继续收尾并整理剩余风险", description: "带目标模板：排队后续 Goal", aliases: [] },
-      { name: "swarm", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
-      { name: "swarm 并行检查最近改动并给出修复建议", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
-      { name: "swarm on", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
-      { name: "swarm off", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
+      { name: "swarm", description: "官方 Swarm 总入口；可跟任务或 on/off", aliases: [] },
+      { name: "swarm 并行检查最近改动并给出修复建议", description: "用官方 SDK 发起 Swarm 任务", aliases: [] },
+      { name: "swarm on", description: "开启官方 Swarm 模式", aliases: [] },
+      { name: "swarm off", description: "关闭官方 Swarm 模式", aliases: [] },
       { name: "theme", description: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", aliases: [] },
       { name: "custom-theme", description: "Kimix 兼容生成官方主题 JSON；生成后可在设置里导入", aliases: [] },
       { name: "custom-theme 做一套低饱和绿色主题", description: "Kimix 兼容生成官方主题 JSON", aliases: [] },

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   OpenProjectRequest,
   OpenProjectResponse,
@@ -147,6 +147,7 @@ import type {
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
+  KimiCodeSwarmRequest,
   KimiCodeUndoHistoryRequest,
   KimiCodeSetPluginEnabledRequest,
   KimiCodeSetPluginMcpServerEnabledRequest,
@@ -334,6 +335,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
     ipcRenderer.invoke("kimi-code:askBtw", req),
+  swarmKimiCode: (req: KimiCodeSwarmRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:swarm", req),
   createKimiCodeGoal: (req: KimiCodeCreateGoalRequest): Promise<KimiCodeGoalResponse> =>
     ipcRenderer.invoke("kimi-code:createGoal", req),
   getKimiCodeGoal: (req: KimiCodeSessionRequest): Promise<KimiCodeGoalResponse> =>
@@ -437,6 +440,7 @@ const api = {
     ipcRenderer.invoke("app:triggerShortcut", req),
   notifyTurnComplete: (req: TurnCompleteNotificationRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:notifyTurnComplete", req),
+  getDraggedFilePath: (file: File): string => webUtils.getPathForFile(file),
   reportRendererHeartbeat: (payload: RendererHeartbeatPayload): void =>
     ipcRenderer.send("app:rendererHeartbeat", payload),
   clearTaskbarAttention: (): Promise<VoidResponse> =>

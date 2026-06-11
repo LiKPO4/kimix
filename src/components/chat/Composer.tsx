@@ -7,6 +7,7 @@ import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, Clarific
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
+import { SwarmPanel, getVisibleSwarmAgents } from "./SwarmPanel";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
@@ -186,9 +187,51 @@ function getLatestUserTurnState(events: TimelineEvent[]) {
 
 type ImageAttachment = {
   id: string;
+  kind?: "image" | "file";
   name: string;
-  dataUrl: string;
+  dataUrl?: string;
+  filePath?: string;
 };
+
+function isImageAttachment(attachment: ImageAttachment): attachment is ImageAttachment & { dataUrl: string } {
+  return Boolean(attachment.dataUrl);
+}
+
+function attachmentFilePath(attachment: ImageAttachment) {
+  return attachment.filePath?.trim() || "";
+}
+
+function buildAttachmentPromptContent(content: string, attachments: ImageAttachment[]) {
+  const files = attachments.filter((attachment) => attachment.kind === "file" || Boolean(attachment.filePath));
+  if (files.length === 0) return content;
+  const fileLines = files.map((file, index) => {
+    const filePath = attachmentFilePath(file);
+    return `${index + 1}. ${file.name}${filePath ? `\n   绝对路径：${filePath}` : "\n   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件"}`;
+  });
+  return [
+    content.trim(),
+    "附件文件：",
+    ...fileLines,
+    "",
+    "请直接使用上述绝对路径读取附件内容，不要只按文件名搜索。",
+  ].filter(Boolean).join("\n");
+}
+
+function toPromptImages(attachments: ImageAttachment[]) {
+  return attachments
+    .filter(isImageAttachment)
+    .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+}
+
+function toUserAttachments(attachments: ImageAttachment[]) {
+  return attachments.map((attachment) => ({
+    id: attachment.id,
+    kind: attachment.kind ?? (attachment.dataUrl ? "image" as const : "file" as const),
+    name: attachment.name,
+    dataUrl: attachment.dataUrl,
+    filePath: attachment.filePath,
+  }));
+}
 
 type CompletionMode = "mention" | "slash";
 
@@ -246,10 +289,10 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-goal-cancel", label: "/goal cancel", detail: "取消并清除当前 Goal", insertText: "/goal cancel ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-next", label: "/goal next", detail: "排队后续 Goal；Kimix 在 SDK 暴露队列 API 前仅提示边界", insertText: "/goal next ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-next-template", label: "/goal next 继续收尾并整理剩余风险", detail: "带目标模板：排队后续 Goal", insertText: "/goal next 继续收尾并整理剩余风险", commandName: "goal", kind: "slash" },
-  { id: "slash-swarm", label: "/swarm", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm ", commandName: "swarm", kind: "slash" },
-  { id: "slash-swarm-template", label: "/swarm 并行检查最近改动并给出修复建议", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm 并行检查最近改动并给出修复建议", commandName: "swarm", kind: "slash" },
-  { id: "slash-swarm-on", label: "/swarm on", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
-  { id: "slash-swarm-off", label: "/swarm off", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm", label: "/swarm", detail: "官方 Swarm 总入口；可跟任务或 on/off", insertText: "/swarm ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-template", label: "/swarm 并行检查最近改动并给出修复建议", detail: "用官方 SDK 发起 Swarm 任务", insertText: "/swarm 并行检查最近改动并给出修复建议", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-on", label: "/swarm on", detail: "开启官方 Swarm 模式", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-off", label: "/swarm off", detail: "关闭官方 Swarm 模式", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
   { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
   { id: "slash-custom-theme", label: "/custom-theme", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
   { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
@@ -537,6 +580,7 @@ export function Composer() {
         const reader = new FileReader();
         reader.onload = () => resolve({
           id: genId(),
+          kind: "image",
           name: file.name || "粘贴图片",
           dataUrl: String(reader.result),
         });
@@ -544,6 +588,27 @@ export function Composer() {
         reader.readAsDataURL(file);
       })),
     );
+    setImageAttachments((prev) => [...prev, ...attachments]);
+  };
+
+  const getDraggedFilePath = (file: File) => {
+    const electronPath = typeof window.api.getDraggedFilePath === "function"
+      ? window.api.getDraggedFilePath(file)
+      : "";
+    if (electronPath) return electronPath;
+    return typeof (file as { path?: unknown }).path === "string" ? (file as { path: string }).path : "";
+  };
+
+  const addFileAttachments = (files: File[]) => {
+    const attachments = files.map((file) => {
+      const filePath = getDraggedFilePath(file);
+      return {
+        id: genId(),
+        kind: "file" as const,
+        name: file.name || filePath.split(/[\\/]/).pop() || "附件文件",
+        filePath,
+      };
+    });
     setImageAttachments((prev) => [...prev, ...attachments]);
   };
 
@@ -562,6 +627,7 @@ export function Composer() {
   const handleSaveDrawingBoard = (image: { name: string; dataUrl: string; sourceId?: string }) => {
     const attachment: ImageAttachment = {
       id: genId(),
+      kind: "image",
       name: image.name,
       dataUrl: image.dataUrl,
     };
@@ -620,7 +686,7 @@ export function Composer() {
       type: "user_message",
       timestamp: Date.now(),
       content,
-      images: images.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })),
+      images: toUserAttachments(images),
     };
     const responsePlaceholder: TimelineEvent = {
       id: genId(),
@@ -657,12 +723,13 @@ export function Composer() {
     targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
 
     const effectiveEngine = "kimi-code";
+    const contentWithAttachments = buildAttachmentPromptContent(content, images);
     const outboundContent = options?.outboundContent ?? (targetSession.longTask || options?.skipClarification
-      ? content
-      : withClarificationBehavior(content, effectiveClarificationToolMode));
+      ? contentWithAttachments
+      : withClarificationBehavior(contentWithAttachments, effectiveClarificationToolMode));
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
-      const imagesForApi = images.map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+      const imagesForApi = toPromptImages(images);
       const sameWorkDir = (a?: string, b?: string) =>
         Boolean(a && b) && a!.replace(/\\/g, "/").toLowerCase() === b!.replace(/\\/g, "/").toLowerCase();
 
@@ -980,7 +1047,7 @@ export function Composer() {
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
     if (name.startsWith("skill:")) return false;
-    if (!["goal", "theme", "custom-theme", "import-from-cc-codex", "compact", "plan", "btw", "undo"].includes(name)) return false;
+    if (!["goal", "theme", "custom-theme", "import-from-cc-codex", "compact", "plan", "btw", "undo", "swarm"].includes(name)) return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name === "goal") {
       await appendSlashNotice(commandNotice);
@@ -990,6 +1057,64 @@ export function Composer() {
       await appendSlashNotice(commandNotice);
       setWorkspaceView("settings");
       await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的 TUI 主题选择器，Kimix 使用独立的全局主题色板。");
+      return true;
+    }
+    if (name === "swarm") {
+      const normalized = args.toLowerCase();
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      if (!args) {
+        await appendSlashNotice(commandNotice);
+        await appendStatusMessage("请输入 Swarm 任务，例如：/swarm 并行检查最近改动并给出修复建议；也可使用 /swarm on 或 /swarm off 切换模式。");
+        return true;
+      }
+      if (normalized === "on" || normalized === "off") {
+        await appendSlashNotice(commandNotice);
+        const enabled = normalized === "on";
+        const res = await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, enabled, trigger: "manual" });
+        await appendStatusMessage(res.success ? (enabled ? "Swarm 模式已开启。" : "Swarm 模式已关闭。") : `Swarm 模式切换失败：${res.error}`);
+        return true;
+      }
+
+      const userEvent: TimelineEvent = {
+        id: genId(),
+        type: "user_message",
+        timestamp: Date.now(),
+        content: content.trim(),
+      };
+      const statusEvent: TimelineEvent = {
+        id: genId(),
+        type: "status_update",
+        timestamp: Date.now(),
+        message: `已发出 Swarm 指令：${args}`,
+        source: "slash",
+        tone: "info",
+      };
+      updateSession(runtime.uiSessionId, (session) => ({
+        ...session,
+        events: [...session.events, userEvent, statusEvent],
+        updatedAt: Date.now(),
+      }));
+      setRunningSessionId(runtime.uiSessionId);
+      const modeRes = await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, enabled: true, trigger: "task" });
+      const res = modeRes.success ? await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, content: args }) : modeRes;
+      if (!res.success) {
+        setRunningSessionId(null);
+        updateSession(runtime.uiSessionId, (session) => ({
+          ...session,
+          events: [
+            ...session.events,
+            {
+              id: genId(),
+              type: "error",
+              timestamp: Date.now(),
+              message: `Swarm 启动失败：${res.error}`,
+              source: "ipc",
+            },
+          ],
+          updatedAt: Date.now(),
+        }));
+      }
       return true;
     }
     if (name === "custom-theme") {
@@ -1191,10 +1316,10 @@ export function Composer() {
       const applied = await applySkillCommand(skillName);
       if (applied && (restContent || imagesToSend.length > 0)) {
         if (hasActiveAssistantTurn && currentSession) {
-          addPendingMessage(currentSession.id, restContent, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
+          addPendingMessage(currentSession.id, restContent, toUserAttachments(imagesToSend));
           if (imagesToSend.length > 0) {
             window.dispatchEvent(new CustomEvent("kimix:toast", {
-              detail: "当前轮次还没结束，文字和图片已加入队列，等待当前轮次结束后自动发送。",
+              detail: "当前轮次还没结束，文字和附件已加入队列，等待当前轮次结束后自动发送。",
             }));
           }
           return;
@@ -1213,7 +1338,7 @@ export function Composer() {
     }
 
     if (isCurrentSessionRunning && currentSession) {
-      addPendingMessage(currentSession.id, trimmed, imagesToSend.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })));
+      addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
       return;
     }
     await sendPromptContent(trimmed, { images: imagesToSend });
@@ -1269,7 +1394,7 @@ export function Composer() {
           type: "steer_message" as const,
           timestamp: Date.now(),
           content,
-          images: images.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })),
+          images: toUserAttachments(images),
           status: "sending" as const,
         },
       ],
@@ -1289,15 +1414,15 @@ export function Composer() {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "当前没有可引导的 SDK 运行轮次，消息会留在队列里等待本轮结束。" }));
       return;
     }
-    const steerId = insertLocalSteerMessage(activeSession.id, trimmed || "[图片]", imagesToSend);
+    const steerId = insertLocalSteerMessage(activeSession.id, trimmed || (imagesToSend.length > 0 ? "[附件]" : ""), imagesToSend);
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);
     inputRef.current?.reset();
     const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
-      content: trimmed,
-      images: imagesToSend.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
+      content: buildAttachmentPromptContent(trimmed, imagesToSend),
+      images: toPromptImages(imagesToSend),
     });
     if (!res.success) {
       updateSteerStatus(activeSession.id, steerId, "failed", res.error);
@@ -1459,13 +1584,7 @@ export function Composer() {
         void addImageFiles(imageFiles);
       }
       if (otherFiles.length === 0) return;
-      const paths = otherFiles
-        .map((f) => {
-          const p = typeof (f as { path?: unknown }).path === "string" ? (f as { path: string }).path : f.name;
-          return p;
-        })
-        .join(", ");
-      setInput((prev) => (prev ? prev + "\n" : "") + `[附件: ${paths}]`);
+      addFileAttachments(otherFiles);
     }
   };
 
@@ -1479,12 +1598,15 @@ export function Composer() {
       return;
     }
     removePendingMessage(id);
+    const pendingAttachments = (pending.images ?? []).map((image) => ({
+      id: image.id ?? genId(),
+      kind: image.kind ?? (image.dataUrl ? "image" as const : "file" as const),
+      name: image.name,
+      dataUrl: image.dataUrl,
+      filePath: image.filePath,
+    }));
     await sendPromptContent(pending.content, {
-      images: (pending.images ?? []).map((image) => ({
-        id: image.id ?? genId(),
-        name: image.name,
-        dataUrl: image.dataUrl ?? "",
-      })).filter((image) => image.dataUrl),
+      images: pendingAttachments,
     });
   };
 
@@ -1500,18 +1622,29 @@ export function Composer() {
     }
     const steerId = insertLocalSteerMessage(
       activeSession.id,
-      pending.content || "[图片]",
+      pending.content || "[附件]",
       (pending.images ?? [])
-        .map((image) => ({ id: image.id ?? genId(), name: image.name, dataUrl: image.dataUrl ?? "" }))
-        .filter((image) => image.dataUrl),
+        .map((image) => ({
+          id: image.id ?? genId(),
+          kind: image.kind ?? (image.dataUrl ? "image" as const : "file" as const),
+          name: image.name,
+          dataUrl: image.dataUrl,
+          filePath: image.filePath,
+        })),
     );
     removePendingMessage(id);
     const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
-      content: pending.content,
+      content: buildAttachmentPromptContent(pending.content, (pending.images ?? []).map((image) => ({
+        id: image.id ?? genId(),
+        kind: image.kind ?? (image.dataUrl ? "image" as const : "file" as const),
+        name: image.name,
+        dataUrl: image.dataUrl,
+        filePath: image.filePath,
+      }))),
       images: (pending.images ?? [])
-        .map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" }))
-        .filter((image) => image.dataUrl),
+        .filter((image) => Boolean(image.dataUrl))
+        .map((image) => ({ name: image.name, dataUrl: image.dataUrl as string })),
     });
     if (!res.success) {
       if (/not active|not found|session/i.test(res.error) && activeSession) {
@@ -1532,9 +1665,11 @@ export function Composer() {
     setInput(pending.content);
     setImageAttachments((pending.images ?? []).map((image) => ({
       id: image.id ?? genId(),
+      kind: image.kind ?? (image.dataUrl ? "image" as const : "file" as const),
       name: image.name,
-      dataUrl: image.dataUrl ?? "",
-    })).filter((image) => image.dataUrl));
+      dataUrl: image.dataUrl,
+      filePath: image.filePath,
+    })));
     setEditingPendingId(id);
     removePendingMessage(id);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -1595,7 +1730,9 @@ export function Composer() {
   const composerCardSessionId = activeSession?.id ?? "__global__";
   const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
   const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
+  const visibleSwarmAgents = activeSession ? getVisibleSwarmAgents(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
+  const swarmHidden = hiddenCards.includes("swarm");
   const pendingHidden = hiddenCards.includes("pending");
   const goalHidden = hiddenCards.includes("goal");
   const currentGoal = activeSession?.officialGoal?.goal ?? null;
@@ -1624,6 +1761,13 @@ export function Composer() {
         <TodoPanel
           events={activeSession.events}
           onDismiss={() => hideComposerCard("todo", "TodoList")}
+        />
+      )}
+
+      {activeSession && visibleSwarmAgents.length > 0 && !swarmHidden && (
+        <SwarmPanel
+          events={activeSession.events}
+          onDismiss={() => hideComposerCard("swarm", "Swarm 子进程")}
         />
       )}
 
@@ -1674,7 +1818,7 @@ export function Composer() {
                 <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">
                   {msg.content || "[图片]"}
                   {(msg.images?.length ?? 0) > 0 && (
-                    <span className="text-[12.5px] text-[var(--kimix-panel-text-muted)]"> · {msg.images?.length} 张图片</span>
+                    <span className="text-[12.5px] text-[var(--kimix-panel-text-muted)]"> · {msg.images?.length} 个附件</span>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
@@ -1939,31 +2083,46 @@ export function Composer() {
         )}
         {imageAttachments.length > 0 && (
           <div className="flex flex-wrap" style={{ gap: 10, paddingTop: 2, paddingBottom: 12 }}>
-            {imageAttachments.map((image) => (
-              <button
-                key={image.id}
-                type="button"
-                onClick={() => setPreviewImage(image)}
-                className="kimix-media-thumb group relative h-20 w-20 overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors"
-                title="点击查看图片"
-                aria-label={`查看图片 ${image.name}`}
-              >
-                <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
+            {imageAttachments.map((attachment) => {
+              const isImage = Boolean(attachment.dataUrl);
+              return (
                 <button
+                  key={attachment.id}
                   type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setImageAttachments((prev) => prev.filter((item) => item.id !== image.id));
-                    if (previewImage?.id === image.id) setPreviewImage(null);
-                  }}
-                  className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-white opacity-95 transition-colors hover:bg-black"
-                  title="移除图片"
-                  aria-label="移除图片"
+                  onClick={() => isImage && setPreviewImage(attachment as ImageAttachment & { dataUrl: string })}
+                  className={`kimix-media-thumb group relative overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors ${isImage ? "h-20 w-20" : "h-20 w-[176px]"}`}
+                  title={isImage ? "点击查看图片" : attachment.filePath || attachment.name}
+                  aria-label={`${isImage ? "查看图片" : "附件文件"} ${attachment.name}`}
                 >
-                  <X size={13} />
+                  {isImage ? (
+                    <img src={attachment.dataUrl} alt={attachment.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full min-w-0 flex-col justify-center text-[var(--kimix-panel-text)]" style={{ gap: 5, paddingLeft: 14, paddingRight: 34 }}>
+                      <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                        <FileText size={16} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                        <span className="min-w-0 truncate text-[13px] font-medium">{attachment.name}</span>
+                      </div>
+                      <div className="truncate text-[12px] text-[var(--kimix-panel-text-muted)]">
+                        {attachment.filePath || "未读取到绝对路径"}
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setImageAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
+                      if (previewImage?.id === attachment.id) setPreviewImage(null);
+                    }}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-white opacity-95 transition-colors hover:bg-black"
+                    title={isImage ? "移除图片" : "移除附件"}
+                    aria-label={isImage ? "移除图片" : "移除附件"}
+                  >
+                    <X size={13} />
+                  </button>
                 </button>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
 

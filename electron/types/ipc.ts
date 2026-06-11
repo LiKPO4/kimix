@@ -1257,7 +1257,7 @@ export type AppSettings = {
 export type HookRule = {
   id: string;
   name: string;
-  event: "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "Notification" | "Stop" | "StopFailure" | "UserPromptSubmit" | "SessionStart" | "SessionEnd" | "SubagentStart" | "SubagentStop" | "PreCompact" | "PostCompact";
+  event: "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "Notification" | "Stop" | "StopFailure" | "Interrupt" | "UserPromptSubmit" | "SessionStart" | "SessionEnd" | "SubagentStart" | "SubagentStop" | "PreCompact" | "PostCompact";
   matcher: string;
   action: "allow" | "block" | "notify" | "run_command";
   command?: string;
@@ -1446,6 +1446,13 @@ export type KimiCodeBtwRequest = {
   sessionId: string;
   content: string;
   timeoutMs?: number;
+};
+
+export type KimiCodeSwarmRequest = {
+  sessionId: string;
+  content?: string;
+  enabled?: boolean;
+  trigger?: "manual" | "task";
 };
 
 export type KimiCodeBtwResponse = {

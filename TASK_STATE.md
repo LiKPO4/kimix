@@ -3,6 +3,24 @@
 ## 当前目标
 停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。
 
+## 2026-06-11 v2.9.22 Kimi Code 0.14.0 SDK / Swarm 跟进
+- 当前目标：对照官方最新 Kimi Code 0.14.0，先刷新 Kimix vendored node-sdk，并落下后续未跟进清单。
+- 已完成：官方研究仓库切到 tag `@moonshot-ai/kimi-code@0.14.0`，commit `ecc049611508ca0e1b8ffbc8a2788b5ccc4c250e`；`packages/node-sdk` 版本为 `0.9.1`；已重新生成 `vendor/kimi-code-sdk/index.mjs`。
+- 已完成：轻量探针确认新版 SDK 可导入、创建会话、读取配置、列出插件/Skill，并暴露 `setSwarmMode`、`swarm`、`reloadPlugins`、`removePlugin`、`getPluginInfo`、`undoHistory`。
+- 已完成：Kimix 补齐官方 `Interrupt` Hook 事件到类型、主进程校验、规则生成提示和 Hooks 面板事件下拉。
+- 已完成：`/swarm on`、`/swarm off` 和 `/swarm <任务>` 已接官方 SDK `setSwarmMode()` / `swarm()`，不再作为普通消息发送。
+- 已完成：`/swarm <任务>` 会先显式进入官方 task-triggered Swarm 模式，并在对话流里显示独立的“已发出 Swarm 指令”提示；移除 Kimix 之前插入的空 assistant 占位，避免看起来像普通“正在思考”。
+- 已完成：输入框上方新增 Swarm 子进程悬浮卡，基于官方 `subagent.*` 生命周期展示排队、运行、限流、完成、失败状态；同一 `agentId` 的正文、思考、工具调用和状态会归档到对应子代理，用于显示每个子代理最近在做什么。
+- 已完成：核验 Kimi 提出的 8 项修复清单，全部确认属于真实问题或真实规则缺口；已修复 TurnEnd 子代理状态、steer wire 确认、CC Codex Skill 备份、ChatThread 类型收窄、拖拽 cleanup、历史 data 空值、renderer watchdog cleanup、Swarm/TodoPanel 间距。
+- 已完成：文件附件不再插入输入框正文，改为复用图片附件栏位展示；发送、排队、引导、重新发送时会把附件文件名和绝对路径加入 prompt，提示 agent 直接读取路径。
+- 已完成：修复 Swarm/子代理后期无新事件时过程摘要计时不刷新的问题；ChatThread 在当前会话运行时每秒轻量刷新，MessageBubble 也会把运行中的工具/子代理纳入 active 判断。
+- 已完成：Swarm 子进程悬浮卡按最新一批 subagent 过滤，只展示当前批次，避免同一会话历史里的 completed 子代理混入当前运行列表。
+- 已完成：修复启动后左侧大量“新会话”loading 占位的问题；启动恢复只读取当前项目的 SDK 会话摘要并选择可用最新会话，不再把所有最近项目历史注入本地 session 列表。
+- 已完成：修复拖拽附件绝对路径丢失的问题；Electron preload 通过 `webUtils.getPathForFile()` 获取文件/文件夹真实路径，renderer 保留旧 `File.path` fallback。
+- 已完成：修复启动恢复历史对话时过程摘要显示离谱耗时的问题；历史回放不再用当前时间兜底计算完成耗时，完成态取不到可靠耗时时只显示“（输出完成）”。
+- 未完成：Swarm 子进程 live delta/tool-call 尾句、undo selector、插件 marketplace update badge、OpenAI-compatible 工具图片输出渲染 fixture、subagent 分组进度细化、`xhigh` reasoning effort 配置回环。
+- 关键文件：`vendor/kimi-code-sdk/index.mjs`、`vendor/kimi-code-sdk/README.md`、`docs/kimi-code-0.14-followup.md`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/SwarmPanel.tsx`、`src/utils/kimiCodeEventMapper.ts`、`src/components/layout/AppShell.tsx`、`src/components/layout/HooksPanel.tsx`。
+
 ## 当前路线文档
 - `KIMI_CODE_SDK_MIGRATION_PLAN.md`：新版 Kimi Code SDK / Wire 迁移总计划与新窗口交接提示词。
 

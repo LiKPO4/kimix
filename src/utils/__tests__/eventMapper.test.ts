@@ -256,6 +256,25 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).isComplete).toBe(true);
   });
 
+  it("does not keep implausible restored assistant durations", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1_000, content: "Done", isThinking: false, isComplete: false },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "assistant_message",
+      timestamp: 1_000 + 13 * 60 * 60 * 1000,
+      content: "",
+      isThinking: false,
+      isComplete: true,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.isComplete).toBe(true);
+    expect(assistant.durationMs).toBeUndefined();
+  });
+
   it("merges streaming tool calls by toolCallId", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "read", status: "running", arguments: { path: "a" }, rawArguments: '{"path":"a"}' },

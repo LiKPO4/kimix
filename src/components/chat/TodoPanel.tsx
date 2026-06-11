@@ -64,7 +64,7 @@ export function TodoPanel({ events, onDismiss }: TodoPanelProps) {
   return (
     <div
       className="overflow-hidden rounded-[16px] border border-border-subtle bg-surface-elevated text-[14.5px] shadow-hover-token"
-      style={{ marginBottom: 8 }}
+      style={{ marginBottom: 14 }}
     >
       <div className={`flex h-11 items-center border-border-subtle text-text-secondary ${collapsed ? "" : "border-b"}`} style={{ paddingLeft: 24, paddingRight: 12 }}>
         <button

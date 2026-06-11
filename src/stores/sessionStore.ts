@@ -92,7 +92,7 @@ export const useSessionStore = create<SessionStore>((set) => ({
   addPendingMessage: (sessionId, content, images = []) =>
     set((state) => {
       const normalized = content.trim();
-      const normalizedImages = images.filter((image) => Boolean(image.dataUrl));
+      const normalizedImages = images.filter((image) => Boolean(image.dataUrl || image.filePath));
       if (!normalized && normalizedImages.length === 0) return state;
       return { pendingMessages: [...state.pendingMessages, createPendingMessage(sessionId, normalized, normalizedImages)] };
     }),

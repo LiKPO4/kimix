@@ -23,10 +23,10 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Source commit | `84afaf42fc2fc1882fd6fc1b656bdc5189b62315` (2026-06-05, "docs(changelog): sync 0.11.0 and 0.10.1 from apps/kimi-code/CHANGELOG.md (#488)") |
-| node-sdk version | `0.8.0` |
-| Validated against CLI | `kimi 0.11.0 upstream package` / local installed `kimi 0.11.0` |
-| Bundled on | 2026-06-05 |
+| Source commit | `ecc049611508ca0e1b8ffbc8a2788b5ccc4c250e` (2026-06-10, "ci: release packages (#621)", tag `@moonshot-ai/kimi-code@0.14.0`) |
+| node-sdk version | `0.9.1` |
+| Validated against CLI | `kimi 0.14.0 upstream package` / local installed `kimi 0.14.0` |
+| Bundled on | 2026-06-11 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 

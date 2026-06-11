@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
-import type { Session, TimelineEvent } from "@/types/ui";
+import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
@@ -34,6 +34,28 @@ import { useSettingsSync } from "@/hooks/useSettingsSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
+
+function promptImages(attachments: UserMessageImage[] = []) {
+  return attachments
+    .filter((image): image is UserMessageImage & { dataUrl: string } => Boolean(image.dataUrl))
+    .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+}
+
+function contentWithFileAttachments(content: string, attachments: UserMessageImage[] = []) {
+  const files = attachments.filter((image) => image.kind === "file" || Boolean(image.filePath));
+  if (files.length === 0) return content;
+  const fileLines = files.map((file, index) => {
+    const filePath = file.filePath?.trim();
+    return `${index + 1}. ${file.name}${filePath ? `\n   绝对路径：${filePath}` : "\n   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件"}`;
+  });
+  return [
+    content.trim(),
+    "附件文件：",
+    ...fileLines,
+    "",
+    "请直接使用上述绝对路径读取附件内容，不要只按文件名搜索。",
+  ].filter(Boolean).join("\n");
+}
 
 const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后生成可直接交给下一个 agent 的交接提示词。
 只输出一个 Markdown 代码块，不要输出解释。
@@ -131,7 +153,11 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
     for (const sessionId of sessionIds) {
       const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
       if (!loaded?.success) continue;
-      const historyEvents = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
+      const eventsSource =
+        loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
+          ? loaded.data.events
+          : [];
+      const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
       if (assistantBodySize(historyEvents) <= assistantBodySize(session.events)) break;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
@@ -1528,8 +1554,8 @@ function App() {
     const timer = setTimeout(() => {
       sendKimiCodePromptWithRetry({
         sessionId: runtimeSessionId,
-        content: next.content,
-        images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
+        content: contentWithFileAttachments(next.content, next.images),
+        images: promptImages(next.images),
       }).then((res) => {
         if (res.success) return;
         throw new Error(res.error);
@@ -1715,8 +1741,6 @@ function App() {
           currentSession: activeLocalSession ?? useAppStore.getState().currentSession,
         });
 
-        const res = await window.api.listSessions({ workDir: activeProject.path });
-        if (!res.success) return;
         const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
         const activeRuntimeIds = new Set([
           activeLocalSession?.id,
@@ -1725,16 +1749,21 @@ function App() {
           activeLocalSession?.longTask?.executorSessionId,
           activeLocalSession?.longTask?.reviewerSessionId,
         ].filter((id): id is string => Boolean(id)));
-        const isUsableHistorySession = (session: (typeof res.data)[number]) => (
+        const isUsableHistorySession = (session: { id: string; title?: string; lastPrompt?: string }) => (
           !hiddenHandoffSessionIds.has(session.id) &&
           !isHiddenInternalSession(session) &&
           !hasArchivedLocalSessionForRuntime(session.id)
         );
+
+        const res = await window.api.listSessions({ workDir: activeProject.path });
+        if (!res.success) return;
+        const activeSummaries = res.data.filter(isUsableHistorySession);
         const latest = (activeRuntimeIds.size > 0
-          ? res.data.find((session) => activeRuntimeIds.has(session.id) && isUsableHistorySession(session))
-          : undefined) ?? res.data.find(isUsableHistorySession);
+          ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))
+          : undefined) ?? activeSummaries[0];
         const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
         if (!latest && !sessionIdToStart) return;
+
         const startRes = await window.api.startSession({
           workDir: activeProject.path,
           sessionId: sessionIdToStart,
@@ -1843,11 +1872,19 @@ function App() {
           isLoading: false,
         });
 
-        useSessionStore.setState((state) => ({
-          sessions: state.sessions.some((item) => item.id === session.id)
-            ? state.sessions.map((item) => (item.id === session.id ? session : item))
-            : [session, ...state.sessions],
-        }));
+        useSessionStore.setState((state) => {
+          const existing = state.sessions.find((item) => item.id === session.id);
+          if (existing?.archivedAt) {
+            // Preserve local archive state; do not resurrect an archived session just because
+            // its history was rediscovered from the SDK store.
+            return state;
+          }
+          return {
+            sessions: existing
+              ? state.sessions.map((item) => (item.id === session.id ? session : item))
+              : [session, ...state.sessions],
+          };
+        });
         useAppStore.setState({ currentSession: session });
         setRunningSessionId(null);
       }).catch(() => {});
@@ -1896,15 +1933,15 @@ function App() {
               // 排队消息现按会话隔离：缺少 sessionId 的旧持久化数据无法归属任何会话，丢弃。
               if (item && typeof item === "object" && typeof item.id === "string" && typeof item.sessionId === "string" && typeof item.content === "string" && typeof item.createdAt === "number") {
                 const images = Array.isArray((item as { images?: unknown }).images)
-                  ? (item as { images: unknown[] }).images.filter((image): image is { id?: string; name: string; dataUrl?: string } => (
-                      image &&
-                      typeof image === "object" &&
-                      typeof (image as { name?: unknown }).name === "string" &&
-                      (
-                        typeof (image as { dataUrl?: unknown }).dataUrl === "undefined" ||
-                        typeof (image as { dataUrl?: unknown }).dataUrl === "string"
-                      )
-                    ))
+                  ? (item as { images: unknown[] }).images.filter((image): image is UserMessageImage => {
+                      if (!image || typeof image !== "object") return false;
+                      const record = image as { name?: unknown; dataUrl?: unknown; filePath?: unknown; kind?: unknown };
+                      if (typeof record.name !== "string") return false;
+                      const hasDataUrl = typeof record.dataUrl === "string" && record.dataUrl.length > 0;
+                      const hasFilePath = typeof record.filePath === "string" && record.filePath.length > 0;
+                      const validKind = record.kind === undefined || record.kind === "image" || record.kind === "file";
+                      return validKind && (hasDataUrl || hasFilePath);
+                    })
                   : undefined;
                 return { ...item, images };
               }
@@ -2307,6 +2344,7 @@ function App() {
                 type: "user_message" as const,
                 timestamp: Date.now(),
                 content: next.content,
+                images: next.images,
               },
               {
                 id: placeholderId,
@@ -2325,8 +2363,8 @@ function App() {
             const latestForQueue = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
             const sendPromise = sendKimiCodePromptWithRetry({
               sessionId: runtimeSessionId,
-              content: next.content,
-              images: next.images?.map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl),
+              content: contentWithFileAttachments(next.content, next.images),
+              images: promptImages(next.images),
             });
             sendPromise.then((res) => {
               if (res.success) return;

@@ -4,6 +4,7 @@ import { ChatThread } from "@/components/chat/ChatThread";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
 import { getVisibleTodos } from "@/components/chat/TodoPanel";
+import { getVisibleSwarmAgents } from "@/components/chat/SwarmPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
@@ -13,6 +14,7 @@ import {
   ClipboardList,
   LucideIcon,
   MessageSquarePlus,
+  Network,
   Target,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
@@ -825,6 +827,7 @@ export function AppShell() {
     [liveCurrentSession?.events],
   );
   const latestTodos = useMemo(() => getVisibleTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
+  const visibleSwarmAgents = useMemo(() => getVisibleSwarmAgents(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
   const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
   const btwSessionId = liveCurrentSession?.id ?? "__global__";
   const btwTransientState = btwTransientBySessionId[btwSessionId] ?? EMPTY_BTW_TRANSIENT_STATE;
@@ -853,6 +856,14 @@ export function AppShell() {
           icon: MessageSquarePlus,
         }
       : null,
+    hiddenComposerCardList.includes("swarm") && visibleSwarmAgents.length > 0
+      ? {
+          key: "swarm" as const,
+          title: "Swarm 子进程",
+          desc: `${visibleSwarmAgents.filter((agent) => agent.status === "completed").length}/${visibleSwarmAgents.length} 已完成`,
+          icon: Network,
+        }
+      : null,
     hiddenComposerCardList.includes("goal") && hasVisibleGoalModeCard
       ? {
           key: "goal" as const,
@@ -861,7 +872,7 @@ export function AppShell() {
           icon: Target,
         }
       : null,
-  ].filter((item): item is { key: "todo" | "pending" | "goal"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
+  ].filter((item): item is { key: "todo" | "pending" | "goal" | "swarm"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
   const visibleSessionLongTasks = useMemo(() => {
     const activeTaskIds = new Set(
       sessions

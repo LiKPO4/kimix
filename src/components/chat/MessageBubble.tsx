@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, Image as ImageIcon, ShieldCheck, SquareTerminal, Webhook } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { TimelineEvent } from "@/types/ui";
+import type { TimelineEvent, UserMessageImage } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { restoreAssistantProgressParagraphs } from "@/utils/assistantParagraphs";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
+import { reliableAssistantDurationMs } from "@/utils/duration";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -79,6 +80,74 @@ function buildAssistantFullCopyText(event: Extract<TimelineEvent, { type: "assis
   ].filter(Boolean).join("\n\n");
 }
 
+function attachmentCopyText(images: UserMessageImage[] = []) {
+  return images.map((image) => {
+    if (image.dataUrl) return `[图片: ${image.name}]`;
+    return `[附件: ${image.name}${image.filePath ? ` | ${image.filePath}` : ""}]`;
+  }).join("\n");
+}
+
+function promptImages(images: UserMessageImage[] = []) {
+  return images
+    .filter((image): image is UserMessageImage & { dataUrl: string } => Boolean(image.dataUrl))
+    .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+}
+
+function contentWithFileAttachments(content: string, images: UserMessageImage[] = []) {
+  const files = images.filter((image) => image.kind === "file" || Boolean(image.filePath));
+  if (files.length === 0) return content;
+  const fileLines = files.map((file, index) => {
+    const filePath = file.filePath?.trim();
+    return `${index + 1}. ${file.name}${filePath ? `\n   绝对路径：${filePath}` : "\n   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件"}`;
+  });
+  return [
+    content.trim(),
+    "附件文件：",
+    ...fileLines,
+    "",
+    "请直接使用上述绝对路径读取附件内容，不要只按文件名搜索。",
+  ].filter(Boolean).join("\n");
+}
+
+function AttachmentThumb({
+  image,
+  index,
+  onPreview,
+}: {
+  image: UserMessageImage;
+  index: number;
+  onPreview: (image: PreviewImage) => void;
+}) {
+  if (image.dataUrl) {
+    return (
+      <button
+        key={image.id ?? `${image.name}-${index}`}
+        type="button"
+        onClick={() => onPreview({ id: image.id, name: image.name, dataUrl: image.dataUrl })}
+        className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
+        title="点击查看图片"
+        aria-label={`查看图片 ${image.name}`}
+      >
+        <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
+      </button>
+    );
+  }
+  return (
+    <div
+      key={image.id ?? `${image.name}-${index}`}
+      className="kimix-media-thumb flex h-24 w-[196px] flex-col justify-center rounded-[14px] text-[var(--kimix-panel-text-muted)]"
+      title={image.filePath || image.name}
+      style={{ gap: 7, paddingLeft: 14, paddingRight: 14 }}
+    >
+      <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+        <FileText size={18} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+        <span className="min-w-0 truncate text-[13px] font-medium text-[var(--kimix-panel-text)]">{image.name || "附件文件"}</span>
+      </div>
+      <span className="truncate text-[12.5px]">{image.filePath || "未读取到绝对路径"}</span>
+    </div>
+  );
+}
+
 function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
@@ -93,7 +162,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   const isLongTaskMessage = Boolean(currentSession?.longTask);
   const images = event.images ?? [];
   const hasText = event.content.trim().length > 0;
-  const copyText = hasText ? event.content : images.map((image) => `[图片: ${image.name}]`).join("\n");
+  const copyText = hasText ? [event.content, attachmentCopyText(images)].filter(Boolean).join("\n\n") : attachmentCopyText(images);
 
   const handleResend = async () => {
     if (!currentSession || runningSessionId === currentSession.id) return;
@@ -119,10 +188,8 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
     try {
       const res = await window.api.sendPrompt({
         sessionId: runtimeSessionId,
-        content: event.content,
-        images: images
-          .filter((image) => Boolean(image.dataUrl))
-        .map((image) => ({ name: image.name, dataUrl: image.dataUrl as string })),
+        content: contentWithFileAttachments(event.content, images),
+        images: promptImages(images),
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
         autoMode: permissionMode === "auto",
@@ -149,27 +216,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
             style={{ gap: 8, marginBottom: hasText ? 12 : 0 }}
           >
             {images.map((image, index) => (
-              image.dataUrl ? (
-                <button
-                  key={image.id ?? `${image.name}-${index}`}
-                  type="button"
-                  onClick={() => setPreviewImage({ id: image.id, name: image.name, dataUrl: image.dataUrl })}
-                  className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
-                  title="点击查看图片"
-                  aria-label={`查看图片 ${image.name}`}
-                >
-                  <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
-                </button>
-              ) : (
-                <div
-                  key={image.id ?? `${image.name}-${index}`}
-                  className="kimix-media-thumb flex h-24 w-24 flex-col items-center justify-center rounded-[14px] text-[var(--kimix-panel-text-muted)]"
-                  style={{ gap: 7, paddingLeft: 10, paddingRight: 10 }}
-                >
-                  <ImageIcon size={20} />
-                  <span className="max-w-full truncate text-[12.5px]">{image.name || "图片"}</span>
-                </div>
-              )
+              <AttachmentThumb key={image.id ?? `${image.name}-${index}`} image={image} index={index} onPreview={setPreviewImage} />
             ))}
           </div>
         )}
@@ -238,27 +285,7 @@ function SteerMessageBubble({ event, embedded = false }: { event: Extract<Timeli
               style={{ gap: 8, marginBottom: hasText ? 12 : 0 }}
             >
               {images.map((image, index) => (
-                image.dataUrl ? (
-                  <button
-                    key={image.id ?? `${image.name}-${index}`}
-                    type="button"
-                    onClick={() => setPreviewImage({ id: image.id, name: image.name, dataUrl: image.dataUrl })}
-                    className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
-                    title="点击查看图片"
-                    aria-label={`查看图片 ${image.name}`}
-                  >
-                    <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
-                  </button>
-                ) : (
-                  <div
-                    key={image.id ?? `${image.name}-${index}`}
-                    className="kimix-media-thumb flex h-24 w-24 flex-col items-center justify-center rounded-[14px] text-[var(--kimix-panel-text-muted)]"
-                    style={{ gap: 7, paddingLeft: 10, paddingRight: 10 }}
-                  >
-                    <ImageIcon size={20} />
-                    <span className="max-w-full truncate text-[12.5px]">{image.name || "图片"}</span>
-                  </div>
-                )
+                <AttachmentThumb key={image.id ?? `${image.name}-${index}`} image={image} index={index} onPreview={setPreviewImage} />
               ))}
             </div>
           )}
@@ -523,14 +550,21 @@ function ApprovalProcessItem({ approval }: { approval: ApprovalEvent }) {
 
 function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
   const [expanded, setExpanded] = useState(false);
-  const isRunning = subagent.status === "running";
+  const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
   const isError = subagent.status === "error";
+  const statusText = subagent.status === "queued"
+    ? "排队"
+    : subagent.status === "suspended"
+      ? "限流等待"
+      : subagent.status === "running"
+        ? "运行中"
+        : isError ? "运行失败" : "已完成";
   const childSummary = subagent.events.length > 0
     ? `${subagent.events.length} 条子事件`
     : "暂无子事件详情";
   const detailText = [
     `子代理：${subagent.agentName || "subagent"}`,
-    `状态：${isRunning ? "运行中" : isError ? "运行失败" : "已完成"}`,
+    `状态：${statusText}`,
     `详情：${childSummary}`,
   ].join("\n");
   return (
@@ -538,8 +572,8 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
+        className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ minHeight: 42, gridTemplateColumns: "18px auto minmax(0, 1fr) minmax(52px, auto) 18px 18px", columnGap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           {isRunning ? (
@@ -548,9 +582,9 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
             <Bot size={14} />
           )}
         </span>
-        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
+        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{statusText}</span>
         <span className="min-w-0 flex-1 truncate leading-5">{subagent.agentName || "子代理"}</span>
-        <span className="w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{subagent.events.length > 0 ? `${subagent.events.length}条` : ""}</span>
+        <span className="shrink-0 whitespace-nowrap text-right leading-5 text-[var(--kimix-panel-text-muted)]">{subagent.events.length > 0 ? `${subagent.events.length} 条` : ""}</span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
           <span className={`h-1.5 w-1.5 rounded-full ${isError ? "bg-accent-danger" : isRunning ? "bg-accent-warning" : "bg-accent-success"}`} />
         </span>
@@ -669,14 +703,18 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   const mdArtifacts = Array.from(new Set(
     displayContent.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
   )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
-  const isActiveAssistant = Boolean(sessionId && !event.isComplete && (
+  const isRunningThisSession = Boolean(sessionId && (
     runningSessionId === sessionId ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
+  const hasActiveProcess = leadingTools.some((tool) => tool.status === "running") ||
+    leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
+  const isActiveAssistant = Boolean(isRunningThisSession && (!event.isComplete || hasActiveProcess));
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
+  const completedDuration = reliableAssistantDurationMs(event.durationMs);
   const durationLabel = event.isComplete
-    ? formatDuration(Number.isFinite(event.durationMs) ? event.durationMs ?? 0 : 0)
+    ? (completedDuration !== undefined ? formatDuration(completedDuration) : "")
     : isActiveAssistant && elapsed >= 1000
       ? formatDuration(elapsed)
       : "";
@@ -684,8 +722,11 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const fullCopyText = buildAssistantFullCopyText(event);
+  const completeLabel = isInterrupted ? "（输出打断）" : "（输出完成）";
   const displayProcessLabel = event.isComplete
-    ? `${isInterrupted ? "（输出打断）" : "（输出完成）"}已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
+    ? durationLabel
+      ? `${completeLabel}已处理${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
+      : `${completeLabel}${roleLabel ? `（${roleLabel}）` : ""}`
     : isActivelyThinking
       ? `正在思考${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`
       : `执行中${roleLabel ? `（${roleLabel}）` : ""} ${durationLabel}`;

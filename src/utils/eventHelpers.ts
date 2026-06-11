@@ -1,4 +1,5 @@
 import type { TimelineEvent } from "@/types/ui";
+import { reliableAssistantDurationMs } from "./duration";
 
 export function isLegacyKimiWorkDirError(message: string) {
   return /unknown option\s+['"]?--work-dir['"]?/i.test(message);
@@ -41,7 +42,7 @@ export function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
       event.thinkingParts?.some((part) => part.text.trim().length > 0)
     );
     if (!hasContent && !hasThinking) return [];
-    return [{ ...event, isComplete: true, isThinking: false, durationMs: event.durationMs ?? Math.max(0, settledAt - event.timestamp) }];
+    return [{ ...event, isComplete: true, isThinking: false, durationMs: reliableAssistantDurationMs(event.durationMs) }];
   });
   return closeOpenCompaction(settled);
 }

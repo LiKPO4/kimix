@@ -29,7 +29,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.20";
+const KIMIX_VERSION = "2.9.24";
 
 type SettingsSectionId =
   | "connection"
@@ -433,12 +433,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const authSettingsRef = useRef<HTMLDivElement>(null);
   const modelSettingsRef = useRef<HTMLDivElement>(null);
   const settingsSectionRefs = useRef(new Map<SettingsSectionId, HTMLElement>());
+  const settingsDragCleanupRef = useRef<(() => void) | null>(null);
   const [settingsSectionOrder, setSettingsSectionOrder] = useState<SettingsSectionId[]>(() => readSettingsSectionOrder());
   const [dragSettingsSectionId, setDragSettingsSectionId] = useState<SettingsSectionId | null>(null);
   const [settingsSectionDrop, setSettingsSectionDrop] = useState<{ id: SettingsSectionId; position: "above" | "below" } | null>(null);
   const [connection, setConnection] = useState<KimiConnectionStatus>(
     settingsStatusCache.connection ?? { loading: true, available: null, verified: false, message: "正在查找 Kimi Code" },
   );
+  useEffect(() => () => {
+    settingsDragCleanupRef.current?.();
+    settingsDragCleanupRef.current = null;
+  }, []);
 
   const settingsSectionOrderValue = (id: SettingsSectionId, fallback: number) => {
     const index = settingsSectionOrder.indexOf(id);
@@ -507,6 +512,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         if (event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
+        settingsDragCleanupRef.current?.();
         setDragSettingsSectionId(id);
         let latestDrop: { id: SettingsSectionId; position: "above" | "below" } | null = null;
         const previousUserSelect = document.body.style.userSelect;
@@ -524,26 +530,25 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
           moveEvent.preventDefault();
           updateDrop(moveEvent.clientY);
         };
-        const finishDrag = (upEvent: PointerEvent) => {
-          upEvent.preventDefault();
+        const cleanupDrag = () => {
           window.removeEventListener("pointermove", handlePointerMove);
           window.removeEventListener("pointerup", finishDrag);
           window.removeEventListener("pointercancel", cancelDrag);
           document.body.style.userSelect = previousUserSelect;
           document.body.style.cursor = previousCursor;
+          settingsDragCleanupRef.current = null;
           setDragSettingsSectionId(null);
           setSettingsSectionDrop(null);
+        };
+        const finishDrag = (upEvent: PointerEvent) => {
+          upEvent.preventDefault();
+          cleanupDrag();
           applySettingsSectionDrop(id, latestDrop);
         };
         const cancelDrag = () => {
-          window.removeEventListener("pointermove", handlePointerMove);
-          window.removeEventListener("pointerup", finishDrag);
-          window.removeEventListener("pointercancel", cancelDrag);
-          document.body.style.userSelect = previousUserSelect;
-          document.body.style.cursor = previousCursor;
-          setDragSettingsSectionId(null);
-          setSettingsSectionDrop(null);
+          cleanupDrag();
         };
+        settingsDragCleanupRef.current = cleanupDrag;
         updateDrop(event.clientY);
         window.addEventListener("pointermove", handlePointerMove);
         window.addEventListener("pointerup", finishDrag);

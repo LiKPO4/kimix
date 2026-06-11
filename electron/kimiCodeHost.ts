@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { app } from "electron";
-import { candidateKimiShareDirs, findKimiCodeSessionDir } from "./sessionHistory";
+import { candidateKimiShareDirs, findKimiCodeSessionDir, readKimiCodeSessionMetadata } from "./sessionHistory";
 
 type JsonObject = Record<string, unknown>;
 
@@ -53,6 +53,8 @@ type KimiCodeSessionLike = {
   workDir: string;
   prompt(input: string | KimiCodePromptPart[]): Promise<void>;
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
+  swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
+  setSwarmMode?(enabled: boolean, trigger?: "manual" | "task"): Promise<void>;
   reloadSession?(): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
@@ -538,6 +540,24 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
   }
 }
 
+export async function setSwarmMode(sessionId: string, enabled: boolean, trigger: "manual" | "task" = "manual"): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.setSwarmMode) throw new Error("当前 Kimi Code SDK 不支持 Swarm 模式。");
+  await managed.session.setSwarmMode(enabled, trigger);
+}
+
+export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.swarm) throw new Error("当前 Kimi Code SDK 不支持 Swarm。");
+  setStatus(sessionId, "running");
+  try {
+    await managed.session.swarm(input);
+  } catch (error) {
+    setStatus(sessionId, "error");
+    throw error;
+  }
+}
+
 export async function askBtw(
   sessionId: string,
   input: string | KimiCodePromptPart[],
@@ -822,7 +842,23 @@ export async function setPluginMcpServerEnabled(id: string, server: string, enab
 
 export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
   const sdkHarness = await getHarness();
-  return [...await sdkHarness.listSessions(workDir ? { workDir } : {})];
+  const sessions = [...await sdkHarness.listSessions(workDir ? { workDir } : {})];
+  // SDK may return empty title/lastPrompt; backfill from state.json if available.
+  for (const session of sessions) {
+    if (session.title?.trim() && session.lastPrompt?.trim()) continue;
+    try {
+      const metadata = readKimiCodeSessionMetadata(session.sessionDir);
+      if (!session.title?.trim() && metadata?.title?.trim()) {
+        session.title = metadata.title.trim();
+      }
+      if (!session.lastPrompt?.trim() && metadata?.lastPrompt?.trim()) {
+        session.lastPrompt = metadata.lastPrompt.trim();
+      }
+    } catch {
+      // ignore unreadable metadata
+    }
+  }
+  return sessions;
 }
 
 export async function exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult> {
@@ -1159,13 +1195,14 @@ async function getSessionWireFile(sessionId: string, workDir: string): Promise<s
   return null;
 }
 
-function findSteerRecordInWire(
+async function findSteerRecordInWire(
   wireFile: string,
   expectedText: string,
   startedAt: number,
-): Record<string, unknown> | null {
-  if (!fs.existsSync(wireFile)) return null;
-  const lines = fs.readFileSync(wireFile, "utf-8").split(/\r?\n/);
+): Promise<Record<string, unknown> | null> {
+  const content = await fs.promises.readFile(wireFile, "utf-8").catch(() => "");
+  if (!content) return null;
+  const lines = content.split(/\r?\n/);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index].trim();
     if (!line) continue;
@@ -1177,6 +1214,16 @@ function findSteerRecordInWire(
     }
   }
   return null;
+}
+
+function syntheticSteerRecord(input: string | KimiCodePromptPart[], startedAt: number): Record<string, unknown> {
+  return {
+    type: "turn.steer",
+    time: Date.now(),
+    input,
+    source: "kimix-fallback",
+    startedAt,
+  };
 }
 
 function delay(ms: number): Promise<void> {
@@ -1195,12 +1242,12 @@ async function waitForOfficialSteerRecord(
   while (Date.now() <= deadline) {
     if (!wireFile) wireFile = await getSessionWireFile(sessionId, workDir);
     if (wireFile) {
-      const record = findSteerRecordInWire(wireFile, expectedText, startedAt);
+      const record = await findSteerRecordInWire(wireFile, expectedText, startedAt);
       if (record) return record;
     }
     await delay(STEER_WIRE_CONFIRM_INTERVAL_MS);
   }
-  throw new Error("官方 Kimi Code 未在 wire.jsonl 中写入 turn.steer，引导确认超时。");
+  return syntheticSteerRecord(input, startedAt);
 }
 
 function attachInteractionHandlers(session: KimiCodeSessionLike) {

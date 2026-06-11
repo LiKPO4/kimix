@@ -145,10 +145,18 @@ export async function getFirstUserMessage(wireFile: string): Promise<string> {
       if (!line.trim()) continue;
       try {
         const record = JSON.parse(line) as {
+          type?: string;
+          input?: unknown;
           message?: { type?: string; payload?: { user_input?: unknown } };
         };
-        if (record.message?.type !== "TurnBegin") continue;
-        const text = extractUserText(record.message.payload?.user_input);
+        let userInput: unknown = undefined;
+        if (record.message?.type === "TurnBegin") {
+          userInput = record.message.payload?.user_input;
+        } else if (record.type === "turn.prompt") {
+          userInput = record.input;
+        }
+        if (userInput === undefined) continue;
+        const text = extractUserText(userInput);
         if (text && !isInternalPromptText(text)) {
           rl.close();
           stream.destroy();
@@ -264,7 +272,7 @@ export async function getKimiCodeSessionDirs(
   return dirs;
 }
 
-function readKimiCodeSessionMetadata(
+export function readKimiCodeSessionMetadata(
   sessionDir: string,
 ): { title?: string; updatedAt?: string; lastPrompt?: string } | null {
   try {

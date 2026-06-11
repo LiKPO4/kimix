@@ -1,6 +1,7 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
 import { isLegacyKimiWorkDirError } from "./eventHelpers";
 import { restoreAssistantProgressParagraphs } from "./assistantParagraphs";
+import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -96,7 +97,7 @@ function closeOpenAssistantBeforeIndex(events: TimelineEvent[], index: number, s
     ...assistant,
     isThinking: false,
     isComplete: true,
-    durationMs: assistant.durationMs ?? Math.max(0, settledAt - assistant.timestamp),
+    durationMs: reliableAssistantDurationMs(assistant.durationMs) ?? reliableAssistantDurationBetween(assistant.timestamp, settledAt),
   };
   return result;
 }
@@ -116,6 +117,48 @@ function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | 
     timestamp,
     items,
   };
+}
+
+function scopedAgentId(event: TimelineEvent): string | undefined {
+  const agentId = "agentId" in event && typeof event.agentId === "string" ? event.agentId : undefined;
+  return agentId && agentId !== "main" ? agentId : undefined;
+}
+
+function stripAgentScope<T extends TimelineEvent>(event: T): T {
+  const next = { ...event } as T & { agentId?: string };
+  delete next.agentId;
+  return next as T;
+}
+
+function mergeSubagentLifecycle(
+  current: Extract<TimelineEvent, { type: "subagent" }>,
+  incoming: Extract<TimelineEvent, { type: "subagent" }>,
+): Extract<TimelineEvent, { type: "subagent" }> {
+  return {
+    ...current,
+    ...incoming,
+    description: incoming.description ?? current.description,
+    parentToolCallId: incoming.parentToolCallId ?? current.parentToolCallId,
+    swarmIndex: incoming.swarmIndex ?? current.swarmIndex,
+    resultSummary: incoming.resultSummary ?? current.resultSummary,
+    error: incoming.error ?? current.error,
+    events: incoming.events.length > 0 ? incoming.events : current.events,
+  };
+}
+
+function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] | null {
+  const agentId = scopedAgentId(incoming);
+  if (!agentId || incoming.type === "subagent") return null;
+  const subagentIndex = existing.findLastIndex((event) => event.type === "subagent" && event.agentId === agentId);
+  if (subagentIndex === -1) return null;
+
+  const result = [...existing];
+  const subagent = result[subagentIndex] as Extract<TimelineEvent, { type: "subagent" }>;
+  result[subagentIndex] = {
+    ...subagent,
+    events: mergeEvents(subagent.events, stripAgentScope(incoming)),
+  };
+  return result;
 }
 
 function extractUserInput(input: unknown): string {
@@ -557,6 +600,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     }
   }
 
+  const withScopedSubagentEvent = attachScopedEventToSubagent(existing, incoming);
+  if (withScopedSubagentEvent) return withScopedSubagentEvent;
+
   // Merge streaming assistant messages
   if (incoming.type === "assistant_message") {
     if (incoming.isComplete && !incoming.content && !incoming.thinking) {
@@ -588,7 +634,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           ...event,
           isThinking: false,
           isComplete: true,
-          durationMs: Math.max(0, Date.now() - event.timestamp),
+          durationMs: reliableAssistantDurationMs(incoming.durationMs) ?? reliableAssistantDurationBetween(event.timestamp, incoming.timestamp),
         };
       });
     }
@@ -620,7 +666,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           : last.thinkingParts,
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
-        durationMs: incoming.isComplete ? Math.max(0, Date.now() - last.timestamp) : last.durationMs,
+        durationMs: incoming.isComplete
+          ? reliableAssistantDurationMs(incoming.durationMs) ?? reliableAssistantDurationBetween(last.timestamp, incoming.timestamp)
+          : reliableAssistantDurationMs(last.durationMs),
       };
       const result = [...existing];
       result[lastIndex] = updated;
@@ -733,12 +781,18 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   if (incoming.type === "subagent") {
     const matchingSubagentIndex = existing.findLastIndex((e) => (
       e.type === "subagent" &&
-      e.agentName === incoming.agentName &&
-      e.status === "running"
+      (
+        (incoming.agentId && e.agentId === incoming.agentId) ||
+        (!incoming.agentId && e.agentName === incoming.agentName)
+      ) &&
+      (e.status === "queued" || e.status === "running" || e.status === "suspended")
     ));
     if (matchingSubagentIndex !== -1) {
       const result = [...existing];
-      result[matchingSubagentIndex] = { ...result[matchingSubagentIndex], ...incoming } as TimelineEvent;
+      result[matchingSubagentIndex] = mergeSubagentLifecycle(
+        result[matchingSubagentIndex] as Extract<TimelineEvent, { type: "subagent" }>,
+        incoming,
+      );
       return result;
     }
   }
