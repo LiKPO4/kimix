@@ -20,6 +20,7 @@ const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
 const KIMI_CODE_USAGE_URL = "https://api.kimi.com/coding/v1/usages";
 const KIMI_CODE_REFRESH_URL = "https://auth.kimi.com/api/oauth/token";
 const KIMI_CODE_INSTALL_BASE_URL = "https://code.kimi.com/kimi-code";
+const KIMI_CODE_BINARY_BASE_URL = `${KIMI_CODE_INSTALL_BASE_URL}/binaries`;
 const KIMI_CODE_INSTALL_PS1_URL = "https://code.kimi.com/kimi-code/install.ps1";
 const KIMI_CODE_INSTALL_SH_URL = "https://code.kimi.com/kimi-code/install.sh";
 const SUPERPOWERS_ZIP_URL = "https://github.com/obra/superpowers/archive/refs/heads/main.zip";
@@ -139,6 +140,34 @@ function getKimiCodeCommandEnv(): NodeJS.ProcessEnv {
     ...process.env,
     KIMI_CODE_NO_AUTO_UPDATE: process.env.KIMI_CODE_NO_AUTO_UPDATE || "1",
     KIMI_CLI_NO_AUTO_UPDATE: process.env.KIMI_CLI_NO_AUTO_UPDATE || "1",
+  };
+}
+
+function redactProxyValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.username || parsed.password) {
+      parsed.username = parsed.username ? "***" : "";
+      parsed.password = parsed.password ? "***" : "";
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed.replace(/\/\/([^/@\s]+)@/g, "//***@").slice(0, 180);
+  }
+}
+
+function getKimiEnvironmentSummary() {
+  const env = getKimiCodeCommandEnv();
+  const proxyKeys = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"] as const;
+  return {
+    kimiCodeHome: env.KIMI_CODE_HOME || resolveKimiShareDir(),
+    proxy: proxyKeys.map((key) => ({
+      key,
+      value: typeof env[key] === "string" && env[key]?.trim() ? redactProxyValue(env[key]!) : "",
+      configured: Boolean(typeof env[key] === "string" && env[key]?.trim()),
+    })),
   };
 }
 
@@ -330,7 +359,7 @@ async function installKimiCodeWindows(): Promise<{ binaryPath: string; output: s
   const version = latestBuffer.toString("utf8").trim();
   if (!version) throw new Error("无法获取 Kimi Code 最新版本");
 
-  const manifestUrl = `${KIMI_CODE_INSTALL_BASE_URL}/${version}/manifest.json`;
+  const manifestUrl = `${KIMI_CODE_BINARY_BASE_URL}/${version}/manifest.json`;
   const manifestBuffer = await downloadBufferWithProgress(manifestUrl, "manifest", "正在获取安装清单");
   const manifest = JSON.parse(manifestBuffer.toString("utf8")) as {
     platforms?: Record<string, { filename?: string; checksum?: string }>;
@@ -339,7 +368,7 @@ async function installKimiCodeWindows(): Promise<{ binaryPath: string; output: s
   const entry = manifest.platforms?.[target];
   if (!entry?.filename || !entry.checksum) throw new Error(`安装清单缺少 ${target}`);
 
-  const baseUrl = KIMI_CODE_INSTALL_BASE_URL;
+  const baseUrl = KIMI_CODE_BINARY_BASE_URL;
   const binaryUrl = `${baseUrl}/${version}/${entry.filename}`;
   const binary = await downloadBufferWithProgress(binaryUrl, "binary", "正在下载 Kimi Code 安装包");
   const actual = createHash("sha256").update(binary).digest("hex");
@@ -403,6 +432,84 @@ type McpServerRecord = {
   enabled?: boolean;
 };
 
+type ImportCcCodexPlanItem = {
+  kind: "instruction" | "skill" | "mcp";
+  source: string;
+  target: string;
+  label: string;
+  action: "append" | "copy" | "merge" | "skip";
+  reason?: string;
+  content?: string;
+  skillSourceDir?: string;
+  flatSkillFile?: string;
+  mcpName?: string;
+  mcpServer?: McpServerRecord;
+};
+
+type ImportCcCodexPlan = {
+  previewId: string;
+  kimiHome: string;
+  projectRoot?: string;
+  items: ImportCcCodexPlanItem[];
+  warnings: string[];
+  createdAt: number;
+};
+
+const importCcCodexPreviewCache = new Map<string, ImportCcCodexPlan>();
+
+type ThemePaletteColors = {
+  primary: string;
+  surface: string;
+  accent: string;
+};
+
+type KimiThemePalette = {
+  primary: string;
+  accent: string;
+  text: string;
+  textStrong: string;
+  textDim: string;
+  textMuted: string;
+  border: string;
+  borderFocus: string;
+  success: string;
+  warning: string;
+  error: string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffAddedStrong: string;
+  diffRemovedStrong: string;
+  diffGutter: string;
+  diffMeta: string;
+  roleUser: string;
+};
+
+type KimiThemeImportItem = {
+  id: string;
+  name: string;
+  displayName: string;
+  path: string;
+  base: "light" | "dark";
+  colors: ThemePaletteColors;
+  kimiColors: KimiThemePalette;
+  sourceTokens: {
+    primary?: string;
+    surface?: string;
+    accent?: string;
+  };
+  warning?: string;
+};
+
+type KimiThemeImportPlan = {
+  previewId: string;
+  themesDir: string;
+  items: KimiThemeImportItem[];
+  warnings: string[];
+  createdAt: number;
+};
+
+const kimiThemeImportPreviewCache = new Map<string, KimiThemeImportPlan>();
+
 function getKimiPaths() {
   const shareDir = resolveKimiShareDir();
   return {
@@ -433,6 +540,464 @@ function backupFileIfExists(filePath: string) {
   if (!fs.existsSync(filePath)) return;
   const backup = `${filePath}.kimix-backup-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}`;
   fs.copyFileSync(filePath, backup);
+}
+
+function backupFileIfExistsWithPath(filePath: string) {
+  if (!fs.existsSync(filePath)) return null;
+  const backup = `${filePath}.kimix-backup-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}`;
+  fs.copyFileSync(filePath, backup);
+  return backup;
+}
+
+function findNearestGitRoot(startDir?: string) {
+  if (!startDir) return undefined;
+  let current = path.resolve(startDir);
+  try {
+    if (!fs.existsSync(current) || !fs.statSync(current).isDirectory()) return undefined;
+  } catch {
+    return undefined;
+  }
+  while (true) {
+    if (fs.existsSync(path.join(current, ".git"))) return current;
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
+function publicImportPlanItem(item: ImportCcCodexPlanItem) {
+  const { content: _content, skillSourceDir: _skillSourceDir, flatSkillFile: _flatSkillFile, mcpServer: _mcpServer, ...publicItem } = item;
+  return publicItem;
+}
+
+function instructionBlock(sourceLabel: string, sourcePath: string, content: string) {
+  return [
+    `<!-- Imported from ${sourceLabel}: ${sourcePath} -->`,
+    "",
+    content.trim(),
+    "",
+    `<!-- End imported from ${sourceLabel}: ${sourcePath} -->`,
+    "",
+  ].join("\n");
+}
+
+function readTextIfExists(filePath: string) {
+  if (!fs.existsSync(filePath)) return null;
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile() || stat.size > 512 * 1024) return null;
+  return fs.readFileSync(filePath, "utf-8");
+}
+
+function parseJsonMcpServers(filePath: string): Record<string, McpServerRecord> {
+  const raw = readTextIfExists(filePath);
+  if (!raw) return {};
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const source = parsed.mcpServers && typeof parsed.mcpServers === "object" && !Array.isArray(parsed.mcpServers)
+    ? parsed.mcpServers as Record<string, unknown>
+    : parsed.mcp_servers && typeof parsed.mcp_servers === "object" && !Array.isArray(parsed.mcp_servers)
+      ? parsed.mcp_servers as Record<string, unknown>
+      : {};
+  const result: Record<string, McpServerRecord> = {};
+  for (const [name, value] of Object.entries(source)) {
+    const server = normalizeMcpServerRecord(value);
+    if (server) result[name] = server;
+  }
+  return result;
+}
+
+function parseCodexTomlMcpServers(filePath: string): Record<string, McpServerRecord> {
+  const raw = readTextIfExists(filePath);
+  if (!raw) return {};
+  const result: Record<string, McpServerRecord> = {};
+  let currentName: string | null = null;
+  for (const line of raw.split(/\r?\n/)) {
+    const section = line.match(/^\s*\[mcp_servers\.([^\]]+)\]\s*$/i);
+    if (section) {
+      currentName = section[1].trim().replace(/^"|"$/g, "");
+      result[currentName] = result[currentName] ?? {};
+      continue;
+    }
+    const otherSection = line.match(/^\s*\[[^\]]+\]\s*$/);
+    if (otherSection) {
+      currentName = null;
+      continue;
+    }
+    if (!currentName) continue;
+    const pair = line.match(/^\s*([A-Za-z0-9_-]+)\s*=\s*(.+?)\s*(?:#.*)?$/);
+    if (!pair) continue;
+    const key = pair[1];
+    const valueRaw = pair[2].trim();
+    const server = result[currentName];
+    if (key === "command" && /^".*"$/.test(valueRaw)) server.command = valueRaw.slice(1, -1);
+    else if (key === "url" && /^".*"$/.test(valueRaw)) {
+      server.url = valueRaw.slice(1, -1);
+      server.transport = "http";
+    } else if (key === "transport" && /^".*"$/.test(valueRaw)) {
+      const transport = valueRaw.slice(1, -1);
+      if (transport === "http" || transport === "stdio") server.transport = transport;
+    } else if (key === "args" && /^\[.*\]$/.test(valueRaw)) {
+      server.args = Array.from(valueRaw.matchAll(/"([^"]*)"/g)).map((match) => match[1]);
+    }
+  }
+  return Object.fromEntries(Object.entries(result).filter(([, server]) => server.command || server.url));
+}
+
+function readTargetMcpConfig(targetPath: string) {
+  if (!fs.existsSync(targetPath)) return {};
+  return JSON.parse(fs.readFileSync(targetPath, "utf-8")) as { mcpServers?: Record<string, McpServerRecord> };
+}
+
+function addInstructionImportItems(items: ImportCcCodexPlanItem[], warnings: string[], sourceLabel: string, sourcePath: string, targetPath: string) {
+  try {
+    const content = readTextIfExists(sourcePath);
+    if (!content?.trim()) return;
+    const targetText = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, "utf-8") : "";
+    const marker = `Imported from ${sourceLabel}: ${sourcePath}`;
+    const action = targetText.includes(marker) ? "skip" : "append";
+    items.push({
+      kind: "instruction",
+      source: sourcePath,
+      target: targetPath,
+      label: `${sourceLabel} instructions`,
+      action,
+      reason: action === "skip" ? "目标文件已包含这段导入标记" : undefined,
+      content: instructionBlock(sourceLabel, sourcePath, content),
+    });
+  } catch (error) {
+    warnings.push(`读取指令文件失败：${sourcePath}：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function addSkillImportItems(items: ImportCcCodexPlanItem[], warnings: string[], sourceLabel: string, sourceRoot: string, targetRoot: string) {
+  if (!fs.existsSync(sourceRoot)) return;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(sourceRoot, { withFileTypes: true });
+  } catch (error) {
+    warnings.push(`读取 Skill 目录失败：${sourceRoot}：${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+  for (const entry of entries) {
+    if (SKILL_SEARCH_IGNORES.has(entry.name)) continue;
+    const sourcePath = path.join(sourceRoot, entry.name);
+    try {
+      let sourceDir: string | undefined;
+      let flatSkillFile: string | undefined;
+      let skillFile: string;
+      if (entry.isDirectory()) {
+        skillFile = path.join(sourcePath, "SKILL.md");
+        if (!fs.existsSync(skillFile)) continue;
+        sourceDir = sourcePath;
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
+        skillFile = sourcePath;
+        flatSkillFile = sourcePath;
+      } else {
+        continue;
+      }
+      const meta = parseSkillFrontmatter(fs.readFileSync(skillFile, "utf-8"));
+      const name = meta.name || path.basename(sourcePath, path.extname(sourcePath));
+      const targetDir = path.join(targetRoot, sanitizeSkillDirName(name));
+      items.push({
+        kind: "skill",
+        source: sourcePath,
+        target: entry.isDirectory() ? path.join(targetDir, "SKILL.md") : path.join(targetDir, "SKILL.md"),
+        label: `${sourceLabel} Skill：${name}`,
+        action: fs.existsSync(targetDir) ? "skip" : "copy",
+        reason: fs.existsSync(targetDir) ? "目标 Skill 已存在" : undefined,
+        skillSourceDir: sourceDir,
+        flatSkillFile,
+      });
+    } catch (error) {
+      warnings.push(`读取 Skill 失败：${sourcePath}：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+function addMcpImportItems(items: ImportCcCodexPlanItem[], warnings: string[], sourceLabel: string, sourcePath: string, targetPath: string, parser: (filePath: string) => Record<string, McpServerRecord>) {
+  if (!fs.existsSync(sourcePath)) return;
+  let servers: Record<string, McpServerRecord>;
+  try {
+    servers = parser(sourcePath);
+  } catch (error) {
+    warnings.push(`读取 MCP 配置失败：${sourcePath}：${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+  let existing: Record<string, McpServerRecord> = {};
+  try {
+    existing = readTargetMcpConfig(targetPath).mcpServers ?? {};
+  } catch (error) {
+    warnings.push(`目标 MCP 配置暂不可合并：${targetPath}：${error instanceof Error ? error.message : String(error)}`);
+    existing = {};
+  }
+  for (const [name, server] of Object.entries(servers)) {
+    const imported = uniqueMcpServerName(existing, name, server);
+    items.push({
+      kind: "mcp",
+      source: sourcePath,
+      target: targetPath,
+      label: `${sourceLabel} MCP：${name}`,
+      action: imported.alreadyExists ? "skip" : "merge",
+      reason: imported.alreadyExists ? `同名同配置已存在：${imported.name}` : imported.name !== name ? `同名不同配置，将导入为 ${imported.name}` : undefined,
+      mcpName: imported.name,
+      mcpServer: server,
+    });
+    existing[imported.name] = server;
+  }
+}
+
+function buildImportFromCcCodexPlan(workDir?: string): ImportCcCodexPlan {
+  const kimiHome = resolveKimiShareDir();
+  const projectRoot = findNearestGitRoot(workDir);
+  const targetUserAgents = path.join(kimiHome, "AGENTS.md");
+  const targetUserSkills = path.join(kimiHome, "skills");
+  const targetProjectAgents = projectRoot ? path.join(projectRoot, ".kimi-code", "AGENTS.md") : undefined;
+  const targetProjectSkills = projectRoot ? path.join(projectRoot, ".kimi-code", "skills") : undefined;
+  const targetMcp = getKimiPaths().mcpConfig;
+  const items: ImportCcCodexPlanItem[] = [];
+  const warnings: string[] = [];
+  const home = os.homedir();
+
+  addInstructionImportItems(items, warnings, "Claude Code", path.join(home, ".claude", "AGENTS.md"), targetUserAgents);
+  addInstructionImportItems(items, warnings, "Claude Code", path.join(home, ".claude", "CLAUDE.md"), targetUserAgents);
+  addInstructionImportItems(items, warnings, "Codex", path.join(home, ".codex", "AGENTS.md"), targetUserAgents);
+  addInstructionImportItems(items, warnings, "Codex", path.join(home, ".codex", "CLAUDE.md"), targetUserAgents);
+  addSkillImportItems(items, warnings, "Claude Code", path.join(home, ".claude", "skills"), targetUserSkills);
+  addSkillImportItems(items, warnings, "Codex", path.join(home, ".codex", "skills"), targetUserSkills);
+  addMcpImportItems(items, warnings, "Claude Code", path.join(home, ".claude.json"), targetMcp, parseJsonMcpServers);
+  addMcpImportItems(items, warnings, "Codex", path.join(home, ".codex", "config.toml"), targetMcp, parseCodexTomlMcpServers);
+
+  if (projectRoot && targetProjectAgents && targetProjectSkills) {
+    addInstructionImportItems(items, warnings, "Claude Code", path.join(projectRoot, ".claude", "AGENTS.md"), targetProjectAgents);
+    addInstructionImportItems(items, warnings, "Claude Code", path.join(projectRoot, ".claude", "CLAUDE.md"), targetProjectAgents);
+    addInstructionImportItems(items, warnings, "Codex", path.join(projectRoot, ".codex", "AGENTS.md"), targetProjectAgents);
+    addInstructionImportItems(items, warnings, "Codex", path.join(projectRoot, ".codex", "CLAUDE.md"), targetProjectAgents);
+    addSkillImportItems(items, warnings, "Claude Code", path.join(projectRoot, ".claude", "skills"), targetProjectSkills);
+    addSkillImportItems(items, warnings, "Codex", path.join(projectRoot, ".codex", "skills"), targetProjectSkills);
+    addMcpImportItems(items, warnings, "Codex", path.join(projectRoot, ".codex", "config.toml"), targetMcp, parseCodexTomlMcpServers);
+  } else if (workDir) {
+    warnings.push("未找到项目 .git 根目录，已跳过项目级 .claude/.codex 导入。");
+  }
+
+  const previewId = randomUUID().slice(0, 8);
+  return { previewId, kimiHome, projectRoot, items, warnings, createdAt: Date.now() };
+}
+
+function applyImportFromCcCodexPlan(plan: ImportCcCodexPlan) {
+  const imported: ImportCcCodexPlanItem[] = [];
+  const skipped: ImportCcCodexPlanItem[] = [];
+  const backups: string[] = [];
+  const warnings = [...plan.warnings];
+  const touchedBackups = new Set<string>();
+
+  function backupOnce(filePath: string) {
+    if (touchedBackups.has(filePath)) return;
+    touchedBackups.add(filePath);
+    const backup = backupFileIfExistsWithPath(filePath);
+    if (backup) backups.push(backup);
+  }
+
+  for (const item of plan.items) {
+    if (item.action === "skip") {
+      skipped.push(item);
+      continue;
+    }
+    try {
+      if (item.kind === "instruction") {
+        if (!item.content) throw new Error("缺少指令内容");
+        fs.mkdirSync(path.dirname(item.target), { recursive: true });
+        backupOnce(item.target);
+        const existing = fs.existsSync(item.target) ? fs.readFileSync(item.target, "utf-8") : "";
+        fs.writeFileSync(item.target, `${existing.trimEnd()}\n\n${item.content}`, "utf-8");
+        imported.push(item);
+      } else if (item.kind === "skill") {
+        fs.mkdirSync(path.dirname(path.dirname(item.target)), { recursive: true });
+        if (item.skillSourceDir) {
+          copyDirectorySafe(item.skillSourceDir, path.dirname(item.target));
+        } else if (item.flatSkillFile) {
+          fs.mkdirSync(path.dirname(item.target), { recursive: true });
+          fs.copyFileSync(item.flatSkillFile, item.target);
+        } else {
+          throw new Error("缺少 Skill 来源");
+        }
+        imported.push(item);
+      } else if (item.kind === "mcp") {
+        if (!item.mcpName || !item.mcpServer) throw new Error("缺少 MCP 配置");
+        fs.mkdirSync(path.dirname(item.target), { recursive: true });
+        backupOnce(item.target);
+        const config = readTargetMcpConfig(item.target);
+        const mcpServers = config.mcpServers && typeof config.mcpServers === "object" ? config.mcpServers : {};
+        mcpServers[item.mcpName] = item.mcpServer;
+        fs.writeFileSync(item.target, `${JSON.stringify({ ...config, mcpServers }, null, 2)}\n`, "utf-8");
+        imported.push(item);
+      }
+    } catch (error) {
+      skipped.push({ ...item, action: "skip", reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  return {
+    imported: imported.map(publicImportPlanItem),
+    skipped: skipped.map(publicImportPlanItem),
+    backups,
+    warnings,
+  };
+}
+
+function normalizeThemeHex(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed.toUpperCase();
+  const short = trimmed.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/);
+  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toUpperCase();
+  return null;
+}
+
+function pickThemeColor(colors: Record<string, unknown>, keys: string[], fallback: string) {
+  for (const key of keys) {
+    const value = normalizeThemeHex(colors[key]);
+    if (value) return { value, key };
+  }
+  return { value: fallback, key: undefined };
+}
+
+function themeImportId(filePath: string) {
+  return createHash("sha1").update(filePath).digest("hex").slice(0, 8);
+}
+
+function uniqueColorCount(values: string[]) {
+  return new Set(values.map((value) => value.toUpperCase())).size;
+}
+
+function buildKimiThemeQualityWarning(colors: KimiThemePalette) {
+  const warnings: string[] = [];
+  if (colors.diffAdded.toUpperCase() === colors.success.toUpperCase()) warnings.push("diffAdded 复用了 success");
+  if (colors.diffRemoved.toUpperCase() === colors.error.toUpperCase()) warnings.push("diffRemoved 复用了 error");
+  if (colors.diffAddedStrong.toUpperCase() === colors.diffAdded.toUpperCase()) warnings.push("diffAddedStrong 未独立加深");
+  if (colors.diffRemovedStrong.toUpperCase() === colors.diffRemoved.toUpperCase()) warnings.push("diffRemovedStrong 未独立加深");
+  if (uniqueColorCount([colors.success, colors.warning, colors.error]) < 3) warnings.push("success/warning/error 区分不足");
+  if (colors.textDim.toUpperCase() === colors.textMuted.toUpperCase()) warnings.push("textDim 与 textMuted 相同");
+  if (uniqueColorCount([colors.border, colors.textMuted, colors.diffGutter]) === 1) warnings.push("border/textMuted/diffGutter 层级过于接近");
+  const usage = new Map<string, number>();
+  Object.values(colors).forEach((value) => usage.set(value.toUpperCase(), (usage.get(value.toUpperCase()) ?? 0) + 1));
+  if ([...usage.values()].some((count) => count > 3)) warnings.push("多个语义 token 共用同一颜色");
+  return warnings.slice(0, 3).join("；") || undefined;
+}
+
+const DEFAULT_KIMI_LIGHT_THEME: KimiThemePalette = {
+  primary: "#1565C0",
+  accent: "#00838F",
+  text: "#1A1A1A",
+  textStrong: "#1A1A1A",
+  textDim: "#454545",
+  textMuted: "#5F5F5F",
+  border: "#737373",
+  borderFocus: "#92660A",
+  success: "#0E7A38",
+  warning: "#92660A",
+  error: "#B91C1C",
+  diffAdded: "#0E7A38",
+  diffRemoved: "#B91C1C",
+  diffAddedStrong: "#0E7A38",
+  diffRemovedStrong: "#B91C1C",
+  diffGutter: "#737373",
+  diffMeta: "#5F5F5F",
+  roleUser: "#9A4A00",
+};
+
+const DEFAULT_KIMI_DARK_THEME: KimiThemePalette = {
+  primary: "#4FA8FF",
+  accent: "#5BC0BE",
+  text: "#E0E0E0",
+  textStrong: "#F5F5F5",
+  textDim: "#888888",
+  textMuted: "#6B6B6B",
+  border: "#5A5A5A",
+  borderFocus: "#E8A838",
+  success: "#4EC87E",
+  warning: "#E8A838",
+  error: "#E85454",
+  diffAdded: "#4EC87E",
+  diffRemoved: "#E85454",
+  diffAddedStrong: "#7AD99B",
+  diffRemovedStrong: "#F08585",
+  diffGutter: "#6B6B6B",
+  diffMeta: "#888888",
+  roleUser: "#FFCB6B",
+};
+
+function normalizeKimiThemeColors(colors: Record<string, unknown>, base: "light" | "dark"): KimiThemePalette {
+  const defaults = base === "light" ? DEFAULT_KIMI_LIGHT_THEME : DEFAULT_KIMI_DARK_THEME;
+  return Object.fromEntries(
+    Object.entries(defaults).map(([key, fallback]) => [
+      key,
+      normalizeThemeHex(colors[key]) ?? fallback,
+    ]),
+  ) as unknown as KimiThemePalette;
+}
+
+function mapKimiThemeToPalette(filePath: string): KimiThemeImportItem | null {
+  const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
+  const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : path.basename(filePath, ".json");
+  const displayName = typeof raw.displayName === "string" && raw.displayName.trim() ? raw.displayName.trim() : name;
+  const base = raw.base === "light" ? "light" : "dark";
+  const colors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors) ? raw.colors as Record<string, unknown> : {};
+  const kimiColors = normalizeKimiThemeColors(colors, base);
+  const primary = pickThemeColor(colors, ["primary", "borderFocus", "roleUser"], "#1982FF");
+  const accent = pickThemeColor(colors, ["accent", "warning", "success", "roleUser"], "#B85C38");
+  const surface = pickThemeColor(
+    colors,
+    ["surface", "background", "bg", "panel", "textMuted", "border"],
+    base === "light" ? "#EDE9E0" : "#2A2D33",
+  );
+  const validColorCount = Object.values(colors).filter((value) => normalizeThemeHex(value)).length;
+  const qualityWarning = buildKimiThemeQualityWarning(kimiColors);
+  return {
+    id: themeImportId(filePath),
+    name,
+    displayName,
+    path: filePath,
+    base,
+    colors: {
+      primary: primary.value,
+      surface: surface.value,
+      accent: accent.value,
+    },
+    kimiColors,
+    sourceTokens: {
+      primary: primary.key,
+      surface: surface.key,
+      accent: accent.key,
+    },
+    warning: validColorCount === 0 ? "未找到有效颜色 token，使用默认映射" : qualityWarning,
+  };
+}
+
+function buildKimiThemeImportPlan(): KimiThemeImportPlan {
+  const themesDir = path.join(resolveKimiShareDir(), "themes");
+  const warnings: string[] = [];
+  const items: KimiThemeImportItem[] = [];
+  if (!fs.existsSync(themesDir)) {
+    warnings.push(`未找到 Kimi Code themes 目录：${themesDir}`);
+  } else {
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(themesDir, { withFileTypes: true });
+    } catch (error) {
+      warnings.push(`读取 themes 目录失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".json")) continue;
+      const filePath = path.join(themesDir, entry.name);
+      try {
+        const item = mapKimiThemeToPalette(filePath);
+        if (item) items.push(item);
+      } catch (error) {
+        warnings.push(`解析主题失败：${filePath}：${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  const previewId = randomUUID().slice(0, 8);
+  return { previewId, themesDir, items, warnings, createdAt: Date.now() };
 }
 
 function ensureKimiCodeMigratedConfig() {
@@ -664,6 +1229,18 @@ function readTomlSectionBody(raw: string, sectionName: string) {
   if (matchIndex < 0) return null;
   const match = matches[matchIndex];
   return raw.slice((match.index ?? 0) + match[0].length, matches[matchIndex + 1]?.index ?? raw.length);
+}
+
+function removeTomlSection(raw: string, sectionName: string) {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
+  if (matchIndex < 0) return raw;
+  const start = matches[matchIndex].index ?? 0;
+  const end = matches[matchIndex + 1]?.index ?? raw.length;
+  const before = raw.slice(0, start).trimEnd();
+  const after = raw.slice(end).trimStart();
+  return `${before}${before && after ? "\n\n" : ""}${after}`;
 }
 
 function resolveExistingManagedApiKey(raw: string, providerName: string) {
@@ -943,6 +1520,7 @@ async function runKimiDoctor() {
     ok: true,
     output: output.trim(),
     message: output.trim() || "Kimi Code 配置诊断通过",
+    environment: getKimiEnvironmentSummary(),
   };
 }
 
@@ -966,6 +1544,41 @@ async function setKimiModelAdaptiveThinkingWithSdk(input: unknown) {
   });
   return kimiCodeConfigToModelSummary(updated);
 }
+
+function removeKimiModelConfig(input: unknown) {
+  const req = z.object({ modelAlias: z.string().trim().min(1).max(160) }).parse(input);
+  ensureKimiCodeMigratedConfig();
+  const configPath = getKimiPaths().config;
+  if (!fs.existsSync(configPath)) throw new Error("尚未找到 Kimi Code config.toml");
+
+  const current = fs.readFileSync(configPath, "utf-8");
+  const summary = readKimiModelConfig();
+  const target = summary.models.find((model) => model.alias === req.modelAlias);
+  if (!target) throw new Error(`模型别名 ${req.modelAlias} 不存在，请先刷新模型配置`);
+  const provider = summary.providers.find((item) => item.name === target.provider);
+  if (provider?.type !== "openai") {
+    throw new Error("只能在 Kimix 中删除 OpenAI-compatible 外部模型；官方 managed 模型请保留。");
+  }
+
+  const fallbackDefault = "kimi-code/kimi-for-coding";
+  backupFileIfExists(configPath);
+  let next = removeTomlSection(current, `models.${toTomlTableKey(target.alias)}`);
+  const remainingModels = summary.models.filter((model) => model.alias !== target.alias);
+  const providerStillUsed = remainingModels.some((model) => model.provider === target.provider);
+  if (target.provider && !providerStillUsed) {
+    const providerKey = toTomlTableKey(target.provider);
+    next = removeTomlSection(next, `providers.${providerKey}`);
+    next = removeTomlSection(next, `providers.${providerKey}.oauth`);
+    next = removeTomlSection(next, `providers.${providerKey}.env`);
+  }
+  if (summary.defaultModel === target.alias) {
+    const fallback = remainingModels.find((model) => model.alias === fallbackDefault)?.alias ?? remainingModels[0]?.alias ?? fallbackDefault;
+    next = setTopLevelTomlString(next, "default_model", fallback);
+  }
+  fs.writeFileSync(configPath, next.trimEnd() + "\n", "utf-8");
+  return readKimiModelConfig();
+}
+
 async function testOpenAiProviderConfig(input: unknown) {
   const config = TestOpenAiProviderConfigSchema.parse(input);
   const kimiPath = await requireKimiExecutable();
@@ -1715,9 +2328,26 @@ function sanitizeFileNamePart(value: string) {
 }
 
 function getRendererWatchdogLogDir() {
-  const desktop = app.getPath("desktop");
-  if (desktop && fs.existsSync(desktop)) return desktop;
-  return app.getPath("userData");
+  return path.join(app.getPath("userData"), "freeze-reports");
+}
+
+function pruneRendererWatchdogReports(dir: string, keep = 20) {
+  try {
+    if (!fs.existsSync(dir)) return;
+    const reports = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /^kimix-watchdog-freeze-.*\.json$/i.test(entry.name))
+      .map((entry) => {
+        const filePath = path.join(dir, entry.name);
+        const stat = fs.statSync(filePath);
+        return { filePath, mtimeMs: stat.mtimeMs };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+    reports.slice(keep).forEach((report) => {
+      try { fs.unlinkSync(report.filePath); } catch { /* ignore stale cleanup errors */ }
+    });
+  } catch (error) {
+    console.warn("[watchdog] failed to prune renderer freeze reports:", error);
+  }
 }
 
 function writeRendererWatchdogReport(stalledMs: number) {
@@ -1774,6 +2404,7 @@ function writeRendererWatchdogReport(stalledMs: number) {
   };
   ensureDirectoryExists(path.dirname(filePath));
   fs.writeFileSync(filePath, JSON.stringify(report, null, 2), "utf-8");
+  pruneRendererWatchdogReports(path.dirname(filePath));
   console.warn(`[watchdog] renderer heartbeat stalled for ${Math.round(stalledMs)}ms, report written: ${filePath}`);
   return filePath;
 }
@@ -3970,6 +4601,16 @@ ipcMain.handle("kimi:setModelAdaptiveThinking", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi:removeModelConfig", async (_, request: unknown) => {
+  try {
+    const config = removeKimiModelConfig(request);
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已删除模型配置${buildConfigReloadSuffix(reloadResult)}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:doctorConfig", async () => {
   try {
     return { success: true, data: await runKimiDoctor() };
@@ -4358,8 +4999,9 @@ ipcMain.handle("kimi-code:compact", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const instruction = typeof req.instruction === "string" && req.instruction.trim() ? req.instruction.trim() : undefined;
     if (!sessionId) return { success: false, error: "Missing sessionId" };
-    await kimiCodeHost.compactSession(sessionId);
+    await kimiCodeHost.compactSession(sessionId, instruction);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -4760,20 +5402,110 @@ ipcMain.handle("kimi:listSlashCommands", async () => {
       { name: "goal status", description: "查看当前 Goal 状态", aliases: [] },
       { name: "goal show", description: "显示当前 Goal 状态", aliases: [] },
       { name: "goal start", description: "启动一个新 Goal", aliases: [] },
+      { name: "goal start 修复已知问题并完成验证", description: "带目标模板：启动一个新 Goal", aliases: [] },
       { name: "goal replace", description: "替换当前 Goal", aliases: [] },
+      { name: "goal replace 完成当前任务并输出验证证据", description: "带目标模板：替换当前 Goal", aliases: [] },
       { name: "goal pause", description: "暂停当前 Goal", aliases: [] },
       { name: "goal resume", description: "继续已暂停/受阻 Goal", aliases: [] },
       { name: "goal cancel", description: "取消并清除当前 Goal", aliases: [] },
-      { name: "goal next", description: "无当前 Goal 时启动；队列暂未接入", aliases: [] },
-      { name: "compact", description: "静默压缩当前上下文", aliases: [] },
+      { name: "goal next", description: "排队后续 Goal；Kimix 在 SDK 暴露队列 API 前仅提示边界", aliases: [] },
+      { name: "goal next 继续收尾并整理剩余风险", description: "带目标模板：排队后续 Goal", aliases: [] },
+      { name: "swarm", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
+      { name: "swarm 并行检查最近改动并给出修复建议", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
+      { name: "swarm on", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
+      { name: "swarm off", description: "暂不支持 API 调用；发送后按普通消息处理", aliases: [] },
+      { name: "theme", description: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", aliases: [] },
+      { name: "custom-theme", description: "Kimix 兼容生成官方主题 JSON；生成后可在设置里导入", aliases: [] },
+      { name: "custom-theme 做一套低饱和绿色主题", description: "Kimix 兼容生成官方主题 JSON", aliases: [] },
+      { name: "import-from-cc-codex", description: "官方导入 Claude Code / Codex 配置的入口；Kimix 当前仅提示边界", aliases: [] },
+      { name: "compact", description: "静默压缩当前上下文，可附带保留指令，如：保留本轮测试结果和待办", aliases: [] },
+      { name: "compact 保留本轮测试结果和待办", description: "带保留指令模板：压缩当前上下文", aliases: [] },
       { name: "plan", description: "切换 Plan 模式", aliases: [] },
       { name: "plan on", description: "开启 Plan 模式", aliases: [] },
       { name: "plan off", description: "关闭 Plan 模式", aliases: [] },
       { name: "btw", description: "侧问，不影响主轮次", aliases: [] },
+      { name: "btw 这个函数是谁调用的", description: "带问题模板：侧问，不影响主轮次", aliases: [] },
       { name: "undo", description: "撤回最近一次官方历史", aliases: [] },
+      { name: "undo 1", description: "带次数模板：撤回最近 1 次官方历史", aliases: [] },
       { name: "skill:", description: "启用本地 Skill 后继续发送", aliases: [] },
     ],
   };
+});
+
+ipcMain.handle("kimi:previewImportFromCcCodex", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { workDir?: unknown } : {};
+    const workDir = typeof req.workDir === "string" ? req.workDir : undefined;
+    const plan = buildImportFromCcCodexPlan(workDir);
+    importCcCodexPreviewCache.set(plan.previewId, plan);
+    for (const [id, cached] of importCcCodexPreviewCache) {
+      if (Date.now() - cached.createdAt > 30 * 60 * 1000) importCcCodexPreviewCache.delete(id);
+    }
+    return {
+      success: true,
+      data: {
+        previewId: plan.previewId,
+        kimiHome: plan.kimiHome,
+        projectRoot: plan.projectRoot,
+        items: plan.items.map(publicImportPlanItem),
+        warnings: plan.warnings,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:applyImportFromCcCodex", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { previewId?: unknown } : {};
+    const previewId = typeof req.previewId === "string" ? req.previewId.trim() : "";
+    if (!previewId) return { success: false, error: "Missing previewId" };
+    const plan = importCcCodexPreviewCache.get(previewId);
+    if (!plan) return { success: false, error: "预览已过期，请重新执行 /import-from-cc-codex" };
+    const result = applyImportFromCcCodexPlan(plan);
+    importCcCodexPreviewCache.delete(previewId);
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:previewThemeImport", async () => {
+  try {
+    const plan = buildKimiThemeImportPlan();
+    kimiThemeImportPreviewCache.set(plan.previewId, plan);
+    for (const [id, cached] of kimiThemeImportPreviewCache) {
+      if (Date.now() - cached.createdAt > 30 * 60 * 1000) kimiThemeImportPreviewCache.delete(id);
+    }
+    return {
+      success: true,
+      data: {
+        previewId: plan.previewId,
+        themesDir: plan.themesDir,
+        items: plan.items,
+        warnings: plan.warnings,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:applyThemeImport", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { previewId?: unknown; themeId?: unknown } : {};
+    const previewId = typeof req.previewId === "string" ? req.previewId.trim() : "";
+    const themeId = typeof req.themeId === "string" ? req.themeId.trim() : "";
+    if (!previewId || !themeId) return { success: false, error: "Missing previewId or themeId" };
+    const plan = kimiThemeImportPreviewCache.get(previewId);
+    if (!plan) return { success: false, error: "主题预览已过期，请重新执行 /custom-theme" };
+    const item = plan.items.find((candidate) => candidate.id === themeId || candidate.name === themeId || candidate.displayName === themeId);
+    if (!item) return { success: false, error: "未找到对应主题，请重新执行 /custom-theme 查看可选项" };
+    return { success: true, data: item };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("kimi:setPlanMode", async (_, request: unknown) => {
@@ -5005,7 +5737,7 @@ ipcMain.handle("kimi:startVis", async () => {
     if (exited) {
       return {
         success: false,
-        error: "kimi vis 进程启动后立刻退出。请确保 Kimi Code 已正确安装，并能在终端运行 'kimi vis --no-open'。",
+        error: "当前 Kimi Code 版本不再支持旧的本地使用详情页入口。",
       };
     }
 
@@ -5015,7 +5747,7 @@ ipcMain.handle("kimi:startVis", async () => {
     } catch {
       return {
         success: false,
-        error: "kimi vis 进程已退出。请确保 Kimi Code 已正确安装。",
+        error: "当前 Kimi Code 版本不再支持旧的本地使用详情页入口。",
       };
     }
 
@@ -5150,6 +5882,33 @@ ipcMain.handle("app:downloadUpdate", async () => {
   }
 });
 
+const KimiThemePaletteSchema = z.object({
+  primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  text: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  textStrong: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  textDim: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  textMuted: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  border: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  borderFocus: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  success: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  warning: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  error: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  diffAdded: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  diffRemoved: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  diffAddedStrong: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  diffRemovedStrong: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  diffGutter: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  diffMeta: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  roleUser: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
+const ThemePaletteColorsSchema = z.object({
+  primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  surface: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
 const SettingsSchema = z.object({
   defaultModel: z.string().optional(),
   defaultThinking: z.boolean().optional(),
@@ -5158,6 +5917,23 @@ const SettingsSchema = z.object({
   enableCompaction: z.boolean().optional(),
   defaultPermissionMode: z.enum(["manual", "auto", "yolo"]).optional(),
   theme: z.enum(["dark", "light", "system"]).optional(),
+  themePalette: z.string().refine((value) =>
+    ["warm-paper", "neutral-gray", "soft-green", "warm-orange", "custom", "kimi"].includes(value) ||
+    /^kimi:[^:]+/.test(value)
+  ).optional(),
+  customThemePalette: ThemePaletteColorsSchema.optional(),
+  kimiThemePalette: KimiThemePaletteSchema.optional(),
+  kimiThemePalettes: z.array(z.object({
+    id: z.string().trim().min(1).max(120),
+    name: z.string().trim().min(1).max(160),
+    displayName: z.string().trim().min(1).max(180),
+    path: z.string().optional(),
+    base: z.enum(["light", "dark"]).optional(),
+    palette: KimiThemePaletteSchema,
+    colors: ThemePaletteColorsSchema.optional(),
+    createdAt: z.number().optional(),
+    updatedAt: z.number().optional(),
+  })).optional(),
   fontSize: z.number().int().min(8).max(32).optional(),
   showThinking: z.boolean().optional(),
   detailedContext: z.boolean().optional(),

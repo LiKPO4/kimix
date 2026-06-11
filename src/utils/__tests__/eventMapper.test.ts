@@ -73,6 +73,22 @@ describe("mapStreamEvent", () => {
     expect((event as Extract<TimelineEvent, { type: "steer_message" }>).content).toBe("Please fix");
   });
 
+  it("maps SteerInput images", () => {
+    const event = mapStreamEvent({
+      type: "SteerInput",
+      payload: {
+        user_input: [
+          { type: "text", text: "Please inspect" },
+          { type: "image_url", image_url: { url: "data:image/png;base64,steer" } },
+        ],
+      },
+    });
+    const steer = event as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.content).toBe("Please inspect");
+    expect(steer.images).toHaveLength(1);
+    expect(steer.images?.[0].dataUrl).toBe("data:image/png;base64,steer");
+  });
+
   it("maps ApprovalRequest", () => {
     const event = mapStreamEvent({
       type: "ApprovalRequest",
@@ -271,6 +287,40 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
   });
 
+  it("closes the previous assistant timer when a steer is officially confirmed", () => {
+    const existing: TimelineEvent[] = [
+      { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: true, isComplete: false },
+      { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "Fix it", status: "accepted" },
+    ];
+    const incoming: TimelineEvent = { id: "steer-2", type: "steer_message", timestamp: 4_000, content: "Fix it", status: "sent" };
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    const steer = result[1] as Extract<TimelineEvent, { type: "steer_message" }>;
+
+    expect(assistant.isComplete).toBe(true);
+    expect(assistant.isThinking).toBe(false);
+    expect(assistant.durationMs).toBe(3_000);
+    expect(steer.status).toBe("sent");
+  });
+
+  it("keeps local steer images when official confirmation has no images", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "steer_message",
+        timestamp: 1,
+        content: "Fix it",
+        images: [{ id: "img-1", name: "shot.png", dataUrl: "data:image/png;base64,local" }],
+        status: "sending",
+      },
+    ];
+    const incoming: TimelineEvent = { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "sent" };
+    const result = mergeEvents(existing, incoming);
+    const steer = result[0] as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.images).toHaveLength(1);
+    expect(steer.images?.[0].dataUrl).toBe("data:image/png;base64,local");
+  });
+
   it("confirms local full steer message when official steer input is truncated", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "steer_message", timestamp: 1, content: "1、按照精确的\n2、输出在对话里就行", status: "sending" },
@@ -295,19 +345,20 @@ describe("mergeEvents", () => {
     expect(result[1].type).toBe("steer_message");
   });
 
-  it("keeps assistant chunks in the active assistant after a confirmed steer", () => {
+  it("starts a new assistant chunk after a confirmed steer", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Before", isThinking: false, isComplete: false },
       { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "sent" },
     ];
     const incoming: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: "After", isThinking: false, isComplete: false };
     const result = mergeEvents(existing, incoming);
-    expect(result).toHaveLength(2);
-    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("BeforeAfter");
+    expect(result).toHaveLength(3);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("Before");
     expect(result[1].type).toBe("steer_message");
+    expect((result[2] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("After");
   });
 
-  it("keeps assistant chunks in the active assistant after an accepted steer", () => {
+  it("keeps assistant chunks before an accepted steer until official confirmation arrives", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Before", isThinking: false, isComplete: false },
       { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "accepted" },
@@ -316,7 +367,8 @@ describe("mergeEvents", () => {
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(2);
     expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("BeforeAfter");
-    expect(result[1].type).toBe("steer_message");
+    const steer = result[1] as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.status).toBe("accepted");
   });
 
   it("keeps tool calls before an unconfirmed trailing steer", () => {
@@ -328,13 +380,14 @@ describe("mergeEvents", () => {
     expect(result.map((event) => event.type)).toEqual(["tool_call", "steer_message"]);
   });
 
-  it("appends status updates after an accepted trailing steer", () => {
+  it("keeps status updates before an accepted trailing steer", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "steer_message", timestamp: 1, content: "Fix it", status: "accepted" },
     ];
     const incoming: TimelineEvent = { id: "2", type: "status_update", timestamp: 2, message: "步骤开始" };
     const result = mergeEvents(existing, incoming);
-    expect(result.map((event) => event.type)).toEqual(["steer_message", "status_update"]);
+    expect(result.map((event) => event.type)).toEqual(["status_update", "steer_message"]);
+    expect((result[1] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("accepted");
   });
 
   it("merges question_request by requestId", () => {

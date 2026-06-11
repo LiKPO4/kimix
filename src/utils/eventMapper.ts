@@ -81,10 +81,31 @@ function isMatchingSteerContent(existing: string, incoming: string): boolean {
     incomingContent.startsWith(existingContent);
 }
 
-function appendBeforeTrailingSendingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
+function appendAfterConfirmedSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
+  return [...existing, ...additions];
+}
+
+function closeOpenAssistantBeforeIndex(events: TimelineEvent[], index: number, settledAt: number): TimelineEvent[] {
+  const assistantIndex = events
+    .slice(0, index)
+    .findLastIndex((event) => event.type === "assistant_message" && !event.isComplete);
+  if (assistantIndex === -1) return events;
+  const assistant = events[assistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
+  const result = [...events];
+  result[assistantIndex] = {
+    ...assistant,
+    isThinking: false,
+    isComplete: true,
+    durationMs: assistant.durationMs ?? Math.max(0, settledAt - assistant.timestamp),
+  };
+  return result;
+}
+
+function appendAroundTrailingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
   const last = existing[existing.length - 1];
-  if (last?.type !== "steer_message" || last.status !== "sending") return [...existing, ...additions];
-  return [...existing.slice(0, -1), ...additions, last];
+  if (last?.type === "steer_message" && last.status !== "sent") return [...existing.slice(0, -1), ...additions, last];
+  if (last?.type === "steer_message" && last.status === "sent") return appendAfterConfirmedSteer(existing, additions);
+  return [...existing, ...additions];
 }
 
 function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | null {
@@ -263,13 +284,15 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     }
 
     case "SteerInput": {
-      const text = extractUserInput(payload.user_input);
-      if (!text.trim()) return null;
+      const message = extractUserMessage(payload.user_input);
+      const text = message.content;
+      if (!text.trim() && message.images.length === 0) return null;
       return {
         id: generateId(),
         type: "steer_message",
         timestamp: eventTimestamp,
-        content: text,
+        content: text || "[图片]",
+        images: message.images,
         status: "sent",
       };
     }
@@ -580,6 +603,12 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       if (hasQuestionBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
         return [...existing, incoming];
       }
+      const hasConfirmedSteerBoundary = eventsAfterOpenAssistant.some((event) => (
+        event.type === "steer_message" && event.status === "sent"
+      ));
+      if (hasConfirmedSteerBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
+        return appendAfterConfirmedSteer(existing, [incoming]);
+      }
       const shouldBreakParagraph = eventsAfterOpenAssistant.some(isAssistantProcessBoundary);
       const updated: typeof last = {
         ...last,
@@ -633,15 +662,23 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       (e) => e.type === "steer_message" && isMatchingSteerContent(e.content, incoming.content)
     );
     if (duplicateIndex !== -1) {
-      const result = [...existing];
+      const result = incoming.status === "sent"
+        ? closeOpenAssistantBeforeIndex(existing, duplicateIndex, incoming.timestamp)
+        : [...existing];
       result[duplicateIndex] = {
         ...result[duplicateIndex],
         status: incoming.status,
         error: incoming.error,
+        images: incoming.images && incoming.images.length > 0
+          ? incoming.images
+          : (result[duplicateIndex] as Extract<TimelineEvent, { type: "steer_message" }>).images,
       } as TimelineEvent;
       return result;
     }
-    return [...existing, incoming];
+    const withClosedAssistant = incoming.status === "sent"
+      ? closeOpenAssistantBeforeIndex(existing, existing.length, incoming.timestamp)
+      : existing;
+    return [...withClosedAssistant, incoming];
   }
 
   if (incoming.type === "question_request") {
@@ -688,9 +725,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         result: incoming.result,
         durationMs: Math.max(0, incoming.timestamp - call.timestamp),
       };
-      return appendBeforeTrailingSendingSteer(result, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
+      return appendAroundTrailingSteer(result, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
     }
-    if (diffEvent || todoEvent) return appendBeforeTrailingSendingSteer(existing, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
+    if (diffEvent || todoEvent) return appendAroundTrailingSteer(existing, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
   }
 
   if (incoming.type === "subagent") {
@@ -708,10 +745,13 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
   if (incoming.type === "status_update") {
     const last = existing[existing.length - 1];
+    if (last?.type === "steer_message" && last.status === "sent") {
+      return appendAfterConfirmedSteer(existing, [incoming]);
+    }
     if (last?.type === "status_update") {
       return [...existing.slice(0, -1), incoming];
     }
-    return appendBeforeTrailingSendingSteer(existing, [incoming]);
+    return appendAroundTrailingSteer(existing, [incoming]);
   }
 
   if (incoming.type === "change_summary") {
@@ -721,10 +761,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const [statusEvent] = result.splice(lastStatusIndex, 1);
       result.push(statusEvent);
     }
-    return appendBeforeTrailingSendingSteer(result, [incoming]);
+    return appendAroundTrailingSteer(result, [incoming]);
   }
 
-  return appendBeforeTrailingSendingSteer(existing, [incoming]);
+  return appendAroundTrailingSteer(existing, [incoming]);
 }
 
 export function mapHistoryEvents(events: unknown[]): TimelineEvent[] {

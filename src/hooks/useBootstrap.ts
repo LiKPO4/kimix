@@ -1,9 +1,13 @@
 import { useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
-import type { Theme, PermissionMode, StatusUpdateDisplay, NotificationMode, ClarificationToolMode, Project } from "@/types/ui";
+import type { Theme, ThemePaletteColors, ThemePaletteId, PermissionMode, StatusUpdateDisplay, NotificationMode, ClarificationToolMode, Project, KimiThemePreset } from "@/types/ui";
+import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 interface BootstrapSetters {
   setTheme: (theme: Theme) => void;
+  setThemePalette: (palette: ThemePaletteId) => void;
+  setCustomThemePalette: (colors: ThemePaletteColors) => void;
+  setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
   setPermissionMode: (mode: PermissionMode) => void;
   setDefaultThinking: (v: boolean) => void;
   setDefaultPlanMode: (v: boolean) => void;
@@ -26,7 +30,16 @@ export function useBootstrap(setters: BootstrapSetters) {
       settingsHydratedRef.current = true;
       window.api.getSettings().then((res) => {
         if (res.success) {
+          writeCachedThemeSnapshot({
+            theme: res.data.theme,
+            themePalette: res.data.themePalette,
+            customThemePalette: res.data.customThemePalette,
+            kimiThemePalettes: res.data.kimiThemePalettes ?? [],
+          });
           setters.setTheme(res.data.theme);
+          setters.setThemePalette(res.data.themePalette);
+          setters.setCustomThemePalette(res.data.customThemePalette);
+          setters.setKimiThemePalettes(res.data.kimiThemePalettes ?? []);
           setters.setPermissionMode(res.data.defaultPermissionMode);
           setters.setDefaultThinking(res.data.defaultThinking);
           setters.setDefaultPlanMode(res.data.defaultPlanMode);

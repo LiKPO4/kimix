@@ -58,6 +58,7 @@ import type {
 } from "../electron/types/ipc";
 import App from "./App";
 import "./index.css";
+import { applyCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 const BROWSER_PREVIEW_SETTINGS_KEY = "kimix_browser_preview_settings";
 
@@ -69,6 +70,13 @@ const defaultBrowserPreviewSettings = {
   enableCompaction: true,
   defaultPermissionMode: "manual" as const,
   theme: "light",
+  themePalette: "warm-paper" as const,
+  customThemePalette: {
+    primary: "#1982FF",
+    surface: "#EDE9E0",
+    accent: "#B85C38",
+  },
+  kimiThemePalettes: [],
   fontSize: 14,
   showThinking: true,
   detailedContext: false,
@@ -280,6 +288,31 @@ function installBrowserPreviewApi() {
         message: "浏览器预览已模拟更新自适应思考",
       },
     }),
+    removeKimiModelConfig: () => Promise.resolve({
+      success: true,
+      data: {
+        configPath: "~/.kimi-code/config.toml",
+        exists: true,
+        defaultModel: "kimi-for-coding",
+        providers: [{
+          name: "managed:kimi-code",
+          type: "kimi",
+          baseUrl: "https://api.kimi.com/coding/v1",
+          hasApiKey: true,
+          hasOauth: true,
+        }],
+        models: [{
+          alias: "kimi-for-coding",
+          provider: "managed:kimi-code",
+          model: "kimi-for-coding",
+          displayName: "Kimi-k2.6",
+          maxContextSize: 262144,
+          adaptiveThinking: true,
+          isDefault: true,
+        }],
+        message: "浏览器预览已模拟删除模型配置",
+      },
+    }),
     listKimiProviderCatalog: () => Promise.resolve({
       success: true,
       data: {
@@ -310,6 +343,15 @@ function installBrowserPreviewApi() {
         ok: true,
         output: "浏览器预览已模拟 Kimi Code 配置诊断通过",
         message: "浏览器预览已模拟 Kimi Code 配置诊断通过",
+        environment: {
+          kimiCodeHome: "~/.kimi-code",
+          proxy: [
+            { key: "HTTP_PROXY", configured: false, value: "" },
+            { key: "HTTPS_PROXY", configured: false, value: "" },
+            { key: "ALL_PROXY", configured: false, value: "" },
+            { key: "NO_PROXY", configured: false, value: "" },
+          ],
+        },
       },
     }),
     testKimiOpenAiProvider: () => Promise.resolve({
@@ -522,6 +564,7 @@ window.addEventListener("unhandledrejection", (event) => {
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element not found");
+applyCachedThemeSnapshot();
 installBrowserPreviewApi();
 createRoot(rootEl).render(
   <StrictMode>

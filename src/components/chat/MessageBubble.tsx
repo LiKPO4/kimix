@@ -212,31 +212,77 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
   );
 }
 
-function SteerMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "steer_message" }> }) {
+function SteerMessageBubble({ event, embedded = false }: { event: Extract<TimelineEvent, { type: "steer_message" }>; embedded?: boolean }) {
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const images = event.images ?? [];
+  const hasText = event.content.trim().length > 0 && event.content.trim() !== "[图片]";
   const label = event.status === "sending"
-    ? "已发送引导请求"
+    ? "引导中"
     : event.status === "accepted"
-      ? "正在引导"
+      ? "引导中"
     : event.status === "failed"
       ? "引导失败"
-      : "已引导对话";
+      : "引导成功";
+  const handleSaveDrawingBoard = (image: { name: string; dataUrl: string }) => {
+    window.dispatchEvent(new CustomEvent("kimix:addDrawingImage", { detail: image }));
+    setPreviewImage(null);
+  };
 
   return (
-    <div className="group w-full" style={{ paddingRight: MESSAGE_SIDE_INDENT }}>
+    <div className="group w-full" style={{ paddingRight: embedded ? 0 : MESSAGE_SIDE_INDENT }}>
       <div className="flex justify-end">
-        <div className="max-w-[58%]">
-          <div
-            style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8 }}
-            className="kimix-user-bubble rounded-[var(--radius-md)] text-[14.5px] leading-[1.45]"
-          >
-            {event.content}
-          </div>
+        <div className="flex max-w-[58%] flex-col items-end">
+          {images.length > 0 && (
+            <div
+              className="flex max-w-full flex-wrap justify-end"
+              style={{ gap: 8, marginBottom: hasText ? 12 : 0 }}
+            >
+              {images.map((image, index) => (
+                image.dataUrl ? (
+                  <button
+                    key={image.id ?? `${image.name}-${index}`}
+                    type="button"
+                    onClick={() => setPreviewImage({ id: image.id, name: image.name, dataUrl: image.dataUrl })}
+                    className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
+                    title="点击查看图片"
+                    aria-label={`查看图片 ${image.name}`}
+                  >
+                    <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
+                  </button>
+                ) : (
+                  <div
+                    key={image.id ?? `${image.name}-${index}`}
+                    className="kimix-media-thumb flex h-24 w-24 flex-col items-center justify-center rounded-[14px] text-[var(--kimix-panel-text-muted)]"
+                    style={{ gap: 7, paddingLeft: 10, paddingRight: 10 }}
+                  >
+                    <ImageIcon size={20} />
+                    <span className="max-w-full truncate text-[12.5px]">{image.name || "图片"}</span>
+                  </div>
+                )
+              ))}
+            </div>
+          )}
+          {hasText && (
+            <div
+              style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8, whiteSpace: "pre-wrap" }}
+              className="kimix-user-bubble rounded-[var(--radius-md)] text-[14.5px] leading-[1.45]"
+            >
+              {event.content}
+            </div>
+          )}
           <div className={`mt-1.5 text-right text-[13px] leading-5 ${event.status === "failed" ? "text-accent-danger" : "text-[var(--kimix-panel-text-secondary)]"}`}>
             {label}
           </div>
           {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-danger">{event.error}</div>}
         </div>
       </div>
+      {previewImage?.dataUrl && (
+        <ImagePreviewOverlay
+          image={previewImage}
+          onClose={() => setPreviewImage(null)}
+          onSaveDrawing={handleSaveDrawingBoard}
+        />
+      )}
     </div>
   );
 }
@@ -312,6 +358,15 @@ function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
   return blocks;
 }
 
+function findThinkingSplitIndex(text: string, minIndex: number) {
+  const candidates = [
+    ...Array.from(text.matchAll(/[。！？?!]\s+/g)).map((match) => (match.index ?? -1) + match[0].length),
+    ...Array.from(text.matchAll(/\n\s*\n+/g)).map((match) => (match.index ?? -1) + match[0].length),
+    ...Array.from(text.matchAll(/\n\s*[-*•]\s+/g)).map((match) => match.index ?? -1),
+  ].filter((index) => index >= minIndex);
+  return candidates.length > 0 ? Math.max(...candidates) : -1;
+}
+
 function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
   const parts = event.thinkingParts?.filter((part) => {
     const text = part.text.trim();
@@ -325,10 +380,20 @@ function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
   parts.forEach((part) => {
     if (!current) currentTimestamp = part.timestamp;
     current += part.text;
-    const shouldFlush = current.length > 620 || (current.length > 120 && /[。！？?!]\s*$/.test(current));
-    if (shouldFlush) {
+    if (current.length > 120 && /[。！？?!]\s*$/.test(current)) {
       blocks.push({ id: `thinking-${part.id}`, timestamp: currentTimestamp, text: current.trim() });
       current = "";
+      return;
+    }
+    if (current.length > 900) {
+      const splitIndex = findThinkingSplitIndex(current, 520);
+      if (splitIndex > 0) {
+        const head = current.slice(0, splitIndex).trim();
+        const tail = current.slice(splitIndex);
+        if (head) blocks.push({ id: `thinking-${part.id}`, timestamp: currentTimestamp, text: head });
+        current = tail;
+        currentTimestamp = part.timestamp;
+      }
     }
   });
   if (current.trim()) {
@@ -353,13 +418,13 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid h-10 w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] leading-none text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+        className="grid w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Brain size={15} />
         </span>
-        <span className="min-w-0 flex-1 truncate">{firstThinkingSentence(block.text)}</span>
+        <span className="min-w-0 flex-1 truncate leading-5">{firstThinkingSentence(block.text)}</span>
         {canExpand && (
           <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -391,15 +456,15 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid h-10 w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+        className="grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={14} />
         </span>
-        <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
-        <span className="min-w-0 flex-1 truncate">{describeTool(tool)}</span>
-        <span className="w-8 shrink-0 text-right text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
+        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
+        <span className="min-w-0 flex-1 truncate leading-5">{describeTool(tool)}</span>
+        <span className="w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
           <span className={`h-1.5 w-1.5 rounded-full ${tool.status === "error" ? "bg-accent-danger" : tool.status === "running" ? "bg-accent-warning" : "bg-accent-success"}`} />
         </span>
@@ -432,14 +497,14 @@ function ApprovalProcessItem({ approval }: { approval: ApprovalEvent }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid h-10 w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+        className="grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           <ShieldCheck size={14} />
         </span>
-        <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">工具请求</span>
-        <span className="min-w-0 flex-1 truncate">{approval.description || approval.toolName || "工具请求"}</span>
+        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">工具请求</span>
+        <span className="min-w-0 flex-1 truncate leading-5">{approval.description || approval.toolName || "工具请求"}</span>
         <span className={`shrink-0 rounded-full text-[12px] leading-5 ${approved ? "text-accent-success" : "text-accent-danger"}`} style={{ paddingLeft: 8, paddingRight: 8 }}>
           {decisionLabel}
         </span>
@@ -473,8 +538,8 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="grid h-10 w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ gap: 9, paddingLeft: 14, paddingRight: 14 }}
+        className="grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           {isRunning ? (
@@ -483,9 +548,9 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
             <Bot size={14} />
           )}
         </span>
-        <span className="shrink-0 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
-        <span className="min-w-0 flex-1 truncate">{subagent.agentName || "子代理"}</span>
-        <span className="w-8 shrink-0 text-right text-[var(--kimix-panel-text-muted)]">{subagent.events.length > 0 ? `${subagent.events.length}条` : ""}</span>
+        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{isRunning ? "运行中" : isError ? "运行失败" : "已完成"}</span>
+        <span className="min-w-0 flex-1 truncate leading-5">{subagent.agentName || "子代理"}</span>
+        <span className="w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{subagent.events.length > 0 ? `${subagent.events.length}条` : ""}</span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
           <span className={`h-1.5 w-1.5 rounded-full ${isError ? "bg-accent-danger" : isRunning ? "bg-accent-warning" : "bg-accent-success"}`} />
         </span>
@@ -610,9 +675,6 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   ));
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
-  const hasThinkingDetails = Boolean(event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim().length > 0));
-  const hasProcessDetails = Boolean(hasThinkingDetails || leadingTools.length > 0 || leadingSubagents.length > 0 || leadingApprovals.length > 0 || changedFiles.length > 0 || trailingStatuses.length > 0);
-  const shouldShowNoContentHint = !hasContent && !hasProcessDetails && (event.isComplete || (isActiveAssistant && elapsed >= 8000));
   const durationLabel = event.isComplete
     ? formatDuration(Number.isFinite(event.durationMs) ? event.durationMs ?? 0 : 0)
     : isActiveAssistant && elapsed >= 1000
@@ -637,23 +699,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
 
         {attachedSteers.length > 0 && (
           <div className="flex flex-col" style={{ gap: 10, paddingRight: MESSAGE_SIDE_INDENT }}>
-            {attachedSteers.map((steer) => <SteerMessageBubble key={steer.id} event={steer} />)}
+            {attachedSteers.map((steer) => <SteerMessageBubble key={steer.id} event={steer} embedded />)}
           </div>
         )}
 
-        {(shouldShowNoContentHint || hasContent || trailingStatuses.length > 0) && (
+        {(hasContent || trailingStatuses.length > 0) && (
           <div className="flex flex-col" style={{ gap: 20, paddingLeft: MESSAGE_SIDE_INDENT }}>
-            {shouldShowNoContentHint && (
-              <div
-                className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
-                style={{ padding: "12px 14px" }}
-              >
-                {event.isComplete
-                  ? "本轮没有生成正文内容，Agent 只返回了思考过程、命令执行或文件变更。"
-                  : "Agent 还没有生成正文内容，当前仍在思考或执行命令。"}
-              </div>
-            )}
-
             {hasContent && (
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">

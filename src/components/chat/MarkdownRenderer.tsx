@@ -6,6 +6,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
+import { restoreMarkdownTables } from "@/utils/assistantParagraphs";
 
 interface MarkdownRendererProps {
   content: string;
@@ -186,14 +187,20 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
         );
       },
       table: ({ children }: { children?: React.ReactNode }) => (
-        <div className={`my-3 rounded-lg ${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"}`} style={{ border: "1px solid #ded8ce" }}>
+        <div
+          className={`rounded-lg ${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"}`}
+          style={{ border: "1px solid #ded8ce", marginTop: 8, marginBottom: 14 }}
+        >
           <table
             className="w-full text-sm text-text-primary"
             style={{
               borderColor: "#e5e1d8",
-              tableLayout: wrapLongLines ? "fixed" : undefined,
-              overflowWrap: wrapLongLines ? "anywhere" : undefined,
-              wordBreak: wrapLongLines ? "break-word" : undefined,
+              margin: 0,
+              minWidth: "100%",
+              width: "100%",
+              tableLayout: "fixed",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
             }}
           >
             {children}
@@ -201,8 +208,8 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
         </div>
       ),
       thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-bg-tertiary text-text-secondary font-medium">{children}</thead>,
-      th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 text-left" style={{ border: "1px solid #e5e1d8" }}>{children}</th>,
-      td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2" style={{ border: "1px solid #eee9e1" }}>{children}</td>,
+      th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 text-left" style={{ border: "1px solid #e5e1d8", overflowWrap: "anywhere", wordBreak: "break-word", verticalAlign: "top" }}>{children}</th>,
+      td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2" style={{ border: "1px solid #eee9e1", overflowWrap: "anywhere", wordBreak: "break-word", verticalAlign: "top" }}>{children}</td>,
       hr: () => <hr className="my-4 border-border-default" />,
       del: ({ children }: { children?: React.ReactNode }) => <span>~{children}~</span>,
     }),
@@ -211,11 +218,12 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(() => [rehypeHighlight], []);
+  const normalizedContent = useMemo(() => restoreMarkdownTables(content), [content]);
 
   return (
     <div className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}>
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   );

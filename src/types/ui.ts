@@ -1,4 +1,43 @@
 export type Theme = "dark" | "light" | "system";
+export type ThemePaletteId = "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
+export interface ThemePaletteColors {
+  primary: string;
+  surface: string;
+  accent: string;
+}
+
+export interface KimiThemePalette {
+  primary: string;
+  accent: string;
+  text: string;
+  textStrong: string;
+  textDim: string;
+  textMuted: string;
+  border: string;
+  borderFocus: string;
+  success: string;
+  warning: string;
+  error: string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffAddedStrong: string;
+  diffRemovedStrong: string;
+  diffGutter: string;
+  diffMeta: string;
+  roleUser: string;
+}
+
+export interface KimiThemePreset {
+  id: string;
+  name: string;
+  displayName: string;
+  path?: string;
+  base?: "light" | "dark";
+  palette: KimiThemePalette;
+  colors?: ThemePaletteColors;
+  createdAt?: number;
+  updatedAt?: number;
+}
 
 export type PermissionMode = "manual" | "auto" | "yolo";
 export type ClarificationToolMode = "off" | "on" | "auto";
@@ -33,6 +72,9 @@ export interface AppState {
   workspaceView: WorkspaceView;
   sidebarOpen: boolean;
   theme: Theme;
+  themePalette: ThemePaletteId;
+  customThemePalette: ThemePaletteColors;
+  kimiThemePalettes: KimiThemePreset[];
 }
 
 export type StatusUpdateDisplay = "each" | "turn_end" | "never";
@@ -150,6 +192,7 @@ export interface SteerMessageEvent {
   type: "steer_message";
   timestamp: number;
   content: string;
+  images?: UserMessageImage[];
   status: "sending" | "accepted" | "sent" | "failed";
   error?: string;
 }
@@ -278,6 +321,7 @@ export interface StatusUpdateEvent {
   message?: string;
   source?: "runtime" | "slash" | "ui" | "ipc";
   tone?: "default" | "info" | "success" | "warning" | "danger";
+  parentEventId?: string;
 }
 
 export interface FileArtifactEvent {

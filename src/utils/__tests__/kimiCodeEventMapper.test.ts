@@ -113,6 +113,8 @@ describe("mapKimiCodeEvent", () => {
       planMode: true,
       usage: { currentTurn: { inputOther: 10, inputCacheRead: 2, inputCacheCreation: 3, output: 20 } },
     }, options);
+    const stepStarted = mapKimiCodeEvent({ type: "turn.step.started", step: 5 }, options);
+    const stepCompleted = mapKimiCodeEvent({ type: "turn.step.completed", step: 5 }, options);
     const interrupted = mapKimiCodeEvent({ type: "turn.step.interrupted", step: 2, message: "cancelled" }, options);
     const compaction = mapKimiCodeEvent({ type: "compaction.completed" }, options);
     const error = mapKimiCodeEvent({ type: "error", message: "broken" }, options);
@@ -120,12 +122,44 @@ describe("mapKimiCodeEvent", () => {
     expect(status?.type).toBe("status_update");
     expect((status as Extract<TimelineEvent, { type: "status_update" }>).inputTokenCount).toBe(15);
     expect((status as Extract<TimelineEvent, { type: "status_update" }>).tokenCount).toBe(20);
+    expect(stepStarted).toBeNull();
+    expect(stepCompleted).toBeNull();
     expect(interrupted?.type).toBe("status_update");
     expect((interrupted as Extract<TimelineEvent, { type: "status_update" }>).message).toContain("cancelled");
     expect(compaction?.type).toBe("compaction");
     expect((compaction as Extract<TimelineEvent, { type: "compaction" }>).phase).toBe("end");
     expect(error?.type).toBe("error");
     expect((error as Extract<TimelineEvent, { type: "error" }>).source).toBe("sdk");
+  });
+
+  it("maps official turn.steer as the steer success marker", () => {
+    const steer = mapKimiCodeEvent({
+      type: "turn.steer",
+      input: [
+        { type: "text", text: "顺便看一下配色" },
+        { type: "image_url", imageUrl: { url: "data:image/png;base64,abc", id: "shot.png" } },
+      ],
+    }, testOptions()) as Extract<TimelineEvent, { type: "steer_message" }>;
+
+    expect(steer.type).toBe("steer_message");
+    expect(steer.status).toBe("sent");
+    expect(steer.content).toBe("顺便看一下配色");
+    expect(steer.images).toHaveLength(1);
+    expect(steer.images?.[0].name).toBe("shot.png");
+  });
+
+  it("maps official turn.steer inside append_loop_event", () => {
+    const steer = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      event: {
+        type: "turn.steer",
+        input: "改一下方向",
+      },
+    }, testOptions()) as Extract<TimelineEvent, { type: "steer_message" }>;
+
+    expect(steer.type).toBe("steer_message");
+    expect(steer.status).toBe("sent");
+    expect(steer.content).toBe("改一下方向");
   });
 });
 
@@ -238,22 +272,27 @@ describe("reduceKimiCodeEvents", () => {
     expect(tool.status).toBe("success");
   });
 
-  it("keeps assistant chunks after an accepted steer boundary in the same session timeline", () => {
+  it("places assistant chunks after official turn.steer confirmation", () => {
     const initial: TimelineEvent[] = [
       { id: "user-1", type: "user_message", timestamp: 1, content: "开始" },
       { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "前半段", isThinking: false, isComplete: false },
       { id: "steer-1", type: "steer_message", timestamp: 3, content: "改一下方向", status: "accepted" },
     ];
     const events = reduceKimiCodeEvents(initial, [
-      { type: "assistant.delta", delta: "后半段" },
+      { type: "assistant.delta", delta: "旧轮继续" },
+      { type: "context.append_loop_event", event: { type: "turn.steer", input: "改一下方向" } },
+      { type: "assistant.delta", delta: "处理引导" },
       { type: "turn.ended", reason: "completed" },
     ], testOptions());
 
-    expect(events).toHaveLength(3);
+    expect(events).toHaveLength(4);
     expect(events[2].type).toBe("steer_message");
-    const assistant = events[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
-    expect(assistant.content).toBe("前半段后半段");
-    expect(assistant.isComplete).toBe(true);
+    expect((events[2] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
+    const before = events[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    const after = events[3] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(before.content).toBe("前半段旧轮继续");
+    expect(after.content).toBe("处理引导");
+    expect(after.isComplete).toBe(true);
   });
 
   it("absorbs tool_result into the linked tool_call through existing merge rules", () => {

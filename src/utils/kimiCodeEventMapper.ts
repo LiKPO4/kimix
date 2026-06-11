@@ -64,6 +64,31 @@ function getContentPart(event: Record<string, unknown>): Record<string, unknown>
   return isRecord(event.part) ? event.part : event;
 }
 
+function extractPromptMessage(input: unknown): { content: string; images: { name: string; dataUrl?: string }[] } {
+  if (isString(input)) return { content: input, images: [] };
+  if (!Array.isArray(input)) return { content: "", images: [] };
+
+  const textParts: string[] = [];
+  const images: { name: string; dataUrl?: string }[] = [];
+  input.forEach((part, index) => {
+    if (!isRecord(part)) return;
+    if (part.type === "text" && isString(part.text)) {
+      textParts.push(part.text);
+      return;
+    }
+    if (part.type === "image_url") {
+      const imageUrl = isRecord(part.imageUrl)
+        ? part.imageUrl
+        : (isRecord(part.image_url) ? part.image_url : {});
+      const url = isString(imageUrl.url) ? imageUrl.url : undefined;
+      const id = isString(imageUrl.id) ? imageUrl.id : undefined;
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url });
+      if (!url) textParts.push("[图片]");
+    }
+  });
+  return { content: textParts.filter(Boolean).join("\n"), images };
+}
+
 function usageOutput(usage: unknown): number | undefined {
   if (!isRecord(usage)) return undefined;
   return isNumber(usage.output) ? usage.output : undefined;
@@ -80,8 +105,6 @@ function usageInput(usage: unknown): number | undefined {
 
 function statusMessageForStep(type: string, event: Record<string, unknown>): string {
   const step = isNumber(event.step) ? ` ${event.step}` : "";
-  if (type === "turn.step.started") return `步骤${step}开始`;
-  if (type === "turn.step.completed") return `步骤${step}完成`;
   if (type === "turn.step.retrying") {
     const message = isString(event.errorMessage) ? event.errorMessage : "正在重试";
     return `步骤${step}重试：${message}`;
@@ -168,6 +191,31 @@ export function mapKimiCodeEvent(
       };
     }
 
+    case "SteerInput":
+    case "steer.input":
+    case "turn.steer": {
+      const payload = isRecord(event.payload) ? event.payload : {};
+      const message = extractPromptMessage(
+        event.user_input ??
+        event.userInput ??
+        event.input ??
+        event.text ??
+        payload.user_input ??
+        payload.userInput ??
+        payload.input ??
+        payload.text,
+      );
+      if (!message.content.trim() && message.images.length === 0) return null;
+      return {
+        id: getId(options),
+        type: "steer_message",
+        timestamp,
+        content: message.content || "[图片]",
+        images: message.images,
+        status: "sent",
+      };
+    }
+
     case "turn.ended":
       return {
         id: getId(options),
@@ -251,6 +299,8 @@ export function mapKimiCodeEvent(
 
     case "turn.step.started":
     case "turn.step.completed":
+      return null;
+
     case "turn.step.retrying":
     case "turn.step.interrupted":
       return {

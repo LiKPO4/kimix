@@ -14,6 +14,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableCompaction: true,
   defaultPermissionMode: "manual",
   theme: "light",
+  themePalette: "warm-paper",
+  customThemePalette: {
+    primary: "#1982FF",
+    surface: "#EDE9E0",
+    accent: "#B85C38",
+  },
+  kimiThemePalettes: [],
   fontSize: 14,
   showThinking: true,
   detailedContext: false,
@@ -55,6 +62,25 @@ export function loadSettings(): AppSettings {
         rawSettings.clarificationToolEnabled === false ? "off" :
           DEFAULT_SETTINGS.clarificationToolMode);
     const settings = { ...DEFAULT_SETTINGS, ...rawSettings, clarificationToolMode };
+    const legacyKimiThemePalette = (rawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;
+    if ((!settings.kimiThemePalettes || settings.kimiThemePalettes.length === 0) && legacyKimiThemePalette) {
+      settings.kimiThemePalettes = [{
+        id: "default",
+        name: "Default",
+        displayName: "KIMI-Default",
+        palette: legacyKimiThemePalette,
+        colors: {
+          primary: legacyKimiThemePalette.primary,
+          surface: legacyKimiThemePalette.textMuted,
+          accent: legacyKimiThemePalette.accent,
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }];
+    }
+    if ((settings.themePalette as string) === "kimi") {
+      settings.themePalette = settings.kimiThemePalettes[0]?.id ? `kimi:${settings.kimiThemePalettes[0].id}` : "warm-paper";
+    }
     if (!["manual", "auto", "yolo"].includes(settings.defaultPermissionMode)) {
       settings.defaultPermissionMode = "manual";
     }

@@ -311,8 +311,8 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               </button>
             </div>
             <pre
-              className="text-xs text-text-secondary bg-bg-primary rounded-xl overflow-x-auto border border-border-subtle font-mono leading-relaxed"
-              style={{ marginTop: 8, maxHeight: 180, padding: "12px 14px" }}
+              className="text-xs text-text-secondary bg-bg-primary rounded-xl overflow-x-hidden border border-border-subtle font-mono leading-relaxed"
+              style={{ marginTop: 8, maxHeight: 180, padding: "12px 14px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}
             >
               {detailPreview}
             </pre>
@@ -402,8 +402,8 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
             )}
 
             <pre
-              className="min-h-0 flex-1 overflow-auto rounded-xl border border-border-subtle bg-bg-primary font-mono text-xs leading-relaxed text-text-secondary"
-              style={{ marginTop: 14, padding: "14px 16px" }}
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-border-subtle bg-bg-primary font-mono text-xs leading-relaxed text-text-secondary"
+              style={{ marginTop: 14, padding: "14px 16px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}
             >
               {detailPreview}
             </pre>

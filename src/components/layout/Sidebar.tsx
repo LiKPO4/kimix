@@ -65,13 +65,21 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
+  const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
 
   const toast = (message: string) => {
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: message }));
   };
 
+  const toggleWorkspaceView = (view: "plugins" | "hooks" | "settings") => {
+    const isSameView = view === "plugins"
+      ? workspaceView === "plugins" || workspaceView === "mcp"
+      : workspaceView === view;
+    setWorkspaceView(isSameView ? "chat" : view);
+  };
+
   const openPlugins = async () => {
-    setWorkspaceView("plugins");
+    toggleWorkspaceView("plugins");
   };
 
   useEffect(() => {
@@ -338,7 +346,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           </button>
           <button
             onClick={() => void openPlugins()}
-            className={`${collapsedNavItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
+            className={`${collapsedNavItemClass} ${pluginWorkspaceActive ? "bg-surface-hover text-text-primary" : ""}`}
             style={collapsedNavButtonStyle}
             title="插件"
             aria-label="插件"
@@ -346,7 +354,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             <LayoutGrid size={17} />
           </button>
           <button
-            onClick={() => setWorkspaceView("hooks")}
+            onClick={() => toggleWorkspaceView("hooks")}
             className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
             style={collapsedNavButtonStyle}
             title="Hooks"
@@ -366,7 +374,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </div>
         <div style={{ marginTop: "auto", height: 36 }}>
           <button
-            onClick={() => setWorkspaceView("settings")}
+            onClick={() => toggleWorkspaceView("settings")}
             className={`${collapsedSettingsItemClass} ${workspaceView === "settings" ? "bg-surface-hover text-text-primary" : ""}`}
             style={collapsedSettingsButtonStyle}
             title="设置"
@@ -446,14 +454,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
         <button
           onClick={() => void openPlugins()}
-          className={`${navItemClass} ${workspaceView === "plugins" ? "bg-surface-hover text-text-primary" : ""}`}
+          className={`${navItemClass} ${pluginWorkspaceActive ? "bg-surface-hover text-text-primary" : ""}`}
           title="插件"
         >
           <LayoutGrid size={17} className="shrink-0 text-text-secondary" />
           <span>插件</span>
         </button>
         <button
-          onClick={() => setWorkspaceView("hooks")}
+          onClick={() => toggleWorkspaceView("hooks")}
           className={`${navItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
           title="Hooks"
         >
@@ -468,7 +476,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2">
+      <div className="min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 8, paddingRight: 8, marginRight: -8 }}>
         <div className="mb-2 flex items-center justify-between px-3">
           <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button
@@ -722,13 +730,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
       <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
         <button
-          onClick={() => setWorkspaceView("settings")}
+          onClick={() => toggleWorkspaceView("settings")}
           className={`kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors ${workspaceView === "settings" ? "bg-surface-hover" : ""}`}
           style={{ height: 36 }}
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.8.364</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.9.20</span>
         </button>
       </div>
     </aside>

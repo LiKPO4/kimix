@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, CheckCircle2, Download, ExternalLink, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, CheckCircle2, Download, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
+import { compactModelDisplayName } from "@/utils/modelDisplay";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -69,15 +70,11 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
   );
 }
 
-function showPendingToast() {
-  window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "待实现" }));
-}
-
 function formatPluginSource(source: string | undefined) {
   return source === "marketplace" ? "Marketplace" : "Installed";
 }
 
-export function ContextBar() {
+export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void }) {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -99,6 +96,7 @@ export function ContextBar() {
   const sessionHasStarted = Boolean(activeSession && activeSession.events.length > 0);
   const sessionModel = sessionHasStarted && activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
   const displayModel = defaultModel ?? sessionModel ?? FALLBACK_KIMI_MODEL;
+  const compactDisplayModel = compactModelDisplayName(displayModel);
   const modelTitle = sessionModel && sessionModel === displayModel
     ? `当前对话模型：${displayModel}`
     : `当前默认模型：${displayModel}`;
@@ -248,27 +246,6 @@ export function ContextBar() {
     }, 80);
   };
 
-  const openVisualizer = async () => {
-    try {
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "正在启动 Kimi Agent Tracing Visualizer…" }));
-      const startRes = await window.api.startKimiVis();
-      if (!startRes.success) {
-        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `启动失败：${startRes.error}` }));
-        return;
-      }
-      // 给 vis 一点时间启动 HTTP 服务
-      await new Promise((r) => setTimeout(r, 3000));
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "正在打开浏览器…" }));
-      const res = await window.api.openExternal("http://localhost:5495");
-      if (!res.success) {
-        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `打开失败：${res.error}` }));
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `打开使用详情出错：${message}` }));
-    }
-  };
-
   useEffect(() => {
     setGitBranch(null);
     if (!project?.path) return;
@@ -326,19 +303,19 @@ export function ContextBar() {
   }, [usageOpen, workDirsOpen]);
 
   return (
-    <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] leading-none text-[var(--kimix-panel-text-secondary)]" style={{ height: 36 }}>
+    <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ height: 36, lineHeight: "20px" }}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div ref={workDirsRef} className="relative min-w-0">
           <button
             type="button"
             onClick={() => setWorkDirsOpen((value) => !value)}
-            className="kimix-muted-action flex min-w-0 items-center rounded-lg"
-            style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
+            className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
+            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
             title={project?.path ?? "当前项目"}
             aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
           >
             <FolderOpen size={16} className="shrink-0" />
-            <span className="max-w-[220px] truncate">{project?.name ?? "未选择项目"}</span>
+            <span className="max-w-[220px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{project?.name ?? "未选择项目"}</span>
           </button>
           {workDirsOpen && (
             <div className="kimix-floating-panel absolute bottom-9 left-0 z-40 w-[360px] rounded-xl" style={{ padding: "16px 18px 18px" }}>
@@ -416,15 +393,6 @@ export function ContextBar() {
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void openVisualizer()}
-                    className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
-                    title="打开 Kimi Agent Tracing Visualizer"
-                  >
-                    <ExternalLink size={14} />
-                    使用详情
-                  </button>
-                  <button
-                    type="button"
                     onClick={loadUsage}
                     className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
                   >
@@ -451,38 +419,38 @@ export function ContextBar() {
         {gitBranch && (
           <button
             type="button"
-            onClick={showPendingToast}
-            className="kimix-muted-action hidden min-w-0 items-center rounded-lg md:flex"
-            style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
+            onClick={onOpenGitDetails}
+            className="kimix-contextbar-action kimix-muted-action hidden min-w-0 items-center rounded-lg md:flex"
+            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
             title={gitBranch}
             aria-label={`当前分支：${gitBranch}`}
           >
             <GitBranch size={16} className="shrink-0" />
-            <span className="max-w-[150px] truncate">{gitBranch}</span>
+            <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>
           </button>
         )}
         <button
           type="button"
           onClick={() => void openModelSettings()}
-          className="kimix-muted-action hidden min-w-0 items-center rounded-lg lg:flex"
-          style={{ gap: 8, height: 36, paddingLeft: 12, paddingRight: 12 }}
+          className="kimix-contextbar-action kimix-muted-action hidden min-w-0 items-center rounded-lg lg:flex"
+          style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
           title={modelTitle}
           aria-label={`${modelTitle}，打开模型设置`}
         >
           <Bot size={16} className="shrink-0" />
-          <span className="shrink-0">模型</span>
-          <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]">{displayModel}</span>
+          <span className="shrink-0" style={{ lineHeight: "20px", paddingBottom: 1 }}>模型</span>
+          <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1 }}>{compactDisplayModel}</span>
         </button>
         <button
           type="button"
           onClick={() => void openKimiStatusSettings()}
-          className={`kimix-kimi-status-text is-${kimiStatus.tone} hidden min-w-0 items-center md:flex`}
-          style={{ gap: 7, height: 36, paddingLeft: 4, paddingRight: 4 }}
+          className={`kimix-contextbar-action kimix-kimi-status-text is-${kimiStatus.tone} hidden min-w-0 items-center rounded-lg md:flex`}
+          style={{ gap: 7, height: 36, lineHeight: "20px", paddingLeft: 10, paddingRight: 10 }}
           title={kimiStatus.detail}
           aria-label={`Kimi Code 状态：${kimiStatus.label}`}
         >
           <KimiStatusIcon size={16} className={`shrink-0 ${isSessionRunning ? "animate-spin" : ""}`} />
-          <span className="truncate">{kimiStatus.label}</span>
+          <span className="truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{kimiStatus.label}</span>
         </button>
       </div>
 

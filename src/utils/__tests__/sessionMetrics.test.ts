@@ -3,6 +3,7 @@ import {
   countUserTurns,
   getLatestStatus,
   isEmptyStatusUpdate,
+  getLatestMetricStatus,
   getLatestMeaningfulStatus,
   getSessionRecommendationMetrics,
   shouldRecommendNewSession,
@@ -84,6 +85,16 @@ describe("getLatestMeaningfulStatus", () => {
       { id: "1", type: "status_update", timestamp: 1, tokenCount: 0, inputTokenCount: 0, contextSize: 0, contextLimit: 256000 },
     ];
     expect(getLatestMeaningfulStatus(events)).toBeUndefined();
+  });
+});
+
+describe("getLatestMetricStatus", () => {
+  it("skips message-only statuses so context metrics do not reset to zero", () => {
+    const events: TimelineEvent[] = [
+      { id: "1", type: "status_update", timestamp: 1, tokenCount: 20, inputTokenCount: 10, contextSize: 1200, contextLimit: 256000 },
+      { id: "2", type: "status_update", timestamp: 2, message: "模型：kimi-for-coding" },
+    ];
+    expect(getLatestMetricStatus(events)?.contextSize).toBe(1200);
   });
 });
 

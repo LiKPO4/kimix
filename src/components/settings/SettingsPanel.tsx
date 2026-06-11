@@ -3,7 +3,8 @@ import type { RefObject } from "react";
 import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Theme, PermissionMode, NotificationMode } from "@/types/ui";
+import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
+import { kimiThemePaletteId, THEME_PALETTES, upsertKimiThemePresets } from "@/utils/themePalettes";
 
 type FreezeReport = {
   at: string;
@@ -28,7 +29,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.8.364";
+const KIMIX_VERSION = "2.9.20";
 
 type SettingsSectionId =
   | "connection"
@@ -106,6 +107,15 @@ type KimiProviderCatalogEntry = {
   }[];
 };
 
+type KimiEnvironmentSummary = {
+  kimiCodeHome: string;
+  proxy: {
+    key: "HTTP_PROXY" | "HTTPS_PROXY" | "ALL_PROXY" | "NO_PROXY";
+    configured: boolean;
+    value: string;
+  }[];
+};
+
 type KimiConnectionStatus = {
   loading: boolean;
   available: boolean | null;
@@ -120,11 +130,13 @@ const settingsStatusCache: {
   auth: KimiAuthStatus | null;
   modelConfig: KimiModelConfigSummary | null;
   modelConfigMessage: string;
+  kimiEnvironment: KimiEnvironmentSummary | null;
 } = {
   connection: null,
   auth: null,
   modelConfig: null,
   modelConfigMessage: "",
+  kimiEnvironment: null,
 };
 
 function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
@@ -340,6 +352,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const theme = useAppStore((s) => s.theme);
   const setTheme = useAppStore((s) => s.setTheme);
+  const themePalette = useAppStore((s) => s.themePalette);
+  const setThemePalette = useAppStore((s) => s.setThemePalette);
+  const customThemePalette = useAppStore((s) => s.customThemePalette);
+  const setCustomThemePalette = useAppStore((s) => s.setCustomThemePalette);
+  const kimiThemePalettes = useAppStore((s) => s.kimiThemePalettes);
+  const setKimiThemePalettes = useAppStore((s) => s.setKimiThemePalettes);
+  const removeKimiThemePalette = useAppStore((s) => s.removeKimiThemePalette);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const detailedContext = useAppStore((s) => s.detailedContext);
@@ -388,10 +407,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
   const [authLoading, setAuthLoading] = useState(!settingsStatusCache.auth);
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
+  const [themeScanLoading, setThemeScanLoading] = useState(false);
+  const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
   const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(settingsStatusCache.modelConfig);
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
+  const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
   const [providerDraft, setProviderDraft] = useState({
     providerName: "deepseek",
     modelAlias: "deepseek/deepseek-v4-flash",
@@ -400,7 +422,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     model: "deepseek-v4-flash",
     maxContextSize: "65536",
   });
-  const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | null>(null);
+  const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | "remove" | null>(null);
   const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
   const [providerMessage, setProviderMessage] = useState("");
   const [providerCatalog, setProviderCatalog] = useState<KimiProviderCatalogEntry[]>([]);
@@ -616,7 +638,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       if (res.success) {
         const detail = res.data.output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join("；");
         settingsStatusCache.modelConfigMessage = detail || res.data.message;
+        settingsStatusCache.kimiEnvironment = res.data.environment ?? null;
         setModelConfigMessage(settingsStatusCache.modelConfigMessage);
+        setKimiEnvironment(settingsStatusCache.kimiEnvironment);
         return;
       }
       settingsStatusCache.modelConfigMessage = `配置诊断失败：${res.error}`;
@@ -774,6 +798,34 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setProviderMessage(`更新自适应思考失败：${res.error}`);
   };
 
+  const handleRemoveModel = async (model: KimiModelConfigSummary["models"][number]) => {
+    const provider = modelConfig?.providers.find((item) => item.name === model.provider);
+    if (provider?.type !== "openai") {
+      setProviderMessage("官方 managed 模型不能在 Kimix 中删除。");
+      return;
+    }
+    if (typeof window.api.removeKimiModelConfig !== "function") {
+      setProviderMessage("模型删除接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
+      return;
+    }
+    const ok = window.confirm(`删除模型配置「${model.displayName || model.alias}」？\n\nKimix 会备份 config.toml，并在无其他模型引用时一并移除对应 Provider。`);
+    if (!ok) return;
+    setProviderBusyAction("remove");
+    setProviderMessage(`正在删除 ${model.alias}...`);
+    const res = await window.api.removeKimiModelConfig({ modelAlias: model.alias });
+    setProviderBusyAction(null);
+    if (res.success) {
+      settingsStatusCache.modelConfig = res.data;
+      settingsStatusCache.modelConfigMessage = res.data.message ?? "";
+      setModelConfig(res.data);
+      setSelectedModelAlias(res.data.defaultModel ?? "");
+      setProviderMessage(settingsStatusCache.modelConfigMessage);
+      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
+      return;
+    }
+    setProviderMessage(`删除失败：${res.error}`);
+  };
+
   const handleTestProvider = async () => {
     const payload = buildProviderPayload();
     if (!payload) {
@@ -886,6 +938,44 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setFreezeReports([]);
   };
 
+  const updateCustomThemeColor = (key: keyof ThemePaletteColors, value: string) => {
+    setCustomThemePalette({ ...customThemePalette, [key]: value });
+    if (themePalette !== "custom") setThemePalette("custom");
+  };
+
+  const scanOfficialKimiThemes = async () => {
+    setThemeScanLoading(true);
+    setThemeScanMessage(null);
+    const preview = await window.api.previewKimiThemeImport();
+    setThemeScanLoading(false);
+    if (!preview.success) {
+      setThemeScanMessage(`扫描失败：${preview.error}`);
+      return;
+    }
+    if (preview.data.items.length === 0) {
+      setThemeScanMessage("未发现官方主题 JSON。可先发送 /custom-theme 让官方 Skill 生成主题。");
+      return;
+    }
+    const presets: KimiThemePreset[] = preview.data.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      displayName: `KIMI-${item.displayName}`,
+      path: item.path,
+      base: item.base,
+      palette: item.kimiColors,
+      colors: item.colors,
+    }));
+    const next = upsertKimiThemePresets(kimiThemePalettes, presets);
+    setKimiThemePalettes(next);
+    const firstNew = presets[0];
+    if (firstNew) setThemePalette(kimiThemePaletteId(firstNew.id));
+    setThemeScanMessage(`已登记/更新 ${presets.length} 套官方 KIMI 主题。`);
+  };
+
+  const activeKimiTheme = themePalette.startsWith("kimi:")
+    ? kimiThemePalettes.find((preset) => kimiThemePaletteId(preset.id) === themePalette)
+    : null;
+
   const exportFreezeReport = (report: FreezeReport, index: number) => {
     const date = new Date(report.at);
     const stamp = Number.isNaN(date.getTime()) ? sanitizeFilenamePart(report.at) : date.toISOString().replace(/[:.]/g, "-");
@@ -942,6 +1032,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "dark", label: "深色", icon: Moon },
     { value: "system", label: "跟随系统", icon: Monitor },
   ];
+  const paletteOptions: { value: ThemePaletteId; label: string; description: string; colors: ThemePaletteColors; kimiId?: string }[] = [
+    ...THEME_PALETTES.map((palette) => ({
+      value: palette.id,
+      label: palette.label,
+      description: palette.description,
+      colors: palette.colors,
+    })),
+    {
+      value: "custom",
+      label: "自定义",
+      description: "使用下方三色生成明暗两套配色",
+      colors: customThemePalette,
+    },
+    ...kimiThemePalettes.map((preset) => ({
+      value: kimiThemePaletteId(preset.id),
+      label: preset.displayName.startsWith("KIMI-") ? preset.displayName : `KIMI-${preset.displayName}`,
+      description: "使用官方 Kimi Code 主题 token",
+      colors: preset.colors ?? {
+        primary: preset.palette.primary,
+        surface: preset.palette.textMuted,
+        accent: preset.palette.accent,
+      },
+      kimiId: preset.id,
+    })),
+  ];
 
   const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
     { value: "manual", label: "手动审批", desc: "高风险操作会先问你", icon: Shield, tooltip: "手动审批：高风险工具调用会暂停确认。" },
@@ -976,14 +1091,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   const content = (
       <div className={variant === "workspace" ? "kimix-settings-panel is-workspace" : "kimix-settings-panel"} onClick={(e) => e.stopPropagation()}>
-        <div className="kimix-settings-header">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]">
+        <div className={variant === "workspace" ? "kimix-workspace-header" : "kimix-settings-header"}>
+          <div className={variant === "workspace" ? "kimix-workspace-header-copy" : "min-w-0"}>
+            <div className={variant === "workspace" ? "kimix-workspace-header-title" : "flex min-w-0 items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]"}>
               {variant === "workspace" && <Settings size={20} className="shrink-0" />}
               <h2 id="settings-title" className="kimix-settings-title">设置</h2>
+              {variant === "workspace" && (
+                <div className="kimix-workspace-header-subtitle">管理模型、主题、权限和本地诊断。</div>
+              )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+          <div className={variant === "workspace" ? "kimix-workspace-header-actions" : "flex shrink-0 items-center"} style={variant === "workspace" ? undefined : { gap: 8 }}>
             {onBackToChat && variant === "workspace" && (
               <button
                 type="button"
@@ -1019,6 +1137,119 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </button>
                   ))}
                 </div>
+                <div className="kimix-settings-subsection-row">
+                  <div className="kimix-settings-subsection-title">色彩方案</div>
+                  <button
+                    type="button"
+                    onClick={() => void scanOfficialKimiThemes()}
+                    className="kimix-icon-text-button kimix-muted-action is-compact"
+                    disabled={themeScanLoading}
+                  >
+                    {themeScanLoading ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+                    <span>扫描官方主题</span>
+                  </button>
+                </div>
+                <div className="kimix-settings-palette-grid">
+                  {paletteOptions.map((palette) => (
+                    <div
+                      key={palette.value}
+                      className={`kimix-settings-palette-wrap ${themePalette === palette.value ? "is-active" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setThemePalette(palette.value)}
+                        className="kimix-settings-palette"
+                        title={palette.description}
+                      >
+                        <span className="kimix-settings-palette-copy">
+                          <span className="kimix-settings-palette-label" title={palette.label}>{palette.label}</span>
+                          <span className="kimix-settings-palette-desc">{palette.description}</span>
+                        </span>
+                        <span className="kimix-settings-palette-swatches" aria-hidden="true">
+                          <span style={{ background: palette.colors.surface }} />
+                          <span style={{ background: palette.colors.primary }} />
+                          <span style={{ background: palette.colors.accent }} />
+                        </span>
+                      </button>
+                      {palette.kimiId && (
+                        <button
+                          type="button"
+                          className="kimix-settings-palette-delete"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            removeKimiThemePalette(palette.kimiId!);
+                            setThemeScanMessage(`已从 Kimix 移除 ${palette.label}。官方主题文件仍保留。`);
+                          }}
+                          title={`从 Kimix 移除 ${palette.label}`}
+                          aria-label={`从 Kimix 移除 ${palette.label}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {themeScanMessage && (
+                  <div className="kimix-settings-theme-scan-message">{themeScanMessage}</div>
+                )}
+                {themePalette === "custom" && (
+                  <div className="kimix-settings-custom-palette is-kimi">
+                    {([
+                      ["primary", "主色"],
+                      ["surface", "底色"],
+                      ["accent", "强调"],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="kimix-settings-color-field is-kimi-token">
+                        <span>{label}</span>
+                        <span
+                          className="kimix-settings-color-swatch-button"
+                          style={{ background: customThemePalette[key] }}
+                        >
+                          <input
+                            type="color"
+                            value={customThemePalette[key]}
+                            onChange={(event) => updateCustomThemeColor(key, event.target.value)}
+                            aria-label={`${label}颜色`}
+                          />
+                        </span>
+                        <input
+                          value={customThemePalette[key]}
+                          onChange={(event) => updateCustomThemeColor(key, event.target.value)}
+                          className="kimix-settings-color-value"
+                          spellCheck={false}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {activeKimiTheme && (
+                  <div className="kimix-settings-custom-palette is-kimi">
+                    {([
+                      ["primary", "主色"],
+                      ["accent", "强调"],
+                      ["text", "正文"],
+                      ["textStrong", "强文本"],
+                      ["textDim", "弱文本"],
+                      ["textMuted", "静默"],
+                      ["border", "边框"],
+                      ["borderFocus", "焦点"],
+                      ["success", "成功"],
+                      ["warning", "警告"],
+                      ["error", "错误"],
+                      ["roleUser", "用户"],
+                    ] as const).map(([key, label]) => (
+                      <div key={key} className="kimix-settings-color-field is-kimi-token">
+                        <span>{label}</span>
+                        <span
+                          aria-hidden="true"
+                          className="h-7 w-9 rounded-lg border border-[var(--kimix-panel-border-soft)]"
+                          style={{ background: activeKimiTheme.palette[key] }}
+                        />
+                        <span className="kimix-settings-color-value select-text">{activeKimiTheme.palette[key]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="kimix-settings-section" {...settingsSectionProps("permission", 4)}>
@@ -1337,6 +1568,28 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasOauth).length} 个已配置凭据
                           </div>
                         </div>
+                        {kimiEnvironment && (
+                          <>
+                            <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
+                              <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Code Home</div>
+                              <div className="kimix-settings-permission-label break-all text-[13px]">{kimiEnvironment.kimiCodeHome}</div>
+                            </div>
+                            <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
+                              <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>代理变量</div>
+                              <div className="kimix-settings-permission-label break-all text-[13px]">
+                                {kimiEnvironment.proxy.some((item) => item.configured)
+                                  ? kimiEnvironment.proxy.filter((item) => item.configured).map((item) => `${item.key}=${item.value || "已配置"}`).join("；")
+                                  : "未配置，Kimi Code 会直连；localhost MCP 服务始终直连。"}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
+                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>微压缩</div>
+                          <div className="kimix-settings-permission-label text-[13px]">
+                            Kimi Code 0.12.0 默认开启，会自动清理较旧的大型工具结果以减少上下文占用。
+                          </div>
+                        </div>
                         {modelConfigMessage && (
                           <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>{modelConfigMessage}</div>
                         )}
@@ -1396,6 +1649,22 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                     >
                                       <Check size={13} />
                                       使用
+                                    </button>
+                                  )}
+                                  {externalOpenAiProvider && (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleRemoveModel(model);
+                                      }}
+                                      disabled={providerBusyAction === "remove"}
+                                      className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-accent-danger-light hover:text-accent-danger"
+                                      title={`删除 ${model.displayName || model.alias}`}
+                                      aria-label={`删除 ${model.displayName || model.alias}`}
+                                    >
+                                      <Trash2 size={13} />
+                                      删除
                                     </button>
                                   )}
                                 </div>

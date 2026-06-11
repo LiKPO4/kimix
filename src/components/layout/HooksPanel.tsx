@@ -357,18 +357,18 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--kimix-panel-bg)]">
-      <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]">
+    <div className="kimix-workspace-page flex h-full min-h-0 flex-col">
+      <div className="kimix-workspace-header">
+        <div className="kimix-workspace-header-copy">
+          <div className="kimix-workspace-header-title">
             <Webhook size={20} />
             <span>Hooks</span>
-          </div>
-          <div className="mt-1 text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
-            管理 Kimi Code hooks 规则；创建规则时可用自然语言描述，由规则创建 agent 生成草稿。
+            <div className="kimix-workspace-header-subtitle">
+              管理 Kimi Code hooks 规则：创建规则时可用自然语言描述
+            </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+        <div className="kimix-workspace-header-actions">
           <button
             type="button"
             onClick={() => startCreate()}
@@ -391,10 +391,11 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "22px 28px 30px" }}>
+      <div className="kimix-workspace-body">
+        <div className="kimix-workspace-content">
         {createMode ? (
           <div className="grid w-full items-start" style={{ gridTemplateColumns: "minmax(320px, 0.86fr) minmax(0, 1.14fr)", gap: 20 }}>
-            <section className="flex flex-col rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "18px 18px", gap: 16 }}>
+            <section className="flex flex-col rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "18px 18px", gap: 16 }}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="flex items-center text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]" style={{ gap: 9 }}>
@@ -452,7 +453,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
               </div>
             </section>
 
-            <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "18px 18px" }}>
+            <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "18px 18px" }}>
               <div className="mb-4 text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]">规则草稿</div>
               {draftRule ? renderRuleEditor(
                 draftRule,
@@ -476,18 +477,18 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 <div className="text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]">规则状态</div>
                 <div className="mt-2 text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">{message}</div>
                 <div className="mt-4 grid grid-cols-2" style={{ gap: 10 }}>
-                  <div className="rounded-lg bg-[var(--kimix-panel-bg)] text-[13px] leading-5" style={{ padding: "11px 12px" }}>
+                  <div className="rounded-lg bg-surface-elevated text-[13px] leading-5" style={{ padding: "11px 12px" }}>
                     <div className="text-[var(--kimix-panel-text-muted)]">全部规则</div>
                     <div className="mt-1 text-[18px] font-semibold text-[var(--kimix-panel-text)]">{rules.length}</div>
                   </div>
-                  <div className="rounded-lg bg-[var(--kimix-panel-bg)] text-[13px] leading-5" style={{ padding: "11px 12px" }}>
+                  <div className="rounded-lg bg-surface-elevated text-[13px] leading-5" style={{ padding: "11px 12px" }}>
                     <div className="text-[var(--kimix-panel-text-muted)]">已启用</div>
                     <div className="mt-1 text-[18px] font-semibold text-[var(--accent-blue)]">{enabledCount}</div>
                   </div>
                 </div>
               </section>
 
-              <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "16px 16px" }}>
+              <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "16px 16px" }}>
                 <div className="text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]">已有规则</div>
                 <div className="mt-4 flex min-w-0 flex-col" style={{ gap: 10 }}>
                   {rules.length === 0 ? (
@@ -495,7 +496,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                       暂无规则。点击模板或“新建规则”开始配置。
                     </div>
                   ) : rules.map((rule) => (
-                    <button key={rule.id} type="button" onClick={() => setSelectedRuleId(rule.id)} className={`w-full rounded-lg border text-left transition-colors ${selectedRule?.id === rule.id ? "border-accent-primary bg-accent-primary-light" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] hover:bg-[var(--kimix-panel-soft-bg)]"}`} style={{ padding: "12px 12px" }}>
+                    <button key={rule.id} type="button" onClick={() => setSelectedRuleId(rule.id)} className={`w-full rounded-lg border text-left transition-colors ${selectedRule?.id === rule.id ? "border-accent-primary bg-accent-primary-light" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated hover:bg-[var(--kimix-panel-soft-bg)]"}`} style={{ padding: "12px 12px" }}>
                       <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                         <div className="min-w-0">
                           <div className="truncate text-[13.5px] font-semibold leading-5 text-[var(--kimix-panel-text)]">{rule.name}</div>
@@ -511,7 +512,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 </div>
               </section>
 
-              <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "16px 16px" }}>
+              <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "16px 16px" }}>
                 <div className="flex items-center" style={{ gap: 10 }}>
                   <Play size={16} className="text-[var(--kimix-panel-text-secondary)]" />
                   <div className="text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]">模板</div>
@@ -532,7 +533,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 </div>
               </section>
 
-              <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ padding: "16px 16px" }}>
+              <section className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "16px 16px" }}>
                 <div className="flex items-center" style={{ gap: 10 }}>
                   <Activity size={16} className="text-[var(--kimix-panel-text-secondary)]" />
                   <div className="text-[15px] font-semibold leading-6 text-[var(--kimix-panel-text)]">最近命中</div>
@@ -560,7 +561,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
               </section>
             </aside>
 
-            <section className="min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ minHeight: 238, padding: "20px 20px" }}>
+            <section className="min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ minHeight: 238, padding: "20px 20px" }}>
                 {selectedRule ? (
                   <>
                     <div className="mb-4 flex items-start justify-between" style={{ gap: 12 }}>
@@ -598,6 +599,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
             </section>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

@@ -210,6 +210,131 @@ export type ListSlashCommandsResponse = {
   error: string;
 };
 
+export type ImportCcCodexPreviewRequest = {
+  workDir?: string;
+}
+
+export type ImportCcCodexApplyRequest = {
+  previewId: string;
+}
+
+export type ImportCcCodexPlanItem = {
+  kind: "instruction" | "skill" | "mcp";
+  source: string;
+  target: string;
+  label: string;
+  action: "append" | "copy" | "merge" | "skip";
+  reason?: string;
+}
+
+export type ImportCcCodexPreviewResponse = {
+  success: true;
+  data: {
+    previewId: string;
+    kimiHome: string;
+    projectRoot?: string;
+    items: ImportCcCodexPlanItem[];
+    warnings: string[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type ImportCcCodexApplyResponse = {
+  success: true;
+  data: {
+    imported: ImportCcCodexPlanItem[];
+    skipped: ImportCcCodexPlanItem[];
+    backups: string[];
+    warnings: string[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type ThemePaletteColors = {
+  primary: string;
+  surface: string;
+  accent: string;
+}
+
+export type KimiThemePalette = {
+  primary: string;
+  accent: string;
+  text: string;
+  textStrong: string;
+  textDim: string;
+  textMuted: string;
+  border: string;
+  borderFocus: string;
+  success: string;
+  warning: string;
+  error: string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffAddedStrong: string;
+  diffRemovedStrong: string;
+  diffGutter: string;
+  diffMeta: string;
+  roleUser: string;
+}
+
+export type KimiThemePreset = {
+  id: string;
+  name: string;
+  displayName: string;
+  path?: string;
+  base?: "light" | "dark";
+  palette: KimiThemePalette;
+  colors?: ThemePaletteColors;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export type KimiThemeImportItem = {
+  id: string;
+  name: string;
+  displayName: string;
+  path: string;
+  base: "light" | "dark";
+  colors: ThemePaletteColors;
+  kimiColors: KimiThemePalette;
+  sourceTokens: {
+    primary?: string;
+    surface?: string;
+    accent?: string;
+  };
+  warning?: string;
+}
+
+export type KimiThemeImportPreviewResponse = {
+  success: true;
+  data: {
+    previewId: string;
+    themesDir: string;
+    items: KimiThemeImportItem[];
+    warnings: string[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiThemeImportApplyRequest = {
+  previewId: string;
+  themeId: string;
+}
+
+export type KimiThemeImportApplyResponse = {
+  success: true;
+  data: KimiThemeImportItem;
+} | {
+  success: false;
+  error: string;
+};
+
 export type CheckKimiCliResponse = {
   success: true;
   data: {
@@ -297,6 +422,10 @@ export type SetKimiModelAdaptiveThinkingRequest = {
   adaptiveThinking: boolean;
 };
 
+export type RemoveKimiModelConfigRequest = {
+  modelAlias: string;
+};
+
 export type KimiProviderCatalogModelSummary = {
   id: string;
   name: string | null;
@@ -350,6 +479,14 @@ export type KimiDoctorConfigResponse = {
     ok: boolean;
     output: string;
     message: string;
+    environment?: {
+      kimiCodeHome: string;
+      proxy: {
+        key: "HTTP_PROXY" | "HTTPS_PROXY" | "ALL_PROXY" | "NO_PROXY";
+        configured: boolean;
+        value: string;
+      }[];
+    };
   };
 } | {
   success: false;
@@ -1087,6 +1224,14 @@ export type AppSettings = {
   enableCompaction: boolean;
   defaultPermissionMode: "manual" | "auto" | "yolo";
   theme: "dark" | "light" | "system";
+  themePalette: "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
+  customThemePalette: {
+    primary: string;
+    surface: string;
+    accent: string;
+  };
+  kimiThemePalettes: KimiThemePreset[];
+  kimiThemePalette?: KimiThemePalette;
   fontSize: number;
   showThinking: boolean;
   detailedContext: boolean;
@@ -1438,6 +1583,7 @@ export type KimiCodeSetPluginMcpServerEnabledRequest = {
 
 export type KimiCodeSessionRequest = {
   sessionId: string;
+  instruction?: string;
 };
 
 export type KimiCodeUndoHistoryRequest = {

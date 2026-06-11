@@ -213,6 +213,7 @@ interface LongTaskInspectorPanelProps {
   btwDisabled: boolean;
   defaultPlanMode: boolean;
   officialGoal: Session["officialGoal"] | null | undefined;
+  gitDetailsOpenSignal?: number;
   onClose: () => void;
   onPatchLongTaskMeta: (
     patch: Partial<NonNullable<Session["longTask"]>>,
@@ -274,6 +275,7 @@ export function LongTaskInspectorPanel({
   btwDisabled,
   defaultPlanMode,
   officialGoal,
+  gitDetailsOpenSignal,
   onClose,
   onPatchLongTaskMeta,
   onApplyTargetStep,
@@ -525,6 +527,13 @@ export function LongTaskInspectorPanel({
     setGitDetailsOpen(true);
     void loadGitDetails();
   };
+  const lastGitDetailsOpenSignalRef = useRef(0);
+  useEffect(() => {
+    const nextSignal = gitDetailsOpenSignal ?? 0;
+    if (nextSignal === lastGitDetailsOpenSignalRef.current) return;
+    lastGitDetailsOpenSignalRef.current = nextSignal;
+    openGitDetails();
+  }, [gitDetailsOpenSignal]);
   useEffect(() => {
     gitInfoRequestIdRef.current += 1;
     gitDetailsRequestIdRef.current += 1;

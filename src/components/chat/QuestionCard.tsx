@@ -148,14 +148,14 @@ export function QuestionCard({ event }: QuestionCardProps) {
   return (
     <div className="flex justify-center">
       <div
-        className="w-full max-w-[96%] rounded-2xl border border-accent-primary-soft bg-accent-primary-light text-text-primary"
-        style={{ padding: collapsed ? "12px 16px" : "20px 22px 12px" }}
+        className="w-full rounded-2xl border border-accent-primary-soft bg-accent-primary-light text-text-primary"
+        style={{ maxWidth: 832, paddingLeft: 22, paddingRight: 22, paddingTop: collapsed ? 13 : 20, paddingBottom: collapsed ? 13 : 12 }}
       >
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
           className="flex w-full items-center rounded-xl text-left transition-colors hover:bg-surface-elevated/60"
-          style={{ gap: 14, minHeight: 48, paddingLeft: collapsed ? 8 : 0, paddingRight: collapsed ? 10 : 0 }}
+          style={{ gap: 14, minHeight: 48, paddingLeft: 10, paddingRight: 10 }}
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]">
             <CircleHelp size={16} />
@@ -171,7 +171,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
 
         {!collapsed && (
           <>
-        <div className="text-[13px] leading-5 text-text-secondary" style={{ marginTop: 8, marginBottom: 18, paddingLeft: 48 }}>
+        <div className="text-[13px] leading-5 text-text-secondary" style={{ marginTop: 8, marginBottom: 18, paddingLeft: 58, paddingRight: 10 }}>
           Kimi 官方结构化提问会在你选择后继续执行。
         </div>
 
@@ -181,7 +181,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
             const customValue = customAnswers[question.question] ?? "";
             const customActive = Boolean(customSelected[question.question] && customValue.trim().length > 0);
             return (
-              <div key={`${question.question}-${questionIndex}`} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ padding: "16px 16px 17px" }}>
+              <div key={`${question.question}-${questionIndex}`} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 17 }}>
                 <div className="flex items-center" style={{ gap: 12, minHeight: 30 }}>
                   {question.header && (
                     <span className="shrink-0 rounded-md bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
@@ -190,7 +190,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
                   )}
                   <div className="min-w-0 flex-1 text-[14.5px] leading-6 text-text-primary">{question.question}</div>
                 </div>
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))]" style={{ gap: 12, marginTop: 12 }}>
+                <div className="kimix-question-options-grid grid" style={{ gap: 12, marginTop: 12 }}>
                   {question.options.map((option) => {
                     const active = !customActive && selected.includes(option.label);
                     return (
@@ -200,7 +200,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
                         disabled={!isPending || isSubmitting}
                         onClick={() => setQuestionAnswer(question.question, option.label, question.multiSelect)}
                         className={`flex w-full items-center rounded-xl border text-left text-[13.5px] transition-colors disabled:cursor-not-allowed ${active ? "border-accent-primary bg-accent-primary-light text-accent-primary-dark" : "border-border-subtle bg-surface-elevated text-text-primary hover:bg-surface-hover"}`}
-                        style={{ gap: 10, minHeight: 58, paddingLeft: 13, paddingRight: 13, paddingTop: 10, paddingBottom: 10 }}
+                        style={{ gap: 10, minHeight: 62, paddingLeft: 13, paddingRight: 13, paddingTop: 10, paddingBottom: 10 }}
                         title={option.description}
                       >
                         <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${active ? "border-accent-primary bg-accent-primary text-white" : "border-border-default text-transparent"}`}>

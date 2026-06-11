@@ -49,7 +49,76 @@ function separatorCells(line: string) {
     .filter(Boolean);
 }
 
-function restoreBrokenMarkdownTables(content: string) {
+function joinMarkdownLineFragments(parts: string[]) {
+  return parts.reduce((merged, part) => {
+    const text = part.trim();
+    if (!merged) return text;
+    const prev = merged[merged.length - 1] ?? "";
+    const next = text[0] ?? "";
+    if (!prev || !next) return merged + text;
+    if (prev === "|" && next !== "|") return `${merged} ${text}`;
+    if (prev === "|" || next === "|" || prev === "/" || next === "/" || prev === "_" || next === "_") return merged + text;
+    if (/[\w.-]/.test(prev) && /[\w.-]/.test(next)) return merged + text;
+    return `${merged} ${text}`;
+  }, "");
+}
+
+function restoreBrokenMarkdownTableRows(lines: string[]) {
+  const restored: string[] = [];
+  let activeTableCells = 0;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    restored.push(line);
+
+    if (isLikelyMarkdownTableHeader(line) && i + 1 < lines.length && isMarkdownTableSeparatorFragment(lines[i + 1])) {
+      activeTableCells = countMarkdownTableCells(line);
+      continue;
+    }
+    if (!activeTableCells) continue;
+    if (isMarkdownTableSeparatorFragment(line)) continue;
+
+    if (!line.trim()) {
+      activeTableCells = 0;
+      continue;
+    }
+    if (!line.includes("|")) {
+      activeTableCells = 0;
+      continue;
+    }
+
+    const fragments = [line];
+    let cursor = i + 1;
+    let consumedBlank = false;
+
+    while (cursor < lines.length && fragments.length < 12) {
+      const candidate = lines[cursor];
+      if (!candidate.trim()) {
+        if (fragments.length === 0) break;
+        consumedBlank = true;
+        cursor += 1;
+        continue;
+      }
+      const merged = joinMarkdownLineFragments([...fragments, candidate]);
+      if (countMarkdownTableCells(merged) > activeTableCells) break;
+      if (!candidate.includes("|") && countMarkdownTableCells(merged) >= activeTableCells) break;
+      if (!candidate.includes("|") && !consumedBlank && !/[\/_.-]$/.test(fragments[fragments.length - 1].trim())) break;
+      fragments.push(candidate);
+      consumedBlank = false;
+      cursor += 1;
+      if (countMarkdownTableCells(joinMarkdownLineFragments(fragments)) >= activeTableCells) break;
+    }
+
+    if (fragments.length > 1) {
+      restored[restored.length - 1] = joinMarkdownLineFragments(fragments);
+      i = cursor - 1;
+    }
+  }
+
+  return restored;
+}
+
+export function restoreMarkdownTables(content: string) {
   if (!content.includes("|") || !content.includes("-")) return content;
   const lines = content.split(/\r?\n/);
   const restored: string[] = [];
@@ -74,6 +143,7 @@ function restoreBrokenMarkdownTables(content: string) {
       }
       if (!isMarkdownTableSeparatorFragment(candidate)) break;
       fragments.push(candidate);
+      consumedBlank = false;
       const mergedCellCount = fragments.flatMap(separatorCells).length;
       cursor += 1;
       if (mergedCellCount >= headerCells) break;
@@ -86,11 +156,11 @@ function restoreBrokenMarkdownTables(content: string) {
     }
   }
 
-  return restored.join("\n");
+  return restoreBrokenMarkdownTableRows(restored).join("\n");
 }
 
 export function restoreAssistantProgressParagraphs(content: string): string {
-  const withTables = restoreBrokenMarkdownTables(content);
+  const withTables = restoreMarkdownTables(content);
   if (withTables.length < 120 || withTables.includes("\n") || !hasProgressBoundary(withTables)) return withTables;
   const pattern = /([。！？；.!?])(?=(先|现在|然后|同时|接着|下一步|利用|构建|分析|批次\d*|云端|版本号|上传|修复))/g;
   const restored = withTables.replace(pattern, "$1\n\n");

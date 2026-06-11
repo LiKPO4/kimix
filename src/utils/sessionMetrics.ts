@@ -28,6 +28,13 @@ export function isEmptyStatusUpdate(event: Extract<TimelineEvent, { type: "statu
     (event.contextSize ?? 0) === 0;
 }
 
+export function hasMetricStatus(event: Extract<TimelineEvent, { type: "status_update" }>) {
+  return event.inputTokenCount !== undefined ||
+    event.tokenCount !== undefined ||
+    event.contextSize !== undefined ||
+    event.contextLimit !== undefined;
+}
+
 export function getLatestMeaningfulStatus(events: TimelineEvent[]) {
   const statuses = events.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
   for (let index = statuses.length - 1; index >= 0; index -= 1) {
@@ -36,11 +43,19 @@ export function getLatestMeaningfulStatus(events: TimelineEvent[]) {
   return undefined;
 }
 
+export function getLatestMetricStatus(events: TimelineEvent[]) {
+  const statuses = events.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
+  for (let index = statuses.length - 1; index >= 0; index -= 1) {
+    if (hasMetricStatus(statuses[index]) && !isEmptyStatusUpdate(statuses[index])) return statuses[index];
+  }
+  return undefined;
+}
+
 export function getSessionRecommendationMetrics(session: Session | undefined, turnLimit: number): SessionRecommendationMetrics {
   const safeLimit = Math.max(1, Math.round(turnLimit || 1));
   const events = session?.events ?? [];
   const turnCount = countUserTurns(events);
-  const latestStatus = getLatestMeaningfulStatus(events);
+  const latestStatus = getLatestMetricStatus(events);
   return {
     turnCount,
     turnLimit: safeLimit,

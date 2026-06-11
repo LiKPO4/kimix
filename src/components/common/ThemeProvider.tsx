@@ -1,22 +1,30 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
+import { applyThemeSnapshot } from "@/utils/themeSnapshot";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useAppStore((s) => s.theme);
+  const themePalette = useAppStore((s) => s.themePalette);
+  const customThemePalette = useAppStore((s) => s.customThemePalette);
+  const kimiThemePalettes = useAppStore((s) => s.kimiThemePalettes);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const applyMode = (mode: "light" | "dark") => {
+      applyThemeSnapshot({ theme: mode, themePalette, customThemePalette, kimiThemePalettes });
+    };
+
     if (theme === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const handler = (e: MediaQueryListEvent) => {
-        document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+        applyMode(e.matches ? "dark" : "light");
       };
-      document.documentElement.setAttribute("data-theme", mq.matches ? "dark" : "light");
+      applyMode(mq.matches ? "dark" : "light");
       mq.addEventListener("change", handler);
       return () => mq.removeEventListener("change", handler);
     } else {
-      document.documentElement.setAttribute("data-theme", theme);
+      applyMode(theme);
     }
-  }, [theme]);
+  }, [theme, themePalette, customThemePalette, kimiThemePalettes]);
 
   return <>{children}</>;
 }

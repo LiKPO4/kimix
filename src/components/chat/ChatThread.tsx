@@ -19,7 +19,7 @@ import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
@@ -77,6 +77,44 @@ function isKimixSyntheticThinking(text: string) {
 
 function normalizeFilePath(value: string) {
   return value.replace(/\\/g, "/").toLowerCase();
+}
+
+function slashNoticeCommand(event: Extract<TimelineEvent, { type: "status_update" }>): string | null {
+  if (event.source !== "slash" || !event.message) return null;
+  const match = event.message.match(/^已接收本地指令：([\s\S]+)$/);
+  return match?.[1]?.trim() || null;
+}
+
+function splitUserAttachedStatuses(events: TimelineEvent[]) {
+  const attachedByUserId = new Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>();
+  const remaining: TimelineEvent[] = [];
+  const userEvents = events.filter((event): event is Extract<TimelineEvent, { type: "user_message" }> => event.type === "user_message");
+
+  const attach = (userId: string, status: Extract<TimelineEvent, { type: "status_update" }>) => {
+    attachedByUserId.set(userId, [...(attachedByUserId.get(userId) ?? []), status]);
+  };
+
+  for (const event of events) {
+    if (event.type !== "status_update" || event.source !== "slash") {
+      remaining.push(event);
+      continue;
+    }
+    if (event.parentEventId && userEvents.some((user) => user.id === event.parentEventId)) {
+      attach(event.parentEventId, event);
+      continue;
+    }
+    const command = slashNoticeCommand(event);
+    const matchedUser = command
+      ? [...userEvents].reverse().find((user) => user.content.trim() === command)
+      : undefined;
+    if (matchedUser) {
+      attach(matchedUser.id, event);
+      continue;
+    }
+    remaining.push(event);
+  }
+
+  return { events: remaining, attachedByUserId };
 }
 
 function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: string }) {
@@ -217,9 +255,24 @@ function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; proj
   );
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
+function UserAttachedStatuses({ statuses }: { statuses?: Extract<TimelineEvent, { type: "status_update" }>[] }) {
+  if (!statuses || statuses.length === 0) return null;
+  return (
+    <div className="flex flex-col items-end" style={{ gap: 6, paddingRight: 18, marginTop: -12, marginBottom: 8 }}>
+      {statuses.map((status) => <StatusCard key={status.id} event={status} />)}
+    </div>
+  );
+}
+
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
   switch (event.type) {
     case "user_message":
+      return (
+        <>
+          <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />
+          <UserAttachedStatuses statuses={attachedUserStatuses} />
+        </>
+      );
     case "steer_message":
       return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />;
     case "assistant_message":
@@ -297,7 +350,11 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
-function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "kimi-code"): RenderItem[] {
+function buildRenderItems(
+  events: TimelineEvent[],
+  sessionEngine?: "prompt" | "kimi-code",
+  attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
+): RenderItem[] {
   const items: RenderItem[] = [];
 
   const pushStandaloneTools = (tools: ToolCallEvent[]) => {
@@ -505,7 +562,12 @@ function buildRenderItems(events: TimelineEvent[], sessionEngine?: "prompt" | "k
     const type = (event as { type?: unknown }).type;
     if (type === "user_message") {
       flushTurn();
-      items.push(type === "approval_request" ? { type: "event", event, approvalDiffs: diffEvents.map((diff) => ({ path: diff.filePath, oldText: diff.oldText, newText: diff.newText })) } : { type: "event", event });
+      items.push({ type: "event", event, attachedUserStatuses: attachedUserStatuses?.get(event.id) });
+      continue;
+    }
+    if (type === "steer_message") {
+      flushTurn();
+      items.push({ type: "event", event });
       continue;
     }
 
@@ -609,15 +671,19 @@ export function ChatThread() {
   const showScrollToBottomRef = useRef(false);
   const [isAutoFollow, setIsAutoFollow] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const splitEvents = useMemo(
+    () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
+    [session?.events]
+  );
   const visibleEvents = useMemo(
-    () => filterStatusUpdates(
-      collapseCompletedCompactions(session?.events ?? []),
-      statusUpdateDisplay,
-    ),
-    [session?.events, statusUpdateDisplay]
+    () => filterStatusUpdates(splitEvents.events, statusUpdateDisplay),
+    [splitEvents.events, statusUpdateDisplay]
   );
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
-  const renderItems = useMemo(() => buildRenderItems(visibleEvents, session?.engine), [visibleEvents, session?.engine]);
+  const renderItems = useMemo(
+    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId),
+    [visibleEvents, session?.engine, splitEvents.attachedByUserId]
+  );
   const contentVersion = useMemo(() => {
     return (session?.events ?? []).map((event) => {
       if (event.type === "assistant_message") {
@@ -785,7 +851,7 @@ export function ChatThread() {
     <div className="relative h-full">
       {session.longTask && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
-          <div className="kimix-chat-column pointer-events-auto">
+          <div className="kimix-chat-stream-column pointer-events-auto">
             <LongTaskBanner meta={session.longTask} projectPath={session.projectPath} />
           </div>
         </div>
@@ -798,7 +864,7 @@ export function ChatThread() {
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div className="kimix-chat-column flex min-h-full w-full flex-col" style={{ gap: 22 }}>
+        <div className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22 }}>
           {renderItems.map((item, index) => (
             <div key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id} className="kimix-message-enter" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
               {item.type === "tool_group"
@@ -815,7 +881,7 @@ export function ChatThread() {
       </div>
       {showScrollToBottom && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-20" style={{ bottom: 24 }}>
-          <div className="kimix-chat-column flex justify-end">
+          <div className="kimix-chat-stream-column flex justify-end">
             <button
               type="button"
               aria-label="滚动到底部"

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Session } from "@/types/ui";
+import type { Session, WorkspaceView } from "@/types/ui";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { collectSessionDiffs } from "@/utils/diff";
@@ -74,6 +74,10 @@ function goalStatusLabel(status: string) {
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
+type NavigationEntry = {
+  workspaceView: WorkspaceView;
+  sessionId: string | null;
+};
 
 type ReleaseInfo = {
   tagName: string;
@@ -236,10 +240,15 @@ export function AppShell() {
   const [longTaskBackgroundTasks, setLongTaskBackgroundTasks] = useState<LongTaskBackgroundTaskView[]>([]);
   const [longTaskBackgroundTasksLoading, setLongTaskBackgroundTasksLoading] = useState(false);
   const [longTaskBackgroundTasksError, setLongTaskBackgroundTasksError] = useState<string | null>(null);
+  const navigationBackStackRef = useRef<NavigationEntry[]>([]);
+  const navigationForwardStackRef = useRef<NavigationEntry[]>([]);
+  const lastNavigationEntryRef = useRef<NavigationEntry | null>(null);
+  const applyingNavigationRef = useRef(false);
   const [targetStepDraft, setTargetStepDraft] = useState("");
   const [targetStepBusy, setTargetStepBusy] = useState(false);
   const [longTaskControlBusy, setLongTaskControlBusy] = useState(false);
   const [sessionLongTasks, setSessionLongTasks] = useState<LongTaskSummary[]>([]);
+  const [gitDetailsOpenSignal, setGitDetailsOpenSignal] = useState(0);
   const [sessionLongTasksLoading, setSessionLongTasksLoading] = useState(false);
   const [shutdownAfterLongTaskId, setShutdownAfterLongTaskId] = useState<string | null>(null);
   const [shutdownDialog, setShutdownDialog] = useState<{ taskId: string; taskTitle: string; remainingSeconds: number } | null>(null);
@@ -513,6 +522,47 @@ export function AppShell() {
     [sessions, currentProject],
   );
 
+  const applyNavigationEntry = (entry: NavigationEntry) => {
+    applyingNavigationRef.current = true;
+    lastNavigationEntryRef.current = entry;
+    setWorkspaceView(entry.workspaceView);
+    const targetSession = entry.sessionId
+      ? useSessionStore.getState().sessions.find((session) => session.id === entry.sessionId && !session.archivedAt && !isHiddenInternalSession(session))
+      : null;
+    setCurrentSession(targetSession ?? null);
+    window.setTimeout(() => {
+      applyingNavigationRef.current = false;
+    }, 0);
+  };
+
+  const navigateHistory = (direction: "back" | "forward") => {
+    const from = lastNavigationEntryRef.current ?? { workspaceView, sessionId: currentSession?.id ?? null };
+    const sourceStack = direction === "back" ? navigationBackStackRef.current : navigationForwardStackRef.current;
+    const target = sourceStack.pop();
+    if (!target) return;
+    const destinationStack = direction === "back" ? navigationForwardStackRef.current : navigationBackStackRef.current;
+    destinationStack.push(from);
+    applyNavigationEntry(target);
+  };
+
+  useEffect(() => {
+    const nextEntry: NavigationEntry = { workspaceView, sessionId: currentSession?.id ?? null };
+    const previous = lastNavigationEntryRef.current;
+    if (applyingNavigationRef.current) {
+      lastNavigationEntryRef.current = nextEntry;
+      return;
+    }
+    if (!previous) {
+      lastNavigationEntryRef.current = nextEntry;
+      return;
+    }
+    if (previous.workspaceView === nextEntry.workspaceView && previous.sessionId === nextEntry.sessionId) return;
+    navigationBackStackRef.current.push(previous);
+    if (navigationBackStackRef.current.length > 80) navigationBackStackRef.current.shift();
+    navigationForwardStackRef.current = [];
+    lastNavigationEntryRef.current = nextEntry;
+  }, [workspaceView, currentSession?.id]);
+
   useEffect(() => {
     if (!currentSession || currentSession.archivedAt || isHiddenInternalSession(currentSession)) return;
     if (isSameProjectPath(currentProject?.path, currentSession.projectPath)) return;
@@ -720,8 +770,8 @@ export function AppShell() {
     if (action === "find") setSearchOpen(true);
     if (action === "previous-chat") moveChat("previous");
     if (action === "next-chat") moveChat("next");
-    if (action === "back") moveChat("previous");
-    if (action === "forward") moveChat("next");
+    if (action === "back") navigateHistory("back");
+    if (action === "forward") navigateHistory("forward");
     if (action === "zoom-in" && typeof window.api.setZoomLevel === "function") void window.api.setZoomLevel(0.5);
     if (action === "zoom-out" && typeof window.api.setZoomLevel === "function") void window.api.setZoomLevel(-0.5);
     if (action === "actual-size" && typeof window.api.resetZoom === "function") void window.api.resetZoom();
@@ -1535,14 +1585,19 @@ ${isFinalStep
     setPluginPanelTab(tab);
     if (workspaceView === "mcp") setWorkspaceView("plugins");
   };
+  const openGitDetailsFromContextBar = () => {
+    setDiffPanelOpen(false);
+    setLongTaskInspectorOpen(true);
+    setGitDetailsOpenSignal((value) => value + 1);
+  };
 
   return (
     <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
         <TopMenuBar
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
-          onNavigateBack={() => moveChat("previous")}
-          onNavigateForward={() => moveChat("next")}
+          onNavigateBack={() => navigateHistory("back")}
+          onNavigateForward={() => navigateHistory("forward")}
           onMenuAction={handleMenuAction}
         hasUpdate={updateState.hasUpdate || hasKimiCodeUpdate}
         updateMessage={topUpdateMessage}
@@ -1597,7 +1652,7 @@ ${isFinalStep
                 <div className="kimix-chat-column">
                   <Composer />
                   <div style={{ marginTop: 10 }}>
-                    <ContextBar />
+                    <ContextBar onOpenGitDetails={openGitDetailsFromContextBar} />
                   </div>
                 </div>
               </div>
@@ -1641,6 +1696,7 @@ ${isFinalStep
             btwDisabled={!liveCurrentSession || isCurrentSessionRunning}
             defaultPlanMode={defaultPlanMode}
             officialGoal={liveCurrentSession?.officialGoal}
+            gitDetailsOpenSignal={gitDetailsOpenSignal}
             onClose={() => setLongTaskInspectorOpen(false)}
             onPatchLongTaskMeta={patchLongTaskMeta}
             onApplyTargetStep={applyTargetStep}

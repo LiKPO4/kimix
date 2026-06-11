@@ -913,6 +913,9 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
 
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
+  const setThemePalette = useAppStore((s) => s.setThemePalette);
+  const setCustomThemePalette = useAppStore((s) => s.setCustomThemePalette);
+  const setKimiThemePalettes = useAppStore((s) => s.setKimiThemePalettes);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
@@ -966,6 +969,9 @@ function App() {
   useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
   useBootstrap({
     setTheme,
+    setThemePalette,
+    setCustomThemePalette,
+    setKimiThemePalettes,
     setPermissionMode,
     setDefaultThinking,
     setDefaultPlanMode,
@@ -2159,7 +2165,7 @@ function App() {
       updateSession(uiSessionId, (session) => ({
         ...session,
         events: appendSessionRecommendationIfNeeded(
-          settlePendingSteerMessages(settleInactiveEvents(session.events), "sent"),
+          settleInactiveEvents(session.events),
           useAppStore.getState().sessionRecommendationEnabled,
           useAppStore.getState().sessionRecommendationTurnLimit,
         ),
@@ -2252,7 +2258,7 @@ function App() {
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: appendSessionRecommendationIfNeeded(
-            settlePendingSteerMessages(settleInactiveEvents(session.events), "sent"),
+            settleInactiveEvents(session.events),
             useAppStore.getState().sessionRecommendationEnabled,
             useAppStore.getState().sessionRecommendationTurnLimit,
           ),

@@ -3,7 +3,8 @@ import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, 
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot } from "@/types/ui";
+import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette } from "@/types/ui";
+import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
@@ -75,6 +76,93 @@ function buildGoalKickoffPrompt(objective: string) {
   ].join("\n");
 }
 
+function buildCustomThemeKickoffPrompt(request: string) {
+  const themeRequest = request.trim() || "生成一套适合日常编码使用的 Kimi Code 主题";
+  return [
+    "【Kimix 官方 /custom-theme 兼容执行】",
+    "",
+    "当前 Kimix 通过 Kimi Code SDK 发送消息，SDK 不会触发官方 TUI 的 slash dispatcher；因此请你直接完成官方 /custom-theme 本该做的工作。",
+    "",
+    `用户主题需求：${themeRequest}`,
+    "",
+    "请直接在本机写入一个 Kimi Code 自定义主题 JSON，不要只给建议，不要询问是否打开预览或本地 URL。",
+    "",
+    "写入位置必须严格按下面步骤解析，不能猜测用户目录：",
+    "- Windows PowerShell 先执行：`$profile = [Environment]::GetFolderPath('UserProfile')`",
+    "- 然后目标目录必须是：`Join-Path $profile '.kimi-code\\themes'`",
+    "- 目标文件必须是：`Join-Path (Join-Path $profile '.kimi-code\\themes') '<theme-name>.json'`",
+    "- 其他系统先用 `$HOME`，目标目录为：`$HOME/.kimi-code/themes`",
+    "- 禁止写入项目目录、当前工作目录、`~/.kimi-code/themes` 的字面量目录、或任何其他用户目录。",
+    "- 如果当前真实用户目录不是 `C:\\Users\\lijialin08`，禁止写入 `C:\\Users\\lijialin08\\.kimi-code\\themes`。",
+    "",
+    "JSON 结构必须包含：",
+    "```json",
+    "{",
+    "  \"name\": \"theme-name\",",
+    "  \"displayName\": \"Theme Display Name\",",
+    "  \"base\": \"light\",",
+    "  \"colors\": {",
+    "    \"primary\": \"#1565C0\",",
+    "    \"accent\": \"#00838F\",",
+    "    \"text\": \"#1A1A1A\",",
+    "    \"textStrong\": \"#1A1A1A\",",
+    "    \"textDim\": \"#454545\",",
+    "    \"textMuted\": \"#5F5F5F\",",
+    "    \"border\": \"#737373\",",
+    "    \"borderFocus\": \"#92660A\",",
+    "    \"success\": \"#0E7A38\",",
+    "    \"warning\": \"#92660A\",",
+    "    \"error\": \"#B91C1C\",",
+    "    \"diffAdded\": \"#0E7A38\",",
+    "    \"diffRemoved\": \"#B91C1C\",",
+    "    \"diffAddedStrong\": \"#0E7A38\",",
+    "    \"diffRemovedStrong\": \"#B91C1C\",",
+    "    \"diffGutter\": \"#737373\",",
+    "    \"diffMeta\": \"#5F5F5F\",",
+    "    \"roleUser\": \"#9A4A00\"",
+    "  }",
+    "}",
+    "```",
+    "",
+    "主题质量要求（必须先按这些规则设计，再写 JSON）：",
+    "- 这 18 个 token 不是三色主题映射，必须按语义分别设计，不能只改 primary/accent/text 后复制默认值。",
+    "- `diffAdded` / `diffRemoved` 是 diff 背景/普通提示语义，必须与 `success` / `error` 有明确色相或明度差异；不能直接等于 success/error。",
+    "- `diffAddedStrong` / `diffRemovedStrong` 必须比对应普通 diff 更强、更醒目，不能等于 diffAdded/diffRemoved，也不能等于 success/error。",
+    "- `diffGutter` / `diffMeta` 是 diff 辅助信息，应该低饱和、低对比，但仍能读清；不要复用 textMuted 以外的强强调色。",
+    "- `success` / `warning` / `error` 必须分别服务成功、警告、错误，warning 不要复用 success 或 borderFocus，error 不要复用 diffRemoved。",
+    "- `borderFocus` 必须是清晰焦点环颜色，通常可比 primary 更暖或更亮，但不能和 border、textMuted 一样弱。",
+    "- `roleUser` 必须是用户身份/用户消息强调色，应该与 primary/accent 有联系但可辨认，不能直接复用 text 或 border。",
+    "- `text` / `textStrong` / `textDim` / `textMuted` 必须形成递进层级；textStrong 应最清晰，textDim 和 textMuted 不能完全相同。",
+    "- `border` 必须能在背景上看见但不抢眼；不能过浅到不可见，也不能和 primary/accent 抢层级。",
+    "- 对低饱和主题也要保留语义区分：可以低饱和，但不能把所有语义色都灰化或同色化。",
+    "",
+    "生成前先做一轮内部配色自检，禁止出现这些情况：",
+    "- diffAdded === success，diffRemoved === error。",
+    "- diffAddedStrong === diffAdded，diffRemovedStrong === diffRemoved。",
+    "- success === warning，warning === error，success === error。",
+    "- textDim === textMuted，border === textMuted === diffGutter。",
+    "- 超过 3 个语义 token 共用同一个颜色值。",
+    "如果自检发现上述任一情况，必须先重新选色再写文件。",
+    "",
+    "建议生成流程：",
+    "1. 先根据用户需求确定 2-3 个主题关键词和 base。",
+    "2. 设计核心色：primary、accent、roleUser、borderFocus。",
+    "3. 设计文本层级和边框层级。",
+    "4. 独立设计状态色：success、warning、error。",
+    "5. 独立设计 diff 色：added/removed、strong added/removed、gutter/meta。",
+    "6. 再写 JSON，写完读取并做重复值/语义色自检。",
+    "",
+    "执行要求：",
+    "- 根据用户需求自行命名主题，文件名使用小写英文、数字和连字符。",
+    "- 颜色必须都是 `#RRGGBB`。",
+    "- 选择 `base` 为 `light` 或 `dark`，并保证正文、弱文本、边框、背景语义在该模式下有足够对比度。",
+    "- 创建目录、写入 JSON 后，读取文件确认 JSON 可解析。",
+    "- 写完后必须输出一段简短自检结论，说明 diff、状态色、文本层级是否各自独立。",
+    "- 写完后必须列出真实目标目录内容，确认新文件出现在 `...\\.kimi-code\\themes\\` 下。",
+    "- 完成后告诉用户主题文件的绝对路径，并提示到 Kimix 设置页点击“扫描官方主题”导入。",
+  ].join("\n");
+}
+
 async function getDefaultKimiModel() {
   try {
     const res = await window.api.getKimiModelConfig();
@@ -115,23 +203,66 @@ type CompletionItem = {
 
 const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
 const slashCommandPattern = /^\/([a-zA-Z][\w:-]*)(?:\s+([\s\S]*))?$/;
+function summarizeImportPlan(items: { kind: string; action: string }[]) {
+  const active = items.filter((item) => item.action !== "skip");
+  const count = (kind: string) => active.filter((item) => item.kind === kind).length;
+  return `指令 ${count("instruction")} 项，Skills ${count("skill")} 项，MCP ${count("mcp")} 项`;
+}
+
+function formatMappedTheme(item: { colors: ThemePaletteColors; sourceTokens: { primary?: string; surface?: string; accent?: string } }) {
+  const token = (value?: string) => value ? `(${value})` : "(兜底)";
+  return `主色 ${item.colors.primary}${token(item.sourceTokens.primary)}，背景 ${item.colors.surface}${token(item.sourceTokens.surface)}，强调 ${item.colors.accent}${token(item.sourceTokens.accent)}`;
+}
+
+type ThemeImportPreview = {
+  previewId: string;
+  themesDir: string;
+  items: {
+    id: string;
+    displayName: string;
+    base: "light" | "dark";
+    colors: ThemePaletteColors;
+    kimiColors: KimiThemePalette;
+    sourceTokens: {
+      primary?: string;
+      surface?: string;
+      accent?: string;
+    };
+    warning?: string;
+  }[];
+  warnings: string[];
+};
 
 const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-goal", label: "/goal", detail: "Goal 总入口；直接跟目标会启动", insertText: "/goal ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-status", label: "/goal status", detail: "查看当前 Goal 状态", insertText: "/goal status ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-show", label: "/goal show", detail: "显示当前 Goal 状态", insertText: "/goal show ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-start", label: "/goal start", detail: "启动一个新 Goal", insertText: "/goal start ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-start-template", label: "/goal start 修复已知问题并完成验证", detail: "带目标模板：启动一个新 Goal", insertText: "/goal start 修复已知问题并完成验证", commandName: "goal", kind: "slash" },
   { id: "slash-goal-replace", label: "/goal replace", detail: "替换当前 Goal", insertText: "/goal replace ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-replace-template", label: "/goal replace 完成当前任务并输出验证证据", detail: "带目标模板：替换当前 Goal", insertText: "/goal replace 完成当前任务并输出验证证据", commandName: "goal", kind: "slash" },
   { id: "slash-goal-pause", label: "/goal pause", detail: "暂停当前 Goal", insertText: "/goal pause ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-resume", label: "/goal resume", detail: "继续已暂停/受阻 Goal", insertText: "/goal resume ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-cancel", label: "/goal cancel", detail: "取消并清除当前 Goal", insertText: "/goal cancel ", commandName: "goal", kind: "slash" },
-  { id: "slash-goal-next", label: "/goal next", detail: "无当前 Goal 时启动；队列暂未接入", insertText: "/goal next ", commandName: "goal", kind: "slash" },
-  { id: "slash-compact", label: "/compact", detail: "静默压缩当前上下文", insertText: "/compact ", commandName: "compact", kind: "slash" },
+  { id: "slash-goal-next", label: "/goal next", detail: "排队后续 Goal；Kimix 在 SDK 暴露队列 API 前仅提示边界", insertText: "/goal next ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal-next-template", label: "/goal next 继续收尾并整理剩余风险", detail: "带目标模板：排队后续 Goal", insertText: "/goal next 继续收尾并整理剩余风险", commandName: "goal", kind: "slash" },
+  { id: "slash-swarm", label: "/swarm", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-template", label: "/swarm 并行检查最近改动并给出修复建议", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm 并行检查最近改动并给出修复建议", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-on", label: "/swarm on", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-off", label: "/swarm off", detail: "暂不支持 API 调用；发送后按普通消息处理", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
+  { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
+  { id: "slash-custom-theme", label: "/custom-theme", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
+  { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
+  { id: "slash-import-from-cc-codex", label: "/import-from-cc-codex", detail: "官方导入 Claude Code / Codex 配置的入口；Kimix 当前仅提示边界", insertText: "/import-from-cc-codex", commandName: "import-from-cc-codex", kind: "slash" },
+  { id: "slash-compact", label: "/compact", detail: "静默压缩当前上下文，可附带保留指令，如：保留本轮测试结果和待办", insertText: "/compact ", commandName: "compact", kind: "slash" },
+  { id: "slash-compact-template", label: "/compact 保留本轮测试结果和待办", detail: "带保留指令模板：压缩当前上下文", insertText: "/compact 保留本轮测试结果和待办", commandName: "compact", kind: "slash" },
   { id: "slash-plan", label: "/plan", detail: "切换 Plan 模式", insertText: "/plan ", commandName: "plan", kind: "slash" },
   { id: "slash-plan-on", label: "/plan on", detail: "开启 Plan 模式", insertText: "/plan on ", commandName: "plan", kind: "slash" },
   { id: "slash-plan-off", label: "/plan off", detail: "关闭 Plan 模式", insertText: "/plan off ", commandName: "plan", kind: "slash" },
   { id: "slash-btw", label: "/btw", detail: "侧问，不影响主轮次", insertText: "/btw ", commandName: "btw", kind: "slash" },
+  { id: "slash-btw-template", label: "/btw 这个函数是谁调用的", detail: "带问题模板：侧问，不影响主轮次", insertText: "/btw 这个函数是谁调用的", commandName: "btw", kind: "slash" },
   { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo ", commandName: "undo", kind: "slash" },
+  { id: "slash-undo-template", label: "/undo 1", detail: "带次数模板：撤回最近 1 次官方历史", insertText: "/undo 1", commandName: "undo", kind: "slash" },
   { id: "slash-skill", label: "/skill:", detail: "启用本地 Skill 后继续发送", insertText: "/skill:", commandName: "skill", kind: "slash" },
 ];
 
@@ -168,6 +299,8 @@ export function Composer() {
   const [previewImage, setPreviewImage] = useState<ImageAttachment | null>(null);
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [slashCommands, setSlashCommands] = useState<CompletionItem[]>([]);
+  const [themeImportPreview, setThemeImportPreview] = useState<ThemeImportPreview | null>(null);
+  const [themeImportApplyingId, setThemeImportApplyingId] = useState<string | null>(null);
   const [fileItems, setFileItems] = useState<CompletionItem[]>([]);
   const [activeCompletionIndex, setActiveCompletionIndex] = useState(0);
   const inputRef = useRef<ComposerInputHandle>(null);
@@ -185,6 +318,9 @@ export function Composer() {
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
+  const setThemePalette = useAppStore((s) => s.setThemePalette);
+  const upsertKimiThemePalette = useAppStore((s) => s.upsertKimiThemePalette);
+  const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const hiddenComposerCards = useAppStore((s) => s.hiddenComposerCards);
   const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
@@ -314,8 +450,9 @@ export function Composer() {
   }, [currentSession?.id, currentSession?.longTask?.activeAgent]);
 
   const activeCompletion = getActiveCompletion(input);
+  const slashCompletionSource = slashCommands.length > 0 ? slashCommands : sdkSlashCommandItems;
   const filteredSlashItems = activeCompletion?.mode === "slash"
-    ? slashCommands.filter((item) => {
+    ? slashCompletionSource.filter((item) => {
         const rawQuery = activeCompletion.query.toLowerCase().trimStart();
         const query = rawQuery.replace(/\s+/g, " ");
         const commandText = item.label.replace(/^\//, "").toLowerCase().replace(/\s+/g, " ");
@@ -325,8 +462,8 @@ export function Composer() {
         if (!wantsSecondaryCommand) {
           return !isSecondaryCommand && (commandText.includes(query) || detail.includes(query));
         }
-        if (!isSecondaryCommand) return false;
         const rootCommand = query.trimStart().split(" ")[0] ?? "";
+        if (!isSecondaryCommand) return false;
         if (!rootCommand || !commandText.startsWith(`${rootCommand} `)) return false;
         const subcommandQuery = query.slice(rootCommand.length).trimStart();
         if (!subcommandQuery) return true;
@@ -348,7 +485,7 @@ export function Composer() {
     activeCompletion && (
       activeCompletion.mode === "mention" ||
       completionItems.length > 0 ||
-      slashCommands.length === 0
+      slashCompletionSource.length === 0
     ),
   );
 
@@ -472,7 +609,7 @@ export function Composer() {
     return session;
   };
 
-  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean }) => {
+  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return;
     let targetSession = ensuredSession;
@@ -493,6 +630,17 @@ export function Composer() {
       isThinking: defaultThinking,
       isComplete: false,
     };
+    const postUserStatusEvent: TimelineEvent | null = options?.postUserStatusMessage
+      ? {
+          id: genId(),
+          type: "status_update",
+          timestamp: Date.now(),
+          message: options.postUserStatusMessage,
+          source: "slash",
+          tone: "info",
+          parentEventId: userEvent.id,
+        }
+      : null;
 
     const shouldAddUserEvent = options?.addUserEvent !== false;
     updateSession(targetSession.id, (session) => ({
@@ -500,6 +648,7 @@ export function Composer() {
       events: [
         ...session.events,
         ...(shouldAddUserEvent ? [userEvent] : []),
+        ...(postUserStatusEvent ? [postUserStatusEvent] : []),
         responsePlaceholder,
       ],
       title: session.title,
@@ -803,7 +952,7 @@ export function Composer() {
       const current = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
       if (current.success && current.data.goal) {
         syncOfficialGoal(runtime.uiSessionId, current.data.goal);
-        await appendStatusMessage("Kimi Code 0.11.0 已修复 TUI 目标队列，但当前 node-sdk 仍未公开 /goal next 队列 API；当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。");
+        await appendStatusMessage("Kimi Code 0.12.0 已默认提供 Goal 队列；当前 Kimix 依赖的 SDK 尚未暴露队列管理 API。当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。");
         return true;
       }
     }
@@ -831,17 +980,77 @@ export function Composer() {
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
     if (name.startsWith("skill:")) return false;
-    if (!["goal", "compact", "plan", "btw", "undo"].includes(name)) return false;
-    await appendSlashNotice(args ? `/${name} ${args}` : `/${name}`);
-    if (name === "goal") return handleGoalSlashCommand(content.trim(), args);
+    if (!["goal", "theme", "custom-theme", "import-from-cc-codex", "compact", "plan", "btw", "undo"].includes(name)) return false;
+    const commandNotice = args ? `/${name} ${args}` : `/${name}`;
+    if (name === "goal") {
+      await appendSlashNotice(commandNotice);
+      return handleGoalSlashCommand(content.trim(), args);
+    }
+    if (name === "theme") {
+      await appendSlashNotice(commandNotice);
+      setWorkspaceView("settings");
+      await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的 TUI 主题选择器，Kimix 使用独立的全局主题色板。");
+      return true;
+    }
+    if (name === "custom-theme") {
+      await sendPromptContent(content.trim(), {
+        outboundContent: buildCustomThemeKickoffPrompt(args),
+        skipClarification: true,
+        postUserStatusMessage: `已接收本地指令：${commandNotice}`,
+      });
+      return true;
+    }
+    if (name === "import-from-cc-codex") {
+      await appendSlashNotice(commandNotice);
+      const [subcommand, previewId] = args.split(/\s+/);
+      if (subcommand === "apply") {
+        if (!previewId) {
+          await appendStatusMessage("请输入预览 ID，例如：/import-from-cc-codex apply abc12345。");
+          return true;
+        }
+        const res = await window.api.applyImportFromCcCodex({ previewId });
+        if (!res.success) {
+          await appendStatusMessage(`导入失败：${res.error}`);
+          return true;
+        }
+        const imported = res.data.imported.length;
+        const skipped = res.data.skipped.length;
+        const backups = res.data.backups.length;
+        await appendStatusMessage(`导入完成：已写入 ${imported} 项，跳过 ${skipped} 项，创建备份 ${backups} 个。请在设置/插件面板刷新确认，必要时重启 Kimi Code 会话。`);
+        return true;
+      }
+      if (args) {
+        await appendStatusMessage("当前仅支持 /import-from-cc-codex 生成安全预览，或 /import-from-cc-codex apply <预览ID> 应用预览。");
+        return true;
+      }
+      const res = await window.api.previewImportFromCcCodex({ workDir: currentProject?.path });
+      if (!res.success) {
+        await appendStatusMessage(`生成导入预览失败：${res.error}`);
+        return true;
+      }
+      const writable = res.data.items.filter((item) => item.action !== "skip");
+      const previewLines = [
+        `已生成 Claude Code / Codex 导入预览：${res.data.previewId}`,
+        `将导入：${summarizeImportPlan(res.data.items)}。`,
+        res.data.projectRoot ? `项目范围：${res.data.projectRoot}` : "项目范围：未找到 .git 根目录，仅预览用户级配置。",
+        res.data.warnings.length > 0 ? `注意：${res.data.warnings.slice(0, 2).join("；")}` : "",
+        writable.length > 0
+          ? `确认无误后发送：/import-from-cc-codex apply ${res.data.previewId}`
+          : "没有发现需要写入的新内容。",
+      ].filter(Boolean);
+      await appendStatusMessage(previewLines.join("\n"));
+      return true;
+    }
     if (name === "compact") {
+      await appendSlashNotice(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
-      const res = await window.api.compactKimiCodeSession({ sessionId: runtime.runtimeSessionId });
+      const res = await window.api.compactKimiCodeSession({ sessionId: runtime.runtimeSessionId, instruction: args || undefined });
       if (!res.success) await appendStatusMessage(`压缩失败：${res.error}`);
       return true;
     }
     if (name === "plan") {
+      await appendSlashNotice(commandNotice);
       const normalized = args.toLowerCase();
       const next = normalized === "on" || normalized === "true" || normalized === "1"
         ? true
@@ -860,6 +1069,7 @@ export function Composer() {
       return true;
     }
     if (name === "btw") {
+      await appendSlashNotice(commandNotice);
       if (!args) {
         await appendStatusMessage("请输入侧问内容，例如：/btw 这个函数是谁调用的？");
         return true;
@@ -884,6 +1094,7 @@ export function Composer() {
       return true;
     }
     if (name === "undo") {
+      await appendSlashNotice(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const rawCount = Number(args || "1");
@@ -1008,12 +1219,37 @@ export function Composer() {
     await sendPromptContent(trimmed, { images: imagesToSend });
   };
 
+  const handleApplyThemeImport = async (themeId: string) => {
+    if (!themeImportPreview) return;
+    setThemeImportApplyingId(themeId);
+    const res = await window.api.applyKimiThemeImport({ previewId: themeImportPreview.previewId, themeId });
+    setThemeImportApplyingId(null);
+    if (!res.success) {
+      await appendStatusMessage(`应用主题映射失败：${res.error}`);
+      return;
+    }
+    upsertKimiThemePalette({
+      id: res.data.id,
+      name: res.data.name,
+      displayName: `KIMI-${res.data.displayName}`,
+      path: res.data.path,
+      base: res.data.base,
+      palette: res.data.kimiColors,
+      colors: res.data.colors,
+    });
+    setThemePalette(kimiThemePaletteId(res.data.id));
+    setThemeImportPreview(null);
+    await appendStatusMessage(`已登记并启用「KIMI-${res.data.displayName}」：Kimix 将使用官方 18 个主题 token，三色预览为 ${formatMappedTheme(res.data)}。`);
+  };
+
   // steer：把输入框内容立即注入当前运行中的 turn，与普通 Enter 排队严格区分。
   const updateSteerStatus = (sessionId: string, steerId: string, status: "accepted" | "sent" | "failed", error?: string) => {
     updateSession(sessionId, (session) => ({
       ...session,
       events: session.events.map((event) => event.id === steerId && event.type === "steer_message"
-        ? { ...event, status, error: status === "failed" ? error : undefined }
+        ? event.status === "sent" && status === "accepted"
+          ? event
+          : { ...event, status, error: status === "failed" ? error : undefined }
         : event
       ),
       updatedAt: Date.now(),
@@ -1022,7 +1258,7 @@ export function Composer() {
     if (updated) setCurrentSession(updated);
   };
 
-  const insertLocalSteerMessage = (sessionId: string, content: string): string => {
+  const insertLocalSteerMessage = (sessionId: string, content: string, images: ImageAttachment[] = []): string => {
     const steerId = genId();
     updateSession(sessionId, (session) => ({
       ...session,
@@ -1033,6 +1269,7 @@ export function Composer() {
           type: "steer_message" as const,
           timestamp: Date.now(),
           content,
+          images: images.map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl })),
           status: "sending" as const,
         },
       ],
@@ -1052,7 +1289,7 @@ export function Composer() {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "当前没有可引导的 SDK 运行轮次，消息会留在队列里等待本轮结束。" }));
       return;
     }
-    const steerId = insertLocalSteerMessage(activeSession.id, trimmed || "[图片]");
+    const steerId = insertLocalSteerMessage(activeSession.id, trimmed || "[图片]", imagesToSend);
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);
@@ -1261,7 +1498,13 @@ export function Composer() {
       }));
       return;
     }
-    const steerId = insertLocalSteerMessage(activeSession.id, pending.content || "[图片]");
+    const steerId = insertLocalSteerMessage(
+      activeSession.id,
+      pending.content || "[图片]",
+      (pending.images ?? [])
+        .map((image) => ({ id: image.id ?? genId(), name: image.name, dataUrl: image.dataUrl ?? "" }))
+        .filter((image) => image.dataUrl),
+    );
     removePendingMessage(id);
     const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
@@ -1322,8 +1565,14 @@ export function Composer() {
       return;
     }
     if (event.key === "Enter" || event.key === "Tab") {
+      const item = completionItems[activeCompletionIndex] ?? completionItems[0];
+      const typedCommand = input.slice(activeCompletion.start).trim().toLowerCase();
+      const completedCommand = item?.insertText.trim().toLowerCase();
+      if (event.key === "Enter" && typedCommand && completedCommand && typedCommand === completedCommand) {
+        return;
+      }
       event.preventDefault();
-      applyCompletion(completionItems[activeCompletionIndex] ?? completionItems[0]);
+      applyCompletion(item);
       return;
     }
     if (event.key === "Escape") {
@@ -1496,6 +1745,89 @@ export function Composer() {
               <X size={13} />
             </button>
           </div>
+        </div>
+      )}
+
+      {themeImportPreview && (
+        <div
+          className="kimix-floating-panel rounded-[16px] text-[13px]"
+          style={{ marginBottom: 10, padding: 16 }}
+        >
+          <div
+            className="grid items-start"
+            style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, marginBottom: 14 }}
+          >
+            <div className="min-w-0">
+              <div className="text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">导入 Kimi Code 主题</div>
+              <div className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{themeImportPreview.themesDir}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setThemeImportPreview(null)}
+              className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+              aria-label="关闭主题导入"
+              title="关闭"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {themeImportPreview.items.length > 0 ? (
+            <div className="flex flex-col" style={{ gap: 12 }}>
+              {themeImportPreview.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-[12px] border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]"
+                  style={{ padding: 14 }}
+                >
+                  <div
+                    className="grid items-center"
+                    style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                        <span className="truncate text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">{item.displayName}</span>
+                        <span className="shrink-0 rounded-md bg-[var(--kimix-panel-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 7, paddingRight: 7 }}>{item.base}</span>
+                        <span className="shrink-0 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{item.id}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap" style={{ gap: 8 }}>
+                        {([
+                          ["主色", item.colors.primary, item.sourceTokens.primary],
+                          ["背景", item.colors.surface, item.sourceTokens.surface],
+                          ["强调", item.colors.accent, item.sourceTokens.accent],
+                        ] as const).map(([label, color, token]) => (
+                          <span key={label} className="inline-flex items-center rounded-lg bg-[var(--kimix-panel-bg)] text-[12.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7, paddingLeft: 8, paddingRight: 9 }}>
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-[var(--kimix-panel-border)]" style={{ background: color }} />
+                            <span>{label}</span>
+                            <span className="font-mono text-[12px] text-[var(--kimix-panel-text)]">{color}</span>
+                            <span className="text-[var(--kimix-panel-text-muted)]">{token ?? "兜底"}</span>
+                          </span>
+                        ))}
+                      </div>
+                      {item.warning && <div className="mt-2 text-[12.5px] leading-5 text-accent-warning">{item.warning}</div>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleApplyThemeImport(item.id)}
+                      disabled={themeImportApplyingId === item.id}
+                      className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:opacity-55"
+                      style={{ minWidth: 86, justifyContent: "center" }}
+                    >
+                      {themeImportApplyingId === item.id ? "导入中" : "导入"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-dashed border-[var(--kimix-panel-border)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: 16 }}>
+              未发现可导入的官方自定义主题 JSON。可先在 Kimi Code 中使用官方 /custom-theme 生成主题文件。
+            </div>
+          )}
+          {themeImportPreview.warnings.length > 0 && (
+            <div className="mt-3 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">
+              {themeImportPreview.warnings.slice(0, 2).join("；")}
+            </div>
+          )}
         </div>
       )}
 

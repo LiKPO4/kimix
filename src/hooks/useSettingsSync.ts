@@ -1,11 +1,15 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
+import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 export function useSettingsSync() {
   useEffect(() => {
     const unsub = useAppStore.subscribe((state, prev) => {
       if (
         state.theme !== prev.theme ||
+        state.themePalette !== prev.themePalette ||
+        state.customThemePalette !== prev.customThemePalette ||
+        state.kimiThemePalettes !== prev.kimiThemePalettes ||
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
         state.defaultPlanMode !== prev.defaultPlanMode ||
@@ -15,11 +19,20 @@ export function useSettingsSync() {
         state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
         state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
         state.voiceShortcut !== prev.voiceShortcut ||
-      state.notificationMode !== prev.notificationMode ||
-      state.clarificationToolMode !== prev.clarificationToolMode
+        state.notificationMode !== prev.notificationMode ||
+        state.clarificationToolMode !== prev.clarificationToolMode
       ) {
+        writeCachedThemeSnapshot({
+          theme: state.theme,
+          themePalette: state.themePalette,
+          customThemePalette: state.customThemePalette,
+          kimiThemePalettes: state.kimiThemePalettes,
+        });
         window.api.saveSettings({
           theme: state.theme,
+          themePalette: state.themePalette,
+          customThemePalette: state.customThemePalette,
+          kimiThemePalettes: state.kimiThemePalettes,
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
           defaultPlanMode: state.defaultPlanMode,
@@ -29,9 +42,9 @@ export function useSettingsSync() {
           sessionRecommendationEnabled: state.sessionRecommendationEnabled,
           sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
           voiceShortcut: state.voiceShortcut,
-        notificationMode: state.notificationMode,
-        clarificationToolMode: state.clarificationToolMode,
-      }).catch(() => {});
+          notificationMode: state.notificationMode,
+          clarificationToolMode: state.clarificationToolMode,
+        }).catch(() => {});
       }
     });
 

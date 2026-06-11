@@ -29,6 +29,7 @@ import type {
   SaveKimiModelConfigResponse,
   SetKimiDefaultModelRequest,
   SetKimiModelAdaptiveThinkingRequest,
+  RemoveKimiModelConfigRequest,
   KimiDoctorConfigResponse,
   ListMcpServersResponse,
   ListKimiProviderCatalogResponse,
@@ -58,6 +59,13 @@ import type {
   ListSessionsResponse,
   ListSlashCommandsRequest,
   ListSlashCommandsResponse,
+  ImportCcCodexApplyRequest,
+  ImportCcCodexApplyResponse,
+  ImportCcCodexPreviewRequest,
+  ImportCcCodexPreviewResponse,
+  KimiThemeImportApplyRequest,
+  KimiThemeImportApplyResponse,
+  KimiThemeImportPreviewResponse,
   LoadSessionRequest,
   LoadSessionResponse,
   ExportSessionRequest,
@@ -234,6 +242,8 @@ const api = {
     ipcRenderer.invoke("kimi:setDefaultModel", req),
   setKimiModelAdaptiveThinking: (req: SetKimiModelAdaptiveThinkingRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:setModelAdaptiveThinking", req),
+  removeKimiModelConfig: (req: RemoveKimiModelConfigRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:removeModelConfig", req),
   listKimiProviderCatalog: (): Promise<ListKimiProviderCatalogResponse> =>
     ipcRenderer.invoke("kimi:listProviderCatalog"),
   doctorKimiConfig: (): Promise<KimiDoctorConfigResponse> =>
@@ -280,6 +290,14 @@ const api = {
     ipcRenderer.invoke("kimi:closeSession", req),
   listSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
     ipcRenderer.invoke("kimi:listSlashCommands", req),
+  previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>
+    ipcRenderer.invoke("kimi:previewImportFromCcCodex", req),
+  applyImportFromCcCodex: (req: ImportCcCodexApplyRequest): Promise<ImportCcCodexApplyResponse> =>
+    ipcRenderer.invoke("kimi:applyImportFromCcCodex", req),
+  previewKimiThemeImport: (): Promise<KimiThemeImportPreviewResponse> =>
+    ipcRenderer.invoke("kimi:previewThemeImport"),
+  applyKimiThemeImport: (req: KimiThemeImportApplyRequest): Promise<KimiThemeImportApplyResponse> =>
+    ipcRenderer.invoke("kimi:applyThemeImport", req),
   listSessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
     ipcRenderer.invoke("kimi:listSessions", req),
   loadSession: (req: LoadSessionRequest): Promise<LoadSessionResponse> =>

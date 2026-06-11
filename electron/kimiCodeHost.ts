@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { app } from "electron";
+import { candidateKimiShareDirs, findKimiCodeSessionDir } from "./sessionHistory";
 
 type JsonObject = Record<string, unknown>;
 
@@ -419,6 +420,9 @@ const pendingApprovals = new Map<string, PendingApproval>();
 const pendingQuestions = new Map<string, PendingQuestion>();
 let eventSink: EventSink | null = null;
 let statusSink: StatusSink | null = null;
+
+const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
+const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
 let nextRequestId = 0;
 let activeLoginAbort: AbortController | null = null;
 const KIMI_CODE_MANAGED_PROVIDER_NAME = "managed:kimi-code";
@@ -573,7 +577,10 @@ export async function askBtw(
 
 export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
   const managed = getManagedSession(sessionId);
+  const startedAt = Date.now();
   await managed.session.steer(input);
+  const officialSteer = await waitForOfficialSteerRecord(sessionId, managed.session.workDir, input, startedAt);
+  eventSink?.({ sessionId, event: officialSteer });
 }
 
 export async function undoHistory(sessionId: string, count: number): Promise<void> {
@@ -605,10 +612,10 @@ export async function setPermission(sessionId: string, mode: KimiCodePermissionM
   managed.permission = mode;
 }
 
-export async function compactSession(sessionId: string): Promise<void> {
+export async function compactSession(sessionId: string, instruction?: string): Promise<void> {
   const managed = getManagedSession(sessionId);
   if (!managed.session.compact) throw new Error("Official Kimi Code SDK does not expose compact on this session");
-  await managed.session.compact();
+  await managed.session.compact(instruction ? { instruction } : undefined);
 }
 
 export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {
@@ -1104,6 +1111,98 @@ function getLoopEvent(event: unknown): Record<string, unknown> | undefined {
   return record.event as Record<string, unknown>;
 }
 
+function normalizeSteerText(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
+function promptInputText(input: string | KimiCodePromptPart[]): string {
+  if (typeof input === "string") return input;
+  return input
+    .flatMap((part) => part.type === "text" ? [part.text] : [])
+    .join("\n");
+}
+
+function steerRecordText(record: Record<string, unknown>): string {
+  const input = record.input;
+  if (typeof input === "string") return input;
+  if (!Array.isArray(input)) return "";
+  return input
+    .flatMap((part) => {
+      if (!part || typeof part !== "object") return [];
+      const item = part as { type?: unknown; text?: unknown };
+      return item.type === "text" && typeof item.text === "string" ? [item.text] : [];
+    })
+    .join("\n");
+}
+
+function isMatchingSteerRecord(
+  record: Record<string, unknown>,
+  expectedText: string,
+  startedAt: number,
+): boolean {
+  if (record.type !== "turn.steer") return false;
+  if (typeof record.time === "number" && record.time < startedAt - 1_000) return false;
+  const normalizedExpected = normalizeSteerText(expectedText);
+  if (!normalizedExpected) return true;
+  const normalizedRecord = normalizeSteerText(steerRecordText(record));
+  if (!normalizedRecord) return false;
+  return normalizedRecord === normalizedExpected ||
+    normalizedRecord.startsWith(normalizedExpected) ||
+    normalizedExpected.startsWith(normalizedRecord);
+}
+
+async function getSessionWireFile(sessionId: string, workDir: string): Promise<string | null> {
+  for (const shareDir of candidateKimiShareDirs()) {
+    const sessionDir = await findKimiCodeSessionDir(shareDir, workDir, sessionId);
+    if (sessionDir) return path.join(sessionDir, "agents", "main", "wire.jsonl");
+  }
+  return null;
+}
+
+function findSteerRecordInWire(
+  wireFile: string,
+  expectedText: string,
+  startedAt: number,
+): Record<string, unknown> | null {
+  if (!fs.existsSync(wireFile)) return null;
+  const lines = fs.readFileSync(wireFile, "utf-8").split(/\r?\n/);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    try {
+      const record = JSON.parse(line) as Record<string, unknown>;
+      if (isMatchingSteerRecord(record, expectedText, startedAt)) return record;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForOfficialSteerRecord(
+  sessionId: string,
+  workDir: string,
+  input: string | KimiCodePromptPart[],
+  startedAt: number,
+): Promise<Record<string, unknown>> {
+  const expectedText = promptInputText(input);
+  const deadline = Date.now() + STEER_WIRE_CONFIRM_TIMEOUT_MS;
+  let wireFile = await getSessionWireFile(sessionId, workDir);
+  while (Date.now() <= deadline) {
+    if (!wireFile) wireFile = await getSessionWireFile(sessionId, workDir);
+    if (wireFile) {
+      const record = findSteerRecordInWire(wireFile, expectedText, startedAt);
+      if (record) return record;
+    }
+    await delay(STEER_WIRE_CONFIRM_INTERVAL_MS);
+  }
+  throw new Error("官方 Kimi Code 未在 wire.jsonl 中写入 turn.steer，引导确认超时。");
+}
+
 function attachInteractionHandlers(session: KimiCodeSessionLike) {
   session.setApprovalHandler?.(async (request) => {
     // Full-access (yolo) bound: never bother the user with an approval card when
@@ -1212,9 +1311,6 @@ function getManagedSession(sessionId: string): ManagedSession {
 
 async function getHarness(): Promise<KimiHarnessLike> {
   if (harness) return harness;
-  // Official Kimi Code 0.10 exposes Goal lifecycle through the SDK, but gates it
-  // behind the same experimental flag used by the TUI /goal command.
-  process.env.KIMI_CODE_EXPERIMENTAL_GOAL_COMMAND = process.env.KIMI_CODE_EXPERIMENTAL_GOAL_COMMAND || "1";
   process.env.KIMI_CODE_NO_AUTO_UPDATE = process.env.KIMI_CODE_NO_AUTO_UPDATE || "1";
   process.env.KIMI_CLI_NO_AUTO_UPDATE = process.env.KIMI_CLI_NO_AUTO_UPDATE || "1";
   const sdk = await loadSdk();

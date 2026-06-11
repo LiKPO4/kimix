@@ -1,5 +1,6 @@
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
+import { compactModelText } from "@/utils/modelDisplay";
 import { isEmptyStatusUpdate } from "@/utils/sessionMetrics";
 
 interface StatusCardProps {
@@ -49,7 +50,7 @@ export function StatusCard({ event }: StatusCardProps) {
           : "bg-surface-hover text-text-muted";
   const details = [
     event.planMode === true ? "Plan" : "",
-    event.message ? event.message : "",
+    event.message ? compactModelText(event.message) : "",
     formatTimestamp(event.timestamp),
     event.tokenCount !== undefined ? `Tokens: ${formatK(event.tokenCount)}` : "",
     event.contextSize !== undefined ? `Context: ${formatContext(event, detailedContext)}` : "",

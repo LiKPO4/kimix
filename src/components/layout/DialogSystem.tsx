@@ -38,8 +38,8 @@ const updateActionColumnStyle = { display: "flex", flexDirection: "column", alig
 const updatePrimaryButtonStyle = { height: 40, minHeight: 40, paddingLeft: 16, paddingRight: 18 } as const;
 const updateLinkButtonStyle = { height: 20, minHeight: 20, paddingLeft: 2, paddingRight: 2 } as const;
 
-const KIMI_CODE_DOCS_URL = "https://moonshotai.github.io/kimi-code/zh/guides/getting-started.html";
-const KIMI_CODE_UPDATE_PAGE_URL = "https://moonshotai.github.io/kimi-code/zh/release-notes/changelog.html";
+const KIMI_CODE_DOCS_URL = "https://www.kimi.com/code/docs/kimi-code-cli/guides/getting-started.html";
+const KIMI_CODE_UPDATE_PAGE_URL = "https://www.kimi.com/code/docs/kimi-code/whats-new.html";
 const KIMI_CODE_WINDOWS_INSTALL_COMMAND = "irm https://code.kimi.com/kimi-code/install.ps1 | iex";
 
 interface KimiOnboardingProps {

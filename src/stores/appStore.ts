@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset } from "@/types/ui";
+import { DEFAULT_CUSTOM_THEME_PALETTE, DEFAULT_KIMI_THEME_PRESETS, DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
+import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
 const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "session", "diffs"];
@@ -32,6 +34,8 @@ function writeRightSidebarCardOrder(order: RightSidebarCardId[]) {
   }
 }
 
+const cachedThemeSnapshot = readCachedThemeSnapshot();
+
 export interface AppStore extends AppState {
   setCurrentProject: (project: Project | null) => void;
   setCurrentSession: (session: Session | null) => void;
@@ -58,6 +62,11 @@ export interface AppStore extends AppState {
   setWorkspaceView: (view: WorkspaceView) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
+  setThemePalette: (palette: ThemePaletteId) => void;
+  setCustomThemePalette: (colors: ThemePaletteColors) => void;
+  setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
+  upsertKimiThemePalette: (preset: KimiThemePreset) => void;
+  removeKimiThemePalette: (id: string) => void;
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
   focusInputTrigger: number;
@@ -93,7 +102,10 @@ export const useAppStore = create<AppStore>((set) => ({
   handoffSessionId: null,
   workspaceView: "chat",
   sidebarOpen: true,
-  theme: "light",
+  theme: cachedThemeSnapshot.theme,
+  themePalette: cachedThemeSnapshot.themePalette,
+  customThemePalette: cachedThemeSnapshot.customThemePalette,
+  kimiThemePalettes: cachedThemeSnapshot.kimiThemePalettes,
   settingsOpen: false,
   focusInputTrigger: 0,
   searchQuery: "",
@@ -147,4 +159,22 @@ export const useAppStore = create<AppStore>((set) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchOpen: (open) => set({ searchOpen: open }),
   setTheme: (theme) => set({ theme }),
+  setThemePalette: (palette) => set({ themePalette: normalizeThemePaletteId(palette) }),
+  setCustomThemePalette: (colors) => set({ customThemePalette: normalizeThemePaletteColors(colors) }),
+  setKimiThemePalettes: (presets) => set({ kimiThemePalettes: normalizeKimiThemePresets(presets) }),
+  upsertKimiThemePalette: (preset) => set((state) => {
+    const next = upsertKimiThemePresets(state.kimiThemePalettes, preset);
+    return {
+      kimiThemePalettes: next,
+      themePalette: kimiThemePaletteId(preset.id),
+    };
+  }),
+  removeKimiThemePalette: (id) => set((state) => {
+    const normalizedId = id.replace(/^kimi:/, "");
+    const next = state.kimiThemePalettes.filter((preset) => preset.id !== normalizedId);
+    return {
+      kimiThemePalettes: next,
+      themePalette: state.themePalette === kimiThemePaletteId(normalizedId) ? DEFAULT_THEME_PALETTE_ID : state.themePalette,
+    };
+  }),
 }));

@@ -60,4 +60,72 @@ describe("sessionToMarkdown", () => {
     expect(markdown).toContain("|------|---------|------|");
     expect(markdown).not.toContain("|------\n\n|---------|------|");
   });
+
+  it("repairs markdown table separators split into several streamed fragments", () => {
+    const session: Session = {
+      id: "s1",
+      title: "表格测试",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 2,
+      isLoading: false,
+      events: [
+        {
+          id: "a1",
+          type: "assistant_message",
+          timestamp: 1,
+          content: [
+            "| 文件路径:行号 | 调用类型 | 所在类/函数 | 备注 |",
+            "|---|---",
+            "",
+            "|---",
+            "",
+            "|---|",
+            "| lib/main_editor.dart:108 | Navigator.push | build | PageRoute 全屏页面跳转 |",
+          ].join("\n"),
+          isThinking: false,
+          isComplete: true,
+        },
+      ],
+    };
+
+    const markdown = sessionToMarkdown(session);
+    expect(markdown).toContain("|---|---|---|---|");
+    expect(markdown).not.toContain("|---|---\n\n|---");
+  });
+
+  it("repairs markdown table rows split across streamed lines", () => {
+    const session: Session = {
+      id: "s1",
+      title: "表格测试",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 2,
+      isLoading: false,
+      events: [
+        {
+          id: "a1",
+          type: "assistant_message",
+          timestamp: 1,
+          content: [
+            "| 文件路径:行号 | 调用类型 | 所在类/函数 | 备注 |",
+            "|---|---|---|---|",
+            "| lib",
+            "",
+            "/features/run/p",
+            "",
+            "resentation/run_page.dart:410 |",
+            "",
+            " Navigator.pushNamed | _TutorialCoachCopy.setState | PageRoute 全屏页面跳转 |",
+          ].join("\n"),
+          isThinking: false,
+          isComplete: true,
+        },
+      ],
+    };
+
+    const markdown = sessionToMarkdown(session);
+    expect(markdown).toContain("| lib/features/run/presentation/run_page.dart:410 | Navigator.pushNamed | _TutorialCoachCopy.setState | PageRoute 全屏页面跳转 |");
+    expect(markdown).not.toContain("| lib\n\n/features/run/p");
+  });
 });

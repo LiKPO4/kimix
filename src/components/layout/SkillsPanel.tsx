@@ -16,8 +16,8 @@ type SkillInfo = {
 };
 
 type PluginPanelTab = "skills" | "mcp";
-const OFFICIAL_PLUGIN_STORE_URL = "https://moonshotai.github.io/kimi-code/zh/customization/plugins.html#安装与管理-plugins";
-const OFFICIAL_PLUGIN_DOCS_URL = "https://moonshotai.github.io/kimi-code/zh/customization/plugins.html#plugin-manifest";
+const OFFICIAL_PLUGIN_STORE_URL = "https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html#安装与管理-plugins";
+const OFFICIAL_PLUGIN_DOCS_URL = "https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html#plugin-manifest";
 
 function asArray<T>(value: T[] | undefined | null): T[] {
   return Array.isArray(value) ? value : [];
@@ -287,7 +287,7 @@ export function SkillsPanel({
   if (!open) return null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--kimix-panel-bg)]">
+    <div className="kimix-workspace-page flex h-full min-h-0 flex-col">
       <div
         className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${dragActive ? "outline outline-2 outline-[var(--accent-blue)]" : ""}`}
         onDragOver={handleDragOver}
@@ -302,17 +302,17 @@ export function SkillsPanel({
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between border-b border-[var(--kimix-panel-divider)]" style={{ padding: "20px 28px" }}>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]">
+        <div className="kimix-workspace-header">
+          <div className="kimix-workspace-header-copy">
+            <div className="kimix-workspace-header-title">
               <LayoutGrid size={20} />
               <span>插件</span>
-            </div>
-            <div className="mt-1 text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
-              管理 Kimix 扩展能力：Skills 负责本地能力包，MCP 负责外部工具服务。
+              <div className="kimix-workspace-header-subtitle">
+                管理 Kimix 扩展能力：Skills 负责本地能力包，MCP 负责外部工具服务。
+              </div>
             </div>
           </div>
-          <div className="flex items-center" style={{ gap: 8 }}>
+          <div className="kimix-workspace-header-actions">
             {selectedTab === "skills" && (
               <>
                 <button
@@ -339,7 +339,8 @@ export function SkillsPanel({
             )}
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "22px 28px 30px" }}>
+        <div className="kimix-workspace-body">
+          <div className="kimix-workspace-content">
           <div className="flex items-center" style={{ gap: 8, marginBottom: 18 }}>
             <button
               type="button"
@@ -378,7 +379,7 @@ export function SkillsPanel({
                       return (
                         <div
                           key={plugin.id}
-                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
                           style={{ padding: "10px 12px" }}
                         >
                           <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
@@ -440,7 +441,7 @@ export function SkillsPanel({
                     <span>{sdkPluginRefreshing ? "刷新中" : "刷新 SDK 状态"}</span>
                   </button>
                   <div
-                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
                     style={{ padding: "10px 12px", marginTop: 12 }}
                   >
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
@@ -474,7 +475,7 @@ export function SkillsPanel({
                       {sdkPlugins.map((plugin) => (
                         <div
                           key={plugin.id}
-                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
                           style={{ padding: "10px 12px" }}
                         >
                           <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
@@ -536,7 +537,7 @@ export function SkillsPanel({
                       if (event.key === "Enter" && !installingPlugin) void installKimiPlugin();
                     }}
                     placeholder="https://github.com/owner/repo 或 https://.../plugin.zip"
-                    className="h-9 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
+                    className="h-9 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
                     style={{ paddingLeft: 12, paddingRight: 12 }}
                   />
                   <button
@@ -569,7 +570,7 @@ export function SkillsPanel({
                   onClick={() => {
                     if (!officialPlugin) void toggleSkill(skill.name);
                   }}
-                  className={`h-full w-full overflow-hidden rounded-xl border text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"}`}
+                  className={`h-full w-full overflow-hidden rounded-xl border text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
                   style={{
                     padding: "14px 18px",
                     cursor: officialPlugin ? "default" : undefined,
@@ -620,6 +621,7 @@ export function SkillsPanel({
             </section>
           </div>
           )}
+          </div>
         </div>
       </div>
     </div>
