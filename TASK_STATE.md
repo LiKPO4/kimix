@@ -30,7 +30,9 @@
 - 已完成：调整主对话流滚动条位置，减少消息区域右侧预留空白，让滚动条更靠近右边界，同时保留稳定滚动槽；版本锚点同步到 v2.9.34。
 - 已完成：修复画板主体高度过高导致画布顶穿底部操作区的问题；右侧画布区域改为固定容器内自适应居中，避免 1:1 画布按自身尺寸撑开弹窗；版本锚点同步到 v2.9.35。
 - 后续约定：用户要求每次完成代码改动并构建通过后，直接重启 Kimix 应用，便于用最新版本截图验收。
+- 已完成：官方 Kimi Code 0.14.2 跟进第一步已落地；vendored `@moonshot-ai/kimi-code-sdk` 从 0.9.1 更新到 0.9.3，来源 tag `@moonshot-ai/kimi-code@0.14.2` / commit `1cb49dba5bbc7d015a791ec9699d45df931ead92`；BTW 侧问优先使用官方 `withInteractiveAgent()` 作用域 API，旧 SDK 保留 setter fallback；版本锚点同步到 v2.9.41。
 - 未完成：Swarm 子进程 live delta/tool-call 尾句、undo selector、插件 marketplace update badge、OpenAI-compatible 工具图片输出渲染 fixture、subagent 分组进度细化、`xhigh` reasoning effort 配置回环。
+- 未完成：Kimi Code 0.14.2 后续跟进仍包括 shell tool stdout/stderr streaming 映射、`getConfigDiagnostics()` 配置警告 UI、compaction replay 历史核验、sub-skill 命名/展示、Swarm “必须单独运行”提示和 YOLO/Plan resume 行为复验。
 - 关键文件：`vendor/kimi-code-sdk/index.mjs`、`vendor/kimi-code-sdk/README.md`、`docs/kimi-code-0.14-followup.md`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/SwarmPanel.tsx`、`src/utils/kimiCodeEventMapper.ts`、`src/components/layout/AppShell.tsx`、`src/components/layout/HooksPanel.tsx`。
 
 ## 当前路线文档
