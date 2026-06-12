@@ -305,7 +305,7 @@ export function LongTasksPanel() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm"
+      className="kimix-modal-overlay fixed inset-0 z-50 flex items-center justify-center"
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"

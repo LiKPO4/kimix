@@ -863,8 +863,8 @@ export function ChatThread() {
       )}
       <div
         ref={scrollRef}
-        className="kimix-content-x h-full overflow-y-auto"
-        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 120 }}
+        className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
+        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 120, scrollbarGutter: "stable" }}
         onScroll={handleScroll}
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}

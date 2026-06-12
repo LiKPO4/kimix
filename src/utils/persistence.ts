@@ -1,12 +1,13 @@
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Project, TimelineEvent } from "@/types/ui";
+import type { Project, Session, TimelineEvent } from "@/types/ui";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
 
 export const LOCAL_SESSIONS_KEY = "kimix_sessions";
 export const LOCAL_PENDING_KEY = "kimix_pending";
 export const LOCAL_ACTIVE_CONTEXT_KEY = "kimix_active_context";
+export const LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY = "kimix_archived_session_tombstones";
 export const LOCAL_PERSIST_DEBOUNCE_MS = 900;
 
 export type LocalActiveContext = {
@@ -14,6 +15,93 @@ export type LocalActiveContext = {
   sessionId: string | null;
   updatedAt: number;
 };
+
+export type ArchivedSessionTombstone = {
+  ids: string[];
+  projectPath: string;
+  title?: string;
+  archivedAt: number;
+};
+
+function normalizePathForArchive(value: string | undefined) {
+  return (value ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function sessionArchiveIds(session: Pick<Session, "id" | "runtimeSessionId" | "officialSessionId" | "longTask">) {
+  return Array.from(new Set([
+    session.id,
+    session.runtimeSessionId,
+    session.officialSessionId,
+    session.longTask?.executorSessionId,
+    session.longTask?.reviewerSessionId,
+  ].filter((id): id is string => Boolean(id))));
+}
+
+export function getArchivedSessionTombstones(): ArchivedSessionTombstone[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item): ArchivedSessionTombstone[] => {
+      if (!item || typeof item !== "object") return [];
+      const ids = Array.isArray((item as { ids?: unknown }).ids)
+        ? (item as { ids: unknown[] }).ids.filter((id): id is string => typeof id === "string" && Boolean(id.trim()))
+        : [];
+      const projectPath = typeof (item as { projectPath?: unknown }).projectPath === "string"
+        ? (item as { projectPath: string }).projectPath
+        : "";
+      const archivedAt = typeof (item as { archivedAt?: unknown }).archivedAt === "number"
+        ? (item as { archivedAt: number }).archivedAt
+        : 0;
+      if (ids.length === 0 || !projectPath || !archivedAt) return [];
+      return [{
+        ids,
+        projectPath,
+        title: typeof (item as { title?: unknown }).title === "string" ? (item as { title: string }).title : undefined,
+        archivedAt,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeArchivedSessionTombstones(tombstones: ArchivedSessionTombstone[]) {
+  localStorage.setItem(LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY, JSON.stringify(tombstones.slice(-500)));
+}
+
+export function rememberArchivedSessionTombstone(session: Session) {
+  const ids = sessionArchiveIds(session);
+  if (ids.length === 0 || !session.projectPath) return;
+  const projectPath = session.projectPath;
+  const archivedAt = session.archivedAt ?? Date.now();
+  const next: ArchivedSessionTombstone = {
+    ids,
+    projectPath,
+    title: session.title,
+    archivedAt,
+  };
+  const existing = getArchivedSessionTombstones().filter((item) => {
+    if (normalizePathForArchive(item.projectPath) !== normalizePathForArchive(projectPath)) return true;
+    return !item.ids.some((id) => ids.includes(id));
+  });
+  writeArchivedSessionTombstones([...existing, next]);
+}
+
+export function forgetArchivedSessionTombstone(session: Session) {
+  const ids = sessionArchiveIds(session);
+  if (ids.length === 0) return;
+  writeArchivedSessionTombstones(getArchivedSessionTombstones().filter((item) => !item.ids.some((id) => ids.includes(id))));
+}
+
+export function isArchivedSessionTombstoned(ids: Array<string | undefined | null>, projectPath?: string) {
+  const normalizedIds = new Set(ids.filter((id): id is string => typeof id === "string" && Boolean(id.trim())));
+  if (normalizedIds.size === 0) return false;
+  const normalizedProjectPath = normalizePathForArchive(projectPath);
+  return getArchivedSessionTombstones().some((item) => {
+    if (normalizedProjectPath && normalizePathForArchive(item.projectPath) !== normalizedProjectPath) return false;
+    return item.ids.some((id) => normalizedIds.has(id));
+  });
+}
 
 export function persistLocalConversationState() {
   try {

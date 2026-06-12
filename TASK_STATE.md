@@ -18,6 +18,18 @@
 - 已完成：修复启动后左侧大量“新会话”loading 占位的问题；启动恢复只读取当前项目的 SDK 会话摘要并选择可用最新会话，不再把所有最近项目历史注入本地 session 列表。
 - 已完成：修复拖拽附件绝对路径丢失的问题；Electron preload 通过 `webUtils.getPathForFile()` 获取文件/文件夹真实路径，renderer 保留旧 `File.path` fallback。
 - 已完成：修复启动恢复历史对话时过程摘要显示离谱耗时的问题；历史回放不再用当前时间兜底计算完成耗时，完成态取不到可靠耗时时只显示“（输出完成）”。
+- 已完成：调整 Windows NSIS 安装器升级快捷方式策略；安装器初始化阶段预写 `KeepShortcuts` 标记，让升级卸载旧版本时尽量保留桌面/开始菜单快捷方式，减少更新后桌面图标被删除重建。
+- 已完成：优化画板左侧工具区布局，从画笔工具开始改为两列排列，并补足颜色/背景切换与色板之间的留白；版本锚点同步到 v2.9.26。
+- 已完成：画板新增选择工具和基础图形对象层；方形、圆角矩形、圆形、线条绘制后可移动、缩放、旋转、删除，并在复制/保存时合成为 PNG；版本锚点同步到 v2.9.27。
+- 已完成：根目录 `start-kimix.bat` 改为调用安全重启脚本，启动前清理 Kimix dev 旧进程和 Vite/构建缓存，避免用户双击 bat 后仍看到旧版本窗口；版本锚点同步到 v2.9.28。
+- 已完成：修复重新构建/启动恢复后已归档对话被官方历史重新拉回的问题；新增归档 tombstone，启动恢复会按官方 session id / runtime session id / 长程任务子会话 id 跳过已归档历史，并为恢复会话补写 `officialSessionId`；版本锚点同步到 v2.9.29。
+- 已完成：画板撤销/重做升级为完整快照，覆盖背景层、笔刷层、对象层和画布尺寸；补齐对象新增/移动/缩放/旋转/删除、背景色、裁剪尺寸恢复；对象退出操作态或切换工具后固定到像素层，便于油漆桶上色；版本锚点同步到 v2.9.30。
+- 已完成：修复滚动条出现/消失导致布局横向重排的问题；左侧项目/会话列表、对话流滚动区、画板左侧工具栏保留稳定滚动槽，避免页面和画板在内容溢出时抖动；版本锚点同步到 v2.9.31。
+- 已完成：修复连续绘制多个图形后撤销需要重复经过视觉相同历史节点的问题；对象固定到像素层时替换当前历史顶而非新增撤销项，恢复快照时只在尺寸变化时重设 canvas 宽高，减少撤销闪烁；版本锚点同步到 v2.9.32。
+- 已完成：画板裁剪提示卡移动到线条宽度和工具之间；支持 Enter 应用裁剪、Esc 取消裁剪；固定画板主体高度并让滚动限制在左侧工具栏内部，避免工具栏滚动条改变右侧绘图页面高度；版本锚点同步到 v2.9.33。
+- 已完成：调整主对话流滚动条位置，减少消息区域右侧预留空白，让滚动条更靠近右边界，同时保留稳定滚动槽；版本锚点同步到 v2.9.34。
+- 已完成：修复画板主体高度过高导致画布顶穿底部操作区的问题；右侧画布区域改为固定容器内自适应居中，避免 1:1 画布按自身尺寸撑开弹窗；版本锚点同步到 v2.9.35。
+- 后续约定：用户要求每次完成代码改动并构建通过后，直接重启 Kimix 应用，便于用最新版本截图验收。
 - 未完成：Swarm 子进程 live delta/tool-call 尾句、undo selector、插件 marketplace update badge、OpenAI-compatible 工具图片输出渲染 fixture、subagent 分组进度细化、`xhigh` reasoning effort 配置回环。
 - 关键文件：`vendor/kimi-code-sdk/index.mjs`、`vendor/kimi-code-sdk/README.md`、`docs/kimi-code-0.14-followup.md`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/SwarmPanel.tsx`、`src/utils/kimiCodeEventMapper.ts`、`src/components/layout/AppShell.tsx`、`src/components/layout/HooksPanel.tsx`。
 

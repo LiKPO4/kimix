@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Circle, Copy, Crop, Eraser, Minus, PaintBucket, Pencil, Redo2, Save, Square, Undo2, X } from "lucide-react";
+import { Check, Circle, Copy, Crop, Eraser, Minus, MousePointer2, PaintBucket, Pencil, Redo2, Save, Square, Trash2, Undo2, X } from "lucide-react";
 
 type BoardRatio = "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
 
-type DrawTool = "brush" | "eraser" | "rect" | "roundRect" | "circle" | "line" | "crop" | "bucket";
+type DrawTool = "select" | "brush" | "eraser" | "rect" | "roundRect" | "circle" | "line" | "crop" | "bucket";
+type ShapeTool = "rect" | "roundRect" | "circle" | "line";
 
 export type DrawingBoardRequest = {
   ratio: BoardRatio;
@@ -32,6 +33,55 @@ type CropSelection = {
   height: number;
 };
 
+type ShapeObject = {
+  id: string;
+  type: ShapeTool;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  strokeColor: string;
+  strokeWidth: number;
+};
+
+type ShapeHandle = "nw" | "ne" | "se" | "sw";
+
+type ShapeInteraction =
+  | {
+      mode: "draw";
+      pointerId: number;
+      start: Point;
+    }
+  | {
+      mode: "move";
+      pointerId: number;
+      start: Point;
+      original: ShapeObject;
+    }
+  | {
+      mode: "resize";
+      pointerId: number;
+      handle: ShapeHandle;
+      original: ShapeObject;
+    }
+  | {
+      mode: "rotate";
+      pointerId: number;
+      original: ShapeObject;
+      center: Point;
+      startAngle: number;
+    };
+
+type BoardSnapshot = {
+  width: number;
+  height: number;
+  backgroundColor: string;
+  bgDataUrl: string;
+  drawDataUrl: string;
+  shapeObjects: ShapeObject[];
+};
+
 const BOARD_SIZES: Record<BoardRatio, { width: number; height: number; label: string }> = {
   "1:1": { width: 720, height: 720, label: "1:1 方形" },
   "4:3": { width: 800, height: 600, label: "4:3 横向" },
@@ -54,6 +104,7 @@ const DRAW_COLORS = [
 ];
 
 const DRAW_TOOLS: { value: DrawTool; label: string; icon: typeof Pencil }[] = [
+  { value: "select", label: "选择", icon: MousePointer2 },
   { value: "brush", label: "画笔", icon: Pencil },
   { value: "eraser", label: "橡皮", icon: Eraser },
   { value: "rect", label: "方形", icon: Square },
@@ -85,6 +136,137 @@ function getCanvasPoint(canvas: HTMLCanvasElement, event: React.PointerEvent<HTM
   return {
     x: ((event.clientX - rect.left) / rect.width) * canvas.width,
     y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+  };
+}
+
+function isShapeTool(tool: DrawTool): tool is ShapeTool {
+  return tool === "rect" || tool === "roundRect" || tool === "circle" || tool === "line";
+}
+
+function createShapeObject(tool: ShapeTool, start: Point, end: Point, color: string, strokeWidth: number): ShapeObject {
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  const width = Math.max(8, Math.abs(end.x - start.x));
+  const height = Math.max(8, Math.abs(end.y - start.y));
+  if (tool === "line") {
+    return {
+      id: `shape-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      type: tool,
+      x: start.x,
+      y: start.y,
+      width: end.x - start.x,
+      height: end.y - start.y,
+      rotation: 0,
+      strokeColor: color,
+      strokeWidth,
+    };
+  }
+  return {
+    id: `shape-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type: tool,
+    x: left,
+    y: top,
+    width,
+    height,
+    rotation: 0,
+    strokeColor: color,
+    strokeWidth,
+  };
+}
+
+function getShapeCenter(shape: ShapeObject): Point {
+  return {
+    x: shape.x + shape.width / 2,
+    y: shape.y + shape.height / 2,
+  };
+}
+
+function rotatePoint(point: Point, center: Point, rotation: number): Point {
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+function toLocalPoint(point: Point, shape: ShapeObject): Point {
+  return rotatePoint(point, getShapeCenter(shape), -shape.rotation);
+}
+
+function getShapeCorners(shape: ShapeObject) {
+  const corners: Record<ShapeHandle, Point> = {
+    nw: { x: shape.x, y: shape.y },
+    ne: { x: shape.x + shape.width, y: shape.y },
+    se: { x: shape.x + shape.width, y: shape.y + shape.height },
+    sw: { x: shape.x, y: shape.y + shape.height },
+  };
+  const center = getShapeCenter(shape);
+  return Object.fromEntries(
+    Object.entries(corners).map(([key, point]) => [key, rotatePoint(point, center, shape.rotation)])
+  ) as Record<ShapeHandle, Point>;
+}
+
+function getRotateHandle(shape: ShapeObject): Point {
+  const center = getShapeCenter(shape);
+  return rotatePoint({ x: center.x, y: shape.y - 34 }, center, shape.rotation);
+}
+
+function pointDistance(a: Point, b: Point) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function distanceToSegment(point: Point, start: Point, end: Point) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return pointDistance(point, start);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq));
+  return pointDistance(point, { x: start.x + t * dx, y: start.y + t * dy });
+}
+
+function hitTestShape(point: Point, shape: ShapeObject) {
+  const local = toLocalPoint(point, shape);
+  const tolerance = Math.max(8, shape.strokeWidth / 2 + 5);
+  if (shape.type === "line") {
+    return distanceToSegment(local, { x: shape.x, y: shape.y }, { x: shape.x + shape.width, y: shape.y + shape.height }) <= tolerance;
+  }
+  return (
+    local.x >= shape.x - tolerance &&
+    local.x <= shape.x + shape.width + tolerance &&
+    local.y >= shape.y - tolerance &&
+    local.y <= shape.y + shape.height + tolerance
+  );
+}
+
+function hitTestShapeHandle(point: Point, shape: ShapeObject): ShapeHandle | "rotate" | null {
+  const corners = getShapeCorners(shape);
+  const handleHitSize = 12;
+  for (const [handle, corner] of Object.entries(corners) as [ShapeHandle, Point][]) {
+    if (pointDistance(point, corner) <= handleHitSize) return handle;
+  }
+  if (pointDistance(point, getRotateHandle(shape)) <= handleHitSize) return "rotate";
+  return null;
+}
+
+function resizeShapeFromHandle(shape: ShapeObject, handle: ShapeHandle, point: Point): ShapeObject {
+  const local = toLocalPoint(point, shape);
+  let left = shape.x;
+  let right = shape.x + shape.width;
+  let top = shape.y;
+  let bottom = shape.y + shape.height;
+  if (handle.includes("w")) left = Math.min(local.x, right - 8);
+  if (handle.includes("e")) right = Math.max(local.x, left + 8);
+  if (handle.includes("n")) top = Math.min(local.y, bottom - 8);
+  if (handle.includes("s")) bottom = Math.max(local.y, top + 8);
+  return {
+    ...shape,
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
   };
 }
 
@@ -132,6 +314,33 @@ function drawShape(ctx: CanvasRenderingContext2D, tool: DrawTool, start: Point, 
     ctx.lineTo(end.x, end.y);
     ctx.stroke();
   }
+}
+
+function drawShapeObject(ctx: CanvasRenderingContext2D, shape: ShapeObject) {
+  const center = getShapeCenter(shape);
+  ctx.save();
+  ctx.translate(center.x, center.y);
+  ctx.rotate(shape.rotation);
+  ctx.translate(-center.x, -center.y);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = shape.strokeWidth;
+  ctx.strokeStyle = shape.strokeColor;
+  if (shape.type === "rect") {
+    ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
+  } else if (shape.type === "roundRect") {
+    drawRoundRect(ctx, shape.x, shape.y, shape.width, shape.height, 24);
+  } else if (shape.type === "circle") {
+    ctx.beginPath();
+    ctx.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, Math.abs(shape.width / 2), Math.abs(shape.height / 2), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (shape.type === "line") {
+    ctx.beginPath();
+    ctx.moveTo(shape.x, shape.y);
+    ctx.lineTo(shape.x + shape.width, shape.y + shape.height);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function normalizeCropSelection(start: Point, end: Point, canvas: HTMLCanvasElement): CropSelection {
@@ -231,10 +440,51 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
   const [colorPanelMode, setColorPanelMode] = useState<"stroke" | "background">("stroke");
   const [strokeWidth, setStrokeWidth] = useState(8);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [undoStack, setUndoStack] = useState<string[]>([]);
-  const [redoStack, setRedoStack] = useState<string[]>([]);
+  const [undoStack, setUndoStack] = useState<BoardSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<BoardSnapshot[]>([]);
   const [cropSelection, setCropSelection] = useState<CropSelection | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: size.width, height: size.height });
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: typeof window === "undefined" ? 1120 : window.innerWidth,
+    height: typeof window === "undefined" ? 780 : window.innerHeight,
+  }));
+  const [shapeObjects, setShapeObjects] = useState<ShapeObject[]>([]);
+  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  const [draftShape, setDraftShape] = useState<ShapeObject | null>(null);
+  const [shapeInteraction, setShapeInteraction] = useState<ShapeInteraction | null>(null);
+
+  const selectedShape = shapeObjects.find((shape) => shape.id === selectedShapeId) ?? null;
+  const boardDisplaySize = useMemo(() => {
+    const modalWidth = Math.min(1120, viewportSize.width * 0.94);
+    const modalHeight = Math.min(720, viewportSize.height * 0.92);
+    const headerReserve = 56;
+    const footerReserve = 50;
+    const contentPadding = 40;
+    const sidebarWidth = 214;
+    const contentGap = 16;
+    const verticalBreathing = 16;
+    const availableWidth = Math.max(260, modalWidth - contentPadding - sidebarWidth - contentGap);
+    const availableHeight = Math.max(300, modalHeight - contentPadding - headerReserve - footerReserve - verticalBreathing);
+    const scale = Math.min(availableWidth / canvasSize.width, availableHeight / canvasSize.height);
+    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    return {
+      width: Math.max(1, Math.floor(canvasSize.width * safeScale)),
+      height: Math.max(1, Math.floor(canvasSize.height * safeScale)),
+    };
+  }, [canvasSize.height, canvasSize.width, viewportSize.height, viewportSize.width]);
+
+  useEffect(() => {
+    const updateViewportSize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      setViewportSize((current) => (
+        current.width === width && current.height === height ? current : { width, height }
+      ));
+    };
+    updateViewportSize();
+    window.addEventListener("resize", updateViewportSize);
+    return () => window.removeEventListener("resize", updateViewportSize);
+  }, []);
 
   const captureCanvas = () => {
     const bgCanvas = bgCanvasRef.current;
@@ -247,24 +497,92 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     if (!ctx) return null;
     ctx.drawImage(bgCanvas, 0, 0);
     ctx.drawImage(drawCanvas, 0, 0);
+    shapeObjects.forEach((shape) => drawShapeObject(ctx, shape));
     return temp.toDataURL("image/png");
   };
 
-  const pushHistory = () => {
+  const captureBoardSnapshot = (overrides: Partial<Pick<BoardSnapshot, "width" | "height" | "backgroundColor" | "shapeObjects">> = {}): BoardSnapshot | null => {
+    const bgCanvas = bgCanvasRef.current;
     const drawCanvas = canvasRef.current;
-    if (!drawCanvas) return;
-    const dataUrl = drawCanvas.toDataURL("image/png");
-    setUndoStack((prev) => (prev[prev.length - 1] === dataUrl ? prev : [...prev, dataUrl]));
+    if (!bgCanvas || !drawCanvas) return null;
+    return {
+      width: overrides.width ?? drawCanvas.width,
+      height: overrides.height ?? drawCanvas.height,
+      backgroundColor: overrides.backgroundColor ?? backgroundColor,
+      bgDataUrl: bgCanvas.toDataURL("image/png"),
+      drawDataUrl: drawCanvas.toDataURL("image/png"),
+      shapeObjects: overrides.shapeObjects ?? shapeObjects,
+    };
+  };
+
+  const snapshotSignature = (snapshot: BoardSnapshot) => JSON.stringify({
+    width: snapshot.width,
+    height: snapshot.height,
+    backgroundColor: snapshot.backgroundColor,
+    bgDataUrl: snapshot.bgDataUrl,
+    drawDataUrl: snapshot.drawDataUrl,
+    shapeObjects: snapshot.shapeObjects,
+  });
+
+  const pushHistory = (overrides: Partial<Pick<BoardSnapshot, "width" | "height" | "backgroundColor" | "shapeObjects">> = {}) => {
+    const snapshot = captureBoardSnapshot(overrides);
+    if (!snapshot) return;
+    setUndoStack((prev) => {
+      const previous = prev[prev.length - 1];
+      if (previous && snapshotSignature(previous) === snapshotSignature(snapshot)) return prev;
+      return [...prev, snapshot];
+    });
     setRedoStack([]);
   };
 
-  const drawDataUrl = async (dataUrl: string) => {
-    const drawCanvas = canvasRef.current;
-    const ctx = drawCanvas?.getContext("2d");
-    if (!drawCanvas || !ctx) return;
+  const replaceLatestHistory = (overrides: Partial<Pick<BoardSnapshot, "width" | "height" | "backgroundColor" | "shapeObjects">> = {}) => {
+    const snapshot = captureBoardSnapshot(overrides);
+    if (!snapshot) return;
+    setUndoStack((prev) => {
+      if (prev.length === 0) return [snapshot];
+      const next = prev.slice(0, -1);
+      return [...next, snapshot];
+    });
+    setRedoStack([]);
+  };
+
+  const drawDataUrl = async (dataUrl: string, target: "bg" | "draw") => {
+    const canvas = target === "bg" ? bgCanvasRef.current : canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
     const image = await loadImage(dataUrl);
-    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    ctx.drawImage(image, 0, 0, drawCanvas.width, drawCanvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  };
+
+  const restoreBoardSnapshot = async (snapshot: BoardSnapshot) => {
+    const bgCanvas = bgCanvasRef.current;
+    const drawCanvas = canvasRef.current;
+    if (!bgCanvas || !drawCanvas) return;
+    if (bgCanvas.width !== snapshot.width || bgCanvas.height !== snapshot.height) {
+      bgCanvas.width = snapshot.width;
+      bgCanvas.height = snapshot.height;
+    }
+    if (drawCanvas.width !== snapshot.width || drawCanvas.height !== snapshot.height) {
+      drawCanvas.width = snapshot.width;
+      drawCanvas.height = snapshot.height;
+    }
+    setCanvasSize((current) => (
+      current.width === snapshot.width && current.height === snapshot.height
+        ? current
+        : { width: snapshot.width, height: snapshot.height }
+    ));
+    setBackgroundColor(snapshot.backgroundColor);
+    appliedBackgroundRef.current = snapshot.backgroundColor;
+    await Promise.all([
+      drawDataUrl(snapshot.bgDataUrl, "bg"),
+      drawDataUrl(snapshot.drawDataUrl, "draw"),
+    ]);
+    setShapeObjects(snapshot.shapeObjects);
+    setSelectedShapeId(null);
+    setDraftShape(null);
+    setShapeInteraction(null);
+    setCropSelection(null);
   };
 
   useEffect(() => {
@@ -287,10 +605,22 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     };
 
     setCropSelection(null);
+    setShapeObjects([]);
+    setSelectedShapeId(null);
+    setDraftShape(null);
+    setShapeInteraction(null);
 
     if (!request.source?.dataUrl) {
       initCanvas(size.width, size.height);
-      setUndoStack([drawCanvas.toDataURL("image/png")]);
+      const initialSnapshot: BoardSnapshot = {
+        width: drawCanvas.width,
+        height: drawCanvas.height,
+        backgroundColor,
+        bgDataUrl: bgCanvas.toDataURL("image/png"),
+        drawDataUrl: drawCanvas.toDataURL("image/png"),
+        shapeObjects: [],
+      };
+      setUndoStack([initialSnapshot]);
       setRedoStack([]);
       return;
     }
@@ -301,7 +631,15 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
       bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
       bgCtx.drawImage(image, 0, 0, bgCanvas.width, bgCanvas.height);
       appliedBackgroundRef.current = backgroundColor;
-      setUndoStack([drawCanvas.toDataURL("image/png")]);
+      const initialSnapshot: BoardSnapshot = {
+        width: drawCanvas.width,
+        height: drawCanvas.height,
+        backgroundColor,
+        bgDataUrl: bgCanvas.toDataURL("image/png"),
+        drawDataUrl: drawCanvas.toDataURL("image/png"),
+        shapeObjects: [],
+      };
+      setUndoStack([initialSnapshot]);
       setRedoStack([]);
     });
     return () => {
@@ -328,8 +666,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     const previous = undoStack[undoStack.length - 2];
     setUndoStack((prev) => prev.slice(0, -1));
     setRedoStack((prev) => [...prev, current]);
-    setCropSelection(null);
-    void drawDataUrl(previous);
+    void restoreBoardSnapshot(previous);
   };
 
   const handleRedo = () => {
@@ -337,8 +674,43 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     if (!next) return;
     setRedoStack((prev) => prev.slice(0, -1));
     setUndoStack((prev) => [...prev, next]);
-    setCropSelection(null);
-    void drawDataUrl(next);
+    void restoreBoardSnapshot(next);
+  };
+
+  const handleDeleteSelectedShape = () => {
+    if (!selectedShapeId) return;
+    const nextShapes = shapeObjects.filter((shape) => shape.id !== selectedShapeId);
+    setShapeObjects(nextShapes);
+    setSelectedShapeId(null);
+    setDraftShape(null);
+    setShapeInteraction(null);
+    pushHistory({ shapeObjects: nextShapes });
+  };
+
+  const commitShapeObjectsToCanvas = (shapes = shapeObjects) => {
+    const drawCanvas = canvasRef.current;
+    const ctx = drawCanvas?.getContext("2d");
+    if (!drawCanvas || !ctx || shapes.length === 0) return false;
+    ctx.globalCompositeOperation = "source-over";
+    shapes.forEach((shape) => drawShapeObject(ctx, shape));
+    setShapeObjects([]);
+    setSelectedShapeId(null);
+    setDraftShape(null);
+    setShapeInteraction(null);
+    replaceLatestHistory({ shapeObjects: [] });
+    return true;
+  };
+
+  const handleToolChange = (nextTool: DrawTool) => {
+    if (tool === "select" && nextTool !== "select") {
+      commitShapeObjectsToCanvas();
+    }
+    setTool(nextTool);
+    if (nextTool !== "select") {
+      setSelectedShapeId(null);
+      setDraftShape(null);
+      setShapeInteraction(null);
+    }
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -346,6 +718,64 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const point = getCanvasPoint(canvas, event);
+
+    if (tool === "select") {
+      const activeShape = selectedShapeId ? shapeObjects.find((shape) => shape.id === selectedShapeId) ?? null : null;
+      const activeHandle = activeShape ? hitTestShapeHandle(point, activeShape) : null;
+      if (activeShape && activeHandle) {
+        canvas.setPointerCapture(event.pointerId);
+        if (activeHandle === "rotate") {
+          const center = getShapeCenter(activeShape);
+          setShapeInteraction({
+            mode: "rotate",
+            pointerId: event.pointerId,
+            original: activeShape,
+            center,
+            startAngle: Math.atan2(point.y - center.y, point.x - center.x),
+          });
+        } else {
+          setShapeInteraction({
+            mode: "resize",
+            pointerId: event.pointerId,
+            handle: activeHandle,
+            original: activeShape,
+          });
+        }
+        return;
+      }
+
+      const hitShape = [...shapeObjects].reverse().find((shape) => hitTestShape(point, shape)) ?? null;
+      setSelectedShapeId(hitShape?.id ?? null);
+      if (!hitShape) {
+        commitShapeObjectsToCanvas();
+        return;
+      }
+      if (hitShape) {
+        canvas.setPointerCapture(event.pointerId);
+        setShapeInteraction({
+          mode: "move",
+          pointerId: event.pointerId,
+          start: point,
+          original: hitShape,
+        });
+      }
+      return;
+    }
+
+    if (isShapeTool(tool)) {
+      canvas.setPointerCapture(event.pointerId);
+      setCropSelection(null);
+      const nextShape = createShapeObject(tool, point, point, color, strokeWidth);
+      setDraftShape(nextShape);
+      setSelectedShapeId(null);
+      setShapeInteraction({
+        mode: "draw",
+        pointerId: event.pointerId,
+        start: point,
+      });
+      return;
+    }
+
     prepareContext(ctx);
     if (tool === "bucket") {
       floodFill(ctx, canvas, point, color);
@@ -357,12 +787,46 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     lastPointRef.current = point;
     snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setCropSelection(null);
+    setSelectedShapeId(null);
     setIsDrawing(true);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
     const canvas = canvasRef.current;
+    if (shapeInteraction && canvas) {
+      const point = getCanvasPoint(canvas, event);
+      if (shapeInteraction.mode === "draw" && isShapeTool(tool)) {
+        setDraftShape(createShapeObject(tool, shapeInteraction.start, point, color, strokeWidth));
+        return;
+      }
+      if (shapeInteraction.mode === "move") {
+        const dx = point.x - shapeInteraction.start.x;
+        const dy = point.y - shapeInteraction.start.y;
+        setShapeObjects((prev) =>
+          prev.map((shape) =>
+            shape.id === shapeInteraction.original.id
+              ? { ...shapeInteraction.original, x: shapeInteraction.original.x + dx, y: shapeInteraction.original.y + dy }
+              : shape
+          )
+        );
+        return;
+      }
+      if (shapeInteraction.mode === "resize") {
+        const resized = resizeShapeFromHandle(shapeInteraction.original, shapeInteraction.handle, point);
+        setShapeObjects((prev) => prev.map((shape) => (shape.id === shapeInteraction.original.id ? resized : shape)));
+        return;
+      }
+      if (shapeInteraction.mode === "rotate") {
+        const currentAngle = Math.atan2(point.y - shapeInteraction.center.y, point.x - shapeInteraction.center.x);
+        const rotation = shapeInteraction.original.rotation + currentAngle - shapeInteraction.startAngle;
+        setShapeObjects((prev) =>
+          prev.map((shape) => (shape.id === shapeInteraction.original.id ? { ...shapeInteraction.original, rotation } : shape))
+        );
+        return;
+      }
+    }
+
+    if (!isDrawing) return;
     const ctx = canvas?.getContext("2d");
     const start = startPointRef.current;
     const last = lastPointRef.current;
@@ -398,6 +862,39 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     if (canvas?.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
     }
+
+    if (shapeInteraction) {
+      if (shapeInteraction.mode === "draw" && draftShape && Math.hypot(draftShape.width, draftShape.height) >= 8) {
+        const nextShapes = [...shapeObjects, draftShape];
+        setShapeObjects(nextShapes);
+        setSelectedShapeId(draftShape.id);
+        setTool("select");
+        pushHistory({ shapeObjects: nextShapes });
+      } else if (end && shapeInteraction.mode === "move") {
+        const dx = end.x - shapeInteraction.start.x;
+        const dy = end.y - shapeInteraction.start.y;
+        const moved = { ...shapeInteraction.original, x: shapeInteraction.original.x + dx, y: shapeInteraction.original.y + dy };
+        const nextShapes = shapeObjects.map((shape) => (shape.id === moved.id ? moved : shape));
+        setShapeObjects(nextShapes);
+        pushHistory({ shapeObjects: nextShapes });
+      } else if (end && shapeInteraction.mode === "resize") {
+        const resized = resizeShapeFromHandle(shapeInteraction.original, shapeInteraction.handle, end);
+        const nextShapes = shapeObjects.map((shape) => (shape.id === resized.id ? resized : shape));
+        setShapeObjects(nextShapes);
+        pushHistory({ shapeObjects: nextShapes });
+      } else if (end && shapeInteraction.mode === "rotate") {
+        const currentAngle = Math.atan2(end.y - shapeInteraction.center.y, end.x - shapeInteraction.center.x);
+        const rotation = shapeInteraction.original.rotation + currentAngle - shapeInteraction.startAngle;
+        const rotated = { ...shapeInteraction.original, rotation };
+        const nextShapes = shapeObjects.map((shape) => (shape.id === rotated.id ? rotated : shape));
+        setShapeObjects(nextShapes);
+        pushHistory({ shapeObjects: nextShapes });
+      }
+      setDraftShape(null);
+      setShapeInteraction(null);
+      return;
+    }
+
     if (canvas && ctx && start && end && snapshot && tool === "crop") {
       ctx.putImageData(snapshot, 0, 0);
       const selection = normalizeCropSelection(start, end, canvas);
@@ -452,8 +949,17 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
       drawCtx.drawImage(drawTemp, 0, 0);
     }
 
+    const nextShapes = shapeObjects
+      .map((shape) => ({ ...shape, x: shape.x - cropSelection.x, y: shape.y - cropSelection.y }))
+      .filter((shape) => shape.x + shape.width >= 0 && shape.y + shape.height >= 0 && shape.x <= cropSelection.width && shape.y <= cropSelection.height);
+    setShapeObjects(nextShapes);
+    setSelectedShapeId(null);
     setCropSelection(null);
-    pushHistory();
+    pushHistory({
+      width: cropSelection.width,
+      height: cropSelection.height,
+      shapeObjects: nextShapes,
+    });
   };
 
   const applyBackgroundColor = (nextColor: string) => {
@@ -463,6 +969,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     bgCtx.fillStyle = nextColor;
     bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
     appliedBackgroundRef.current = nextColor;
+    pushHistory({ backgroundColor: nextColor });
   };
 
   useEffect(() => {
@@ -489,14 +996,38 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
       }
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       const key = event.key.toLowerCase();
-      if (key === "b") setTool("brush");
-      if (key === "e") setTool("eraser");
-      if (key === "r") setTool("rect");
-      if (key === "q") setTool("roundRect");
-      if (key === "o") setTool("circle");
-      if (key === "l") setTool("line");
-      if (key === "c") setTool("crop");
-      if (key === "f") setTool("bucket");
+      if (key === "enter" && cropSelection) {
+        event.preventDefault();
+        handleApplyCrop();
+        return;
+      }
+      if (key === "delete" || key === "backspace") {
+        handleDeleteSelectedShape();
+        return;
+      }
+      if (key === "escape") {
+        if (cropSelection) {
+          setCropSelection(null);
+          return;
+        }
+        if (shapeObjects.length > 0) {
+          commitShapeObjectsToCanvas();
+          return;
+        }
+        setSelectedShapeId(null);
+        setDraftShape(null);
+        setShapeInteraction(null);
+        return;
+      }
+      if (key === "v") handleToolChange("select");
+      if (key === "b") handleToolChange("brush");
+      if (key === "e") handleToolChange("eraser");
+      if (key === "r") handleToolChange("rect");
+      if (key === "q") handleToolChange("roundRect");
+      if (key === "o") handleToolChange("circle");
+      if (key === "l") handleToolChange("line");
+      if (key === "c") handleToolChange("crop");
+      if (key === "f") handleToolChange("bucket");
       if (["1", "2", "3", "4"].includes(key)) {
         setStrokeWidth(STROKE_SIZES[Number(key) - 1]?.value ?? strokeWidth);
       }
@@ -524,10 +1055,60 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
     if (!res.success) return;
   };
 
+  const renderShapeSvg = (shape: ShapeObject, isDraft = false) => {
+    const center = getShapeCenter(shape);
+    const transform = `rotate(${(shape.rotation * 180) / Math.PI} ${center.x} ${center.y})`;
+    const commonProps = {
+      fill: "none",
+      stroke: shape.strokeColor,
+      strokeWidth: shape.strokeWidth,
+      strokeLinecap: "round" as const,
+      strokeLinejoin: "round" as const,
+      opacity: isDraft ? 0.72 : 1,
+    };
+    if (shape.type === "rect") {
+      return <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} transform={transform} {...commonProps} />;
+    }
+    if (shape.type === "roundRect") {
+      return <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx={24} ry={24} transform={transform} {...commonProps} />;
+    }
+    if (shape.type === "circle") {
+      return (
+        <ellipse
+          key={shape.id}
+          cx={shape.x + shape.width / 2}
+          cy={shape.y + shape.height / 2}
+          rx={Math.abs(shape.width / 2)}
+          ry={Math.abs(shape.height / 2)}
+          transform={transform}
+          {...commonProps}
+        />
+      );
+    }
+    return (
+      <line
+        key={shape.id}
+        x1={shape.x}
+        y1={shape.y}
+        x2={shape.x + shape.width}
+        y2={shape.y + shape.height}
+        transform={transform}
+        {...commonProps}
+      />
+    );
+  };
+
+  const selectionCorners = selectedShape ? getShapeCorners(selectedShape) : null;
+  const rotateHandle = selectedShape ? getRotateHandle(selectedShape) : null;
+
   return (
     <div className="kimix-preview-overlay fixed inset-0 z-[90] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="画板">
-      <div className="kimix-modal-card flex max-h-[92vh] w-[min(1120px,94vw)] flex-col rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.28)]" style={{ padding: 20 }} onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between" style={{ gap: 16, marginBottom: 16 }}>
+      <div
+        className="kimix-modal-card flex w-[min(1120px,94vw)] flex-col rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+        style={{ boxSizing: "border-box", height: "min(720px, 92vh)", padding: 20 }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between" style={{ gap: 16, marginBottom: 16 }}>
           <div className="min-w-0">
             <div className="text-[17px] font-semibold text-[var(--kimix-panel-text)]">简易画板</div>
             <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
@@ -539,9 +1120,10 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 gap-4">
-          <aside className="kimix-settings-card flex w-[214px] shrink-0 flex-col overflow-y-auto rounded-xl" style={{ padding: "16px 14px", gap: 18 }}>
-            <section>
+        <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: "214px minmax(0, 1fr)", gap: 16 }}>
+          <aside className="kimix-settings-card flex w-[214px] shrink-0 flex-col rounded-xl" style={{ padding: "16px 10px 16px 14px", height: "100%", minHeight: 0 }}>
+            <div className="kimix-stable-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ gap: 18, paddingRight: 4, scrollbarGutter: "stable" }}>
+              <section>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">历史</div>
               <div className="mt-3 grid grid-cols-2" style={{ gap: 8 }}>
                 <button type="button" onClick={handleUndo} disabled={undoStack.length <= 1} className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-text-secondary hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-35">
@@ -553,9 +1135,9 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                   重做
                 </button>
               </div>
-            </section>
+              </section>
 
-            <section>
+              <section>
               <div className="flex rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ gap: 4, padding: 4 }}>
                 {[
                   { value: "stroke" as const, label: "颜色" },
@@ -574,7 +1156,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                   );
                 })}
               </div>
-              <div className="mt-3 grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5" style={{ gap: 8, marginTop: 14 }}>
                 {DRAW_COLORS.map((item) => (
                   <button
                     key={`${colorPanelMode}-${item.value}`}
@@ -596,9 +1178,9 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                   </button>
                 ))}
               </div>
-            </section>
+              </section>
 
-            <section>
+              <section>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">线条宽度</div>
               <div className="mt-3 grid grid-cols-4" style={{ gap: 8 }}>
                 {STROKE_SIZES.map((item) => {
@@ -615,12 +1197,50 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                   );
                 })}
               </div>
-            </section>
+              </section>
 
-            <section>
+              {selectedShape && (
+                <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
+                  <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">对象属性</div>
+                  <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 8 }}>
+                    拖动图形移动，拖角点缩放，拖顶部圆点旋转。
+                  </div>
+                  <div className="grid grid-cols-2 text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8, marginTop: 12 }}>
+                    <div>宽 {Math.round(Math.abs(selectedShape.width))}</div>
+                    <div>高 {Math.round(Math.abs(selectedShape.height))}</div>
+                    <div>角度 {Math.round((selectedShape.rotation * 180) / Math.PI)}°</div>
+                    <div>线宽 {selectedShape.strokeWidth}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedShape}
+                    className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-red-600 hover:bg-red-50"
+                    style={{ marginTop: 12, width: "100%" }}
+                  >
+                    <Trash2 size={14} />
+                    删除对象
+                  </button>
+                </section>
+              )}
+
+              {cropSelection && (
+                <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">已选择裁剪区域，应用后会铺满当前画板。</div>
+                  <div className="flex" style={{ gap: 8, marginTop: 12 }}>
+                    <button type="button" onClick={handleApplyCrop} className="kimix-icon-text-button is-compact flex-1 justify-center rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark">
+                      应用
+                    </button>
+                    <button type="button" onClick={() => setCropSelection(null)} className="kimix-icon-text-button is-compact justify-center rounded-lg text-text-secondary hover:bg-[var(--kimix-panel-hover)]">
+                      取消
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              <section>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">工具</div>
-              <div className="mt-1 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">快捷键：B/E/R/Q/O/L/C/F</div>
-              <div className="mt-3 flex flex-col" style={{ gap: 8 }}>
+              <div className="mt-1 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">快捷键：V/B/E/R/Q/O/L/C/F</div>
+              <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 12 }}>
                 {DRAW_TOOLS.map((item) => {
                   const Icon = item.icon;
                   const active = tool === item.value;
@@ -628,8 +1248,8 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                     <button
                       key={item.value}
                       type="button"
-                      onClick={() => setTool(item.value)}
-                      className={`kimix-icon-text-button is-compact rounded-lg text-[13px] ${active ? "bg-accent-primary-light text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      onClick={() => handleToolChange(item.value)}
+                      className={`kimix-icon-text-button is-compact justify-center rounded-lg text-[12.5px] ${active ? "bg-accent-primary-light text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                       aria-pressed={active}
                     >
                       <Icon size={14} />
@@ -638,55 +1258,97 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                   );
                 })}
               </div>
-            </section>
-
-            {cropSelection && (
-              <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
-                <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">已选择裁剪区域，应用后会铺满当前画板。</div>
-                <div className="mt-3 flex" style={{ gap: 8 }}>
-                  <button type="button" onClick={handleApplyCrop} className="kimix-icon-text-button is-compact flex-1 justify-center rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark">
-                    应用
-                  </button>
-                  <button type="button" onClick={() => setCropSelection(null)} className="kimix-icon-text-button is-compact justify-center rounded-lg text-text-secondary hover:bg-[var(--kimix-panel-hover)]">
-                    取消
-                  </button>
-                </div>
               </section>
-            )}
+            </div>
           </aside>
 
-          <div className="flex min-w-0 flex-1 items-center justify-center rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: 18 }}>
-            <div className="relative max-h-[64vh] max-w-full">
-              <canvas
-                ref={bgCanvasRef}
-                className="block max-h-[64vh] max-w-full rounded-lg border border-border-default shadow-elevated-token"
-                style={{ aspectRatio: `${canvasSize.width} / ${canvasSize.height}` }}
-              />
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0 block h-full w-full touch-none rounded-lg"
-                style={{ aspectRatio: `${canvasSize.width} / ${canvasSize.height}`, background: "transparent" }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={finishDrawing}
-                onPointerCancel={finishDrawing}
-              />
-              {cropSelection && (
-                <div
-                  className="pointer-events-none absolute border-2 border-dashed border-accent-primary bg-accent-primary/10"
-                  style={{
-                    left: `${(cropSelection.x / canvasSize.width) * 100}%`,
-                    top: `${(cropSelection.y / canvasSize.height) * 100}%`,
-                    width: `${(cropSelection.width / canvasSize.width) * 100}%`,
-                    height: `${(cropSelection.height / canvasSize.height) * 100}%`,
-                  }}
+          <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden" style={{ height: "100%" }}>
+            <div className="flex h-full w-full min-w-0 items-center justify-center overflow-hidden">
+              <div
+                className="relative rounded-lg border border-border-default shadow-elevated-token"
+                style={{
+                  width: boardDisplaySize.width,
+                  height: boardDisplaySize.height,
+                }}
+              >
+                <canvas
+                  ref={bgCanvasRef}
+                  className="absolute inset-0 block h-full w-full rounded-lg"
                 />
-              )}
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 block h-full w-full touch-none rounded-lg"
+                  style={{
+                    background: "transparent",
+                    cursor: tool === "select" ? "default" : isShapeTool(tool) ? "crosshair" : undefined,
+                  }}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={finishDrawing}
+                  onPointerCancel={finishDrawing}
+                />
+                <svg
+                  className="pointer-events-none absolute inset-0 block h-full w-full rounded-lg"
+                  viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
+                  aria-hidden="true"
+                >
+                  {shapeObjects.map((shape) => renderShapeSvg(shape))}
+                  {draftShape && renderShapeSvg(draftShape, true)}
+                  {selectedShape && selectionCorners && (
+                    <g>
+                      <polygon
+                        points={`${selectionCorners.nw.x},${selectionCorners.nw.y} ${selectionCorners.ne.x},${selectionCorners.ne.y} ${selectionCorners.se.x},${selectionCorners.se.y} ${selectionCorners.sw.x},${selectionCorners.sw.y}`}
+                        fill="none"
+                        stroke="#339af0"
+                        strokeWidth={2}
+                        strokeDasharray="8 6"
+                      />
+                      {rotateHandle && (
+                        <>
+                          <line
+                            x1={(selectionCorners.nw.x + selectionCorners.ne.x) / 2}
+                            y1={(selectionCorners.nw.y + selectionCorners.ne.y) / 2}
+                            x2={rotateHandle.x}
+                            y2={rotateHandle.y}
+                            stroke="#339af0"
+                            strokeWidth={2}
+                          />
+                          <circle cx={rotateHandle.x} cy={rotateHandle.y} r={7} fill="#ffffff" stroke="#339af0" strokeWidth={2} />
+                        </>
+                      )}
+                      {(Object.entries(selectionCorners) as [ShapeHandle, Point][]).map(([handle, point]) => (
+                        <rect
+                          key={handle}
+                          x={point.x - 6}
+                          y={point.y - 6}
+                          width={12}
+                          height={12}
+                          rx={3}
+                          fill="#ffffff"
+                          stroke="#339af0"
+                          strokeWidth={2}
+                        />
+                      ))}
+                    </g>
+                  )}
+                </svg>
+                {cropSelection && (
+                  <div
+                    className="pointer-events-none absolute border-2 border-dashed border-accent-primary bg-accent-primary/10"
+                    style={{
+                      left: `${(cropSelection.x / canvasSize.width) * 100}%`,
+                      top: `${(cropSelection.y / canvasSize.height) * 100}%`,
+                      width: `${(cropSelection.width / canvasSize.width) * 100}%`,
+                      height: `${(cropSelection.height / canvasSize.height) * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between" style={{ gap: 14, marginTop: 16 }}>
+        <div className="flex shrink-0 items-center justify-between" style={{ gap: 14, marginTop: 16 }}>
           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">保存后会作为一张 PNG 图片加入输入区的上传图片列表。</div>
           <div className="flex shrink-0 items-center" style={{ gap: 14 }}>
             <button type="button" onClick={onClose} className="kimix-icon-text-button is-compact rounded-lg text-text-secondary hover:bg-[var(--kimix-panel-hover)]">

@@ -29,6 +29,7 @@ type KimiCodeSdkModule = {
 
 type KimiHarnessLike = {
   interactiveAgentId?: string;
+  withInteractiveAgent?<T>(agentId: string, fn: () => T): T;
   auth?: {
     login(providerName?: string, options?: {
       signal?: AbortSignal;
@@ -44,8 +45,13 @@ type KimiHarnessLike = {
   listSessions(options?: { workDir?: string; sessionId?: string }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
+  getConfigDiagnostics?(): Promise<KimiCodeConfigDiagnostics>;
   setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig>;
   close(): Promise<void>;
+};
+
+type KimiCodeConfigDiagnostics = {
+  warnings?: string[];
 };
 
 type KimiCodeSessionLike = {
@@ -570,15 +576,13 @@ export async function askBtw(
   }
 
   const sdkHarness = await getHarness();
-  const previousAgentId = sdkHarness.interactiveAgentId;
   const agentId = await managed.session.startBtw();
   const run: BtwRun = { agentId, parts: [], thinkingParts: [], ended: false };
   managed.hiddenAgentIds.add(agentId);
   managed.btwRuns.set(agentId, run);
 
   try {
-    sdkHarness.interactiveAgentId = agentId;
-    await managed.session.prompt(input);
+    await runWithInteractiveAgent(sdkHarness, agentId, () => managed.session.prompt(input));
     await waitForBtwRun(run, options.timeoutMs ?? 120_000);
     if (run.error) throw new Error(run.error);
     return {
@@ -588,8 +592,6 @@ export async function askBtw(
       reason: run.endReason,
     };
   } finally {
-    if (previousAgentId === undefined) delete sdkHarness.interactiveAgentId;
-    else sdkHarness.interactiveAgentId = previousAgentId;
     managed.btwRuns.delete(agentId);
     managed.hiddenAgentIds.delete(agentId);
   }

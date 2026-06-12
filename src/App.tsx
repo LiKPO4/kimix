@@ -22,7 +22,9 @@ import {
 } from "@/utils/eventHelpers";
 import {
   getHiddenHandoffSessionIds,
+  isArchivedSessionTombstoned,
   rememberHiddenHandoffSession,
+  rememberArchivedSessionTombstone,
   persistLocalConversationState,
   readLocalActiveContext,
   LOCAL_SESSIONS_KEY,
@@ -95,10 +97,12 @@ function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?:
   ));
 }
 
-function hasArchivedLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): boolean {
+function hasArchivedLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null, projectPath?: string): boolean {
   const ids = new Set([historySessionId, runtimeSessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
+  if (isArchivedSessionTombstoned([...ids], projectPath)) return true;
   return useSessionStore.getState().sessions.some((session) => (
     Boolean(session.archivedAt) &&
+    (!projectPath || isSameLocalProjectPath(session.projectPath, projectPath)) &&
     (
       ids.has(session.id) ||
       Boolean(session.officialSessionId && ids.has(session.officialSessionId)) ||
@@ -1752,7 +1756,7 @@ function App() {
         const isUsableHistorySession = (session: { id: string; title?: string; lastPrompt?: string }) => (
           !hiddenHandoffSessionIds.has(session.id) &&
           !isHiddenInternalSession(session) &&
-          !hasArchivedLocalSessionForRuntime(session.id)
+          !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, activeProject.path)
         );
 
         const res = await window.api.listSessions({ workDir: activeProject.path });
@@ -1800,7 +1804,11 @@ function App() {
           return;
         }
         const historySessionId = latest?.id ?? sessionIdToStart ?? startRes.data.sessionId;
-        const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId);
+        if (hasArchivedLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id, activeProject.path)) {
+          setRunningSessionId(null);
+          return;
+        }
+        const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id);
         const loaded = await window.api.loadSession({
           workDir: activeProject.path,
           sessionId: historySessionId,
@@ -1837,6 +1845,7 @@ function App() {
           const session = hydrateLongTaskProgressFromHistory({
             ...runtimeOwner,
             runtimeSessionId: startRes.data.sessionId,
+            officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
             model: runtimeOwner.model ?? startRes.data.model ?? null,
             events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
             isLoading: false,
@@ -1867,6 +1876,7 @@ function App() {
           createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
           updatedAt: latest?.updatedAt ?? activeLocalSession?.updatedAt ?? Date.now(),
           runtimeSessionId: startRes.data.sessionId,
+          officialSessionId: historySessionId,
           longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
           events,
           isLoading: false,
@@ -1916,6 +1926,7 @@ function App() {
             });
           });
           useSessionStore.setState({ sessions: restoredSessions });
+          restoredSessions.filter((session) => session.archivedAt).forEach(rememberArchivedSessionTombstone);
           void repairKimiCodeHistoryBodies(restoredSessions);
         }
       } catch {

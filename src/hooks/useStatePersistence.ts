@@ -4,8 +4,10 @@ import { useAppStore } from "@/stores/appStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import {
   LOCAL_PERSIST_DEBOUNCE_MS,
+  forgetArchivedSessionTombstone,
   persistLocalActiveContext,
   persistLocalConversationState,
+  rememberArchivedSessionTombstone,
 } from "@/utils/persistence";
 
 export function useStatePersistence() {
@@ -39,6 +41,14 @@ export function useStatePersistence() {
         state.sessions.length !== prev.sessions.length ||
         state.sessions.some((session) => prev.sessions.find((prevSession) => prevSession.id === session.id)?.archivedAt !== session.archivedAt);
       if (archiveOrDeletionChanged) {
+        for (const session of state.sessions) {
+          const previous = prev.sessions.find((prevSession) => prevSession.id === session.id);
+          if (!previous?.archivedAt && session.archivedAt) {
+            rememberArchivedSessionTombstone(session);
+          } else if (previous?.archivedAt && !session.archivedAt) {
+            forgetArchivedSessionTombstone(session);
+          }
+        }
         flushLocalConversationState();
         return;
       }

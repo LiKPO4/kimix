@@ -171,7 +171,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-start justify-center bg-black/20 px-5" style={{ paddingTop: 86 }} onMouseDown={onClose}>
+    <div className="kimix-modal-overlay fixed inset-0 z-[85] flex items-start justify-center px-5" style={{ paddingTop: 86 }} onMouseDown={onClose}>
       <div className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
           <Search size={18} className="shrink-0 text-text-muted" />

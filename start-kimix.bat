@@ -14,10 +14,10 @@ if "%~1"=="--check" (
 
 echo Starting Kimix from %CD%
 echo.
-echo If the app does not refresh, close the old Kimix window and run this file again.
+echo Cleaning old Kimix dev processes and cache before starting.
 echo.
 
-call pnpm dev
+PowerShell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\restart-kimix-dev.ps1"
 
 echo.
 echo Kimix dev process exited. Press any key to close this window.
