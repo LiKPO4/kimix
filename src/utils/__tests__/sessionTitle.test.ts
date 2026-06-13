@@ -38,26 +38,27 @@ describe("deriveSessionTitle", () => {
     expect(deriveSessionTitle([], "默认")).toBe("默认");
   });
 
-  it("returns fallback when no assistant messages", () => {
+  it("derives title from first user message", () => {
     const events: TimelineEvent[] = [
-      { id: "1", type: "user_message", timestamp: 1, content: "Hi" },
+      { id: "1", type: "user_message", timestamp: 1, content: "Scan recent changes and summarize risks" },
     ];
-    expect(deriveSessionTitle(events)).toBe("新会话");
+    expect(deriveSessionTitle(events)).toBe("Scan recent changes and summar...");
   });
 
-  it("derives title from first assistant message", () => {
+  it("prefers first user message over assistant greeting", () => {
+    const events: TimelineEvent[] = [
+      { id: "1", type: "user_message", timestamp: 1, content: "Review drawing board layout" },
+      { id: "2", type: "assistant_message", timestamp: 2, content: "Hello there", isThinking: false, isComplete: true },
+    ];
+    expect(deriveSessionTitle(events)).toBe("Review drawing board layout");
+  });
+
+  it("falls back to assistant message when user content is not meaningful", () => {
     const events: TimelineEvent[] = [
       { id: "1", type: "user_message", timestamp: 1, content: "Hi" },
       { id: "2", type: "assistant_message", timestamp: 2, content: "Hello there", isThinking: false, isComplete: true },
     ];
     expect(deriveSessionTitle(events)).toBe("Hello there");
-  });
-
-  it("ignores assistant messages shorter than 4 chars", () => {
-    const events: TimelineEvent[] = [
-      { id: "1", type: "assistant_message", timestamp: 1, content: "Ok", isThinking: false, isComplete: true },
-    ];
-    expect(deriveSessionTitle(events)).toBe("新会话");
   });
 
   it("uses fallback param when provided", () => {

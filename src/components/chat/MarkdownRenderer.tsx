@@ -6,7 +6,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
-import { restoreMarkdownTables } from "@/utils/assistantParagraphs";
+import { restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 
 interface MarkdownRendererProps {
   content: string;
@@ -218,7 +218,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(() => [rehypeHighlight], []);
-  const normalizedContent = useMemo(() => restoreMarkdownTables(content), [content]);
+  const normalizedContent = useMemo(() => restoreInlineMarkdownHeadings(restoreMarkdownTables(content)), [content]);
 
   return (
     <div className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}>

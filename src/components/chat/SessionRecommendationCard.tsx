@@ -24,7 +24,7 @@ function useAnimatedDots(active: boolean) {
 export function SessionRecommendationCard({ event, sourceSessionId, projectPath }: { event: Extract<TimelineEvent, { type: "session_recommendation" }>; sourceSessionId: string; projectPath: string }) {
   const { createSession, creating } = useCreateProjectSession();
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
-  const isHandoffRunning = event.handoffStatus === "running" || handoffSessionId === sourceSessionId;
+  const isHandoffRunning = event.handoffStatus === "running" && handoffSessionId === sourceSessionId;
   const dots = useAnimatedDots(isHandoffRunning);
   const disabled = creating || isHandoffRunning || !sourceSessionId || !projectPath;
 

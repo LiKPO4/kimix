@@ -602,8 +602,13 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
   const managed = getManagedSession(sessionId);
   const startedAt = Date.now();
   await managed.session.steer(input);
-  const officialSteer = await waitForOfficialSteerRecord(sessionId, managed.session.workDir, input, startedAt);
-  eventSink?.({ sessionId, event: officialSteer });
+  eventSink?.({ sessionId, event: syntheticSteerRecord(input, startedAt) });
+  void waitForOfficialSteerRecord(sessionId, managed.session.workDir, input, startedAt)
+    .then((officialSteer) => {
+      if (officialSteer.source === "kimix-fallback") return;
+      eventSink?.({ sessionId, event: officialSteer });
+    })
+    .catch(() => undefined);
 }
 
 export async function undoHistory(sessionId: string, count: number): Promise<void> {

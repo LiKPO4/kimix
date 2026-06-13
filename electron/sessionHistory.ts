@@ -512,7 +512,8 @@ export async function getSessions(workDir: string): Promise<SessionInfo[]> {
         if (st.size === 0) continue;
         const metadata = readKimiCodeSessionMetadata(sessionDir);
         const firstMsg = await getFirstUserMessage(wireFile);
-        const brief = firstMsg || metadata?.title || metadata?.lastPrompt || "";
+        const officialTitle = metadata?.title && metadata.title !== "New Session" ? metadata.title : "";
+        const brief = officialTitle || firstMsg || metadata?.lastPrompt || "";
         if (!brief || isInternalPromptText(brief)) continue;
         const sessionId = path.basename(sessionDir);
         if (HIDDEN_PREFIXES.some((prefix) => sessionId.startsWith(prefix))) continue;

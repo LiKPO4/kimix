@@ -159,8 +159,16 @@ export function restoreMarkdownTables(content: string) {
   return restoreBrokenMarkdownTableRows(restored).join("\n");
 }
 
+export function restoreInlineMarkdownHeadings(content: string) {
+  if (!content.includes("#")) return content;
+  return content.replace(
+    /([^`\n])([。！？；：.!?:;])\s+(#{1,6}\s+\S)/g,
+    "$1$2\n\n$3",
+  );
+}
+
 export function restoreAssistantProgressParagraphs(content: string): string {
-  const withTables = restoreMarkdownTables(content);
+  const withTables = restoreInlineMarkdownHeadings(restoreMarkdownTables(content));
   if (withTables.length < 120 || withTables.includes("\n") || !hasProgressBoundary(withTables)) return withTables;
   const pattern = /([。！？；.!?])(?=(先|现在|然后|同时|接着|下一步|利用|构建|分析|批次\d*|云端|版本号|上传|修复))/g;
   const restored = withTables.replace(pattern, "$1\n\n");

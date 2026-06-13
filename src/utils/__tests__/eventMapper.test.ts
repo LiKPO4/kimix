@@ -177,6 +177,23 @@ describe("mapStreamEvent", () => {
     expect(user.images).toHaveLength(1);
     expect(user.images[0].dataUrl).toBe("data:image/png;base64,abc");
   });
+
+  it("extracts images from camelCase imageUrl user_input", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "text", text: "Look at this" },
+          { type: "image_url", imageUrl: { url: "data:image/png;base64,abc", id: "shot.png" } },
+        ],
+      },
+    });
+    const user = event as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(user.content).toBe("Look at this");
+    expect(user.images).toHaveLength(1);
+    expect(user.images[0].name).toBe("shot.png");
+    expect(user.images[0].dataUrl).toBe("data:image/png;base64,abc");
+  });
 });
 
 describe("mergeEvents", () => {
@@ -275,6 +292,26 @@ describe("mergeEvents", () => {
     expect(assistant.durationMs).toBeUndefined();
   });
 
+  it("falls back to the turn start when restored assistant duration is too short", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1_000, content: "开始处理" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 31_000, content: "Done", isThinking: false, isComplete: false },
+    ];
+    const incoming: TimelineEvent = {
+      id: "turn-end",
+      type: "assistant_message",
+      timestamp: 32_000,
+      content: "",
+      isThinking: false,
+      isComplete: true,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.isComplete).toBe(true);
+    expect(assistant.durationMs).toBe(31_000);
+  });
+
   it("merges streaming tool calls by toolCallId", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "read", status: "running", arguments: { path: "a" }, rawArguments: '{"path":"a"}' },
@@ -334,6 +371,31 @@ describe("mergeEvents", () => {
       },
     ];
     const incoming: TimelineEvent = { id: "2", type: "steer_message", timestamp: 2, content: "Fix it", status: "sent" };
+    const result = mergeEvents(existing, incoming);
+    const steer = result[0] as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.images).toHaveLength(1);
+    expect(steer.images?.[0].dataUrl).toBe("data:image/png;base64,local");
+  });
+
+  it("keeps local steer images when official confirmation only has a file-like image id", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "steer_message",
+        timestamp: 1,
+        content: "Fix it",
+        images: [{ id: "img-1", name: "shot.png", dataUrl: "data:image/png;base64,local" }],
+        status: "sending",
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "steer_message",
+      timestamp: 2,
+      content: "Fix it",
+      images: [{ name: "image.png", dataUrl: "image.png" }],
+      status: "sent",
+    };
     const result = mergeEvents(existing, incoming);
     const steer = result[0] as Extract<TimelineEvent, { type: "steer_message" }>;
     expect(steer.images).toHaveLength(1);

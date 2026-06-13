@@ -5,6 +5,7 @@ import { isEmptyStatusUpdate } from "@/utils/sessionMetrics";
 
 interface StatusCardProps {
   event: Extract<TimelineEvent, { type: "status_update" }>;
+  inline?: boolean;
 }
 
 function formatK(tokens: number): string {
@@ -36,7 +37,7 @@ function formatTimestamp(timestamp: number): string {
   ].join("-");
 }
 
-export function StatusCard({ event }: StatusCardProps) {
+export function StatusCard({ event, inline = false }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
   if (isEmptyStatusUpdate(event)) return null;
   const toneClass = event.tone === "info" || event.source === "slash"
@@ -56,16 +57,22 @@ export function StatusCard({ event }: StatusCardProps) {
     event.contextSize !== undefined ? `Context: ${formatContext(event, detailedContext)}` : "",
   ].filter(Boolean);
 
-  return (
-    <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
+  const pill = (
       <div
         className={`inline-flex max-w-full items-center rounded-full ${toneClass}`}
-        style={{ gap: 12, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6, fontSize: 13, lineHeight: "18px" }}
+        style={{ gap: 12, paddingLeft: inline ? 13 : 16, paddingRight: inline ? 13 : 16, paddingTop: inline ? 5 : 6, paddingBottom: inline ? 5 : 6, fontSize: 13, lineHeight: "18px" }}
       >
         {details.map((detail, index) => (
           <span key={`${event.id}-${index}`} className="truncate">{detail}</span>
         ))}
       </div>
+  );
+
+  if (inline) return pill;
+
+  return (
+    <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
+      {pill}
     </div>
   );
 }

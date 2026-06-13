@@ -199,9 +199,9 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
   const detailPreview = summary.prettyDetails.trim();
 
   return (
-    <div className="flex justify-center">
+    <div id={`kimix-approval-${event.id}`} className="flex justify-center">
       <div
-        className="max-w-[90%] w-full rounded-2xl border border-border-default bg-bg-secondary"
+        className="max-w-[90%] w-full rounded-2xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
         style={{ padding: "14px 18px 16px" }}
       >
         <div className="flex items-center text-sm font-medium text-text-primary" style={{ gap: 10 }}>
@@ -210,7 +210,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
         </div>
 
         <div
-          className="rounded-xl border border-border-subtle bg-bg-primary"
+          className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
           style={{ marginTop: 12, padding: "12px 14px" }}
         >
           <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "start" }}>
@@ -224,7 +224,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               </div>
             </div>
             <span
-              className="rounded-full border border-border-subtle text-xs text-text-secondary"
+              className="rounded-full border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary"
               style={{ padding: "4px 10px", lineHeight: "18px" }}
             >
               {riskLabel(event.riskLevel)}
@@ -241,7 +241,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
                 {summary.paths.map((path) => (
                   <code
                     key={path}
-                    className="rounded-lg border border-border-subtle bg-bg-secondary text-xs text-text-secondary break-all"
+                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
                     style={{ padding: "7px 10px" }}
                   >
                     {path}
@@ -262,9 +262,9 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               {relatedDiffs.map((diff) => (
                 <div
                   key={diff.path}
-                  className="overflow-hidden rounded-xl border border-border-subtle bg-bg-primary"
+                  className="overflow-hidden rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
                 >
-                  <div className="grid items-center border-b border-border-subtle" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "9px 12px" }}>
+                  <div className="grid items-center border-b border-[var(--kimix-panel-divider)]" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "9px 12px" }}>
                     <code className="min-w-0 truncate text-xs text-text-secondary">{diff.path}</code>
                     <span className="shrink-0 text-xs">
                       <span className="text-accent-green">+{diff.additions ?? 0}</span>
@@ -303,7 +303,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               <button
                 type="button"
                 onClick={() => setDetailsOpen(true)}
-                className="kimix-icon-text-button text-text-secondary hover:bg-bg-hover"
+                className="kimix-icon-text-button text-text-secondary hover:bg-[var(--kimix-panel-hover)]"
                 style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
               >
                 <Expand size={14} />
@@ -311,7 +311,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               </button>
             </div>
             <pre
-              className="text-xs text-text-secondary bg-bg-primary rounded-xl overflow-x-hidden border border-border-subtle font-mono leading-relaxed"
+              className="text-xs text-text-secondary bg-[var(--kimix-panel-bg)] rounded-xl overflow-x-hidden border border-[var(--kimix-panel-border-soft)] font-mono leading-relaxed"
               style={{ marginTop: 8, maxHeight: 180, padding: "12px 14px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}
             >
               {detailPreview}
@@ -360,13 +360,13 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
 
       {detailsOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[2px]"
           style={{ padding: 24 }}
           role="dialog"
           aria-modal="true"
         >
           <div
-            className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-2xl border border-border-default bg-bg-secondary shadow-2xl"
+            className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-2xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] shadow-floating-token"
             style={{ padding: 20 }}
           >
             <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, alignItems: "center" }}>
@@ -379,7 +379,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               <button
                 type="button"
                 onClick={() => setDetailsOpen(false)}
-                className="kimix-icon-text-button text-text-secondary hover:bg-bg-hover"
+                className="kimix-icon-text-button text-text-secondary hover:bg-[var(--kimix-panel-hover)]"
                 style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
               >
                 <X size={14} />
@@ -392,7 +392,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
                 {summary.paths.map((path) => (
                   <code
                     key={`modal-${path}`}
-                    className="rounded-lg border border-border-subtle bg-bg-primary text-xs text-text-secondary break-all"
+                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
                     style={{ padding: "7px 10px" }}
                   >
                     {path}
@@ -402,7 +402,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
             )}
 
             <pre
-              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-border-subtle bg-bg-primary font-mono text-xs leading-relaxed text-text-secondary"
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] font-mono text-xs leading-relaxed text-text-secondary"
               style={{ marginTop: 14, padding: "14px 16px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}
             >
               {detailPreview}
@@ -412,7 +412,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
               <button
                 type="button"
                 onClick={() => navigator.clipboard?.writeText(detailPreview)}
-                className="kimix-icon-text-button text-text-secondary hover:bg-bg-hover"
+                className="kimix-icon-text-button text-text-secondary hover:bg-[var(--kimix-panel-hover)]"
                 style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
               >
                 <Copy size={14} />

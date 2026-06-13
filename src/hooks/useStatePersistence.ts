@@ -12,22 +12,39 @@ import {
 
 export function useStatePersistence() {
   const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const conversationDirtyRef = useRef(false);
+  const isUnloadingRef = useRef(false);
+  const lastConversationPersistAtRef = useRef(Date.now());
 
   useEffect(() => {
-    const flushLocalConversationState = () => {
+    const maxPersistWaitMs = 5000;
+
+    const clearConversationPersistTimer = () => {
       if (persistenceTimerRef.current) {
         clearTimeout(persistenceTimerRef.current);
         persistenceTimerRef.current = null;
       }
+    };
+
+    const flushLocalConversationState = () => {
+      clearConversationPersistTimer();
+      if (!conversationDirtyRef.current) return;
+      conversationDirtyRef.current = false;
+      lastConversationPersistAtRef.current = Date.now();
       persistLocalConversationState();
     };
 
     const scheduleLocalConversationPersist = () => {
+      conversationDirtyRef.current = true;
       if (persistenceTimerRef.current) clearTimeout(persistenceTimerRef.current);
+      const elapsedSincePersist = Date.now() - lastConversationPersistAtRef.current;
+      const delay = Math.max(0, Math.min(LOCAL_PERSIST_DEBOUNCE_MS, maxPersistWaitMs - elapsedSincePersist));
       persistenceTimerRef.current = setTimeout(() => {
         persistenceTimerRef.current = null;
+        conversationDirtyRef.current = false;
+        lastConversationPersistAtRef.current = Date.now();
         persistLocalConversationState();
-      }, LOCAL_PERSIST_DEBOUNCE_MS);
+      }, delay);
     };
 
     const unsubscribeSessionPersistence = useSessionStore.subscribe((state, prev) => {
@@ -41,6 +58,7 @@ export function useStatePersistence() {
         state.sessions.length !== prev.sessions.length ||
         state.sessions.some((session) => prev.sessions.find((prevSession) => prevSession.id === session.id)?.archivedAt !== session.archivedAt);
       if (archiveOrDeletionChanged) {
+        conversationDirtyRef.current = true;
         for (const session of state.sessions) {
           const previous = prev.sessions.find((prevSession) => prevSession.id === session.id);
           if (!previous?.archivedAt && session.archivedAt) {
@@ -59,18 +77,18 @@ export function useStatePersistence() {
       persistLocalActiveContext();
     });
 
-    const handleBeforeUnload = flushLocalConversationState;
+    const handleBeforeUnload = () => {
+      isUnloadingRef.current = true;
+      clearConversationPersistTimer();
+    };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       unsubscribeSessionPersistence();
       unsubscribeActiveContextPersistence();
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      if (persistenceTimerRef.current) {
-        clearTimeout(persistenceTimerRef.current);
-        persistenceTimerRef.current = null;
-      }
-      flushLocalConversationState();
+      clearConversationPersistTimer();
+      if (!isUnloadingRef.current) flushLocalConversationState();
       persistLocalActiveContext();
     };
   }, []);

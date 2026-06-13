@@ -42,19 +42,9 @@ function useAnimatedDots(active: boolean) {
   return ".".repeat(count);
 }
 
-function useRunningClock(active: boolean) {
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => {
-      setTick((value) => value + 1);
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [active]);
-}
-
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
+const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
+const CHAT_BOTTOM_SPACER_HEIGHT = 60;
 
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   drafting: "需求澄清",
@@ -277,6 +267,22 @@ function UserAttachedStatuses({ statuses }: { statuses?: Extract<TimelineEvent, 
   );
 }
 
+function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () => void }) {
+  return (
+    <div className="flex justify-center" style={{ paddingTop: 4, paddingBottom: 2 }}>
+      <button
+        type="button"
+        onClick={onExpand}
+        className="kimix-icon-text-button kimix-muted-action"
+        style={{ minHeight: 34, paddingLeft: 16, paddingRight: 16 }}
+      >
+        <ChevronDown size={15} />
+        <span>已折叠较早对话 {count} 条，点击展开</span>
+      </button>
+    </div>
+  );
+}
+
 function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
   switch (event.type) {
     case "user_message":
@@ -432,6 +438,7 @@ function buildRenderItems(
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
+    const trailingStatusEvents = turnSettled ? statusEvents : [];
     const diffEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff");
     const mergedChangeSummary = mergeChangeSummaryEvents(turnEvents.filter((event): event is Extract<TimelineEvent, { type: "change_summary" }> => event.type === "change_summary"));
     const summaryPathSet = new Set((mergedChangeSummary?.files ?? []).map((file) => normalizeFilePath(file.path)));
@@ -478,7 +485,7 @@ function buildRenderItems(
           leadingApprovals: assistantAttached ? [] : resolvedApprovals,
           attachedSteers: getAttachedSteers(),
           changedFiles: assistantAttached ? [] : Array.from(changedFiles),
-          trailingStatuses: [],
+          trailingStatuses: assistantAttached ? [] : trailingStatusEvents,
           hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
         });
         assistantAttached = true;
@@ -500,7 +507,7 @@ function buildRenderItems(
         continue;
       }
       if (event.type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), trailingStatuses: [] });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), trailingStatuses: trailingStatusEvents });
         toolsAttached = true;
         assistantAttached = true;
         continue;
@@ -556,12 +563,14 @@ function buildRenderItems(
     if (planPath && !planPreviewAttached) {
       items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
     }
-    if (turnSettled) {
+    if (turnSettled && !assistantAttached) {
       statusEvents.forEach((event) => items.push({ type: "event", event }));
     }
-    if (!assistantAttached) {
+    if (!assistantAttached && subagents.length === 1) {
       subagents.forEach((event) => items.push({ type: "event", event }));
     }
+    // Multi-agent Swarm progress is rendered by the floating SwarmPanel above the composer.
+    // Keeping those rows out of the message stream prevents duplicate process lists.
   };
 
   let turnBody: TimelineEvent[] = [];
@@ -673,8 +682,8 @@ export function ChatThread() {
   const scrollTokenRef = useRef(0);
   const isAutoFollowRef = useRef(true);
   const showScrollToBottomRef = useRef(false);
-  const [isAutoFollow, setIsAutoFollow] = useState(true);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const scrollToBottomButtonRef = useRef<HTMLButtonElement>(null);
+  const [showOlderItems, setShowOlderItems] = useState(false);
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
     [session?.events]
@@ -700,13 +709,18 @@ export function ChatThread() {
   const updateAutoFollow = (value: boolean) => {
     if (isAutoFollowRef.current === value) return;
     isAutoFollowRef.current = value;
-    setIsAutoFollow(value);
   };
 
   const updateShowScrollToBottom = (value: boolean) => {
     if (showScrollToBottomRef.current === value) return;
     showScrollToBottomRef.current = value;
-    setShowScrollToBottom(value);
+    const button = scrollToBottomButtonRef.current;
+    if (!button) return;
+    button.style.opacity = value ? "1" : "0";
+    button.style.transform = value ? "translateY(0) scale(1)" : "translateY(6px) scale(0.96)";
+    button.style.pointerEvents = value ? "auto" : "none";
+    button.tabIndex = value ? 0 : -1;
+    button.setAttribute("aria-hidden", value ? "false" : "true");
   };
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -714,7 +728,7 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    node.scrollTo({ top: node.scrollHeight, behavior });
+    node.scrollTo({ top: Math.max(0, node.scrollHeight - node.clientHeight), behavior });
     window.setTimeout(() => {
       if (token !== scrollTokenRef.current || !autoFollowRef.current) return;
       const current = scrollRef.current;
@@ -739,30 +753,27 @@ export function ChatThread() {
       autoFollowRef.current = false;
       updateAutoFollow(false);
     }
-    const node = scrollRef.current;
-    if (!node) return;
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
-    updateShowScrollToBottom(distance > 24);
   };
 
   useEffect(() => {
     autoFollowRef.current = true;
     userScrollRef.current = false;
+    setShowOlderItems(false);
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
     window.requestAnimationFrame(() => scrollToBottom("auto"));
   }, [session?.id]);
 
   useEffect(() => {
-    if (isAutoFollow) {
-      window.requestAnimationFrame(() => scrollToBottom("smooth"));
+    if (isAutoFollowRef.current) {
+      window.requestAnimationFrame(() => scrollToBottom("auto"));
       return;
     }
     const node = scrollRef.current;
     if (!node) return;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
-  }, [contentVersion, isAutoFollow]);
+  }, [contentVersion]);
 
   const retryLastUserMessage = async () => {
     if (!session) throw new Error("当前没有可重试的会话");
@@ -846,7 +857,9 @@ export function ChatThread() {
     runningSessionId === session.id ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
-  useRunningClock(hasActiveTurn);
+  const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
+  const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
+  const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;
@@ -864,14 +877,20 @@ export function ChatThread() {
       <div
         ref={scrollRef}
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
-        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 60, scrollbarGutter: "stable" }}
+        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain" }}
         onScroll={handleScroll}
+        onPointerDown={(event) => {
+          if (event.button === 0) pauseAutoFollowForUser();
+        }}
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22 }}>
-          {renderItems.map((item, index) => (
-            <div key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id} className="kimix-message-enter" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
+        <div className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
+          {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={() => setShowOlderItems(true)} />}
+          {visibleRenderItems.map((item) => (
+            <div
+              key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id}
+            >
               {item.type === "tool_group"
                 ? <ToolGroup tools={item.tools} />
                 : item.type === "plan_preview"
@@ -884,22 +903,31 @@ export function ChatThread() {
           ))}
         </div>
       </div>
-      {showScrollToBottom && (
-        <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-20" style={{ bottom: 24 }}>
-          <div className="kimix-chat-stream-column flex justify-end">
-            <button
-              type="button"
-              aria-label="滚动到底部"
-              title="滚动到底部"
-              onClick={enableAutoFollow}
-              className="pointer-events-auto flex items-center justify-center rounded-full border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)] shadow-[0_8px_22px_rgba(15,15,15,0.10)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text)]"
-              style={{ width: 38, height: 38 }}
-            >
-              <ArrowDown size={17} />
-            </button>
-          </div>
+      <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-20" style={{ bottom: 24 }}>
+        <div className="kimix-chat-stream-column flex justify-end">
+          <button
+            ref={scrollToBottomButtonRef}
+            type="button"
+            aria-label="滚动到底部"
+            aria-hidden="true"
+            tabIndex={-1}
+            title="滚动到底部"
+            onClick={enableAutoFollow}
+            className="flex items-center justify-center rounded-full border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)] shadow-[0_8px_22px_rgba(15,15,15,0.10)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text)]"
+            style={{
+              width: 38,
+              height: 38,
+              opacity: 0,
+              pointerEvents: "none",
+              transform: "translateY(6px) scale(0.96)",
+              transition: "opacity 120ms ease, transform 120ms ease, background-color var(--duration-base) var(--ease-hover), color var(--duration-base) var(--ease-hover)",
+              willChange: "opacity, transform",
+            }}
+          >
+            <ArrowDown size={17} />
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

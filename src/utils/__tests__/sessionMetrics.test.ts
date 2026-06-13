@@ -69,6 +69,21 @@ describe("isEmptyStatusUpdate", () => {
       isEmptyStatusUpdate({ id: "1", type: "status_update", timestamp: 1, message: "已接收本地指令：/goal status", source: "slash" }),
     ).toBe(false);
   });
+
+  it("treats model-only zero status as empty", () => {
+    expect(
+      isEmptyStatusUpdate({ id: "1", type: "status_update", timestamp: 1, message: "模型：kimi-for-coding", tokenCount: 0, inputTokenCount: 0, contextSize: 0, contextLimit: 256000 }),
+    ).toBe(true);
+  });
+
+  it("treats internal step-only statuses as empty", () => {
+    expect(
+      isEmptyStatusUpdate({ id: "1", type: "status_update", timestamp: 1, step: 2, message: "步骤 2中断：已中断" }),
+    ).toBe(true);
+    expect(
+      isEmptyStatusUpdate({ id: "2", type: "status_update", timestamp: 2, step: 2, message: "输出打断" }),
+    ).toBe(true);
+  });
 });
 
 describe("getLatestMeaningfulStatus", () => {

@@ -102,6 +102,8 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     : `当前默认模型：${displayModel}`;
   const pendingApprovalCount = activeSession?.events.filter((event) => event.type === "approval_request" && event.status === "pending").length ?? 0;
   const pendingQuestionCount = activeSession?.events.filter((event) => event.type === "question_request" && event.status === "pending").length ?? 0;
+  const firstPendingApproval = activeSession?.events.find((event) => event.type === "approval_request" && event.status === "pending");
+  const firstPendingQuestion = activeSession?.events.find((event) => event.type === "question_request" && event.status === "pending");
   const latestError = [...(activeSession?.events ?? [])].reverse().find((event) => event.type === "error");
   const isSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
   const kimiStatus = pendingApprovalCount > 0
@@ -239,11 +241,46 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     }, 80);
   };
 
-  const openKimiStatusSettings = async () => {
-    setWorkspaceView("settings");
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent(latestError ? "kimix:focus-auth-settings" : "kimix:focus-model-settings"));
-    }, 80);
+  const showToast = (detail: string) => {
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail }));
+  };
+
+  const scrollToStatusEvent = (elementId: string, successMessage: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) {
+      showToast("暂未找到对应卡片，请在当前对话中查看");
+      return;
+    }
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    showToast(successMessage);
+  };
+
+  const handleKimiStatusClick = async () => {
+    if (firstPendingApproval?.type === "approval_request") {
+      scrollToStatusEvent(`kimix-approval-${firstPendingApproval.id}`, `${pendingApprovalCount} 个权限请求等待处理`);
+      return;
+    }
+    if (firstPendingQuestion?.type === "question_request") {
+      scrollToStatusEvent(`kimix-question-${firstPendingQuestion.id}`, `${pendingQuestionCount} 个问题等待回答`);
+      return;
+    }
+    if (latestError) {
+      setWorkspaceView("settings");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings"));
+      }, 80);
+      return;
+    }
+    if (isSessionRunning) {
+      showToast("当前轮次正在运行");
+      return;
+    }
+    if (activeSession?.runtimeSessionId) {
+      await navigator.clipboard?.writeText(activeSession.runtimeSessionId);
+      showToast("已复制 runtime session id");
+      return;
+    }
+    showToast("当前没有 Kimi Code 运行会话");
   };
 
   useEffect(() => {
@@ -443,7 +480,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         </button>
         <button
           type="button"
-          onClick={() => void openKimiStatusSettings()}
+          onClick={() => void handleKimiStatusClick()}
           className={`kimix-contextbar-action kimix-kimi-status-text is-${kimiStatus.tone} hidden min-w-0 items-center rounded-lg md:flex`}
           style={{ gap: 7, height: 36, lineHeight: "20px", paddingLeft: 10, paddingRight: 10 }}
           title={kimiStatus.detail}

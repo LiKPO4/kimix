@@ -146,7 +146,7 @@ export function QuestionCard({ event }: QuestionCardProps) {
       : "等待选择后继续执行";
 
   return (
-    <div className="flex justify-center">
+    <div id={`kimix-question-${event.id}`} className="flex justify-center">
       <div
         className="w-full rounded-2xl border border-accent-primary-soft bg-accent-primary-light text-text-primary"
         style={{ maxWidth: 832, paddingLeft: 22, paddingRight: 22, paddingTop: collapsed ? 13 : 20, paddingBottom: collapsed ? 13 : 12 }}

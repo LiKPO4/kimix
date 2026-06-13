@@ -154,7 +154,7 @@ describe("mapKimiCodeEvent", () => {
     expect(stepStarted).toBeNull();
     expect(stepCompleted).toBeNull();
     expect(interrupted?.type).toBe("status_update");
-    expect((interrupted as Extract<TimelineEvent, { type: "status_update" }>).message).toContain("cancelled");
+    expect((interrupted as Extract<TimelineEvent, { type: "status_update" }>).message).toBe("输出打断");
     expect(compaction?.type).toBe("compaction");
     expect((compaction as Extract<TimelineEvent, { type: "compaction" }>).phase).toBe("end");
     expect(error?.type).toBe("error");

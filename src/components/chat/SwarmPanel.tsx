@@ -115,7 +115,9 @@ function agentActivity(agent: SubagentEvent) {
     const label = activityLabel(agent.events[index]);
     if (label) return label;
   }
-  if (agent.description) return "等待子代理上报进度";
+  if (agent.status === "queued") return "等待调度";
+  if (agent.status === "suspended") return "限流等待恢复";
+  if (agent.status === "running") return "已启动，等待子代理上报进度";
   return "";
 }
 
@@ -129,6 +131,18 @@ function StatusIcon({ status }: { status: SubagentEvent["status"] }) {
 
 function agentSummary(agent: SubagentEvent) {
   return agentActivity(agent) || agent.resultSummary || agent.error || agent.description || agent.agentName;
+}
+
+function agentProgressMeta(agent: SubagentEvent) {
+  const toolCount = agent.events.filter((event) => event.type === "tool_call" || event.type === "tool_result").length;
+  const assistantCount = agent.events.filter((event) => event.type === "assistant_message").length;
+  const statusCount = agent.events.filter((event) => event.type === "status_update").length;
+  const parts = [
+    toolCount > 0 ? `${toolCount} 条工具` : "",
+    assistantCount > 0 ? `${assistantCount} 段输出` : "",
+    statusCount > 0 ? `${statusCount} 条状态` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "";
 }
 
 export function SwarmPanel({ events, onDismiss }: SwarmPanelProps) {
@@ -177,26 +191,32 @@ export function SwarmPanel({ events, onDismiss }: SwarmPanelProps) {
       {!collapsed && (
         <div className="max-h-52 overflow-y-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
           <div className="flex flex-col" style={{ gap: 8, paddingLeft: 16, paddingRight: 16 }}>
-            {agents.map((agent, index) => (
-              <div
-                key={subagentKey(agent, index)}
-                className="grid min-h-[52px] min-w-0 items-center rounded-[10px] border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[14px] leading-5"
-                style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}
-              >
-                <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
-                  <StatusIcon status={agent.status} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-text-primary">{agent.description || agent.agentName || `子进程 ${index + 1}`}</div>
-                    <div className="truncate text-[12.5px] text-text-muted" style={{ marginTop: 4 }}>
-                      {agentSummary(agent)}
+            {agents.map((agent, index) => {
+              const progressMeta = agentProgressMeta(agent);
+              return (
+                <div
+                  key={subagentKey(agent, index)}
+                  className="grid min-h-[52px] min-w-0 items-center rounded-[10px] border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[14px] leading-5"
+                  style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}
+                >
+                  <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
+                    <StatusIcon status={agent.status} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-text-primary">{agent.description || agent.agentName || `子进程 ${index + 1}`}</div>
+                      <div className="flex min-w-0 items-center text-[12.5px] text-text-muted" style={{ gap: 8, marginTop: 4 }}>
+                        <span className="min-w-0 flex-1 truncate">{agentSummary(agent)}</span>
+                        {progressMeta && (
+                          <span className="shrink-0 text-[12px] text-text-muted">{progressMeta}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  <div className="flex h-7 min-w-[64px] shrink-0 items-center justify-center rounded-lg bg-surface-elevated text-[12.5px] text-text-muted" style={{ paddingLeft: 10, paddingRight: 10 }}>
+                    {statusLabel(agent.status)}
+                  </div>
                 </div>
-                <div className="flex h-7 min-w-[64px] shrink-0 items-center justify-center rounded-lg bg-surface-elevated text-[12.5px] text-text-muted" style={{ paddingLeft: 10, paddingRight: 10 }}>
-                  {statusLabel(agent.status)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

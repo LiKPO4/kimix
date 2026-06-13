@@ -95,7 +95,7 @@ function extractPromptMessage(input: unknown): { content: string; images: { name
         : (isRecord(part.image_url) ? part.image_url : {});
       const url = isString(imageUrl.url) ? imageUrl.url : undefined;
       const id = isString(imageUrl.id) ? imageUrl.id : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url });
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined });
       if (!url) textParts.push("[图片]");
     }
   });
@@ -117,14 +117,11 @@ function usageInput(usage: unknown): number | undefined {
 }
 
 function statusMessageForStep(type: string, event: Record<string, unknown>): string {
-  const step = isNumber(event.step) ? ` ${event.step}` : "";
   if (type === "turn.step.retrying") {
-    const message = isString(event.errorMessage) ? event.errorMessage : "正在重试";
-    return `步骤${step}重试：${message}`;
+    return "正在重试";
   }
   if (type === "turn.step.interrupted") {
-    const message = isString(event.message) ? event.message : "已中断";
-    return `步骤${step}中断：${message}`;
+    return "输出打断";
   }
   return "状态更新";
 }

@@ -23,6 +23,17 @@ export type ArchivedSessionTombstone = {
   archivedAt: number;
 };
 
+export function resetStaleSessionRecommendationEvents(events: TimelineEvent[]) {
+  let changed = false;
+  const nextEvents = events.map((event) => {
+    if (event.type !== "session_recommendation" || event.handoffStatus !== "running") return event;
+    changed = true;
+    const { handoffStatus: _handoffStatus, handoffError: _handoffError, ...rest } = event;
+    return rest;
+  });
+  return changed ? nextEvents : events;
+}
+
 function normalizePathForArchive(value: string | undefined) {
   return (value ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
@@ -109,7 +120,7 @@ export function persistLocalConversationState() {
     const runningSessionId = useAppStore.getState().runningSessionId;
     localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(state.sessions.map((session) => ({
       ...session,
-      events: sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events)),
+      events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events))),
       isLoading: false,
     }))));
     localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(state.pendingMessages));

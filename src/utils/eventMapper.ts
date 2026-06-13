@@ -120,9 +120,36 @@ function closeOpenAssistantBeforeIndex(events: TimelineEvent[], index: number, s
     ...assistant,
     isThinking: false,
     isComplete: true,
-    durationMs: reliableAssistantDurationMs(assistant.durationMs) ?? reliableAssistantDurationBetween(assistant.timestamp, settledAt),
+    durationMs: completedAssistantDuration(events, assistantIndex, assistant, settledAt),
   };
   return result;
+}
+
+function findTurnAnchorTimestamp(events: TimelineEvent[], beforeIndex: number): number | undefined {
+  for (let index = beforeIndex - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "user_message" || event.type === "steer_message") return event.timestamp;
+  }
+  return undefined;
+}
+
+function completedAssistantDuration(
+  events: TimelineEvent[],
+  assistantIndex: number,
+  assistant: Extract<TimelineEvent, { type: "assistant_message" }>,
+  completedAt: number,
+  incomingDurationMs?: number,
+): number | undefined {
+  const direct =
+    reliableAssistantDurationMs(incomingDurationMs) ??
+    reliableAssistantDurationMs(assistant.durationMs) ??
+    reliableAssistantDurationBetween(assistant.timestamp, completedAt);
+  if (direct !== undefined) return direct;
+
+  const turnStartedAt = findTurnAnchorTimestamp(events, assistantIndex);
+  return turnStartedAt !== undefined
+    ? reliableAssistantDurationBetween(turnStartedAt, completedAt)
+    : undefined;
 }
 
 function appendAroundTrailingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
@@ -133,7 +160,6 @@ function appendAroundTrailingSteer(existing: TimelineEvent[], additions: Timelin
 }
 
 function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | null {
-  if (items.length === 0) return null;
   return {
     id: generateId(),
     type: "todo",
@@ -235,9 +261,12 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
       return;
     }
     if (part.type === "image_url") {
-      const imageUrl = isRecord(part.image_url) ? part.image_url : {};
+      const imageUrl = isRecord(part.imageUrl)
+        ? part.imageUrl
+        : (isRecord(part.image_url) ? part.image_url : {});
       const url = isString(imageUrl.url) ? imageUrl.url : undefined;
-      images.push({ name: `图片 ${index + 1}`, dataUrl: url });
+      const id = isString(imageUrl.id) ? imageUrl.id : undefined;
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined });
       if (!url) textParts.push("[图片]");
     }
   });
@@ -260,6 +289,10 @@ function getUserImageSignature(event: Extract<TimelineEvent, { type: "user_messa
   return (event.images ?? [])
     .map((image) => image.dataUrl || image.name || "图片")
     .join("|");
+}
+
+function hasDisplayableImages(images?: { dataUrl?: string }[]) {
+  return Boolean(images?.some((image) => typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")));
 }
 
 function readTimestampCandidate(value: unknown): number | null {
@@ -761,7 +794,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           ...event,
           isThinking: false,
           isComplete: true,
-          durationMs: reliableAssistantDurationMs(incoming.durationMs) ?? reliableAssistantDurationBetween(event.timestamp, incoming.timestamp),
+          durationMs: completedAssistantDuration(existing, index, event, incoming.timestamp, incoming.durationMs),
         };
       });
     }
@@ -794,7 +827,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
         durationMs: incoming.isComplete
-          ? reliableAssistantDurationMs(incoming.durationMs) ?? reliableAssistantDurationBetween(last.timestamp, incoming.timestamp)
+          ? completedAssistantDuration(existing, lastIndex, last, incoming.timestamp, incoming.durationMs)
           : reliableAssistantDurationMs(last.durationMs),
       };
       const result = [...existing];
@@ -845,7 +878,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         ...result[duplicateIndex],
         status: incoming.status,
         error: incoming.error,
-        images: incoming.images && incoming.images.length > 0
+        images: hasDisplayableImages(incoming.images)
           ? incoming.images
           : (result[duplicateIndex] as Extract<TimelineEvent, { type: "steer_message" }>).images,
       } as TimelineEvent;

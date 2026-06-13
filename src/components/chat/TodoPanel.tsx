@@ -11,8 +11,23 @@ function isTodoStatus(value: unknown): value is TodoItem["status"] {
   return value === "pending" || value === "in_progress" || value === "done";
 }
 
+function isTodoToolName(toolName: string) {
+  return /todo/i.test(toolName);
+}
+
+function isEmptyTodoResult(result: unknown) {
+  if (typeof result === "string") return /todo\s+list\s+is\s+empty|todos?\s*(?:are|is)?\s*empty|空/.test(result.toLowerCase());
+  if (Array.isArray(result)) return result.length === 0;
+  if (!result || typeof result !== "object") return false;
+  const record = result as Record<string, unknown>;
+  return (
+    (Array.isArray(record.todos) && record.todos.length === 0) ||
+    (Array.isArray(record.items) && record.items.length === 0)
+  );
+}
+
 function todoItemsFromTool(event: Extract<TimelineEvent, { type: "tool_call" }>): TodoItem[] {
-  if (!/todo/i.test(event.toolName)) return [];
+  if (!isTodoToolName(event.toolName)) return [];
   const rawItems = Array.isArray(event.arguments.todos)
     ? event.arguments.todos
     : Array.isArray(event.arguments.items)
@@ -39,10 +54,11 @@ function todoItemsFromTool(event: Extract<TimelineEvent, { type: "tool_call" }>)
 export function getLatestTodos(events: TimelineEvent[]): TodoItem[] {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
-    if (event.type === "todo" && event.items.length > 0) return event.items;
+    if (event.type === "todo") return event.items;
     if (event.type === "tool_call") {
       const items = todoItemsFromTool(event);
       if (items.length > 0) return items;
+      if (isTodoToolName(event.toolName) && event.status === "success" && isEmptyTodoResult(event.result)) return [];
     }
   }
   return [];

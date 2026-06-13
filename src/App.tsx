@@ -7,7 +7,7 @@ import type { PendingMessage } from "@/stores/sessionStore";
 import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
-import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { deriveSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
@@ -27,6 +27,7 @@ import {
   rememberArchivedSessionTombstone,
   persistLocalConversationState,
   readLocalActiveContext,
+  resetStaleSessionRecommendationEvents,
   LOCAL_SESSIONS_KEY,
   LOCAL_PENDING_KEY,
 } from "@/utils/persistence";
@@ -70,6 +71,7 @@ const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后�
 - 阻塞
 - 关键文件/命令
 - 下一步最小行动`;
+const HANDOFF_TIMEOUT_MS = 180_000;
 let rendererWindowFocusedHint = typeof document !== "undefined" ? document.hasFocus() : false;
 
 interface HandoffJob {
@@ -78,6 +80,7 @@ interface HandoffJob {
   projectPath: string;
   recommendationEventId: string;
   events: TimelineEvent[];
+  timeoutId: ReturnType<typeof window.setTimeout>;
 }
 
 interface StartHandoffDetail {
@@ -129,16 +132,39 @@ function assistantBodySize(events: TimelineEvent[]) {
     .reduce((sum, event) => sum + event.content.trim().length, 0);
 }
 
-function hasPossiblyLostAssistantBody(session: Session) {
+function displayableUserImageCount(events: TimelineEvent[]) {
+  return events
+    .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
+      event.type === "user_message" || event.type === "steer_message"
+    ))
+    .reduce((sum, event) => sum + (event.images ?? []).filter((image) => (
+      typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")
+    )).length, 0);
+}
+
+function hasPossiblyLostUserImages(events: TimelineEvent[]) {
+  return events.some((event) => {
+    if (event.type !== "user_message" && event.type !== "steer_message") return false;
+    return (event.images ?? []).some((image) => (
+      !image.filePath &&
+      !(typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/"))
+    ));
+  });
+}
+
+function needsKimiCodeHistoryRepair(session: Session) {
   return session.engine === "kimi-code" &&
     !session.longTask &&
     !session.archivedAt &&
     Boolean(session.projectPath) &&
-    session.events.some((event) => (
-      event.type === "assistant_message" &&
-      event.isComplete &&
-      event.content.trim().length === 0
-    ));
+    (
+      session.events.some((event) => (
+        event.type === "assistant_message" &&
+        event.isComplete &&
+        event.content.trim().length === 0
+      )) ||
+      hasPossiblyLostUserImages(session.events)
+    );
 }
 
 function getKimiHistorySessionIds(session: Session) {
@@ -149,8 +175,16 @@ function getKimiHistorySessionIds(session: Session) {
   ].filter((id): id is string => Boolean(id))));
 }
 
+function extractOfficialSessionTitle(event: unknown): string | null {
+  if (!event || typeof event !== "object" || Array.isArray(event)) return null;
+  const record = event as Record<string, unknown>;
+  if (record.type !== "session.meta.updated" || typeof record.title !== "string") return null;
+  const title = truncateSessionTitle(record.title);
+  return title && title !== "New Session" ? title : null;
+}
+
 async function repairKimiCodeHistoryBodies(sessions: Session[]) {
-  const candidates = sessions.filter(hasPossiblyLostAssistantBody).slice(0, 12);
+  const candidates = sessions.filter(needsKimiCodeHistoryRepair).slice(0, 12);
   for (const session of candidates) {
     const sessionIds = getKimiHistorySessionIds(session);
     if (sessionIds.length === 0 || !session.projectPath) continue;
@@ -162,7 +196,9 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           ? loaded.data.events
           : [];
       const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
-      if (assistantBodySize(historyEvents) <= assistantBodySize(session.events)) break;
+      const hasMoreAssistantBody = assistantBodySize(historyEvents) > assistantBodySize(session.events);
+      const hasMoreDisplayableImages = displayableUserImageCount(historyEvents) > displayableUserImageCount(session.events);
+      if (!hasMoreAssistantBody && !hasMoreDisplayableImages) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
         sessions: state.sessions.map((item) => item.id === session.id
@@ -340,6 +376,18 @@ function updateRecommendationEvent(sessionId: string, eventId: string, patch: Pa
     )),
     updatedAt: Date.now(),
   }));
+}
+
+function getHandoffTerminalStatus(event: unknown): "completed" | "error" | "interrupted" | null {
+  const type = event && typeof event === "object" ? (event as { type?: unknown }).type : undefined;
+  if (type === "turn.ended") {
+    const reason = (event as { reason?: unknown }).reason;
+    if (reason === "cancelled" || reason === "interrupted") return "interrupted";
+    if (reason === "failed" || reason === "error") return "error";
+    return "completed";
+  }
+  if (type === "error") return "error";
+  return null;
 }
 
 function extractAssistantContent(events: TimelineEvent[]): string {
@@ -1929,7 +1977,7 @@ function App() {
             .filter((session) => !isHiddenInternalSession(session))
             .map((session) => ({
               ...session,
-              events: sanitizePersistedEvents(Array.isArray(session.events) ? session.events : []),
+              events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? session.events : [])),
             }));
           if (JSON.stringify(visibleSessions) !== storedSessions) {
             localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
@@ -1941,7 +1989,7 @@ function App() {
               ...session,
               engine: knownEngine ? rawEngine : "kimi-code",
               runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
-              events: sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []),
+              events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : [])),
               isLoading: false,
             });
           });
@@ -1999,6 +2047,7 @@ function App() {
 
     const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
       handoffJobRef.current = null;
+      window.clearTimeout(job.timeoutId);
       void window.api.closeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
       if (status !== "completed") {
         setHandoffSessionId(null);
@@ -2054,12 +2103,18 @@ function App() {
         });
         if (!startRes.success) throw new Error(startRes.error);
         rememberHiddenHandoffSession(startRes.data.sessionId);
+        const timeoutId = window.setTimeout(() => {
+          const job = handoffJobRef.current;
+          if (!job || job.runtimeSessionId !== startRes.data.sessionId) return;
+          void finishHandoffJob(job, "error");
+        }, HANDOFF_TIMEOUT_MS);
         handoffJobRef.current = {
           sourceSessionId: detail.sourceSessionId,
           runtimeSessionId: startRes.data.sessionId,
           projectPath: detail.projectPath,
           recommendationEventId: detail.recommendationEventId,
           events: [],
+          timeoutId,
         };
         const prompt = buildHandoffPrompt(sourceSession);
         const sendRes = await window.api.sendPrompt({
@@ -2073,6 +2128,7 @@ function App() {
       })().catch((err) => {
         const job = handoffJobRef.current;
         handoffJobRef.current = null;
+        if (job?.timeoutId) window.clearTimeout(job.timeoutId);
         setHandoffSessionId(null);
         setRunningSessionId(null);
         if (job?.runtimeSessionId) void window.api.closeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
@@ -2086,13 +2142,18 @@ function App() {
 
     const unsubscribeEvent = window.api.onKimiEvent((payload) => {
       if (!payload.event) return;
+      const currentHandoffJob = handoffJobRef.current;
+      if (currentHandoffJob?.runtimeSessionId === payload.sessionId) {
+        const mapped = mapStreamEvent(payload.event);
+        if (mapped) currentHandoffJob.events = mergeEvents(currentHandoffJob.events, mapped);
+        const terminalStatus = getHandoffTerminalStatus(payload.event);
+        if (terminalStatus) {
+          void finishHandoffJob(currentHandoffJob, terminalStatus);
+        }
+        return;
+      }
       const mapped = mapStreamEvent(payload.event);
       if (mapped) {
-        const handoffJob = handoffJobRef.current;
-        if (handoffJob?.runtimeSessionId === payload.sessionId) {
-          handoffJob.events = mergeEvents(handoffJob.events, mapped);
-          return;
-        }
         const uiSessionId = resolveUiSessionId(payload.sessionId);
         const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         if (targetSession?.engine === "kimi-code" || targetSession?.longTask) return;
@@ -2132,6 +2193,15 @@ function App() {
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
+      const officialTitle = extractOfficialSessionTitle(rawEvent);
+      if (officialTitle && !targetSession?.titleLocked) {
+        updateSession(uiSessionId, (session) => ({
+          ...session,
+          title: officialTitle,
+          updatedAt: Date.now(),
+        }));
+        syncCurrentSessionFromStore(uiSessionId);
+      }
       const mapped = rawEvent?.type === "kimix.approval.request"
         ? mapKimiCodeApprovalRequest({
             ...(rawEvent.request && typeof rawEvent.request === "object" && !Array.isArray(rawEvent.request) ? rawEvent.request as Record<string, unknown> : {}),
@@ -2456,6 +2526,10 @@ function App() {
       window.removeEventListener("blur", markRendererWindowBlurred);
       document.removeEventListener("pointerdown", markRendererWindowFocused, true);
       document.removeEventListener("keydown", markRendererWindowFocused, true);
+      if (handoffJobRef.current) {
+        window.clearTimeout(handoffJobRef.current.timeoutId);
+        handoffJobRef.current = null;
+      }
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
       goalRefreshTimersRef.current.forEach(clearTimeout);

@@ -1157,6 +1157,7 @@ export function Composer() {
         message: `已发出 Swarm 指令：${args}`,
         source: "slash",
         tone: "info",
+        parentEventId: userEvent.id,
       };
       updateSession(runtime.uiSessionId, (session) => ({
         ...session,
@@ -2206,11 +2207,21 @@ export function Composer() {
                       setImageAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
                       if (previewImage?.id === attachment.id) setPreviewImage(null);
                     }}
-                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent-danger/85 text-white opacity-95 transition-colors hover:bg-accent-danger"
+                    className="absolute rounded-full bg-accent-danger/85 text-white opacity-95 transition-colors hover:bg-accent-danger"
+                    style={{
+                      top: 6,
+                      right: 6,
+                      width: 25,
+                      height: 25,
+                      display: "grid",
+                      placeItems: "center",
+                      padding: 0,
+                      lineHeight: 0,
+                    }}
                     title={isImage ? "移除图片" : "移除附件"}
                     aria-label={isImage ? "移除图片" : "移除附件"}
                   >
-                    <X size={13} />
+                    <X size={13} style={{ display: "block" }} />
                   </button>
                 </button>
               );

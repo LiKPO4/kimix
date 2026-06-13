@@ -22,7 +22,13 @@ export function getLatestStatus(events: TimelineEvent[]) {
 }
 
 export function isEmptyStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {
-  if (event.message?.trim()) return false;
+  const message = event.message?.trim() ?? "";
+  const hasNonZeroMetric =
+    (event.inputTokenCount ?? 0) > 0 ||
+    (event.tokenCount ?? 0) > 0 ||
+    (event.contextSize ?? 0) > 0;
+  if (message && event.step !== undefined && !hasNonZeroMetric && /^(?:步骤\s*\d+\s*)?(?:中断|重试|输出打断|正在重试)/.test(message)) return true;
+  if (message && !(message.startsWith("模型：") && !hasNonZeroMetric)) return false;
   return (event.inputTokenCount ?? 0) === 0 &&
     (event.tokenCount ?? 0) === 0 &&
     (event.contextSize ?? 0) === 0;
