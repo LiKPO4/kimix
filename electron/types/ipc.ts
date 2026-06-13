@@ -1398,6 +1398,11 @@ export type KimiCodeSkillSummary = {
   source: string;
   type?: string;
   disableModelInvocation?: boolean;
+  isSubSkill?: boolean;
+};
+
+export type KimiCodeConfigDiagnostics = {
+  warnings?: string[];
 };
 
 export type KimiCodeSessionSummary = {
@@ -1663,6 +1668,14 @@ export type KimiCodeStatusResponse = {
 export type KimiCodeUsageResponse = {
   success: true;
   data: Record<string, unknown>;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeConfigDiagnosticsResponse = {
+  success: true;
+  data: KimiCodeConfigDiagnostics;
 } | {
   success: false;
   error: string;

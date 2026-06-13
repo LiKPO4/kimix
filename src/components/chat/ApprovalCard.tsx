@@ -323,7 +323,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
           <div className="flex flex-wrap" style={{ gap: 10, marginTop: 14 }}>
             <button
               onClick={() => handleApprove("once")}
-              className="kimix-icon-text-button bg-accent-green text-white text-sm hover:opacity-90"
+              className="kimix-icon-text-button kimix-success-action text-sm"
             >
               <Check size={14} />
               <span>允许一次</span>

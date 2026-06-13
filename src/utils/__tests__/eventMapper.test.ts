@@ -490,4 +490,24 @@ describe("mapHistoryEvents", () => {
   it("handles empty array", () => {
     expect(mapHistoryEvents([])).toEqual([]);
   });
+
+  it("replays native kimi-code compaction without finishing the active assistant", () => {
+    const result = mapHistoryEvents([
+      { type: "assistant.delta", payload: { delta: "压缩前" }, time: 100 },
+      { type: "compaction.completed", payload: {}, time: 120 },
+      { type: "assistant.delta", payload: { delta: "继续输出后半段内容" }, time: 140 },
+      { type: "tool.call.started", payload: { toolCallId: "call-1", name: "Bash", args: { command: "pwd" } }, time: 150 },
+      { type: "tool.progress", payload: { toolCallId: "call-1", update: { kind: "stdout", text: "D:/WORKS\n" } }, time: 160 },
+      { type: "turn.ended", payload: {}, time: 200 },
+    ]);
+
+    const assistant = result.find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
+    const compaction = result.find((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction");
+    const tool = result.find((event): event is Extract<TimelineEvent, { type: "tool_call" }> => event.type === "tool_call");
+    expect(assistant?.content).toBe("压缩前\n\n继续输出后半段内容");
+    expect(assistant?.isComplete).toBe(true);
+    expect(compaction?.phase).toBe("end");
+    expect(tool?.status).toBe("success");
+    expect(tool?.result).toBe("D:/WORKS\n");
+  });
 });

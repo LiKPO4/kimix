@@ -130,6 +130,7 @@ import type {
   KimiCodeListPluginsResponse,
   KimiCodeListSkillsResponse,
   KimiCodeListMarketplaceResponse,
+  KimiCodeConfigDiagnosticsResponse,
   KimiCodeManagedUsageRequest,
   KimiCodeManagedUsageResponse,
   KimiCodeMcpServerRequest,
@@ -331,6 +332,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:forkSession", req),
   renameKimiCodeSession: (req: KimiCodeRenameSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:renameSession", req),
+  reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:reloadSession", req),
   sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
@@ -367,6 +370,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:getStatus", req),
   getKimiCodeUsage: (req: KimiCodeSessionRequest): Promise<KimiCodeUsageResponse> =>
     ipcRenderer.invoke("kimi-code:getUsage", req),
+  getKimiCodeConfigDiagnostics: (): Promise<KimiCodeConfigDiagnosticsResponse> =>
+    ipcRenderer.invoke("kimi-code:getConfigDiagnostics"),
   getKimiCodeManagedUsage: (req?: KimiCodeManagedUsageRequest): Promise<KimiCodeManagedUsageResponse> =>
     ipcRenderer.invoke("kimi-code:getManagedUsage", req),
   listKimiCodeMcpServers: (req: KimiCodeSessionRequest): Promise<KimiCodeListMcpServersResponse> =>

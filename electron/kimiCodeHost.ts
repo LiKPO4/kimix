@@ -230,6 +230,7 @@ export type KimiCodeSkillSummary = {
   source: string;
   type?: string;
   disableModelInvocation?: boolean;
+  isSubSkill?: boolean;
 };
 
 export type KimiCodeConfig = {
@@ -875,6 +876,12 @@ export async function exportSession(input: KimiCodeExportSessionInput): Promise<
 export async function getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig> {
   const sdkHarness = await getHarness();
   return sdkHarness.getConfig(options);
+}
+
+export async function getConfigDiagnostics(): Promise<KimiCodeConfigDiagnostics> {
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.getConfigDiagnostics) return { warnings: [] };
+  return sdkHarness.getConfigDiagnostics();
 }
 
 export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig> {

@@ -4,7 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session, TimelineEvent } from "@/types/ui";
 import type { LongTaskRecoveryInfo, LongTaskSummary } from "@electron/types/ipc";
-import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 function defaultTitleFromRequest(value: string) {
   return value.trim().split(/\r?\n/)[0]?.slice(0, 42) ?? "";
@@ -251,6 +251,12 @@ export function LongTasksPanel() {
       await launchPlanningKickoff(recoverableTask);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (isKimiActiveTurnError(message)) {
+        setRunningSessionId(recoverableTask.id);
+        setError("官方仍有未结束的轮次，Kimix 已恢复运行态。请等待当前轮结束，或点击停止后再重试。");
+        setOpen(true);
+        return;
+      }
       setRunningSessionId(null);
       await markKickoffFailed(recoverableTask, message);
       setError(`任务已创建，但规划启动失败：${message}`);
@@ -289,6 +295,12 @@ export function LongTasksPanel() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (createdTask) {
+        if (isKimiActiveTurnError(message)) {
+          setRunningSessionId(createdTask.id);
+          setError("任务已创建，但官方仍有未结束的轮次，Kimix 已恢复运行态。请等待当前轮结束，或点击停止后再重试规划启动。");
+          setOpen(true);
+          return;
+        }
         setRunningSessionId(null);
         await markKickoffFailed(createdTask, message);
         setError(`任务已创建，但规划启动失败：${message}`);

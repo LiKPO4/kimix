@@ -25,14 +25,14 @@ function Stop-KimixProcessTree {
 
   foreach ($process in $all) {
     $commandLine = [string]$process.CommandLine
-    $isKimixElectron = $process.Name -eq "electron.exe" -and (
-      (Test-ContainsIgnoreCase $commandLine $workspace) -or
-      (Test-ContainsIgnoreCase $commandLine "AppData\Roaming\kimix")
-    )
+    $inWorkspace = Test-ContainsIgnoreCase $commandLine $workspace
+    $isKimixElectron = $process.Name -eq "electron.exe" -and $inWorkspace
     $isKimixNode = $process.Name -eq "node.exe" -and (
-      (Test-ContainsIgnoreCase $commandLine $workspace) -or
-      (Test-ContainsIgnoreCase $commandLine "scripts/dev.cjs") -or
-      (Test-ContainsIgnoreCase $commandLine "electron-vite")
+      $inWorkspace -and (
+        (Test-ContainsIgnoreCase $commandLine "scripts/dev.cjs") -or
+        (Test-ContainsIgnoreCase $commandLine "electron-vite") -or
+        (Test-ContainsIgnoreCase $commandLine "pnpm")
+      )
     )
 
     if ($isKimixElectron -or $isKimixNode) {

@@ -466,7 +466,7 @@ export function SessionToolbar({
           </button>
         ) : (
           <div ref={launchMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${launchMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"}`}>
+            <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${launchMenuOpen ? "border-accent-primary bg-accent-primary-light text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"}`}>
               <button
                 onClick={() => void launchExecutable()}
                 className="flex h-full flex-1 items-center justify-center"
@@ -482,7 +482,7 @@ export function SessionToolbar({
                   e.stopPropagation();
                   setLaunchMenuOpen((value) => !value);
                 }}
-                className="mr-0.5 flex h-8 w-6 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+                className="mr-0.5 flex h-8 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--kimix-panel-soft-bg)]"
                 title="启动方式"
                 aria-label="启动方式"
               >
@@ -538,7 +538,7 @@ export function SessionToolbar({
           </div>
         )}
         <div ref={projectMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${projectMenuOpen ? "border-accent-primary text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:text-[var(--kimix-panel-text)]"} ${!projectPath ? "opacity-45" : ""}`}>
+          <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${projectMenuOpen ? "border-accent-primary bg-accent-primary-light text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"} ${!projectPath ? "opacity-45" : ""}`}>
             <button
               onClick={openProjectPath}
               disabled={!projectPath}
@@ -556,7 +556,7 @@ export function SessionToolbar({
                 setProjectMenuOpen((value) => !value);
               }}
               disabled={!projectPath}
-              className="mr-0.5 flex h-8 w-6 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover disabled:cursor-not-allowed"
+              className="mr-0.5 flex h-8 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--kimix-panel-soft-bg)] disabled:cursor-not-allowed"
               title="打开方式"
               aria-label="打开方式"
             >

@@ -50,6 +50,14 @@ function normalizeResult(event: Record<string, unknown>): unknown {
   return result ?? "";
 }
 
+function normalizeToolProgress(event: Record<string, unknown>): string {
+  const update = isRecord(event.update) ? event.update : {};
+  const text = isString(update.text) ? update.text : "";
+  if (!text) return "";
+  const kind = isString(update.kind) ? update.kind : "";
+  return kind === "stderr" ? `[stderr] ${text}` : text;
+}
+
 function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, unknown> {
   if (event.type === "context.append_loop_event" && isRecord(event.event)) {
     return {
@@ -302,6 +310,22 @@ export function mapKimiCodeEvent(
         status: "running",
         arguments: args,
         rawArguments: Object.keys(args).length > 0 ? JSON.stringify(args) : undefined,
+      };
+    }
+
+    case "tool.progress": {
+      const output = normalizeToolProgress(event);
+      if (!output) return null;
+      return {
+        id: getId(options),
+        type: "tool_call",
+        timestamp,
+        agentId: getAgentId(event),
+        toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
+        toolName: isString(event.name) ? event.name : "unknown",
+        status: "running",
+        arguments: {},
+        result: output,
       };
     }
 

@@ -12,7 +12,7 @@ import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 
 function genId(): string {
@@ -55,12 +55,58 @@ function withClarificationBehavior(content: string, mode: ClarificationToolMode)
   return `${CLARIFICATION_PROMPTS[mode]}\n\n用户原始需求：\n${content}`;
 }
 
+function removeLocalSendAttempt(
+  events: TimelineEvent[],
+  userEventId: string,
+  responseEventId: string,
+  shouldRemoveUserEvent: boolean,
+) {
+  return events.filter((event) => {
+    if (event.id === responseEventId) return false;
+    if (shouldRemoveUserEvent && event.id === userEventId) return false;
+    if (shouldRemoveUserEvent && event.type === "status_update" && event.parentEventId === userEventId) return false;
+    return true;
+  });
+}
+
 function goalStatusLabel(status: string) {
   if (status === "active") return "进行中";
   if (status === "paused") return "已暂停";
   if (status === "blocked") return "受阻";
   if (status === "complete") return "已完成";
   return status;
+}
+
+function formatPercent(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const normalized = value > 1 ? value : value * 100;
+  return `${normalized.toFixed(normalized >= 10 ? 1 : 2)}%`;
+}
+
+function formatKimiCodeStatus(status: Record<string, unknown>): string {
+  const contextTokens = typeof status.contextTokens === "number" ? status.contextTokens : undefined;
+  const maxContextTokens = typeof status.maxContextTokens === "number" ? status.maxContextTokens : undefined;
+  const contextUsage = formatPercent(status.contextUsage);
+  const lines = [
+    "Kimi Code 状态：",
+    typeof status.model === "string" ? `模型：${status.model}` : "",
+    typeof status.permission === "string" ? `权限：${status.permission}` : "",
+    typeof status.planMode === "boolean" ? `Plan：${status.planMode ? "开" : "关"}` : "",
+    typeof status.thinkingLevel === "string" ? `思考强度：${status.thinkingLevel}` : "",
+    contextTokens !== undefined && maxContextTokens !== undefined
+      ? `上下文：${contextTokens.toLocaleString()} / ${maxContextTokens.toLocaleString()}${contextUsage ? ` (${contextUsage})` : ""}`
+      : contextUsage
+        ? `上下文：${contextUsage}`
+        : "",
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+function formatKimiCodeUsage(usage: unknown): string {
+  if (!usage || typeof usage !== "object") return "Kimi Code 用量：暂无可显示的会话用量。";
+  const usageRecord = usage as Record<string, unknown>;
+  const compact = JSON.stringify(usageRecord, null, 2);
+  return `Kimi Code 会话用量：\n${compact}`;
 }
 
 function buildGoalKickoffPrompt(objective: string) {
@@ -180,8 +226,11 @@ const iconButtonClass =
 function getLatestUserTurnState(events: TimelineEvent[]) {
   const latestUserIndex = events.findLastIndex((event) => event.type === "user_message");
   const turnEvents = latestUserIndex >= 0 ? events.slice(latestUserIndex + 1) : events;
-  const hasCompletedAssistant = turnEvents.some((event) => event.type === "assistant_message" && event.isComplete);
-  const hasUnfinishedAssistant = turnEvents.some((event) => event.type === "assistant_message" && !event.isComplete);
+  const latestAssistant = [...turnEvents].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+    event.type === "assistant_message"
+  ));
+  const hasCompletedAssistant = Boolean(latestAssistant?.isComplete);
+  const hasUnfinishedAssistant = Boolean(latestAssistant && !latestAssistant.isComplete);
   return { hasCompletedAssistant, hasUnfinishedAssistant };
 }
 
@@ -302,6 +351,9 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-plan", label: "/plan", detail: "切换 Plan 模式", insertText: "/plan ", commandName: "plan", kind: "slash" },
   { id: "slash-plan-on", label: "/plan on", detail: "开启 Plan 模式", insertText: "/plan on ", commandName: "plan", kind: "slash" },
   { id: "slash-plan-off", label: "/plan off", detail: "关闭 Plan 模式", insertText: "/plan off ", commandName: "plan", kind: "slash" },
+  { id: "slash-status", label: "/status", detail: "显示当前 SDK 会话状态", insertText: "/status", commandName: "status", kind: "slash" },
+  { id: "slash-usage", label: "/usage", detail: "显示当前 SDK 会话用量", insertText: "/usage", commandName: "usage", kind: "slash" },
+  { id: "slash-reload", label: "/reload", detail: "重载当前 SDK 会话配置", insertText: "/reload", commandName: "reload", kind: "slash" },
   { id: "slash-btw", label: "/btw", detail: "侧问，不影响主轮次", insertText: "/btw ", commandName: "btw", kind: "slash" },
   { id: "slash-btw-template", label: "/btw 这个函数是谁调用的", detail: "带问题模板：侧问，不影响主轮次", insertText: "/btw 这个函数是谁调用的", commandName: "btw", kind: "slash" },
   { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo ", commandName: "undo", kind: "slash" },
@@ -428,11 +480,6 @@ export function Composer() {
   useEffect(() => {
     if (focusInputTrigger > 0) inputRef.current?.focus();
   }, [focusInputTrigger]);
-
-  useEffect(() => {
-    if (!activeSession || !isCurrentSessionRunning || !latestUserTurnState.hasCompletedAssistant) return;
-    setRunningSessionId(null);
-  }, [activeSession?.id, isCurrentSessionRunning, latestUserTurnState.hasCompletedAssistant, setRunningSessionId]);
 
   useEffect(() => {
     const handleAddDrawingImage = (event: Event) => {
@@ -813,6 +860,27 @@ export function Composer() {
         return;
       } catch (err) {
         console.error("Kimi Code send failed:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        if (isKimiActiveTurnError(message)) {
+          setRunningSessionId(targetSession.id);
+          updateSession(targetSession.id, (session) => ({
+            ...session,
+            events: [
+              ...removeLocalSendAttempt(session.events, userEvent.id, responsePlaceholder.id, shouldAddUserEvent),
+              {
+                id: genId(),
+                type: "status_update",
+                timestamp: Date.now(),
+                message: "官方仍有未结束的轮次，Kimix 已恢复运行态。请等待当前轮结束，或点击停止后再发送新消息。",
+                source: "ipc",
+                tone: "warning",
+              },
+            ],
+            updatedAt: Date.now(),
+          }));
+          targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+          return;
+        }
         setRunningSessionId(null);
         updateSession(targetSession.id, (session) => ({
           ...session,
@@ -825,7 +893,7 @@ export function Composer() {
               id: genId(),
               type: "error",
               timestamp: Date.now(),
-              message: err instanceof Error ? err.message : String(err),
+              message,
               source: "ipc",
             },
           ],
@@ -1047,7 +1115,7 @@ export function Composer() {
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
     if (name.startsWith("skill:")) return false;
-    if (!["goal", "theme", "custom-theme", "import-from-cc-codex", "compact", "plan", "btw", "undo", "swarm"].includes(name)) return false;
+    if (!["goal", "theme", "custom-theme", "import-from-cc-codex", "compact", "plan", "btw", "undo", "swarm", "reload", "status", "usage"].includes(name)) return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name === "goal") {
       await appendSlashNotice(commandNotice);
@@ -1191,6 +1259,30 @@ export function Composer() {
       } else {
         await appendStatusMessage(next ? "Plan 模式已开启，新会话发送时生效。" : "Plan 模式已关闭。");
       }
+      return true;
+    }
+    if (name === "reload") {
+      await appendSlashNotice(commandNotice);
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      const res = await window.api.reloadKimiCodeSession({ sessionId: runtime.runtimeSessionId });
+      await appendStatusMessage(res.success ? "已重载当前 Kimi Code 会话配置。" : `重载失败：${res.error}`);
+      return true;
+    }
+    if (name === "status") {
+      await appendSlashNotice(commandNotice);
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      const res = await window.api.getKimiCodeStatus({ sessionId: runtime.runtimeSessionId });
+      await appendAssistantNotice(res.success ? formatKimiCodeStatus(res.data as Record<string, unknown>) : `读取 Kimi Code 状态失败：${res.error}`);
+      return true;
+    }
+    if (name === "usage") {
+      await appendSlashNotice(commandNotice);
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      const res = await window.api.getKimiCodeUsage({ sessionId: runtime.runtimeSessionId });
+      await appendAssistantNotice(res.success ? formatKimiCodeUsage(res.data) : `读取 Kimi Code 会话用量失败：${res.error}`);
       return true;
     }
     if (name === "btw") {
@@ -2114,7 +2206,7 @@ export function Composer() {
                       setImageAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
                       if (previewImage?.id === attachment.id) setPreviewImage(null);
                     }}
-                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-white opacity-95 transition-colors hover:bg-black"
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent-danger/85 text-white opacity-95 transition-colors hover:bg-accent-danger"
                     title={isImage ? "移除图片" : "移除附件"}
                     aria-label={isImage ? "移除图片" : "移除附件"}
                   >
@@ -2293,7 +2385,7 @@ export function Composer() {
                     <span className="text-[13px]">引导</span>
                   </button>
                 )}
-                <button onClick={handleStop} className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:opacity-90" title="停止" aria-label="停止">
+                <button onClick={handleStop} className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" title="停止" aria-label="停止">
                   <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
                 </button>
               </>

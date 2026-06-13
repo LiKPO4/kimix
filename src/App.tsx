@@ -11,7 +11,7 @@ import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
-import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import {
   settleInactiveEvents,
@@ -1564,7 +1564,27 @@ function App() {
         if (res.success) return;
         throw new Error(res.error);
       }).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
         useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
+        if (isKimiActiveTurnError(message)) {
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            events: [
+              ...session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
+              {
+                id: crypto.randomUUID(),
+                type: "status_update" as const,
+                timestamp: Date.now(),
+                message: "官方仍有未结束的轮次，Kimix 已恢复运行态；队列消息会在当前轮结束后继续发送。",
+                source: "ipc" as const,
+                tone: "warning" as const,
+              },
+            ],
+            updatedAt: Date.now(),
+          }));
+          setRunningSessionId(uiSessionId);
+          return;
+        }
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: [
@@ -1573,7 +1593,7 @@ function App() {
               id: crypto.randomUUID(),
               type: "error" as const,
               timestamp: Date.now(),
-              message: err instanceof Error ? err.message : String(err),
+              message,
               source: "ipc" as const,
             },
           ],
@@ -2075,6 +2095,7 @@ function App() {
         }
         const uiSessionId = resolveUiSessionId(payload.sessionId);
         const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+        if (targetSession?.engine === "kimi-code" || targetSession?.longTask) return;
         const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
         const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
         markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
@@ -2381,7 +2402,27 @@ function App() {
               if (res.success) return;
               throw new Error(res.error);
             }).catch((err) => {
+              const message = err instanceof Error ? err.message : String(err);
               useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
+              if (isKimiActiveTurnError(message)) {
+                updateSession(uiSessionId, (session) => ({
+                  ...session,
+                  events: [
+                    ...session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
+                    {
+                      id: crypto.randomUUID(),
+                      type: "status_update" as const,
+                      timestamp: Date.now(),
+                      message: "官方仍有未结束的轮次，Kimix 已恢复运行态；队列消息会在当前轮结束后继续发送。",
+                      source: "ipc" as const,
+                      tone: "warning" as const,
+                    },
+                  ],
+                  updatedAt: Date.now(),
+                }));
+                setRunningSessionId(uiSessionId);
+                return;
+              }
               updateSession(uiSessionId, (session) => ({
                 ...session,
                 events: [
@@ -2390,7 +2431,7 @@ function App() {
                     id: crypto.randomUUID(),
                     type: "error" as const,
                     timestamp: Date.now(),
-                    message: err instanceof Error ? err.message : String(err),
+                    message,
                     source: "ipc" as const,
                   },
                 ],

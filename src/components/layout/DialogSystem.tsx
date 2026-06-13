@@ -229,14 +229,14 @@ function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchC
           <button
             type="button"
             onClick={onClose}
-            className="kimix-icon-text-button bg-surface-hover text-text-secondary hover:bg-surface-active"
+            className="kimix-icon-text-button text-text-secondary hover:bg-surface-hover"
           >
             取消
           </button>
           <button
             type="button"
             onClick={() => void onSave()}
-            className="kimix-icon-text-button bg-text-primary text-text-inverse hover:opacity-90"
+            className="kimix-icon-text-button kimix-strong-action"
           >
             保存命令
           </button>

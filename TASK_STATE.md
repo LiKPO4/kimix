@@ -31,8 +31,13 @@
 - 已完成：修复画板主体高度过高导致画布顶穿底部操作区的问题；右侧画布区域改为固定容器内自适应居中，避免 1:1 画布按自身尺寸撑开弹窗；版本锚点同步到 v2.9.35。
 - 后续约定：用户要求每次完成代码改动并构建通过后，直接重启 Kimix 应用，便于用最新版本截图验收。
 - 已完成：官方 Kimi Code 0.14.2 跟进第一步已落地；vendored `@moonshot-ai/kimi-code-sdk` 从 0.9.1 更新到 0.9.3，来源 tag `@moonshot-ai/kimi-code@0.14.2` / commit `1cb49dba5bbc7d015a791ec9699d45df931ead92`；BTW 侧问优先使用官方 `withInteractiveAgent()` 作用域 API，旧 SDK 保留 setter fallback；版本锚点同步到 v2.9.41。
+- 已完成：官方 Kimi Code 0.14.2 shell 工具 streaming 事件 `tool.progress` 已映射到 Kimix 工具卡，运行中 stdout/stderr 会合并显示；补齐 `/reload`、`/status`、`/usage` 本地 slash 到 SDK reload/status/usage API；核查官方 slash 注册表后确认 `/provider` 等配置入口继续由 Kimix 设置页/模型配置承载，不新增伪聊天命令；版本锚点同步到 v2.9.42。
+- 已完成：修复上下文压缩完成后当前轮仍在执行但输入框提前解锁的问题；Composer 不再根据本地已完成 assistant 分段自行清运行态，改为等待 SDK status/turn 收口；真正 TurnEnd 时兜底关闭仍 running 的工具卡，避免过程摘要停在“正在思考/执行中”；版本锚点同步到 v2.9.43。
+- 已完成：修复官方 active turn 残留/恢复场景下新消息误发后 UI 再次清运行态的问题；Composer、空态建议、队列续发和长程任务启动遇到 active-turn 拒收时会回滚本地占位、恢复运行态并提示等待当前轮结束；`sendKimiCodePromptWithRetry` 不再自动 cancel 官方当前轮；dev 重启脚本只匹配当前仓库 dev 进程，降低误碰安装版风险；版本锚点同步到 v2.9.44。
+- 已完成：继续收口 Kimi Code 0.14.2 剩余项；接入 `getConfigDiagnostics()` 并在插件 / Skills 页显示配置警告，SDK Skill 列表展示 Sub-skill 标识和数量统计；历史回放兼容 SDK 原生 assistant/thinking/tool progress/turn end/compaction 事件，补测试核验 compaction replay 后不会提前结束 assistant 或丢工具进度；版本锚点同步到 v2.9.45。
+- 已完成：优化长会话滚动到底部的顿挫感；确认输入区是正常 footer 而非覆盖浮层后，将 ChatThread 底部真实滚动留白从 120px 收敛到 60px，减少滚到底后继续滚空白区的顿挫，同时保留底部呼吸感；版本锚点同步到 v2.9.46。
 - 未完成：Swarm 子进程 live delta/tool-call 尾句、undo selector、插件 marketplace update badge、OpenAI-compatible 工具图片输出渲染 fixture、subagent 分组进度细化、`xhigh` reasoning effort 配置回环。
-- 未完成：Kimi Code 0.14.2 后续跟进仍包括 shell tool stdout/stderr streaming 映射、`getConfigDiagnostics()` 配置警告 UI、compaction replay 历史核验、sub-skill 命名/展示、Swarm “必须单独运行”提示和 YOLO/Plan resume 行为复验。
+- 未完成：Kimi Code 0.14.2 后续跟进仍包括 Swarm “必须单独运行”提示和 YOLO/Plan resume 行为复验。
 - 关键文件：`vendor/kimi-code-sdk/index.mjs`、`vendor/kimi-code-sdk/README.md`、`docs/kimi-code-0.14-followup.md`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/SwarmPanel.tsx`、`src/utils/kimiCodeEventMapper.ts`、`src/components/layout/AppShell.tsx`、`src/components/layout/HooksPanel.tsx`。
 
 ## 当前路线文档
@@ -3024,3 +3029,43 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
 ## 下一步
 - 请用户用 v2.8.338 复验：新窗口/新会话直接点击 Plan，应只提示 Plan 已开启且不报 session 不存在；随后发送首条消息应以 Plan 模式开始。
+
+# 2026-06-13 v2.9.47 Kimi Code 实时输出重复修复
+## 当前目标
+- 查明并修复会话 `fjwq6pgu6` 中助手输出出现词片段重复的问题。
+## 已完成
+- 确认根因：主进程同时向旧 `kimi:event` 和新 `kimi-code:event` 通道发送同一条 Kimi Code SDK 事件；v2.9.45 为 compaction replay 让旧 `eventMapper` 开始识别 SDK 原生 `assistant.delta` 后，实时会话里同一 delta 被两个通道各合并一次。
+- 旧 `kimi:event` handler 现在跳过 `engine === "kimi-code"` 和长程任务会话，保留给 legacy 流程使用，避免 Kimi Code 实时输出双重合并。
+- 版本号三处同步到 v2.9.47，并新增 `docs/release-notes/v2.9.47.md`。
+## 验证
+- `pnpm test:run -- src/utils/__tests__/eventMapper.test.ts src/utils/__tests__/kimiCodeEventMapper.test.ts src/utils/__tests__/kimiCodeSendRetry.test.ts` 通过：3 个测试文件、69 个测试通过。
+- `pnpm build` 通过，renderer hash：`assets/index-C8DDvTFB.js`。
+## 下一步
+- 构建和相关事件映射测试通过后，请用户用 v2.9.47 复验 Kimi Code 新实时会话是否还会出现词片段重复。
+
+# 2026-06-13 v2.9.48 高优先级按钮 hover 收敛
+## 当前目标
+- 核对并修复 Kimi 自检清单中确认真实的高优先级按钮 hover 不一致问题，避免强按钮 hover 变淡、危险操作颜色硬编码和可点击元素缺少反馈。
+## 已完成
+- 停止按钮、弹窗保存命令按钮、审批“允许一次”按钮改为背景色加深/体系化 hover，不再使用 `hover:opacity-90`。
+- 顶部启动/项目组合按钮统一外层 hover 背景与展开态反馈，小三角 hover 改用同一 panel soft 背景。
+- 画板删除对象改用 `accent-danger` 体系；附件删除按钮 hover 改为危险色；MCP OAuth 开关补齐 hover。
+- 确认 Settings 拖拽手柄已有 hover 和 `cursor: grab`，该条为误报，未改动。
+- 版本号三处同步到 v2.9.48，并新增 `docs/release-notes/v2.9.48.md`。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-CYTyxGsA.js`。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 构建通过后，请用户用 v2.9.48 重点复验停止按钮、审批卡、顶部工具栏、MCP OAuth、画板删除对象和附件删除 hover。
+
+# 2026-06-13 v2.9.49 侧栏设置入口 hover 对齐
+## 当前目标
+- 修复侧栏底部「设置」按钮 hover 背景色与上方「插件 / Hooks」导航按钮不一致的问题。
+## 已完成
+- `kimix-settings-entry:hover` 从硬编码 `rgba(0, 0, 0, 0.05)` 改为主题 token `var(--surface-hover)`，与 `kimix-sidebar-nav-item:hover` 保持一致。
+- 版本号三处同步到 v2.9.49，并新增 `docs/release-notes/v2.9.49.md`。
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-DCpAIzL6.js`。
+- `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
+## 下一步
+- 构建通过后，请用户用 v2.9.49 复验侧栏底部「设置」和上方「插件 / Hooks」hover 背景是否一致。

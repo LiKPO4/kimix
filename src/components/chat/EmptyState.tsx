@@ -3,7 +3,7 @@ import { Bug, GitBranch, ListChecks, Sparkles } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 
 const FALLBACK_SUGGESTIONS = [
   { icon: Sparkles, text: "分析当前项目结构，列出最值得优先处理的 3 个问题，并说明验证方式" },
@@ -186,8 +186,28 @@ export function EmptyState() {
       if (!sendRes.success) throw new Error(sendRes.error);
     } catch (err) {
       console.error("Send failed:", err);
+      const message = err instanceof Error ? err.message : String(err);
       setRunningSessionId(null);
       if (targetSession) {
+        if (isKimiActiveTurnError(message)) {
+          setRunningSessionId(targetSession.id);
+          updateSession(targetSession.id, (session) => ({
+            ...session,
+            events: [
+              ...session.events.filter((event) => event.id !== userEvent.id && event.id !== responsePlaceholder.id),
+              {
+                id: genId(),
+                type: "status_update",
+                timestamp: Date.now(),
+                message: "官方仍有未结束的轮次，Kimix 已恢复运行态。请等待当前轮结束，或点击停止后再发送新消息。",
+                source: "ipc",
+                tone: "warning",
+              },
+            ],
+            updatedAt: Date.now(),
+          }));
+          return;
+        }
         updateSession(targetSession.id, (session) => ({
           ...session,
           events: session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)),

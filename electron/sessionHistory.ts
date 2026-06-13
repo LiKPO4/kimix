@@ -398,6 +398,32 @@ function parseKimiCodeRecord(record: Record<string, unknown>): SessionHistoryEve
     };
   }
 
+  if (typeof record.type === "string" && (
+    record.type === "assistant.delta" ||
+    record.type === "thinking.delta" ||
+    record.type === "turn.ended" ||
+    record.type === "tool.call.started" ||
+    record.type === "tool.call.delta" ||
+    record.type === "tool.result" ||
+    record.type === "tool.progress" ||
+    record.type === "subagent.spawned" ||
+    record.type === "subagent.started" ||
+    record.type === "subagent.suspended" ||
+    record.type === "subagent.completed" ||
+    record.type === "subagent.failed" ||
+    record.type === "compaction.started" ||
+    record.type === "compaction.completed" ||
+    record.type === "compaction.cancelled" ||
+    record.type === "warning" ||
+    record.type === "error"
+  )) {
+    return {
+      type: record.type,
+      payload: record,
+      time: record.time,
+    };
+  }
+
   // Loop events: content parts and step ends.
   if (record.type === "context.append_loop_event" && record.event && typeof record.event === "object") {
     const event = record.event as { type?: unknown; part?: unknown; time?: unknown };

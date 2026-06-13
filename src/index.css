@@ -49,6 +49,7 @@
   /* Semantic Accents */
   --accent-success: #15803D;
   --accent-success-light: #F0FDF4;
+  --kimix-success-button-hover: #0F6B32;
   --accent-warning: #CA8A04;
   --accent-warning-light: #FEFCE8;
   --accent-danger: #DC2626;
@@ -186,6 +187,7 @@
 
   --accent-success: #4ADE80;
   --accent-success-light: #1A3324;
+  --kimix-success-button-hover: #36C96B;
   --accent-warning: #FACC15;
   --accent-warning-light: #3A3318;
   --accent-danger: #F87171;
@@ -640,7 +642,22 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-strong-action:hover {
+  background: var(--text-secondary);
   transform: scale(1.02);
+}
+
+.kimix-success-action {
+  background: var(--accent-success);
+  color: var(--text-inverse);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover);
+}
+
+.kimix-success-action:hover:not(:disabled),
+.kimix-success-action:focus-visible:not(:disabled) {
+  background: var(--kimix-success-button-hover);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-hover);
 }
 
 /* ── Menus ── */
@@ -1757,7 +1774,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-entry:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--surface-hover);
   box-shadow: var(--shadow-hover);
 }
 

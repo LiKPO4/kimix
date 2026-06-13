@@ -43,6 +43,29 @@ function mergeArguments(rawArguments: string, fallback: Record<string, unknown>)
   return Object.keys(parsed).length > 0 ? parsed : fallback;
 }
 
+function payloadValue(payload: Record<string, unknown>, source: Record<string, unknown>, key: string): unknown {
+  return key in payload ? payload[key] : source[key];
+}
+
+function payloadString(payload: Record<string, unknown>, source: Record<string, unknown>, key: string): string | undefined {
+  const value = payloadValue(payload, source, key);
+  return isString(value) ? value : undefined;
+}
+
+function mergeToolResult(current: unknown, incoming: unknown): unknown {
+  if (incoming === undefined) return current;
+  if (current === undefined) return incoming;
+  if (typeof current === "string" && typeof incoming === "string") return `${current}${incoming}`;
+  return incoming;
+}
+
+function normalizeNativeToolProgress(payload: Record<string, unknown>, source: Record<string, unknown>): string {
+  const update = isRecord(payload.update) ? payload.update : isRecord(source.update) ? source.update : {};
+  const text = isString(update.text) ? update.text : "";
+  if (!text) return "";
+  return update.kind === "stderr" ? `[stderr] ${text}` : text;
+}
+
 function appendAssistantContent(existingContent: string, incomingContent: string, paragraphBreak: boolean): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
@@ -269,6 +292,105 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
   const eventTimestamp = resolveEventTimestamp(source, payload);
 
   switch (type) {
+    case "assistant.delta": {
+      const delta = payloadString(payload, source, "delta");
+      if (!delta) return null;
+      return {
+        id: generateId(),
+        type: "assistant_message",
+        timestamp: eventTimestamp,
+        agentId: payloadString(payload, source, "agentId"),
+        content: delta,
+        isThinking: false,
+        isComplete: false,
+      };
+    }
+
+    case "thinking.delta": {
+      const delta = payloadString(payload, source, "delta");
+      if (!delta) return null;
+      return {
+        id: generateId(),
+        type: "assistant_message",
+        timestamp: eventTimestamp,
+        agentId: payloadString(payload, source, "agentId"),
+        content: "",
+        thinking: delta,
+        thinkingParts: [{ id: generateId(), timestamp: eventTimestamp, text: delta }],
+        isThinking: true,
+        isComplete: false,
+      };
+    }
+
+    case "turn.ended":
+      return {
+        id: generateId(),
+        type: "assistant_message",
+        timestamp: eventTimestamp,
+        content: "",
+        isThinking: false,
+        isComplete: true,
+      };
+
+    case "tool.call.started": {
+      const args = payloadValue(payload, source, "args");
+      return {
+        id: generateId(),
+        type: "tool_call",
+        timestamp: eventTimestamp,
+        agentId: payloadString(payload, source, "agentId"),
+        toolCallId: payloadString(payload, source, "toolCallId") ?? payloadString(payload, source, "id") ?? generateId(),
+        toolName: payloadString(payload, source, "name") ?? payloadString(payload, source, "toolName") ?? "unknown",
+        status: "running",
+        arguments: parseArguments(args),
+        rawArguments: isString(args) ? args : undefined,
+      };
+    }
+
+    case "tool.progress": {
+      const result = normalizeNativeToolProgress(payload, source);
+      if (!result) return null;
+      return {
+        id: generateId(),
+        type: "tool_call",
+        timestamp: eventTimestamp,
+        agentId: payloadString(payload, source, "agentId"),
+        toolCallId: payloadString(payload, source, "toolCallId") ?? payloadString(payload, source, "id") ?? LATEST_TOOL_CALL,
+        toolName: payloadString(payload, source, "name") ?? payloadString(payload, source, "toolName") ?? "unknown",
+        status: "running",
+        arguments: {},
+        result,
+      };
+    }
+
+    case "tool.result":
+      return {
+        id: generateId(),
+        type: "tool_result",
+        timestamp: eventTimestamp,
+        agentId: payloadString(payload, source, "agentId"),
+        toolCallId: payloadString(payload, source, "toolCallId") ?? payloadString(payload, source, "id") ?? "",
+        toolName: payloadString(payload, source, "name") ?? payloadString(payload, source, "toolName") ?? "unknown",
+        result: payloadValue(payload, source, "result") ?? payloadValue(payload, source, "output") ?? "",
+      };
+
+    case "compaction.started":
+      return {
+        id: generateId(),
+        type: "compaction",
+        timestamp: eventTimestamp,
+        phase: "begin",
+      };
+
+    case "compaction.completed":
+    case "compaction.cancelled":
+      return {
+        id: generateId(),
+        type: "compaction",
+        timestamp: eventTimestamp,
+        phase: "end",
+      };
+
     case "TurnBegin": {
       const userMessage = extractUserMessage(payload.user_input);
       if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
@@ -608,14 +730,19 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     if (incoming.isComplete && !incoming.content && !incoming.thinking) {
       const latestOpenIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
       const hasRunningSubagent = existing.some((e) => e.type === "subagent" && e.status === "running");
+      const hasRunningTool = existing.some((e) => e.type === "tool_call" && e.status === "running");
 
-      // TurnEnd 到达时，同时关闭 running 的 subagent 和未完成的 assistant_message
+      // TurnEnd 到达时，同时关闭 running 的 subagent/tool 和未完成的 assistant_message
       // 因为 TurnEnd 代表整个 turn 结束，不应让 subagent 的 TurnEnd 提前结束主对话
-      // 也不应让主对话完成后 subagent 还保持 running
+      // 也不应让主对话完成后过程卡片还保持 running
       let base = existing;
-      if (hasRunningSubagent) {
+      if (hasRunningSubagent || hasRunningTool) {
         base = existing.map((event) =>
-          event.type === "subagent" && event.status === "running" ? { ...event, status: "completed" as const } : event
+          event.type === "subagent" && event.status === "running"
+            ? { ...event, status: "completed" as const }
+            : event.type === "tool_call" && event.status === "running"
+              ? { ...event, status: "success" as const, durationMs: Math.max(0, incoming.timestamp - event.timestamp) }
+              : event
         );
       }
 
@@ -693,7 +820,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         ...last,
         toolName: incoming.toolName && incoming.toolName !== "unknown" ? incoming.toolName : last.toolName,
         arguments: mergeArguments(rawArguments, fallbackArguments),
-        rawArguments,
+        rawArguments: rawArguments || last.rawArguments || incoming.rawArguments,
+        result: mergeToolResult(last.result, incoming.result),
       };
       const result = [...existing];
       result[targetIndex] = updated;

@@ -1214,7 +1214,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                   <button
                     type="button"
                     onClick={handleDeleteSelectedShape}
-                    className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-red-600 hover:bg-red-50"
+                    className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-accent-danger hover:bg-accent-danger-light"
                     style={{ marginTop: 12, width: "100%" }}
                   >
                     <Trash2 size={14} />

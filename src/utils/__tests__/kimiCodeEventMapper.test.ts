@@ -81,6 +81,26 @@ describe("mapKimiCodeEvent", () => {
     expect((result as Extract<TimelineEvent, { type: "tool_result" }>).result).toBe("D:/WORKS");
   });
 
+  it("maps shell tool progress output while the tool is still running", () => {
+    const progress = mapKimiCodeEvent({
+      type: "tool.progress",
+      toolCallId: "call-1",
+      name: "Bash",
+      update: { kind: "stdout", text: "line 1\n" },
+    }, testOptions());
+    const stderr = mapKimiCodeEvent({
+      type: "tool.progress",
+      toolCallId: "call-1",
+      name: "Bash",
+      update: { kind: "stderr", text: "warn\n" },
+    }, testOptions());
+
+    expect(progress?.type).toBe("tool_call");
+    expect((progress as Extract<TimelineEvent, { type: "tool_call" }>).status).toBe("running");
+    expect((progress as Extract<TimelineEvent, { type: "tool_call" }>).result).toBe("line 1\n");
+    expect((stderr as Extract<TimelineEvent, { type: "tool_call" }>).result).toBe("[stderr] warn\n");
+  });
+
   it("preserves non-main agent ids on assistant and tool events", () => {
     const options = testOptions();
     const assistant = mapKimiCodeEvent({ type: "assistant.delta", agentId: "agent-1", delta: "正在检查" }, options);
@@ -358,6 +378,46 @@ describe("reduceKimiCodeEvents", () => {
     expect(tool.type).toBe("tool_call");
     expect(tool.status).toBe("success");
     expect(tool.result).toBe("content");
+  });
+
+  it("merges shell tool progress into the running tool call", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "tool.call.started", toolCallId: "call-1", name: "Bash", args: { command: "printf hi" } },
+      { type: "tool.progress", toolCallId: "call-1", name: "Bash", update: { kind: "stdout", text: "h" } },
+      { type: "tool.progress", toolCallId: "call-1", name: "Bash", update: { kind: "stdout", text: "i" } },
+    ], testOptions());
+
+    expect(events).toHaveLength(1);
+    const tool = events[0] as Extract<TimelineEvent, { type: "tool_call" }>;
+    expect(tool.status).toBe("running");
+    expect(tool.arguments).toEqual({ command: "printf hi" });
+    expect(tool.result).toBe("hi");
+  });
+
+  it("does not finish an active assistant when compaction completes before turn end", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "assistant.delta", delta: "正在整理" },
+      { type: "compaction.completed" },
+    ], testOptions());
+
+    const assistant = events[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.type).toBe("assistant_message");
+    expect(assistant.isComplete).toBe(false);
+    expect(events[1].type).toBe("compaction");
+  });
+
+  it("closes running tool calls only when the turn really ends", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "assistant.delta", delta: "准备执行" },
+      { type: "tool.call.started", toolCallId: "call-1", name: "Bash", args: { command: "sleep 1" } },
+      { type: "compaction.completed" },
+      { type: "turn.ended", reason: "completed" },
+    ], testOptions());
+
+    const assistant = events.find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
+    const tool = events.find((event): event is Extract<TimelineEvent, { type: "tool_call" }> => event.type === "tool_call");
+    expect(assistant?.isComplete).toBe(true);
+    expect(tool?.status).toBe("success");
   });
 
   it("reduces swarm subagent lifecycle updates by agent id", () => {

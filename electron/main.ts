@@ -4955,6 +4955,18 @@ ipcMain.handle("kimi-code:renameSession", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:reloadSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    await kimiCodeHost.reloadSession(sessionId);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -5200,6 +5212,14 @@ ipcMain.handle("kimi-code:getUsage", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!sessionId) return { success: false, error: "Missing sessionId" };
     return { success: true, data: await kimiCodeHost.getUsage(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:getConfigDiagnostics", async () => {
+  try {
+    return { success: true, data: await kimiCodeHost.getConfigDiagnostics() };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

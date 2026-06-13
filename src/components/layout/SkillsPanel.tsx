@@ -3,7 +3,7 @@ import { Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Uplo
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import type { KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
+import type { KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
 
 type SkillInfo = {
   name: string;
@@ -48,6 +48,7 @@ export function SkillsPanel({
   const [installingPlugin, setInstallingPlugin] = useState(false);
   const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
   const [sdkSkills, setSdkSkills] = useState<KimiCodeSkillSummary[]>([]);
+  const [configDiagnostics, setConfigDiagnostics] = useState<KimiCodeConfigDiagnostics>({ warnings: [] });
   const [sdkPluginRefreshing, setSdkPluginRefreshing] = useState(false);
   const [sdkPluginToggling, setSdkPluginToggling] = useState<string | null>(null);
   const [marketplace, setMarketplace] = useState<KimiCodeMarketplacePlugin[]>([]);
@@ -62,9 +63,10 @@ export function SkillsPanel({
 
   const refreshSdkPlugins = async (nextMessage?: string) => {
     setSdkPluginRefreshing(true);
-    const [pluginRes, skillRes] = await Promise.all([
+    const [pluginRes, skillRes, diagnosticsRes] = await Promise.all([
       window.api.listKimiCodePlugins(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
       window.api.listKimiCodeSkills(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
+      window.api.getKimiCodeConfigDiagnostics(),
     ]);
     setSdkPluginRefreshing(false);
     if (!pluginRes.success) {
@@ -79,7 +81,13 @@ export function SkillsPanel({
     const nextSkills = asArray(skillRes.data);
     setSdkPlugins(nextPlugins);
     setSdkSkills(nextSkills);
-    setMessage(nextMessage ?? `已从官方 SDK 读取 ${nextPlugins.length} 个 Plugin、${nextSkills.length} 个 Skill`);
+    if (diagnosticsRes.success) {
+      setConfigDiagnostics(diagnosticsRes.data);
+    } else {
+      setConfigDiagnostics({ warnings: [`读取配置诊断失败：${diagnosticsRes.error}`] });
+    }
+    const subSkillCount = nextSkills.filter((skill) => skill.isSubSkill).length;
+    setMessage(nextMessage ?? `已从官方 SDK 读取 ${nextPlugins.length} 个 Plugin、${nextSkills.length} 个 Skill${subSkillCount > 0 ? `（含 ${subSkillCount} 个 Sub-skill）` : ""}`);
   };
 
   useEffect(() => {
@@ -284,6 +292,9 @@ export function SkillsPanel({
     return plugin.enabled ? "已启用" : "已停用";
   };
 
+  const configWarnings = asArray(configDiagnostics.warnings).filter((warning) => warning.trim().length > 0);
+  const subSkillCount = sdkSkills.filter((skill) => skill.isSubSkill).length;
+
   if (!open) return null;
 
   return (
@@ -441,20 +452,59 @@ export function SkillsPanel({
                     <span>{sdkPluginRefreshing ? "刷新中" : "刷新 SDK 状态"}</span>
                   </button>
                   <div
+                    className={`rounded-lg border ${configWarnings.length > 0 ? "border-accent-warning/35 bg-accent-warning-light/40" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
+                    style={{ padding: "10px 12px", marginTop: 12 }}
+                  >
+                    <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                      <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">配置诊断</div>
+                      <span className={`shrink-0 rounded-full text-[12px] leading-5 ${configWarnings.length > 0 ? "bg-accent-warning text-white" : "bg-accent-success-light text-accent-success"}`} style={{ paddingLeft: 8, paddingRight: 8 }}>
+                        {configWarnings.length > 0 ? `${configWarnings.length} 条警告` : "正常"}
+                      </span>
+                    </div>
+                    {configWarnings.length > 0 ? (
+                      <div className="flex flex-col" style={{ gap: 8, marginTop: 10 }}>
+                        {configWarnings.slice(0, 4).map((warning, index) => (
+                          <div
+                            key={`${index}:${warning}`}
+                            className="rounded-md bg-surface-elevated text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                            style={{ padding: "8px 10px" }}
+                            title={warning}
+                          >
+                            {warning}
+                          </div>
+                        ))}
+                        {configWarnings.length > 4 && (
+                          <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">还有 {configWarnings.length - 4} 条配置警告未展示</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
+                        官方 SDK 当前没有返回配置警告。
+                      </div>
+                    )}
+                  </div>
+                  <div
                     className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
                     style={{ padding: "10px 12px", marginTop: 12 }}
                   >
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                       <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">已加载 Skills</div>
                       <span className="shrink-0 rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                        {sdkSkills.length}
+                        {sdkSkills.length}{subSkillCount > 0 ? ` / ${subSkillCount} 子` : ""}
                       </span>
                     </div>
                     {sdkSkills.length > 0 ? (
                       <div className="flex flex-col" style={{ gap: 7, marginTop: 9 }}>
                         {sdkSkills.slice(0, 5).map((skill) => (
                           <div key={`${skill.source}:${skill.name}`} className="min-w-0">
-                            <div className="truncate text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={skill.name}>{skill.name}</div>
+                            <div className="flex min-w-0 items-center" style={{ gap: 6 }}>
+                              <div className="truncate text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={skill.name}>{skill.name}</div>
+                              {skill.isSubSkill && (
+                                <span className="shrink-0 rounded-full bg-[var(--kimix-panel-badge-bg)] text-[11px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 7, paddingRight: 7 }}>
+                                  Sub-skill
+                                </span>
+                              )}
+                            </div>
                             <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" title={skill.path}>
                               {skill.type ?? "skill"} · {skill.source}
                             </div>
