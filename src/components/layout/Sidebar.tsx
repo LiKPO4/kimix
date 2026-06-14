@@ -2,12 +2,13 @@ import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizon
 import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Project } from "@/types/ui";
+import type { Project, Session } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { loadPersistedSessionFromMain, suppressNextLocalConversationPersist } from "@/utils/persistence";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -392,7 +393,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     : sessions;
 
   const projectSessions = (projectPath: string) =>
-    visibleSessions.filter((s) => isSameProjectPath(s.projectPath, projectPath) && !s.archivedAt && !isHiddenInternalSession(s));
+    visibleSessions
+      .filter((s) => isSameProjectPath(s.projectPath, projectPath) && !s.archivedAt && !isHiddenInternalSession(s))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
 
   const syncProjectForSession = (session: { projectPath: string }) => {
     const project = recentProjects.find((item) => isSameProjectPath(item.path, session.projectPath));
@@ -407,6 +410,21 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     syncProjectForSession(session);
     setCurrentSession(session);
     if (session.events.some((event) => event.type === "user_message" || event.type === "assistant_message")) return;
+
+    const persisted = await loadPersistedSessionFromMain<Session>(session.id);
+    if (persisted && Array.isArray(persisted.events) && persisted.events.length > 0) {
+      const restoredSession = {
+        ...session,
+        ...persisted,
+        events: persisted.events,
+        isLoading: false,
+      };
+      suppressNextLocalConversationPersist();
+      updateSession(session.id, () => restoredSession);
+      syncProjectForSession(restoredSession);
+      setCurrentSession(restoredSession);
+      return;
+    }
 
     const loaded = await window.api.loadSession({
       workDir: session.projectPath,
@@ -741,7 +759,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.9.84</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.9.94</span>
         </button>
       </div>
     </aside>

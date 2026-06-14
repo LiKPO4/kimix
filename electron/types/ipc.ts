@@ -1815,3 +1815,36 @@ export type DefaultWorkDirResponse = {
   success: false;
   error: string;
 }
+
+export type SessionPersistenceState = {
+  updatedAt: number;
+  sessions: unknown[];
+  pendingMessages: unknown[];
+  activeContext: unknown;
+  archivedTombstones: unknown[];
+  hiddenHandoffSessionIds: string[];
+};
+
+export type GetSessionPersistenceResponse = {
+  success: true;
+  data: SessionPersistenceState;
+} | {
+  success: false;
+  error: string;
+};
+
+export type GetPersistedSessionRequest = {
+  id: string;
+};
+
+export type GetPersistedSessionResponse = {
+  success: true;
+  data: unknown | null;
+} | {
+  success: false;
+  error: string;
+};
+
+export type SetSessionPersistenceRequest = SessionPersistenceState;
+
+export type SetSessionPersistenceResponse = VoidResponse;

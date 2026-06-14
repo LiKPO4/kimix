@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -44,6 +44,8 @@ function useAnimatedDots(active: boolean) {
 
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
+const CHAT_INITIAL_RENDER_ITEMS = 5;
+const CHAT_PREPROCESS_EVENT_LIMIT = 48;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
 
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
@@ -632,21 +634,21 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
   ));
   return events.some((event) => {
     if (event.type === "user_message") {
-      return event.content.trim().length > 0 || Boolean(event.images && event.images.length > 0);
+      return event.content.length > 0 || Boolean(event.images && event.images.length > 0);
     }
     if (event.type === "steer_message") {
-      return event.content.trim().length > 0;
+      return event.content.length > 0;
     }
     if (event.type === "assistant_message") {
       const hasText =
-        event.content.trim().length > 0 ||
-        Boolean(event.thinking && event.thinking.trim().length > 0);
+        event.content.length > 0 ||
+        Boolean(event.thinking && event.thinking.length > 0);
       const isActiveThinking = Boolean(isRunningThisSession && event.isThinking && !event.isComplete);
       return hasText || isActiveThinking;
     }
     if (event.type === "tool_result") return false;
     if (event.type === "status_update") {
-      return Boolean(event.message && event.message.trim().length > 0) || isRunningThisSession;
+      return Boolean(event.message && event.message.length > 0) || isRunningThisSession;
     }
     if (
       event.type === "tool_call" ||
@@ -687,9 +689,20 @@ export function ChatThread() {
   const showScrollToBottomRef = useRef(false);
   const scrollToBottomButtonRef = useRef<HTMLButtonElement>(null);
   const [showOlderItems, setShowOlderItems] = useState(false);
+  const [, startTransition] = useTransition();
+  const [phaseComplete, setPhaseComplete] = useState(true);
+  const needsPhase2ScrollRef = useRef(false);
+  const rawEvents = session?.events ?? [];
+  const eventsForRender = useMemo(
+    () => (showOlderItems || rawEvents.length <= CHAT_PREPROCESS_EVENT_LIMIT
+      ? rawEvents
+      : rawEvents.slice(-CHAT_PREPROCESS_EVENT_LIMIT)),
+    [rawEvents, showOlderItems]
+  );
+  const foldedEventCount = showOlderItems ? 0 : Math.max(0, rawEvents.length - eventsForRender.length);
   const splitEvents = useMemo(
-    () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
-    [session?.events]
+    () => splitUserAttachedStatuses(collapseCompletedCompactions(eventsForRender)),
+    [eventsForRender]
   );
   const visibleEvents = useMemo(
     () => filterStatusUpdates(splitEvents.events, statusUpdateDisplay),
@@ -701,13 +714,14 @@ export function ChatThread() {
     [visibleEvents, session?.engine, splitEvents.attachedByUserId]
   );
   const contentVersion = useMemo(() => {
-    return (session?.events ?? []).map((event) => {
+    const tailEvents = rawEvents.slice(-CHAT_PREPROCESS_EVENT_LIMIT);
+    return `${rawEvents.length}|${tailEvents.map((event) => {
       if (event.type === "assistant_message") {
         return `${event.id}:${event.content.length}:${event.thinking?.length ?? 0}:${event.isComplete ? 1 : 0}`;
       }
       return `${event.id}:${event.type}`;
-    }).join("|");
-  }, [session?.events]);
+    }).join("|")}`;
+  }, [rawEvents]);
 
   const updateAutoFollow = (value: boolean) => {
     if (isAutoFollowRef.current === value) return;
@@ -764,8 +778,20 @@ export function ChatThread() {
     setShowOlderItems(false);
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
+    setPhaseComplete(false);
+    needsPhase2ScrollRef.current = true;
     window.requestAnimationFrame(() => scrollToBottom("auto"));
+    const timerId = window.setTimeout(() => {
+      startTransition(() => setPhaseComplete(true));
+    }, 0);
+    return () => window.clearTimeout(timerId);
   }, [session?.id]);
+
+  useEffect(() => {
+    if (!phaseComplete || !needsPhase2ScrollRef.current) return;
+    needsPhase2ScrollRef.current = false;
+    window.requestAnimationFrame(() => scrollToBottom("auto"));
+  }, [phaseComplete]);
 
   useEffect(() => {
     if (isAutoFollowRef.current) {
@@ -860,9 +886,10 @@ export function ChatThread() {
     runningSessionId === session.id ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
-  const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
-  const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
-  const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
+  const effectiveRenderLimit = phaseComplete ? CHAT_FULL_RENDER_ITEM_LIMIT : CHAT_INITIAL_RENDER_ITEMS;
+  const shouldFoldOlderItems = phaseComplete && !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
+  const foldedItemCount = foldedEventCount + (shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0);
+  const visibleRenderItems = showOlderItems ? renderItems : renderItems.slice(-effectiveRenderLimit);
   const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;

@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.9.84",
+  "version": "2.9.94",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -50,12 +50,15 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
     "@vitest/ui": "^4.1.7",
+    "classic-level": "^3.0.0",
     "concurrently": "^9.0.0",
+    "crc32c": "^0.6.0",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0",
     "electron-vite": "^5.0.0",
     "esbuild": "^0.28.0",
     "jsdom": "^29.1.1",
+    "snappy": "^7.3.3",
     "typescript": "^5.7.0",
     "vite": "^6.3.0",
     "vitest": "^4.1.7"

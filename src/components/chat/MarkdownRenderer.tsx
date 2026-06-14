@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -99,7 +99,7 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   );
 }
 
-export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRendererProps) {
+function MarkdownRendererBase({ content, wrapLongLines = false }: MarkdownRendererProps) {
   useEffect(() => {
     hljsLinkRefCount++;
     updateHljsTheme();
@@ -228,3 +228,5 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
     </div>
   );
 }
+
+export const MarkdownRenderer = memo(MarkdownRendererBase);

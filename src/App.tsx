@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useCallback } from "react";
+﻿import { useEffect, useRef, useCallback, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
@@ -27,9 +27,12 @@ import {
   rememberArchivedSessionTombstone,
   persistLocalConversationState,
   readLocalActiveContext,
+  pullSessionStateSnapshotFromMain,
   resetStaleSessionRecommendationEvents,
+  suppressNextLocalConversationPersist,
   LOCAL_SESSIONS_KEY,
   LOCAL_PENDING_KEY,
+  type MainSessionPersistenceState,
 } from "@/utils/persistence";
 import { useRendererLagDetector } from "@/hooks/useRendererLagDetector";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -224,7 +227,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           },
         });
       }
-      persistLocalConversationState();
+      persistLocalConversationState([session.id]);
       break;
     }
   }
@@ -1028,6 +1031,83 @@ function App() {
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
+  const [sessionStateReady, setSessionStateReady] = useState(false);
+
+  const hydrateSessionsFromPersistenceState = useCallback((state?: MainSessionPersistenceState | null) => {
+    const sourceSessions = state?.sessions;
+    const storedSessions = sourceSessions ? null : localStorage.getItem(LOCAL_SESSIONS_KEY);
+    if (!sourceSessions && !storedSessions) return false;
+    try {
+      const parsed = sourceSessions ?? JSON.parse(storedSessions as string);
+      if (!Array.isArray(parsed)) return false;
+      const visibleSessions = parsed
+        .filter((session) => !isHiddenInternalSession(session))
+        .map((session) => ({
+          ...session,
+          events: Array.isArray(session.events) ? session.events : [],
+        }));
+      if (!sourceSessions && JSON.stringify(visibleSessions) !== storedSessions) {
+        localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
+      }
+      const restoredSessions = visibleSessions.map((session) => {
+        const rawEngine = (session as { engine?: unknown }).engine;
+        const knownEngine = rawEngine === "prompt" || rawEngine === "kimi-code";
+        return hydrateLongTaskProgressFromHistory({
+          ...session,
+          engine: knownEngine ? rawEngine : "kimi-code",
+          runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
+          events: Array.isArray(session.events) ? session.events : [],
+          isLoading: false,
+        });
+      });
+      suppressNextLocalConversationPersist();
+      useSessionStore.setState({ sessions: restoredSessions });
+      restoredSessions.filter((session) => session.archivedAt).forEach(rememberArchivedSessionTombstone);
+      void repairKimiCodeHistoryBodies(restoredSessions);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    pullSessionStateSnapshotFromMain().then((state) => {
+      if (!mounted) return;
+      hydrateSessionsFromPersistenceState(state);
+    }).finally(() => {
+      if (!mounted) return;
+      setSessionStateReady(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [hydrateSessionsFromPersistenceState]);
+
+  useEffect(() => {
+    if (!sessionStateReady) return;
+    let refreshing = false;
+    const refreshSessionState = () => {
+      if (refreshing) return;
+      refreshing = true;
+      pullSessionStateSnapshotFromMain()
+        .then((state) => {
+          if (state) hydrateSessionsFromPersistenceState(state);
+        })
+        .finally(() => {
+          refreshing = false;
+        });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshSessionState();
+    };
+    window.addEventListener("focus", refreshSessionState);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", refreshSessionState);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [sessionStateReady, hydrateSessionsFromPersistenceState]);
 
   useRendererLagDetector();
   useSettingsSync();
@@ -1571,7 +1651,7 @@ function App() {
     if (pendingQueueDispatchRef.current.has(uiSessionId)) return false;
     const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (latestSession && hasPendingQuestion(latestSession.events)) {
-      persistLocalConversationState();
+      persistLocalConversationState([uiSessionId]);
       return false;
     }
     const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
@@ -1788,6 +1868,7 @@ function App() {
   };
 
   useEffect(() => {
+    if (!sessionStateReady) return;
     const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
       if (bootstrapDoneRef.current) return;
       bootstrapDoneRef.current = true;
@@ -1968,39 +2049,7 @@ function App() {
       }).catch(() => {});
     });
 
-    const storedSessions = localStorage.getItem(LOCAL_SESSIONS_KEY);
-    if (storedSessions) {
-      try {
-        const parsed = JSON.parse(storedSessions);
-        if (Array.isArray(parsed)) {
-          const visibleSessions = parsed
-            .filter((session) => !isHiddenInternalSession(session))
-            .map((session) => ({
-              ...session,
-              events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? session.events : [])),
-            }));
-          if (JSON.stringify(visibleSessions) !== storedSessions) {
-            localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
-          }
-          const restoredSessions = visibleSessions.map((session) => {
-            const rawEngine = (session as { engine?: unknown }).engine;
-            const knownEngine = rawEngine === "prompt" || rawEngine === "kimi-code";
-            return hydrateLongTaskProgressFromHistory({
-              ...session,
-              engine: knownEngine ? rawEngine : "kimi-code",
-              runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
-              events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : [])),
-              isLoading: false,
-            });
-          });
-          useSessionStore.setState({ sessions: restoredSessions });
-          restoredSessions.filter((session) => session.archivedAt).forEach(rememberArchivedSessionTombstone);
-          void repairKimiCodeHistoryBodies(restoredSessions);
-        }
-      } catch {
-        // ignore parse error
-      }
-    }
+    hydrateSessionsFromPersistenceState();
 
     const storedPending = localStorage.getItem(LOCAL_PENDING_KEY);
     if (storedPending) {
@@ -2174,14 +2223,14 @@ function App() {
           }
           if (mappedWithRole.type === "error" || mappedWithRole.type === "question_request") {
             flushStreamEvents();
-            persistLocalConversationState();
+            persistLocalConversationState([uiSessionId]);
           }
           return;
         }
         enqueueStreamEvent(uiSessionId, mappedWithRole);
         if (mappedWithRole.type === "question_request") {
           flushStreamEvents();
-          persistLocalConversationState();
+          persistLocalConversationState([uiSessionId]);
         }
       }
     });
@@ -2231,7 +2280,7 @@ function App() {
         }
         if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
           flushStreamEvents();
-          persistLocalConversationState();
+          persistLocalConversationState([uiSessionId]);
         }
         return;
       }
@@ -2255,7 +2304,7 @@ function App() {
       }
       if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
         flushStreamEvents();
-        persistLocalConversationState();
+        persistLocalConversationState([uiSessionId]);
       }
     });
 
@@ -2429,7 +2478,7 @@ function App() {
 
         const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         if (latestSession && hasPendingQuestion(latestSession.events)) {
-          persistLocalConversationState();
+          persistLocalConversationState([uiSessionId]);
           return;
         }
 
@@ -2536,7 +2585,7 @@ function App() {
       goalRefreshTimersRef.current.clear();
       goalLastRefreshRef.current.clear();
     };
-  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
+  }, [sessionStateReady, setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents, hydrateSessionsFromPersistenceState]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

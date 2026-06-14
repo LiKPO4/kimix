@@ -13,6 +13,7 @@ import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
+import * as sessionStore from "./sessionStore";
 import type { RendererHeartbeatPayload } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
@@ -2190,6 +2191,15 @@ if (process.platform === "win32") {
   app.setAppUserModelId("com.kimix.app");
 }
 
+// Unify dev and packaged userData so localStorage / IndexedDB / projects.json are
+// shared across development builds and installed builds. Must run before any
+// code calls app.getPath('userData').
+const packagedUserDataDir = getPackagedUserDataDir();
+if (!fs.existsSync(packagedUserDataDir)) {
+  fs.mkdirSync(packagedUserDataDir, { recursive: true });
+}
+app.setPath("userData", packagedUserDataDir);
+
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 let rendererReloadedAfterBlank = false;
@@ -3569,55 +3579,14 @@ function getPackagedUserDataDir(): string {
   return path.join(home, ".config", "Kimix");
 }
 
-function copyDirSync(src: string, dest: string) {
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirSync(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-function mergeDirSync(src: string, dest: string) {
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      mergeDirSync(srcPath, destPath);
-    } else if (!fs.existsSync(destPath)) {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
 function getDefaultProject() {
   const packagedUserData = getPackagedUserDataDir();
   const workDir = path.join(packagedUserData, "default-project");
 
-  // Dev builds historically stored data under Electron's userData directory.
-  // One-time merge into the packaged Kimix location so dev and packaged builds share data.
-  if (!app.isPackaged) {
-    const devWorkDir = path.join(app.getPath("userData"), "default-project");
-    if (fs.existsSync(devWorkDir) && devWorkDir !== workDir) {
-      try {
-        fs.mkdirSync(packagedUserData, { recursive: true });
-        mergeDirSync(devWorkDir, workDir);
-      } catch {
-        // If merge fails, ensureDirectoryExists below still creates the target dir.
-      }
-    }
-  }
-
-  ensureDirectoryExists(workDir);
   return {
     id: "default-kimi-project",
     path: workDir,
-    name: "kimix",
+    name: "kimix默认目录",
     lastOpenedAt: Date.now(),
   };
 }
@@ -5907,6 +5876,42 @@ ipcMain.handle("kimi:exportSession", async (_, request: unknown) => {
 // App IPC handlers
 ipcMain.handle("app:getSettings", async () => {
   return { success: true, data: settingsService.loadSettings() };
+});
+
+ipcMain.handle("sessionPersistence:get", async () => {
+  try {
+    return { success: true, data: sessionStore.readSessionState() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("sessionPersistence:getSummary", async () => {
+  try {
+    return { success: true, data: sessionStore.readSessionSummaryState() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("sessionPersistence:getSession", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ id: z.string().trim().min(1) }).parse(request);
+    return { success: true, data: sessionStore.getPersistedSession(parsed.id) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("sessionPersistence:set", async (_, state: unknown) => {
+  try {
+    const current = sessionStore.readSessionState();
+    const incoming = sessionStore.normalizeState(state);
+    sessionStore.writeSessionState(sessionStore.mergeSessionStates(current, incoming), incoming.sessions);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("app:getInfo", async () => {

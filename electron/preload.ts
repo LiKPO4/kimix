@@ -103,6 +103,11 @@ import type {
   CheckUpdateResponse,
   DownloadUpdateProgress,
   DownloadUpdateResponse,
+  GetSessionPersistenceResponse,
+  GetPersistedSessionRequest,
+  GetPersistedSessionResponse,
+  SetSessionPersistenceRequest,
+  SetSessionPersistenceResponse,
   CopyImageRequest,
   LaunchCommandRequest,
   TriggerShortcutRequest,
@@ -425,6 +430,14 @@ const api = {
   getSettings: (): Promise<SettingsResponse> => ipcRenderer.invoke("app:getSettings"),
   saveSettings: (settings: SaveSettingsRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:saveSettings", settings),
+  getSessionPersistence: (): Promise<GetSessionPersistenceResponse> =>
+    ipcRenderer.invoke("sessionPersistence:get"),
+  getSessionPersistenceSummary: (): Promise<GetSessionPersistenceResponse> =>
+    ipcRenderer.invoke("sessionPersistence:getSummary"),
+  getPersistedSession: (req: GetPersistedSessionRequest): Promise<GetPersistedSessionResponse> =>
+    ipcRenderer.invoke("sessionPersistence:getSession", req),
+  setSessionPersistence: (state: SetSessionPersistenceRequest): Promise<SetSessionPersistenceResponse> =>
+    ipcRenderer.invoke("sessionPersistence:set", state),
   getAppInfo: (): Promise<AppInfoResponse> => ipcRenderer.invoke("app:getInfo"),
   checkForUpdates: (): Promise<CheckUpdateResponse> => ipcRenderer.invoke("app:checkForUpdates"),
   downloadUpdate: (): Promise<DownloadUpdateResponse> => ipcRenderer.invoke("app:downloadUpdate"),

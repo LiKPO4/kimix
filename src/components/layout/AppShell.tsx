@@ -1509,7 +1509,7 @@ ${isFinalStep
       btwRounds: updater(session.btwRounds ?? []),
       updatedAt: Date.now(),
     }));
-    window.setTimeout(() => persistLocalConversationState(), 0);
+    window.setTimeout(() => persistLocalConversationState([sessionId]), 0);
   };
   const setBtwInput = (value: string) => {
     updateBtwTransientState(btwSessionId, { input: value, error: null });

@@ -1,4 +1,6 @@
 allowBuilds:
+  classic-level: true
+  crc32c: true
   electron: true
   electron-winstaller: true
   esbuild: true
