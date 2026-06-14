@@ -1122,7 +1122,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
 
         <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: "214px minmax(0, 1fr)", gap: 16 }}>
           <aside className="kimix-settings-card flex w-[214px] shrink-0 flex-col rounded-xl" style={{ padding: "16px 10px 16px 14px", height: "100%", minHeight: 0 }}>
-            <div className="kimix-stable-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ gap: 18, paddingRight: 4, scrollbarGutter: "stable" }}>
+            <div className="kimix-stable-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ paddingRight: 4, scrollbarGutter: "stable" }}>
               <section>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">历史</div>
               <div className="mt-3 grid grid-cols-2" style={{ gap: 8 }}>
@@ -1137,7 +1137,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
               </div>
               </section>
 
-              <section>
+              <section style={{ marginTop: 12 }}>
               <div className="flex rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ gap: 4, padding: 4 }}>
                 {[
                   { value: "stroke" as const, label: "颜色" },
@@ -1200,7 +1200,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
               </section>
 
               {selectedShape && (
-                <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
+                <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 18, padding: "12px 12px" }}>
                   <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">对象属性</div>
                   <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 8 }}>
                     拖动图形移动，拖角点缩放，拖顶部圆点旋转。
@@ -1224,7 +1224,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
               )}
 
               {cropSelection && (
-                <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
+                <section className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 18, padding: "12px 12px" }}>
                   <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">已选择裁剪区域，应用后会铺满当前画板。</div>
                   <div className="flex" style={{ gap: 8, marginTop: 12 }}>
                     <button type="button" onClick={handleApplyCrop} className="kimix-icon-text-button is-compact flex-1 justify-center rounded-lg bg-accent-primary text-white hover:bg-accent-primary-dark">
@@ -1237,7 +1237,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                 </section>
               )}
 
-              <section>
+              <section style={{ marginTop: 18 }}>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">工具</div>
               <div className="mt-1 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">快捷键：V/B/E/R/Q/O/L/C/F</div>
               <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 12 }}>

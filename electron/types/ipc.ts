@@ -860,6 +860,36 @@ export type GitDetailsResponse = {
   error: string;
 };
 
+export type GitGraphEntry = {
+  graph: string;
+  shortHash: string;
+  hash: string;
+  parents: string[];
+  author: string;
+  date: string;
+  refs: string[];
+  subject: string;
+};
+
+export type GitGraphRequest = {
+  projectPath: string;
+  limit?: number;
+};
+
+export type GitGraphResponse = {
+  success: true;
+  data: {
+    branch?: string;
+    gitRoot?: string;
+    commits: GitGraphEntry[];
+    limit: number;
+    truncated?: boolean;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type GitCommitRequest = {
   projectPath: string;
   message: string;

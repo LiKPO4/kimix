@@ -90,8 +90,8 @@
   --kimix-panel-badge-text: var(--text-secondary);
 
   --kimix-overlay-bg: rgba(245, 242, 235, 0.74);
-  --kimix-modal-overlay-bg: rgba(245, 242, 235, 0.56);
-  --kimix-modal-overlay-blur: 4px;
+  --kimix-modal-overlay-bg: rgba(0, 0, 0, 0.2);
+  --kimix-modal-overlay-blur: none;
   --kimix-selection-idle-bg: var(--surface-elevated);
   --kimix-selection-idle-border: var(--border-strong);
   --kimix-composer-bg: var(--surface-elevated);
@@ -227,8 +227,8 @@
   --kimix-panel-badge-text: var(--text-secondary);
 
   --kimix-overlay-bg: rgba(18, 16, 14, 0.72);
-  --kimix-modal-overlay-bg: rgba(18, 16, 14, 0.58);
-  --kimix-modal-overlay-blur: 4px;
+  --kimix-modal-overlay-bg: rgba(0, 0, 0, 0.2);
+  --kimix-modal-overlay-blur: none;
   --kimix-selection-idle-bg: var(--surface-base);
   --kimix-selection-idle-border: var(--border-strong);
   --kimix-composer-bg: var(--surface-elevated);
@@ -1644,8 +1644,6 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-modal-overlay {
   background: var(--kimix-modal-overlay-bg);
-  -webkit-backdrop-filter: blur(var(--kimix-modal-overlay-blur));
-  backdrop-filter: blur(var(--kimix-modal-overlay-blur));
 }
 
 .kimix-preview-close,
@@ -1759,7 +1757,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-onboarding-overlay {
-  background: var(--kimix-overlay-bg);
+  background: var(--kimix-modal-overlay-bg);
 }
 
 /* ── Settings Entry ── */

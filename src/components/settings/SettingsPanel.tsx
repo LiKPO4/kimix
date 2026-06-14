@@ -29,7 +29,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.79";
+const KIMIX_VERSION = "2.9.84";
 
 type SettingsSectionId =
   | "connection"
@@ -2017,7 +2017,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
       onClick={() => setSettingsOpen(false)}
       role="dialog"
       aria-modal="true"

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { exec, execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { Project } from "./types/ipc";
+import type { GitGraphEntry, Project } from "./types/ipc";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -175,6 +175,8 @@ async function runGit(gitRoot: string, args: string[], timeout = 30000): Promise
 }
 
 const MAX_GIT_DETAIL_FILES = 300;
+const DEFAULT_GIT_GRAPH_COMMITS = 100;
+const MAX_GIT_GRAPH_COMMITS = 1000;
 
 type GitRemoteState = {
   upstream?: string;
@@ -444,6 +446,75 @@ export async function getGitDetails(projectPath: string): Promise<{ branch?: str
       additions: stats[file.path]?.additions ?? 0,
       deletions: stats[file.path]?.deletions ?? 0,
     })),
+  };
+}
+
+function cleanGitRefName(ref: string) {
+  return ref
+    .trim()
+    .replace(/^tag:\s+refs\/tags\//, "tag: ")
+    .replace(/^refs\/heads\//, "")
+    .replace(/^refs\/remotes\//, "")
+    .replace(/^refs\/tags\//, "tag: ");
+}
+
+function parseGitRefs(rawRefs: string) {
+  const refs: string[] = [];
+  rawRefs
+    .split(",")
+    .map((ref) => ref.trim())
+    .filter(Boolean)
+    .forEach((ref) => {
+      if (ref.startsWith("HEAD -> ")) {
+        refs.push("HEAD");
+        refs.push(cleanGitRefName(ref.slice("HEAD -> ".length)));
+        return;
+      }
+      refs.push(cleanGitRefName(ref));
+    });
+  return Array.from(new Set(refs)).slice(0, 8);
+}
+
+export async function getGitGraph(projectPath: string, limit = DEFAULT_GIT_GRAPH_COMMITS): Promise<{ branch?: string; gitRoot?: string; commits: GitGraphEntry[]; limit: number; truncated?: boolean }> {
+  const gitRoot = await requireGitRoot(projectPath);
+  const branch = await getGitBranch(gitRoot);
+  const safeLimit = Math.max(1, Math.min(MAX_GIT_GRAPH_COMMITS, Math.floor(limit || DEFAULT_GIT_GRAPH_COMMITS)));
+  const output = await runGit(gitRoot, [
+    "--no-pager",
+    "log",
+    "--graph",
+    "--all",
+    "--decorate=full",
+    "--date=format-local:%m/%d %H:%M",
+    `--max-count=${safeLimit + 1}`,
+    "--pretty=format:%x1f%h%x1f%H%x1f%P%x1f%an%x1f%ad%x1f%D%x1f%s",
+  ], 30000);
+  const commits = output
+    .split(/\r?\n/)
+    .map((line): GitGraphEntry | null => {
+      const fieldStart = line.indexOf("\x1f");
+      if (fieldStart < 0) return null;
+      const graph = line.slice(0, fieldStart).trimEnd();
+      const [shortHash, hash, parentsRaw, author, date, refsRaw, subject] = line.slice(fieldStart + 1).split("\x1f");
+      if (!shortHash || !hash) return null;
+      return {
+        graph,
+        shortHash,
+        hash,
+        parents: parentsRaw ? parentsRaw.split(/\s+/).filter(Boolean) : [],
+        author: author ?? "",
+        date: date ?? "",
+        refs: parseGitRefs(refsRaw ?? ""),
+        subject: subject ?? "",
+      };
+    })
+    .filter((entry): entry is GitGraphEntry => entry !== null);
+  return {
+    branch,
+    gitRoot,
+    commits: commits.slice(0, safeLimit),
+    limit: safeLimit,
+    truncated: commits.length > safeLimit,
   };
 }
 

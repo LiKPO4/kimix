@@ -4003,6 +4003,21 @@ ipcMain.handle("project:getGitDetails", async (_, projectPath: string) => {
   }
 });
 
+ipcMain.handle("project:getGitGraph", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({
+      projectPath: z.string().min(1).max(4096),
+      limit: z.number().int().min(1).max(1000).optional(),
+    }).safeParse(request);
+    if (!parsed.success) return { success: false, error: "Invalid git graph request" };
+    if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
+    const graph = await projectService.getGitGraph(parsed.data.projectPath, parsed.data.limit);
+    return { success: true, data: graph };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:gitCommit", async (_, request: unknown) => {
   try {
     const parsed = z.object({

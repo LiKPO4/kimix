@@ -70,7 +70,7 @@ function KimiOnboardingDialog({
   if (!show && !installBusy) return null;
   const showDownloadPercent = installPhase === "binary" && installPercent > 0;
   return (
-    <div className="kimix-onboarding-overlay fixed inset-0 z-[118] flex items-center justify-center backdrop-blur-sm" style={{ padding: 24 }}>
+    <div className="kimix-onboarding-overlay fixed inset-0 z-[118] flex items-center justify-center" style={{ padding: 24 }}>
       <div className="kimix-onboarding-card w-full max-w-[560px] rounded-[18px] border shadow-[0_26px_80px_rgba(35,31,25,0.18)]" style={{ padding: "22px 24px" }}>
         <div className="flex items-start justify-between" style={{ gap: 16 }}>
           <div className="flex min-w-0 items-start" style={{ gap: 14 }}>
@@ -197,7 +197,7 @@ interface LaunchCommandDialogProps {
 function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchCommandDialogProps) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/20 px-5" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5" onMouseDown={onClose}>
       <div
         className="kimix-modal-card w-full max-w-[520px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]"
         style={{ padding: "22px 24px 24px" }}
@@ -254,7 +254,7 @@ interface ShutdownDialogProps {
 function ShutdownDialog({ dialog, onCancel }: ShutdownDialogProps) {
   if (!dialog) return null;
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/25 px-5">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5">
       <div className="kimix-modal-card w-full max-w-[460px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" style={{ padding: "22px 24px" }}>
         <div className="text-[18px] font-semibold leading-6 text-text-primary">长程任务已完成</div>
         <div className="mt-3 text-[14px] leading-6 text-text-secondary">
@@ -331,7 +331,7 @@ function HelpDialogPanel({
   if (!dialog) return null;
   const showCliDownloadPercent = cliUpdateState.progressPhase === "binary" && cliUpdateState.progressPercent > 0;
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-5" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5" onMouseDown={onClose}>
       <div className="kimix-modal-card w-full max-w-[560px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "16px 20px" }}>
           <div className="flex items-center gap-2.5 text-[18px] font-semibold text-text-primary">

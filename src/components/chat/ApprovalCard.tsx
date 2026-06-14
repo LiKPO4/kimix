@@ -360,7 +360,7 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
 
       {detailsOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
           style={{ padding: 24 }}
           role="dialog"
           aria-modal="true"

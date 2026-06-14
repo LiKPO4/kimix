@@ -634,7 +634,7 @@ export function SessionToolbar({
     </div>
     {renameDialogOpen && (
       <div
-        className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-overlay-bg)]"
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
         style={{ padding: 24 }}
         onMouseDown={() => {
           if (!renameBusy) setRenameDialogOpen(false);

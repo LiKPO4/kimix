@@ -37,13 +37,15 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { BtwRound, ComposerDockCard, RightSidebarCardId, Session } from "@/types/ui";
-import type { GitStatusFile, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { GitGraphEntry, GitStatusFile, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { formatReleaseDate } from "@/utils/format";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { alignSessionDiffsToGitStatus } from "@/utils/diff";
+
+const GIT_GRAPH_PAGE_SIZE = 100;
 
 export type HiddenComposerCardEntry = {
   key: ComposerDockCard;
@@ -133,6 +135,28 @@ function gitStatusLabel(status: string) {
   if (status.includes("A")) return "新增";
   if (status.includes("M")) return "修改";
   return status || "改动";
+}
+
+function getCompactGitRefs(refs: string[], branch?: string) {
+  const uniqueRefs = Array.from(new Set(refs.filter(Boolean)));
+  const priorityRefs = uniqueRefs
+    .map((ref) => ({
+      ref,
+      priority:
+        ref === "HEAD" ? 0 :
+          branch && ref === branch ? 1 :
+            branch && ref === `origin/${branch}` ? 2 :
+              ref.startsWith("tag: ") ? 3 :
+                ref === "origin/HEAD" ? 9 :
+                  4,
+    }))
+    .sort((a, b) => a.priority - b.priority)
+    .map((item) => item.ref);
+  return {
+    visible: priorityRefs.slice(0, 2),
+    hidden: Math.max(priorityRefs.length - 2, 0),
+    title: priorityRefs.join(", "),
+  };
 }
 
 function formatGitErrorForUser(error: string) {
@@ -338,6 +362,13 @@ export function LongTaskInspectorPanel({
   const [gitCommitMessage, setGitCommitMessage] = useState("");
   const [gitDetailsOpen, setGitDetailsOpen] = useState(false);
   const [gitDetailsLoading, setGitDetailsLoading] = useState(false);
+  const [gitGraphOpen, setGitGraphOpen] = useState(false);
+  const [gitGraphLoading, setGitGraphLoading] = useState(false);
+  const [gitGraphLoadingMore, setGitGraphLoadingMore] = useState(false);
+  const [gitGraphError, setGitGraphError] = useState<string | null>(null);
+  const [gitGraphCommits, setGitGraphCommits] = useState<GitGraphEntry[]>([]);
+  const [gitGraphTruncated, setGitGraphTruncated] = useState(false);
+  const [gitGraphLimit, setGitGraphLimit] = useState(GIT_GRAPH_PAGE_SIZE);
   const [gitFiles, setGitFiles] = useState<GitStatusFile[]>([]);
   const [gitTotalFileCount, setGitTotalFileCount] = useState(0);
   const [gitFilesTruncated, setGitFilesTruncated] = useState(false);
@@ -346,6 +377,7 @@ export function LongTaskInspectorPanel({
   const rightCardDragCleanupRef = useRef<(() => void) | null>(null);
   const gitInfoRequestIdRef = useRef(0);
   const gitDetailsRequestIdRef = useRef(0);
+  const gitGraphRequestIdRef = useRef(0);
   const projectPathForSession = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const openFile = (filePath: string, projectPath = projectPathForSession) => {
     if (projectPath) void window.api.openFile({ projectPath, filePath });
@@ -532,6 +564,49 @@ export function LongTaskInspectorPanel({
     setGitDetailsOpen(true);
     void loadGitDetails();
   };
+  const loadGitGraph = async (limit = gitGraphLimit, mode: "replace" | "more" = "replace") => {
+    const requestId = ++gitGraphRequestIdRef.current;
+    if (!projectPathForGit) {
+      setGitGraphCommits([]);
+      setGitGraphTruncated(false);
+      setGitGraphError(null);
+      return;
+    }
+    if (mode === "more") setGitGraphLoadingMore(true);
+    else setGitGraphLoading(true);
+    try {
+      const res = await window.api.getGitGraph({ projectPath: projectPathForGit, limit });
+      if (requestId !== gitGraphRequestIdRef.current) return;
+      if (!res.success) {
+        const userMessage = formatGitErrorForUser(res.error);
+        setGitGraphError(userMessage);
+        if (mode !== "more") {
+          setGitGraphCommits([]);
+          setGitGraphTruncated(false);
+        }
+        showToast(`读取 Git 图谱失败：${userMessage}`);
+        return;
+      }
+      setGitBranch(res.data.branch);
+      setGitGraphCommits(res.data.commits);
+      setGitGraphLimit(res.data.limit);
+      setGitGraphTruncated(Boolean(res.data.truncated));
+      setGitGraphError(null);
+    } finally {
+      if (mode === "more") setGitGraphLoadingMore(false);
+      else if (requestId === gitGraphRequestIdRef.current) setGitGraphLoading(false);
+    }
+  };
+  const openGitGraph = () => {
+    setGitGraphOpen(true);
+    setGitGraphLimit(GIT_GRAPH_PAGE_SIZE);
+    void loadGitGraph(GIT_GRAPH_PAGE_SIZE);
+  };
+  const loadMoreGitGraph = () => {
+    const nextLimit = gitGraphLimit + GIT_GRAPH_PAGE_SIZE;
+    setGitGraphLimit(nextLimit);
+    void loadGitGraph(nextLimit, "more");
+  };
   const lastGitDetailsOpenSignalRef = useRef(0);
   useEffect(() => {
     const nextSignal = gitDetailsOpenSignal ?? 0;
@@ -542,6 +617,7 @@ export function LongTaskInspectorPanel({
   useEffect(() => {
     gitInfoRequestIdRef.current += 1;
     gitDetailsRequestIdRef.current += 1;
+    gitGraphRequestIdRef.current += 1;
     setGitBranch(undefined);
     setGitStatus("");
     setGitUpstream(undefined);
@@ -555,7 +631,13 @@ export function LongTaskInspectorPanel({
     setGitTotalFileCount(0);
     setGitFilesTruncated(false);
     setSelectedGitFiles(new Set());
+    setGitGraphCommits([]);
+    setGitGraphTruncated(false);
+    setGitGraphError(null);
+    setGitGraphLoadingMore(false);
+    setGitGraphLimit(GIT_GRAPH_PAGE_SIZE);
     if (gitDetailsOpen) void loadGitDetails();
+    if (gitGraphOpen) void loadGitGraph(GIT_GRAPH_PAGE_SIZE);
     else void refreshGitInfo("silent");
   }, [projectPathForGit]);
   const commitSelectedGitFiles = async () => {
@@ -603,6 +685,7 @@ export function LongTaskInspectorPanel({
       setGitCommitMessage("");
       showToast("Git 提交完成");
       await loadGitDetails();
+      if (gitGraphOpen) await loadGitGraph();
     } finally {
       setGitBusy(null);
     }
@@ -634,6 +717,7 @@ export function LongTaskInspectorPanel({
       setGitError(null);
       showToast("Git 拉取完成");
       if (gitDetailsOpen) await loadGitDetails();
+      if (gitGraphOpen) await loadGitGraph();
     } finally {
       setGitBusy(null);
     }
@@ -664,6 +748,7 @@ export function LongTaskInspectorPanel({
       setGitError(null);
       showToast("Git 推送完成");
       if (gitDetailsOpen) await loadGitDetails();
+      if (gitGraphOpen) await loadGitGraph();
     } finally {
       setGitBusy(null);
     }
@@ -1531,15 +1616,26 @@ export function LongTaskInspectorPanel({
                     <span>推送</span>
                   </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={!projectPathForGit || gitBusy !== null}
-                  onClick={() => void refreshGitInfo()}
-                  className="kimix-icon-text-button is-compact w-full justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  {gitBusy === "refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  <span>刷新状态</span>
-                </button>
+                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={!projectPathForGit}
+                    onClick={openGitGraph}
+                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <GitCommitHorizontal size={14} />
+                    <span>图谱</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!projectPathForGit || gitBusy !== null}
+                    onClick={() => void refreshGitInfo()}
+                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {gitBusy === "refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    <span>刷新</span>
+                  </button>
+                </div>
               </div>
             </section>
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("goal", 4, { padding: "16px 16px 18px" })}>
@@ -1851,7 +1947,7 @@ export function LongTaskInspectorPanel({
       </div>
     </aside>
     {gitDetailsOpen && (
-      <div className="fixed inset-0 z-[86] flex items-start justify-center bg-black/20" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={() => setGitDetailsOpen(false)}>
+      <div className="fixed inset-0 z-[86] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={() => setGitDetailsOpen(false)}>
         <div
           className="w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
           onMouseDown={(event) => event.stopPropagation()}
@@ -2047,6 +2143,127 @@ export function LongTaskInspectorPanel({
                   {gitBusy === "commit" ? <Loader2 size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
                   提交所选
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    {gitGraphOpen && (
+      <div className="fixed inset-0 z-[87] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={() => setGitGraphOpen(false)}>
+        <div
+          className="w-full max-w-[1020px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
+            <GitCommitHorizontal size={18} className="shrink-0 text-accent-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-semibold leading-5 text-text-primary">Git 图谱</div>
+              <div className="truncate text-[12.5px] leading-5 text-text-muted">
+                {gitBranch ? `${gitBranch} · ` : ""}已显示 {gitGraphCommits.length} 条最近提交{gitGraphTruncated ? " · 可继续展开" : ""}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!projectPathForGit || gitGraphLoading || gitGraphLoadingMore}
+              onClick={() => void loadGitGraph(gitGraphLimit)}
+              className="kimix-icon-text-button is-compact shrink-0 bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              {gitGraphLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              刷新
+            </button>
+            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={() => setGitGraphOpen(false)} aria-label="关闭 Git 图谱">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="max-h-[640px] overflow-y-auto" style={{ padding: 18 }}>
+            <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-base">
+              <div className="min-w-[820px]">
+                <div
+                  className="grid border-b border-border-subtle bg-surface-elevated text-[12.5px] font-medium leading-5 text-text-muted"
+                  style={{ gridTemplateColumns: "74px minmax(260px, 1fr) 118px 104px 82px", padding: "10px 12px", columnGap: 12 }}
+                >
+                  <div>图</div>
+                  <div>描述</div>
+                  <div>日期</div>
+                  <div>作者</div>
+                  <div>提交</div>
+                </div>
+                {gitGraphLoading ? (
+                  <div className="text-center text-[13px] leading-6 text-text-muted" style={{ padding: 34 }}>
+                    正在读取 Git 图谱...
+                  </div>
+                ) : gitGraphError ? (
+                  <div className="text-center text-[13px] leading-6 text-accent-danger" style={{ padding: 34 }}>
+                    {gitGraphError}
+                  </div>
+                ) : gitGraphCommits.length > 0 ? (
+                  <div className="flex flex-col">
+                    {gitGraphCommits.map((commit, index) => {
+                      const compactRefs = getCompactGitRefs(commit.refs, gitBranch);
+                      return (
+                        <div
+                          key={commit.hash}
+                          className={`grid items-center text-[13px] leading-5 ${index === 0 ? "bg-surface-hover" : "bg-surface-base"} ${index > 0 ? "border-t border-border-subtle/70" : ""}`}
+                          style={{ gridTemplateColumns: "74px minmax(260px, 1fr) 118px 104px 82px", padding: "10px 12px", columnGap: 12 }}
+                        >
+                          <div className="min-w-0 font-mono text-[16px] leading-5 text-accent-primary" style={{ whiteSpace: "pre", letterSpacing: 0 }}>
+                            {commit.graph || "*"}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center" style={{ gap: 6 }}>
+                              {compactRefs.visible.map((ref) => (
+                                <span
+                                  key={`${commit.hash}-${ref}`}
+                                  className="shrink-0 rounded-md border border-accent-primary-soft bg-accent-primary-light text-[12px] leading-5 text-accent-primary"
+                                  style={{ maxWidth: 92, paddingLeft: 7, paddingRight: 7 }}
+                                  title={compactRefs.title}
+                                >
+                                  <span className="block truncate">{ref}</span>
+                                </span>
+                              ))}
+                              {compactRefs.hidden > 0 && (
+                                <span
+                                  className="shrink-0 rounded-md bg-surface-elevated text-[12px] leading-5 text-text-muted"
+                                  style={{ minWidth: 30, paddingLeft: 7, paddingRight: 7, textAlign: "center" }}
+                                  title={compactRefs.title}
+                                >
+                                  +{compactRefs.hidden}
+                                </span>
+                              )}
+                              <span className="min-w-0 truncate text-text-primary" title={commit.subject}>{commit.subject || "(无提交说明)"}</span>
+                            </div>
+                            {commit.parents.length > 1 && (
+                              <div className="text-[12px] leading-5 text-text-muted" style={{ marginTop: 3 }}>
+                                merge · {commit.parents.length} parents
+                              </div>
+                            )}
+                          </div>
+                          <div className="truncate text-text-muted" title={commit.date}>{commit.date}</div>
+                          <div className="truncate text-text-muted" title={commit.author}>{commit.author}</div>
+                          <div className="font-mono text-[12.5px] leading-5 text-text-muted" title={commit.hash}>{commit.shortHash}</div>
+                        </div>
+                      );
+                    })}
+                    {gitGraphTruncated && (
+                      <div className="border-t border-border-subtle bg-surface-elevated" style={{ padding: "12px 12px" }}>
+                        <button
+                          type="button"
+                          disabled={gitGraphLoadingMore}
+                          onClick={loadMoreGitGraph}
+                          className="kimix-icon-text-button is-compact w-full justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                        >
+                          {gitGraphLoadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
+                          <span>{gitGraphLoadingMore ? "正在展开..." : "展开更多 100 条"}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center text-[13px] leading-6 text-text-muted" style={{ padding: 34 }}>
+                    当前仓库没有可显示的提交图谱
+                  </div>
+                )}
               </div>
             </div>
           </div>
