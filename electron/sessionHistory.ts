@@ -181,14 +181,76 @@ export function sanitizeKimiWorkDirName(workDir: string) {
   return base.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "default-project";
 }
 
+/**
+ * Matches the vendored SDK's `normalizeWindowsPath` (index.mjs ~26454):
+ * backslashes -> forward slashes, and the leading drive letter is uppercased.
+ */
+function normalizeWindowsPathLikeSdk(input: string): string {
+  if (!input) return input;
+  return input.replace(/\\/g, "/").replace(/^[A-Za-z]:\//, (m) => m.toUpperCase());
+}
+
+/**
+ * Matches the vendored SDK's `slugifyWorkDirName` (index.mjs ~48929): lowercase,
+ * collapse non-[a-z0-9._-] to `-`, trim, slice(0, 40), trim again, fallback to
+ * "workspace" for empty/dot segments.
+ */
+function slugifyWorkDirNameLikeSdk(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/^-+|-+$/g, "");
+  return slug === "" || slug === "." || slug === ".." ? "workspace" : slug;
+}
+
+/**
+ * Matches the vendored SDK's `basename` for our purposes: last non-empty segment
+ * after normalizing backslashes to forward slashes.
+ */
+function basenameLikeSdk(normalized: string): string {
+  const segments = normalizeWindowsPathLikeSdk(normalized).split("/");
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (segments[i]) return segments[i];
+  }
+  return "";
+}
+
+/**
+ * Faithful replica of the vendored Kimi Code SDK's `encodeWorkDirKey`
+ * (index.mjs ~48936). Kimix reads sessions with the SAME bucket name the SDK
+ * writes them under, otherwise sessions are invisible across dev/packaged builds.
+ *
+ * The SDK uses `pathe`'s resolve (not node:path): forward slashes + uppercase
+ * leading drive letter, otherwise case preserved. sha256 first 12 hex chars.
+ */
+export function encodeOfficialWorkDirKey(workDir: string): string {
+  const normalized = normalizeWindowsPathLikeSdk(path.resolve(workDir));
+  const slug = slugifyWorkDirNameLikeSdk(basenameLikeSdk(normalized));
+  const hash = createHash("sha256").update(normalized).digest("hex").slice(0, 12);
+  return `wd_${slug}_${hash}`;
+}
+
+/**
+ * Normalized form used for comparing workDirs against `session_index.jsonl`
+ * entries (drive uppercased, forward slashes, trailing slash trimmed).
+ */
+function normalizeWorkDirForCompare(workDir: string): string {
+  return normalizeWindowsPathLikeSdk(path.resolve(workDir)).replace(/\/+$/, "");
+}
+
 export function kimiWorkDirBucketNames(workDir: string): string[] {
+  // Primary: the official SDK algorithm (exact match against what the SDK writes).
+  const official = encodeOfficialWorkDirKey(workDir);
+  // Legacy fallback: the previous Kimix-only variants, in case any on-disk bucket
+  // predates the SDK algorithm alignment (kept non-authoritative, after official).
   const resolved = path.resolve(workDir);
-  const normalized = resolved.replace(/\\/g, "/");
-  const variants = Array.from(new Set([normalized, resolved]));
-  return variants.map((value) => {
+  const legacy = Array.from(new Set([resolved.replace(/\\/g, "/"), resolved])).map((value) => {
     const hash = createHash("sha256").update(value).digest("hex").slice(0, 12);
     return `wd_${sanitizeKimiWorkDirName(workDir)}_${hash}`;
   });
+  return Array.from(new Set([official, ...legacy]));
 }
 
 function kimiSessionDirNames(sessionId: string): string[] {
@@ -221,6 +283,16 @@ export async function findKimiCodeSessionDir(
     }
   }
 
+  // Index fallback: the SDK's session_index.jsonl maps sessionId+workDir to an
+  // exact sessionDir. More precise than the exhaustive scan below.
+  const indexed = await resolveSessionDirsFromIndex(shareDir, workDir);
+  for (const sessionDir of indexed) {
+    const matchName = path.basename(sessionDir);
+    if (names.includes(matchName) && fs.existsSync(getNewKimiWireFile(sessionDir))) {
+      return sessionDir;
+    }
+  }
+
   // Exhaustive fallback: scan all bucket dirs (handles any hash algorithm).
   const bucketEntries = await fsp.readdir(sessionsRoot, { withFileTypes: true }).catch(() => []);
   for (const bucket of bucketEntries) {
@@ -235,6 +307,45 @@ export async function findKimiCodeSessionDir(
   }
 
   return null;
+}
+
+/**
+ * Fallback resolver: reads the SDK-maintained `session_index.jsonl` (one JSON
+ * object per line: { sessionId, sessionDir, workDir }) and returns every
+ * sessionDir whose normalized workDir equals the requested one. Used when the
+ * bucket-name match yields nothing, to cover historical or edge-case workDirs
+ * whose on-disk bucket the current hash algorithm can't reproduce.
+ */
+async function resolveSessionDirsFromIndex(
+  shareDir: string,
+  workDir: string,
+): Promise<string[]> {
+  const indexPath = path.join(shareDir, "session_index.jsonl");
+  const target = normalizeWorkDirForCompare(workDir);
+  const dirs: string[] = [];
+  let stream: fs.ReadStream;
+  try {
+    stream = fs.createReadStream(indexPath, { encoding: "utf-8" });
+  } catch {
+    return dirs;
+  }
+  await new Promise<void>((resolve) => {
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    rl.on("line", (line) => {
+      if (!line) return;
+      try {
+        const entry = JSON.parse(line) as { sessionId?: unknown; sessionDir?: unknown; workDir?: unknown };
+        if (typeof entry.sessionDir !== "string" || typeof entry.workDir !== "string") return;
+        if (normalizeWorkDirForCompare(entry.workDir) !== target) return;
+        dirs.push(entry.sessionDir);
+      } catch {
+        // skip malformed lines
+      }
+    });
+    rl.on("close", resolve);
+    rl.on("error", resolve);
+  });
+  return dirs;
 }
 
 export async function getKimiCodeSessionDirs(
@@ -265,6 +376,16 @@ export async function getKimiCodeSessionDirs(
     for (const entry of sessionEntries) {
       if (!entry.isDirectory() || !/^(session_|ses_)?[0-9a-f-]{36}$/i.test(entry.name)) continue;
       const sessionDir = path.join(bucketDir, entry.name);
+      if (fs.existsSync(getNewKimiWireFile(sessionDir))) dirs.push(sessionDir);
+    }
+  }
+
+  // Fallback: if the bucket-name match found nothing, consult the SDK's
+  // session_index.jsonl for an authoritative workDir -> sessionDir mapping.
+  // Covers historical workDirs whose bucket the current hash can't reproduce.
+  if (dirs.length === 0) {
+    const indexed = await resolveSessionDirsFromIndex(shareDir, workDir);
+    for (const sessionDir of indexed) {
       if (fs.existsSync(getNewKimiWireFile(sessionDir))) dirs.push(sessionDir);
     }
   }
