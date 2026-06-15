@@ -2,7 +2,7 @@ import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizon
 import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Project } from "@/types/ui";
+import type { Project, Session } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
@@ -36,6 +36,26 @@ function isSameProjectPath(a: string | undefined, b: string | undefined) {
   const left = normalizeProjectPath(a);
   const right = normalizeProjectPath(b);
   return Boolean(left && right && left === right);
+}
+
+function hasActiveTimelineWork(session: Session) {
+  return session.events.some((event) => {
+    if (event.type === "assistant_message") return !event.isComplete;
+    if (event.type === "tool_call") return event.status === "running";
+    if (event.type === "steer_message") return event.status === "sending" || event.status === "accepted";
+    if (event.type === "subagent") return event.status === "queued" || event.status === "running" || event.status === "suspended";
+    return false;
+  });
+}
+
+function isSidebarSessionBusy(session: Session, runningSessionId: string | null) {
+  const runtimeSessionId = getRuntimeSessionId(session);
+  return Boolean(
+    session.isLoading ||
+    runningSessionId === session.id ||
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId) ||
+    hasActiveTimelineWork(session)
+  );
 }
 
 interface SidebarProps {
@@ -275,7 +295,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       toast(`导出失败：${res.error}`);
       return;
     }
-    toast(res.data.path ? "已导出 Kimi Debug ZIP" : "已取消导出");
+    toast(res.data.path ? "已导出 Kimi 调试包" : "已取消导出");
   };
 
   const exportSessionMarkdown = async (sessionId: string) => {
@@ -646,7 +666,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             }}
                           >
                             {pSessions.map((s) => {
-                              const isSessionBusy = runningSessionId === s.id || s.isLoading;
+                              const isSessionBusy = isSidebarSessionBusy(s, runningSessionId);
                               const isLongTaskSession = Boolean(s.longTask);
 
                               return (
@@ -696,8 +716,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                       void exportSessionArchive(s.id, s.title);
                                     }}
                                     className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
-                                    title="导出 Kimi Debug ZIP"
-                                    aria-label="导出 Kimi Debug ZIP"
+                                    title="导出 Kimi 调试包"
+                                    aria-label="导出 Kimi 调试包"
                                   >
                                     <Download size={11} />
                                   </button>
@@ -741,7 +761,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.9.84</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.9.97</span>
         </button>
       </div>
     </aside>

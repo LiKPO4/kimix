@@ -455,14 +455,14 @@ export function Composer() {
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const latestUserTurnState = getLatestUserTurnState(activeSession?.events ?? []);
   const hasUnfinishedAssistant = latestUserTurnState.hasUnfinishedAssistant && !latestUserTurnState.hasCompletedAssistant;
-  const hasActiveAssistantTurn = isCurrentSessionRunning && hasUnfinishedAssistant;
+  const hasActiveAssistantTurn = isCurrentSessionRunning || hasUnfinishedAssistant;
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
     isCurrentSessionRunning
   );
-  const shouldShowStopButton = isCurrentSessionRunning;
+  const shouldShowStopButton = isCurrentSessionRunning || hasUnfinishedAssistant;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
-  const canTogglePlanMode = canUseComposer && !isCurrentSessionRunning;
+  const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -1430,7 +1430,7 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    if (isCurrentSessionRunning && currentSession) {
+    if (hasActiveAssistantTurn && currentSession) {
       addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
       return;
     }

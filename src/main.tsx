@@ -24,6 +24,10 @@ import type {
   LoadSessionResponse,
   OpenProjectResponse,
   ReadTextFileResponse,
+  ExportMarkdownResponse,
+  ExportSessionResponse,
+  ExportSessionBackupResponse,
+  ImportSessionBackupResponse,
   KimiLoginResponse,
   KimiLogoutResponse,
   KimiCodeListSessionsResponse,
@@ -403,6 +407,10 @@ function installBrowserPreviewApi() {
     listSlashCommands: (): Promise<ListSlashCommandsResponse> => Promise.resolve({ success: true, data: [] }),
     listSessions: (): Promise<ListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
     loadSession: (): Promise<LoadSessionResponse> => Promise.resolve({ success: true, data: { sessionId: "browser-preview", events: [] } }),
+    exportSession: (): Promise<ExportSessionResponse> => fail("导出 Kimi Debug ZIP"),
+    exportSessionBackup: (): Promise<ExportSessionBackupResponse> => fail("导出 Kimix 会话快照"),
+    importSessionBackup: (): Promise<ImportSessionBackupResponse> => fail("导入 Kimix 会话快照"),
+    exportMarkdown: (): Promise<ExportMarkdownResponse> => fail("导出 Markdown"),
     getKimiUsage: (): Promise<KimiUsageResponse> => Promise.resolve({
       success: true,
       data: {

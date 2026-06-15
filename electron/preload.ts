@@ -70,6 +70,10 @@ import type {
   LoadSessionResponse,
   ExportSessionRequest,
   ExportSessionResponse,
+  ExportSessionBackupRequest,
+  ExportSessionBackupResponse,
+  ImportSessionBackupRequest,
+  ImportSessionBackupResponse,
   ExportMarkdownRequest,
   ExportMarkdownResponse,
   GitInfoResponse,
@@ -310,6 +314,10 @@ const api = {
     ipcRenderer.invoke("kimi:loadSession", req),
   exportSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>
     ipcRenderer.invoke("kimi:exportSession", req),
+  exportSessionBackup: (req: ExportSessionBackupRequest): Promise<ExportSessionBackupResponse> =>
+    ipcRenderer.invoke("project:exportSessionBackup", req),
+  importSessionBackup: (req?: ImportSessionBackupRequest): Promise<ImportSessionBackupResponse> =>
+    ipcRenderer.invoke("project:importSessionBackup", req),
   exportMarkdown: (req: ExportMarkdownRequest): Promise<ExportMarkdownResponse> =>
     ipcRenderer.invoke("project:exportMarkdown", req),
   getKimiUsage: (): Promise<KimiUsageResponse> =>

@@ -39,6 +39,11 @@ function isMarkdownTableSeparatorFragment(line: string) {
   return trimmed.includes("|") && trimmed.includes("-") && /^[:\-\|\s]+$/.test(trimmed);
 }
 
+function isMarkdownTableSeparatorLikeFragment(line: string) {
+  const trimmed = line.trim();
+  return trimmed.includes("|") && /^[:\-\|\s]+$/.test(trimmed);
+}
+
 function separatorCells(line: string) {
   return line
     .trim()
@@ -141,7 +146,7 @@ export function restoreMarkdownTables(content: string) {
         cursor += 1;
         continue;
       }
-      if (!isMarkdownTableSeparatorFragment(candidate)) break;
+      if (!isMarkdownTableSeparatorLikeFragment(candidate)) break;
       fragments.push(candidate);
       consumedBlank = false;
       const mergedCellCount = fragments.flatMap(separatorCells).length;

@@ -789,6 +789,28 @@ export type ExportSessionRequest = {
   title?: string;
 }
 
+export type SessionBackupSnapshot = {
+  schemaVersion: number;
+  appVersion?: string;
+  exportedAt?: string;
+  source?: string;
+  sessions: unknown[];
+  pendingMessages: unknown[];
+  projects: unknown[];
+  archivedTombstones: unknown[];
+  hiddenHandoffSessionIds: string[];
+  activeContext?: unknown;
+};
+
+export type ExportSessionBackupRequest = {
+  snapshot: SessionBackupSnapshot;
+  suggestedName?: string;
+}
+
+export type ImportSessionBackupRequest = {
+  path?: string;
+}
+
 export type ExportMarkdownRequest = {
   title?: string;
   content: string;
@@ -810,6 +832,29 @@ export type ExportSessionResponse = {
   data: {
     path: string;
     output?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type ExportSessionBackupResponse = {
+  success: true;
+  data: {
+    path: string;
+    output?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type ImportSessionBackupResponse = {
+  success: true;
+  data: {
+    path: string;
+    snapshot: SessionBackupSnapshot;
+    canceled?: boolean;
   };
 } | {
   success: false;

@@ -13,7 +13,7 @@ import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
-import type { RendererHeartbeatPayload } from "./types/ipc";
+import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -2674,6 +2674,166 @@ async function exportKimiSessionArchive(request: { sessionId?: string; title?: s
   const output = await runLongCommand(fallbackKimiPath, args, 2 * 60 * 1000);
   await shell.showItemInFolder(result.filePath);
   return { path: result.filePath, output: `Kimi Code fallback export completed\n${output}` };
+}
+
+const SESSION_BACKUP_SCHEMA_VERSION = 1;
+
+function emptySessionBackupSnapshot(): SessionBackupSnapshot {
+  return {
+    schemaVersion: SESSION_BACKUP_SCHEMA_VERSION,
+    appVersion: app.getVersion(),
+    exportedAt: new Date().toISOString(),
+    source: "Kimix",
+    sessions: [],
+    pendingMessages: [],
+    projects: [],
+    archivedTombstones: [],
+    hiddenHandoffSessionIds: [],
+  };
+}
+
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function unknownArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))))
+    : [];
+}
+
+function normalizeSessionBackupSnapshot(value: unknown): SessionBackupSnapshot {
+  const record = asPlainRecord(value);
+  if (!record) throw new Error("会话快照格式无效");
+  const schemaVersion = typeof record.schemaVersion === "number" && Number.isFinite(record.schemaVersion)
+    ? record.schemaVersion
+    : SESSION_BACKUP_SCHEMA_VERSION;
+  return {
+    schemaVersion,
+    appVersion: typeof record.appVersion === "string" ? record.appVersion : undefined,
+    exportedAt: typeof record.exportedAt === "string" ? record.exportedAt : undefined,
+    source: typeof record.source === "string" ? record.source : undefined,
+    sessions: unknownArray(record.sessions),
+    pendingMessages: unknownArray(record.pendingMessages),
+    projects: unknownArray(record.projects),
+    archivedTombstones: unknownArray(record.archivedTombstones ?? record.archivedSessionTombstones),
+    hiddenHandoffSessionIds: stringArray(record.hiddenHandoffSessionIds),
+    activeContext: record.activeContext,
+  };
+}
+
+function addBackupJson(zip: AdmZip, name: string, value: unknown) {
+  zip.addFile(name, Buffer.from(JSON.stringify(value, null, 2), "utf8"));
+}
+
+async function exportSessionBackupArchive(request: unknown) {
+  const req = asPlainRecord(request);
+  if (!req) throw new Error("缺少导出请求");
+  const snapshot = normalizeSessionBackupSnapshot(req.snapshot);
+  const suggestedName = typeof req.suggestedName === "string" && req.suggestedName.trim()
+    ? req.suggestedName.trim()
+    : "Kimix 会话快照";
+  const defaultName = `${sanitizeDownloadName(suggestedName)}-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
+  const result = await dialog.showSaveDialog(mainWindow ?? undefined, {
+    title: "导出 Kimix 会话快照",
+    defaultPath: path.join(app.getPath("downloads"), defaultName),
+    filters: [{ name: "Kimix 会话快照", extensions: ["zip"] }],
+  });
+  if (result.canceled || !result.filePath) {
+    return { path: "", output: "用户取消导出" };
+  }
+  ensureDirectoryExists(path.dirname(result.filePath));
+  const zip = new AdmZip();
+  const fullSnapshot: SessionBackupSnapshot = {
+    ...snapshot,
+    schemaVersion: SESSION_BACKUP_SCHEMA_VERSION,
+    exportedAt: snapshot.exportedAt || new Date().toISOString(),
+    source: snapshot.source || "Kimix",
+  };
+  addBackupJson(zip, "manifest.json", {
+    schemaVersion: fullSnapshot.schemaVersion,
+    appVersion: fullSnapshot.appVersion,
+    exportedAt: fullSnapshot.exportedAt,
+    source: fullSnapshot.source,
+    counts: {
+      sessions: fullSnapshot.sessions.length,
+      pendingMessages: fullSnapshot.pendingMessages.length,
+      projects: fullSnapshot.projects.length,
+      archivedTombstones: fullSnapshot.archivedTombstones.length,
+      hiddenHandoffSessionIds: fullSnapshot.hiddenHandoffSessionIds.length,
+    },
+  });
+  addBackupJson(zip, "sessions.json", fullSnapshot.sessions);
+  addBackupJson(zip, "pending.json", fullSnapshot.pendingMessages);
+  addBackupJson(zip, "projects.json", fullSnapshot.projects);
+  addBackupJson(zip, "archived-tombstones.json", fullSnapshot.archivedTombstones);
+  addBackupJson(zip, "hidden-handoff-session-ids.json", fullSnapshot.hiddenHandoffSessionIds);
+  addBackupJson(zip, "active-context.json", fullSnapshot.activeContext ?? null);
+  addBackupJson(zip, "snapshot.json", fullSnapshot);
+  zip.writeZip(result.filePath);
+  await shell.showItemInFolder(result.filePath);
+  return { path: result.filePath, output: "Kimix 会话快照导出完成" };
+}
+
+function parseBackupJsonText(text: string, label: string) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${label} 不是有效 JSON：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function readZipJson(zip: AdmZip, name: string) {
+  const entry = zip.getEntry(name);
+  if (!entry) return undefined;
+  return parseBackupJsonText(entry.getData().toString("utf8"), name);
+}
+
+function readSessionBackupSnapshot(filePath: string): SessionBackupSnapshot {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".json") {
+    return normalizeSessionBackupSnapshot(parseBackupJsonText(fs.readFileSync(filePath, "utf8"), path.basename(filePath)));
+  }
+  if (ext !== ".zip") throw new Error("请选择 .zip 或 .json 会话快照文件");
+  const zip = new AdmZip(filePath);
+  const snapshot = readZipJson(zip, "snapshot.json");
+  if (snapshot) return normalizeSessionBackupSnapshot(snapshot);
+  return normalizeSessionBackupSnapshot({
+    schemaVersion: SESSION_BACKUP_SCHEMA_VERSION,
+    sessions: readZipJson(zip, "sessions.json") ?? [],
+    pendingMessages: readZipJson(zip, "pending.json") ?? [],
+    projects: readZipJson(zip, "projects.json") ?? [],
+    archivedTombstones: readZipJson(zip, "archived-tombstones.json") ?? [],
+    hiddenHandoffSessionIds: readZipJson(zip, "hidden-handoff-session-ids.json") ?? [],
+    activeContext: readZipJson(zip, "active-context.json") ?? undefined,
+  });
+}
+
+async function importSessionBackupArchive(request?: ImportSessionBackupRequest) {
+  if (request?.path) {
+    const filePath = path.resolve(request.path);
+    if (!fs.existsSync(filePath)) throw new Error("快照文件不存在");
+    return { path: filePath, snapshot: readSessionBackupSnapshot(filePath), canceled: false };
+  }
+  const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+    title: "导入 Kimix 会话快照",
+    properties: ["openFile"],
+    filters: [
+      { name: "Kimix 会话快照", extensions: ["zip", "json"] },
+      { name: "所有文件", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return { path: "", snapshot: emptySessionBackupSnapshot(), canceled: true };
+  }
+  const filePath = result.filePaths[0];
+  return { path: filePath, snapshot: readSessionBackupSnapshot(filePath), canceled: false };
 }
 
 async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
@@ -5899,6 +6059,22 @@ ipcMain.handle("kimi:exportSession", async (_, request: unknown) => {
         title: typeof req.title === "string" ? req.title : undefined,
       }),
     };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:exportSessionBackup", async (_, request: ExportSessionBackupRequest) => {
+  try {
+    return { success: true, data: await exportSessionBackupArchive(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:importSessionBackup", async (_, request?: ImportSessionBackupRequest) => {
+  try {
+    return { success: true, data: await importSessionBackupArchive(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

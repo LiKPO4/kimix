@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download } from "lucide-react";
+import type { DragEvent, RefObject } from "react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
 import { kimiThemePaletteId, THEME_PALETTES, upsertKimiThemePresets } from "@/utils/themePalettes";
+import {
+  applySessionBackupImportPlan,
+  buildSessionBackupSnapshot,
+  createSessionBackupImportPlan,
+  formatSessionBackupImportSummary,
+  hasSessionBackupImportChanges,
+} from "@/utils/sessionBackup";
+import { isHiddenInternalSession } from "@/utils/internalSessions";
 
 type FreezeReport = {
   at: string;
@@ -29,7 +37,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.84";
+const KIMIX_VERSION = "2.9.97";
 
 type SettingsSectionId =
   | "connection"
@@ -43,6 +51,7 @@ type SettingsSectionId =
   | "notification"
   | "voice"
   | "archived"
+  | "migration"
   | "freeze";
 
 const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
@@ -57,6 +66,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "notification",
   "voice",
   "archived",
+  "migration",
   "freeze",
 ];
 
@@ -384,6 +394,15 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }))
     .join("\n")
   );
+  const migrationCountsDigest = useSessionStore((s) => {
+    const visibleSessions = s.sessions.filter((session) => !isHiddenInternalSession(session));
+    return [
+      visibleSessions.length,
+      visibleSessions.filter((session) => session.archivedAt).length,
+      s.pendingMessages.length,
+      s.recentProjects.length,
+    ].join("|");
+  });
   const archivedSessionSummaries = useMemo(() => {
     if (!archivedSessionsDigest) return [];
     return archivedSessionsDigest
@@ -403,6 +422,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
+  const [migrationBusy, setMigrationBusy] = useState<"export" | "import" | null>(null);
+  const [migrationDragActive, setMigrationDragActive] = useState(false);
+  const [migrationMessage, setMigrationMessage] = useState("");
   const [freezeExpanded, setFreezeExpanded] = useState(false);
   const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
   const [authLoading, setAuthLoading] = useState(!settingsStatusCache.auth);
@@ -989,6 +1011,93 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     downloadTextFile(filename, safeJsonStringify(buildFreezeReportExport(report, freezeReports)));
   };
 
+  const handleExportSessionBackup = async () => {
+    setMigrationBusy("export");
+    setMigrationMessage("正在准备会话快照...");
+    try {
+      const snapshot = buildSessionBackupSnapshot(KIMIX_VERSION);
+      const res = await window.api.exportSessionBackup({
+        snapshot,
+        suggestedName: "Kimix 会话快照",
+      });
+      if (!res.success) {
+        setMigrationMessage(`导出失败：${res.error}`);
+        return;
+      }
+      setMigrationMessage(res.data.path
+        ? `已导出 ${snapshot.sessions.length} 个会话，其中 ${snapshot.sessions.filter((session) => Boolean((session as { archivedAt?: unknown }).archivedAt)).length} 个保持归档。`
+        : "已取消导出。");
+    } catch (error) {
+      setMigrationMessage(`导出失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setMigrationBusy(null);
+    }
+  };
+
+  const runImportSessionBackup = async (filePath?: string) => {
+    setMigrationBusy("import");
+    setMigrationMessage(filePath ? "正在读取拖入的会话快照..." : "正在读取会话快照...");
+    try {
+      const res = await window.api.importSessionBackup(filePath ? { path: filePath } : undefined);
+      if (!res.success) {
+        setMigrationMessage(`导入失败：${res.error}`);
+        return;
+      }
+      if (res.data.canceled || !res.data.path) {
+        setMigrationMessage("已取消导入。");
+        return;
+      }
+      const plan = createSessionBackupImportPlan(res.data.snapshot);
+      if (!hasSessionBackupImportChanges(plan.stats)) {
+        setMigrationMessage("快照里没有比本机更新的可导入内容。");
+        return;
+      }
+      const ok = window.confirm(formatSessionBackupImportSummary(plan));
+      if (!ok) {
+        setMigrationMessage("已取消合并导入。");
+        return;
+      }
+      await applySessionBackupImportPlan(plan);
+      const successMessage = `已合并导入：新增 ${plan.stats.addedSessions} 个会话，更新 ${plan.stats.updatedSessions} 个会话，分叉副本 ${plan.stats.forkedSessions} 个，归档记录 ${plan.stats.archivedTombstones} 条。`;
+      setMigrationMessage(successMessage);
+      window.alert(successMessage);
+    } catch (error) {
+      setMigrationMessage(`导入失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setMigrationBusy(null);
+    }
+  };
+
+  const handleImportSessionBackup = async () => {
+    await runImportSessionBackup();
+  };
+
+  const handleMigrationDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    if (!migrationBusy) setMigrationDragActive(true);
+  };
+
+  const handleMigrationDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMigrationDragActive(false);
+    if (migrationBusy) return;
+    const file = Array.from(event.dataTransfer.files)[0];
+    const filePath = file && typeof window.api.getDraggedFilePath === "function"
+      ? window.api.getDraggedFilePath(file)
+      : "";
+    if (!filePath) {
+      setMigrationMessage("没有拿到拖入文件路径，请使用“合并导入”按钮选择快照。");
+      return;
+    }
+    if (!/\.(zip|json)$/i.test(filePath)) {
+      setMigrationMessage("请拖入 .zip 或 .json 格式的 Kimix 会话快照。");
+      return;
+    }
+    void runImportSessionBackup(filePath);
+  };
+
   useEffect(() => {
     if (settingsOpen || variant === "workspace") {
       if (!settingsStatusCache.connection) void checkConnection(false);
@@ -1076,9 +1185,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const archivedSessions = [...archivedSessionSummaries]
     .sort((a, b) => b.archivedAt - a.archivedAt);
   const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, SETTINGS_PREVIEW_ITEM_LIMIT);
-  const hiddenArchivedCount = Math.max(0, archivedSessions.length - SETTINGS_PREVIEW_ITEM_LIMIT);
+  const expandableArchivedCount = Math.max(0, archivedSessions.length - visibleArchivedSessions.length);
+  const canToggleArchivedList = archivedSessions.length > SETTINGS_PREVIEW_ITEM_LIMIT;
   const visibleFreezeReports = freezeExpanded ? freezeReports : freezeReports.slice(0, SETTINGS_PREVIEW_ITEM_LIMIT);
   const hiddenFreezeCount = Math.max(0, freezeReports.length - SETTINGS_PREVIEW_ITEM_LIMIT);
+  const [migrationSessionCount = 0, migrationArchivedCount = 0, migrationPendingCount = 0, migrationProjectCount = 0] = migrationCountsDigest
+    .split("|")
+    .map((value) => Number(value) || 0);
 
   const handleRestoreSession = (sessionId: string) => {
     restoreSession(sessionId);
@@ -1397,7 +1510,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           </div>
                         </div>
                       ))}
-                      {hiddenArchivedCount > 0 && (
+                      {canToggleArchivedList && (
                         <button
                           type="button"
                           onClick={() => setArchivedExpanded((current) => !current)}
@@ -1405,12 +1518,73 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           style={{ marginTop: 2 }}
                         >
                           {archivedExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                          <span>{archivedExpanded ? `折叠剩余 ${hiddenArchivedCount} 个归档对话` : `展开剩余 ${hiddenArchivedCount} 个归档对话`}</span>
+                          <span>{archivedExpanded ? `收起归档列表，仅保留最近 ${SETTINGS_PREVIEW_ITEM_LIMIT} 个` : `展开剩余 ${expandableArchivedCount} 个归档对话`}</span>
                         </button>
                       )}
                     </div>
                   ) : (
                     <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">暂无归档对话。</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("migration", 11)}>
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <Download size={16} className="text-text-muted" />
+                    <span>会话迁移</span>
+                  </div>
+                  {settingsDragHandle("migration", "会话迁移")}
+                </div>
+                <div
+                  className={`kimix-settings-card ${migrationDragActive ? "is-active" : ""}`}
+                  onDragEnter={handleMigrationDragOver}
+                  onDragOver={handleMigrationDragOver}
+                  onDragLeave={() => setMigrationDragActive(false)}
+                  onDrop={handleMigrationDrop}
+                  style={{
+                    padding: "18px 16px",
+                    borderColor: migrationDragActive ? "var(--accent-primary)" : undefined,
+                    background: migrationDragActive ? "var(--accent-primary-light)" : undefined,
+                  }}
+                >
+                  <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 14 }}>
+                    <div className="min-w-0">
+                      <div className="text-[14.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">导出全部，合并导入</div>
+                      <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                        当前可迁移 {migrationSessionCount} 个会话、{migrationArchivedCount} 个归档、{migrationPendingCount} 条待发送队列、{migrationProjectCount} 个项目。
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center justify-end" style={{ gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => void handleExportSessionBackup()}
+                        disabled={Boolean(migrationBusy)}
+                        className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                        style={{ minWidth: 92, justifyContent: "center" }}
+                      >
+                        {migrationBusy === "export" ? <RefreshCw size={14} className="kimix-spin" /> : <Download size={14} />}
+                        <span>导出全部</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleImportSessionBackup()}
+                        disabled={Boolean(migrationBusy)}
+                        className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-primary hover:bg-accent-primary-light disabled:cursor-wait disabled:opacity-55"
+                        style={{ minWidth: 92, justifyContent: "center" }}
+                      >
+                        {migrationBusy === "import" ? <RefreshCw size={14} className="kimix-spin" /> : <Upload size={14} />}
+                        <span>合并导入</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 12 }}>
+                    导入会按会话 id、官方 id 和 runtime id 去重；可拖入 .zip/.json 快照，新机器上的归档会话会继续保持归档，本机已有的新内容优先保留。
+                  </div>
+                  {migrationMessage && (
+                    <div className="kimix-settings-theme-scan-message" style={{ marginTop: 12 }}>
+                      {migrationMessage}
+                    </div>
                   )}
                 </div>
               </div>

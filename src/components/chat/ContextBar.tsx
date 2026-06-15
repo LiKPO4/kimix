@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 import { compactModelDisplayName } from "@/utils/modelDisplay";
+import { sessionToMarkdown } from "@/utils/markdownExport";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -119,30 +120,13 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             : { label: "未连接", tone: "muted" as const, icon: Radio, detail: "当前没有 Kimi Code 运行会话" };
   const KimiStatusIcon = kimiStatus.icon;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!session) return;
-    let md = `# ${session.title}\n\n`;
-    for (const ev of session.events) {
-      if (ev.type === "user_message") {
-        md += `## User\n\n${ev.content}\n\n`;
-      } else if (ev.type === "assistant_message") {
-        md += `## Assistant\n\n${ev.content}\n\n`;
-        if (ev.thinking) {
-          md += `> **Thinking**\n> ${ev.thinking.replace(/\n/g, "\n> ")}\n\n`;
-        }
-      } else if (ev.type === "tool_call") {
-        md += `> **Tool**: ${ev.toolName}\n\n`;
-      } else if (ev.type === "error") {
-        md += `> **Error**: ${ev.message}\n\n`;
-      }
-    }
-    const blob = new Blob([md], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${session.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "_")}.md`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const res = await window.api.exportMarkdown({
+      title: session.title,
+      content: sessionToMarkdown(session),
+    });
+    if (!res.success) window.alert(`导出失败：${res.error}`);
   };
 
   const addAdditionalWorkDir = async () => {
@@ -493,11 +477,11 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
 
       {session && (
         <button
-          onClick={handleExport}
+          onClick={() => void handleExport()}
           className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
           style={{ height: 36 }}
-          title="导出聊天记录"
-          aria-label="导出聊天记录"
+          title="导出 Markdown"
+          aria-label="导出 Markdown"
         >
           <Download size={16} />
           <span>导出</span>

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -686,6 +686,7 @@ export function ChatThread() {
   const isAutoFollowRef = useRef(true);
   const showScrollToBottomRef = useRef(false);
   const scrollToBottomButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
@@ -762,6 +763,7 @@ export function ChatThread() {
     autoFollowRef.current = true;
     userScrollRef.current = false;
     setShowOlderItems(false);
+    pendingOlderItemsScrollAnchorRef.current = null;
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
     window.requestAnimationFrame(() => scrollToBottom("auto"));
@@ -864,9 +866,36 @@ export function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
+
+  useLayoutEffect(() => {
+    const anchor = pendingOlderItemsScrollAnchorRef.current;
+    const node = scrollRef.current;
+    if (!anchor || !node || !showOlderItems) return;
+    pendingOlderItemsScrollAnchorRef.current = null;
+    const delta = node.scrollHeight - anchor.scrollHeight;
+    node.scrollTop = anchor.scrollTop + Math.max(0, delta);
+    autoFollowRef.current = false;
+    userScrollRef.current = true;
+    updateAutoFollow(false);
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    updateShowScrollToBottom(distance > 80);
+  }, [showOlderItems, visibleRenderItems.length]);
+
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;
   }
+
+  const expandOlderItems = () => {
+    const node = scrollRef.current;
+    if (node) {
+      pendingOlderItemsScrollAnchorRef.current = {
+        scrollHeight: node.scrollHeight,
+        scrollTop: node.scrollTop,
+      };
+      scrollTokenRef.current += 1;
+    }
+    setShowOlderItems(true);
+  };
 
   return (
     <div className="relative h-full">
@@ -889,7 +918,7 @@ export function ChatThread() {
         onTouchStart={pauseAutoFollowForUser}
       >
         <div className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
-          {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={() => setShowOlderItems(true)} />}
+          {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
           {visibleRenderItems.map((item) => (
             <div
               key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id}
