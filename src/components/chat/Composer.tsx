@@ -1390,6 +1390,14 @@ export function Composer() {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
+    if (hasActiveAssistantTurn && currentSession) {
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
+      return;
+    }
     const slashHandled = trimmed.startsWith("/") ? await handleSdkSlashCommand(trimmed) : false;
     if (slashHandled) {
       setInput("");
@@ -1430,10 +1438,6 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    if (hasActiveAssistantTurn && currentSession) {
-      addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
-      return;
-    }
     await sendPromptContent(trimmed, { images: imagesToSend });
   };
 

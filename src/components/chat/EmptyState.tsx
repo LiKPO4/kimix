@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { displayProjectName } from "@/utils/projectDisplay";
 
 const FALLBACK_SUGGESTIONS = [
   { icon: Sparkles, text: "分析当前项目结构，列出最值得优先处理的 3 个问题，并说明验证方式" },
@@ -231,7 +232,7 @@ export function EmptyState() {
     );
   }
 
-  const titleProjectName = project.name || "当前项目";
+  const titleProjectName = displayProjectName(project, "当前项目");
   const isSending = Boolean(runningSessionId || pendingSuggestion);
 
   return (

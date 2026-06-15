@@ -54,13 +54,14 @@ export function useStatePersistence() {
         useSessionStore.setState({ sessions: visibleSessions });
         return;
       }
+      const previousSessionsById = new Map(prev.sessions.map((session) => [session.id, session]));
       const archiveOrDeletionChanged =
         state.sessions.length !== prev.sessions.length ||
-        state.sessions.some((session) => prev.sessions.find((prevSession) => prevSession.id === session.id)?.archivedAt !== session.archivedAt);
+        state.sessions.some((session) => previousSessionsById.get(session.id)?.archivedAt !== session.archivedAt);
       if (archiveOrDeletionChanged) {
         conversationDirtyRef.current = true;
         for (const session of state.sessions) {
-          const previous = prev.sessions.find((prevSession) => prevSession.id === session.id);
+          const previous = previousSessionsById.get(session.id);
           if (!previous?.archivedAt && session.archivedAt) {
             rememberArchivedSessionTombstone(session);
           } else if (previous?.archivedAt && !session.archivedAt) {

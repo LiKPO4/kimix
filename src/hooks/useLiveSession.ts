@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useSessionStore } from "@/stores/sessionStore";
+import { selectSessionById } from "@/stores/selectors";
 import type { Session } from "@/types/ui";
 
 /**
@@ -11,10 +12,7 @@ import type { Session } from "@/types/ui";
 export function useLiveSession(sessionId: string | null | undefined): Session | undefined {
   return useSessionStore(
     useMemo(
-      () => (s) => {
-        if (!sessionId) return undefined;
-        return s.sessions.find((session) => session.id === sessionId);
-      },
+      () => selectSessionById(sessionId),
       [sessionId],
     ),
   );

@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session, TimelineEvent } from "@/types/ui";
 import type { LongTaskRecoveryInfo, LongTaskSummary } from "@electron/types/ipc";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { displayProjectName } from "@/utils/projectDisplay";
 
 function defaultTitleFromRequest(value: string) {
   return value.trim().split(/\r?\n/)[0]?.slice(0, 42) ?? "";
@@ -333,7 +334,7 @@ export function LongTasksPanel() {
             <div className="min-w-0">
               <h2 id="long-tasks-title" className="text-[18px] font-semibold leading-6 text-text-primary">长程任务</h2>
               <div className="mt-0.5 truncate text-[13px] leading-5 text-text-muted">
-                {selectedProject ? selectedProject.name : "未选择项目"}
+                {displayProjectName(selectedProject)}
               </div>
             </div>
           </div>

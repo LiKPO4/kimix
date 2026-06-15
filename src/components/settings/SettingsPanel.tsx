@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -37,7 +38,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.97";
+const KIMIX_VERSION = "2.9.99";
 
 type SettingsSectionId =
   | "connection"
@@ -384,40 +385,30 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const notificationMode = useAppStore((s) => s.notificationMode);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
-  const archivedSessionsDigest = useSessionStore((s) => s.sessions
-    .filter((session) => session.archivedAt)
-    .map((session) => JSON.stringify({
-      id: session.id,
-      title: session.title,
-      projectPath: session.projectPath,
-      archivedAt: session.archivedAt ?? 0,
-    }))
-    .join("\n")
-  );
+  const archivedSessionItems = useSessionStore(useShallow((s) => s.sessions.filter((session) => session.archivedAt)));
   const migrationCountsDigest = useSessionStore((s) => {
-    const visibleSessions = s.sessions.filter((session) => !isHiddenInternalSession(session));
+    let visibleCount = 0;
+    let archivedCount = 0;
+    for (const session of s.sessions) {
+      if (isHiddenInternalSession(session)) continue;
+      visibleCount += 1;
+      if (session.archivedAt) archivedCount += 1;
+    }
     return [
-      visibleSessions.length,
-      visibleSessions.filter((session) => session.archivedAt).length,
+      visibleCount,
+      archivedCount,
       s.pendingMessages.length,
       s.recentProjects.length,
     ].join("|");
   });
   const archivedSessionSummaries = useMemo(() => {
-    if (!archivedSessionsDigest) return [];
-    return archivedSessionsDigest
-      .split("\n")
-      .filter(Boolean)
-      .map((line): ArchivedSessionSummary | null => {
-        try {
-          const parsed = JSON.parse(line) as ArchivedSessionSummary;
-          return parsed && typeof parsed.id === "string" ? parsed : null;
-        } catch {
-          return null;
-        }
-      })
-      .filter((session): session is ArchivedSessionSummary => Boolean(session));
-  }, [archivedSessionsDigest]);
+    return archivedSessionItems.map((session) => ({
+      id: session.id,
+      title: session.title,
+      projectPath: session.projectPath,
+      archivedAt: session.archivedAt ?? 0,
+    }));
+  }, [archivedSessionItems]);
   const restoreSession = useSessionStore((s) => s.restoreSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);

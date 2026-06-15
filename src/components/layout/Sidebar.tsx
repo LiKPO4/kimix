@@ -1,5 +1,5 @@
 import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session } from "@/types/ui";
@@ -7,6 +7,7 @@ import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
+import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 function formatRelativeTime(ts: number): string {
@@ -407,12 +408,24 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     );
   }
 
-  const visibleSessions = currentSession && !sessions.some((session) => session.id === currentSession.id)
-    ? [currentSession, ...sessions]
-    : sessions;
+  const { visibleSessions, sessionsByProjectPath } = useMemo(() => {
+    const visible = currentSession && !sessions.some((session) => session.id === currentSession.id)
+      ? [currentSession, ...sessions]
+      : sessions;
+    const byProject = new Map<string, Session[]>();
+    for (const session of visible) {
+      if (session.archivedAt || isHiddenInternalSession(session)) continue;
+      const projectKey = normalizeProjectPath(session.projectPath);
+      if (!projectKey) continue;
+      const items = byProject.get(projectKey);
+      if (items) items.push(session);
+      else byProject.set(projectKey, [session]);
+    }
+    return { visibleSessions: visible, sessionsByProjectPath: byProject };
+  }, [currentSession, sessions]);
 
   const projectSessions = (projectPath: string) =>
-    visibleSessions.filter((s) => isSameProjectPath(s.projectPath, projectPath) && !s.archivedAt && !isHiddenInternalSession(s));
+    sessionsByProjectPath.get(normalizeProjectPath(projectPath)) ?? [];
 
   const syncProjectForSession = (session: { projectPath: string }) => {
     const project = recentProjects.find((item) => isSameProjectPath(item.path, session.projectPath));
@@ -583,8 +596,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                   else next.add(project.id);
                                   return next;
                                 });
-                                const hasSession = visibleSessions.some((s) => isSameProjectPath(s.projectPath, project.path) && !s.archivedAt && !isHiddenInternalSession(s));
-                                if (!isExpanded && !hasSession && !useAppStore.getState().creatingSessionProjectPath) {
+                                if (!isExpanded && pSessions.length === 0 && !useAppStore.getState().creatingSessionProjectPath) {
                                   await createSessionForProject(project);
                                 }
                               }
@@ -592,7 +604,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                           >
                             <FolderOpen size={16} className="shrink-0 text-text-muted" />
-                            <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                            <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
                             {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                           </button>
                           <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
@@ -761,7 +773,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.9.97</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.9.99</span>
         </button>
       </div>
     </aside>

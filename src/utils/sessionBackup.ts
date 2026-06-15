@@ -432,6 +432,7 @@ export function createSessionBackupImportPlan(rawSnapshot: SessionBackupSnapshot
     .filter((tombstone): tombstone is ArchivedSessionTombstone => Boolean(tombstone));
 
   const currentState = useSessionStore.getState();
+  const hiddenCurrentSessions = currentState.sessions.filter((session) => isHiddenInternalSession(session));
   const nextSessions = currentState.sessions.filter((session) => !isHiddenInternalSession(session));
   const sessionIdMap = new Map<string, string>();
   const existingSessionIds = new Set(nextSessions.map((session) => session.id));
@@ -489,25 +490,26 @@ export function createSessionBackupImportPlan(rawSnapshot: SessionBackupSnapshot
     else stats.skippedSessions += 1;
   }
 
-  const sortedSessions = [...nextSessions].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sortedVisibleSessions = [...nextSessions].sort((a, b) => b.updatedAt - a.updatedAt);
+  const finalSessions = [...sortedVisibleSessions, ...hiddenCurrentSessions];
   const projectMerge = mergeProjects(currentState.recentProjects, importedProjects);
   stats.addedProjects = projectMerge.stats.addedProjects;
   stats.updatedProjects = projectMerge.stats.updatedProjects;
   stats.skippedProjects = projectMerge.stats.skippedProjects;
 
-  const validSessionIds = new Set(sortedSessions.map((session) => session.id));
+  const validSessionIds = new Set(finalSessions.map((session) => session.id));
   const pendingMerge = mergePendingMessages(currentState.pendingMessages, importedPending, validSessionIds, sessionIdMap);
   stats.addedPendingMessages = pendingMerge.addedPendingMessages;
   stats.skippedPendingMessages = pendingMerge.skippedPendingMessages;
 
-  const activeIdentityKeys = new Set(sortedSessions
+  const activeIdentityKeys = new Set(finalSessions
     .filter((session) => !session.archivedAt)
     .flatMap((session) => sessionIdentityKeys(session)));
   const safeImportedTombstones = importedTombstones.filter((tombstone) => (
     !tombstone.ids.some((id) => activeIdentityKeys.has(id))
   ));
   stats.importedArchivedTombstones = safeImportedTombstones.length;
-  const generatedTombstones = sortedSessions
+  const generatedTombstones = finalSessions
     .map((session) => makeArchivedTombstone(session))
     .filter((item): item is ArchivedSessionTombstone => Boolean(item));
   const archivedTombstones = mergeArchivedTombstones([
@@ -525,7 +527,7 @@ export function createSessionBackupImportPlan(rawSnapshot: SessionBackupSnapshot
 
   return {
     snapshot,
-    sessions: sortedSessions,
+    sessions: finalSessions,
     pendingMessages: pendingMerge.pendingMessages,
     projects: projectMerge.projects,
     projectsToPersist: projectMerge.projectsToPersist,

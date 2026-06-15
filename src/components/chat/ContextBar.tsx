@@ -5,6 +5,7 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 import { compactModelDisplayName } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
+import { displayProjectName } from "@/utils/projectDisplay";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -94,6 +95,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const workDirsRef = useRef<HTMLDivElement>(null);
   const activeSession = session ?? currentSession;
+  const projectDisplayName = displayProjectName(project);
   const sessionHasStarted = Boolean(activeSession && activeSession.events.length > 0);
   const sessionModel = sessionHasStarted && activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
   const displayModel = defaultModel ?? sessionModel ?? FALLBACK_KIMI_MODEL;
@@ -333,10 +335,10 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
             style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
             title={project?.path ?? "当前项目"}
-            aria-label={project?.name ? `当前项目：${project.name}` : "当前项目"}
+            aria-label={project ? `当前项目：${projectDisplayName}` : "当前项目"}
           >
             <FolderOpen size={16} className="shrink-0" />
-            <span className="max-w-[220px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{project?.name ?? "未选择项目"}</span>
+            <span className="max-w-[220px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{projectDisplayName}</span>
           </button>
           {workDirsOpen && (
             <div className="kimix-floating-panel absolute bottom-9 left-0 z-40 w-[360px] rounded-xl" style={{ padding: "16px 18px 18px" }}>

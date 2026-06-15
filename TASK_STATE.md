@@ -13,6 +13,8 @@
 - 2026-06-15 v2.9.95：侧栏会话转圈不再只依赖单个全局 `runningSessionId`，同时识别 runtime id 和会话内未完成的 assistant/tool/steer/subagent 事件，多个并行会话可同时显示运行态。
 - 2026-06-15 v2.9.96：设置页归档对话“展开剩余”数量改为基于当前实际未展示条目计算，展开后改用“收起归档列表”文案，避免把总量或固定差值误读为可展开数量。
 - 2026-06-15 v2.9.97：修复流式输出把 Markdown 表格分隔线拆成 `|` / 空行 / `--------|` 多段后无法渲染为表格的问题，预处理会合并 separator 碎片并补充测试覆盖。
+- 2026-06-15 v2.9.98：默认项目显示名改为“Kimix 默认项目”，启动时兼容刷新旧本地记录中仍显示为 `kimix` 的默认项目名称；侧栏和底部状态栏新增显示层兜底，避免前端缓存旧 name 时仍显示 `kimix`。
+- 2026-06-15 v2.9.99：补齐空态页、长程任务入口和检查面板的默认项目显示名兜底；会话快照导入合并时保留本机隐藏内部会话；当前轮仍在输出时 slash/skill 输入也会先进入待发送队列；会话快照导入/导出的磁盘读写改为异步路径；`useLiveSession` 复用会话 id 索引；设置页归档摘要去掉 JSON 字符串往返并用浅比较减少无关重渲染；侧栏按项目路径缓存可见会话分组；本地持久化订阅用 id Map 判断归档变化，减少重复查找。
 
 ## 当前目标
 停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。

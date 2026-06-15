@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { selectSessionById } from "@/stores/selectors";
 import type { Session, WorkspaceView } from "@/types/ui";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -529,9 +530,9 @@ export function AppShell() {
     lastNavigationEntryRef.current = entry;
     setWorkspaceView(entry.workspaceView);
     const targetSession = entry.sessionId
-      ? useSessionStore.getState().sessions.find((session) => session.id === entry.sessionId && !session.archivedAt && !isHiddenInternalSession(session))
+      ? selectSessionById(entry.sessionId)(useSessionStore.getState())
       : null;
-    setCurrentSession(targetSession ?? null);
+    setCurrentSession(targetSession && !targetSession.archivedAt && !isHiddenInternalSession(targetSession) ? targetSession : null);
     window.setTimeout(() => {
       applyingNavigationRef.current = false;
     }, 0);
@@ -800,7 +801,7 @@ export function AppShell() {
   };
 
   const liveCurrentSession = useMemo(
-    () => sessions.find((session) => session.id === currentSession?.id) ?? currentSession,
+    () => selectSessionById(currentSession?.id)(useSessionStore.getState()) ?? currentSession,
     [sessions, currentSession],
   );
   const longTaskMeta = liveCurrentSession?.longTask;

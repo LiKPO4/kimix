@@ -42,6 +42,7 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { formatReleaseDate } from "@/utils/format";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
+import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { alignSessionDiffsToGitStatus } from "@/utils/diff";
 
@@ -476,7 +477,7 @@ export function LongTaskInspectorPanel({
   }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, runningSessionId]);
   const projectPathForGit = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const gitProjectLabel = projectPathForGit && currentProject?.path === projectPathForGit
-    ? currentProject.name || projectNameFromPath(projectPathForGit)
+    ? displayProjectName(currentProject, projectNameFromPath(projectPathForGit))
     : projectPathForGit
       ? projectNameFromPath(projectPathForGit)
       : "";

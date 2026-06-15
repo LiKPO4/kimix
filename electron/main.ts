@@ -25,6 +25,8 @@ const KIMI_CODE_INSTALL_PS1_URL = "https://code.kimi.com/kimi-code/install.ps1";
 const KIMI_CODE_INSTALL_SH_URL = "https://code.kimi.com/kimi-code/install.sh";
 const SUPERPOWERS_ZIP_URL = "https://github.com/obra/superpowers/archive/refs/heads/main.zip";
 const SUPERPOWERS_GIT_URL = "https://github.com/obra/superpowers.git";
+const DEFAULT_PROJECT_ID = "default-kimi-project";
+const DEFAULT_PROJECT_DISPLAY_NAME = "Kimix 默认项目";
 const SUPERPOWERS_SKILL_NAMES = [
   "brainstorming",
   "dispatching-parallel-agents",
@@ -2732,6 +2734,15 @@ function addBackupJson(zip: AdmZip, name: string, value: unknown) {
   zip.addFile(name, Buffer.from(JSON.stringify(value, null, 2), "utf8"));
 }
 
+async function readFileIfExists(filePath: string) {
+  try {
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function exportSessionBackupArchive(request: unknown) {
   const req = asPlainRecord(request);
   if (!req) throw new Error("缺少导出请求");
@@ -2776,7 +2787,7 @@ async function exportSessionBackupArchive(request: unknown) {
   addBackupJson(zip, "hidden-handoff-session-ids.json", fullSnapshot.hiddenHandoffSessionIds);
   addBackupJson(zip, "active-context.json", fullSnapshot.activeContext ?? null);
   addBackupJson(zip, "snapshot.json", fullSnapshot);
-  zip.writeZip(result.filePath);
+  await zip.writeZipPromise(result.filePath, { overwrite: true });
   await shell.showItemInFolder(result.filePath);
   return { path: result.filePath, output: "Kimix 会话快照导出完成" };
 }
@@ -2795,13 +2806,14 @@ function readZipJson(zip: AdmZip, name: string) {
   return parseBackupJsonText(entry.getData().toString("utf8"), name);
 }
 
-function readSessionBackupSnapshot(filePath: string): SessionBackupSnapshot {
+async function readSessionBackupSnapshot(filePath: string): Promise<SessionBackupSnapshot> {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".json") {
-    return normalizeSessionBackupSnapshot(parseBackupJsonText(fs.readFileSync(filePath, "utf8"), path.basename(filePath)));
+    const text = await fs.promises.readFile(filePath, "utf8");
+    return normalizeSessionBackupSnapshot(parseBackupJsonText(text, path.basename(filePath)));
   }
   if (ext !== ".zip") throw new Error("请选择 .zip 或 .json 会话快照文件");
-  const zip = new AdmZip(filePath);
+  const zip = new AdmZip(await fs.promises.readFile(filePath));
   const snapshot = readZipJson(zip, "snapshot.json");
   if (snapshot) return normalizeSessionBackupSnapshot(snapshot);
   return normalizeSessionBackupSnapshot({
@@ -2818,8 +2830,8 @@ function readSessionBackupSnapshot(filePath: string): SessionBackupSnapshot {
 async function importSessionBackupArchive(request?: ImportSessionBackupRequest) {
   if (request?.path) {
     const filePath = path.resolve(request.path);
-    if (!fs.existsSync(filePath)) throw new Error("快照文件不存在");
-    return { path: filePath, snapshot: readSessionBackupSnapshot(filePath), canceled: false };
+    if (!await readFileIfExists(filePath)) throw new Error("快照文件不存在");
+    return { path: filePath, snapshot: await readSessionBackupSnapshot(filePath), canceled: false };
   }
   const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
     title: "导入 Kimix 会话快照",
@@ -2833,7 +2845,7 @@ async function importSessionBackupArchive(request?: ImportSessionBackupRequest) 
     return { path: "", snapshot: emptySessionBackupSnapshot(), canceled: true };
   }
   const filePath = result.filePaths[0];
-  return { path: filePath, snapshot: readSessionBackupSnapshot(filePath), canceled: false };
+  return { path: filePath, snapshot: await readSessionBackupSnapshot(filePath), canceled: false };
 }
 
 async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
@@ -3775,9 +3787,9 @@ function getDefaultProject() {
 
   ensureDirectoryExists(workDir);
   return {
-    id: "default-kimi-project",
+    id: DEFAULT_PROJECT_ID,
     path: workDir,
-    name: "kimix",
+    name: DEFAULT_PROJECT_DISPLAY_NAME,
     lastOpenedAt: Date.now(),
   };
 }
@@ -3898,7 +3910,21 @@ function createWindow() {
 
 async function restoreLastContext() {
   const recentProjects = projectService.getRecentProjects();
-  const project = recentProjects[0] ?? getDefaultProject();
+  const defaultProject = getDefaultProject();
+  const recentProject = recentProjects[0];
+  const isDefaultProject = Boolean(recentProject && (
+    recentProject.id === DEFAULT_PROJECT_ID ||
+    path.resolve(recentProject.path) === path.resolve(defaultProject.path)
+  ));
+  const project = isDefaultProject
+    ? {
+        ...recentProject,
+        id: DEFAULT_PROJECT_ID,
+        path: defaultProject.path,
+        name: DEFAULT_PROJECT_DISPLAY_NAME,
+        lastOpenedAt: Date.now(),
+      }
+    : recentProject ?? defaultProject;
 
   projectService.addRecentProject(project);
 

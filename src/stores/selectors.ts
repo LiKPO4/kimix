@@ -25,10 +25,20 @@ export const selectCurrentProjectPath = (s: AppStore) => s.currentProject?.path 
 
 // ── SessionStore selectors ──
 
+const sessionIndexCache = new WeakMap<Session[], Map<string, Session>>();
+
+function sessionIndexFor(sessions: Session[]) {
+  const cached = sessionIndexCache.get(sessions);
+  if (cached) return cached;
+  const index = new Map(sessions.map((session) => [session.id, session]));
+  sessionIndexCache.set(sessions, index);
+  return index;
+}
+
 /** Curried selector: find a session by id from the sessions array */
 export const selectSessionById = (id: string | null | undefined) => (s: SessionStore): Session | undefined => {
   if (!id) return undefined;
-  return s.sessions.find((session) => session.id === id);
+  return sessionIndexFor(s.sessions).get(id);
 };
 
 /** Curried selector: active (non-archived) sessions for a given project path */
