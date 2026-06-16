@@ -77,7 +77,12 @@ async function main() {
     });
 
     const results = [];
-    results.push(await capture("harness.getExperimentalFlags", () => harness.getExperimentalFlags()));
+    results.push(await capture("harness.getExperimentalFeatures", () => {
+      if (typeof harness.getExperimentalFeatures === "function") {
+        return harness.getExperimentalFeatures();
+      }
+      return harness.getExperimentalFlags?.();
+    }));
     results.push(await capture("session.getStatus", () => session.getStatus()));
     results.push(await capture("session.undoHistory(1) on fresh session", () => session.undoHistory(1)));
     results.push(await capture("session.listBackgroundTasks({ activeOnly: false })", () =>
