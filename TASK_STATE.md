@@ -29,6 +29,7 @@
 - 2026-06-16 v2.9.108：当 assistant 正文事件已结束但子代理/工具仍未完成时，过程摘要不再显示“输出完成”，改为显示“子代理运行中/命令运行中”并保持会话运行态。
 - 2026-06-16 v2.9.109：跟进官方 Kimi Code 0.15.0，研究仓库切到 tag `@moonshot-ai/kimi-code@0.15.0` / commit `18aa21575b893c02f244272e78e994afe1b0adcc`；`packages/node-sdk` 仍为 `0.9.3`，已重建并刷新 `vendor/kimi-code-sdk/index.mjs`，记录 `docs/kimi-code-0.15-followup.md`，轻量 SDK 探针兼容 `getExperimentalFeatures()`。
 - 2026-06-16 v2.9.110：补齐官方 0.15.0 新增的 legacy SSE MCP support，Kimix MCP 类型、添加面板、主进程校验、Plugin MCP 导入和配置读取支持 `transport: "sse"`。
+- 2026-06-16 v2.9.111：搜索面板新增“全部工作目录”官方会话视图，调用 Kimi Code SDK 全量会话列表，可跨工作目录搜索并复制恢复命令。
 
 ## 当前目标
 停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。

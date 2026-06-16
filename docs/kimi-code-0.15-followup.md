@@ -19,6 +19,11 @@
 
 - Added Kimix MCP configuration support for the new official `sse` transport.
 
+## Completed In Kimix v2.9.111
+
+- Added an all-workdirs official session view to Kimix's search overlay.
+- The global session view uses the existing SDK `listSessions({})` path and provides copyable resume commands instead of automatically importing cross-workdir sessions.
+
 ## Upstream Notes
 
 - 0.15.0 adds an all-sessions picker in the official TUI.
@@ -29,7 +34,7 @@
 ## Kimix Impact
 
 - `packages/node-sdk` remains version `0.9.3`, and the public SDK surface used by Kimix did not show a breaking API change during this diff.
-- The official all-sessions picker is TUI-only for now; Kimix already owns its session list and migration UX, so no UI was added.
+- The official all-sessions picker is TUI-only upstream, so Kimix exposes the same data source through its own search overlay.
 - SSE MCP support required a Kimix renderer, IPC, and main-process validation update because the local MCP panel previously only allowed `http` and `stdio`.
 
 ## Verification

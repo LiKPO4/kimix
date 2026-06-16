@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, MessageSquare, Search, X } from "lucide-react";
+import { ClipboardCopy, FileText, Globe2, MessageSquare, Search, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
+import type { KimiCodeSessionSummary } from "../../../electron/types/ipc";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
@@ -10,6 +11,15 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 
 type SearchMatch = {
   session: Session;
+  kind: string;
+  text: string;
+  timestamp: number;
+};
+
+type SearchScope = "project" | "all";
+
+type GlobalSessionMatch = {
+  session: KimiCodeSessionSummary;
   kind: string;
   text: string;
   timestamp: number;
@@ -36,6 +46,10 @@ function compact(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function formatResumeCommand(session: KimiCodeSessionSummary): string {
+  return `cd /d "${session.workDir}" && kimi resume ${session.id}`;
+}
+
 export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const currentProject = useAppStore((s) => s.currentProject);
@@ -44,12 +58,18 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const addSession = useSessionStore((s) => s.addSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<SearchScope>("project");
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [searchOnlySessions, setSearchOnlySessions] = useState<Session[]>([]);
+  const [loadingGlobalSessions, setLoadingGlobalSessions] = useState(false);
+  const [globalSessions, setGlobalSessions] = useState<KimiCodeSessionSummary[]>([]);
+  const [copyMessage, setCopyMessage] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    setScope("project");
+    setCopyMessage("");
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
@@ -59,6 +79,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   useEffect(() => {
     if (!open || !currentProject) return;
+    if (scope !== "project") return;
     let cancelled = false;
     void window.api.listSessions({ workDir: currentProject.path }).then((res) => {
       if (cancelled || !res.success) return;
@@ -84,7 +105,24 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     return () => {
       cancelled = true;
     };
-  }, [open, currentProject?.path]);
+  }, [open, currentProject?.path, scope]);
+
+  useEffect(() => {
+    if (!open || scope !== "all" || globalSessions.length > 0) return;
+    let cancelled = false;
+    setLoadingGlobalSessions(true);
+    void window.api.listKimiCodeSessions({}).then((res) => {
+      if (cancelled) return;
+      if (res.success) {
+        setGlobalSessions(res.data.filter((item) => !item.archived).sort((a, b) => b.updatedAt - a.updatedAt));
+      }
+    }).finally(() => {
+      if (!cancelled) setLoadingGlobalSessions(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, scope, globalSessions.length]);
 
   const searchableSessions = useMemo(() => {
     const storeIds = new Set(sessions.map((session) => session.id));
@@ -96,6 +134,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   useEffect(() => {
     if (!open || !currentProject) return;
+    if (scope !== "project") return;
     const unloaded = searchableSessions
       .filter((session) => session.projectPath === currentProject.path && session.events.length === 0)
       .filter((session) => !isHiddenInternalSession(session))
@@ -129,7 +168,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     return () => {
       cancelled = true;
     };
-  }, [open, currentProject?.path, searchableSessions, updateSession]);
+  }, [open, currentProject?.path, scope, searchableSessions, updateSession]);
 
   const projectSessions = useMemo(() => {
     return searchableSessions
@@ -168,6 +207,31 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     return all.slice(0, 24);
   }, [projectSessions, query]);
 
+  const globalMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const all: GlobalSessionMatch[] = [];
+    for (const session of globalSessions) {
+      const title = session.title || session.lastPrompt || "历史对话";
+      const text = compact([session.lastPrompt, session.workDir].filter(Boolean).join(" · "));
+      const haystack = `${title}\n${text}\n${session.id}`.toLowerCase();
+      if (!q || haystack.includes(q)) {
+        all.push({
+          session,
+          kind: q ? "官方会话" : "最近官方会话",
+          text: text || session.workDir,
+          timestamp: session.updatedAt,
+        });
+      }
+    }
+    return all.slice(0, 40);
+  }, [globalSessions, query]);
+
+  const copyResumeCommand = async (session: KimiCodeSessionSummary) => {
+    await navigator.clipboard?.writeText(formatResumeCommand(session));
+    setCopyMessage("已复制恢复命令");
+    window.setTimeout(() => setCopyMessage(""), 1800);
+  };
+
   if (!open) return null;
 
   return (
@@ -193,10 +257,57 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           </button>
         </div>
         <div className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
-          <div className="px-2 pb-2 text-[13px] text-text-muted">
-            {loadingHistory ? "正在补充加载最近历史..." : query.trim() ? `${matches.length} 条匹配` : "最近对话"}
+          <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
+            <button
+              className={`kimix-icon-text-button ${scope === "project" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
+              style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+              onClick={() => setScope("project")}
+            >
+              <MessageSquare size={14} />
+              当前项目
+            </button>
+            <button
+              className={`kimix-icon-text-button ${scope === "all" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
+              style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+              onClick={() => setScope("all")}
+            >
+              <Globe2 size={14} />
+              全部工作目录
+            </button>
+            {copyMessage && <span className="ml-auto text-[12px] text-text-muted">{copyMessage}</span>}
           </div>
-          {matches.length > 0 ? matches.map((match, index) => (
+          <div className="px-2 pb-2 text-[13px] text-text-muted">
+            {scope === "all"
+              ? loadingGlobalSessions ? "正在读取官方全会话..." : query.trim() ? `${globalMatches.length} 条匹配` : "官方全会话"
+              : loadingHistory ? "正在补充加载最近历史..." : query.trim() ? `${matches.length} 条匹配` : "最近对话"}
+          </div>
+          {scope === "all" ? (
+            globalMatches.length > 0 ? globalMatches.map((match) => (
+              <div
+                key={match.session.id}
+                className="grid min-h-14 w-full items-center rounded-xl text-left transition-colors hover:bg-surface-hover"
+                style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "10px 14px" }}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[14.5px] text-text-primary">{match.session.title || match.session.lastPrompt || "历史对话"}</span>
+                  <span className="mt-1 block truncate text-[13px] text-text-muted">{match.kind} · {match.text}</span>
+                </span>
+                <button
+                  className="kimix-icon-text-button text-text-muted hover:bg-surface-hover"
+                  style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                  onClick={() => void copyResumeCommand(match.session)}
+                  title={formatResumeCommand(match.session)}
+                >
+                  <ClipboardCopy size={14} />
+                  复制命令
+                </button>
+              </div>
+            )) : (
+              <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
+                没有找到官方会话
+              </div>
+            )
+          ) : matches.length > 0 ? matches.map((match, index) => (
             <button
               key={`${match.session.id}-${match.kind}-${match.timestamp}-${index}`}
               onClick={() => {
