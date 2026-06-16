@@ -91,7 +91,7 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
     { label: "切换文件树", hint: "Ctrl+Shift+E", action: "toggle-file-tree", disabled: true, note: "文件树面板暂未实现" },
     { label: "打开浏览器标签页", hint: "Ctrl+T", action: "open-browser-tab", disabled: true, note: "内置浏览器页暂未实现" },
     { label: "重新载入页面", hint: "Ctrl+R", action: "reload-browser-page" },
-    { label: "切换差异面板", hint: "Alt+Ctrl+B", action: "toggle-diff-panel" },
+    { label: "切换文件预览", hint: "Alt+Ctrl+B", action: "toggle-diff-panel" },
     { label: "查找", hint: "Ctrl+F", action: "find" },
     { type: "separator" },
     { label: "上一个对话", hint: "Ctrl+Shift+[", action: "previous-chat" },

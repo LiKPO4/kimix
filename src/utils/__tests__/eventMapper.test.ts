@@ -493,6 +493,79 @@ describe("mergeEvents", () => {
     expect(result).toHaveLength(1); // tool_call absorbed the result; no diff/todo appended
   });
 
+  it("adds change summary and diff when tool_result contains structured diff", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "edit", status: "running", arguments: {} },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-1",
+      toolName: "edit",
+      result: "ok",
+      display: { diff: { path: "src/app.ts", oldText: "before", newText: "after\nmore" } },
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result.map((event) => event.type)).toEqual(["tool_call", "change_summary", "diff"]);
+    const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0].path).toBe("src/app.ts");
+    expect(change.additions).toBe(1);
+    const diff = result[2] as Extract<TimelineEvent, { type: "diff" }>;
+    expect(diff.filePath).toBe("src/app.ts");
+  });
+
+  it("adds change summary for successful Write tool without structured diff", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "tool_call",
+        timestamp: 1,
+        toolCallId: "tc-1",
+        toolName: "Write",
+        status: "running",
+        arguments: { path: "plans/next.md", content: "a\nb\n" },
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-1",
+      toolName: "Write",
+      result: "Wrote 4 bytes",
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result.map((event) => event.type)).toEqual(["tool_call", "change_summary"]);
+    const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0].path).toBe("plans/next.md");
+    expect(change.additions).toBe(2);
+  });
+
+  it("does not add change summary for successful Read tool with a path", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "tool_call",
+        timestamp: 1,
+        toolCallId: "tc-1",
+        toolName: "Read",
+        status: "running",
+        arguments: { path: "plans/next.md" },
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-1",
+      toolName: "Read",
+      result: "content",
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result.map((event) => event.type)).toEqual(["tool_call"]);
+  });
+
   it("replaces consecutive status_update", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "status_update", timestamp: 1, tokenCount: 10, inputTokenCount: 5, contextSize: 100, contextLimit: 256000 },

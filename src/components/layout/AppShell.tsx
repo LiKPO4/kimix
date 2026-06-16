@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
 import { getVisibleTodos } from "@/components/chat/TodoPanel";
@@ -11,7 +12,10 @@ import { SkillsPanel } from "./SkillsPanel";
 import { HooksPanel } from "./HooksPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
 import {
+  ArrowLeft,
   ClipboardList,
+  ExternalLink,
+  FileText,
   LucideIcon,
   MessageSquarePlus,
   Network,
@@ -21,7 +25,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { selectSessionById } from "@/stores/selectors";
 import type { Session, WorkspaceView } from "@/types/ui";
-import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
@@ -178,9 +182,83 @@ const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: strin
   "close-window": { title: "", body: "" },
 };
 
+function ProjectFilePreviewViewer({
+  file,
+  content,
+  resolvedPath,
+  loading,
+  error,
+  onBack,
+  onOpenFile,
+}: {
+  file: PreviewFileInfo;
+  content: string;
+  resolvedPath: string;
+  loading: boolean;
+  error: string;
+  onBack: () => void;
+  onOpenFile: () => void;
+}) {
+  const previewIsMarkdown = file.extension === "md" || file.extension === "markdown";
+  return (
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-base">
+      <div
+        className="grid shrink-0 items-center border-b border-border-subtle"
+        style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 14, padding: "14px 22px" }}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className="kimix-icon-text-button kimix-muted-action is-compact"
+          style={{ minHeight: 34, paddingLeft: 12, paddingRight: 14 }}
+        >
+          <ArrowLeft size={15} />
+          <span>返回对话</span>
+        </button>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center text-[15px] font-semibold leading-5 text-text-primary" style={{ gap: 9 }}>
+            <FileText size={16} className="shrink-0 text-text-muted" />
+            <span className="min-w-0 truncate" title={file.name}>{file.name}</span>
+          </div>
+          <div className="mt-1 truncate text-[12.5px] leading-5 text-text-muted" title={resolvedPath || file.path}>
+            {resolvedPath || file.path}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenFile}
+          className="kimix-icon-text-button kimix-muted-action is-compact"
+          style={{ minHeight: 34, paddingLeft: 12, paddingRight: 14 }}
+        >
+          <ExternalLink size={14} />
+          <span>打开</span>
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto" style={{ padding: "24px 34px 34px" }}>
+        <div className="mx-auto w-full max-w-[960px]">
+          {loading ? (
+            <div className="text-[13.5px] leading-6 text-text-muted">正在读取文件...</div>
+          ) : error ? (
+            <div className="rounded-lg border border-border-subtle bg-surface-elevated text-[13.5px] leading-6 text-accent-danger" style={{ padding: "16px 18px" }}>
+              {error}
+            </div>
+          ) : previewIsMarkdown ? (
+            <MarkdownRenderer content={content || " "} />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-elevated font-mono text-[13px] leading-6 text-text-primary" style={{ padding: "18px 20px" }}>
+              {content || " "}
+            </pre>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 export function AppShell() {
   const currentSession = useAppStore((s) => s.currentSession);
+  const filePreviewExtensions = useAppStore((s) => s.filePreviewExtensions);
   const currentProject = useAppStore((s) => s.currentProject);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
@@ -215,6 +293,11 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<PreviewFileInfo | null>(null);
+  const [previewContent, setPreviewContent] = useState("");
+  const [previewResolvedPath, setPreviewResolvedPath] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const toastTimerRef = useRef<number | null>(null);
   const [helpDialog, setHelpDialog] = useState<HelpDialog | null>(null);
   const [infoTopic, setInfoTopic] = useState<{ title: string; body: string; url?: string } | null>(null);
@@ -821,6 +904,7 @@ export function AppShell() {
   const longTaskEventCount = liveCurrentSession?.events.length ?? 0;
   const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
+  const previewProjectPath = liveCurrentSession?.projectPath ?? currentProject?.path;
   const isCurrentSessionRunning = Boolean(liveCurrentSession && runningSessionId === liveCurrentSession.id);
   const longTaskStatusTone = "executor";
   const sessionDiffs = useMemo(
@@ -831,6 +915,49 @@ export function AppShell() {
   const visibleSwarmAgents = useMemo(() => getVisibleSwarmAgents(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
   const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
   const btwSessionId = liveCurrentSession?.id ?? "__global__";
+
+  useEffect(() => {
+    setPreviewFile(null);
+    setPreviewContent("");
+    setPreviewResolvedPath("");
+    setPreviewError("");
+  }, [previewProjectPath]);
+
+  useEffect(() => {
+    if (!diffPanelOpen) {
+      setPreviewFile(null);
+      setPreviewContent("");
+      setPreviewResolvedPath("");
+      setPreviewError("");
+    }
+  }, [diffPanelOpen]);
+
+  useEffect(() => {
+    if (!previewProjectPath || !previewFile) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError("");
+    setPreviewContent("");
+    setPreviewResolvedPath("");
+    window.api.readTextFile({ projectPath: previewProjectPath, path: previewFile.path }).then((res) => {
+      if (cancelled) return;
+      setPreviewLoading(false);
+      if (!res.success) {
+        setPreviewError(`读取文件失败：${res.error}`);
+        return;
+      }
+      setPreviewContent(res.data.content);
+      setPreviewResolvedPath(res.data.path);
+    }).catch((err) => {
+      if (cancelled) return;
+      setPreviewLoading(false);
+      setPreviewError(`读取文件失败：${err instanceof Error ? err.message : String(err)}`);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewProjectPath, previewFile?.path]);
+
   const btwTransientState = btwTransientBySessionId[btwSessionId] ?? EMPTY_BTW_TRANSIENT_STATE;
   const btwState: BtwPanelState = liveCurrentSession
     ? { ...btwTransientState, rounds: liveCurrentSession.btwRounds ?? [] }
@@ -1655,6 +1782,18 @@ ${isFinalStep
             <HooksPanel onBackToChat={() => setWorkspaceView("chat")} />
           ) : settingsWorkspaceActive ? (
             <SettingsPanel variant="workspace" onBackToChat={() => setWorkspaceView("chat")} />
+          ) : previewFile ? (
+            <ProjectFilePreviewViewer
+              file={previewFile}
+              content={previewContent}
+              resolvedPath={previewResolvedPath}
+              loading={previewLoading}
+              error={previewError}
+              onBack={() => setPreviewFile(null)}
+              onOpenFile={() => {
+                if (previewProjectPath) void window.api.openFile({ projectPath: previewProjectPath, filePath: previewFile.path });
+              }}
+            />
           ) : (
             <>
               <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -1738,11 +1877,11 @@ ${isFinalStep
         {chatWorkspaceActive && diffPanelOpen && (
           <DiffPanel
             width={rightPanelWidth}
-            diffs={sessionDiffs}
+            projectPath={previewProjectPath}
+            allowedExtensions={filePreviewExtensions}
+            selectedPath={previewFile?.path}
+            onSelectFile={setPreviewFile}
             onClose={() => setDiffPanelOpen(false)}
-            onOpenFile={(filePath) => {
-              if (liveCurrentSession) void window.api.openFile({ projectPath: liveCurrentSession.projectPath, filePath });
-            }}
           />
         )}
       </div>

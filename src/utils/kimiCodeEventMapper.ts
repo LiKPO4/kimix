@@ -25,6 +25,10 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isKimixFallbackSteer(event: Record<string, unknown>): boolean {
+  return event.source === "kimix-fallback";
+}
+
 function getTimestamp(event: Record<string, unknown>, options: KimiCodeEventMapperOptions): number {
   return isNumber(event.time) ? event.time : options.now ?? Date.now();
 }
@@ -48,6 +52,59 @@ function normalizeResult(event: Record<string, unknown>): unknown {
   const result = event.result;
   if (isRecord(result) && "output" in result) return result.output;
   return result ?? "";
+}
+
+function normalizeToolDisplay(event: Record<string, unknown>): Extract<TimelineEvent, { type: "tool_result" }>["display"] | undefined {
+  const result = isRecord(event.result) ? event.result : {};
+  const output = "output" in event ? event.output : result.output;
+  const displayBlocks = Array.isArray(event.display)
+    ? event.display
+    : Array.isArray(result.display)
+      ? result.display
+      : Array.isArray(output)
+        ? output
+        : [];
+  if (displayBlocks.length === 0) return undefined;
+
+  const blocks = displayBlocks.filter(isRecord);
+  const diffBlock = blocks.find((block) => block.type === "diff");
+  const todoBlock = blocks.find((block) => block.type === "todo");
+  let display: Extract<TimelineEvent, { type: "tool_result" }>["display"] | undefined;
+
+  if (diffBlock) {
+    const path = isString(diffBlock.path) ? diffBlock.path : undefined;
+    const oldText = isString(diffBlock.old_text)
+      ? diffBlock.old_text
+      : isString(diffBlock.oldText)
+        ? diffBlock.oldText
+        : undefined;
+    const newText = isString(diffBlock.new_text)
+      ? diffBlock.new_text
+      : isString(diffBlock.newText)
+        ? diffBlock.newText
+        : undefined;
+    if (path && oldText !== undefined && newText !== undefined) {
+      display = { diff: { path, oldText, newText } };
+    }
+  }
+
+  if (todoBlock && Array.isArray(todoBlock.items)) {
+    display = {
+      ...display,
+      todo: todoBlock.items.filter(isRecord).map((item, index) => {
+        const status = isString(item.status) && ["pending", "in_progress", "done"].includes(item.status)
+          ? item.status as "pending" | "in_progress" | "done"
+          : "pending";
+        return {
+          id: isString(item.id) ? item.id : `todo-${index}`,
+          content: isString(item.content) ? item.content : isString(item.title) ? item.title : "",
+          status,
+        };
+      }),
+    };
+  }
+
+  return display;
 }
 
 function normalizeToolProgress(event: Record<string, unknown>): string {
@@ -248,7 +305,7 @@ export function mapKimiCodeEvent(
         timestamp,
         content: message.content || "[图片]",
         images: message.images,
-        status: "sent",
+        status: isKimixFallbackSteer(event) ? "accepted" : "sent",
       };
     }
 
@@ -335,6 +392,7 @@ export function mapKimiCodeEvent(
         toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
         toolName: isString(event.name) ? event.name : "unknown",
         result: normalizeResult(event),
+        display: normalizeToolDisplay(event),
       };
 
     case "agent.status.updated": {

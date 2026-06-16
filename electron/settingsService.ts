@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
+  filePreviewExtensions: ["md", "txt"],
   expandToolCalls: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,

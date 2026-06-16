@@ -2104,6 +2104,32 @@ function resolveProjectFile(projectPath: string, filePath: string) {
   return resolvedFile;
 }
 
+function normalizePreviewExtensions(input: unknown, fallback = ["md", "txt"]) {
+  const raw = Array.isArray(input) ? input : fallback;
+  const normalized = raw
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
+    .filter((item) => /^[a-z0-9]{1,12}$/.test(item));
+  return Array.from(new Set(normalized)).slice(0, 20);
+}
+
+function previewExtensionSet(input?: unknown) {
+  return new Set(normalizePreviewExtensions(input).map((item) => `.${item}`));
+}
+
+const READABLE_TEXT_EXTENSIONS = new Set([
+  ".md",
+  ".txt",
+  ".json",
+  ".log",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".ini",
+  ".csv",
+  ".tsv",
+]);
+
 function isPathInside(parent: string, child: string) {
   const relative = path.relative(path.resolve(parent), path.resolve(child));
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -2145,8 +2171,7 @@ function resolveReadableTextFile(requestPath: string, projectPath?: string) {
   }
 
   const ext = path.extname(resolvedFile).toLowerCase();
-  const allowedExts = new Set([".md", ".txt", ".json", ".log", ".yaml", ".yml"]);
-  if (!allowedExts.has(ext)) {
+  if (!READABLE_TEXT_EXTENSIONS.has(ext)) {
     throw new Error("Only text files can be read");
   }
 
@@ -2154,6 +2179,69 @@ function resolveReadableTextFile(requestPath: string, projectPath?: string) {
   if (!stat.isFile()) throw new Error("Path is not a file");
   if (stat.size > 1024 * 1024) throw new Error("Text file is too large");
   return { resolvedFile, updatedAt: stat.mtimeMs };
+}
+
+function listProjectPreviewFiles(projectPath: string, extensions?: unknown) {
+  const resolvedProject = path.resolve(projectPath);
+  const allowedExts = previewExtensionSet(extensions);
+  if (!fs.existsSync(resolvedProject) || !fs.statSync(resolvedProject).isDirectory()) {
+    throw new Error("Project path does not exist");
+  }
+  const results: Array<{
+    path: string;
+    name: string;
+    extension: string;
+    size: number;
+    updatedAt: number;
+    depth: number;
+  }> = [];
+
+  function addFile(relativePath: string, depth: number) {
+    const fullPath = resolveProjectFile(resolvedProject, relativePath);
+    const stat = fs.statSync(fullPath);
+    const ext = path.extname(relativePath).toLowerCase();
+    const extension = ext.replace(/^\./, "");
+    if (!allowedExts.has(ext) || !READABLE_TEXT_EXTENSIONS.has(ext)) return;
+    if (stat.size > 1024 * 1024) return;
+    results.push({
+      path: relativePath.replace(/\\/g, "/"),
+      name: path.basename(relativePath),
+      extension,
+      size: stat.size,
+      updatedAt: stat.mtimeMs,
+      depth,
+    });
+  }
+
+  const rootEntries = fs.readdirSync(resolvedProject, { withFileTypes: true });
+  for (const entry of rootEntries) {
+    if (entry.name.startsWith(".") || FILE_SEARCH_IGNORES.has(entry.name)) continue;
+    if (entry.isFile()) {
+      addFile(entry.name, 0);
+    }
+  }
+
+  for (const entry of rootEntries) {
+    if (entry.name.startsWith(".") || FILE_SEARCH_IGNORES.has(entry.name) || !entry.isDirectory()) continue;
+    const dirPath = path.join(resolvedProject, entry.name);
+    let children: fs.Dirent[] = [];
+    try {
+      children = fs.readdirSync(dirPath, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const child of children) {
+      if (child.name.startsWith(".") || !child.isFile()) continue;
+      addFile(path.join(entry.name, child.name), 1);
+    }
+  }
+
+  return results
+    .sort((a, b) => {
+      if (a.depth !== b.depth) return a.depth - b.depth;
+      return a.path.localeCompare(b.path, "zh-CN");
+    })
+    .map(({ depth: _depth, ...item }) => item);
 }
 
 // Log unhandled errors to prevent silent crashes
@@ -4487,6 +4575,21 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:listPreviewFiles", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as { projectPath?: unknown; extensions?: unknown };
+    if (typeof req.projectPath !== "string" || !req.projectPath) {
+      return { success: false, error: "Invalid project path" };
+    }
+    return { success: true, data: listProjectPreviewFiles(req.projectPath, req.extensions) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:listSkills", async () => {
   try {
     const settings = settingsService.loadSettings();
@@ -6260,6 +6363,7 @@ const SettingsSchema = z.object({
   notificationMode: z.enum(["never", "unfocused", "always"]).optional(),
   clarificationToolMode: z.enum(["off", "on", "auto"]).optional(),
   clarificationToolEnabled: z.boolean().optional(),
+  filePreviewExtensions: z.array(z.string().trim().min(1).max(16)).max(20).optional(),
   expandToolCalls: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),

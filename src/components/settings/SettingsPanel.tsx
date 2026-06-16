@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
@@ -38,7 +38,8 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.99";
+const KIMIX_VERSION = "2.9.108";
+const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
   | "connection"
@@ -48,6 +49,7 @@ type SettingsSectionId =
   | "permission"
   | "context"
   | "message"
+  | "filePreview"
   | "newSession"
   | "notification"
   | "voice"
@@ -63,6 +65,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "permission",
   "context",
   "message",
+  "filePreview",
   "newSession",
   "notification",
   "voice",
@@ -358,6 +361,14 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   );
 }
 
+function normalizeFilePreviewExtensions(value: string | string[]) {
+  const parts = Array.isArray(value) ? value : value.split(/[\s,，;；]+/);
+  return Array.from(new Set(parts
+    .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
+    .filter((item) => /^[a-z0-9]{1,12}$/.test(item))))
+    .slice(0, 20);
+}
+
 export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "modal" | "workspace"; onBackToChat?: () => void }) {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
@@ -384,6 +395,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const notificationMode = useAppStore((s) => s.notificationMode);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
+  const filePreviewExtensions = useAppStore((s) => s.filePreviewExtensions);
+  const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const archivedSessionItems = useSessionStore(useShallow((s) => s.sessions.filter((session) => session.archivedAt)));
   const migrationCountsDigest = useSessionStore((s) => {
@@ -417,6 +430,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [migrationDragActive, setMigrationDragActive] = useState(false);
   const [migrationMessage, setMigrationMessage] = useState("");
   const [freezeExpanded, setFreezeExpanded] = useState(false);
+  const [filePreviewExtensionDraft, setFilePreviewExtensionDraft] = useState(filePreviewExtensions.join(", "));
   const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
   const [authLoading, setAuthLoading] = useState(!settingsStatusCache.auth);
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
@@ -427,6 +441,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
+
+  useEffect(() => {
+    setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
+  }, [filePreviewExtensions]);
   const [providerDraft, setProviderDraft] = useState({
     providerName: "deepseek",
     modelAlias: "deepseek/deepseek-v4-flash",
@@ -1412,7 +1430,58 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("newSession", 7)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("filePreview", 7)}>
+                <div className="kimix-settings-section-title">
+                  <FileText size={16} className="text-text-muted" />
+                  <span>文件预览</span>
+                  {settingsDragHandle("filePreview", "文件预览")}
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "16px 16px 18px" }}>
+                  <label className="kimix-settings-permission-label block" htmlFor="file-preview-extensions">
+                    允许预览的文件类型
+                  </label>
+                  <div className="kimix-settings-permission-desc" style={{ marginTop: 6 }}>
+                    仅扫描项目根目录第一层，文件大小超过 1 MB 会自动跳过。
+                  </div>
+                  <input
+                    id="file-preview-extensions"
+                    value={filePreviewExtensionDraft}
+                    onChange={(event) => setFilePreviewExtensionDraft(event.target.value)}
+                    onBlur={() => setFilePreviewExtensions(normalizeFilePreviewExtensions(filePreviewExtensionDraft))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.currentTarget.blur();
+                      }
+                    }}
+                    className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
+                    style={{ marginTop: 12, paddingLeft: 12, paddingRight: 12 }}
+                    placeholder="md, txt"
+                  />
+                  <div className="flex flex-wrap" style={{ gap: 8, marginTop: 12 }}>
+                    {FILE_PREVIEW_EXTENSION_OPTIONS.map((extension) => {
+                      const selected = filePreviewExtensions.includes(extension);
+                      return (
+                        <button
+                          key={extension}
+                          type="button"
+                          onClick={() => {
+                            const next = selected
+                              ? filePreviewExtensions.filter((item) => item !== extension)
+                              : [...filePreviewExtensions, extension];
+                            setFilePreviewExtensions(normalizeFilePreviewExtensions(next.length > 0 ? next : ["md", "txt"]));
+                          }}
+                          className={`kimix-icon-text-button is-compact ${selected ? "bg-accent-primary-light text-accent-primary" : "kimix-muted-action"}`}
+                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                        >
+                          .{extension}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("newSession", 8)}>
                 <div className="kimix-settings-section-title">
                   <MessageSquare size={16} className="text-text-muted" />
                   <span>新对话建议</span>
@@ -1450,7 +1519,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("archived", 10)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("archived", 11)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Archive size={16} className="text-text-muted" />
@@ -1519,7 +1588,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("migration", 11)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("migration", 12)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Download size={16} className="text-text-muted" />
@@ -2050,7 +2119,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("notification", 8)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("notification", 9)}>
                 <div className="kimix-settings-section-title">
                   <Bell size={16} className="text-text-muted" />
                   <span>完成通知</span>
@@ -2074,7 +2143,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("voice", 9)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("voice", 10)}>
                 <div className="kimix-settings-section-title">
                   <Mic size={16} className="text-text-muted" />
                   <span>语音输入</span>
@@ -2103,7 +2172,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("freeze", 11)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("freeze", 13)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <AlertCircle size={16} className="text-text-muted" />

@@ -265,12 +265,12 @@ function SteerMessageBubble({ event, embedded = false }: { event: Extract<Timeli
   const images = event.images ?? [];
   const hasText = event.content.trim().length > 0 && event.content.trim() !== "[图片]";
   const label = event.status === "sending"
-    ? "引导中"
+    ? "引导发送中"
     : event.status === "accepted"
-      ? "引导中"
+      ? "等待官方确认"
     : event.status === "failed"
       ? "引导失败"
-      : "引导成功";
+      : "官方已记录引导";
   const handleSaveDrawingBoard = (image: { name: string; dataUrl: string }) => {
     window.dispatchEvent(new CustomEvent("kimix:addDrawingImage", { detail: image }));
     setPreviewImage(null);
@@ -664,10 +664,12 @@ function AssistantProcessLabel({
   event,
   isActiveAssistant,
   isInterrupted,
+  activeProcessLabel,
 }: {
   event: AssistantEvent;
   isActiveAssistant: boolean;
   isInterrupted: boolean;
+  activeProcessLabel?: string;
 }) {
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
@@ -679,6 +681,11 @@ function AssistantProcessLabel({
       : "";
   const roleLabel = formatAgentRole(event.agentRole);
   const completeLabel = isInterrupted ? "（输出打断）" : "（输出完成）";
+  if (activeProcessLabel) {
+    return durationLabel
+      ? <>{activeProcessLabel}{roleLabel ? `（${roleLabel}）` : ""} {durationLabel}</>
+      : <>{activeProcessLabel}{roleLabel ? `（${roleLabel}）` : ""}</>;
+  }
   if (event.isComplete) {
     return durationLabel
       ? <>{completeLabel}已处理{roleLabel ? `（${roleLabel}）` : ""} {durationLabel}</>
@@ -856,6 +863,11 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   const hasActiveProcess = leadingTools.some((tool) => tool.status === "running") ||
     leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
   const isActiveAssistant = Boolean(isRunningThisSession && (!event.isComplete || hasActiveProcess));
+  const activeProcessLabel = leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
+    ? "子代理运行中"
+    : leadingTools.some((tool) => tool.status === "running")
+      ? "命令运行中"
+      : undefined;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const fullCopyText = useMemo(() => buildAssistantFullCopyText(event), [event.content, event.thinking, event.thinkingParts, event.timestamp]);
@@ -869,7 +881,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
             tools={leadingTools}
             subagents={leadingSubagents}
             approvals={leadingApprovals}
-            label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} />}
+            label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} />}
           />
         )}
 
@@ -884,7 +896,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
             {hasContent && (
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-                  <MarkdownRenderer content={displayContent} />
+                  <MarkdownRenderer content={displayContent} deferOffscreen={!isActiveAssistant && event.isComplete && displayContent.length > 1200} />
                 </div>
                 {mdArtifacts.length > 0 && (
                   <div className="flex flex-col" style={{ gap: 12 }}>

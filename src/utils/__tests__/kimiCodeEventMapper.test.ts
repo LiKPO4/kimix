@@ -177,6 +177,18 @@ describe("mapKimiCodeEvent", () => {
     expect(steer.images?.[0].name).toBe("shot.png");
   });
 
+  it("does not treat Kimix fallback steer record as official confirmation", () => {
+    const steer = mapKimiCodeEvent({
+      type: "turn.steer",
+      input: "先不要动手，只做计划",
+      source: "kimix-fallback",
+    }, testOptions()) as Extract<TimelineEvent, { type: "steer_message" }>;
+
+    expect(steer.type).toBe("steer_message");
+    expect(steer.status).toBe("accepted");
+    expect(steer.content).toBe("先不要动手，只做计划");
+  });
+
   it("maps official turn.steer inside append_loop_event", () => {
     const steer = mapKimiCodeEvent({
       type: "context.append_loop_event",
@@ -378,6 +390,63 @@ describe("reduceKimiCodeEvents", () => {
     expect(tool.type).toBe("tool_call");
     expect(tool.status).toBe("success");
     expect(tool.result).toBe("content");
+  });
+
+  it("extracts structured diff from SDK tool result display blocks", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "tool.call.started", toolCallId: "call-1", name: "Edit", args: { path: "src/app.ts" } },
+      {
+        type: "tool.result",
+        toolCallId: "call-1",
+        name: "Edit",
+        output: "ok",
+        display: [
+          {
+            type: "diff",
+            path: "src/app.ts",
+            old_text: "const a = 1;\n",
+            new_text: "const a = 2;\n",
+          },
+        ],
+      },
+    ], testOptions());
+
+    expect(events).toHaveLength(3);
+    expect(events[0].type).toBe("tool_call");
+    expect(events[1].type).toBe("change_summary");
+    const change = events[1] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0].path).toBe("src/app.ts");
+    expect(events[2].type).toBe("diff");
+    const diff = events[2] as Extract<TimelineEvent, { type: "diff" }>;
+    expect(diff.filePath).toBe("src/app.ts");
+    expect(diff.oldText).toBe("const a = 1;\n");
+    expect(diff.newText).toBe("const a = 2;\n");
+  });
+
+  it("extracts structured diff from SDK tool result output blocks", () => {
+    const events = reduceKimiCodeEvents([], [
+      {
+        type: "tool.result",
+        toolCallId: "call-1",
+        name: "Edit",
+        output: [
+          {
+            type: "diff",
+            path: "src/app.ts",
+            oldText: "before",
+            newText: "after",
+          },
+        ],
+      },
+    ], testOptions());
+
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe("change_summary");
+    const diff = events[1] as Extract<TimelineEvent, { type: "diff" }>;
+    expect(diff.type).toBe("diff");
+    expect(diff.filePath).toBe("src/app.ts");
+    expect(diff.oldText).toBe("before");
+    expect(diff.newText).toBe("after");
   });
 
   it("merges shell tool progress into the running tool call", () => {

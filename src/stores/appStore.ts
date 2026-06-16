@@ -53,6 +53,7 @@ export interface AppStore extends AppState {
   setVoiceShortcut: (shortcut: string) => void;
   setNotificationMode: (mode: NotificationMode) => void;
   setClarificationToolMode: (mode: ClarificationToolMode) => void;
+  setFilePreviewExtensions: (extensions: string[]) => void;
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
   setDiffPanelOpen: (open: boolean) => void;
@@ -94,6 +95,7 @@ export const useAppStore = create<AppStore>((set) => ({
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
+  filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
   longTaskInspectorOpen: false,
   diffPanelOpen: false,
@@ -127,6 +129,12 @@ export const useAppStore = create<AppStore>((set) => ({
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
   setNotificationMode: (mode) => set({ notificationMode: mode }),
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
+  setFilePreviewExtensions: (extensions) => set({
+    filePreviewExtensions: Array.from(new Set(extensions
+      .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
+      .filter((item) => /^[a-z0-9]{1,12}$/.test(item))))
+      .slice(0, 20),
+  }),
   setLongTasksOpen: (open) => set({ longTasksOpen: open }),
   setLongTaskInspectorOpen: (open) => set({ longTaskInspectorOpen: open }),
   setDiffPanelOpen: (open) => set({ diffPanelOpen: open }),

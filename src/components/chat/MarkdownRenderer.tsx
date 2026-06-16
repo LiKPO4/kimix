@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { Check, Copy } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
@@ -11,6 +11,7 @@ import { restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/as
 interface MarkdownRendererProps {
   content: string;
   wrapLongLines?: boolean;
+  deferOffscreen?: boolean;
 }
 
 // Module-level ref-counted theme link
@@ -36,6 +37,12 @@ function nodeText(node: React.ReactNode): string {
     return nodeText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
   }
   return "";
+}
+
+function estimateMarkdownHeight(content: string) {
+  const lineCount = content.split(/\r?\n/).length;
+  const textRows = Math.ceil(content.length / 88);
+  return Math.max(72, Math.min(560, Math.max(lineCount, textRows) * 24));
 }
 
 function CodeBlock({ className, children, wrapLongLines }: { className?: string; children?: React.ReactNode; wrapLongLines: boolean }) {
@@ -99,7 +106,36 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   );
 }
 
-export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false }: MarkdownRendererProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldRender, setShouldRender] = useState(!deferOffscreen);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!deferOffscreen) {
+      setShouldRender(true);
+      return;
+    }
+    setShouldRender(false);
+  }, [content, deferOffscreen]);
+
+  useEffect(() => {
+    if (!deferOffscreen || shouldRender) return;
+    const node = containerRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, rootMargin: "1600px 0px", threshold: 0.01 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [deferOffscreen, shouldRender]);
+
   useEffect(() => {
     hljsLinkRefCount++;
     updateHljsTheme();
@@ -219,9 +255,33 @@ export function MarkdownRenderer({ content, wrapLongLines = false }: MarkdownRen
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(() => [rehypeHighlight], []);
   const normalizedContent = useMemo(() => restoreInlineMarkdownHeadings(restoreMarkdownTables(content)), [content]);
+  const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(normalizedContent);
+
+  useLayoutEffect(() => {
+    if (!shouldRender) return;
+    const node = containerRef.current;
+    if (!node) return;
+    const height = node.getBoundingClientRect().height;
+    if (height > 0) setMeasuredHeight(height);
+  }, [shouldRender, normalizedContent]);
+
+  if (!shouldRender) {
+    return (
+      <div
+        ref={containerRef}
+        className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
+        style={{ minHeight: placeholderHeight, contentVisibility: "auto", containIntrinsicSize: `${Math.round(placeholderHeight)}px` }}
+        aria-hidden="true"
+      />
+    );
+  }
 
   return (
-    <div className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}>
+    <div
+      ref={containerRef}
+      className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
+      style={{ contentVisibility: "auto", containIntrinsicSize: measuredHeight ? `${Math.round(measuredHeight)}px` : undefined }}
+    >
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
         {normalizedContent}
       </ReactMarkdown>

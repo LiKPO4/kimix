@@ -613,8 +613,8 @@ export function SessionToolbar({
               ? "border-accent-primary bg-accent-primary-light text-accent-primary"
               : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
           }`}
-          title="差异面板"
-          aria-label="差异面板"
+          title="文件预览"
+          aria-label="文件预览"
         >
           <FileText size={15} />
         </button>

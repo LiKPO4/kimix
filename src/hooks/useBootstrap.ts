@@ -19,6 +19,7 @@ interface BootstrapSetters {
   setVoiceShortcut: (v: string) => void;
   setNotificationMode: (v: NotificationMode) => void;
   setClarificationToolMode: (v: ClarificationToolMode) => void;
+  setFilePreviewExtensions: (v: string[]) => void;
   setRecentProjects: (projects: Project[]) => void;
 }
 
@@ -51,6 +52,7 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setVoiceShortcut(res.data.voiceShortcut);
           setters.setNotificationMode(res.data.notificationMode);
           setters.setClarificationToolMode(res.data.clarificationToolMode);
+          setters.setFilePreviewExtensions(res.data.filePreviewExtensions ?? ["md", "txt"]);
         }
       }).catch(() => {});
     }

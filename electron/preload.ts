@@ -88,6 +88,8 @@ import type {
   OpenFileRequest,
   OpenEditorRequest,
   OpenPathRequest,
+  ListPreviewFilesRequest,
+  ListPreviewFilesResponse,
   ReadTextFileRequest,
   ReadTextFileResponse,
   RevertFilesRequest,
@@ -200,6 +202,8 @@ const api = {
     ipcRenderer.invoke("project:openPath", req),
   readTextFile: (req: ReadTextFileRequest): Promise<ReadTextFileResponse> =>
     ipcRenderer.invoke("project:readTextFile", req),
+  listPreviewFiles: (req: ListPreviewFilesRequest): Promise<ListPreviewFilesResponse> =>
+    ipcRenderer.invoke("project:listPreviewFiles", req),
   openFile: (req: OpenFileRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openFile", req),
   revertFiles: (req: RevertFilesRequest): Promise<VoidResponse> =>

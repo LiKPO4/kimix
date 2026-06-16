@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, FileText, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -220,70 +220,79 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
     const change = changesByPath.get(key);
     const oldText = change?.oldText ?? diffEvent?.oldText;
     const newText = change?.newText ?? diffEvent?.newText;
-    const diffExpanded = Boolean(expandedDiffs[key]);
-    const diffLines = oldText !== undefined || newText !== undefined ? buildLineDiff(oldText, newText) : [];
+    const hasStructuredDiff = oldText !== undefined || newText !== undefined;
+    const diffExpanded = hasStructuredDiff && Boolean(expandedDiffs[key]);
+    const diffLines = hasStructuredDiff ? buildLineDiff(oldText, newText) : [];
     return (
       <div key={file.path} className="border-b border-border-subtle last:border-b-0">
-        <div className="flex min-h-11 items-center" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
+        <div
+          className="grid min-h-11 items-center"
+          style={{
+            gridTemplateColumns: "minmax(0, 1fr) auto auto 72px",
+            paddingLeft: 18,
+            paddingRight: 18,
+            columnGap: 10,
+          }}
+        >
           <button
             type="button"
-            onClick={() => setExpandedDiffs((state) => ({ ...state, [key]: !state[key] }))}
-            className="flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors hover:bg-surface-hover"
+            onClick={() => {
+              if (!hasStructuredDiff) return;
+              setExpandedDiffs((state) => ({ ...state, [key]: !state[key] }));
+            }}
+            className={`flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors ${hasStructuredDiff ? "hover:bg-surface-hover" : "cursor-default"}`}
             style={{ gap: 8, padding: "6px 8px" }}
-            title="展开查看 diff"
+            title={file.path}
           >
-            {diffExpanded ? <ChevronDown size={14} className="shrink-0 text-text-muted" /> : <ChevronRight size={14} className="shrink-0 text-text-muted" />}
+            {hasStructuredDiff
+              ? diffExpanded
+                ? <ChevronDown size={14} className="shrink-0 text-text-muted" />
+                : <ChevronRight size={14} className="shrink-0 text-text-muted" />
+              : <FileText size={14} className="shrink-0 text-text-muted" />}
             <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{file.path}</span>
           </button>
-          <span className="shrink-0 text-[13.5px] text-accent-success">+{file.additions ?? 0}</span>
-          <span className="shrink-0 text-[13.5px] text-accent-danger">-{file.deletions ?? 0}</span>
+          <div className="flex items-center justify-self-end text-[13.5px]" style={{ gap: 8, minWidth: 72 }}>
+            <span className="text-accent-success">+{file.additions ?? 0}</span>
+            <span className="text-accent-danger">-{file.deletions ?? 0}</span>
+          </div>
+          {!hasStructuredDiff && (
+            <span
+              className="justify-self-end rounded-md bg-surface-hover text-[12.5px] leading-5 text-text-muted"
+              style={{ paddingLeft: 8, paddingRight: 8 }}
+              title={`完整路径：${file.path}`}
+            >
+              摘要
+            </span>
+          )}
+          {hasStructuredDiff && <span />}
           <button
             type="button"
             onClick={() => void handleRevert([file])}
             disabled={!projectPath || reverting}
-            className="flex h-8 shrink-0 items-center rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
-            style={{ gap: 6, paddingLeft: 10, paddingRight: 10 }}
+            className="flex h-8 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
+            style={{ gap: 6, paddingLeft: 10, paddingRight: 10, minWidth: 68 }}
             title="撤销此文件"
           >
             <span>{reverting ? "撤销中" : "撤销"}</span>
             <RotateCcw size={13} />
           </button>
         </div>
-        {diffExpanded && (
+        {hasStructuredDiff && diffExpanded && (
           <div className="bg-surface-base" style={{ padding: "0 18px 14px 40px" }}>
-            {oldText !== undefined || newText !== undefined ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="overflow-hidden rounded-lg border border-accent-danger/30 bg-surface-elevated">
-                  <div style={{ padding: "10px 12px" }} className="border-b border-accent-danger/20 text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
-                  <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                    {renderDiffColumn(diffLines, "old")}
-                  </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="overflow-hidden rounded-lg border border-accent-danger/30 bg-surface-elevated">
+                <div style={{ padding: "10px 12px" }} className="border-b border-accent-danger/20 text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
+                <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                  {renderDiffColumn(diffLines, "old")}
                 </div>
-                <div className="overflow-hidden rounded-lg border border-accent-success/30 bg-surface-elevated">
-                  <div style={{ padding: "10px 12px" }} className="border-b border-accent-success/20 text-[12px] font-medium leading-5 text-accent-success">修改后</div>
-                  <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                    {renderDiffColumn(diffLines, "new")}
-                  </div>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-accent-success/30 bg-surface-elevated">
+                <div style={{ padding: "10px 12px" }} className="border-b border-accent-success/20 text-[12px] font-medium leading-5 text-accent-success">修改后</div>
+                <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                  {renderDiffColumn(diffLines, "new")}
                 </div>
-                {/* keep old pre blocks unavailable: colored line diff above is the source of truth */}
-                {false && (
-                  <div className="rounded-lg border border-accent-danger/20 bg-surface-elevated" style={{ padding: "12px 12px" }}>
-                  <div className="text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
-                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-text-secondary">{oldText || "空"}</pre>
-                  </div>
-                )}
-                {false && (
-                  <div className="rounded-lg border border-accent-success/20 bg-surface-elevated" style={{ padding: "12px 12px" }}>
-                  <div className="text-[12px] font-medium leading-5 text-accent-success">修改后</div>
-                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-text-secondary">{newText || "空"}</pre>
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "12px 13px" }}>
-                当前事件只提供了文件汇总，暂时没有结构化 diff；可以打开右侧差异面板查看已捕获的详细 diff。
-              </div>
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -292,33 +301,34 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
 
   return (
     <div className="w-full overflow-hidden rounded-[14px] border border-border-subtle bg-surface-elevated">
-      <div className="flex min-h-14 items-center border-b border-border-subtle" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
+      <div
+        className="grid items-center border-b border-border-subtle"
+        style={{ gridTemplateColumns: "minmax(0, 1fr) auto", minHeight: 44, paddingLeft: 18, paddingRight: 18, columnGap: 14 }}
+      >
         <button
           type="button"
           onClick={() => canExpand && setExpanded((value) => !value)}
           disabled={!canExpand}
-          className="flex h-8 min-w-0 items-center rounded-lg text-[15px] leading-6 text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-default disabled:hover:bg-transparent"
-          style={{ gap: 8, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
+          className="flex min-w-0 items-center rounded-lg text-[14px] leading-5 text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-default disabled:hover:bg-transparent"
+          style={{ gap: 8, height: 30, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
         >
           {canExpand && (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
-          <span className="truncate">{files.length} 个文件已更改</span>
+          <span className="truncate">文件变更</span>
+          <span className="shrink-0 text-[13.5px] text-text-muted">{files.length} 个</span>
           <span className="shrink-0 text-accent-success">+{additions}</span>
           <span className="shrink-0 text-accent-danger">-{deletions}</span>
         </button>
-        <div className="min-w-0 flex-1" />
-        {files.length > 1 && (
-          <button
-            type="button"
-            onClick={() => void handleRevert(files)}
-            disabled={!projectPath || reverting}
-            className="flex h-8 shrink-0 items-center rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
-            style={{ gap: 6, paddingLeft: 10, paddingRight: 10 }}
-            title="撤销全部文件"
-          >
-            <span>{reverting ? "撤销中" : "全部撤销"}</span>
-            <RotateCcw size={13} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => void handleRevert(files)}
+          disabled={!projectPath || reverting || files.length === 0}
+          className="flex shrink-0 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
+          style={{ gap: 6, height: 30, paddingLeft: 12, paddingRight: 12, minWidth: 92 }}
+          title="撤销全部文件"
+        >
+          <span>{reverting ? "撤销中" : "全部撤销"}</span>
+          <RotateCcw size={13} />
+        </button>
       </div>
       <div>
         {visibleFiles.map((file) => renderFileRow(file))}

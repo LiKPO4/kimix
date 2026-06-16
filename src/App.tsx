@@ -1005,6 +1005,7 @@ function App() {
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
+  const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
@@ -1061,6 +1062,7 @@ function App() {
     setVoiceShortcut,
     setNotificationMode,
     setClarificationToolMode,
+    setFilePreviewExtensions,
     setRecentProjects,
   });
 

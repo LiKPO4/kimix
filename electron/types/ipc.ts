@@ -1013,6 +1013,27 @@ export type ReadTextFileResponse = {
   error: string;
 };
 
+export type ListPreviewFilesRequest = {
+  projectPath: string;
+  extensions?: string[];
+}
+
+export type PreviewFileInfo = {
+  path: string;
+  name: string;
+  extension: string;
+  size: number;
+  updatedAt: number;
+}
+
+export type ListPreviewFilesResponse = {
+  success: true;
+  data: PreviewFileInfo[];
+} | {
+  success: false;
+  error: string;
+};
+
 export type OpenFileRequest = {
   projectPath: string;
   filePath: string;
@@ -1316,6 +1337,7 @@ export type AppSettings = {
   voiceShortcut: string;
   notificationMode: "never" | "unfocused" | "always";
   clarificationToolMode: "off" | "on" | "auto";
+  filePreviewExtensions: string[];
   expandToolCalls: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;

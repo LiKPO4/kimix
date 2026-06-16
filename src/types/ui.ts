@@ -63,6 +63,7 @@ export interface AppState {
   voiceShortcut: string;
   notificationMode: NotificationMode;
   clarificationToolMode: ClarificationToolMode;
+  filePreviewExtensions: string[];
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
   diffPanelOpen: boolean;

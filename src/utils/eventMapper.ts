@@ -152,6 +152,57 @@ function completedAssistantDuration(
     : undefined;
 }
 
+function countTextLines(value: string): number {
+  if (!value) return 0;
+  return value.split(/\r?\n/).filter((line) => line.length > 0).length;
+}
+
+function createChangeSummaryFromDiff(diff: Extract<TimelineEvent, { type: "diff" }>): TimelineEvent {
+  const additions = Math.max(0, countTextLines(diff.newText) - countTextLines(diff.oldText));
+  const deletions = Math.max(0, countTextLines(diff.oldText) - countTextLines(diff.newText));
+  return {
+    id: generateId(),
+    type: "change_summary",
+    timestamp: diff.timestamp,
+    files: [{ path: diff.filePath, additions, deletions }],
+    additions,
+    deletions,
+  };
+}
+
+function firstStringValue(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
+function createChangeSummaryFromToolCall(
+  call: Extract<TimelineEvent, { type: "tool_call" }>,
+  timestamp: number,
+): TimelineEvent | null {
+  const toolName = call.toolName.toLowerCase();
+  if (!["write", "edit", "multiedit"].some((name) => toolName.includes(name))) return null;
+
+  const args = call.arguments ?? {};
+  const path = firstStringValue(args, ["path", "filePath", "file_path"]);
+  if (!path) return null;
+  const newText = firstStringValue(args, ["content", "newString", "new_string", "replacement", "text"]);
+  const oldText = firstStringValue(args, ["oldString", "old_string", "oldText", "old_text"]) ?? "";
+  const additions = newText !== undefined ? Math.max(0, countTextLines(newText) - countTextLines(oldText)) : 0;
+  const deletions = oldText ? Math.max(0, countTextLines(oldText) - countTextLines(newText ?? "")) : 0;
+
+  return {
+    id: generateId(),
+    type: "change_summary",
+    timestamp,
+    files: [{ path, additions, deletions }],
+    additions,
+    deletions,
+  };
+}
+
 function appendAroundTrailingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
   const last = existing[existing.length - 1];
   if (last?.type === "steer_message" && last.status !== "sent") return [...existing.slice(0, -1), ...additions, last];
@@ -925,7 +976,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           newText: incoming.display.diff.newText,
         }
       : null;
+    const changeEvent = diffEvent ? createChangeSummaryFromDiff(diffEvent) : null;
     const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
+    const displayEvents = [...(changeEvent ? [changeEvent] : []), ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
     if (callIndex !== -1) {
       const call = result[callIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
       result[callIndex] = {
@@ -934,9 +987,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         result: incoming.result,
         durationMs: Math.max(0, incoming.timestamp - call.timestamp),
       };
-      return appendAroundTrailingSteer(result, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
+      const fallbackChangeEvent = displayEvents.length === 0 ? createChangeSummaryFromToolCall(call, incoming.timestamp) : null;
+      return appendAroundTrailingSteer(result, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
     }
-    if (diffEvent || todoEvent) return appendAroundTrailingSteer(existing, [...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])]);
+    if (displayEvents.length > 0) return appendAroundTrailingSteer(existing, displayEvents);
   }
 
   if (incoming.type === "subagent") {
