@@ -14,7 +14,7 @@ type KimiAuthStatus = {
 
 type McpServerInfo = {
   name: string;
-  transport: "http" | "stdio";
+  transport: "http" | "sse" | "stdio";
   url?: string;
   command?: string;
   args?: string[];
@@ -39,7 +39,7 @@ type KeyValueItem = {
 
 type AddFormState = {
   name: string;
-  transport: "http" | "stdio";
+  transport: "http" | "sse" | "stdio";
   url: string;
   command: string;
   args: string[];
@@ -86,7 +86,7 @@ function normalizeKeyValueItems(items: KeyValueItem[], separator: "=" | ":") {
 }
 
 function summarizeServer(server: McpServerInfo) {
-  if (server.transport === "http") {
+  if (server.transport === "http" || server.transport === "sse") {
     return server.url || "未配置 URL";
   }
   const args = server.args && server.args.length > 0 ? ` ${server.args.join(" ")}` : "";
@@ -228,7 +228,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
       const res = await window.api.addMcpServer({
         name: form.name.trim(),
         transport: form.transport,
-        url: form.transport === "http" ? form.url.trim() : undefined,
+        url: form.transport === "http" || form.transport === "sse" ? form.url.trim() : undefined,
         command: form.transport === "stdio" ? form.command.trim() : undefined,
         args: form.transport === "stdio" ? normalizeArgs(form.args) : undefined,
         env: normalizeKeyValueItems(form.envItems, "="),
@@ -407,15 +407,16 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                     <div className="text-[13px] text-[var(--kimix-panel-text-secondary)]">传输方式</div>
                     <select
                       value={form.transport}
-                      onChange={(event) => setForm((current) => ({ ...current, transport: event.target.value as "http" | "stdio" }))}
+                      onChange={(event) => setForm((current) => ({ ...current, transport: event.target.value as "http" | "sse" | "stdio" }))}
                       className="mt-2 h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
                       style={{ paddingLeft: 12, paddingRight: 18 }}
                     >
                       <option value="http">HTTP</option>
+                      <option value="sse">SSE</option>
                       <option value="stdio">stdio</option>
                     </select>
                   </label>
-                  {form.transport === "http" ? (
+                  {form.transport === "http" || form.transport === "sse" ? (
                     <label className="min-w-0">
                       <div className="text-[13px] text-[var(--kimix-panel-text-secondary)]">URL</div>
                       <input
@@ -500,7 +501,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                     onChange={(envItems) => setForm((current) => ({ ...current, envItems }))}
                     separator="="
                   />
-                  {form.transport === "http" && (
+                  {(form.transport === "http" || form.transport === "sse") && (
                     <KeyValueListEditor
                       title="请求头"
                       placeholderKey="Header"
@@ -592,7 +593,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
               )}
               {servers.length === 0 ? (
                 <div className="kimix-soft-card rounded-xl text-[14px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "18px 18px 16px", gridColumn: "1 / -1" }}>
-                  当前还没有 MCP 服务。可以先添加一个 HTTP 或 stdio 服务，再做测试和授权。
+                  当前还没有 MCP 服务。可以先添加一个 HTTP、SSE 或 stdio 服务，再做测试和授权。
                 </div>
               ) : (
                 servers.map((server) => (

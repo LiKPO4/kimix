@@ -524,7 +524,7 @@ export type KimiLogoutResponse = {
 
 export type McpServerInfo = {
   name: string;
-  transport: "http" | "stdio";
+  transport: "http" | "sse" | "stdio";
   url?: string;
   command?: string;
   args?: string[];
@@ -556,7 +556,7 @@ export type ListMcpServersResponse = {
 
 export type AddMcpServerRequest = {
   name: string;
-  transport: "http" | "stdio";
+  transport: "http" | "sse" | "stdio";
   url?: string;
   command?: string;
   args?: string[];
@@ -1445,7 +1445,7 @@ export type KimiCodeSessionStatus = {
 
 export type KimiCodeMcpServerInfo = {
   name: string;
-  transport: "stdio" | "http";
+  transport: "stdio" | "http" | "sse";
   status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";
   toolCount: number;
   error?: string;

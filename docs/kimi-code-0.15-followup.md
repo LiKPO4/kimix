@@ -15,6 +15,10 @@
 - Updated `vendor/kimi-code-sdk/README.md` provenance to the 0.15.0 tag.
 - Updated the local lightweight SDK probe to use the current `getExperimentalFeatures()` API with a legacy fallback.
 
+## Completed In Kimix v2.9.110
+
+- Added Kimix MCP configuration support for the new official `sse` transport.
+
 ## Upstream Notes
 
 - 0.15.0 adds an all-sessions picker in the official TUI.
@@ -24,10 +28,9 @@
 
 ## Kimix Impact
 
-- No Kimix renderer or IPC API change was required in this pass.
 - `packages/node-sdk` remains version `0.9.3`, and the public SDK surface used by Kimix did not show a breaking API change during this diff.
 - The official all-sessions picker is TUI-only for now; Kimix already owns its session list and migration UX, so no UI was added.
-- SSE MCP support is inherited through the refreshed SDK/runtime path; no extra Kimix MCP schema change was needed in this pass.
+- SSE MCP support required a Kimix renderer, IPC, and main-process validation update because the local MCP panel previously only allowed `http` and `stdio`.
 
 ## Verification
 

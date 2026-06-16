@@ -153,7 +153,7 @@ export type KimiCodeSessionUsage = Record<string, unknown>;
 
 export type KimiCodeMcpServerInfo = {
   name: string;
-  transport: "stdio" | "http";
+  transport: "stdio" | "http" | "sse";
   status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";
   toolCount: number;
   error?: string;

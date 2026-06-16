@@ -429,7 +429,7 @@ type McpServerRecord = {
   env?: Record<string, string>;
   headers?: Record<string, string>;
   url?: string;
-  transport?: "http" | "stdio";
+  transport?: "http" | "sse" | "stdio";
   auth?: "oauth" | string;
   enabled?: boolean;
 };
@@ -636,7 +636,7 @@ function parseCodexTomlMcpServers(filePath: string): Record<string, McpServerRec
       server.transport = "http";
     } else if (key === "transport" && /^".*"$/.test(valueRaw)) {
       const transport = valueRaw.slice(1, -1);
-      if (transport === "http" || transport === "stdio") server.transport = transport;
+      if (transport === "http" || transport === "sse" || transport === "stdio") server.transport = transport;
     } else if (key === "args" && /^\[.*\]$/.test(valueRaw)) {
       server.args = Array.from(valueRaw.matchAll(/"([^"]*)"/g)).map((match) => match[1]);
     }
@@ -1660,7 +1660,7 @@ function readMcpServers() {
   const entries = parsed && parsed.mcpServers && typeof parsed.mcpServers === "object" ? parsed.mcpServers : {};
   const servers = Object.entries(entries).map(([name, value]) => ({
     name,
-    transport: value.transport === "http" || value.url ? "http" as const : "stdio" as const,
+    transport: value.transport === "sse" ? "sse" as const : value.transport === "http" || value.url ? "http" as const : "stdio" as const,
     url: value.url,
     command: value.command,
     args: Array.isArray(value.args) ? value.args : [],
@@ -1747,7 +1747,7 @@ function normalizeMcpServerRecord(value: unknown): McpServerRecord | null {
   const headers = record.headers && typeof record.headers === "object" && !Array.isArray(record.headers)
     ? Object.fromEntries(Object.entries(record.headers as Record<string, unknown>).map(([key, item]) => [key, String(item)]))
     : undefined;
-  const transport = record.transport === "http" || record.transport === "stdio" ? record.transport : undefined;
+  const transport = record.transport === "http" || record.transport === "sse" || record.transport === "stdio" ? record.transport : undefined;
   return {
     command: typeof record.command === "string" ? record.command : undefined,
     args: toStringArray(record.args),
@@ -1763,7 +1763,7 @@ function normalizeMcpServerRecord(value: unknown): McpServerRecord | null {
 function readPluginMcpServers() {
   const servers: {
     name: string;
-    transport: "http" | "stdio";
+    transport: "http" | "sse" | "stdio";
     url?: string;
     command?: string;
     args?: string[];
@@ -1791,7 +1791,7 @@ function readPluginMcpServers() {
         if (!server) continue;
         servers.push({
           name,
-          transport: server.transport === "http" || server.url ? "http" : "stdio",
+          transport: server.transport === "sse" ? "sse" : server.transport === "http" || server.url ? "http" : "stdio",
           url: server.url,
           command: server.command,
           args: server.args ?? [],
@@ -1891,7 +1891,7 @@ function importPluginMcpServerToConfig(request: unknown) {
   fs.mkdirSync(path.dirname(paths.mcpConfig), { recursive: true });
   backupFileIfExists(paths.mcpConfig);
   mcpServers[imported.name] = {
-    transport: server.transport === "http" || server.url ? "http" : "stdio",
+    transport: server.transport === "sse" ? "sse" : server.transport === "http" || server.url ? "http" : "stdio",
     url: server.url,
     command: server.command,
     args: server.args ?? [],
@@ -5067,7 +5067,7 @@ ipcMain.handle("kimi:addMcpServer", async (_, request: unknown) => {
   try {
     const parsed = z.object({
       name: z.string().trim().min(1),
-      transport: z.enum(["http", "stdio"]),
+      transport: z.enum(["http", "sse", "stdio"]),
       url: z.string().trim().optional(),
       command: z.string().trim().optional(),
       args: z.array(z.string().trim()).optional(),
@@ -5084,8 +5084,8 @@ ipcMain.handle("kimi:addMcpServer", async (_, request: unknown) => {
     for (const headerValue of parsed.headers ?? []) {
       if (headerValue) args.push("--header", headerValue);
     }
-    if (parsed.transport === "http") {
-      if (!parsed.url) throw new Error("HTTP MCP 需要填写 URL");
+    if (parsed.transport === "http" || parsed.transport === "sse") {
+      if (!parsed.url) throw new Error(`${parsed.transport.toUpperCase()} MCP 需要填写 URL`);
       args.push(parsed.url);
     } else {
       if (!parsed.command) throw new Error("stdio MCP 需要填写命令");
