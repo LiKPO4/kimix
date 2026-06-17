@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, ChevronUp, FileText, RotateCcw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -140,7 +140,7 @@ function renderDiffColumn(lines: DiffLine[], side: "old" | "new") {
   });
 }
 
-export function ChangeCard({ changes, event }: ChangeCardProps) {
+export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const project = useAppStore((s) => s.currentProject);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -362,4 +362,4 @@ export function ChangeCard({ changes, event }: ChangeCardProps) {
       )}
     </div>
   );
-}
+});

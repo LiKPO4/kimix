@@ -1,5 +1,5 @@
 import { AlertCircle, ClipboardCopy, LogIn, RefreshCw, RotateCcw, Settings, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 
@@ -53,7 +53,7 @@ function classifyError(message: string): { kind: ErrorRecoveryKind; title: strin
   };
 }
 
-export function ErrorCard({ event, onRetry }: ErrorCardProps) {
+export const ErrorCard = memo(function ErrorCard({ event, onRetry }: ErrorCardProps) {
   const [dismissed, setDismissed] = useState(false);
   const [loginState, setLoginState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [loginMessage, setLoginMessage] = useState("");
@@ -220,4 +220,4 @@ export function ErrorCard({ event, onRetry }: ErrorCardProps) {
       </div>
     </div>
   );
-}
+});

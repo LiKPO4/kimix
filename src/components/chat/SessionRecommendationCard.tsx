@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { ArrowRight, FileText, MessageSquarePlus } from "lucide-react";
 import { useCreateProjectSession } from "@/hooks/useCreateProjectSession";
 import { useAppStore } from "@/stores/appStore";
@@ -21,7 +21,7 @@ function useAnimatedDots(active: boolean) {
   return ".".repeat(count);
 }
 
-export function SessionRecommendationCard({ event, sourceSessionId, projectPath }: { event: Extract<TimelineEvent, { type: "session_recommendation" }>; sourceSessionId: string; projectPath: string }) {
+export const SessionRecommendationCard = memo(function SessionRecommendationCard({ event, sourceSessionId, projectPath }: { event: Extract<TimelineEvent, { type: "session_recommendation" }>; sourceSessionId: string; projectPath: string }) {
   const { createSession, creating } = useCreateProjectSession();
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
   const isHandoffRunning = event.handoffStatus === "running" && handoffSessionId === sourceSessionId;
@@ -93,4 +93,4 @@ export function SessionRecommendationCard({ event, sourceSessionId, projectPath 
       </div>
     </div>
   );
-}
+});

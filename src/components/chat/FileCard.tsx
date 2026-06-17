@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ChevronDown, FileText } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -8,7 +9,7 @@ interface FileCardProps {
   fileType?: string;
 }
 
-export function FileCard({ event, filePath, fileType }: FileCardProps) {
+export const FileCard = memo(function FileCard({ event, filePath, fileType }: FileCardProps) {
   const project = useAppStore((s) => s.currentProject);
   const path = event?.filePath ?? filePath ?? "";
   const type = event?.fileType ?? fileType ?? "文档 · MD";
@@ -42,4 +43,4 @@ export function FileCard({ event, filePath, fileType }: FileCardProps) {
       </div>
     </div>
   );
-}
+});

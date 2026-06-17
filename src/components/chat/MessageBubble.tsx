@@ -958,7 +958,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   );
 }
 
-export function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, changeSummary, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, changeSummary, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
@@ -966,4 +966,4 @@ export function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools
     return <SteerMessageBubble event={event} />;
   }
   return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
-}
+});

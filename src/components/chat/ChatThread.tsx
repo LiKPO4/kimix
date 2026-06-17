@@ -959,6 +959,7 @@ export function ChatThread() {
     pendingOlderItemsScrollAnchorRef.current = null;
     resizeScrollAnchorRef.current = null;
     lastScrollSizeRef.current = null;
+    cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
     if (session?.id) {
@@ -970,7 +971,10 @@ export function ChatThread() {
         window.requestAnimationFrame(keepSessionAtBottom);
       });
     }
-    return () => cancelSessionAutoBottom();
+    return () => {
+      cancelSessionAutoBottom();
+      cancelPendingAnchorCapture();
+    };
   }, [session?.id]);
 
   useLayoutEffect(() => {
@@ -1090,10 +1094,32 @@ export function ChatThread() {
       throw new Error(res.error);
     }
   };
+  // Anchor capture (getBoundingClientRect + querySelectorAll) is expensive and
+  // triggers forced layout. It used to run on every scroll frame. We now coalesce
+  // repeated scroll events into a single rAF so the capture happens at most once
+  // per frame, instead of N times inside the scroll handler itself.
+  const anchorCaptureFrameRef = useRef(0);
+  const scheduleAnchorCapture = () => {
+    if (anchorCaptureFrameRef.current) return;
+    anchorCaptureFrameRef.current = window.requestAnimationFrame(() => {
+      anchorCaptureFrameRef.current = 0;
+      captureResizeScrollAnchor();
+    });
+  };
+  const cancelPendingAnchorCapture = () => {
+    if (anchorCaptureFrameRef.current) {
+      window.cancelAnimationFrame(anchorCaptureFrameRef.current);
+      anchorCaptureFrameRef.current = 0;
+    }
+  };
+
   const handleScroll = () => {
     const node = scrollRef.current;
     if (!node) return;
-    captureResizeScrollAnchor();
+    // Coalesce the expensive anchor capture into one rAF per frame instead of
+    // running getBoundingClientRect/querySelectorAll synchronously on every
+    // scroll event (forced reflow per frame).
+    scheduleAnchorCapture();
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronRight, CircleHelp, SendHorizontal } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -15,7 +15,7 @@ function optionKey(question: string, label: string) {
   return `${question}::${label}`;
 }
 
-export function QuestionCard({ event }: QuestionCardProps) {
+export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -263,4 +263,4 @@ export function QuestionCard({ event }: QuestionCardProps) {
       </div>
     </div>
   );
-}
+});

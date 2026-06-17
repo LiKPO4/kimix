@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, Copy, Expand, FileText, GitCompare, ShieldCheck, Wrench, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
@@ -124,7 +124,7 @@ function buildUnifiedPreview(oldText = "", newText = "") {
   return rows;
 }
 
-export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
+export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -424,4 +424,4 @@ export function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
       )}
     </div>
   );
-}
+});

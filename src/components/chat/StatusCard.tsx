@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 import { compactModelText } from "@/utils/modelDisplay";
@@ -37,7 +38,7 @@ function formatTimestamp(timestamp: number): string {
   ].join("-");
 }
 
-export function StatusCard({ event, inline = false }: StatusCardProps) {
+export const StatusCard = memo(function StatusCard({ event, inline = false }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
   if (isEmptyStatusUpdate(event)) return null;
   const toneClass = event.tone === "info" || event.source === "slash"
@@ -75,4 +76,4 @@ export function StatusCard({ event, inline = false }: StatusCardProps) {
       {pill}
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ChevronDown, ChevronRight, Terminal, FileText, FolderSearch, Wrench } from "lucide-react";
 import type { TimelineEvent } from "@/types/ui";
 import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
@@ -56,7 +56,7 @@ function inferToolMeta(event: Extract<TimelineEvent, { type: "tool_call" | "tool
   return { label: "执行工具", detail: preview, icon: FolderSearch };
 }
 
-export function ToolCard({ event }: ToolCardProps) {
+export const ToolCard = memo(function ToolCard({ event }: ToolCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isToolCall = event.type === "tool_call";
   const status = isToolCall ? event.status : "success";
@@ -103,4 +103,4 @@ export function ToolCard({ event }: ToolCardProps) {
       </div>
     </div>
   );
-}
+});
