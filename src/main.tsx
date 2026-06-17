@@ -422,7 +422,7 @@ function installBrowserPreviewApi() {
         message: unsupported("读取 Kimi 用量"),
       },
     }),
-    startKimiVis: (): Promise<VoidResponse> => fail("启动 Kimi Agent Tracing Visualizer"),
+    startKimiVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),
     createKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("创建 Kimi Code SDK 会话"),
     resumeKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("恢复 Kimi Code SDK 会话"),
     forkKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("派生 Kimi Code SDK 会话"),

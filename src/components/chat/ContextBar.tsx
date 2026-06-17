@@ -6,6 +6,7 @@ import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc
 import { compactModelDisplayName } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
+import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -108,7 +109,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const firstPendingApproval = activeSession?.events.find((event) => event.type === "approval_request" && event.status === "pending");
   const firstPendingQuestion = activeSession?.events.find((event) => event.type === "question_request" && event.status === "pending");
   const latestError = [...(activeSession?.events ?? [])].reverse().find((event) => event.type === "error");
-  const isSessionRunning = Boolean(activeSession && runningSessionId === activeSession.id);
+  const isSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const kimiStatus = pendingApprovalCount > 0
     ? { label: "待审批", tone: "warning" as const, icon: PauseCircle, detail: `${pendingApprovalCount} 个权限请求等待处理` }
     : pendingQuestionCount > 0

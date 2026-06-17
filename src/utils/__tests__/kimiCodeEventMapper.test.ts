@@ -375,8 +375,9 @@ describe("reduceKimiCodeEvents", () => {
     const before = events[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
     const after = events[3] as Extract<TimelineEvent, { type: "assistant_message" }>;
     expect(before.content).toBe("前半段旧轮继续");
+    expect(before.isComplete).toBe(true);
     expect(after.content).toBe("处理引导");
-    expect(after.isComplete).toBe(true);
+    expect(after.isComplete).toBe(false);
   });
 
   it("absorbs tool_result into the linked tool_call through existing merge rules", () => {

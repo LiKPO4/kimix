@@ -14,6 +14,8 @@ type SearchMatch = {
   kind: string;
   text: string;
   timestamp: number;
+  eventId?: string;
+  searchText?: string;
 };
 
 type SearchScope = "project" | "all";
@@ -46,8 +48,21 @@ function compact(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function quotePowerShellLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
 function formatResumeCommand(session: KimiCodeSessionSummary): string {
-  return `cd /d "${session.workDir}" && kimi resume ${session.id}`;
+  return `Set-Location -LiteralPath ${quotePowerShellLiteral(session.workDir)}; kimi -S ${session.id}`;
+}
+
+function loadWithTimeout(session: Session, timeoutMs = 8000) {
+  return Promise.race([
+    window.api.loadSession({ workDir: session.projectPath, sessionId: getRuntimeSessionId(session) ?? session.id }),
+    new Promise<Awaited<ReturnType<typeof window.api.loadSession>>>((resolve) => {
+      window.setTimeout(() => resolve({ success: false, error: "加载超时" }), timeoutMs);
+    }),
+  ]);
 }
 
 export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -60,7 +75,9 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("project");
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyLoadMessage, setHistoryLoadMessage] = useState("");
   const [searchOnlySessions, setSearchOnlySessions] = useState<Session[]>([]);
+  const attemptedHistoryLoadIdsRef = useRef<Set<string>>(new Set());
   const [loadingGlobalSessions, setLoadingGlobalSessions] = useState(false);
   const [globalSessions, setGlobalSessions] = useState<KimiCodeSessionSummary[]>([]);
   const [copyMessage, setCopyMessage] = useState("");
@@ -70,11 +87,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     setQuery("");
     setScope("project");
     setCopyMessage("");
+    setHistoryLoadMessage("");
+    attemptedHistoryLoadIdsRef.current.clear();
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
   useEffect(() => {
     setSearchOnlySessions([]);
+    attemptedHistoryLoadIdsRef.current.clear();
   }, [currentProject?.path]);
 
   useEffect(() => {
@@ -138,15 +158,29 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     const unloaded = searchableSessions
       .filter((session) => session.projectPath === currentProject.path && session.events.length === 0)
       .filter((session) => !isHiddenInternalSession(session))
+      .filter((session) => !attemptedHistoryLoadIdsRef.current.has(`${session.projectPath}::${session.id}`))
       .slice(0, 12);
-    if (unloaded.length === 0) return;
+    if (unloaded.length === 0) {
+      if (loadingHistory) setLoadingHistory(false);
+      return;
+    }
+    for (const session of unloaded) {
+      attemptedHistoryLoadIdsRef.current.add(`${session.projectPath}::${session.id}`);
+    }
     let cancelled = false;
+    let loadedCount = 0;
+    let failedCount = 0;
     setLoadingHistory(true);
+    setHistoryLoadMessage("");
     Promise.all(unloaded.map(async (session) => {
-      const loaded = await window.api.loadSession({ workDir: session.projectPath, sessionId: getRuntimeSessionId(session) ?? session.id });
-      if (!loaded.success || cancelled) return;
+      const loaded = await loadWithTimeout(session);
+      if (!loaded.success || cancelled) {
+        failedCount += 1;
+        return;
+      }
       const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
       if (isHiddenInternalSession({ ...session, events })) return;
+      loadedCount += 1;
       const isStoreSession = useSessionStore.getState().sessions.some((item) => item.id === session.id);
       if (isStoreSession) {
         updateSession(session.id, (current) => ({
@@ -163,7 +197,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           : item
       )));
     })).finally(() => {
-      if (!cancelled) setLoadingHistory(false);
+      if (!cancelled) {
+        setLoadingHistory(false);
+        const message = failedCount > 0
+          ? `已补充 ${loadedCount} 条历史，${failedCount} 条加载失败`
+          : `已补充 ${loadedCount} 条历史`;
+        setHistoryLoadMessage(message);
+        window.setTimeout(() => setHistoryLoadMessage(""), 2200);
+      }
     });
     return () => {
       cancelled = true;
@@ -177,11 +218,18 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [searchableSessions, currentProject]);
 
-  const openSession = (session: Session) => {
+  const openSession = (session: Session, targetEventId?: string, searchText?: string) => {
     const current = useSessionStore.getState().sessions.find((item) => item.id === session.id);
     if (!current) addSession(session);
     setCurrentSession(current ?? session);
     onClose();
+    if (targetEventId) {
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("kimix:focus-timeline-event", {
+          detail: { sessionId: session.id, eventId: targetEventId, searchText },
+        }));
+      }, 160);
+    }
   };
 
   const matches = useMemo(() => {
@@ -199,7 +247,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
         for (const item of eventText(event)) {
           const text = compact(item.text);
           if (text && text.toLowerCase().includes(q)) {
-            all.push({ session, kind: item.kind, text, timestamp: event.timestamp });
+            all.push({ session, kind: item.kind, text, timestamp: event.timestamp, eventId: event.id, searchText: query.trim() });
           }
         }
       }
@@ -245,8 +293,8 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") onClose();
-              if (event.key === "Enter" && matches[0]) {
-                openSession(matches[0].session);
+              if (event.key === "Enter" && scope === "project" && matches[0]) {
+                openSession(matches[0].session, matches[0].eventId, matches[0].searchText);
               }
             }}
             className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none placeholder:text-text-muted"
@@ -279,7 +327,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           <div className="px-2 pb-2 text-[13px] text-text-muted">
             {scope === "all"
               ? loadingGlobalSessions ? "正在读取官方全会话..." : query.trim() ? `${globalMatches.length} 条匹配` : "官方全会话"
-              : loadingHistory ? "正在补充加载最近历史..." : query.trim() ? `${matches.length} 条匹配` : "最近对话"}
+              : loadingHistory ? "正在补充加载最近历史..." : historyLoadMessage || (query.trim() ? `${matches.length} 条匹配` : "最近对话")}
           </div>
           {scope === "all" ? (
             globalMatches.length > 0 ? globalMatches.map((match) => (
@@ -311,7 +359,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             <button
               key={`${match.session.id}-${match.kind}-${match.timestamp}-${index}`}
               onClick={() => {
-                openSession(match.session);
+                openSession(match.session, match.eventId, match.searchText);
               }}
               className="flex min-h-12 w-full items-center rounded-xl text-left transition-colors hover:bg-surface-hover"
               style={{ gap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}

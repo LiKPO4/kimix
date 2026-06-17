@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileText,
   FolderOpen,
-  GitFork,
   GitBranch,
   History,
   Laptop,
@@ -271,7 +270,7 @@ export function SessionToolbar({
     { type: "separator" },
     { label: "打开侧边聊天", icon: MessageSquarePlus, disabled: true, action: () => undefined },
     { label: "派生到本地", icon: Laptop, disabled: !canForkKimiSession, action: forkCurrentSession },
-    { label: "派生到新工作树", icon: GitFork, disabled: true, action: () => undefined },
+    { label: "会话可视化", icon: History, disabled: !liveCurrentSession || liveCurrentSession.engine !== "kimi-code" || !getRuntimeSessionId(liveCurrentSession), action: openKimiVis },
     { label: "添加自动化...", icon: History, disabled: true, action: () => undefined },
     { type: "separator" },
     { label: "在新窗口中打开", icon: ExternalLink, disabled: true, action: () => undefined },
@@ -317,6 +316,24 @@ export function SessionToolbar({
       showToast(`启动失败：${res.error}`);
     }
   };
+
+  async function openKimiVis() {
+    if (!liveCurrentSession || liveCurrentSession.engine !== "kimi-code") {
+      showToast("当前不是 Kimi Code 会话");
+      return;
+    }
+    const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+    if (!runtimeSessionId) {
+      showToast("当前会话没有可视化的官方 session");
+      return;
+    }
+    const res = await window.api.startKimiVis({ sessionId: runtimeSessionId });
+    if (!res.success) {
+      showToast(`打开可视化失败：${res.error}`);
+    } else {
+      showToast("已打开 Kimi vis");
+    }
+  }
 
   const undoKimiHistory = async () => {
     if (!liveCurrentSession || liveCurrentSession.engine !== "kimi-code") {

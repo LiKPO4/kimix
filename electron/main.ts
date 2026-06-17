@@ -6084,8 +6084,11 @@ ipcMain.handle("kimi:getUsage", async () => {
   }
 });
 
-ipcMain.handle("kimi:startVis", async () => {
+ipcMain.handle("kimi:startVis", async (_, request: unknown) => {
   try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" && req.sessionId.trim() ? req.sessionId.trim() : undefined;
+    const noOpen = req.noOpen === true;
     let kimiPath = await resolveKimiCommand();
     if (!kimiPath) {
       const hinted = commandHintPaths("kimi").find((candidate) => fs.existsSync(candidate));
@@ -6117,7 +6120,8 @@ ipcMain.handle("kimi:startVis", async () => {
       return { success: false, error: `找到 kimi 路径 ${kimiPath}，但无法运行。请检查安装是否完整。` };
     }
 
-    const child = spawn(kimiPath, ["vis", "--no-open"], {
+    const args = ["vis", ...(sessionId ? [sessionId] : []), ...(noOpen ? ["--no-open"] : [])];
+    const child = spawn(kimiPath, args, {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -6140,7 +6144,7 @@ ipcMain.handle("kimi:startVis", async () => {
     if (exited) {
       return {
         success: false,
-        error: "当前 Kimi Code 版本不再支持旧的本地使用详情页入口。",
+        error: "启动 kimi vis 失败。请确认 Kimi Code CLI 已更新到 v0.16.0 或更高版本。",
       };
     }
 
@@ -6150,7 +6154,7 @@ ipcMain.handle("kimi:startVis", async () => {
     } catch {
       return {
         success: false,
-        error: "当前 Kimi Code 版本不再支持旧的本地使用详情页入口。",
+        error: "kimi vis 进程已退出。请确认 Kimi Code CLI 已更新到 v0.16.0 或更高版本。",
       };
     }
 

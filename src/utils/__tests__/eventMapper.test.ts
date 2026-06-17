@@ -323,6 +323,40 @@ describe("mergeEvents", () => {
     expect(tool.rawArguments).toBe('{"path":"a"}{"path":"b"}');
   });
 
+  it("does not duplicate identical full raw arguments for the same running tool", () => {
+    const rawArguments = JSON.stringify({
+      path: "D:/WORKS/Android Project/Project04/AGENTS.md",
+      content: "# AGENTS.md\n\n".repeat(100),
+    });
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "tool_call",
+        timestamp: 1,
+        toolCallId: "tc-1",
+        toolName: "Write",
+        status: "running",
+        arguments: { path: "D:/WORKS/Android Project/Project04/AGENTS.md", content: "# AGENTS.md\n\n" },
+        rawArguments,
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_call",
+      timestamp: 2,
+      toolCallId: "tc-1",
+      toolName: "Write",
+      status: "running",
+      arguments: { path: "D:/WORKS/Android Project/Project04/AGENTS.md", content: "# AGENTS.md\n\n" },
+      rawArguments,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const tool = result[0] as Extract<TimelineEvent, { type: "tool_call" }>;
+    expect(tool.rawArguments).toBe(rawArguments);
+    expect(tool.rawArguments).not.toBe(`${rawArguments}${rawArguments}`);
+  });
+
   it("deduplicates user messages", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Hi", isThinking: false, isComplete: true },
@@ -343,7 +377,7 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
   });
 
-  it("closes the previous assistant timer when a steer is officially confirmed", () => {
+  it("keeps the previous assistant running when a steer is officially confirmed", () => {
     const existing: TimelineEvent[] = [
       { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: true, isComplete: false },
       { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "Fix it", status: "accepted" },
@@ -353,10 +387,58 @@ describe("mergeEvents", () => {
     const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
     const steer = result[1] as Extract<TimelineEvent, { type: "steer_message" }>;
 
-    expect(assistant.isComplete).toBe(true);
-    expect(assistant.isThinking).toBe(false);
-    expect(assistant.durationMs).toBe(3_000);
+    expect(assistant.isComplete).toBe(false);
+    expect(assistant.isThinking).toBe(true);
+    expect(assistant.durationMs).toBeUndefined();
     expect(steer.status).toBe("sent");
+  });
+
+  it("closes the previous assistant timer when the post-steer assistant starts", () => {
+    const existing: TimelineEvent[] = [
+      { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: true, isComplete: false },
+      { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "Fix it", status: "accepted" },
+    ];
+    const confirmed: TimelineEvent = { id: "steer-2", type: "steer_message", timestamp: 4_000, content: "Fix it", status: "sent" };
+    const status: TimelineEvent = { id: "status-1", type: "status_update", timestamp: 4_500, message: "下一步准备中" };
+    const nextAssistant: TimelineEvent = { id: "assistant-2", type: "assistant_message", timestamp: 5_000, content: "After", isThinking: false, isComplete: false };
+
+    const afterConfirm = mergeEvents(existing, confirmed);
+    const afterStatus = mergeEvents(afterConfirm, status);
+    const result = mergeEvents(afterStatus, nextAssistant);
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    const after = result[3] as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect((afterStatus[0] as Extract<TimelineEvent, { type: "assistant_message" }>).isComplete).toBe(false);
+    expect(before.isComplete).toBe(true);
+    expect(before.isThinking).toBe(false);
+    expect(before.durationMs).toBe(4_000);
+    expect(result[1].type).toBe("steer_message");
+    expect(result[2].type).toBe("status_update");
+    expect(after.content).toBe("After");
+    expect(after.isComplete).toBe(false);
+  });
+
+  it("does not complete the post-steer assistant on an empty completion marker", () => {
+    const existing: TimelineEvent[] = [
+      { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: false, isComplete: true },
+      { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "Fix it", status: "sent" },
+      { id: "assistant-2", type: "assistant_message", timestamp: 3_000, content: "After", isThinking: false, isComplete: false },
+    ];
+    const incoming: TimelineEvent = {
+      id: "turn-end",
+      type: "assistant_message",
+      timestamp: 4_000,
+      content: "",
+      isThinking: false,
+      isComplete: true,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const after = result[2] as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect(after.content).toBe("After");
+    expect(after.isComplete).toBe(false);
+    expect(after.durationMs).toBeUndefined();
   });
 
   it("keeps local steer images when official confirmation has no images", () => {
@@ -434,9 +516,269 @@ describe("mergeEvents", () => {
     const incoming: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: "After", isThinking: false, isComplete: false };
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(3);
-    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("Before");
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(before.content).toBe("Before");
+    expect(before.isComplete).toBe(true);
     expect(result[1].type).toBe("steer_message");
     expect((result[2] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("After");
+  });
+
+  it("keeps a post-steer file path tail with the previous assistant body", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "assistant_message",
+        timestamp: 1,
+        content: "APK 还在 `tv_browser/build/app/outputs/flutter-apk/app-release.ap",
+        isThinking: false,
+        isComplete: false,
+      },
+      { id: "2", type: "steer_message", timestamp: 2, content: "目录下有无云端密钥", status: "sent" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "k。\n\n是否需要我现在按 AGENTS.md 的发布流程推到服务器？",
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    const after = result[2] as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect(before.content).toBe("APK 还在 `tv_browser/build/app/outputs/flutter-apk/app-release.apk。");
+    expect(before.isComplete).toBe(true);
+    expect(result[1].type).toBe("steer_message");
+    expect(after.content).toBe("是否需要我现在按 AGENTS.md 的发布流程推到服务器？");
+  });
+
+  it("keeps a post-steer markdown table continuation with the previous assistant body", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "assistant_message",
+        timestamp: 1,
+        content: "查到了。\n\n关键发现\n\n项目目录下有一个旧 APK:\n\n| APK | 版本 | 日期 | min",
+        isThinking: false,
+        isComplete: false,
+      },
+      { id: "2", type: "steer_message", timestamp: 2, content: "顺便把该更新的 agent 文档也更新更新", status: "sent" },
+    ];
+    const tableContinuation: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "Sdk | compileSdk |\n| --- | --- | --- | --- | --- |\n| server/downloads/tv-browser-release.apk | 2.0.41+2000042 | 今天 | 24 | 36 |",
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, tableContinuation);
+    expect(result).toHaveLength(2);
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(before.content).toContain("| APK | 版本 | 日期 | minSdk | compileSdk |");
+    expect(before.content).toContain("| server/downloads/tv-browser-release.apk | 2.0.41+2000042 | 今天 | 24 | 36 |");
+    expect(before.isComplete).toBe(false);
+    expect(result[1].type).toBe("steer_message");
+
+    const nextAssistant: TimelineEvent = {
+      id: "4",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "我会继续修正文档里的错误。",
+      isThinking: false,
+      isComplete: false,
+    };
+    const next = mergeEvents(result, nextAssistant);
+    expect(next).toHaveLength(3);
+    expect((next[0] as Extract<TimelineEvent, { type: "assistant_message" }>).isComplete).toBe(true);
+    expect((next[2] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("我会继续修正文档里的错误。");
+  });
+
+  it("keeps a post-steer fenced markdown tail with the previous assistant body", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "assistant_message",
+        timestamp: 1,
+        content: [
+          "好的，下面是当前 `AGENTS.md` 的全文：",
+          "",
+          "```markdown",
+          "# AGENTS.md",
+          "",
+          "## 环境与兼容性",
+          "- `minSdkVersion` 由当前 Flutter SDK 默认决定",
+          "- 老 TV 盒子如需兼容，需在 `android/app/build.gradle` 显式设置 `minSdkVersion 21",
+        ].join("\n"),
+        isThinking: false,
+        isComplete: false,
+      },
+      { id: "2", type: "steer_message", timestamp: 2, content: "让你列出不是列出文件", status: "sent" },
+    ];
+    const tail: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      content: [
+        "`，并自行测试插件兼容性",
+        "- `compileSdk` 只影响编译，不影响用户设备的最低安装版本",
+        "",
+        "## 常用命令",
+        "- `flutter analyze` - 本地静态检查",
+        "```",
+        "",
+        "你看看有没有需要再调整的地方。",
+      ].join("\n"),
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, tail);
+    expect(result).toHaveLength(2);
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(before.content).toContain("`minSdkVersion 21`，并自行测试插件兼容性");
+    expect(before.content).toContain("## 常用命令");
+    expect(before.content).toContain("你看看有没有需要再调整的地方。");
+    expect(result[1].type).toBe("steer_message");
+
+    const nextAssistant: TimelineEvent = {
+      id: "4",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "抱歉，理解错了。下面是修改建议条目。",
+      isThinking: false,
+      isComplete: false,
+    };
+    const next = mergeEvents(result, nextAssistant);
+    expect(next).toHaveLength(3);
+    expect((next[0] as Extract<TimelineEvent, { type: "assistant_message" }>).isComplete).toBe(true);
+    expect((next[2] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("抱歉，理解错了。下面是修改建议条目。");
+  });
+
+  it("dedupes a post-steer assistant snapshot that repeats the previous fenced prefix", () => {
+    const prefix = [
+      "好的，下面是当前 `AGENTS.md` 的全文：",
+      "",
+      "```markdown",
+      "# AGENTS.md",
+      "",
+      "## 技术栈",
+      "- Flutter 3.44.0",
+    ].join("\n");
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "assistant_message",
+        timestamp: 1,
+        content: prefix,
+        isThinking: false,
+        isComplete: false,
+      },
+      { id: "2", type: "steer_message", timestamp: 2, content: "让你列出不是列出文件", status: "sent" },
+    ];
+    const snapshot: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      content: `${prefix}\n- Riverpod / WebView\n\`\`\``,
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, snapshot);
+    expect(result).toHaveLength(2);
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(before.content).toBe(`${prefix}\n- Riverpod / WebView\n\`\`\``);
+    expect(before.content.match(/好的，下面是当前/g)).toHaveLength(1);
+  });
+
+  it("keeps a post-steer markdown table cell continuation with the previous assistant body", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "assistant_message",
+        timestamp: 1,
+        content: [
+          "确实，这两轮提交信息太笼统了，后面查历史时会看不懂。",
+          "",
+          "那两轮实际做了什么",
+          "",
+          "| 原 Commit | 原 Message | 实际内容 |",
+          "| --- | --- | --- |",
+          "| 9848517 | \"修复已知问题\" | 新增 browser-selection.js、重构 browser_page.dart、新增 player_error_card.dart、将 formatClock / formatDuration |",
+        ].join("\n"),
+        isThinking: false,
+        isComplete: false,
+      },
+      { id: "2", type: "steer_message", timestamp: 2, content: "agent 文档里要把这个约束好", status: "sent" },
+    ];
+    const continuation: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      content: [
+        "抽到 core/formatters.dart、首页搜索支持缓存未命中时联网查找 |",
+        "| 28711dd | \"修复已知问题\" | MainActivity.kt 中 BACK 键不再拦截，放行给 Flutter PopScope 处理返回逻辑 |",
+        "",
+        "修正方案",
+        "",
+        "我倾向于只重写 commit message，不拆分历史。",
+      ].join("\n"),
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, continuation);
+    expect(result).toHaveLength(3);
+    const before = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    const after = result[2] as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect(before.content).toContain("formatClock / formatDuration 抽到 core/formatters.dart");
+    expect(before.content).toContain("| 28711dd | \"修复已知问题\" | MainActivity.kt 中 BACK 键不再拦截");
+    expect(before.content).not.toContain("formatDuration |抽到");
+    expect(before.isComplete).toBe(true);
+    expect(result[1].type).toBe("steer_message");
+    expect(after.content).toBe("修正方案\n\n我倾向于只重写 commit message，不拆分历史。");
+  });
+
+  it("does not merge a new post-steer markdown table into the previous assistant body", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "assistant_message",
+        timestamp: 1,
+        content: [
+          "已有记录如下：",
+          "",
+          "| 文件 | 状态 |",
+          "| --- | --- |",
+          "| AGENTS.md | 已更新 |",
+        ].join("\n"),
+        isThinking: false,
+        isComplete: false,
+      },
+      { id: "2", type: "steer_message", timestamp: 2, content: "再列一下后续事项", status: "sent" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      content: [
+        "| 后续事项 | 状态 |",
+        "| --- | --- |",
+        "| 补 release notes | 待办 |",
+      ].join("\n"),
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(3);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toContain("| AGENTS.md | 已更新 |");
+    expect((result[2] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toContain("| 后续事项 | 状态 |");
   });
 
   it("keeps assistant chunks before an accepted steer until official confirmation arrives", () => {

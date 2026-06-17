@@ -326,8 +326,8 @@ const api = {
     ipcRenderer.invoke("project:exportMarkdown", req),
   getKimiUsage: (): Promise<KimiUsageResponse> =>
     ipcRenderer.invoke("kimi:getUsage"),
-  startKimiVis: (): Promise<VoidResponse> =>
-    ipcRenderer.invoke("kimi:startVis"),
+  startKimiVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi:startVis", req),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {

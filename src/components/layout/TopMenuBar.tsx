@@ -243,7 +243,7 @@ export function TopMenuBar({
         </nav>
       </div>
 
-      <div className="flex items-center" style={{ WebkitAppRegion: "no-drag" as const, gap: 8 }}>
+      <div className="flex items-center" style={{ WebkitAppRegion: "no-drag" as const, gap: 8, paddingRight: 8 }}>
         <button
           onClick={() => window.api.minimizeWindow()}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover"

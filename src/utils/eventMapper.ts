@@ -59,6 +59,15 @@ function mergeToolResult(current: unknown, incoming: unknown): unknown {
   return incoming;
 }
 
+function mergeRawArguments(current = "", incoming = ""): string | undefined {
+  if (!current && !incoming) return undefined;
+  if (!current) return incoming;
+  if (!incoming) return current;
+  if (current === incoming || current.endsWith(incoming)) return current;
+  if (incoming.startsWith(current)) return incoming;
+  return `${current}${incoming}`;
+}
+
 function normalizeNativeToolProgress(payload: Record<string, unknown>, source: Record<string, unknown>): string {
   const update = isRecord(payload.update) ? payload.update : isRecord(source.update) ? source.update : {};
   const text = isString(update.text) ? update.text : "";
@@ -105,8 +114,137 @@ function isMatchingSteerContent(existing: string, incoming: string): boolean {
     incomingContent.startsWith(existingContent);
 }
 
-function appendAfterConfirmedSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
-  return [...existing, ...additions];
+function splitAtFirstParagraphBreak(content: string): { continuation: string; remaining: string } {
+  const breakMatch = /\r?\n\s*\r?\n/.exec(content);
+  if (!breakMatch || breakMatch.index < 0) return { continuation: content, remaining: "" };
+  return {
+    continuation: content.slice(0, breakMatch.index),
+    remaining: content.slice(breakMatch.index + breakMatch[0].length).trimStart(),
+  };
+}
+
+function lastNonEmptyLine(content: string): string {
+  const lines = content.split(/\r?\n/);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].trim()) return lines[index];
+  }
+  return "";
+}
+
+type PostSteerAssistantContinuation = {
+  continuation: string;
+  remaining: string;
+  trimTrailingTablePipe?: boolean;
+};
+
+function pipeCount(line: string): number {
+  return line.match(/\|/g)?.length ?? 0;
+}
+
+function hasRecentMarkdownTableContext(content: string): boolean {
+  const recentLines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-8);
+  return recentLines.some((line) => pipeCount(line) >= 2);
+}
+
+function stripTrailingTablePipe(content: string): string {
+  return content.replace(/\s*\|\s*$/, "");
+}
+
+function appendWithOverlap(existingContent: string, incomingContent: string): string {
+  if (!existingContent || !incomingContent) return existingContent + incomingContent;
+  if (incomingContent.startsWith(existingContent)) return incomingContent;
+  if (existingContent.endsWith(incomingContent)) return existingContent;
+
+  const maxOverlap = Math.min(existingContent.length, incomingContent.length, 8192);
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    if (existingContent.endsWith(incomingContent.slice(0, size))) {
+      return existingContent + incomingContent.slice(size);
+    }
+  }
+  return existingContent + incomingContent;
+}
+
+function appendPostSteerContinuation(previousContent: string, continuation: string, trimTrailingTablePipe = false): string {
+  const base = trimTrailingTablePipe ? stripTrailingTablePipe(previousContent) : previousContent;
+  if (!base || !continuation) return base + continuation;
+  const overlapped = appendWithOverlap(base, continuation);
+  if (overlapped !== base + continuation) return overlapped;
+  if (/\s$/.test(base) || /^\s/.test(continuation) || /^[。.!?！？,，;；:：]/.test(continuation)) {
+    return base + continuation;
+  }
+  if (/[A-Za-z0-9_.)\]`]/.test(base.at(-1) ?? "") && /^[\u4e00-\u9fff]/u.test(continuation)) {
+    return `${base} ${continuation}`;
+  }
+  return base + continuation;
+}
+
+function isInsideUnclosedFencedCodeBlock(content: string): boolean {
+  const fences = content.match(/(?:^|\r?\n)[ \t]*```/g)?.length ?? 0;
+  return fences % 2 === 1;
+}
+
+function isLikelyInlineCodeContinuation(previousContent: string, incomingContent: string): boolean {
+  if (!isInsideUnclosedInlineCode(previousContent)) return false;
+  return incomingContent.trimStart().startsWith("`");
+}
+
+function isLikelyMarkdownTableContinuation(previousContent: string, incomingContent: string): boolean {
+  const previousLine = lastNonEmptyLine(previousContent).trimEnd();
+  const incomingFirstLine = incomingContent.trimStart().split(/\r?\n/)[0]?.trimStart() ?? "";
+  if (!previousLine || !incomingFirstLine) return false;
+  if (incomingFirstLine.startsWith("|")) return false;
+  if (!incomingFirstLine.includes("|")) return false;
+
+  const previousPipeCount = pipeCount(previousLine);
+  const incomingPipeCount = pipeCount(incomingFirstLine);
+  if (incomingPipeCount === 0) return false;
+  if (previousPipeCount === 0) return hasRecentMarkdownTableContext(previousContent);
+
+  // The assistant was interrupted in the middle of a Markdown table row, e.g.
+  // "| APK | 版本 | 日期 | min" + "Sdk | compileSdk |".
+  return !previousLine.endsWith("|") || hasRecentMarkdownTableContext(previousContent);
+}
+
+function splitPostSteerAssistantContinuation(previousContent: string, incomingContent: string): PostSteerAssistantContinuation | null {
+  const previous = previousContent.trimEnd();
+  if (!previous || !incomingContent) return null;
+
+  if (isInsideUnclosedFencedCodeBlock(previousContent)) {
+    return { continuation: incomingContent, remaining: "" };
+  }
+
+  if (isLikelyInlineCodeContinuation(previousContent, incomingContent)) {
+    return splitAtFirstParagraphBreak(incomingContent);
+  }
+
+  const punctuation = incomingContent.match(/^([。.!?！？,，;；]+)/);
+  if (punctuation && !/[。.!?！？,，;；]$/.test(previous)) {
+    const continuation = punctuation[1];
+    const remaining = incomingContent.slice(continuation.length).trimStart();
+    return { continuation, remaining };
+  }
+
+  if (isLikelyMarkdownTableContinuation(previousContent, incomingContent)) {
+    const split = splitAtFirstParagraphBreak(incomingContent);
+    return {
+      ...split,
+      trimTrailingTablePipe: /\|\s*$/.test(previousContent),
+    };
+  }
+
+  const previousToken = previous.match(/[A-Za-z0-9_./\\-]{2,}$/)?.[0] ?? "";
+  const previousTokenContext = previous.slice(Math.max(0, previous.length - 64));
+  if (!previousToken || !/[./\\_-]/.test(previousTokenContext)) return null;
+
+  const continuationMatch = incomingContent.match(/^([A-Za-z0-9_./\\-]{1,12})([。.!?！？,，;；:]?)(?=\s|$|[\u4e00-\u9fff])/);
+  if (!continuationMatch) return null;
+  const continuation = continuationMatch[0];
+  const remaining = incomingContent.slice(continuation.length).trimStart();
+  return { continuation, remaining };
 }
 
 function closeOpenAssistantBeforeIndex(events: TimelineEvent[], index: number, settledAt: number): TimelineEvent[] {
@@ -123,6 +261,32 @@ function closeOpenAssistantBeforeIndex(events: TimelineEvent[], index: number, s
     durationMs: completedAssistantDuration(events, assistantIndex, assistant, settledAt),
   };
   return result;
+}
+
+function hasConfirmedSteerAfterOpenAssistant(events: TimelineEvent[]): boolean {
+  const assistantIndex = events.findLastIndex((event) => event.type === "assistant_message" && !event.isComplete);
+  if (assistantIndex === -1) return false;
+  return events.slice(assistantIndex + 1).some((event) => (
+    event.type === "steer_message" && event.status === "sent"
+  ));
+}
+
+function hasConfirmedSteerBeforeIndex(events: TimelineEvent[], index: number): boolean {
+  return events.slice(0, index).some((event) => (
+    event.type === "steer_message" && event.status === "sent"
+  ));
+}
+
+function appendAfterConfirmedSteer(
+  existing: TimelineEvent[],
+  additions: TimelineEvent[],
+  { closeOpenAssistant = true }: { closeOpenAssistant?: boolean } = {},
+): TimelineEvent[] {
+  if (!closeOpenAssistant || additions.length === 0 || !hasConfirmedSteerAfterOpenAssistant(existing)) {
+    return [...existing, ...additions];
+  }
+  const settledAt = additions[0].timestamp;
+  return [...closeOpenAssistantBeforeIndex(existing, existing.length, settledAt), ...additions];
 }
 
 function findTurnAnchorTimestamp(events: TimelineEvent[], beforeIndex: number): number | undefined {
@@ -207,6 +371,7 @@ function appendAroundTrailingSteer(existing: TimelineEvent[], additions: Timelin
   const last = existing[existing.length - 1];
   if (last?.type === "steer_message" && last.status !== "sent") return [...existing.slice(0, -1), ...additions, last];
   if (last?.type === "steer_message" && last.status === "sent") return appendAfterConfirmedSteer(existing, additions);
+  if (hasConfirmedSteerAfterOpenAssistant(existing)) return appendAfterConfirmedSteer(existing, additions);
   return [...existing, ...additions];
 }
 
@@ -833,6 +998,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       if (latestOpenIndex === -1) {
         return base;
       }
+      if (hasConfirmedSteerBeforeIndex(existing, latestOpenIndex)) {
+        return base;
+      }
       return base.flatMap((event, index) => {
         if (event.type !== "assistant_message" || event.isComplete) return event;
         const hasContent = event.content.trim().length > 0;
@@ -864,6 +1032,17 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         event.type === "steer_message" && event.status === "sent"
       ));
       if (hasConfirmedSteerBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
+        const split = splitPostSteerAssistantContinuation(last.content, incoming.content);
+        if (split) {
+          const withContinuation = [...existing];
+          withContinuation[lastIndex] = {
+            ...last,
+            content: appendPostSteerContinuation(last.content, split.continuation, split.trimTrailingTablePipe),
+          };
+          const hasRemainingAssistant = Boolean(split.remaining.trim() || incoming.thinking?.trim());
+          if (!hasRemainingAssistant) return withContinuation;
+          return appendAfterConfirmedSteer(withContinuation, [{ ...incoming, content: split.remaining }]);
+        }
         return appendAfterConfirmedSteer(existing, [incoming]);
       }
       const shouldBreakParagraph = eventsAfterOpenAssistant.some(isAssistantProcessBoundary);
@@ -898,13 +1077,13 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
     if (targetIndex !== -1) {
       const last = existing[targetIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
-      const rawArguments = (last.rawArguments ?? "") + (incoming.rawArguments ?? "");
+      const rawArguments = mergeRawArguments(last.rawArguments, incoming.rawArguments);
       const fallbackArguments = { ...last.arguments, ...incoming.arguments };
       const updated: typeof last = {
         ...last,
         toolName: incoming.toolName && incoming.toolName !== "unknown" ? incoming.toolName : last.toolName,
-        arguments: mergeArguments(rawArguments, fallbackArguments),
-        rawArguments: rawArguments || last.rawArguments || incoming.rawArguments,
+        arguments: mergeArguments(rawArguments ?? "", fallbackArguments),
+        rawArguments,
         result: mergeToolResult(last.result, incoming.result),
       };
       const result = [...existing];
@@ -922,9 +1101,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       (e) => e.type === "steer_message" && isMatchingSteerContent(e.content, incoming.content)
     );
     if (duplicateIndex !== -1) {
-      const result = incoming.status === "sent"
-        ? closeOpenAssistantBeforeIndex(existing, duplicateIndex, incoming.timestamp)
-        : [...existing];
+      const result = [...existing];
       result[duplicateIndex] = {
         ...result[duplicateIndex],
         status: incoming.status,
@@ -935,10 +1112,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       } as TimelineEvent;
       return result;
     }
-    const withClosedAssistant = incoming.status === "sent"
-      ? closeOpenAssistantBeforeIndex(existing, existing.length, incoming.timestamp)
-      : existing;
-    return [...withClosedAssistant, incoming];
+    return [...existing, incoming];
   }
 
   if (incoming.type === "question_request") {
@@ -1015,7 +1189,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   if (incoming.type === "status_update") {
     const last = existing[existing.length - 1];
     if (last?.type === "steer_message" && last.status === "sent") {
-      return appendAfterConfirmedSteer(existing, [incoming]);
+      return appendAfterConfirmedSteer(existing, [incoming], { closeOpenAssistant: false });
     }
     if (last?.type === "status_update") {
       return [...existing.slice(0, -1), incoming];

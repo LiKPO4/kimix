@@ -6,7 +6,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
-import { restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
+import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 
 interface MarkdownRendererProps {
   content: string;
@@ -62,7 +62,10 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   };
 
   return (
-    <div className="relative my-3 overflow-hidden rounded-lg border border-border-subtle bg-surface-base">
+    <div
+      className="kimix-markdown-code-block relative my-3 overflow-hidden rounded-lg border border-border-subtle bg-surface-base"
+      style={{ boxSizing: "border-box" }}
+    >
       <div className="flex items-center justify-between border-b border-border-subtle bg-surface-hover" style={{ gap: 12, paddingLeft: 18, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}>
         <span className="min-w-0 truncate font-mono text-xs text-text-muted">
           {className?.replace("language-", "") || "code"}
@@ -82,10 +85,15 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
       <pre
         className={`${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"} bg-surface-base`}
         style={{
+          margin: 0,
+          display: "block",
+          width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
           paddingLeft: 18,
           paddingRight: 18,
-          paddingTop: 14,
-          paddingBottom: 14,
+          paddingTop: 16,
+          paddingBottom: 16,
           whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
           overflowWrap: wrapLongLines ? "anywhere" : undefined,
           wordBreak: wrapLongLines ? "break-word" : undefined,
@@ -94,6 +102,13 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
         <code
           className={`${className ?? ""} block font-mono text-sm leading-6`}
           style={{
+            display: "block",
+            margin: 0,
+            padding: 0,
+            width: "max-content",
+            minWidth: "100%",
+            background: "transparent",
+            lineHeight: "24px",
             whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
             overflowWrap: wrapLongLines ? "anywhere" : undefined,
             wordBreak: wrapLongLines ? "break-word" : undefined,
@@ -254,7 +269,10 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(() => [rehypeHighlight], []);
-  const normalizedContent = useMemo(() => restoreInlineMarkdownHeadings(restoreMarkdownTables(content)), [content]);
+  const normalizedContent = useMemo(
+    () => restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content)))),
+    [content],
+  );
   const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(normalizedContent);
 
   useLayoutEffect(() => {

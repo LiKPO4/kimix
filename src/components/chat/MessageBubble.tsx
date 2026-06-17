@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useMemo, type ReactNode } from "react";
+import { memo, useState, useRef, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -7,9 +7,12 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { restoreAssistantProgressParagraphs } from "@/utils/assistantParagraphs";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
+import { ChangeCard } from "./ChangeCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { reliableAssistantDurationMs } from "@/utils/duration";
+import { hasActiveTimelineWorkEvents } from "@/utils/sessionActivity";
+import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -21,6 +24,7 @@ interface MessageBubbleProps {
   leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[];
   attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[];
   changedFiles?: string[];
+  changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>;
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
 }
@@ -58,13 +62,47 @@ function formatDuration(ms: number): string {
   return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`;
 }
 
+const elapsedClockListeners = new Set<() => void>();
+let elapsedClockNow = Date.now();
+let elapsedClockTimer: ReturnType<typeof window.setTimeout> | undefined;
+
+function scheduleElapsedClockTick() {
+  if (elapsedClockTimer !== undefined || elapsedClockListeners.size === 0) return;
+  const now = Date.now();
+  const delay = Math.max(120, 1000 - (now % 1000) + 20);
+  elapsedClockTimer = window.setTimeout(() => {
+    elapsedClockTimer = undefined;
+    elapsedClockNow = Date.now();
+    elapsedClockListeners.forEach((listener) => listener());
+    scheduleElapsedClockTick();
+  }, delay);
+}
+
+function subscribeElapsedClock(listener: () => void) {
+  elapsedClockListeners.add(listener);
+  elapsedClockNow = Date.now();
+  listener();
+  scheduleElapsedClockTick();
+  return () => {
+    elapsedClockListeners.delete(listener);
+    if (elapsedClockListeners.size === 0 && elapsedClockTimer !== undefined) {
+      window.clearTimeout(elapsedClockTimer);
+      elapsedClockTimer = undefined;
+    }
+  };
+}
+
+function getElapsedClockSnapshot() {
+  return elapsedClockNow;
+}
+
 function useElapsed(start: number, active: boolean) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [active]);
+  const sharedNow = useSyncExternalStore(
+    active ? subscribeElapsedClock : () => () => {},
+    getElapsedClockSnapshot,
+    getElapsedClockSnapshot,
+  );
+  const now = active ? sharedNow : Date.now();
   return Math.max(0, now - start);
 }
 
@@ -267,10 +305,10 @@ function SteerMessageBubble({ event, embedded = false }: { event: Extract<Timeli
   const label = event.status === "sending"
     ? "引导发送中"
     : event.status === "accepted"
-      ? "等待官方确认"
+      ? "等待官方写入"
     : event.status === "failed"
       ? "引导失败"
-      : "官方已记录引导";
+      : "引导已写入当前轮";
   const handleSaveDrawingBoard = (image: { name: string; dataUrl: string }) => {
     window.dispatchEvent(new CustomEvent("kimix:addDrawingImage", { detail: image }));
     setPreviewImage(null);
@@ -346,22 +384,7 @@ function normalizeThinkingMarkdown(text: string) {
 }
 
 function describeTool(tool: ToolEvent) {
-  const command = typeof tool.arguments.command === "string"
-    ? tool.arguments.command
-    : typeof tool.arguments.cmd === "string"
-      ? tool.arguments.cmd
-      : tool.rawArguments || tool.toolName || "工具调用";
-  return command.replace(/\s+/g, " ").slice(0, 220);
-}
-
-function stringifyToolDetail(value: unknown) {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
+  return toolArgumentPreview(tool) || tool.toolName || "工具调用";
 }
 
 function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
@@ -470,8 +493,8 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
 
 function ToolProcessItem({ tool }: { tool: ToolEvent }) {
   const [expanded, setExpanded] = useState(false);
-  const argumentText = tool.rawArguments?.trim() || stringifyToolDetail(tool.arguments);
-  const resultText = stringifyToolDetail(tool.result).trim();
+  const argumentText = formatToolArgumentsForDisplay(tool).trim();
+  const resultText = formatToolResultForDisplay(tool.result);
   const detailText = [
     `工具：${tool.toolName || "未知工具"}`,
     argumentText ? `参数：\n${argumentText}` : "",
@@ -674,7 +697,13 @@ function AssistantProcessLabel({
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(event.timestamp, isActiveAssistant);
   const completedDuration = reliableAssistantDurationMs(event.durationMs);
-  const durationLabel = event.isComplete
+  const hasVisibleOutput = Boolean(
+    event.content.trim() ||
+    event.thinking?.trim() ||
+    event.thinkingParts?.some((part) => part.text.trim().length > 0)
+  );
+  const isSettledForDisplay = event.isComplete || (!isActiveAssistant && hasVisibleOutput);
+  const durationLabel = isSettledForDisplay
     ? (completedDuration !== undefined ? formatDuration(completedDuration) : "")
     : isActiveAssistant && elapsed >= 1000
       ? formatDuration(elapsed)
@@ -686,7 +715,7 @@ function AssistantProcessLabel({
       ? <>{activeProcessLabel}{roleLabel ? `（${roleLabel}）` : ""} {durationLabel}</>
       : <>{activeProcessLabel}{roleLabel ? `（${roleLabel}）` : ""}</>;
   }
-  if (event.isComplete) {
+  if (isSettledForDisplay) {
     return durationLabel
       ? <>{completeLabel}已处理{roleLabel ? `（${roleLabel}）` : ""} {durationLabel}</>
       : <>{completeLabel}{roleLabel ? `（${roleLabel}）` : ""}</>;
@@ -846,7 +875,7 @@ function AssistantMessageFooter({
   );
 }
 
-function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -860,12 +889,13 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
     runningSessionId === sessionId ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
-  const hasActiveProcess = leadingTools.some((tool) => tool.status === "running") ||
+  const hasRunningProcess = leadingTools.some((tool) => tool.status === "running") ||
     leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
-  const isActiveAssistant = Boolean(isRunningThisSession && (!event.isComplete || hasActiveProcess));
-  const activeProcessLabel = leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
+  const hasRecentTimelineActivity = hasActiveTimelineWorkEvents([event, ...leadingTools, ...leadingSubagents]);
+  const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity) && (!event.isComplete || hasRunningProcess));
+  const activeProcessLabel = isActiveAssistant && leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
     ? "子代理运行中"
-    : leadingTools.some((tool) => tool.status === "running")
+    : isActiveAssistant && leadingTools.some((tool) => tool.status === "running")
       ? "命令运行中"
       : undefined;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
@@ -891,7 +921,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
           </div>
         )}
 
-        {(hasContent || trailingStatuses.length > 0) && (
+        {(hasContent || changeSummary || trailingStatuses.length > 0) && (
           <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
             {hasContent && (
               <>
@@ -908,7 +938,9 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
               </>
             )}
 
-            {(hasContent || trailingStatuses.length > 0) && (
+            {changeSummary && <ChangeCard event={changeSummary} />}
+
+            {(hasContent || changeSummary || trailingStatuses.length > 0) && (
               <AssistantMessageFooter
                 statuses={trailingStatuses}
                 onCopy={() => void trigger(event.content)}
@@ -926,12 +958,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   );
 }
 
-export function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, changeSummary, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }

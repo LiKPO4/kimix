@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Terminal, FileText, FolderSearch, Wrench } from "lucide-react";
 import type { TimelineEvent } from "@/types/ui";
+import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 
 interface ToolCardProps {
   event: Extract<TimelineEvent, { type: "tool_call" | "tool_result" }>;
@@ -15,21 +16,11 @@ function formatDuration(ms?: number): string {
   return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
 }
 
-function stringifyValue(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
 function inferToolMeta(event: Extract<TimelineEvent, { type: "tool_call" | "tool_result" }>) {
   if (event.type === "tool_result") {
     return { label: "工具结果", detail: "", icon: Wrench };
   }
 
-  const argsText = event.rawArguments || stringifyValue(event.arguments);
   const command = typeof event.arguments.command === "string"
     ? event.arguments.command
     : typeof event.arguments.cmd === "string"
@@ -40,28 +31,29 @@ function inferToolMeta(event: Extract<TimelineEvent, { type: "tool_call" | "tool
     : typeof event.arguments.file_path === "string"
       ? event.arguments.file_path
       : "";
+  const preview = toolArgumentPreview(event);
 
-  if (command || /Get-ChildItem|Select-String|Measure-Object|npm|pnpm|git|cmd|powershell/i.test(argsText)) {
+  if (command || /Get-ChildItem|Select-String|Measure-Object|npm|pnpm|git|cmd|powershell/i.test(preview)) {
     return {
       label: command ? `运行 ${command}` : "运行命令",
-      detail: command || argsText.replace(/\s+/g, " ").slice(0, 120),
+      detail: command || preview,
       icon: Terminal,
     };
   }
 
-  if (path || /read|file|path|Get-Content/i.test(argsText)) {
+  if (path || /read|file|path|Get-Content/i.test(preview)) {
     return {
       label: path ? `读取 ${path}` : "读取文件",
-      detail: path || argsText.replace(/\s+/g, " ").slice(0, 120),
+      detail: path || preview,
       icon: FileText,
     };
   }
 
   if (event.toolName && event.toolName !== "unknown") {
-    return { label: event.toolName, detail: argsText.replace(/\s+/g, " ").slice(0, 120), icon: Wrench };
+    return { label: event.toolName, detail: preview, icon: Wrench };
   }
 
-  return { label: "执行工具", detail: argsText.replace(/\s+/g, " ").slice(0, 120), icon: FolderSearch };
+  return { label: "执行工具", detail: preview, icon: FolderSearch };
 }
 
 export function ToolCard({ event }: ToolCardProps) {
@@ -74,12 +66,12 @@ export function ToolCard({ event }: ToolCardProps) {
   const toolResult = isToolCall && "result" in event ? event.result : undefined;
   const details = isToolCall
     ? [
-        stringifyValue(event.arguments),
-        typeof toolResult === "string" && toolResult.trim()
-          ? `${status === "running" ? "实时输出" : "输出"}:\n${toolResult}`
+        formatToolArgumentsForDisplay(event),
+        formatToolResultForDisplay(toolResult)
+          ? `${status === "running" ? "实时输出" : "输出"}:\n${formatToolResultForDisplay(toolResult)}`
           : "",
       ].filter(Boolean).join("\n\n")
-    : stringifyValue(event.result);
+    : formatToolResultForDisplay(event.result);
 
   const statusText = status === "running" ? "正在运行" : status === "error" ? "失败" : "已运行";
   const dotClass = status === "running" ? "bg-accent-warning" : status === "error" ? "bg-accent-danger" : "bg-accent-success";

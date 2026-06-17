@@ -12,6 +12,7 @@ import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 
@@ -222,17 +223,6 @@ async function getDefaultKimiModel() {
 
 const iconButtonClass =
   "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35";
-
-function getLatestUserTurnState(events: TimelineEvent[]) {
-  const latestUserIndex = events.findLastIndex((event) => event.type === "user_message");
-  const turnEvents = latestUserIndex >= 0 ? events.slice(latestUserIndex + 1) : events;
-  const latestAssistant = [...turnEvents].reverse().find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
-    event.type === "assistant_message"
-  ));
-  const hasCompletedAssistant = Boolean(latestAssistant?.isComplete);
-  const hasUnfinishedAssistant = Boolean(latestAssistant && !latestAssistant.isComplete);
-  return { hasCompletedAssistant, hasUnfinishedAssistant };
-}
 
 type ImageAttachment = {
   id: string;
@@ -448,19 +438,14 @@ export function Composer() {
     ? allPendingMessages.filter((msg) => msg.sessionId === currentSession.id)
     : [];
   const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
-  const isCurrentSessionRunning = Boolean(activeSession && (
-    runningSessionId === activeSession.id ||
-    Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
-  ));
+  const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
-  const latestUserTurnState = getLatestUserTurnState(activeSession?.events ?? []);
-  const hasUnfinishedAssistant = latestUserTurnState.hasUnfinishedAssistant && !latestUserTurnState.hasCompletedAssistant;
-  const hasActiveAssistantTurn = isCurrentSessionRunning || hasUnfinishedAssistant;
+  const hasActiveAssistantTurn = isCurrentSessionRunning;
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
     isCurrentSessionRunning
   );
-  const shouldShowStopButton = isCurrentSessionRunning || hasUnfinishedAssistant;
+  const shouldShowStopButton = isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
   const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn;
 
@@ -1538,7 +1523,9 @@ export function Composer() {
       stateRunningSessionId === activeSession.id ||
       Boolean(activeRuntimeSessionId && stateRunningSessionId === activeRuntimeSessionId)
     ));
-    const sessionId = (hasUnfinishedAssistant || stateRunningMatchesActive) && activeSession ? activeSession.id : stateRunningSessionId ?? activeSession?.id;
+    const sessionId = (isSessionRuntimeRunning(activeSession, stateRunningSessionId) || stateRunningMatchesActive) && activeSession
+      ? activeSession.id
+      : stateRunningSessionId ?? activeSession?.id;
     if (!sessionId) return;
     if (stateRunningSessionId === sessionId || (activeRuntimeSessionId && stateRunningSessionId === activeRuntimeSessionId)) setRunningSessionId(null);
     updateSession(sessionId, (session) => ({

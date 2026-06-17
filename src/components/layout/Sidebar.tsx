@@ -9,6 +9,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -39,23 +40,10 @@ function isSameProjectPath(a: string | undefined, b: string | undefined) {
   return Boolean(left && right && left === right);
 }
 
-function hasActiveTimelineWork(session: Session) {
-  return session.events.some((event) => {
-    if (event.type === "assistant_message") return !event.isComplete;
-    if (event.type === "tool_call") return event.status === "running";
-    if (event.type === "steer_message") return event.status === "sending" || event.status === "accepted";
-    if (event.type === "subagent") return event.status === "queued" || event.status === "running" || event.status === "suspended";
-    return false;
-  });
-}
-
 function isSidebarSessionBusy(session: Session, runningSessionId: string | null) {
-  const runtimeSessionId = getRuntimeSessionId(session);
   return Boolean(
     session.isLoading ||
-    runningSessionId === session.id ||
-    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId) ||
-    hasActiveTimelineWork(session)
+    isSessionRuntimeRunning(session, runningSessionId)
   );
 }
 
@@ -509,7 +497,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
       </div>
 
-      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 8, paddingRight: 8, scrollbarGutter: "stable" }}>
+      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 8, paddingRight: 16, marginRight: -8, scrollbarGutter: "stable" }}>
         <div className="mb-2 flex items-center justify-between px-3">
           <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button
@@ -773,7 +761,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.9.111</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.9.139</span>
         </button>
       </div>
     </aside>

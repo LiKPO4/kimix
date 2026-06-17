@@ -20,10 +20,14 @@ import { reliableAssistantDurationMs } from "@/utils/duration";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
-  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
+  | { type: "event"; event: TimelineEvent; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
+
+function renderItemKey(item: RenderItem) {
+  return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
+}
 
 function useAnimatedDots(active: boolean) {
   const [count, setCount] = useState(0);
@@ -45,6 +49,8 @@ function useAnimatedDots(active: boolean) {
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
+const SESSION_OPEN_BOTTOM_SETTLE_MS = 1200;
+const SESSION_OPEN_BOTTOM_SETTLE_INTERVAL_MS = 120;
 
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   drafting: "需求澄清",
@@ -283,7 +289,7 @@ function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () 
   );
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, changedFiles, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
   switch (event.type) {
     case "user_message":
       return (
@@ -295,7 +301,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadin
     case "steer_message":
       return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />;
     case "assistant_message":
-      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -488,11 +494,13 @@ function buildRenderItems(
           leadingApprovals: assistantAttached ? [] : resolvedApprovals,
           attachedSteers: getAttachedSteers(),
           changedFiles: assistantAttached ? [] : Array.from(changedFiles),
+          changeSummary: assistantAttached ? undefined : mergedChangeSummary ?? undefined,
           trailingStatuses: assistantAttached ? [] : trailingStatusEvents,
           hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
         });
         assistantAttached = true;
         toolsAttached = true;
+        if (mergedChangeSummary) changeSummaryAttached = true;
         continue;
       }
       if (
@@ -510,9 +518,10 @@ function buildRenderItems(
         continue;
       }
       if (event.type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), trailingStatuses: trailingStatusEvents });
+        items.push({ type: "event", event, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), changeSummary: mergedChangeSummary ?? undefined, trailingStatuses: trailingStatusEvents });
         toolsAttached = true;
         assistantAttached = true;
+        if (mergedChangeSummary) changeSummaryAttached = true;
         continue;
       }
       if (!toolsAttached) {
@@ -679,6 +688,7 @@ export function ChatThread() {
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
   const session = useLiveSession(currentSession?.id);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const streamContentRef = useRef<HTMLDivElement>(null);
   const autoFollowRef = useRef(true);
   const userScrollRef = useRef(false);
   const ignoreScrollUntilRef = useRef(0);
@@ -686,8 +696,15 @@ export function ChatThread() {
   const isAutoFollowRef = useRef(true);
   const showScrollToBottomRef = useRef(false);
   const scrollToBottomButtonRef = useRef<HTMLButtonElement>(null);
+  const sessionAutoBottomUntilRef = useRef(0);
+  const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
+  const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
+  const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const [showOlderItems, setShowOlderItems] = useState(false);
+  const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
+  const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
     [session?.events]
@@ -727,12 +744,28 @@ export function ChatThread() {
     button.setAttribute("aria-hidden", value ? "false" : "true");
   };
 
+  const clearSessionAutoBottomTimer = () => {
+    if (sessionAutoBottomTimerRef.current === null) return;
+    window.clearTimeout(sessionAutoBottomTimerRef.current);
+    sessionAutoBottomTimerRef.current = null;
+  };
+
+  const cancelSessionAutoBottom = () => {
+    sessionAutoBottomUntilRef.current = 0;
+    clearSessionAutoBottomTimer();
+  };
+
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     const node = scrollRef.current;
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    node.scrollTo({ top: Math.max(0, node.scrollHeight - node.clientHeight), behavior });
+    const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
+    if (behavior === "auto") {
+      node.scrollTop = bottom;
+    } else {
+      node.scrollTo({ top: bottom, behavior });
+    }
     window.setTimeout(() => {
       if (token !== scrollTokenRef.current || !autoFollowRef.current) return;
       const current = scrollRef.current;
@@ -740,6 +773,23 @@ export function ChatThread() {
       const distance = current.scrollHeight - current.scrollTop - current.clientHeight;
       updateShowScrollToBottom(distance > 80);
     }, 460);
+  };
+
+  const keepSessionAtBottom = () => {
+    if (!scrollRef.current || !autoFollowRef.current || userScrollRef.current) {
+      cancelSessionAutoBottom();
+      return;
+    }
+    scrollToBottom("auto");
+    if (Date.now() >= sessionAutoBottomUntilRef.current) {
+      clearSessionAutoBottomTimer();
+      return;
+    }
+    clearSessionAutoBottomTimer();
+    sessionAutoBottomTimerRef.current = window.setTimeout(() => {
+      sessionAutoBottomTimerRef.current = null;
+      keepSessionAtBottom();
+    }, SESSION_OPEN_BOTTOM_SETTLE_INTERVAL_MS);
   };
 
   const enableAutoFollow = () => {
@@ -751,6 +801,7 @@ export function ChatThread() {
   };
 
   const pauseAutoFollowForUser = () => {
+    cancelSessionAutoBottom();
     userScrollRef.current = true;
     scrollTokenRef.current += 1;
     if (autoFollowRef.current) {
@@ -759,19 +810,218 @@ export function ChatThread() {
     }
   };
 
+  const captureResizeScrollAnchor = () => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const containerRect = node.getBoundingClientRect();
+    const anchorTop = containerRect.top + Math.min(Math.max(node.clientHeight * 0.24, 96), 220);
+    const items = Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-render-key]"));
+    const anchor = items.find((item) => item.getBoundingClientRect().bottom >= anchorTop) ?? items[0] ?? null;
+    if (!anchor) {
+      resizeScrollAnchorRef.current = null;
+      return;
+    }
+    resizeScrollAnchorRef.current = {
+      key: anchor.dataset.kimixRenderKey ?? "",
+      offsetTop: anchor.getBoundingClientRect().top - containerRect.top,
+    };
+  };
+
+  const restoreResizeScrollAnchor = () => {
+    const node = scrollRef.current;
+    const anchor = resizeScrollAnchorRef.current;
+    if (!node || !anchor?.key) return false;
+    const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
+    const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
+    if (!target) return false;
+    const containerRect = node.getBoundingClientRect();
+    const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
+    const delta = nextOffsetTop - anchor.offsetTop;
+    if (Math.abs(delta) > 0.5) {
+      node.scrollTop += delta;
+    }
+    return true;
+  };
+
+  const findRenderedEventNode = (eventId: string): HTMLElement | null => {
+    const node = scrollRef.current;
+    if (!node) return null;
+    const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(eventId) : eventId.replace(/["\\]/g, "\\$&");
+    const direct = node.querySelector<HTMLElement>(`[data-kimix-event-id="${escaped}"]`);
+    if (direct) return direct;
+    return Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-event-ids]"))
+      .find((item) => (item.dataset.kimixEventIds ?? "").split(" ").includes(eventId)) ?? null;
+  };
+
+  const selectTextInNode = (target: HTMLElement, searchText?: string): boolean => {
+    const needle = searchText?.trim();
+    if (!needle) return false;
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let textNode = walker.nextNode() as Text | null;
+    const lowerNeedle = needle.toLowerCase();
+    while (textNode) {
+      textNodes.push(textNode);
+      textNode = walker.nextNode() as Text | null;
+    }
+    const fullText = textNodes.map((node) => node.nodeValue ?? "").join("");
+    const index = fullText.toLowerCase().indexOf(lowerNeedle);
+    if (index < 0) return false;
+    const endIndex = index + needle.length;
+    let cursor = 0;
+    let startNode: Text | null = null;
+    let endNode: Text | null = null;
+    let startOffset = 0;
+    let endOffset = 0;
+    for (const node of textNodes) {
+      const length = node.nodeValue?.length ?? 0;
+      const next = cursor + length;
+      if (!startNode && index >= cursor && index <= next) {
+        startNode = node;
+        startOffset = index - cursor;
+      }
+      if (!endNode && endIndex >= cursor && endIndex <= next) {
+        endNode = node;
+        endOffset = endIndex - cursor;
+        break;
+      }
+      cursor = next;
+    }
+    if (!startNode || !endNode) return false;
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    const node = scrollRef.current;
+    const rect = range.getBoundingClientRect();
+    if (node && rect.height > 0) {
+      const containerRect = node.getBoundingClientRect();
+      const targetTop = node.scrollTop + rect.top - containerRect.top - Math.max(80, node.clientHeight * 0.28);
+      node.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+    } else {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return true;
+  };
+
+  const focusTimelineEvent = (eventId: string, searchText?: string): boolean => {
+    cancelSessionAutoBottom();
+    const target = findRenderedEventNode(eventId);
+    if (!target) {
+      if (!showOlderItems) {
+        setShowOlderItems(true);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText));
+        });
+      }
+      return false;
+    }
+    scrollTokenRef.current += 1;
+    autoFollowRef.current = false;
+    userScrollRef.current = true;
+    updateAutoFollow(false);
+    const didSelectText = selectTextInNode(target, searchText);
+    if (!didSelectText) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    setHighlightedEventId(eventId);
+    window.setTimeout(() => {
+      setHighlightedEventId((current) => current === eventId ? null : current);
+    }, 2200);
+    return true;
+  };
+
   useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string; eventId?: string; searchText?: string }>).detail;
+      if (!detail?.sessionId || !detail.eventId) return;
+      pendingFocusEventRef.current = { sessionId: detail.sessionId, eventId: detail.eventId, searchText: detail.searchText };
+      if (session?.id === detail.sessionId) {
+        window.requestAnimationFrame(() => {
+          if (focusTimelineEvent(detail.eventId, detail.searchText)) {
+            pendingFocusEventRef.current = null;
+          }
+        });
+      }
+    };
+    window.addEventListener("kimix:focus-timeline-event", handler);
+    return () => window.removeEventListener("kimix:focus-timeline-event", handler);
+  }, [session?.id, showOlderItems]);
+
+  useLayoutEffect(() => {
+    setPrimedSessionId(null);
+    cancelSessionAutoBottom();
     autoFollowRef.current = true;
     userScrollRef.current = false;
     setShowOlderItems(false);
     pendingOlderItemsScrollAnchorRef.current = null;
+    resizeScrollAnchorRef.current = null;
+    lastScrollSizeRef.current = null;
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
-    window.requestAnimationFrame(() => scrollToBottom("auto"));
+    if (session?.id) {
+      sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_SETTLE_MS;
+      keepSessionAtBottom();
+      window.requestAnimationFrame(() => {
+        keepSessionAtBottom();
+        setPrimedSessionId(session.id);
+        window.requestAnimationFrame(keepSessionAtBottom);
+      });
+    }
+    return () => cancelSessionAutoBottom();
   }, [session?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const node = scrollRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    lastScrollSizeRef.current = { width: node.clientWidth, height: node.clientHeight, scrollHeight: node.scrollHeight };
+    captureResizeScrollAnchor();
+    const observer = new ResizeObserver(() => {
+      const current = scrollRef.current;
+      if (!current) return;
+      const previousSize = lastScrollSizeRef.current;
+      const nextSize = { width: current.clientWidth, height: current.clientHeight, scrollHeight: current.scrollHeight };
+      lastScrollSizeRef.current = nextSize;
+      if (
+        !previousSize ||
+        (
+          previousSize.width === nextSize.width &&
+          previousSize.height === nextSize.height &&
+          previousSize.scrollHeight === nextSize.scrollHeight
+        )
+      ) {
+        return;
+      }
+      if (autoFollowRef.current && !userScrollRef.current) {
+        window.requestAnimationFrame(() => scrollToBottom("auto"));
+        return;
+      }
+      const token = ++scrollTokenRef.current;
+      window.requestAnimationFrame(() => {
+        if (token !== scrollTokenRef.current) return;
+        restoreResizeScrollAnchor();
+        captureResizeScrollAnchor();
+        const nodeAfterRestore = scrollRef.current;
+        if (!nodeAfterRestore) return;
+        const distance = nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
+        updateShowScrollToBottom(distance > 80);
+      });
+    });
+    observer.observe(node);
+    const contentNode = streamContentRef.current;
+    if (contentNode) observer.observe(contentNode);
+    return () => observer.disconnect();
+  }, [session?.id, showOlderItems]);
+
+  useLayoutEffect(() => {
     if (isAutoFollowRef.current) {
-      window.requestAnimationFrame(() => scrollToBottom("auto"));
+      if (Date.now() < sessionAutoBottomUntilRef.current) {
+        keepSessionAtBottom();
+      } else {
+        scrollToBottom("auto");
+      }
       return;
     }
     const node = scrollRef.current;
@@ -843,6 +1093,7 @@ export function ChatThread() {
   const handleScroll = () => {
     const node = scrollRef.current;
     if (!node) return;
+    captureResizeScrollAnchor();
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
@@ -866,6 +1117,17 @@ export function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
+  const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
+
+  useEffect(() => {
+    const pending = pendingFocusEventRef.current;
+    if (!pending || !session || pending.sessionId !== session.id) return;
+    window.requestAnimationFrame(() => {
+      if (focusTimelineEvent(pending.eventId, pending.searchText)) {
+        pendingFocusEventRef.current = null;
+      }
+    });
+  }, [session?.id, visibleRenderItems.length]);
 
   useLayoutEffect(() => {
     const anchor = pendingOlderItemsScrollAnchorRef.current;
@@ -909,7 +1171,7 @@ export function ChatThread() {
       <div
         ref={scrollRef}
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
-        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain" }}
+        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
         onScroll={handleScroll}
         onPointerDown={(event) => {
           if (event.button === 0) pauseAutoFollowForUser();
@@ -917,11 +1179,24 @@ export function ChatThread() {
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
+        <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
           {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
           {visibleRenderItems.map((item) => (
             <div
-              key={item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id}
+              key={renderItemKey(item)}
+              data-kimix-render-key={renderItemKey(item)}
+              data-kimix-event-id={item.type === "event" ? item.event.id : undefined}
+              data-kimix-event-ids={item.type === "event" ? item.event.id.split(":").join(" ") : item.type === "tool_group" ? item.tools.map((tool) => tool.id).join(" ") : undefined}
+              style={{
+                borderRadius: 12,
+                outline: item.type === "event" && highlightedEventId === item.event.id
+                  ? "2px solid var(--accent-primary)"
+                  : item.type === "tool_group" && item.tools.some((tool) => tool.id === highlightedEventId)
+                    ? "2px solid var(--accent-primary)"
+                    : "2px solid transparent",
+                outlineOffset: 4,
+                transition: "outline-color 160ms ease",
+              }}
             >
               {item.type === "tool_group"
                 ? <ToolGroup tools={item.tools} />
@@ -929,7 +1204,7 @@ export function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} changedFiles={item.changedFiles} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
+                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
               }
             </div>
           ))}

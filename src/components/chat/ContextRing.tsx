@@ -3,6 +3,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { getSessionRecommendationMetrics, getLatestMetricStatus } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 
 function formatK(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;
@@ -98,7 +99,7 @@ export function ContextRing() {
   const percent = contextLimit > 0 ? Math.min(100, (used / contextLimit) * 100) : 0;
   const remaining = Math.max(0, 100 - percent);
   const recommendation = getSessionRecommendationMetrics(session, sessionRecommendationTurnLimit);
-  const isCurrentSessionRunning = Boolean(currentSession && runningSessionId === currentSession.id);
+  const isCurrentSessionRunning = isSessionRuntimeRunning(currentSession, runningSessionId);
   const compactRequestPending = compactStatus === "pending";
   const canCompact = Boolean(currentSession && hasContextStatus && !isCurrentSessionRunning && !isCompacting && !compactRequestPending);
   const compactingDots = useAnimatedDots(isCompacting || compactRequestPending);
