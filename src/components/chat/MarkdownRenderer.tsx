@@ -45,6 +45,31 @@ function estimateMarkdownHeight(content: string) {
   return Math.max(72, Math.min(560, Math.max(lineCount, textRows) * 24));
 }
 
+const DEFERRED_RENDER_MARGIN = 1800;
+
+function isNearViewport(node: HTMLElement, margin = DEFERRED_RENDER_MARGIN) {
+  const rect = node.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  return rect.bottom >= -margin &&
+    rect.top <= viewportHeight + margin &&
+    rect.right >= -margin &&
+    rect.left <= viewportWidth + margin;
+}
+
+function getScrollableAncestors(node: HTMLElement) {
+  const parents: Array<HTMLElement | Window> = [window];
+  let parent = node.parentElement;
+  while (parent && parent !== document.body) {
+    const style = window.getComputedStyle(parent);
+    if (/(auto|scroll|overlay)/.test(`${style.overflowY}${style.overflow}`)) {
+      parents.push(parent);
+    }
+    parent = parent.parentElement;
+  }
+  return parents;
+}
+
 function CodeBlock({ className, children, wrapLongLines }: { className?: string; children?: React.ReactNode; wrapLongLines: boolean }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -125,19 +150,42 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(!deferOffscreen);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const normalizedContent = useMemo(
+    () => restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content)))),
+    [content],
+  );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!deferOffscreen) {
       setShouldRender(true);
       return;
     }
+    const node = containerRef.current;
+    if (node && isNearViewport(node)) {
+      setShouldRender(true);
+      return;
+    }
     setShouldRender(false);
-  }, [content, deferOffscreen]);
+  }, [normalizedContent, deferOffscreen]);
 
   useEffect(() => {
     if (!deferOffscreen || shouldRender) return;
     const node = containerRef.current;
     if (!node) return;
+    let frame = 0;
+    const revealIfNear = () => {
+      frame = 0;
+      if (!containerRef.current || !isNearViewport(containerRef.current)) return false;
+      setShouldRender(true);
+      return true;
+    };
+    const scheduleReveal = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        void revealIfNear();
+      });
+    };
+    if (revealIfNear()) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -148,7 +196,15 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       { root: null, rootMargin: "1600px 0px", threshold: 0.01 },
     );
     observer.observe(node);
-    return () => observer.disconnect();
+    const scrollableParents = getScrollableAncestors(node);
+    scrollableParents.forEach((parent) => parent.addEventListener("scroll", scheduleReveal, { passive: true }));
+    window.addEventListener("resize", scheduleReveal);
+    return () => {
+      observer.disconnect();
+      scrollableParents.forEach((parent) => parent.removeEventListener("scroll", scheduleReveal));
+      window.removeEventListener("resize", scheduleReveal);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, [deferOffscreen, shouldRender]);
 
   useEffect(() => {
@@ -269,10 +325,6 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(() => [rehypeHighlight], []);
-  const normalizedContent = useMemo(
-    () => restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content)))),
-    [content],
-  );
   const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(normalizedContent);
 
   useLayoutEffect(() => {
