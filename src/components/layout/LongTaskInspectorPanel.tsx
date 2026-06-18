@@ -400,28 +400,39 @@ export function LongTaskInspectorPanel({
   const loadKimiHealth = async () => {
     setKimiHealthLoading(true);
     try {
-      const [cliRes, authRes, modelRes, gitRes] = await Promise.all([
+      const runtimeId = liveCurrentSession?.engine === "kimi-code"
+        ? liveCurrentSession.runtimeSessionId ?? liveCurrentSession.officialSessionId ?? undefined
+        : undefined;
+      const [cliRes, authRes, modelRes, gitRes, serverRuntimeRes] = await Promise.all([
         window.api.checkKimiCli({ verify: false }).catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
         window.api.getKimiAuthStatus().catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
         window.api.getKimiModelConfig().catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
         projectPathForKimi
           ? window.api.getGitInfo(projectPathForKimi).catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }))
           : Promise.resolve({ success: false as const, error: "未选择项目" }),
+        runtimeId
+          ? window.api.getKimiCodeServerRuntimeDiagnostics({ sessionId: runtimeId }).catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }))
+          : Promise.resolve({ success: false as const, error: "未绑定运行时" }),
       ]);
-      const runtimeId = liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : undefined;
       const cliOk = cliRes.success && cliRes.data.available;
       const authOk = authRes.success && authRes.data.loggedIn;
       const modelOk = modelRes.success && (modelRes.data.defaultModel || modelRes.data.models.length > 0);
       const gitOk = gitRes.success && Boolean(gitRes.data.branch || gitRes.data.gitRoot);
       const sessionOk = Boolean(liveCurrentSession?.engine === "kimi-code" && runtimeId);
+      const serverRuntimeOk = serverRuntimeRes.success
+        ? serverRuntimeRes.data.connections.some((connection) => connection.subscribedToCurrentSession)
+        : true;
       const details = [
         cliRes.success ? cliRes.data.message : `CLI 检测失败：${cliRes.error}`,
         authRes.success ? authRes.data.message : `登录状态失败：${authRes.error}`,
         modelRes.success ? `模型：${modelRes.data.defaultModel ?? "未设置默认模型"}` : `模型配置失败：${modelRes.error}`,
         gitRes.success ? (gitOk ? `Git：${gitRes.data.branch ?? "已检测仓库"}` : "Git：当前项目不是 Git 仓库") : `Git：${gitRes.error}`,
         liveCurrentSession ? `会话：${runtimeId ? "已绑定 Kimi Code" : "缺少 runtime id"}` : "会话：未选择会话",
+        ...(serverRuntimeRes.success ? [
+          `Server：${serverRuntimeRes.data.tools.length} 个工具，${serverRuntimeRes.data.mcpServers.length} 个 MCP，${serverRuntimeRes.data.connections.filter((connection) => connection.subscribedToCurrentSession).length} 个当前订阅连接`,
+        ] : []),
       ];
-      const issueCount = [cliOk, authOk, modelOk, projectPathForKimi ? gitOk : true, liveCurrentSession ? sessionOk : true].filter((ok) => !ok).length;
+      const issueCount = [cliOk, authOk, modelOk, projectPathForKimi ? gitOk : true, liveCurrentSession ? sessionOk : true, serverRuntimeOk].filter((ok) => !ok).length;
       setKimiHealth({
         cli: cliOk ? "ok" : "error",
         auth: authOk ? "ok" : "warning",
@@ -1622,7 +1633,7 @@ export function LongTaskInspectorPanel({
                     ))}
                   </div>
                   <div className="flex flex-col" style={{ gap: 7, marginTop: 10 }}>
-                    {(kimiHealth?.details ?? ["正在检测 Kimi Code 状态..."]).slice(0, 5).map((detail, index) => (
+                    {(kimiHealth?.details ?? ["正在检测 Kimi Code 状态..."]).slice(0, 6).map((detail, index) => (
                       <div key={`${index}-${detail}`} className="truncate text-[12px] leading-5 text-text-muted" title={detail}>
                         {detail}
                       </div>

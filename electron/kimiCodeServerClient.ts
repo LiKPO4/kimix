@@ -45,6 +45,23 @@ export type ServerMcpServer = {
   tool_count: number;
 };
 
+export type ServerTool = {
+  name: string;
+  description: string;
+  input_schema: unknown;
+  source: "builtin" | "skill" | "mcp";
+  mcp_server_id?: string;
+};
+
+export type ServerConnection = {
+  id: string;
+  connected_at: string;
+  remote_address: string | null;
+  user_agent: string | null;
+  has_client_hello: boolean;
+  subscriptions: string[];
+};
+
 export type ServerBackgroundTask = {
   id: string;
   session_id: string;
@@ -219,6 +236,17 @@ export class KimiCodeServerClient {
   async listMcpServers(): Promise<ServerMcpServer[]> {
     const result = await this.request<{ servers: ServerMcpServer[] }>("/api/v1/mcp/servers");
     return result.servers;
+  }
+
+  async listTools(sessionId?: string): Promise<ServerTool[]> {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    const result = await this.request<{ tools: ServerTool[] }>(`/api/v1/tools${query}`);
+    return result.tools;
+  }
+
+  async listConnections(): Promise<ServerConnection[]> {
+    const result = await this.request<{ connections: ServerConnection[] }>("/api/v1/connections");
+    return result.connections;
   }
 
   restartMcpServer(serverId: string): Promise<{ restarting: true }> {

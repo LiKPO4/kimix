@@ -3175,3 +3175,17 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 全量测试 21 个文件、177/177 通过；`pnpm build` 通过，renderer hash：`assets/index-Dxl8HXaf.js`。
 ## 下一步
 - 跑全量测试与最终构建并提交；随后继续 tool catalog / 运行时诊断。
+
+# 2026-06-18 v2.9.146 Kimi Server 工具目录与运行时诊断
+## 当前目标
+- 接入官方 Server 的 session-effective tools 与 live connections，补齐可观察性。
+## 已完成
+- Server Client 接入 `/tools?session_id=` 与 `/connections`，Host 汇总 session status、工具、MCP 和连接为只读诊断接口。
+- MCP 页展示 builtin/Skill/MCP 工具来源分布、工具目录、MCP 状态和当前会话订阅连接数。
+- 右侧 Kimi 自检补充 Server 工具、MCP 与订阅连接摘要；SDK 会话保持原诊断路径。
+- 版本号三处同步到 v2.9.146；新增真实 tools/connections 探针。
+## 验证
+- 真实 0.17.1 Server 探针通过：26 个 builtin 工具；1 个完成 client_hello 的 WebSocket 客户端正确订阅当前 session。
+- 全量测试 21 个文件、177/177 通过；`pnpm build` 通过，renderer hash：`assets/index-BW3gMdIH.js`。
+## 下一步
+- 跑全量测试与最终构建并提交；随后核对 Server model catalog / config / OAuth。

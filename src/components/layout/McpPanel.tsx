@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Cable, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
+import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import type { KimiCodeMcpServerInfo } from "@electron/types/ipc";
+import type { KimiCodeMcpServerInfo, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
 
 type KimiAuthStatus = {
   available: boolean;
@@ -184,14 +184,19 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
   const [form, setForm] = useState<AddFormState>(() => createEmptyForm());
   const [lastTestOutput, setLastTestOutput] = useState<Record<string, string>>({});
   const [runtimeServers, setRuntimeServers] = useState<KimiCodeMcpServerInfo[]>([]);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<KimiCodeServerRuntimeDiagnostics | null>(null);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
 
   const refresh = async (nextMessage?: string) => {
     setLoading(true);
-    const [authRes, listRes, runtimeRes] = await Promise.all([
+    const [authRes, listRes, runtimeRes, diagnosticsRes] = await Promise.all([
       window.api.getKimiAuthStatus(),
       window.api.listMcpServers(),
       runtimeSessionId
         ? window.api.listKimiCodeMcpServers({ sessionId: runtimeSessionId })
+        : Promise.resolve(null),
+      runtimeSessionId
+        ? window.api.getKimiCodeServerRuntimeDiagnostics({ sessionId: runtimeSessionId })
         : Promise.resolve(null),
     ]);
     setLoading(false);
@@ -207,7 +212,8 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     setAuth(authRes.data);
     setServers(listRes.data.servers);
     setPluginServers(listRes.data.pluginServers ?? []);
-    setRuntimeServers(runtimeRes?.success ? runtimeRes.data : []);
+    setRuntimeDiagnostics(diagnosticsRes?.success ? diagnosticsRes.data : null);
+    setRuntimeServers(diagnosticsRes?.success ? diagnosticsRes.data.mcpServers : runtimeRes?.success ? runtimeRes.data : []);
     setConfigPath(listRes.data.configPath);
     setMessage(nextMessage ?? authRes.data.message);
   };
@@ -247,6 +253,12 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
       await refresh(`已请求官方 Server 重启 ${server.name}`);
     });
   };
+  const runtimeToolCounts = runtimeDiagnostics?.tools.reduce((counts, tool) => {
+    counts[tool.source] += 1;
+    return counts;
+  }, { builtin: 0, skill: 0, mcp: 0 }) ?? { builtin: 0, skill: 0, mcp: 0 };
+  const subscribedConnectionCount = runtimeDiagnostics?.connections.filter((connection) => connection.subscribedToCurrentSession).length ?? 0;
+  const visibleRuntimeTools = toolsExpanded ? runtimeDiagnostics?.tools ?? [] : runtimeDiagnostics?.tools.slice(0, 8) ?? [];
 
   const handleAddServer = async () => {
     await runBusy("add", async () => {
@@ -579,6 +591,62 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                       {runtimeServers.length} 个服务
                     </div>
                   </div>
+                  {runtimeDiagnostics && (
+                    <div style={{ marginTop: 14 }}>
+                      <div className="grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
+                        {[
+                          ["内置工具", runtimeToolCounts.builtin],
+                          ["Skill 工具", runtimeToolCounts.skill],
+                          ["MCP 工具", runtimeToolCounts.mcp],
+                          ["订阅连接", subscribedConnectionCount],
+                        ].map(([label, count]) => (
+                          <div key={label} className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "11px 12px" }}>
+                            <div className="text-[11.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{label}</div>
+                            <div className="text-[16px] font-semibold leading-6 text-[var(--kimix-panel-text)]" style={{ marginTop: 2 }}>{count}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ marginTop: 12, padding: "13px 14px" }}>
+                        <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                          <div className="min-w-0">
+                            <div className="text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">会话有效工具目录</div>
+                            <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 3 }}>
+                              共 {runtimeDiagnostics.tools.length} 个工具 · {runtimeDiagnostics.connections.length} 个活跃客户端
+                            </div>
+                          </div>
+                          {runtimeDiagnostics.tools.length > 8 && (
+                            <button
+                              type="button"
+                              onClick={() => setToolsExpanded((value) => !value)}
+                              className="kimix-icon-text-button kimix-muted-action is-compact"
+                            >
+                              {toolsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              <span>{toolsExpanded ? "收起" : "展开全部"}</span>
+                            </button>
+                          )}
+                        </div>
+                        {visibleRuntimeTools.length > 0 ? (
+                          <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 12 }}>
+                            {visibleRuntimeTools.map((tool) => (
+                              <div key={`${tool.source}:${tool.mcpServerId ?? ""}:${tool.name}`} className="rounded-lg bg-surface-base" style={{ padding: "10px 12px" }}>
+                                <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8 }}>
+                                  <div className="truncate text-[12.5px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={tool.name}>{tool.name}</div>
+                                  <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                    {tool.source === "builtin" ? "内置" : tool.source === "skill" ? "Skill" : "MCP"}
+                                  </span>
+                                </div>
+                                <div className="line-clamp-2 text-[11.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }} title={tool.description}>
+                                  {tool.description || "无说明"}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 12 }}>当前会话没有可用工具。</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {runtimeServers.length > 0 ? (
                     <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
                       {runtimeServers.map((server) => (

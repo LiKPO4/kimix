@@ -24,6 +24,8 @@
 - 真实 0.17.1 探针已验证：会话发现 13 个 Skill，项目探针 Skill 激活成功；MCP 返回 1 个 connected 服务和 2 个工具；不存在服务的 restart 返回官方 `40408`。
 - 右侧会话栏已接 Server 会话树：展示当前节点、fork 分支和直接 child，支持刷新、新建 child、载入历史并切换。官方 `/children` 不包含 `:fork`，Kimix 使用创建 fork 时写入的 `metadata.forkedFrom` 合并关系。
 - 真实会话树探针已验证：官方 child 可列出和恢复；fork 不进入官方 children，但 `forkedFrom` 元数据可稳定识别，合并后得到 2 个关联节点。
+- Server tool catalog 与 connections 已合并为只读运行时诊断：MCP 页展示会话有效工具、builtin/Skill/MCP 来源分布、MCP 状态和当前订阅连接；右侧 Kimi 自检复用同一诊断结果。
+- 真实 0.17.1 探针已验证：当前会话返回 26 个 builtin 工具；WebSocket 完成 `client_hello` 后，connections 返回 1 个客户端且正确订阅当前 session。
 
 ## B. 后端已有基础，产品入口仍不完整
 
@@ -35,11 +37,9 @@
 
 按用户价值排序：
 
-1. tools：Server tool catalog 尚未形成独立产品入口；MCP list/restart 已接。
-2. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
-3. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
-4. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
-5. connections：连接列表只在探针层验证，尚无诊断入口。
+1. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
+2. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
+3. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
 
 ## D. 延后或阻塞
 
@@ -50,5 +50,5 @@
 
 ## 推荐推进顺序
 
-1. 继续补齐高价值官方能力：tool catalog 与运行时诊断。
-2. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。
+1. 核对并接入 Server model catalog / config / OAuth 中能替代现有旁路的部分。
+2. 再评估文件系统、独立 prompt/message 查询等边际能力。

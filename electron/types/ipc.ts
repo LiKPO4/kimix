@@ -1456,6 +1456,31 @@ export type KimiCodeMcpStartupMetrics = {
   durationMs: number;
 };
 
+export type KimiCodeServerToolInfo = {
+  name: string;
+  description: string;
+  source: "builtin" | "skill" | "mcp";
+  mcpServerId?: string;
+  inputSchema: unknown;
+};
+
+export type KimiCodeServerConnectionInfo = {
+  id: string;
+  connectedAt: string;
+  remoteAddress: string | null;
+  userAgent: string | null;
+  hasClientHello: boolean;
+  subscriptions: string[];
+  subscribedToCurrentSession: boolean;
+};
+
+export type KimiCodeServerRuntimeDiagnostics = {
+  session: KimiCodeSessionStatus;
+  tools: KimiCodeServerToolInfo[];
+  mcpServers: KimiCodeMcpServerInfo[];
+  connections: KimiCodeServerConnectionInfo[];
+};
+
 export type KimiCodeBackgroundTaskInfo = {
   taskId: string;
   command: string;
@@ -1852,6 +1877,14 @@ export type KimiCodeBackgroundTaskOutputResponse = {
 export type KimiCodeBackgroundTaskOutputPathResponse = {
   success: true;
   data?: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeServerRuntimeDiagnosticsResponse = {
+  success: true;
+  data: KimiCodeServerRuntimeDiagnostics;
 } | {
   success: false;
   error: string;

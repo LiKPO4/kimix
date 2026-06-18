@@ -181,6 +181,27 @@ export type KimiCodeMcpStartupMetrics = {
   durationMs: number;
 };
 
+export type KimiCodeServerRuntimeDiagnostics = {
+  session: KimiCodeSessionStatus;
+  tools: Array<{
+    name: string;
+    description: string;
+    source: "builtin" | "skill" | "mcp";
+    mcpServerId?: string;
+    inputSchema: unknown;
+  }>;
+  mcpServers: KimiCodeMcpServerInfo[];
+  connections: Array<{
+    id: string;
+    connectedAt: string;
+    remoteAddress: string | null;
+    userAgent: string | null;
+    hasClientHello: boolean;
+    subscriptions: string[];
+    subscribedToCurrentSession: boolean;
+  }>;
+};
+
 export type KimiCodeBackgroundTaskStatus =
   | "running"
   | "awaiting_approval"
@@ -983,6 +1004,37 @@ export async function reconnectMcpServer(sessionId: string, name: string): Promi
   const managed = getManagedSession(sessionId);
   if (!managed.session.reconnectMcpServer) throw new Error("Official Kimi Code SDK does not expose reconnectMcpServer on this session");
   await managed.session.reconnectMcpServer(name);
+}
+
+export async function getServerRuntimeDiagnostics(sessionId: string): Promise<KimiCodeServerRuntimeDiagnostics> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方 Server 运行时诊断仅适用于 Server 会话。");
+  const client = getServerClient();
+  const [status, tools, mcpServers, connections] = await Promise.all([
+    client.getSessionStatus(sessionId),
+    client.listTools(sessionId),
+    client.listMcpServers(),
+    client.listConnections(),
+  ]);
+  return {
+    session: serverStatusToKimiCodeStatus(status, serverSessions.get(sessionId)?.session.usage),
+    tools: tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      source: tool.source,
+      mcpServerId: tool.mcp_server_id,
+      inputSchema: tool.input_schema,
+    })),
+    mcpServers: mcpServers.map(toKimiCodeMcpServerInfo),
+    connections: connections.map((connection) => ({
+      id: connection.id,
+      connectedAt: connection.connected_at,
+      remoteAddress: connection.remote_address,
+      userAgent: connection.user_agent,
+      hasClientHello: connection.has_client_hello,
+      subscriptions: connection.subscriptions,
+      subscribedToCurrentSession: connection.subscriptions.includes(sessionId),
+    })),
+  };
 }
 
 export async function listBackgroundTasks(sessionId: string, options: { activeOnly?: boolean; limit?: number } = {}): Promise<KimiCodeBackgroundTaskInfo[]> {
