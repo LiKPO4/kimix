@@ -66,6 +66,35 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("uses official session action routes for compact, undo, BTW and archive", async () => {
+    const calls: Array<{ url: string; body?: BodyInit | null }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body });
+      const data = url.endsWith(":btw")
+        ? { agent_id: "agent-btw" }
+        : url.endsWith(":archive")
+          ? { archived: true }
+          : {};
+      return new Response(JSON.stringify({ code: 0, data }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await client.compactSession("session/1", "保留验收结果");
+    await client.undoSession("session/1", 2);
+    await client.startBtwSession("session/1");
+    await client.archiveSession("session/1");
+
+    expect(calls).toEqual([
+      { url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1:compact", body: JSON.stringify({ instruction: "保留验收结果" }) },
+      { url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1:undo", body: JSON.stringify({ count: 2 }) },
+      { url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1:btw", body: "{}" },
+      { url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1:archive", body: "{}" },
+    ]);
+  });
+
   it("treats already-finished Server task cancellation as an idempotent stop result", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       code: 40904,

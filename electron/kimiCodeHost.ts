@@ -736,6 +736,10 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
 }
 
 export async function undoHistory(sessionId: string, count: number): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    await getServerClient().undoSession(sessionId, count);
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.undoHistory) throw new Error("Official Kimi Code SDK does not expose undoHistory on this session");
   await managed.session.undoHistory(count);
@@ -788,6 +792,10 @@ export async function setPermission(sessionId: string, mode: KimiCodePermissionM
 }
 
 export async function compactSession(sessionId: string, instruction?: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    await getServerClient().compactSession(sessionId, instruction);
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.compact) throw new Error("Official Kimi Code SDK does not expose compact on this session");
   await managed.session.compact(instruction ? { instruction } : undefined);

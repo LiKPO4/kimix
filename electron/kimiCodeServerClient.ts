@@ -254,6 +254,34 @@ export class KimiCodeServerClient {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:abort`, { method: "POST", body: "{}" });
   }
 
+  compactSession(sessionId: string, instruction?: string): Promise<Record<string, never>> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:compact`, {
+      method: "POST",
+      body: JSON.stringify(instruction ? { instruction } : {}),
+    });
+  }
+
+  undoSession(sessionId: string, count = 1): Promise<unknown> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:undo`, {
+      method: "POST",
+      body: JSON.stringify({ count }),
+    });
+  }
+
+  startBtwSession(sessionId: string): Promise<{ agent_id: string }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:btw`, {
+      method: "POST",
+      body: "{}",
+    });
+  }
+
+  archiveSession(sessionId: string): Promise<{ archived: true }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:archive`, {
+      method: "POST",
+      body: "{}",
+    });
+  }
+
   async listTasks(sessionId: string, status?: ServerBackgroundTask["status"]): Promise<ServerBackgroundTask[]> {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
     const result = await this.request<{ items: ServerBackgroundTask[] }>(
