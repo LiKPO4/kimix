@@ -90,8 +90,8 @@ describe("KimiCodeServerClient protocol adapters", () => {
       in_flight_turn: {
         items: [
           { role: "user", content: [{ type: "text", text: "本地 UI 已有用户消息" }] },
-          { id: "msg-active", role: "assistant", content: [{ type: "think", think: "先分析" }, { type: "text", text: "最终回答" }] },
-          { role: "tool", toolCallId: "call-1", content: [{ type: "text", text: "工具输出" }] },
+          { id: "msg-active", role: "assistant", content: [{ type: "thinking", thinking: "先分析" }, { type: "text", text: "最终回答" }] },
+          { role: "tool", content: [{ type: "tool_result", tool_call_id: "call-1", output: "工具输出" }] },
         ],
       },
     }, "session-1");

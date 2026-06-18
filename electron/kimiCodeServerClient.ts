@@ -561,7 +561,10 @@ function snapshotMessageToServerFrames(
     return frames;
   }
   if (role === "tool") {
-    const toolCallId = stringField(message, "toolCallId") ?? stringField(message, "tool_call_id");
+    const toolCallId = stringField(message, "toolCallId") ??
+      stringField(message, "tool_call_id") ??
+      firstContentStringField(message, "tool_call_id") ??
+      firstContentStringField(message, "toolCallId");
     const output = contentToText(message.content);
     if (!toolCallId || !output) return [];
     return [{
@@ -606,8 +609,8 @@ function contentPartsToFrames(
         payload: snapshotReplayPayload({ part: { type: "text", text: part.text } }, replayMode, messageId, messageText, "assistant"),
       }];
     }
-    if ((type === "think" || type === "thinking") && typeof (part.think ?? part.text) === "string") {
-      const think = String(part.think ?? part.text);
+    if ((type === "think" || type === "thinking") && typeof (part.think ?? part.thinking ?? part.text) === "string") {
+      const think = String(part.think ?? part.thinking ?? part.text);
       return think ? [{
         type: "content.part",
         session_id: sessionId,
@@ -627,6 +630,8 @@ function contentToText(content: unknown): string {
     if (typeof part === "string") return part;
     if (!isRecord(part)) return "";
     if (typeof part.think === "string") return part.think;
+    if (typeof part.thinking === "string") return part.thinking;
+    if (typeof part.output === "string") return part.output;
     return typeof part.text === "string"
       ? part.text
       : (typeof part.content === "string" ? part.content : "");
@@ -636,6 +641,16 @@ function contentToText(content: unknown): string {
 function stringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" && value ? value : undefined;
+}
+
+function firstContentStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const content = Array.isArray(record.content) ? record.content : [];
+  for (const part of content) {
+    if (!isRecord(part)) continue;
+    const value = stringField(part, key);
+    if (value) return value;
+  }
+  return undefined;
 }
 
 function snapshotMessageId(message: Record<string, unknown>, role: string): string {
