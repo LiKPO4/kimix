@@ -77,31 +77,90 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(normalized.message).toContain("原始错误：Failed to load native module");
   });
 
-  it("replays only in-flight snapshot messages through existing raw event shapes", () => {
+  it("marks history replay frames and in-flight replay frames separately", () => {
     const frames = snapshotMessagesToServerFrames({
       as_of_seq: 42,
       epoch: "epoch-1",
       session: { id: "session-1", status: "idle" },
       messages: {
         items: [
-          { role: "assistant", content: [{ type: "text", text: "历史消息不自动重放，避免重复" }] },
+          { id: "msg-history", role: "assistant", content: [{ type: "text", text: "历史消息可按需补偿" }] },
         ],
       },
       in_flight_turn: {
         items: [
           { role: "user", content: [{ type: "text", text: "本地 UI 已有用户消息" }] },
-          { role: "assistant", content: [{ type: "think", think: "先分析" }, { type: "text", text: "最终回答" }] },
+          { id: "msg-active", role: "assistant", content: [{ type: "think", think: "先分析" }, { type: "text", text: "最终回答" }] },
           { role: "tool", toolCallId: "call-1", content: [{ type: "text", text: "工具输出" }] },
         ],
       },
     }, "session-1");
 
-    expect(frames).toEqual([
+    expect(frames[0]).toMatchObject({
+      type: "content.part",
+      payload: {
+        snapshotReplay: "history",
+        snapshotMessageId: "msg-history",
+        snapshotMessageText: "历史消息可按需补偿",
+        part: { type: "text", text: "历史消息可按需补偿" },
+      },
+    });
+    expect(frames.slice(2)).toEqual([
       { type: "turn.started", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "turn.started" } },
-      { type: "content.part", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { part: { type: "think", think: "先分析" } } },
-      { type: "content.part", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { part: { type: "text", text: "最终回答" } } },
-      { type: "turn.ended", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "turn.ended" } },
-      { type: "tool.result", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "tool.result", toolCallId: "call-1", output: "工具输出" } },
+      {
+        type: "content.part",
+        session_id: "session-1",
+        seq: 42,
+        epoch: "epoch-1",
+        payload: {
+          snapshotReplay: "in_flight",
+          snapshotMessageId: "msg-active",
+          snapshotMessageText: "先分析\n最终回答",
+          snapshotRole: "assistant",
+          part: { type: "think", think: "先分析" },
+        },
+      },
+      {
+        type: "content.part",
+        session_id: "session-1",
+        seq: 42,
+        epoch: "epoch-1",
+        payload: {
+          snapshotReplay: "in_flight",
+          snapshotMessageId: "msg-active",
+          snapshotMessageText: "先分析\n最终回答",
+          snapshotRole: "assistant",
+          part: { type: "text", text: "最终回答" },
+        },
+      },
+      {
+        type: "turn.ended",
+        session_id: "session-1",
+        seq: 42,
+        epoch: "epoch-1",
+        payload: {
+          type: "turn.ended",
+          snapshotReplay: "in_flight",
+          snapshotMessageId: "msg-active",
+          snapshotMessageText: "先分析\n最终回答",
+          snapshotRole: "assistant",
+        },
+      },
+      {
+        type: "tool.result",
+        session_id: "session-1",
+        seq: 42,
+        epoch: "epoch-1",
+        payload: {
+          type: "tool.result",
+          toolCallId: "call-1",
+          output: "工具输出",
+          snapshotReplay: "in_flight",
+          snapshotMessageId: "tool:工具输出",
+          snapshotMessageText: "工具输出",
+          snapshotRole: "tool",
+        },
+      },
     ]);
   });
 });

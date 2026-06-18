@@ -12,6 +12,7 @@ import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetric
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import {
   settleInactiveEvents,
@@ -2204,6 +2205,7 @@ function App() {
         }));
         syncCurrentSessionFromStore(uiSessionId);
       }
+      if (shouldSkipKimiCodeSnapshotReplay(rawEvent, targetSession?.events)) return;
       const mapped = rawEvent?.type === "kimix.approval.request"
         ? mapKimiCodeApprovalRequest({
             ...(rawEvent.request && typeof rawEvent.request === "object" && !Array.isArray(rawEvent.request) ? rawEvent.request as Record<string, unknown> : {}),

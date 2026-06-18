@@ -101,10 +101,14 @@ export function normalizeServerTerminalCreateError(error: unknown): Error {
 }
 
 export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
+  const historyItems = Array.isArray(snapshot.messages?.items) ? snapshot.messages.items : [];
   const inFlight = isRecord(snapshot.in_flight_turn) ? snapshot.in_flight_turn : {};
   const messages = "messages" in inFlight ? inFlight.messages : ("message" in inFlight ? [inFlight.message] : inFlight.items);
-  const items = Array.isArray(messages) ? messages : [];
-  return items.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch));
+  const inFlightItems = Array.isArray(messages) ? messages : [];
+  return [
+    ...historyItems.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch, "history")),
+    ...inFlightItems.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch, "in_flight")),
+  ];
 }
 
 export class KimiCodeServerClient {
@@ -527,16 +531,32 @@ export class KimiCodeServerClient {
   }
 }
 
-function snapshotMessageToServerFrames(message: unknown, sessionId: string, seq: number, epoch?: string): ServerFrame[] {
+function snapshotMessageToServerFrames(
+  message: unknown,
+  sessionId: string,
+  seq: number,
+  epoch: string | undefined,
+  replayMode: "history" | "in_flight",
+): ServerFrame[] {
   if (!isRecord(message)) return [];
   const role = typeof message.role === "string" ? message.role : "";
   if (role === "user") {
-    return [{ type: "turn.started", session_id: sessionId, seq, epoch, payload: { type: "turn.started" } }];
+    return replayMode === "in_flight"
+      ? [{ type: "turn.started", session_id: sessionId, seq, epoch, payload: { type: "turn.started" } }]
+      : [];
   }
+  const messageId = snapshotMessageId(message, role);
   if (role === "assistant") {
-    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch);
+    const messageText = contentToText(message.content);
+    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageId, messageText);
     if (frames.length > 0) {
-      frames.push({ type: "turn.ended", session_id: sessionId, seq, epoch, payload: { type: "turn.ended" } });
+      frames.push({
+        type: "turn.ended",
+        session_id: sessionId,
+        seq,
+        epoch,
+        payload: snapshotReplayPayload({ type: "turn.ended" }, replayMode, messageId, messageText, role),
+      });
     }
     return frames;
   }
@@ -549,26 +569,52 @@ function snapshotMessageToServerFrames(message: unknown, sessionId: string, seq:
       session_id: sessionId,
       seq,
       epoch,
-      payload: { type: "tool.result", toolCallId, output },
+      payload: snapshotReplayPayload({ type: "tool.result", toolCallId, output }, replayMode, messageId, output, role),
     }];
   }
   return [];
 }
 
-function contentPartsToFrames(content: unknown, sessionId: string, seq: number, epoch?: string): ServerFrame[] {
+function contentPartsToFrames(
+  content: unknown,
+  sessionId: string,
+  seq: number,
+  epoch: string | undefined,
+  replayMode: "history" | "in_flight",
+  messageId: string,
+  messageText: string,
+): ServerFrame[] {
   if (typeof content === "string") {
-    return content ? [{ type: "assistant.delta", session_id: sessionId, seq, epoch, payload: { delta: content } }] : [];
+    return content ? [{
+      type: "assistant.delta",
+      session_id: sessionId,
+      seq,
+      epoch,
+      payload: snapshotReplayPayload({ delta: content }, replayMode, messageId, messageText, "assistant"),
+    }] : [];
   }
   if (!Array.isArray(content)) return [];
   return content.flatMap((part) => {
     if (!isRecord(part)) return [];
     const type = typeof part.type === "string" ? part.type : "";
     if (type === "text" && typeof part.text === "string" && part.text) {
-      return [{ type: "content.part", session_id: sessionId, seq, epoch, payload: { part: { type: "text", text: part.text } } }];
+      return [{
+        type: "content.part",
+        session_id: sessionId,
+        seq,
+        epoch,
+        payload: snapshotReplayPayload({ part: { type: "text", text: part.text } }, replayMode, messageId, messageText, "assistant"),
+      }];
     }
     if ((type === "think" || type === "thinking") && typeof (part.think ?? part.text) === "string") {
       const think = String(part.think ?? part.text);
-      return think ? [{ type: "content.part", session_id: sessionId, seq, epoch, payload: { part: { type: "think", think } } }] : [];
+      return think ? [{
+        type: "content.part",
+        session_id: sessionId,
+        seq,
+        epoch,
+        payload: snapshotReplayPayload({ part: { type: "think", think } }, replayMode, messageId, messageText, "assistant"),
+      }] : [];
     }
     return [];
   });
@@ -580,6 +626,7 @@ function contentToText(content: unknown): string {
   return content.map((part) => {
     if (typeof part === "string") return part;
     if (!isRecord(part)) return "";
+    if (typeof part.think === "string") return part.think;
     return typeof part.text === "string"
       ? part.text
       : (typeof part.content === "string" ? part.content : "");
@@ -589,6 +636,29 @@ function contentToText(content: unknown): string {
 function stringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" && value ? value : undefined;
+}
+
+function snapshotMessageId(message: Record<string, unknown>, role: string): string {
+  return stringField(message, "id") ??
+    stringField(message, "message_id") ??
+    stringField(message, "messageId") ??
+    `${role}:${contentToText(message.content).slice(0, 512)}`;
+}
+
+function snapshotReplayPayload(
+  payload: Record<string, unknown>,
+  replayMode: "history" | "in_flight",
+  messageId: string,
+  messageText: string,
+  role: string,
+): Record<string, unknown> {
+  return {
+    ...payload,
+    snapshotReplay: replayMode,
+    snapshotMessageId: messageId,
+    snapshotMessageText: messageText,
+    snapshotRole: role,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
