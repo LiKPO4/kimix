@@ -458,6 +458,7 @@ function installBrowserPreviewApi() {
     listKimiCodeSessions: (): Promise<KimiCodeListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
     listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> => Promise.resolve({ success: true, data: [] }),
     listKimiCodeSkills: (): Promise<KimiCodeListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
+    activateKimiCodeSkill: () => fail("激活 Kimi Code Skill"),
     loadKimiCodeSession: (): Promise<KimiCodeLoadSessionResponse> => fail("加载 Kimi Code SDK 会话历史"),
     closeKimiCodeSession: (): Promise<VoidResponse> => fail("关闭 Kimi Code SDK 会话"),
     listKimiCodePlugins: (): Promise<KimiCodeListPluginsResponse> => fail("读取 Kimi Code SDK 插件列表"),

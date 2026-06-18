@@ -1444,6 +1444,7 @@ export type KimiCodeSessionStatus = {
 };
 
 export type KimiCodeMcpServerInfo = {
+  id?: string;
   name: string;
   transport: "stdio" | "http" | "sse";
   status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";

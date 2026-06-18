@@ -12,7 +12,9 @@ import {
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
   type ServerFrame,
+  type ServerMcpServer,
   type ServerSession,
+  type ServerSkill,
   type ServerSessionStatus,
   type ServerSnapshot,
   type ServerTerminal,
@@ -98,6 +100,7 @@ type KimiCodeSessionLike = {
   resumeGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
   cancelGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
   listSkills?(): Promise<readonly KimiCodeSkillSummary[]>;
+  activateSkill?(name: string, args?: string): Promise<void>;
   listPlugins?(): Promise<readonly KimiCodePluginSummary[]>;
   installPlugin?(source: string): Promise<KimiCodePluginSummary>;
   setPluginEnabled?(id: string, enabled: boolean): Promise<void>;
@@ -165,6 +168,7 @@ export type KimiCodeSessionStatus = {
 export type KimiCodeSessionUsage = Record<string, unknown>;
 
 export type KimiCodeMcpServerInfo = {
+  id?: string;
   name: string;
   transport: "stdio" | "http" | "sse";
   status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";
@@ -952,6 +956,9 @@ export async function login(
 }
 
 export async function listMcpServers(sessionId: string): Promise<KimiCodeMcpServerInfo[]> {
+  if (serverSessions.has(sessionId)) {
+    return (await getServerClient().listMcpServers()).map(toKimiCodeMcpServerInfo);
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.listMcpServers) throw new Error("Official Kimi Code SDK does not expose listMcpServers on this session");
   return [...await managed.session.listMcpServers()];
@@ -964,6 +971,13 @@ export async function getMcpStartupMetrics(sessionId: string): Promise<KimiCodeM
 }
 
 export async function reconnectMcpServer(sessionId: string, name: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    const servers = await getServerClient().listMcpServers();
+    const server = servers.find((item) => item.id === name || item.name === name);
+    if (!server) throw new Error(`Kimi Server MCP 服务不存在：${name}`);
+    await getServerClient().restartMcpServer(server.id);
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.reconnectMcpServer) throw new Error("Official Kimi Code SDK does not expose reconnectMcpServer on this session");
   await managed.session.reconnectMcpServer(name);
@@ -1096,6 +1110,7 @@ async function getOrCreatePluginSession(): Promise<KimiCodeSessionLike> {
 }
 
 function resolvePluginSession(sessionId?: string): Promise<KimiCodeSessionLike> | KimiCodeSessionLike {
+  if (sessionId && serverSessions.has(sessionId)) return getOrCreatePluginSession();
   if (sessionId) return getManagedSession(sessionId).session;
   return getOrCreatePluginSession();
 }
@@ -1107,9 +1122,52 @@ export async function listPlugins(sessionId?: string): Promise<KimiCodePluginSum
 }
 
 export async function listSkills(sessionId?: string): Promise<KimiCodeSkillSummary[]> {
+  if (sessionId && serverSessions.has(sessionId)) {
+    return (await getServerClient().listSkills(sessionId)).map(toKimiCodeSkillSummary);
+  }
   const session = await resolvePluginSession(sessionId);
   if (!session.listSkills) throw new Error("Official Kimi Code SDK does not expose listSkills on this session");
   return [...await session.listSkills()];
+}
+
+export async function activateSkill(sessionId: string, name: string, args?: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    await getServerClient().activateSkill(sessionId, name, args);
+    return;
+  }
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.activateSkill) throw new Error("Official Kimi Code SDK does not expose activateSkill on this session");
+  await managed.session.activateSkill(name, args);
+}
+
+export function toKimiCodeSkillSummary(skill: ServerSkill): KimiCodeSkillSummary {
+  return {
+    name: skill.name,
+    description: skill.description,
+    path: skill.path,
+    source: skill.source,
+    type: skill.type,
+    disableModelInvocation: skill.disable_model_invocation,
+    isSubSkill: skill.type === "sub-skill",
+  };
+}
+
+export function toKimiCodeMcpServerInfo(server: ServerMcpServer): KimiCodeMcpServerInfo {
+  const status = server.status === "connected"
+    ? "connected" as const
+    : server.status === "connecting"
+      ? "pending" as const
+      : server.status === "error"
+        ? "failed" as const
+        : "disabled" as const;
+  return {
+    id: server.id,
+    name: server.name,
+    transport: server.transport,
+    status,
+    toolCount: server.tool_count,
+    error: server.last_error,
+  };
 }
 
 export async function installPlugin(source: string, sessionId?: string): Promise<KimiCodePluginSummary> {

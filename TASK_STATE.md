@@ -3147,3 +3147,17 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `git diff --check` 通过；仅提示 Windows LF/CRLF warning。
 ## 下一步
 - 构建通过后，请用户用 v2.9.49 复验侧栏底部「设置」和上方「插件 / Hooks」hover 背景是否一致。
+
+# 2026-06-18 v2.9.144 Kimi Server Skill / MCP 接入
+## 当前目标
+- 把 Kimi Code 0.17.1 Server 的 Skill 与 MCP 能力接入现有 Kimix 产品入口。
+## 已完成
+- Server Client 接入 Skill list/activate 与 MCP server list/restart；Host 统一映射到现有 SDK 数据结构。
+- `/skill:name 参数` 优先调用当前官方会话的 Skill 激活接口；该接口本身会启动一轮，不再重复发送参数。
+- Skills 页兼容 Server 无 Plugin 列表的情况；MCP 页展示当前会话运行态、工具数、错误并支持重启。
+- 版本号三处同步到 v2.9.144；新增独立真实探针脚本。
+## 验证
+- 真实 0.17.1 Server 探针通过：13 个 Skill、项目 Skill 激活成功；1 个 MCP connected、2 个工具；缺失服务 restart 返回 40408。
+- 全量测试 21 个文件、176/176 通过；`pnpm build` 通过，renderer hash：`assets/index-BQVv66qF.js`。
+## 下一步
+- 跑全量测试后提交本轮；随后进入 fork / children 会话树 UI。

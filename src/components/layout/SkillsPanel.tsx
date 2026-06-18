@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Upload } from "lucide-react";
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import type { KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
 
 type SkillInfo = {
@@ -55,7 +54,9 @@ export function SkillsPanel({
   const [installingMarketId, setInstallingMarketId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
-  const sdkRuntimeSessionId = currentSession?.engine === "kimi-code" ? getRuntimeSessionId(currentSession) : undefined;
+  const sdkRuntimeSessionId = currentSession?.engine === "kimi-code"
+    ? currentSession.runtimeSessionId ?? currentSession.officialSessionId ?? undefined
+    : undefined;
 
   useEffect(() => {
     setLocalActiveTab(activeTab);
@@ -70,11 +71,11 @@ export function SkillsPanel({
     ]);
     setSdkPluginRefreshing(false);
     if (!pluginRes.success) {
-      setMessage(`刷新 SDK 插件状态失败：${pluginRes.error}`);
+      setMessage(`刷新官方插件状态失败：${pluginRes.error}`);
       return;
     }
     if (!skillRes.success) {
-      setMessage(`刷新 SDK Skills 状态失败：${skillRes.error}`);
+      setMessage(`刷新官方 Skills 状态失败：${skillRes.error}`);
       return;
     }
     const nextPlugins = asArray(pluginRes.data);
@@ -87,7 +88,7 @@ export function SkillsPanel({
       setConfigDiagnostics({ warnings: [`读取配置诊断失败：${diagnosticsRes.error}`] });
     }
     const subSkillCount = nextSkills.filter((skill) => skill.isSubSkill).length;
-    setMessage(nextMessage ?? `已从官方 SDK 读取 ${nextPlugins.length} 个 Plugin、${nextSkills.length} 个 Skill${subSkillCount > 0 ? `（含 ${subSkillCount} 个 Sub-skill）` : ""}`);
+    setMessage(nextMessage ?? `已从官方运行时读取 ${nextPlugins.length} 个 Plugin、${nextSkills.length} 个 Skill${subSkillCount > 0 ? `（含 ${subSkillCount} 个 Sub-skill）` : ""}`);
   };
 
   useEffect(() => {
@@ -200,7 +201,7 @@ export function SkillsPanel({
       return;
     }
     setInstallingPlugin(true);
-    setMessage("正在通过官方 SDK 安装 Plugin...");
+    setMessage("正在通过官方运行时安装 Plugin...");
     const res = await window.api.installKimiCodePlugin({ source: url, ...(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}) });
     setInstallingPlugin(false);
     if (!res.success) {
@@ -436,20 +437,20 @@ export function SkillsPanel({
               </div>
               <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                  <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方 SDK 插件状态</div>
+                  <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方运行时插件状态</div>
                     <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 8, paddingRight: 8 }}>
                       SDK
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => void refreshSdkPlugins("已刷新官方 SDK 插件状态")}
+                    onClick={() => void refreshSdkPlugins("已刷新官方运行时插件状态")}
                     disabled={sdkPluginRefreshing || Boolean(sdkPluginToggling)}
                     className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
                     style={{ width: "100%", marginTop: 12 }}
                   >
                     <RefreshCw size={14} className={sdkPluginRefreshing ? "kimix-spin" : ""} />
-                    <span>{sdkPluginRefreshing ? "刷新中" : "刷新 SDK 状态"}</span>
+                    <span>{sdkPluginRefreshing ? "刷新中" : "刷新运行时状态"}</span>
                   </button>
                   <div
                     className={`rounded-lg border ${configWarnings.length > 0 ? "border-accent-warning/35 bg-accent-warning-light/40" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
@@ -479,7 +480,7 @@ export function SkillsPanel({
                       </div>
                     ) : (
                       <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
-                        官方 SDK 当前没有返回配置警告。
+                      官方运行时当前没有返回配置警告。
                       </div>
                     )}
                   </div>
@@ -516,7 +517,7 @@ export function SkillsPanel({
                       </div>
                     ) : (
                       <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
-                        当前 SDK 会话没有加载 Skill，或尚未刷新。
+                        当前官方会话没有加载 Skill，或尚未刷新。
                       </div>
                     )}
                   </div>
@@ -570,7 +571,7 @@ export function SkillsPanel({
                     </div>
                   ) : (
                     <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
-                      当前 SDK 会话没有已安装 Plugin，或尚未刷新。
+                      当前官方运行时没有已安装 Plugin，或尚未刷新。
                     </div>
                   )}
               </div>

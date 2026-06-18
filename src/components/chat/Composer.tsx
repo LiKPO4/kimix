@@ -1309,7 +1309,30 @@ export function Composer() {
     return false;
   };
 
-  const applySkillCommand = async (skillName: string) => {
+  const applySkillCommand = async (skillName: string, args?: string) => {
+    const runtime = await ensureOfficialRuntimeForSession();
+    if (!runtime) return false;
+    const officialSkillRes = await window.api.listKimiCodeSkills({ sessionId: runtime.runtimeSessionId });
+    if (officialSkillRes.success) {
+      const normalizedName = skillName.trim().toLowerCase();
+      const officialSkill = officialSkillRes.data.find((item) => item.name.toLowerCase() === normalizedName);
+      if (officialSkill) {
+        const activateRes = await window.api.activateKimiCodeSkill({
+          sessionId: runtime.runtimeSessionId,
+          name: officialSkill.name,
+          args: args || undefined,
+        });
+        await appendLocalEvent({
+          id: genId(),
+          type: activateRes.success ? "status_update" : "error",
+          timestamp: Date.now(),
+          message: activateRes.success ? `已激活官方 Skill：${officialSkill.name}` : `激活 Skill 失败：${activateRes.error}`,
+          source: "ui",
+        });
+        return activateRes.success ? "activated" as const : false;
+      }
+    }
+
     const skillRes = await window.api.listSkills();
     if (!skillRes.success) {
       await appendLocalEvent({
@@ -1368,7 +1391,7 @@ export function Composer() {
       ],
       updatedAt: Date.now(),
     }));
-    return true;
+    return "enabled" as const;
   };
 
   const handleSend = async () => {
@@ -1399,8 +1422,8 @@ export function Composer() {
       setImageAttachments([]);
       setEditingPendingId(null);
       inputRef.current?.reset();
-      const applied = await applySkillCommand(skillName);
-      if (applied && (restContent || imagesToSend.length > 0)) {
+      const applied = await applySkillCommand(skillName, restContent || undefined);
+      if (applied === "enabled" && (restContent || imagesToSend.length > 0)) {
         if (hasActiveAssistantTurn && currentSession) {
           addPendingMessage(currentSession.id, restContent, toUserAttachments(imagesToSend));
           if (imagesToSend.length > 0) {

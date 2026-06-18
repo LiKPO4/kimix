@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Cable, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
+import { useAppStore } from "@/stores/appStore";
+import type { KimiCodeMcpServerInfo } from "@electron/types/ipc";
 
 type KimiAuthStatus = {
   available: boolean;
@@ -167,6 +169,10 @@ function KeyValueListEditor({
 }
 
 export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: () => void; embedded?: boolean }) {
+  const currentSession = useAppStore((state) => state.currentSession);
+  const runtimeSessionId = currentSession?.engine === "kimi-code"
+    ? currentSession.runtimeSessionId ?? currentSession.officialSessionId ?? undefined
+    : undefined;
   const [auth, setAuth] = useState<KimiAuthStatus | null>(null);
   const [servers, setServers] = useState<McpServerInfo[]>([]);
   const [pluginServers, setPluginServers] = useState<PluginMcpServerInfo[]>([]);
@@ -177,12 +183,16 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState<AddFormState>(() => createEmptyForm());
   const [lastTestOutput, setLastTestOutput] = useState<Record<string, string>>({});
+  const [runtimeServers, setRuntimeServers] = useState<KimiCodeMcpServerInfo[]>([]);
 
   const refresh = async (nextMessage?: string) => {
     setLoading(true);
-    const [authRes, listRes] = await Promise.all([
+    const [authRes, listRes, runtimeRes] = await Promise.all([
       window.api.getKimiAuthStatus(),
       window.api.listMcpServers(),
+      runtimeSessionId
+        ? window.api.listKimiCodeMcpServers({ sessionId: runtimeSessionId })
+        : Promise.resolve(null),
     ]);
     setLoading(false);
     if (!authRes.success) {
@@ -197,13 +207,14 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     setAuth(authRes.data);
     setServers(listRes.data.servers);
     setPluginServers(listRes.data.pluginServers ?? []);
+    setRuntimeServers(runtimeRes?.success ? runtimeRes.data : []);
     setConfigPath(listRes.data.configPath);
     setMessage(nextMessage ?? authRes.data.message);
   };
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [runtimeSessionId]);
 
   useEffect(() => {
     const handleAuthChanged = () => {
@@ -220,6 +231,21 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const handleRestartRuntimeServer = async (server: KimiCodeMcpServerInfo) => {
+    if (!runtimeSessionId) return;
+    await runBusy(`restart-runtime:${server.id ?? server.name}`, async () => {
+      const res = await window.api.reconnectKimiCodeMcpServer({
+        sessionId: runtimeSessionId,
+        name: server.id ?? server.name,
+      });
+      if (!res.success) {
+        setMessage(`重启 ${server.name} 失败：${res.error}`);
+        return;
+      }
+      await refresh(`已请求官方 Server 重启 ${server.name}`);
+    });
   };
 
   const handleAddServer = async () => {
@@ -537,6 +563,54 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
             )}
 
             <div className="grid min-w-0" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+              {runtimeSessionId && (
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "18px 18px 16px", gridColumn: "1 / -1" }}>
+                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14 }}>
+                    <div className="min-w-0">
+                      <div className="flex items-center text-[15px] font-medium text-[var(--kimix-panel-text)]" style={{ gap: 8 }}>
+                        <Cable size={15} />
+                        <span>当前会话运行态</span>
+                      </div>
+                      <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
+                        来自官方 Kimi Server；显示实际连接状态、工具数量，并可按服务重启。
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[11px] font-medium text-[var(--kimix-panel-badge-text)]" style={{ height: 28, minWidth: 62, paddingLeft: 12, paddingRight: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {runtimeServers.length} 个服务
+                    </div>
+                  </div>
+                  {runtimeServers.length > 0 ? (
+                    <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                      {runtimeServers.map((server) => (
+                        <div key={server.id ?? server.name} className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ padding: "13px 14px 12px" }}>
+                          <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14 }}>
+                            <div className="min-w-0">
+                              <div className="truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">{server.name}</div>
+                              <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                                {server.transport.toUpperCase()} · {server.toolCount} 个工具 · {server.status === "connected" ? "已连接" : server.status === "pending" ? "连接中" : server.status === "failed" ? "连接失败" : "未连接"}
+                              </div>
+                              {server.error && <div className="break-all text-[12px] leading-5 text-accent-danger" style={{ marginTop: 5 }}>{server.error}</div>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleRestartRuntimeServer(server)}
+                              disabled={Boolean(busyAction)}
+                              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
+                            >
+                              <RefreshCw size={14} className={busyAction === `restart-runtime:${server.id ?? server.name}` ? "animate-spin" : ""} />
+                              <span>{busyAction === `restart-runtime:${server.id ?? server.name}` ? "重启中" : "重启"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 14 }}>
+                      当前官方 Server 会话没有加载 MCP 服务。
+                    </div>
+                  )}
+                </div>
+              )}
               {pluginServers.length > 0 && (
                 <div className="kimix-soft-card rounded-xl" style={{ padding: "18px 18px 16px", gridColumn: "1 / -1" }}>
                   <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--kimix-panel-text)]">

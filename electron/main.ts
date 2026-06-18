@@ -6715,6 +6715,21 @@ app.whenReady().then(async () => {
   createWindow();
 });
 
+ipcMain.handle("kimi-code:activateSkill", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    const name = typeof req.name === "string" ? req.name.trim() : "";
+    const args = typeof req.args === "string" && req.args.trim() ? req.args.trim() : undefined;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    if (!name) return { success: false, error: "Missing skill name" };
+    await kimiCodeHost.activateSkill(sessionId, name, args);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:listChildSessions", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

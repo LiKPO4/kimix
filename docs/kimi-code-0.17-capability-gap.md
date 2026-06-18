@@ -19,6 +19,9 @@
 - Server BTW 已按官方 `agent_id` 隔离 WebSocket 事件并汇总正文、思考和结束原因，复用现有 BTW 面板。
 - Kimix 本地归档迁移会同步调用 Server `session:archive`，并继续写入本地 tombstone 防止历史恢复回流。
 - Server session status 会在会话注册和 prompt 完成后回填 context tokens/limit/usage，并复用现有 ContextRing。
+- Server Skill list / activate 已接入现有 Skills 页和 `/skill:name 参数` 入口；SDK 会话继续走同名官方 SDK 方法。
+- Server MCP list / restart 已接入现有 MCP 页，展示当前会话的真实连接状态、工具数和错误，并支持按服务 ID 重启。
+- 真实 0.17.1 探针已验证：会话发现 13 个 Skill，项目探针 Skill 激活成功；MCP 返回 1 个 connected 服务和 2 个工具；不存在服务的 restart 返回官方 `40408`。
 
 ## B. 后端已有基础，产品入口仍不完整
 
@@ -31,12 +34,11 @@
 
 按用户价值排序：
 
-1. skills：Server 的 list / activate 尚未接入；当前仍走 SDK Skill 能力。
-2. tools / MCP：Server 的 tools、MCP server list/restart 尚未接入；当前仍走 SDK/配置链路。
-3. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
-4. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
-5. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
-6. connections：连接列表只在探针层验证，尚无诊断入口。
+1. tools：Server tool catalog 尚未形成独立产品入口；MCP list/restart 已接。
+2. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
+3. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
+4. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
+5. connections：连接列表只在探针层验证，尚无诊断入口。
 
 ## D. 延后或阻塞
 
@@ -47,6 +49,5 @@
 
 ## 推荐推进顺序
 
-1. Server Skill / MCP 状态与现有管理页统一。
-2. 会话树（fork / children）正式 UI。
-3. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。
+1. 会话树（fork / children）正式 UI。
+2. 再评估 tool catalog、文件系统、connections、独立 prompt/message 查询等边际能力。

@@ -27,6 +27,24 @@ export type ServerSessionStatus = {
   context_usage: number;
 };
 
+export type ServerSkill = {
+  name: string;
+  description: string;
+  path: string;
+  source: string;
+  type?: string;
+  disable_model_invocation?: boolean;
+};
+
+export type ServerMcpServer = {
+  id: string;
+  name: string;
+  transport: "stdio" | "http" | "sse";
+  status: "connected" | "connecting" | "disconnected" | "error";
+  last_error?: string;
+  tool_count: number;
+};
+
 export type ServerBackgroundTask = {
   id: string;
   session_id: string;
@@ -174,6 +192,32 @@ export class KimiCodeServerClient {
 
   getSessionStatus(sessionId: string): Promise<ServerSessionStatus> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/status`);
+  }
+
+  async listSkills(sessionId: string): Promise<ServerSkill[]> {
+    const result = await this.request<{ skills: ServerSkill[] }>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/skills`,
+    );
+    return result.skills;
+  }
+
+  activateSkill(sessionId: string, skillName: string, args?: string): Promise<{ activated: true; skill_name: string }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/skills/${encodeURIComponent(skillName)}:activate`, {
+      method: "POST",
+      body: JSON.stringify(args ? { args } : {}),
+    });
+  }
+
+  async listMcpServers(): Promise<ServerMcpServer[]> {
+    const result = await this.request<{ servers: ServerMcpServer[] }>("/api/v1/mcp/servers");
+    return result.servers;
+  }
+
+  restartMcpServer(serverId: string): Promise<{ restarting: true }> {
+    return this.request(`/api/v1/mcp/servers/${encodeURIComponent(serverId)}:restart`, {
+      method: "POST",
+      body: "{}",
+    });
   }
 
   async listSessions(): Promise<ServerSession[]> {
