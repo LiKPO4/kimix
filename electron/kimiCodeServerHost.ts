@@ -110,6 +110,18 @@ export class KimiCodeServerHost {
     this.status = { ...this.status, routing };
   }
 
+  markFallback(error: unknown) {
+    this.child?.kill();
+    this.child = null;
+    this.status = {
+      ...this.status,
+      state: "fallback",
+      routing: "sdk",
+      managed: false,
+      error: errorMessage(error),
+    };
+  }
+
   async start(): Promise<KimiCodeServerHostStatus> {
     if (!this.status.enabled) return this.getStatus();
     if (this.status.state === "attached" || this.status.state === "managed") return this.getStatus();

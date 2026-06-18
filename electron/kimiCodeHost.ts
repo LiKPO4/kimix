@@ -543,23 +543,31 @@ export function setKimiCodeStatusSink(sink: StatusSink | null) {
 
 export async function createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
   if (shouldRouteNewSessionToServer()) {
-    const client = getServerClient();
-    const session = await client.createSession(options);
-    return registerServerSession(session, options.workDir, options);
+    try {
+      const client = getServerClient();
+      const session = await client.createSession(options);
+      return registerServerSession(session, options.workDir, options);
+    } catch (error) {
+      markServerRuntimeFailure(error);
+      console.warn("[KimiCodeServerHost] create session failed; falling back to SDK:", error);
+    }
   }
-  const sdkHarness = await getHarness();
-  const session = await sdkHarness.createSession(options);
-  return registerSession(session, "idle", options.permission ?? "manual");
+  return createSdkSession(options);
 }
 
 export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSession> {
   const existingServer = serverSessions.get(sessionId);
   if (existingServer) return toServerEngineSession(existingServer);
   if (shouldRouteNewSessionToServer()) {
-    const client = getServerClient();
-    const session = await client.getSession(sessionId);
-    const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : process.cwd();
-    return registerServerSession(session, workDir, {});
+    try {
+      const client = getServerClient();
+      const session = await client.getSession(sessionId);
+      const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : process.cwd();
+      return registerServerSession(session, workDir, {});
+    } catch (error) {
+      markServerRuntimeFailure(error);
+      console.warn("[KimiCodeServerHost] resume session failed; falling back to SDK:", error);
+    }
   }
   const existing = sessions.get(sessionId);
   if (existing) return toEngineSession(existing.session, existing.status);
@@ -579,6 +587,12 @@ export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSe
     // Best effort: fall back to "manual" if the status read fails.
   }
   return registerSession(session, "idle", resumedPermission);
+}
+
+async function createSdkSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
+  const sdkHarness = await getHarness();
+  const session = await sdkHarness.createSession(options);
+  return registerSession(session, "idle", options.permission ?? "manual");
 }
 
 export async function forkSession(
@@ -706,8 +720,14 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
     try {
       await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
     } catch (error) {
-      setStatus(sessionId, "error");
-      throw error;
+      console.warn("[KimiCodeServerHost] prompt failed; falling back to SDK:", error);
+      const fallback = await fallbackServerSessionToSdk(sessionId, serverManaged, error);
+      try {
+        await fallback.session.prompt(input);
+      } catch (sdkError) {
+        setStatus(sessionId, "error");
+        throw sdkError;
+      }
     }
     return;
   }
@@ -1625,6 +1645,38 @@ async function registerServerSession(
 
 function shouldRouteNewSessionToServer() {
   return isKimiCodeServerSessionRoutingEnabled(process.env, settingsService.loadSettings()) && kimiCodeServerHost.isReady();
+}
+
+function markServerRuntimeFailure(error: unknown) {
+  kimiCodeServerHost.markFallback(error);
+  unsubscribeServerFrames?.();
+  unsubscribeServerFrames = null;
+  void serverClient?.close().catch(() => undefined);
+  serverClient = null;
+}
+
+async function fallbackServerSessionToSdk(
+  sessionId: string,
+  serverManaged: ServerManagedSession,
+  error: unknown,
+): Promise<ManagedSession> {
+  serverSessions.delete(sessionId);
+  markServerRuntimeFailure(error);
+  const sdkHarness = await getHarness();
+  const session = await sdkHarness.createSession({
+    id: sessionId,
+    workDir: serverManaged.workDir,
+    model: serverManaged.model,
+    thinking: serverManaged.thinking,
+    permission: serverManaged.permission,
+    planMode: serverManaged.planMode,
+  });
+  return sessions.get(session.id) ?? (() => {
+    registerSession(session, "running", serverManaged.permission);
+    const managed = sessions.get(session.id);
+    if (!managed) throw new Error("Kimi Code SDK fallback session registration failed");
+    return managed;
+  })();
 }
 
 function getServerClient() {

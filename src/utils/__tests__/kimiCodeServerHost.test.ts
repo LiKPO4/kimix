@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectKimiCodeServerContract, isKimiCodeServerExperimentEnabled } from "../../../electron/kimiCodeServerHost";
+import { inspectKimiCodeServerContract, isKimiCodeServerExperimentEnabled, KimiCodeServerHost } from "../../../electron/kimiCodeServerHost";
 
 describe("kimiCodeServerHost", () => {
   it("keeps the experiment opt-in", () => {
@@ -31,5 +31,17 @@ describe("kimiCodeServerHost", () => {
     expect(result.serverVersion).toBe("0.0.0");
     expect(result.websocketChannel).toBe(true);
     expect(Object.values(result.requiredPaths).every(Boolean)).toBe(true);
+  });
+
+  it("marks runtime failures as SDK fallback", () => {
+    const host = new KimiCodeServerHost({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" });
+    host.markFallback(new Error("fetch failed"));
+    expect(host.getStatus()).toMatchObject({
+      enabled: true,
+      state: "fallback",
+      routing: "sdk",
+      managed: false,
+      error: "fetch failed",
+    });
   });
 });
