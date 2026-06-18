@@ -826,6 +826,19 @@ export function Composer() {
 
       try {
         let kimiCodeSessionId = await ensureKimiCodeRuntime();
+        const markPromptDispatchStarted = () => {
+          const startedAt = Date.now();
+          updateSession(targetSession.id, (session) => ({
+            ...session,
+            events: session.events.map((event) => event.id === responsePlaceholder.id
+              ? { ...event, timestamp: startedAt }
+              : event
+            ),
+            updatedAt: startedAt,
+          }));
+          targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+        };
+        markPromptDispatchStarted();
         let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
           content: outboundContent,
@@ -835,6 +848,7 @@ export function Composer() {
           updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
           targetSession = { ...targetSession, runtimeSessionId: undefined };
           kimiCodeSessionId = await ensureKimiCodeRuntime();
+          markPromptDispatchStarted();
           res = await sendKimiCodePromptWithRetry({
             sessionId: kimiCodeSessionId,
             content: outboundContent,

@@ -179,6 +179,15 @@ export function EmptyState() {
         };
         setCurrentSession(targetSession);
       }
+      const dispatchStartedAt = Date.now();
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        events: session.events.map((event) => event.id === responsePlaceholder.id
+          ? { ...event, timestamp: dispatchStartedAt }
+          : event
+        ),
+        updatedAt: dispatchStartedAt,
+      }));
       const sendRes = await sendKimiCodePromptWithRetry({
         sessionId: runtimeSessionId,
         content: text,

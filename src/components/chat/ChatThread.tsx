@@ -1092,6 +1092,15 @@ export function ChatThread() {
     if (latest) setCurrentSession(latest);
     setRunningSessionId(session.id);
 
+    const dispatchStartedAt = Date.now();
+    updateSession(session.id, (current) => ({
+      ...current,
+      events: current.events.map((event) => event.id === placeholder.id
+        ? { ...event, timestamp: dispatchStartedAt }
+        : event
+      ),
+      updatedAt: dispatchStartedAt,
+    }));
     const res = await window.api.sendPrompt({
       sessionId: runtimeSessionId,
       content: lastPrompt.content,
