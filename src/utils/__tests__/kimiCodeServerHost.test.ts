@@ -1,0 +1,30 @@
+import { describe, expect, it } from "vitest";
+import { inspectKimiCodeServerContract, isKimiCodeServerExperimentEnabled } from "../../../electron/kimiCodeServerHost";
+
+describe("kimiCodeServerHost", () => {
+  it("keeps the experiment opt-in", () => {
+    expect(isKimiCodeServerExperimentEnabled({})).toBe(false);
+    expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
+    expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "true" })).toBe(false);
+  });
+
+  it("detects capabilities without trusting the reported version", () => {
+    const paths = Object.fromEntries([
+      "/api/v1/sessions",
+      "/api/v1/sessions/{session_id}/snapshot",
+      "/api/v1/sessions/{session_id}/prompts",
+      "/api/v1/sessions/{session_id}/approvals",
+      "/api/v1/sessions/{session_id}/questions",
+      "/api/v1/tools",
+      "/api/v1/workspaces",
+    ].map((item) => [item, {}]));
+    const result = inspectKimiCodeServerContract(
+      { server_id: "server-1", server_version: "0.0.0" },
+      { info: { version: "0.0.0" }, paths },
+      { info: { version: "0.0.0" }, channels: { kimiCodeWebSocket: {} } },
+    );
+    expect(result.serverVersion).toBe("0.0.0");
+    expect(result.websocketChannel).toBe(true);
+    expect(Object.values(result.requiredPaths).every(Boolean)).toBe(true);
+  });
+});

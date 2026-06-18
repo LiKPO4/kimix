@@ -57,6 +57,7 @@
 - 2026-06-18 v2.9.142：修复长会话从底部向上翻时进度条偶尔倒退；用户主动滚动期间暂停 ResizeObserver 锚点回补，滚动停顿后再捕获新锚点。
 - 2026-06-18 Kimi Code 0.17.1 P0：本机 CLI 已更新到 0.17.1；Kimix vendored node-sdk 从 0.9.3 刷新到 0.9.4，来源 tag `@moonshot-ai/kimi-code@0.17.1` / commit `55f865642f18768ac0ae5d0ac236f617f79c4ff1`。下一步新增官方 Server REST / WebSocket 能力探针。
 - 2026-06-18 Kimi Code 0.17.1 P1：新增 `scripts/probe-kimi-code-server.mjs`，启动官方 foreground Server 并运行官方 server-e2e 场景；health/meta/auth、OpenAPI/AsyncAPI、session snapshot、WS 重连与 seq replay、prompt、queued steer、cancel、approval、question 共 6 组全绿。下一步在实验开关后新增 Server Host，保留 vendored SDK Host 为默认回滚路径。
+- 2026-06-18 Kimi Code 0.17.1 P2.1：新增实验性 `KimiCodeServerHost`，仅在 `KIMIX_EXPERIMENTAL_KIMI_SERVER=1` 时复用或启动 foreground Server；按 endpoint / OpenAPI / AsyncAPI capability gate 验证，失败自动回退且会话流量仍走 SDK，退出时只停止 Kimix 自己启动的 Server。
 
 ## 当前目标
 停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。

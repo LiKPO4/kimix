@@ -9,6 +9,7 @@ import AdmZip from "adm-zip";
 import { z } from "zod";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
+import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
@@ -6569,11 +6570,15 @@ ipcMain.handle("window:close", () => {
 app.on("before-quit", (event) => {
   if (isQuitting) return;
   const ids = kimiCodeHost.getActiveSessionIds();
-  if (ids.length === 0) return;
+  const serverStatus = kimiCodeServerHost.getStatus();
+  if (ids.length === 0 && !serverStatus.managed) return;
   event.preventDefault();
   isQuitting = true;
   Promise.race([
-    Promise.all(ids.map((id) => kimiCodeHost.closeSession(id).catch(() => {}))),
+    Promise.all([
+      ...ids.map((id) => kimiCodeHost.closeSession(id).catch(() => {})),
+      kimiCodeServerHost.stop().catch(() => {}),
+    ]),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 10000)),
   ]).then(() => {
     app.quit();
@@ -6594,4 +6599,10 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  const serverStatus = await kimiCodeServerHost.start();
+  if (serverStatus.enabled) {
+    console.info("[KimiCodeServerHost]", serverStatus);
+  }
+  createWindow();
+});
