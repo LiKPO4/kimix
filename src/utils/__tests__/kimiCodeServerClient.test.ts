@@ -70,6 +70,24 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("reads messages and prompt queue through official diagnostic routes", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(url);
+      const data = url.includes("/messages?")
+        ? { items: [{ id: "m1", session_id: "session/1", role: "user", content: [], created_at: "2026-06-18T00:00:00Z" }], has_more: true }
+        : { active: { prompt_id: "p1", user_message_id: "m1", status: "running", created_at: "2026-06-18T00:00:00Z" }, queued: [] };
+      return new Response(JSON.stringify({ code: 0, data }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.listMessages("session/1", 20)).resolves.toMatchObject({ has_more: true });
+    await expect(client.listPrompts("session/1")).resolves.toMatchObject({ active: { prompt_id: "p1" }, queued: [] });
+    expect(calls).toEqual([
+      "http://127.0.0.1:58627/api/v1/sessions/session%2F1/messages?page_size=20",
+      "http://127.0.0.1:58627/api/v1/sessions/session%2F1/prompts",
+    ]);
+  });
+
   it("merges official children with Kimix fork metadata for the session tree", () => {
     const child = { id: "child-1", status: "idle", metadata: { parent_session_id: "parent" } };
     const fork = { id: "fork-1", status: "idle", metadata: { forkedFrom: "parent" } };

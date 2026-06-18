@@ -41,7 +41,7 @@
 按用户价值排序：
 
 1. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
-2. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
+2. messages / prompts：已在 Kimi 自检接入只读摘要；最近消息数量/角色分布、active/queued prompt 可诊断，不回灌正文或形成第二套历史。
 
 ## D. 延后或阻塞
 
@@ -53,6 +53,5 @@
 
 ## 推荐推进顺序
 
-1. 为 messages / prompts 查询增加诊断入口。
-2. 评估模型目录对现有模型设置的只读增强。
-3. files/workspace 等低边际能力暂不推进。
+1. 评估模型目录对现有模型设置的只读增强。
+2. files/workspace 等低边际能力暂不推进。

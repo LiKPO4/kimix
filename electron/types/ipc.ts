@@ -1481,6 +1481,17 @@ export type KimiCodeServerRuntimeDiagnostics = {
   tools: KimiCodeServerToolInfo[];
   mcpServers: KimiCodeMcpServerInfo[];
   connections: KimiCodeServerConnectionInfo[];
+  messages: {
+    sampled: number;
+    hasMore: boolean;
+    roles: Record<string, number>;
+    latestCreatedAt: string | null;
+  };
+  prompts: {
+    activeId: string | null;
+    activeStatus: string | null;
+    queuedCount: number;
+  };
 };
 
 export type KimiCodeServerModelCatalog = {

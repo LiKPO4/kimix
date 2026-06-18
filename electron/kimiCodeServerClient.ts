@@ -101,6 +101,22 @@ export type ServerBackgroundTask = {
   output_bytes?: number;
 };
 
+export type ServerMessageSummary = {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant" | "tool" | "system";
+  content: unknown[];
+  created_at: string;
+  prompt_id?: string;
+};
+
+export type ServerPromptSummary = {
+  prompt_id: string;
+  user_message_id: string;
+  status: string;
+  created_at: string;
+};
+
 export type ServerTerminal = {
   id: string;
   session_id: string;
@@ -277,6 +293,15 @@ export class KimiCodeServerClient {
   async listConnections(): Promise<ServerConnection[]> {
     const result = await this.request<{ connections: ServerConnection[] }>("/api/v1/connections");
     return result.connections;
+  }
+
+  listMessages(sessionId: string, pageSize = 20): Promise<{ items: ServerMessageSummary[]; has_more: boolean }> {
+    const query = new URLSearchParams({ page_size: String(Math.max(1, Math.min(100, pageSize))) });
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages?${query}`);
+  }
+
+  listPrompts(sessionId: string): Promise<{ active: ServerPromptSummary | null; queued: ServerPromptSummary[] }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`);
   }
 
   getAuthSummary(): Promise<ServerAuthSummary> {

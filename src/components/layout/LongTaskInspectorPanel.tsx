@@ -430,6 +430,8 @@ export function LongTaskInspectorPanel({
         liveCurrentSession ? `会话：${runtimeId ? "已绑定 Kimi Code" : "缺少 runtime id"}` : "会话：未选择会话",
         ...(serverRuntimeRes.success ? [
           `Server：${serverRuntimeRes.data.tools.length} 个工具，${serverRuntimeRes.data.mcpServers.length} 个 MCP，${serverRuntimeRes.data.connections.filter((connection) => connection.subscribedToCurrentSession).length} 个当前订阅连接`,
+          `消息诊断：最近 ${serverRuntimeRes.data.messages.sampled} 条${serverRuntimeRes.data.messages.hasMore ? "（仍有更早记录）" : ""}；角色 ${Object.entries(serverRuntimeRes.data.messages.roles).map(([role, count]) => `${role} ${count}`).join(" / ") || "无"}`,
+          `Prompt 诊断：${serverRuntimeRes.data.prompts.activeId ? `active ${serverRuntimeRes.data.prompts.activeStatus ?? "unknown"}` : "无 active"}，队列 ${serverRuntimeRes.data.prompts.queuedCount}`,
         ] : []),
       ];
       const issueCount = [cliOk, authOk, modelOk, projectPathForKimi ? gitOk : true, liveCurrentSession ? sessionOk : true, serverRuntimeOk].filter((ok) => !ok).length;
@@ -1639,7 +1641,7 @@ export function LongTaskInspectorPanel({
                     ))}
                   </div>
                   <div className="flex flex-col" style={{ gap: 7, marginTop: 10 }}>
-                    {(kimiHealth?.details ?? ["正在检测 Kimi Code 状态..."]).slice(0, 6).map((detail, index) => (
+                    {(kimiHealth?.details ?? ["正在检测 Kimi Code 状态..."]).slice(0, 8).map((detail, index) => (
                       <div key={`${index}-${detail}`} className="truncate text-[12px] leading-5 text-text-muted" title={detail}>
                         {detail}
                       </div>

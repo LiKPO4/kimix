@@ -201,6 +201,17 @@ export type KimiCodeServerRuntimeDiagnostics = {
     subscriptions: string[];
     subscribedToCurrentSession: boolean;
   }>;
+  messages: {
+    sampled: number;
+    hasMore: boolean;
+    roles: Record<string, number>;
+    latestCreatedAt: string | null;
+  };
+  prompts: {
+    activeId: string | null;
+    activeStatus: string | null;
+    queuedCount: number;
+  };
 };
 
 export type KimiCodeServerModelCatalog = {
@@ -1066,11 +1077,13 @@ export async function reconnectMcpServer(sessionId: string, name: string): Promi
 export async function getServerRuntimeDiagnostics(sessionId: string): Promise<KimiCodeServerRuntimeDiagnostics> {
   if (!serverSessions.has(sessionId)) throw new Error("官方 Server 运行时诊断仅适用于 Server 会话。");
   const client = getServerClient();
-  const [status, tools, mcpServers, connections] = await Promise.all([
+  const [status, tools, mcpServers, connections, messages, prompts] = await Promise.all([
     client.getSessionStatus(sessionId),
     client.listTools(sessionId),
     client.listMcpServers(),
     client.listConnections(),
+    client.listMessages(sessionId, 20),
+    client.listPrompts(sessionId),
   ]);
   return {
     session: serverStatusToKimiCodeStatus(status, serverSessions.get(sessionId)?.session.usage),
@@ -1091,6 +1104,22 @@ export async function getServerRuntimeDiagnostics(sessionId: string): Promise<Ki
       subscriptions: connection.subscriptions,
       subscribedToCurrentSession: connection.subscriptions.includes(sessionId),
     })),
+    messages: {
+      sampled: messages.items.length,
+      hasMore: messages.has_more,
+      roles: messages.items.reduce<Record<string, number>>((counts, message) => {
+        counts[message.role] = (counts[message.role] ?? 0) + 1;
+        return counts;
+      }, {}),
+      latestCreatedAt: messages.items.reduce<string | null>((latest, message) => (
+        !latest || Date.parse(message.created_at) > Date.parse(latest) ? message.created_at : latest
+      ), null),
+    },
+    prompts: {
+      activeId: prompts.active?.prompt_id ?? null,
+      activeStatus: prompts.active?.status ?? null,
+      queuedCount: prompts.queued.length,
+    },
   };
 }
 
