@@ -127,11 +127,13 @@ import type {
   KimiCodeBackgroundTaskOutputPathResponse,
   KimiCodeBackgroundTaskOutputResponse,
   KimiCodeBackgroundTaskRequest,
+  KimiCodeChildSessionRequest,
   KimiCodeInstallPluginRequest,
   KimiCodeListBackgroundTasksRequest,
   KimiCodeListBackgroundTasksResponse,
   KimiCodeListSessionsRequest,
   KimiCodeListSessionsResponse,
+  KimiCodeListServerTerminalsResponse,
   KimiCodeLoadSessionRequest,
   KimiCodeLoadSessionResponse,
   KimiCodeListMcpServersResponse,
@@ -156,6 +158,8 @@ import type {
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
+  KimiCodeServerTerminalRequest,
+  KimiCodeServerTerminalResponse,
   KimiCodeSwarmRequest,
   KimiCodeUndoHistoryRequest,
   KimiCodeSetPluginEnabledRequest,
@@ -346,6 +350,10 @@ const api = {
     ipcRenderer.invoke("kimi-code:resumeSession", req),
   forkKimiCodeSession: (req: KimiCodeForkSessionRequest): Promise<KimiCodeSessionResponse> =>
     ipcRenderer.invoke("kimi-code:forkSession", req),
+  listKimiCodeChildSessions: (req: KimiCodeSessionRequest): Promise<KimiCodeListSessionsResponse> =>
+    ipcRenderer.invoke("kimi-code:listChildSessions", req),
+  createKimiCodeChildSession: (req: KimiCodeChildSessionRequest): Promise<KimiCodeSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:createChildSession", req),
   renameKimiCodeSession: (req: KimiCodeRenameSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:renameSession", req),
   reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
@@ -404,6 +412,20 @@ const api = {
     ipcRenderer.invoke("kimi-code:getBackgroundTaskOutputPath", req),
   stopKimiCodeBackgroundTask: (req: KimiCodeBackgroundTaskRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:stopBackgroundTask", req),
+  listKimiCodeServerTerminals: (req: KimiCodeSessionRequest): Promise<KimiCodeListServerTerminalsResponse> =>
+    ipcRenderer.invoke("kimi-code:listServerTerminals", req),
+  createKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<KimiCodeServerTerminalResponse> =>
+    ipcRenderer.invoke("kimi-code:createServerTerminal", req),
+  closeKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:closeServerTerminal", req),
+  attachKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<{ success: boolean; data?: unknown; error?: string }> =>
+    ipcRenderer.invoke("kimi-code:attachServerTerminal", req),
+  detachKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:detachServerTerminal", req),
+  writeKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:writeServerTerminal", req),
+  resizeKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:resizeServerTerminal", req),
   listKimiCodeSessions: (req?: KimiCodeListSessionsRequest): Promise<KimiCodeListSessionsResponse> =>
     ipcRenderer.invoke("kimi-code:listSessions", req),
   closeKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>

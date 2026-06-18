@@ -11,6 +11,7 @@ import {
   KimiCodeServerClient,
   type ServerFrame,
   type ServerSession,
+  type ServerTerminal,
 } from "./kimiCodeServerClient";
 
 type JsonObject = Record<string, unknown>;
@@ -195,6 +196,19 @@ export type KimiCodeBackgroundTaskInfo = {
   agentId?: string;
   subagentType?: string;
   failureReason?: string;
+};
+
+export type KimiCodeServerTerminalInfo = {
+  id: string;
+  sessionId: string;
+  cwd: string;
+  shell: string;
+  cols: number;
+  rows: number;
+  status: "running" | "exited";
+  createdAt: string;
+  exitedAt?: string;
+  exitCode?: number | null;
 };
 
 export type KimiCodeExportSessionInput = {
@@ -512,6 +526,20 @@ export async function forkSession(
   sessionId: string,
   options: { forkId?: string; title?: string; metadata?: JsonObject } = {},
 ): Promise<KimiCodeEngineSession> {
+  const parent = serverSessions.get(sessionId);
+  if (parent) {
+    const session = await getServerClient().forkSession(sessionId, {
+      title: options.title,
+      metadata: options.metadata,
+    });
+    const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : parent.workDir;
+    return registerServerSession(session, workDir, {
+      model: parent.model,
+      thinking: parent.thinking,
+      permission: parent.permission,
+      planMode: parent.planMode,
+    });
+  }
   const sdkHarness = await getHarness();
   if (!sdkHarness.forkSession) throw new Error("当前 Kimi Code SDK 不支持会话派生。");
   const session = await sdkHarness.forkSession({
@@ -532,13 +560,45 @@ export async function forkSession(
   return registerSession(session, "idle", forkPermission);
 }
 
+export async function listChildSessions(sessionId: string): Promise<KimiCodeSessionSummary[]> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方子会话列表当前仅由实验性 Kimi Server 提供。");
+  return (await getServerClient().listChildren(sessionId)).map(serverSessionSummary);
+}
+
+export async function createChildSession(
+  sessionId: string,
+  options: { title?: string; metadata?: JsonObject } = {},
+): Promise<KimiCodeEngineSession> {
+  const parent = serverSessions.get(sessionId);
+  if (!parent) throw new Error("官方子会话创建当前仅由实验性 Kimi Server 提供。");
+  const session = await getServerClient().createChild(sessionId, options);
+  const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : parent.workDir;
+  return registerServerSession(session, workDir, {
+    model: parent.model,
+    thinking: parent.thinking,
+    permission: parent.permission,
+    planMode: parent.planMode,
+  });
+}
+
 export async function renameSession(sessionId: string, title: string): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    serverManaged.session = await getServerClient().renameSession(sessionId, title);
+    return;
+  }
   const sdkHarness = await getHarness();
   if (!sdkHarness.renameSession) throw new Error("当前 Kimi Code SDK 不支持会话重命名。");
   await sdkHarness.renameSession({ id: sessionId, title });
 }
 
 export async function reloadSession(sessionId: string): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    serverManaged.session = await getServerClient().getSession(sessionId);
+    setStatus(sessionId, mapServerStatus(serverManaged.session.status));
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.reloadSession) throw new Error("当前 Kimi Code SDK 不支持会话重载。");
   await managed.session.reloadSession();
@@ -870,27 +930,94 @@ export async function reconnectMcpServer(sessionId: string, name: string): Promi
 }
 
 export async function listBackgroundTasks(sessionId: string, options: { activeOnly?: boolean; limit?: number } = {}): Promise<KimiCodeBackgroundTaskInfo[]> {
+  if (serverSessions.has(sessionId)) {
+    const tasks = await getServerClient().listTasks(sessionId, options.activeOnly ? "running" : undefined);
+    const mapped = tasks.map((task) => ({
+      taskId: task.id,
+      command: task.command ?? "",
+      description: task.description,
+      status: task.status === "cancelled" ? "killed" as const : task.status,
+      pid: 0,
+      exitCode: null,
+      startedAt: Date.parse(task.started_at ?? task.created_at),
+      endedAt: task.completed_at ? Date.parse(task.completed_at) : null,
+      subagentType: task.kind,
+    }));
+    return options.limit ? mapped.slice(0, options.limit) : mapped;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.listBackgroundTasks) throw new Error("Official Kimi Code SDK does not expose listBackgroundTasks on this session");
   return [...await managed.session.listBackgroundTasks(options)];
 }
 
 export async function getBackgroundTaskOutput(sessionId: string, taskId: string, options: { tail?: number } = {}): Promise<string> {
+  if (serverSessions.has(sessionId)) {
+    const task = await getServerClient().getTask(sessionId, taskId, Math.max(1_024, (options.tail ?? 200) * 256));
+    return task.output_preview ?? "";
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.getBackgroundTaskOutput) throw new Error("Official Kimi Code SDK does not expose getBackgroundTaskOutput on this session");
   return managed.session.getBackgroundTaskOutput(taskId, options);
 }
 
 export async function getBackgroundTaskOutputPath(sessionId: string, taskId: string): Promise<string | undefined> {
+  if (serverSessions.has(sessionId)) return undefined;
   const managed = getManagedSession(sessionId);
   if (!managed.session.getBackgroundTaskOutputPath) throw new Error("Official Kimi Code SDK does not expose getBackgroundTaskOutputPath on this session");
   return managed.session.getBackgroundTaskOutputPath(taskId);
 }
 
 export async function stopBackgroundTask(sessionId: string, taskId: string, reason?: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    await getServerClient().cancelTask(sessionId, taskId);
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.stopBackgroundTask) throw new Error("Official Kimi Code SDK does not expose stopBackgroundTask on this session");
   await managed.session.stopBackgroundTask(taskId, reason ? { reason } : {});
+}
+
+export async function listServerTerminals(sessionId: string): Promise<KimiCodeServerTerminalInfo[]> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  return (await getServerClient().listTerminals(sessionId)).map(toServerTerminalInfo);
+}
+
+export async function createServerTerminal(
+  sessionId: string,
+  options: { cwd?: string; shell?: string; cols?: number; rows?: number } = {},
+): Promise<KimiCodeServerTerminalInfo> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  return toServerTerminalInfo(await getServerClient().createTerminal(sessionId, options));
+}
+
+export async function closeServerTerminal(sessionId: string, terminalId: string): Promise<void> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  await getServerClient().closeTerminal(sessionId, terminalId);
+}
+
+export async function attachServerTerminal(sessionId: string, terminalId: string, sinceSeq?: number): Promise<unknown> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  return getServerClient().attachTerminal(sessionId, terminalId, sinceSeq);
+}
+
+export async function detachServerTerminal(sessionId: string, terminalId: string): Promise<void> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  await getServerClient().detachTerminal(sessionId, terminalId);
+}
+
+export async function writeServerTerminal(sessionId: string, terminalId: string, data: string): Promise<void> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  await getServerClient().writeTerminal(sessionId, terminalId, data);
+}
+
+export async function resizeServerTerminal(
+  sessionId: string,
+  terminalId: string,
+  cols: number,
+  rows: number,
+): Promise<void> {
+  if (!serverSessions.has(sessionId)) throw new Error("官方终端当前仅由实验性 Kimi Server 提供。");
+  await getServerClient().resizeTerminal(sessionId, terminalId, cols, rows);
 }
 
 // Lazily-created session for plugin management when no chat session is active.
@@ -950,6 +1077,14 @@ export async function setPluginMcpServerEnabled(id: string, server: string, enab
 }
 
 export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
+  if (shouldRouteNewSessionToServer()) {
+    const normalizedWorkDir = workDir ? path.resolve(workDir).toLowerCase() : undefined;
+    return (await getServerClient().listSessions())
+      .filter((session) => !normalizedWorkDir || (
+        typeof session.metadata?.cwd === "string" && path.resolve(session.metadata.cwd).toLowerCase() === normalizedWorkDir
+      ))
+      .map(serverSessionSummary);
+  }
   const sdkHarness = await getHarness();
   const sessions = [...await sdkHarness.listSessions(workDir ? { workDir } : {})];
   // SDK may return empty title/lastPrompt; backfill from state.json if available.
@@ -1366,6 +1501,35 @@ function mapServerStatus(status: string): KimiCodeEngineStatus {
 
 function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSession {
   return { sessionId: managed.session.id, workDir: managed.workDir, status: managed.status };
+}
+
+function serverSessionSummary(session: ServerSession): KimiCodeSessionSummary {
+  const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : "";
+  return {
+    id: session.id,
+    title: session.title,
+    workDir,
+    sessionDir: "",
+    createdAt: session.created_at ? Date.parse(session.created_at) : 0,
+    updatedAt: session.updated_at ? Date.parse(session.updated_at) : 0,
+    archived: session.archived,
+    metadata: session.metadata,
+  };
+}
+
+function toServerTerminalInfo(terminal: ServerTerminal): KimiCodeServerTerminalInfo {
+  return {
+    id: terminal.id,
+    sessionId: terminal.session_id,
+    cwd: terminal.cwd,
+    shell: terminal.shell,
+    cols: terminal.cols,
+    rows: terminal.rows,
+    status: terminal.status,
+    createdAt: terminal.created_at,
+    exitedAt: terminal.exited_at,
+    exitCode: terminal.exit_code,
+  };
 }
 
 function waitForBtwRun(run: BtwRun, timeoutMs: number): Promise<void> {

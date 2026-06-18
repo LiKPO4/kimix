@@ -4,10 +4,42 @@ export type ServerPromptPart =
 
 export type ServerSession = {
   id: string;
+  workspace_id?: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
   status: string;
+  archived?: boolean;
   metadata?: Record<string, unknown>;
   agent_config?: Record<string, unknown>;
   usage?: Record<string, unknown>;
+};
+
+export type ServerBackgroundTask = {
+  id: string;
+  session_id: string;
+  kind: "subagent" | "bash" | "tool";
+  description: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  command?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  output_preview?: string;
+  output_bytes?: number;
+};
+
+export type ServerTerminal = {
+  id: string;
+  session_id: string;
+  cwd: string;
+  shell: string;
+  cols: number;
+  rows: number;
+  status: "running" | "exited";
+  created_at: string;
+  exited_at?: string;
+  exit_code?: number | null;
 };
 
 export type ServerFrame = {
@@ -105,10 +137,50 @@ export class KimiCodeServerClient {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}`);
   }
 
+  async listSessions(): Promise<ServerSession[]> {
+    const sessions: ServerSession[] = [];
+    let afterId: string | undefined;
+    for (let page = 0; page < 100; page += 1) {
+      const query = new URLSearchParams({ page_size: "100" });
+      if (afterId) query.set("after_id", afterId);
+      const result = await this.request<{ items: ServerSession[]; has_more: boolean }>(`/api/v1/sessions?${query}`);
+      sessions.push(...result.items);
+      if (!result.has_more || result.items.length === 0) break;
+      afterId = result.items.at(-1)?.id;
+    }
+    return sessions;
+  }
+
+  forkSession(sessionId: string, body: { title?: string; metadata?: Record<string, unknown> } = {}) {
+    return this.request<ServerSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}:fork`, {
+      method: "POST", body: JSON.stringify(body),
+    });
+  }
+
+  async listChildren(sessionId: string): Promise<ServerSession[]> {
+    const result = await this.request<{ items: ServerSession[] }>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/children?page_size=100`,
+    );
+    return result.items;
+  }
+
+  createChild(sessionId: string, body: { title?: string; metadata?: Record<string, unknown> } = {}) {
+    return this.request<ServerSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/children`, {
+      method: "POST", body: JSON.stringify(body),
+    });
+  }
+
   updateSession(sessionId: string, agentConfig: Record<string, unknown>): Promise<ServerSession> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/profile`, {
       method: "POST",
       body: JSON.stringify({ agent_config: agentConfig }),
+    });
+  }
+
+  renameSession(sessionId: string, title: string): Promise<ServerSession> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/profile`, {
+      method: "POST",
+      body: JSON.stringify({ title }),
     });
   }
 
@@ -157,6 +229,71 @@ export class KimiCodeServerClient {
 
   abort(sessionId: string): Promise<unknown> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:abort`, { method: "POST", body: "{}" });
+  }
+
+  async listTasks(sessionId: string, status?: ServerBackgroundTask["status"]): Promise<ServerBackgroundTask[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    const result = await this.request<{ items: ServerBackgroundTask[] }>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks${query}`,
+    );
+    return result.items;
+  }
+
+  getTask(sessionId: string, taskId: string, outputBytes = 65_536): Promise<ServerBackgroundTask> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}?with_output=true&output_bytes=${outputBytes}`);
+  }
+
+  cancelTask(sessionId: string, taskId: string): Promise<{ cancelled: boolean }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}:cancel`, {
+      method: "POST", body: "{}",
+    });
+  }
+
+  async listTerminals(sessionId: string): Promise<ServerTerminal[]> {
+    const result = await this.request<{ items: ServerTerminal[] }>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/terminals`,
+    );
+    return result.items;
+  }
+
+  createTerminal(sessionId: string, body: { cwd?: string; shell?: string; cols?: number; rows?: number } = {}) {
+    return this.request<ServerTerminal>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/terminals`, {
+      method: "POST", body: JSON.stringify(body),
+    });
+  }
+
+  getTerminal(sessionId: string, terminalId: string) {
+    return this.request<ServerTerminal>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/terminals/${encodeURIComponent(terminalId)}`);
+  }
+
+  closeTerminal(sessionId: string, terminalId: string): Promise<{ closed: true }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/terminals/${encodeURIComponent(terminalId)}:close`, {
+      method: "POST", body: "{}",
+    });
+  }
+
+  async attachTerminal(sessionId: string, terminalId: string, sinceSeq?: number): Promise<unknown> {
+    await this.ensureConnected();
+    const ack = await this.sendControl("terminal_attach", {
+      session_id: sessionId, terminal_id: terminalId, since_seq: sinceSeq,
+    });
+    if (ack.code !== 0) throw new Error(`Kimi Server terminal attach 失败：${ack.msg ?? ack.code}`);
+    return ack.payload;
+  }
+
+  async detachTerminal(sessionId: string, terminalId: string): Promise<void> {
+    const ack = await this.sendControl("terminal_detach", { session_id: sessionId, terminal_id: terminalId });
+    if (ack.code !== 0) throw new Error(`Kimi Server terminal detach 失败：${ack.msg ?? ack.code}`);
+  }
+
+  async writeTerminal(sessionId: string, terminalId: string, data: string): Promise<void> {
+    const ack = await this.sendControl("terminal_input", { session_id: sessionId, terminal_id: terminalId, data });
+    if (ack.code !== 0) throw new Error(`Kimi Server terminal input 失败：${ack.msg ?? ack.code}`);
+  }
+
+  async resizeTerminal(sessionId: string, terminalId: string, cols: number, rows: number): Promise<void> {
+    const ack = await this.sendControl("terminal_resize", { session_id: sessionId, terminal_id: terminalId, cols, rows });
+    if (ack.code !== 0) throw new Error(`Kimi Server terminal resize 失败：${ack.msg ?? ack.code}`);
   }
 
   resolveApproval(sessionId: string, approvalId: string, body: Record<string, unknown>): Promise<unknown> {

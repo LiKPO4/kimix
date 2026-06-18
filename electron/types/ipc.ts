@@ -1473,6 +1473,19 @@ export type KimiCodeBackgroundTaskInfo = {
   failureReason?: string;
 };
 
+export type KimiCodeServerTerminalInfo = {
+  id: string;
+  sessionId: string;
+  cwd: string;
+  shell: string;
+  cols: number;
+  rows: number;
+  status: "running" | "exited";
+  createdAt: string;
+  exitedAt?: string;
+  exitCode?: number | null;
+};
+
 export type KimiCodePluginSummary = {
   id: string;
   displayName: string;
@@ -1672,6 +1685,22 @@ export type KimiCodeBackgroundTaskRequest = {
   reason?: string;
 };
 
+export type KimiCodeChildSessionRequest = {
+  sessionId: string;
+  title?: string;
+};
+
+export type KimiCodeServerTerminalRequest = {
+  sessionId: string;
+  terminalId?: string;
+  cwd?: string;
+  shell?: string;
+  cols?: number;
+  rows?: number;
+  sinceSeq?: number;
+  data?: string;
+};
+
 export type KimiCodeInstallPluginRequest = {
   sessionId?: string;
   source: string;
@@ -1821,6 +1850,22 @@ export type KimiCodeBackgroundTaskOutputResponse = {
 export type KimiCodeBackgroundTaskOutputPathResponse = {
   success: true;
   data?: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeServerTerminalResponse = {
+  success: true;
+  data: KimiCodeServerTerminalInfo;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeListServerTerminalsResponse = {
+  success: true;
+  data: KimiCodeServerTerminalInfo[];
 } | {
   success: false;
   error: string;

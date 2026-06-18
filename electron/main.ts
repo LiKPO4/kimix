@@ -5627,6 +5627,102 @@ ipcMain.handle("kimi-code:stopBackgroundTask", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:listServerTerminals", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.listServerTerminals(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:createServerTerminal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const data = await kimiCodeHost.createServerTerminal(sessionId, {
+      cwd: typeof req.cwd === "string" && req.cwd.trim() ? req.cwd.trim() : undefined,
+      shell: typeof req.shell === "string" && req.shell.trim() ? req.shell.trim() : undefined,
+      cols: typeof req.cols === "number" && req.cols > 0 ? Math.round(req.cols) : undefined,
+      rows: typeof req.rows === "number" && req.rows > 0 ? Math.round(req.rows) : undefined,
+    });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:closeServerTerminal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const terminalId = typeof req.terminalId === "string" ? req.terminalId : "";
+    if (!sessionId || !terminalId) return { success: false, error: "Missing sessionId or terminalId" };
+    await kimiCodeHost.closeServerTerminal(sessionId, terminalId);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:attachServerTerminal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const terminalId = typeof req.terminalId === "string" ? req.terminalId : "";
+    const sinceSeq = typeof req.sinceSeq === "number" && req.sinceSeq >= 0 ? Math.round(req.sinceSeq) : undefined;
+    if (!sessionId || !terminalId) return { success: false, error: "Missing sessionId or terminalId" };
+    return { success: true, data: await kimiCodeHost.attachServerTerminal(sessionId, terminalId, sinceSeq) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:detachServerTerminal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const terminalId = typeof req.terminalId === "string" ? req.terminalId : "";
+    if (!sessionId || !terminalId) return { success: false, error: "Missing sessionId or terminalId" };
+    await kimiCodeHost.detachServerTerminal(sessionId, terminalId);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:writeServerTerminal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const terminalId = typeof req.terminalId === "string" ? req.terminalId : "";
+    const data = typeof req.data === "string" ? req.data : "";
+    if (!sessionId || !terminalId || !data) return { success: false, error: "Missing sessionId, terminalId or data" };
+    await kimiCodeHost.writeServerTerminal(sessionId, terminalId, data);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:resizeServerTerminal", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const terminalId = typeof req.terminalId === "string" ? req.terminalId : "";
+    const cols = typeof req.cols === "number" && req.cols > 0 ? Math.round(req.cols) : 0;
+    const rows = typeof req.rows === "number" && req.rows > 0 ? Math.round(req.rows) : 0;
+    if (!sessionId || !terminalId || !cols || !rows) return { success: false, error: "Missing terminal resize parameters" };
+    await kimiCodeHost.resizeServerTerminal(sessionId, terminalId, cols, rows);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:listSessions", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -6605,4 +6701,31 @@ app.whenReady().then(async () => {
     console.info("[KimiCodeServerHost]", serverStatus);
   }
   createWindow();
+});
+
+ipcMain.handle("kimi-code:listChildSessions", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.listChildSessions(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:createChildSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const title = typeof req.title === "string" ? req.title.trim().slice(0, 200) : undefined;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const data = await kimiCodeHost.createChildSession(sessionId, {
+      title: title || undefined,
+      metadata: { source: "kimix-child", parentSessionId: sessionId },
+    });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });

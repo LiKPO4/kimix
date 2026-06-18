@@ -15,6 +15,10 @@ describe("kimiCodeServerHost", () => {
       "/api/v1/sessions/{session_id}/prompts",
       "/api/v1/sessions/{session_id}/approvals",
       "/api/v1/sessions/{session_id}/questions",
+      "/api/v1/sessions/{session_id}/{tail}",
+      "/api/v1/sessions/{session_id}/children",
+      "/api/v1/sessions/{session_id}/tasks",
+      "/api/v1/sessions/{session_id}/terminals",
       "/api/v1/tools",
       "/api/v1/workspaces",
     ].map((item) => [item, {}]));

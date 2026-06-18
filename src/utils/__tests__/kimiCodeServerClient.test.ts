@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
+  KimiCodeServerClient,
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("KimiCodeServerClient protocol adapters", () => {
   it("requires a separate explicit flag for server session routing", () => {
@@ -30,5 +33,34 @@ describe("KimiCodeServerClient protocol adapters", () => {
       session_id: "s1",
       payload: { delta: "hi", agentId: "main" },
     })).toEqual({ type: "assistant.delta", delta: "hi", agentId: "main", seq: 7 });
+  });
+
+  it("uses official P3 REST routes for fork, children, tasks and terminals", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(url);
+      const data = url.includes("/children") && !url.endsWith("/children")
+        ? { items: [] }
+        : url.includes("/tasks") || url.endsWith("/terminals")
+          ? { items: [] }
+          : { id: "child", status: "idle" };
+      return new Response(JSON.stringify({ code: 0, data }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await client.forkSession("parent", { title: "fork" });
+    await client.listChildren("parent");
+    await client.createChild("parent", { title: "child" });
+    await client.listTasks("parent");
+    await client.listTerminals("parent");
+    expect(calls).toEqual([
+      "http://127.0.0.1:58627/api/v1/sessions/parent:fork",
+      "http://127.0.0.1:58627/api/v1/sessions/parent/children?page_size=100",
+      "http://127.0.0.1:58627/api/v1/sessions/parent/children",
+      "http://127.0.0.1:58627/api/v1/sessions/parent/tasks",
+      "http://127.0.0.1:58627/api/v1/sessions/parent/terminals",
+    ]);
   });
 });
