@@ -13,6 +13,7 @@ import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeS
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
+import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import {
   settleInactiveEvents,
@@ -1036,6 +1037,7 @@ function App() {
   const runtimePrewarmInFlightRef = useRef<Set<string>>(new Set());
   const runtimePrewarmRetryAfterRef = useRef<Map<string, number>>(new Map());
   const runtimePrewarmLastOkRef = useRef<Map<string, string>>(new Map());
+  const runtimeTerminalPollRef = useRef<Map<string, number>>(new Map());
 
   useRendererLagDetector();
   useSettingsSync();
@@ -2621,6 +2623,70 @@ function App() {
       goalLastRefreshRef.current.clear();
     };
   }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
+
+  useEffect(() => {
+    if (!runningSessionId) return;
+    let disposed = false;
+    let checking = false;
+    const reconciliationStartedAt = Date.now();
+
+    const reconcileRuntimeStatus = async () => {
+      if (disposed || checking) return;
+      const activeRunningId = useAppStore.getState().runningSessionId;
+      if (!activeRunningId || activeRunningId !== runningSessionId) return;
+      const session = useSessionStore.getState().sessions.find((item) => (
+        item.id === activeRunningId || item.runtimeSessionId === activeRunningId || item.officialSessionId === activeRunningId
+      ));
+      if (!session || session.longTask) return;
+      const runtimeSessionId = getRuntimeSessionId(session);
+      if (!runtimeSessionId) return;
+
+      checking = true;
+      try {
+        const response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
+        if (disposed || !response.success) return;
+        if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
+          runtimeTerminalPollRef.current.delete(runtimeSessionId);
+          return;
+        }
+        if (Date.now() - reconciliationStartedAt < 2500) return;
+
+        const terminalPolls = (runtimeTerminalPollRef.current.get(runtimeSessionId) ?? 0) + 1;
+        runtimeTerminalPollRef.current.set(runtimeSessionId, terminalPolls);
+        if (terminalPolls < 2) return;
+        runtimeTerminalPollRef.current.delete(runtimeSessionId);
+
+        const latestRunningId = useAppStore.getState().runningSessionId;
+        if (latestRunningId !== session.id && latestRunningId !== runtimeSessionId) return;
+        flushStreamEvents();
+        updateSession(session.id, (item) => ({
+          ...item,
+          events: settleInactiveEvents(item.events),
+          updatedAt: Date.now(),
+        }));
+        syncCurrentSessionFromStore(session.id);
+        setRunningSessionId(null);
+        if (response.data.engineStatus === "completed" || response.data.engineStatus === "idle") {
+          dispatchNextPendingKimiMessage(session.id, runtimeSessionId);
+        }
+      } finally {
+        checking = false;
+      }
+    };
+
+    const firstCheck = window.setTimeout(() => void reconcileRuntimeStatus(), 1200);
+    const timer = window.setInterval(() => void reconcileRuntimeStatus(), 1500);
+    const syncNow = () => void reconcileRuntimeStatus();
+    window.addEventListener("focus", syncNow);
+    document.addEventListener("visibilitychange", syncNow);
+    return () => {
+      disposed = true;
+      window.clearTimeout(firstCheck);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", syncNow);
+      document.removeEventListener("visibilitychange", syncNow);
+    };
+  }, [runningSessionId, setRunningSessionId, updateSession, flushStreamEvents]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

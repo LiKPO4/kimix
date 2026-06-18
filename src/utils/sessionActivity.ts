@@ -1,7 +1,12 @@
 import type { Session, TimelineEvent } from "@/types/ui";
+import type { KimiCodeEngineStatus } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "./runtimeSession";
 
 const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
+
+export function isTerminalKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {
+  return status === "completed" || status === "interrupted" || status === "error" || status === "idle";
+}
 
 export function isTimelineEventActive(event: TimelineEvent, now = Date.now()) {
   if (now - event.timestamp > STALE_TIMELINE_WORK_MS) return false;

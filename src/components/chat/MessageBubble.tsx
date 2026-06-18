@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { memo, useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
@@ -205,47 +205,23 @@ function formatDuration(ms: number): string {
   return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`;
 }
 
-const elapsedClockListeners = new Set<() => void>();
-let elapsedClockNow = Date.now();
-let elapsedClockTimer: ReturnType<typeof window.setTimeout> | undefined;
-
-function scheduleElapsedClockTick() {
-  if (elapsedClockTimer !== undefined || elapsedClockListeners.size === 0) return;
-  const now = Date.now();
-  const delay = Math.max(120, 1000 - (now % 1000) + 20);
-  elapsedClockTimer = window.setTimeout(() => {
-    elapsedClockTimer = undefined;
-    elapsedClockNow = Date.now();
-    elapsedClockListeners.forEach((listener) => listener());
-    scheduleElapsedClockTick();
-  }, delay);
-}
-
-function subscribeElapsedClock(listener: () => void) {
-  elapsedClockListeners.add(listener);
-  elapsedClockNow = Date.now();
-  listener();
-  scheduleElapsedClockTick();
-  return () => {
-    elapsedClockListeners.delete(listener);
-    if (elapsedClockListeners.size === 0 && elapsedClockTimer !== undefined) {
-      window.clearTimeout(elapsedClockTimer);
-      elapsedClockTimer = undefined;
-    }
-  };
-}
-
-function getElapsedClockSnapshot() {
-  return elapsedClockNow;
-}
-
 function useElapsed(start: number, active: boolean) {
-  const sharedNow = useSyncExternalStore(
-    active ? subscribeElapsedClock : () => () => {},
-    getElapsedClockSnapshot,
-    getElapsedClockSnapshot,
-  );
-  const now = active ? sharedNow : Date.now();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!active) return;
+    const tick = () => setNow(Date.now());
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [active, start]);
+
   return Math.max(0, now - start);
 }
 

@@ -1435,6 +1435,7 @@ export type KimiCodeSessionInfo = {
 };
 
 export type KimiCodeSessionStatus = {
+  engineStatus?: KimiCodeEngineStatus;
   model?: string;
   thinkingLevel?: string;
   permission?: KimiCodePermissionMode;

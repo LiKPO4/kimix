@@ -157,6 +157,7 @@ export type KimiCodeSessionSummary = {
 };
 
 export type KimiCodeSessionStatus = {
+  engineStatus?: KimiCodeEngineStatus;
   model?: string;
   thinkingLevel?: string;
   permission?: KimiCodePermissionMode;
@@ -972,7 +973,7 @@ export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatu
     return serverStatusToKimiCodeStatus(await refreshServerSessionStatus(sessionId, false), serverManaged.session.usage);
   }
   const managed = getManagedSession(sessionId);
-  return managed.session.getStatus();
+  return { ...await managed.session.getStatus(), engineStatus: managed.status };
 }
 
 export async function getUsage(sessionId: string): Promise<KimiCodeSessionUsage> {
@@ -1781,7 +1782,8 @@ function handleServerFrame(frame: ServerFrame) {
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event);
   if (frame.type === "prompt.completed") {
-    if (serverSessions.get(sessionId)?.status === "running") setStatus(sessionId, "completed");
+    const currentStatus = serverSessions.get(sessionId)?.status;
+    if (currentStatus !== "interrupted" && currentStatus !== "error") setStatus(sessionId, "completed");
     void refreshServerSessionStatus(sessionId, true).catch((error) => {
       console.warn(`[KimiCodeServerHost] refresh completed status failed for ${sessionId}:`, error);
     });
@@ -1818,6 +1820,7 @@ export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<st
 
 function serverStatusToKimiCodeStatus(status: ServerSessionStatus, usage: unknown): KimiCodeSessionStatus {
   return {
+    engineStatus: mapServerStatus(status.status),
     model: status.model,
     thinkingLevel: status.thinking_level,
     permission: status.permission === "manual" || status.permission === "auto" || status.permission === "yolo"

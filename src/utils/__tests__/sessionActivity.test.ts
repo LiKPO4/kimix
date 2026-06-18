@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isTimelineEventActive } from "../sessionActivity";
+import { hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -16,6 +16,13 @@ function session(events: TimelineEvent[] = []): Session {
 }
 
 describe("sessionActivity", () => {
+  it("recognizes runtime states that must clear a stale running UI", () => {
+    expect(isTerminalKimiCodeEngineStatus("completed")).toBe(true);
+    expect(isTerminalKimiCodeEngineStatus("idle")).toBe(true);
+    expect(isTerminalKimiCodeEngineStatus("running")).toBe(false);
+    expect(isTerminalKimiCodeEngineStatus("waiting_question")).toBe(false);
+  });
+
   it("treats running tool work as active timeline work", () => {
     expect(hasActiveTimelineWorkEvents([
       { id: "tool-1", type: "tool_call", timestamp: 1, toolCallId: "call-1", toolName: "Bash", status: "running", arguments: {} },
