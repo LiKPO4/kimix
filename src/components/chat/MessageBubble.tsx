@@ -811,21 +811,23 @@ function AssistantProcessLabel({
   isActiveAssistant,
   isInterrupted,
   activeProcessLabel,
+  elapsedStartAt,
 }: {
   event: AssistantEvent;
   isActiveAssistant: boolean;
   isInterrupted: boolean;
   activeProcessLabel?: string;
+  elapsedStartAt?: number;
 }) {
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
-  const elapsed = useElapsed(event.timestamp, isActiveAssistant);
+  const elapsed = useElapsed(elapsedStartAt ?? event.timestamp, isActiveAssistant);
   const completedDuration = reliableAssistantDurationMs(event.durationMs);
   const hasVisibleOutput = Boolean(
     event.content.trim() ||
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
   );
-  const isSettledForDisplay = event.isComplete || (!isActiveAssistant && hasVisibleOutput);
+  const isSettledForDisplay = !isActiveAssistant && (event.isComplete || hasVisibleOutput);
   const durationLabel = isSettledForDisplay
     ? (completedDuration !== undefined ? formatDuration(completedDuration) : "")
     : isActiveAssistant && elapsed >= 1000
@@ -1016,6 +1018,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
     leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
   const hasRecentTimelineActivity = hasActiveTimelineWorkEvents([event, ...leadingTools, ...leadingSubagents]);
   const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity) && (!event.isComplete || hasRunningProcess));
+  const elapsedStartAt = Math.min(
+    event.timestamp,
+    activeStatus?.timestamp ?? event.timestamp,
+    ...leadingTools.map((tool) => tool.timestamp),
+    ...leadingSubagents.map((subagent) => subagent.timestamp),
+  );
   const hasActualThinking = Boolean(
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
@@ -1042,7 +1050,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
             tools={leadingTools}
             subagents={leadingSubagents}
             approvals={leadingApprovals}
-            label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} />}
+            label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />}
           />
         )}
 
