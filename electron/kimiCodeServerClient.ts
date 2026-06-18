@@ -100,6 +100,13 @@ export function normalizeServerTerminalCreateError(error: unknown): Error {
   return error instanceof Error ? error : new Error(message);
 }
 
+export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
+  const inFlight = isRecord(snapshot.in_flight_turn) ? snapshot.in_flight_turn : {};
+  const messages = "messages" in inFlight ? inFlight.messages : ("message" in inFlight ? [inFlight.message] : inFlight.items);
+  const items = Array.isArray(messages) ? messages : [];
+  return items.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch));
+}
+
 export class KimiCodeServerClient {
   private socket: WebSocket | null = null;
   private connected: Promise<void> | null = null;
@@ -518,4 +525,72 @@ export class KimiCodeServerClient {
     if (envelope.code !== 0) throw new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
     return envelope.data;
   }
+}
+
+function snapshotMessageToServerFrames(message: unknown, sessionId: string, seq: number, epoch?: string): ServerFrame[] {
+  if (!isRecord(message)) return [];
+  const role = typeof message.role === "string" ? message.role : "";
+  if (role === "user") {
+    return [{ type: "turn.started", session_id: sessionId, seq, epoch, payload: { type: "turn.started" } }];
+  }
+  if (role === "assistant") {
+    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch);
+    if (frames.length > 0) {
+      frames.push({ type: "turn.ended", session_id: sessionId, seq, epoch, payload: { type: "turn.ended" } });
+    }
+    return frames;
+  }
+  if (role === "tool") {
+    const toolCallId = stringField(message, "toolCallId") ?? stringField(message, "tool_call_id");
+    const output = contentToText(message.content);
+    if (!toolCallId || !output) return [];
+    return [{
+      type: "tool.result",
+      session_id: sessionId,
+      seq,
+      epoch,
+      payload: { type: "tool.result", toolCallId, output },
+    }];
+  }
+  return [];
+}
+
+function contentPartsToFrames(content: unknown, sessionId: string, seq: number, epoch?: string): ServerFrame[] {
+  if (typeof content === "string") {
+    return content ? [{ type: "assistant.delta", session_id: sessionId, seq, epoch, payload: { delta: content } }] : [];
+  }
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((part) => {
+    if (!isRecord(part)) return [];
+    const type = typeof part.type === "string" ? part.type : "";
+    if (type === "text" && typeof part.text === "string" && part.text) {
+      return [{ type: "content.part", session_id: sessionId, seq, epoch, payload: { part: { type: "text", text: part.text } } }];
+    }
+    if ((type === "think" || type === "thinking") && typeof (part.think ?? part.text) === "string") {
+      const think = String(part.think ?? part.text);
+      return think ? [{ type: "content.part", session_id: sessionId, seq, epoch, payload: { part: { type: "think", think } } }] : [];
+    }
+    return [];
+  });
+}
+
+function contentToText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part) => {
+    if (typeof part === "string") return part;
+    if (!isRecord(part)) return "";
+    return typeof part.text === "string"
+      ? part.text
+      : (typeof part.content === "string" ? part.content : "");
+  }).filter(Boolean).join("\n");
+}
+
+function stringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

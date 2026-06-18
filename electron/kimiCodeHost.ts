@@ -10,8 +10,10 @@ import {
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
   normalizeServerTerminalCreateError,
+  snapshotMessagesToServerFrames,
   type ServerFrame,
   type ServerSession,
+  type ServerSnapshot,
   type ServerTerminal,
 } from "./kimiCodeServerClient";
 
@@ -1415,11 +1417,15 @@ function handleServerFrame(frame: ServerFrame) {
     ? frame.payload as Record<string, unknown>
     : {};
   if (frame.type === "kimix.server.snapshot") {
-    const session = payload.session as ServerSession | undefined;
+    const snapshot = payload as ServerSnapshot;
+    const session = snapshot.session;
     const managed = serverSessions.get(sessionId);
     if (session && managed) {
       managed.session = session;
       setStatus(sessionId, mapServerStatus(session.status));
+    }
+    for (const replayFrame of snapshotMessagesToServerFrames(snapshot, sessionId)) {
+      handleServerFrame(replayFrame);
     }
     for (const approval of Array.isArray(payload.pending_approvals) ? payload.pending_approvals : []) {
       if (!approval || typeof approval !== "object") continue;

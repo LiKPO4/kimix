@@ -4,6 +4,7 @@ import {
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
   normalizeServerTerminalCreateError,
+  snapshotMessagesToServerFrames,
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
 
@@ -74,5 +75,33 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(normalized.message).toContain("conpty.node");
     expect(normalized.message).toContain("Kimix 已接入 terminal create/list/close");
     expect(normalized.message).toContain("原始错误：Failed to load native module");
+  });
+
+  it("replays only in-flight snapshot messages through existing raw event shapes", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 42,
+      epoch: "epoch-1",
+      session: { id: "session-1", status: "idle" },
+      messages: {
+        items: [
+          { role: "assistant", content: [{ type: "text", text: "历史消息不自动重放，避免重复" }] },
+        ],
+      },
+      in_flight_turn: {
+        items: [
+          { role: "user", content: [{ type: "text", text: "本地 UI 已有用户消息" }] },
+          { role: "assistant", content: [{ type: "think", think: "先分析" }, { type: "text", text: "最终回答" }] },
+          { role: "tool", toolCallId: "call-1", content: [{ type: "text", text: "工具输出" }] },
+        ],
+      },
+    }, "session-1");
+
+    expect(frames).toEqual([
+      { type: "turn.started", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "turn.started" } },
+      { type: "content.part", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { part: { type: "think", think: "先分析" } } },
+      { type: "content.part", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { part: { type: "text", text: "最终回答" } } },
+      { type: "turn.ended", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "turn.ended" } },
+      { type: "tool.result", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "tool.result", toolCallId: "call-1", output: "工具输出" } },
+    ]);
   });
 });
