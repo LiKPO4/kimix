@@ -1,6 +1,7 @@
 # Kimix 长程任务状态
 
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
+- 发布收口：v2.10.0 汇总 v2.9.97 之后 48 个能力与稳定性提交；全量测试、生产构建和真实 Kimi Code 0.17.1 Server 主探针通过，准备由 tag 触发 GitHub Actions 多平台发布。
 - 当前目标：停止重复加固探针，按官方 0.17.1 Server 协议逐项补齐 Kimix 的实际能力缺口。
 - 能力收口 TodoList（按顺序推进）：
   - [x] 已转 Server：会话创建/恢复、prompt/steer/abort、WebSocket 恢复、审批/提问、compact/undo、BTW、归档同步、usage、Skill、MCP、会话树、tool/connections 诊断。
