@@ -202,6 +202,32 @@ export type KimiCodeServerRuntimeDiagnostics = {
   }>;
 };
 
+export type KimiCodeServerModelCatalog = {
+  auth: {
+    ready: boolean;
+    providerCount: number;
+    defaultModel: string | null;
+    managedProvider: { name: string; status: string } | null;
+  };
+  config: Record<string, unknown>;
+  models: Array<{
+    provider: string;
+    model: string;
+    displayName?: string;
+    maxContextSize: number;
+    capabilities: string[];
+  }>;
+  providers: Array<{
+    id: string;
+    type: string;
+    baseUrl?: string;
+    defaultModel?: string;
+    hasApiKey: boolean;
+    status: "connected" | "error" | "unconfigured";
+    models: string[];
+  }>;
+};
+
 export type KimiCodeBackgroundTaskStatus =
   | "running"
   | "awaiting_approval"
@@ -1033,6 +1059,41 @@ export async function getServerRuntimeDiagnostics(sessionId: string): Promise<Ki
       hasClientHello: connection.has_client_hello,
       subscriptions: connection.subscriptions,
       subscribedToCurrentSession: connection.subscriptions.includes(sessionId),
+    })),
+  };
+}
+
+export async function getServerModelCatalog(): Promise<KimiCodeServerModelCatalog> {
+  const client = getServerClient();
+  const [auth, config, models, providers] = await Promise.all([
+    client.getAuthSummary(),
+    client.getRedactedConfig(),
+    client.listModels(),
+    client.listProviders(),
+  ]);
+  return {
+    auth: {
+      ready: auth.ready,
+      providerCount: auth.providers_count,
+      defaultModel: auth.default_model,
+      managedProvider: auth.managed_provider,
+    },
+    config,
+    models: models.map((model) => ({
+      provider: model.provider,
+      model: model.model,
+      displayName: model.display_name,
+      maxContextSize: model.max_context_size,
+      capabilities: model.capabilities ?? [],
+    })),
+    providers: providers.map((provider) => ({
+      id: provider.id,
+      type: provider.type,
+      baseUrl: provider.base_url,
+      defaultModel: provider.default_model,
+      hasApiKey: provider.has_api_key,
+      status: provider.status,
+      models: provider.models ?? [],
     })),
   };
 }

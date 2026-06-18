@@ -7,9 +7,11 @@
 - 已完成：Server BTW 按官方返回的 `agent_id` 提交 prompt、隔离子 Agent WebSocket 事件并汇总正文/思考/结束原因，复用现有 BTW 面板且不污染主对话。
 - 已完成：所有 Kimix 归档入口统一通过状态迁移触发官方 Server `session:archive`，同时保留本地 tombstone；官方无 unarchive，因此本地恢复不会反向取消官方归档。
 - 已完成：会话注册和 prompt 完成后读取 Server session status，把 `context_tokens` / `max_context_tokens` / `context_usage` 转为现有 SDK 状态事件，复用 ContextRing 展示。
+- 已完成：Server Skill/MCP、会话树、tool catalog/connections 诊断，以及 auth/redacted config/model/provider 只读目录已接入现有页面；模型配置写入继续走 SDK。
+- 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。
-- 下一步：把 Server Skill / MCP 状态接入现有管理页。
+- 下一步：先评估 Server 会话路由默认化，再进入 files/workspace 与 messages/prompts 等边际能力。
 
 ## 2026-06-14 v2.9.87 显式会话快照迁移
 - 当前目标：放弃 dev 版 / 安装版自动共享会话状态，改为用户手动导出全部快照、另一端去重合并导入。

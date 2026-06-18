@@ -146,6 +146,7 @@ import type {
   KimiCodeMcpServerRequest,
   KimiCodeMcpStartupMetricsResponse,
   KimiCodeServerRuntimeDiagnosticsResponse,
+  KimiCodeServerModelCatalogResponse,
   KimiCodePluginResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
@@ -407,6 +408,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:getMcpStartupMetrics", req),
   getKimiCodeServerRuntimeDiagnostics: (req: KimiCodeSessionRequest): Promise<KimiCodeServerRuntimeDiagnosticsResponse> =>
     ipcRenderer.invoke("kimi-code:getServerRuntimeDiagnostics", req),
+  getKimiCodeServerModelCatalog: (): Promise<KimiCodeServerModelCatalogResponse> =>
+    ipcRenderer.invoke("kimi-code:getServerModelCatalog"),
   reconnectKimiCodeMcpServer: (req: KimiCodeMcpServerRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:reconnectMcpServer", req),
   listKimiCodeBackgroundTasks: (req: KimiCodeListBackgroundTasksRequest): Promise<KimiCodeListBackgroundTasksResponse> =>

@@ -62,6 +62,31 @@ export type ServerConnection = {
   subscriptions: string[];
 };
 
+export type ServerAuthSummary = {
+  ready: boolean;
+  providers_count: number;
+  default_model: string | null;
+  managed_provider: { name: string; status: "authenticated" | "expired" | "revoked" | "unauthenticated" } | null;
+};
+
+export type ServerModelCatalogItem = {
+  provider: string;
+  model: string;
+  display_name?: string;
+  max_context_size: number;
+  capabilities?: string[];
+};
+
+export type ServerProviderCatalogItem = {
+  id: string;
+  type: string;
+  base_url?: string;
+  default_model?: string;
+  has_api_key: boolean;
+  status: "connected" | "error" | "unconfigured";
+  models?: string[];
+};
+
 export type ServerBackgroundTask = {
   id: string;
   session_id: string;
@@ -247,6 +272,24 @@ export class KimiCodeServerClient {
   async listConnections(): Promise<ServerConnection[]> {
     const result = await this.request<{ connections: ServerConnection[] }>("/api/v1/connections");
     return result.connections;
+  }
+
+  getAuthSummary(): Promise<ServerAuthSummary> {
+    return this.request("/api/v1/auth");
+  }
+
+  getRedactedConfig(): Promise<Record<string, unknown>> {
+    return this.request("/api/v1/config");
+  }
+
+  async listModels(): Promise<ServerModelCatalogItem[]> {
+    const result = await this.request<{ items: ServerModelCatalogItem[] }>("/api/v1/models");
+    return result.items;
+  }
+
+  async listProviders(): Promise<ServerProviderCatalogItem[]> {
+    const result = await this.request<{ items: ServerProviderCatalogItem[] }>("/api/v1/providers");
+    return result.items;
   }
 
   restartMcpServer(serverId: string): Promise<{ restarting: true }> {

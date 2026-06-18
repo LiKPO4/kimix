@@ -171,6 +171,40 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("reads the official redacted auth, config, model, and provider catalog routes", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(url);
+      const data = url.endsWith("/auth")
+        ? { ready: true, providers_count: 1, default_model: "kimi-code/kimi-for-coding", managed_provider: { name: "kimi-code", status: "authenticated" } }
+        : url.endsWith("/config")
+          ? { default_provider: "kimi-code", providers: { "kimi-code": { type: "kimi", has_api_key: false } } }
+          : url.endsWith("/models")
+            ? { items: [{ provider: "kimi-code", model: "kimi-for-coding", display_name: "K2.7 Code High Speed", max_context_size: 262144, capabilities: ["thinking", "tool_use"] }] }
+            : { items: [{ id: "managed:kimi-code", type: "kimi", has_api_key: false, status: "connected", models: ["kimi-for-coding"] }] };
+      return new Response(JSON.stringify({ code: 0, data }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.getAuthSummary()).resolves.toMatchObject({ ready: true, providers_count: 1 });
+    await expect(client.getRedactedConfig()).resolves.toMatchObject({ default_provider: "kimi-code" });
+    await expect(client.listModels()).resolves.toEqual([
+      expect.objectContaining({ model: "kimi-for-coding", max_context_size: 262144 }),
+    ]);
+    await expect(client.listProviders()).resolves.toEqual([
+      expect.objectContaining({ id: "managed:kimi-code", status: "connected" }),
+    ]);
+    expect(calls).toEqual([
+      "http://127.0.0.1:58627/api/v1/auth",
+      "http://127.0.0.1:58627/api/v1/config",
+      "http://127.0.0.1:58627/api/v1/models",
+      "http://127.0.0.1:58627/api/v1/providers",
+    ]);
+  });
+
   it("treats already-finished Server task cancellation as an idempotent stop result", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       code: 40904,

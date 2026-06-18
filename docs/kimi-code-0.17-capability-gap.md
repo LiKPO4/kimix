@@ -26,6 +26,8 @@
 - 真实会话树探针已验证：官方 child 可列出和恢复；fork 不进入官方 children，但 `forkedFrom` 元数据可稳定识别，合并后得到 2 个关联节点。
 - Server tool catalog 与 connections 已合并为只读运行时诊断：MCP 页展示会话有效工具、builtin/Skill/MCP 来源分布、MCP 状态和当前订阅连接；右侧 Kimi 自检复用同一诊断结果。
 - 真实 0.17.1 探针已验证：当前会话返回 26 个 builtin 工具；WebSocket 完成 `client_hello` 后，connections 返回 1 个客户端且正确订阅当前 session。
+- Server auth / redacted config / model catalog / provider catalog 已接入设置页只读运行时目录；现有 SDK 模型配置和默认模型写入继续作为正式链路。
+- 真实 0.17.1 探针已验证：认证 ready，1 个 connected OAuth Provider，模型 `kimi-code/kimi-for-coding` 的 context 为 262144，并返回 thinking、image/video input、tool use 等能力。
 
 ## B. 后端已有基础，产品入口仍不完整
 
@@ -37,18 +39,18 @@
 
 按用户价值排序：
 
-1. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
-2. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
-3. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
+1. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
+2. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
 
 ## D. 延后或阻塞
 
 - terminal 实机：等待官方 Windows native 模块修复。
+- OAuth Server 写链路：本机 `POST /api/v1/oauth/login` 超过 10 秒仍无响应；官方实现会等待 device code 且请求断开未中止后台流程。Kimix 暂保留已验证的 SDK 登录入口，避免设置页请求挂起。
 - Server 默认化：需先完成 BTW、归档同步、状态字段回环和一轮 UI 回归，再考虑灰度扩大。
 - 官方 0.17.1 只提供 archive、没有 unarchive；设置页“恢复归档”仍是 Kimix 本地恢复，不会反向取消官方归档标记。
 - 文件系统 REST：Kimix 已有 Electron 本地文件能力，除非需要浏览器/远程 Server 场景，否则边际收益低于会话能力。
 
 ## 推荐推进顺序
 
-1. 核对并接入 Server model catalog / config / OAuth 中能替代现有旁路的部分。
+1. 评估 Server 会话路由默认化所需的灰度与回滚边界。
 2. 再评估文件系统、独立 prompt/message 查询等边际能力。

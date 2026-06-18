@@ -14,6 +14,7 @@ import {
   hasSessionBackupImportChanges,
 } from "@/utils/sessionBackup";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import type { KimiCodeServerModelCatalog } from "@electron/types/ipc";
 
 type FreezeReport = {
   at: string;
@@ -38,7 +39,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.146";
+const KIMIX_VERSION = "2.9.147";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -441,6 +442,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
+  const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
 
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
@@ -647,8 +649,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const refreshModelConfig = async (options: { showLoading?: boolean } = {}) => {
     const showLoading = options.showLoading ?? !settingsStatusCache.modelConfig;
     if (showLoading) setModelConfigLoading(true);
-    const res = await window.api.getKimiModelConfig();
+    const [res, serverCatalogRes] = await Promise.all([
+      window.api.getKimiModelConfig(),
+      window.api.getKimiCodeServerModelCatalog(),
+    ]);
     setModelConfigLoading(false);
+    setServerModelCatalog(serverCatalogRes.success ? serverCatalogRes.data : null);
     if (res.success) {
       settingsStatusCache.modelConfig = res.data;
       settingsStatusCache.modelConfigMessage = res.data.exists ? "" : "尚未找到 Kimi Code config.toml。";
@@ -1807,6 +1813,43 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasOauth).length} 个已配置凭据
                           </div>
                         </div>
+                        {serverModelCatalog && (
+                          <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ padding: "14px 16px", marginTop: 4 }}>
+                            <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                              <div className="min-w-0">
+                                <div className="kimix-settings-permission-label">Server 运行时目录</div>
+                                <div className="kimix-settings-permission-desc">
+                                  {serverModelCatalog.models.length} 个模型 · {serverModelCatalog.providers.length} 个 Provider · 脱敏配置
+                                </div>
+                              </div>
+                              <span className={`rounded-full text-[11.5px] leading-5 ${serverModelCatalog.auth.ready ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`} style={{ height: 26, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                                {serverModelCatalog.auth.ready ? "认证就绪" : "认证未就绪"}
+                              </span>
+                            </div>
+                            <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
+                              {serverModelCatalog.models.slice(0, 4).map((model) => (
+                                <div key={`${model.provider}:${model.model}`} className="rounded-lg bg-surface-elevated" style={{ padding: "10px 12px" }}>
+                                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                                    <div className="min-w-0">
+                                      <div className="truncate text-[12.5px] font-medium leading-5 text-text-primary">{model.displayName || model.model}</div>
+                                      <div className="truncate text-[11.5px] leading-5 text-text-muted">{model.provider} · Context {model.maxContextSize.toLocaleString()}</div>
+                                    </div>
+                                    <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                      {model.capabilities.includes("thinking") ? "支持思考" : "标准"}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex flex-wrap" style={{ gap: 8, marginTop: 10 }}>
+                              {serverModelCatalog.providers.map((provider) => (
+                                <span key={provider.id} className={`rounded-full text-[11px] leading-5 ${provider.status === "connected" ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                                  {provider.id} · {provider.status === "connected" ? "已连接" : provider.status}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {kimiEnvironment && (
                           <>
                             <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>

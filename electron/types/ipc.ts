@@ -1481,6 +1481,32 @@ export type KimiCodeServerRuntimeDiagnostics = {
   connections: KimiCodeServerConnectionInfo[];
 };
 
+export type KimiCodeServerModelCatalog = {
+  auth: {
+    ready: boolean;
+    providerCount: number;
+    defaultModel: string | null;
+    managedProvider: { name: string; status: string } | null;
+  };
+  config: Record<string, unknown>;
+  models: Array<{
+    provider: string;
+    model: string;
+    displayName?: string;
+    maxContextSize: number;
+    capabilities: string[];
+  }>;
+  providers: Array<{
+    id: string;
+    type: string;
+    baseUrl?: string;
+    defaultModel?: string;
+    hasApiKey: boolean;
+    status: "connected" | "error" | "unconfigured";
+    models: string[];
+  }>;
+};
+
 export type KimiCodeBackgroundTaskInfo = {
   taskId: string;
   command: string;
@@ -1885,6 +1911,14 @@ export type KimiCodeBackgroundTaskOutputPathResponse = {
 export type KimiCodeServerRuntimeDiagnosticsResponse = {
   success: true;
   data: KimiCodeServerRuntimeDiagnostics;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeServerModelCatalogResponse = {
+  success: true;
+  data: KimiCodeServerModelCatalog;
 } | {
   success: false;
   error: string;

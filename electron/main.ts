@@ -5638,6 +5638,14 @@ ipcMain.handle("kimi-code:getServerRuntimeDiagnostics", async (_, request: unkno
   }
 });
 
+ipcMain.handle("kimi-code:getServerModelCatalog", async () => {
+  try {
+    return { success: true, data: await kimiCodeHost.getServerModelCatalog() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:archiveSession", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
