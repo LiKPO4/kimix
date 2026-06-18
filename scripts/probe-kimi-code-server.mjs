@@ -295,6 +295,7 @@ async function probeKimixSnapshotReplayAdapter() {
       const payload = isRecord(frame.payload) ? frame.payload : {};
       return (payload.prompt_id ?? payload.promptId) === prompt.prompt_id;
     }, 120_000);
+    const sessionStatus = await request(`/sessions/${encodeURIComponent(session.id)}/status`);
     const snapshot = await request(`/sessions/${encodeURIComponent(session.id)}/snapshot`);
     const replayPayloads = snapshotHistoryReplayPayloads(snapshot);
     const assistantReplay = replayPayloads.find((item) => item.snapshotRole === "assistant" && item.snapshotMessageText.includes("KIMIX_SNAPSHOT_REPLAY_OK"));
@@ -305,7 +306,10 @@ async function probeKimixSnapshotReplayAdapter() {
     }] : [];
     const skipExisting = assistantReplay ? shouldSkipHistoryReplay(assistantReplay, localEvents) : false;
     const keepMissing = assistantReplay ? !shouldSkipHistoryReplay(assistantReplay, []) : false;
-    record("Kimix snapshot replay adapter", Boolean(assistantReplay && skipExisting && keepMissing), {
+    const statusContextValid = Number.isFinite(sessionStatus?.context_tokens) &&
+      Number.isFinite(sessionStatus?.max_context_tokens) &&
+      Number.isFinite(sessionStatus?.context_usage);
+    record("Kimix snapshot replay + session status adapter", Boolean(assistantReplay && skipExisting && keepMissing && statusContextValid), {
       sessionId: session.id,
       promptId: prompt.prompt_id,
       snapshotKeys: snapshot && typeof snapshot === "object" ? Object.keys(snapshot) : [],
@@ -320,9 +324,16 @@ async function probeKimixSnapshotReplayAdapter() {
       } : undefined,
       skipExisting,
       keepMissing,
+      sessionStatus: {
+        status: sessionStatus?.status,
+        contextTokens: sessionStatus?.context_tokens,
+        maxContextTokens: sessionStatus?.max_context_tokens,
+        contextUsage: sessionStatus?.context_usage,
+        contextFieldsValid: statusContextValid,
+      },
     });
   } catch (error) {
-    record("Kimix snapshot replay adapter", false, { error: summarizeError(error), sessionId: session?.id });
+    record("Kimix snapshot replay + session status adapter", false, { error: summarizeError(error), sessionId: session?.id });
   } finally {
     try { socket?.close(); } catch {}
     if (session?.id) {
@@ -589,7 +600,7 @@ async function writeReport() {
     "## 结论",
     "",
     "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
-    "- Kimix snapshot replay adapter 已用真实 Server session / prompt / snapshot 验证：history replay 有稳定标记，renderer 可跳过已存在内容并补入缺失内容。",
+    "- Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。",
     "- Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。",
     "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
     "- 当前 0.17.1 native CLI 的 `/meta` 与 OpenAPI 自报版本为 `0.0.0`；P2 必须按 endpoint / contract capability 探测，不能只按 server_version 判断。",

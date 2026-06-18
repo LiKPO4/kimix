@@ -1,6 +1,6 @@
 # Kimi Code 0.17.1 Server P1 探针结果
 
-- 生成时间：2026-06-18T08:06:05.803Z
+- 生成时间：2026-06-18T08:17:08.618Z
 - CLI：C:\Users\Administrator\.kimi-code\bin\kimi.exe
 - Server：http://127.0.0.1:58639
 - 官方源码：C:\Users\Administrator\AppData\Local\Temp\kimix-kimi-code-research
@@ -14,7 +14,7 @@
 {
   "code": 0,
   "timedOut": false,
-  "durationMs": 416,
+  "durationMs": 415,
   "stdout": "0.17.1\n",
   "stderr": ""
 }
@@ -24,7 +24,7 @@
 
 ```json
 {
-  "serverId": "01KVCW71XE6YCPMV7GDA8NPT5Y",
+  "serverId": "01KVCWV6D4CS0EAMS2MRPCDTV0",
   "serverVersion": "0.0.0",
   "authReady": true,
   "openapiVersion": "0.0.0",
@@ -40,7 +40,7 @@
 
 ```json
 {
-  "sessionId": "session_f1c15b81-1cf4-4a94-ae10-ce47766edda6",
+  "sessionId": "session_f3472d32-c2b3-4137-a6cf-98d92dc7d1d3",
   "snapshotKeys": [
     "as_of_seq",
     "epoch",
@@ -53,12 +53,12 @@
 }
 ```
 
-### 通过：Kimix snapshot replay adapter
+### 通过：Kimix snapshot replay + session status adapter
 
 ```json
 {
-  "sessionId": "session_957ebd8d-b88a-489d-bcf6-3e53cb2b78d3",
-  "promptId": "prompt_01KVCW72YM881QFKF8KS39NRAC",
+  "sessionId": "session_9b49de77-3d7f-4df8-a43b-e39d7b9145fd",
+  "promptId": "prompt_01KVCWV7EJDGTV72T72D054D1C",
   "snapshotKeys": [
     "as_of_seq",
     "epoch",
@@ -73,12 +73,19 @@
   "assistantReplay": {
     "snapshotReplay": "history",
     "snapshotRole": "assistant",
-    "snapshotMessageId": "msg_session_957ebd8d-b88a-489d-bcf6-3e53cb2b78d3_000001",
-    "textLength": 65,
+    "snapshotMessageId": "msg_session_9b49de77-3d7f-4df8-a43b-e39d7b9145fd_000001",
+    "textLength": 109,
     "containsMarker": true
   },
   "skipExisting": true,
-  "keepMissing": true
+  "keepMissing": true,
+  "sessionStatus": {
+    "status": "idle",
+    "contextTokens": 20833,
+    "maxContextTokens": 262144,
+    "contextUsage": 0.07947158813476562,
+    "contextFieldsValid": true
+  }
 }
 ```
 
@@ -86,11 +93,11 @@
 
 ```json
 {
-  "sessionId": "session_91958924-cf1b-43e5-b01f-14da00d976ba",
-  "promptId": "prompt_01KVCW75RE2VHNA3NY5XH10DM5",
+  "sessionId": "session_2d1d0b07-0a0a-45e6-9f3b-6a69ce7aaf95",
+  "promptId": "prompt_01KVCWVANEQQG6BKXK7Y1F5E5C",
   "agentId": "agent-0",
-  "frameCount": 71,
-  "btwFrameCount": 67,
+  "frameCount": 48,
+  "btwFrameCount": 44,
   "mainContentFrameCount": 0,
   "containsMarker": true,
   "ended": true
@@ -101,9 +108,9 @@
 
 ```json
 {
-  "sessionId": "session_9511efbc-17e5-4ad5-a11c-c5f8c943f569",
-  "promptId": "prompt_01KVCW7839BDV2308M5ZXKNF4W",
-  "taskId": "bash-fzeusn7a",
+  "sessionId": "session_d77f9eae-a4a4-4bd2-8009-0d7b01310ed1",
+  "promptId": "prompt_01KVCWVCRJTQKD9N5J4NXZK3FH",
+  "taskId": "bash-97uof385",
   "kind": "bash",
   "approvedBashRequests": 1,
   "promptCompletedAfterCancel": true,
@@ -138,8 +145,8 @@
   "coverage": "WS 握手、断线重连、seq replay、messages/tasks、prompt",
   "code": 0,
   "timedOut": false,
-  "durationMs": 5004,
-  "stdout": "▶ server at http://127.0.0.1:58639\n▶ phase 0: server_id=01KVCW71XE6YCPMV7GDA8NPT5Y version=0.0.0\n▶ phase 0: auth.ready=true\n▶ session session_4d3ecd2a-b83d-49d9-baeb-6ed1f78f567e created\n▶ prompt prompt_01KVCW7J42MSGNWYJWKSJJNT8P completed; maxSeq=13\n▶ refresh #1: caught-up; accepted=[session_4d3ecd2a-b83d-49d9-baeb-6ed1f78f567e], replayed=0\n▶ refresh #2: replay seq=1..13 (13 events)\n▶ phase 2: messages=2 tasks=0\n▶ phase 5: follow-up prompt completed at seq=21\n✓ 03-refresh-replay: refresh round-trip preserves subscription + replay semantics\n",
+  "durationMs": 4948,
+  "stdout": "▶ server at http://127.0.0.1:58639\n▶ phase 0: server_id=01KVCWV6D4CS0EAMS2MRPCDTV0 version=0.0.0\n▶ phase 0: auth.ready=true\n▶ session session_28cc7fcb-d0f7-483f-a320-49c2031780ab created\n▶ prompt prompt_01KVCWVQWMZDEC4A3BGAC848E1 completed; maxSeq=13\n▶ refresh #1: caught-up; accepted=[session_28cc7fcb-d0f7-483f-a320-49c2031780ab], replayed=0\n▶ refresh #2: replay seq=1..13 (13 events)\n▶ phase 2: messages=2 tasks=0\n▶ phase 5: follow-up prompt completed at seq=21\n✓ 03-refresh-replay: refresh round-trip preserves subscription + replay semantics\n",
   "stderr": ""
 }
 ```
@@ -151,8 +158,8 @@
   "coverage": "approval/question pending 列表与响应闭环",
   "code": 0,
   "timedOut": false,
-  "durationMs": 6794,
-  "stdout": "▶ server at http://127.0.0.1:58639\n▶ pending: session session_f6ff5945-946e-4f2a-85f7-2f1c96a8fab5 created\n▶ approval: prompt prompt_01KVCW7PYM6TMHEYFXPZWVGA41 submitted\n▶ approval: pending approval 01KVCW7RPQ98F2J7TCAMWJYNE3 tool=Bash\n▶ approval: prompt completed via prompt.completed\n▶ question: prompt prompt_01KVCW7SV2DFCHZNJ0SXRCBHK3 submitted\n▶ question: pending question 01KVCW7V50W8R1ZM9KHWFBTF8A items=1\n▶ question: prompt completed via prompt.completed\n✓ 08-pending-recovery: pending approvals and questions round-tripped\n",
+  "durationMs": 8104,
+  "stdout": "▶ server at http://127.0.0.1:58639\n▶ pending: session session_c5dd0e5c-23df-4a54-bd34-3aa801361de7 created\n▶ approval: prompt prompt_01KVCWVWQJH0PPVYPZYSC5YYCV submitted\n▶ approval: pending approval 01KVCWVYS1ZEE3W8XEVK72SFT2 tool=Bash\n▶ approval: prompt completed via prompt.completed\n▶ question: prompt prompt_01KVCWW0760K5N5GPSR4PV6HR2 submitted\n▶ question: pending question 01KVCWW1X6M00X4466MXBK7TV4 items=1\n▶ question: prompt completed via prompt.completed\n✓ 08-pending-recovery: pending approvals and questions round-tripped\n",
   "stderr": ""
 }
 ```
@@ -164,8 +171,8 @@
   "coverage": "queued prompt steer 与 WS 事件",
   "code": 0,
   "timedOut": false,
-  "durationMs": 2215,
-  "stdout": "▶ session session_e81d724d-e52c-4a91-b574-366e43524e91 created\n▶ session session_e81d724d-e52c-4a91-b574-366e43524e91 subscribed\n▶ active prompt injected: prompt_debug_queue_steer_14940\n▶ first prompt queued: prompt_01KVCW7XN9K31B7K8JAHE4FXA6\n▶ second prompt queued: prompt_01KVCW7XSM8RWSRCCBAZ2JBA22\n▶ queue before steer: prompt_01KVCW7XN9K31B7K8JAHE4FXA6, prompt_01KVCW7XSM8RWSRCCBAZ2JBA22\n▶ steer response: {\"steered\":true,\"prompt_ids\":[\"prompt_01KVCW7XN9K31B7K8JAHE4FXA6\",\"prompt_01KVCW7XSM8RWSRCCBAZ2JBA22\"]}\n▶ prompt.steered frame: {\"type\":\"prompt.steered\",\"seq\":9,\"session_id\":\"session_e81d724d-e52c-4a91-b574-366e43524e91\",\"payload\":{\"type\":\"prompt.steered\",\"agentId\":\"main\",\"sessionId\":\"session_e81d724d-e52c-4a91-b574-366e43524e91\",\"activePromptId\":\"prompt_debug_queue_steer_14940\",\"promptIds\":[\"prompt_01KVCW7XN9K31B7K8JAHE4FXA6\",\"prompt_01KVCW7XSM8RWSRCCBAZ2JBA22\"],\"content\":[{\"type\":\"text\",\"text\":\"First queued prompt for server steer.\"},{\"type\":\"text\",\"text\":\"Second queued prompt for server steer.\"}],\"steeredAt\":\"2026-06-18T08:05:59.392Z\"}}\n✓ 10-prompt-queue-steer: queued prompts steered and queue drained\n",
+  "durationMs": 2211,
+  "stdout": "▶ session session_9cd14b91-a86b-4c20-904c-d67ad8c0d862 created\n▶ session session_9cd14b91-a86b-4c20-904c-d67ad8c0d862 subscribed\n▶ active prompt injected: prompt_debug_queue_steer_9324\n▶ first prompt queued: prompt_01KVCWW4NXTKK1QFDK5QFDTCK9\n▶ second prompt queued: prompt_01KVCWW4TEBWH4MG07A9CPAJZH\n▶ queue before steer: prompt_01KVCWW4NXTKK1QFDK5QFDTCK9, prompt_01KVCWW4TEBWH4MG07A9CPAJZH\n▶ steer response: {\"steered\":true,\"prompt_ids\":[\"prompt_01KVCWW4NXTKK1QFDK5QFDTCK9\",\"prompt_01KVCWW4TEBWH4MG07A9CPAJZH\"]}\n▶ prompt.steered frame: {\"type\":\"prompt.steered\",\"seq\":9,\"session_id\":\"session_9cd14b91-a86b-4c20-904c-d67ad8c0d862\",\"payload\":{\"type\":\"prompt.steered\",\"agentId\":\"main\",\"sessionId\":\"session_9cd14b91-a86b-4c20-904c-d67ad8c0d862\",\"activePromptId\":\"prompt_debug_queue_steer_9324\",\"promptIds\":[\"prompt_01KVCWW4NXTKK1QFDK5QFDTCK9\",\"prompt_01KVCWW4TEBWH4MG07A9CPAJZH\"],\"content\":[{\"type\":\"text\",\"text\":\"First queued prompt for server steer.\"},{\"type\":\"text\",\"text\":\"Second queued prompt for server steer.\"}],\"steeredAt\":\"2026-06-18T08:17:01.957Z\"}}\n✓ 10-prompt-queue-steer: queued prompts steered and queue drained\n",
   "stderr": ""
 }
 ```
@@ -177,8 +184,8 @@
   "coverage": "prompt 完成、queued/active/session cancel 与恢复",
   "code": 0,
   "timedOut": false,
-  "durationMs": 5897,
-  "stdout": "▶ session session_21bb6264-8c5a-4a9d-8f2f-5bcdb2af8e5f created\n▶ session session_21bb6264-8c5a-4a9d-8f2f-5bcdb2af8e5f subscribed\n▶ prompt completed: prompt_01KVCW7ZSCXX5GHH39EMMC3JD7\n▶ injected active prompt for queued cancel: prompt_debug_cancel_queued_19992\n▶ queued prompt submitted: prompt_01KVCW81NKJS9S3JHSS039T06J\n▶ abort queued response: {\"aborted\":true}\n▶ prompt.aborted frame received for queued prompt prompt_01KVCW81NKJS9S3JHSS039T06J\n▶ injected active prompt for session abort: prompt_debug_cancel_session_19992\n▶ session abort response: {\"aborted\":true}\n▶ prompt.aborted frame received for session-aborted prompt prompt_debug_cancel_session_19992\n▶ injected active prompt for repeated ESC: prompt_debug_repeated_esc_19992\n▶ first ESC abort response: {\"aborted\":true}\n▶ prompt.aborted frame received for repeated ESC prompt prompt_debug_repeated_esc_19992\n▶ second ESC abort returned 40903 as expected\n▶ injected active prompt for repeated session abort: prompt_debug_repeated_session_abort_19992\n▶ first session-level ESC abort response: {\"aborted\":true}\n▶ second session-level ESC abort response: {\"aborted\":true}\n▶ third session-level ESC abort response: {\"aborted\":true}\n▶ repeated session-level ESC produced exactly one prompt.aborted frame\n▶ recovered prompt completed: prompt_01KVCW82KDT56MYPF5V78N0KD3\n✓ 12-send-and-cancel: submit + abort round-trips succeeded\n",
+  "durationMs": 6140,
+  "stdout": "▶ session session_7c5c8cdc-d02d-465f-8d99-a5122502d6cd created\n▶ session session_7c5c8cdc-d02d-465f-8d99-a5122502d6cd subscribed\n▶ prompt completed: prompt_01KVCWW6V3Z0827ZS4J47YA12G\n▶ injected active prompt for queued cancel: prompt_debug_cancel_queued_9456\n▶ queued prompt submitted: prompt_01KVCWW8SB8BSGFNKSJT7A68D2\n▶ abort queued response: {\"aborted\":true}\n▶ prompt.aborted frame received for queued prompt prompt_01KVCWW8SB8BSGFNKSJT7A68D2\n▶ injected active prompt for session abort: prompt_debug_cancel_session_9456\n▶ session abort response: {\"aborted\":true}\n▶ prompt.aborted frame received for session-aborted prompt prompt_debug_cancel_session_9456\n▶ injected active prompt for repeated ESC: prompt_debug_repeated_esc_9456\n▶ first ESC abort response: {\"aborted\":true}\n▶ prompt.aborted frame received for repeated ESC prompt prompt_debug_repeated_esc_9456\n▶ second ESC abort returned 40903 as expected\n▶ injected active prompt for repeated session abort: prompt_debug_repeated_session_abort_9456\n▶ first session-level ESC abort response: {\"aborted\":true}\n▶ second session-level ESC abort response: {\"aborted\":true}\n▶ third session-level ESC abort response: {\"aborted\":true}\n▶ repeated session-level ESC produced exactly one prompt.aborted frame\n▶ recovered prompt completed: prompt_01KVCWW9QMV86FC538E2ANJ78C\n✓ 12-send-and-cancel: submit + abort round-trips succeeded\n",
   "stderr": ""
 }
 ```
@@ -186,7 +193,7 @@
 ## 结论
 
 - Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。
-- Kimix snapshot replay adapter 已用真实 Server session / prompt / snapshot 验证：history replay 有稳定标记，renderer 可跳过已存在内容并补入缺失内容。
+- Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。
 - Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。
 - Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。
 - 当前 0.17.1 native CLI 的 `/meta` 与 OpenAPI 自报版本为 `0.0.0`；P2 必须按 endpoint / contract capability 探测，不能只按 server_version 判断。

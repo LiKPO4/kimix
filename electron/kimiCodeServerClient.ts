@@ -15,6 +15,18 @@ export type ServerSession = {
   usage?: Record<string, unknown>;
 };
 
+export type ServerSessionStatus = {
+  status: string;
+  model?: string;
+  thinking_level: string;
+  permission: string;
+  plan_mode: boolean;
+  swarm_mode: boolean;
+  context_tokens: number;
+  max_context_tokens: number;
+  context_usage: number;
+};
+
 export type ServerBackgroundTask = {
   id: string;
   session_id: string;
@@ -158,6 +170,10 @@ export class KimiCodeServerClient {
 
   getSession(sessionId: string): Promise<ServerSession> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}`);
+  }
+
+  getSessionStatus(sessionId: string): Promise<ServerSessionStatus> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/status`);
   }
 
   async listSessions(): Promise<ServerSession[]> {

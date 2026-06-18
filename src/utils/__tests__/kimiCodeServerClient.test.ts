@@ -95,6 +95,35 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("reads the official session status endpoint", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      code: 0,
+      data: {
+        status: "idle",
+        model: "kimi-code/kimi-for-coding",
+        thinking_level: "high",
+        permission: "manual",
+        plan_mode: false,
+        swarm_mode: false,
+        context_tokens: 1234,
+        max_context_tokens: 262144,
+        context_usage: 0.0047,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.getSessionStatus("session/1")).resolves.toMatchObject({
+      context_tokens: 1234,
+      max_context_tokens: 262144,
+      context_usage: 0.0047,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:58627/api/v1/sessions/session%2F1/status",
+      expect.any(Object),
+    );
+  });
+
   it("treats already-finished Server task cancellation as an idempotent stop result", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       code: 40904,

@@ -13,6 +13,7 @@ import {
   snapshotMessagesToServerFrames,
   type ServerFrame,
   type ServerSession,
+  type ServerSessionStatus,
   type ServerSnapshot,
   type ServerTerminal,
 } from "./kimiCodeServerClient";
@@ -873,15 +874,7 @@ export async function cancelGoal(sessionId: string, reason?: string): Promise<Ki
 export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatus> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    const session = await getServerClient().getSession(sessionId);
-    serverManaged.session = session;
-    return {
-      model: serverManaged.model,
-      thinkingLevel: serverManaged.thinking,
-      permission: serverManaged.permission,
-      planMode: serverManaged.planMode,
-      usage: session.usage,
-    };
+    return serverStatusToKimiCodeStatus(await refreshServerSessionStatus(sessionId, false), serverManaged.session.usage);
   }
   const managed = getManagedSession(sessionId);
   return managed.session.getStatus();
@@ -1448,6 +1441,9 @@ async function registerServerSession(
   };
   serverSessions.set(session.id, managed);
   await getServerClient().subscribe(session.id);
+  void refreshServerSessionStatus(session.id, true).catch((error) => {
+    console.warn(`[KimiCodeServerHost] refresh initial status failed for ${session.id}:`, error);
+  });
   kimiCodeServerHost.setRouting("server");
   emitStatus(session.id, managed.status);
   return toServerEngineSession(managed);
@@ -1514,9 +1510,55 @@ function handleServerFrame(frame: ServerFrame) {
   if (managed && consumeBtwEvent(managed.btwRuns, event)) return;
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event);
-  if (frame.type === "prompt.completed" && serverSessions.get(sessionId)?.status === "running") {
-    setStatus(sessionId, "completed");
+  if (frame.type === "prompt.completed") {
+    if (serverSessions.get(sessionId)?.status === "running") setStatus(sessionId, "completed");
+    void refreshServerSessionStatus(sessionId, true).catch((error) => {
+      console.warn(`[KimiCodeServerHost] refresh completed status failed for ${sessionId}:`, error);
+    });
   }
+}
+
+async function refreshServerSessionStatus(sessionId: string, emitEvent: boolean): Promise<ServerSessionStatus> {
+  const managed = serverSessions.get(sessionId);
+  if (!managed) throw new Error(`Kimi Server session is not active: ${sessionId}`);
+  const status = await getServerClient().getSessionStatus(sessionId);
+  if (status.model) managed.model = status.model;
+  managed.thinking = status.thinking_level;
+  if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
+    managed.permission = status.permission;
+  }
+  managed.planMode = status.plan_mode;
+  if (emitEvent) eventSink?.({ sessionId, event: serverStatusToAgentEvent(status) });
+  return status;
+}
+
+export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<string, unknown> {
+  return {
+    type: "agent.status.updated",
+    model: status.model,
+    thinkingLevel: status.thinking_level,
+    permission: status.permission,
+    planMode: status.plan_mode,
+    swarmMode: status.swarm_mode,
+    contextTokens: status.context_tokens,
+    maxContextTokens: status.max_context_tokens,
+    contextUsage: status.context_usage,
+  };
+}
+
+function serverStatusToKimiCodeStatus(status: ServerSessionStatus, usage: unknown): KimiCodeSessionStatus {
+  return {
+    model: status.model,
+    thinkingLevel: status.thinking_level,
+    permission: status.permission === "manual" || status.permission === "auto" || status.permission === "yolo"
+      ? status.permission
+      : undefined,
+    planMode: status.plan_mode,
+    contextTokens: status.context_tokens,
+    maxContextTokens: status.max_context_tokens,
+    contextUsage: status.context_usage,
+    usage,
+  };
 }
 
 function emitServerError(sessionId: string, error: unknown) {
