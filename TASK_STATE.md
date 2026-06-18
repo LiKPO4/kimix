@@ -29,6 +29,7 @@
 - 已完成：v2.9.157 补强后台任务 UI：区分 Server/SDK 来源，映射 Server `output_preview`，运行态每 2 秒刷新；瞬时刷新失败不清空任务，保留上次结果并展示失败提示。
 - 已完成：v2.9.158 接入官方 messages 分页与 prompts 队列 GET；右侧 Kimi 自检只展示最近消息数量/角色分布和 active/queued prompt 数，不读取正文到 UI、不参与本地时间线写入。
 - 已完成：v2.9.159 修复运行中链路状态被 ChatThread 隐藏且空占位 assistant 被误标为“正在思考”；过程头现在显示准备/恢复/runtime/Server/SDK fallback 等真实链路阶段，收到真实 thinking、正文、工具或子代理事件后再切换为对应状态。
+- 已完成：v2.9.160 为流式输出造成的 Markdown 表格截断增加兜底；确认表头后可补齐不完整分隔线，并把多行首尾粘连、再次断开的表格正文按表头列数重排，代码块及普通含竖线文本不参与修复。
 - 已验证：真实 Kimi Code 0.17.1 新建空会话后，messages GET 返回 `code=0/items=0/has_more=false`，prompts GET 返回 `code=0/active=false/queued=0`。
 - 收口结论：Server 模型/auth/config/provider 目录保持只读已足够；files/workspace REST 与 Electron 本地文件能力重复，OAuth/terminal 有上游阻塞，强迁移旧 SDK 会话风险高，当前没有继续实现的高收益项。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。

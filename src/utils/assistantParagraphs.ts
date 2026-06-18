@@ -231,6 +231,60 @@ export function normalizeIndentedFencedCodeBlocks(content: string) {
   return normalized.join("\n");
 }
 
+function expandCollapsedMarkdownTableRows(lines: string[]) {
+  const expanded: string[] = [];
+  let activeTableCells = 0;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (isLikelyMarkdownTableHeader(line) && i + 1 < lines.length && isMarkdownTableSeparatorFragment(lines[i + 1])) {
+      activeTableCells = countMarkdownTableCells(line);
+      expanded.push(line);
+      continue;
+    }
+    if (!activeTableCells || isMarkdownTableSeparatorFragment(line)) {
+      expanded.push(line);
+      continue;
+    }
+    if (!line.trim() || !line.includes("|")) {
+      activeTableCells = 0;
+      expanded.push(line);
+      continue;
+    }
+    if (countMarkdownTableCells(line) <= activeTableCells) {
+      expanded.push(line);
+      continue;
+    }
+
+    const cells: string[] = [];
+    let cursor = i;
+    while (cursor < lines.length && cells.length < activeTableCells * 20) {
+      const candidate = lines[cursor];
+      if (!candidate.trim() || !candidate.includes("|")) break;
+      cells.push(...candidate
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim())
+        .filter(Boolean));
+      cursor += 1;
+      if (cells.length >= activeTableCells && cells.length % activeTableCells === 0) break;
+    }
+
+    if (cells.length >= activeTableCells && cells.length % activeTableCells === 0) {
+      for (let offset = 0; offset < cells.length; offset += activeTableCells) {
+        expanded.push(`| ${cells.slice(offset, offset + activeTableCells).join(" | ")} |`);
+      }
+      i = cursor - 1;
+      continue;
+    }
+    expanded.push(line);
+  }
+
+  return expanded;
+}
+
 function restoreBrokenMarkdownTableRows(lines: string[]) {
   const restored: string[] = [];
   let activeTableCells = 0;
@@ -319,13 +373,15 @@ export function restoreMarkdownTables(content: string) {
       }
 
       const cells = fragments.flatMap(separatorCells);
-      if (cells.length === headerCells) {
-        restored.push(`|${cells.join("|")}|`);
+      if (cells.length >= 2) {
+        const normalizedCells = cells.slice(0, headerCells);
+        while (normalizedCells.length < headerCells) normalizedCells.push("---");
+        restored.push(`|${normalizedCells.join("|")}|`);
         i = cursor - 1;
       }
     }
 
-    return restoreBrokenMarkdownTableRows(restored).join("\n");
+    return restoreBrokenMarkdownTableRows(expandCollapsedMarkdownTableRows(restored)).join("\n");
   });
 }
 

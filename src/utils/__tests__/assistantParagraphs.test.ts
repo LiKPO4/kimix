@@ -49,6 +49,26 @@ describe("restoreMarkdownTables", () => {
       "```",
     ].join("\n"));
   });
+
+  it("restores rows that were collapsed together and split again during streaming", () => {
+    expect(restoreMarkdownTables([
+      "| id | 名称 | 类型 | 稀有度 | 效果 kind | 来源 |",
+      "|----------|------|",
+      "| slash_bamboo | 青竹斩 | attack | normal | damage | 初始/普通奖励 | | heavy_cleave | 沉岳劈 |",
+      "attack |",
+      "uncommon | damage | 普通奖励 | | guard_seal | 护身诀 | defend | normal | guard | 初始/普通奖励 |",
+      "",
+      "后续说明。",
+    ].join("\n"))).toBe([
+      "| id | 名称 | 类型 | 稀有度 | 效果 kind | 来源 |",
+      "|----------|------|---|---|---|---|",
+      "| slash_bamboo | 青竹斩 | attack | normal | damage | 初始/普通奖励 |",
+      "| heavy_cleave | 沉岳劈 | attack | uncommon | damage | 普通奖励 |",
+      "| guard_seal | 护身诀 | defend | normal | guard | 初始/普通奖励 |",
+      "",
+      "后续说明。",
+    ].join("\n"));
+  });
 });
 
 describe("normalizeIndentedFencedCodeBlocks", () => {
