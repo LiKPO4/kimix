@@ -1,6 +1,7 @@
 # Kimix 长程任务状态
 
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
+- 当前修复：v2.10.4 套餐用量悬窗每次打开都会自动刷新；自动刷新和手动刷新重叠时只采纳最后一次请求结果，避免旧响应覆盖新数据。
 - 当前修复：v2.10.3 稳定运行中过程头计时；assistant 正文事件已完成但同一轮工具/子代理仍在运行时，不再切到无 live elapsed 的完成耗时分支，过程头会持续显示“命令运行中/子代理运行中 x秒”。
 - 当前修复：v2.10.2 恢复新会话标准欢迎页；空态判断改为基于过滤后的可渲染事件，避免后台 Server/runtime 状态事件被隐藏后仍把 ChatThread 判定为“已有内容”，导致主区域出现空白。
 - 当前修复：v2.10.1 针对 v2.10.0 启动恢复旧官方 Server runtime 时 `/profile Session was not found` 仍冒红错的问题，补齐 resume 后同步 profile 阶段的 session missing 兜底；单个旧 session 丢失不再标记 Server 整体 fallback，自动创建同项目 fresh runtime 并保留 Kimix 本地历史。

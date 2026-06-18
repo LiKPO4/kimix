@@ -94,6 +94,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const [now, setNow] = useState(Date.now());
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const usageMenuRef = useRef<HTMLDivElement>(null);
+  const usageRequestIdRef = useRef(0);
   const workDirsRef = useRef<HTMLDivElement>(null);
   const activeSession = session ?? currentSession;
   const projectDisplayName = displayProjectName(project);
@@ -167,10 +168,13 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   };
 
   const loadUsage = async () => {
+    const requestId = usageRequestIdRef.current + 1;
+    usageRequestIdRef.current = requestId;
     setUsageLoading(true);
     setUsageLoginState("idle");
     try {
       const res = await window.api.getKimiUsage();
+      if (usageRequestIdRef.current !== requestId) return;
       if (res.success) {
         setUsageData(res.data);
       } else {
@@ -186,6 +190,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         });
       }
     } catch (err) {
+      if (usageRequestIdRef.current !== requestId) return;
       setUsageData({
         available: false,
         updatedAt: Date.now(),
@@ -197,7 +202,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         ],
       });
     } finally {
-      setUsageLoading(false);
+      if (usageRequestIdRef.current === requestId) setUsageLoading(false);
     }
   };
 
@@ -216,7 +221,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const toggleUsage = () => {
     const next = !usageOpen;
     setUsageOpen(next);
-    if (next && !usageData) {
+    if (next) {
       void loadUsage();
     }
   };
