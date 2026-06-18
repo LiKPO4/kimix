@@ -9,6 +9,7 @@ import {
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
+  normalizeServerTerminalCreateError,
   type ServerFrame,
   type ServerSession,
   type ServerTerminal,
@@ -990,7 +991,7 @@ export async function createServerTerminal(
   try {
     return toServerTerminalInfo(await getServerClient().createTerminal(sessionId, options));
   } catch (error) {
-    throw normalizeServerTerminalError(error);
+    throw normalizeServerTerminalCreateError(error);
   }
 }
 
@@ -1534,18 +1535,6 @@ function toServerTerminalInfo(terminal: ServerTerminal): KimiCodeServerTerminalI
     exitedAt: terminal.exited_at,
     exitCode: terminal.exit_code,
   };
-}
-
-function normalizeServerTerminalError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("conpty.node") || message.includes("Failed to load native module")) {
-    return new Error([
-      "官方 Kimi Code Server 终端创建失败：当前 Windows 0.17.1 安装包缺少可加载的 ConPTY native 模块（conpty.node）。",
-      "Kimix 已接入 terminal create/list/close 与 attach/input/resize 接口，但需要官方 CLI 修复或补齐 native 模块后才能创建内嵌终端。",
-      `原始错误：${message}`,
-    ].join("\n"));
-  }
-  return error instanceof Error ? error : new Error(message);
 }
 
 function waitForBtwRun(run: BtwRun, timeoutMs: number): Promise<void> {

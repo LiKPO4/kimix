@@ -3,6 +3,7 @@ import {
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
+  normalizeServerTerminalCreateError,
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
 
@@ -62,5 +63,16 @@ describe("KimiCodeServerClient protocol adapters", () => {
       "http://127.0.0.1:58627/api/v1/sessions/parent/tasks",
       "http://127.0.0.1:58627/api/v1/sessions/parent/terminals",
     ]);
+  });
+
+  it("turns the upstream Windows ConPTY packaging failure into an actionable terminal error", () => {
+    const normalized = normalizeServerTerminalCreateError(
+      new Error("Failed to load native module: conpty.node: No such built-in module"),
+    );
+    expect(normalized.message).toContain("官方 Kimi Code Server 终端创建失败");
+    expect(normalized.message).toContain("Windows 0.17.1");
+    expect(normalized.message).toContain("conpty.node");
+    expect(normalized.message).toContain("Kimix 已接入 terminal create/list/close");
+    expect(normalized.message).toContain("原始错误：Failed to load native module");
   });
 });

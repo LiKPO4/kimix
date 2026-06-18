@@ -88,6 +88,18 @@ export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> 
   return { type: frame.type, ...payload, seq: frame.seq };
 }
 
+export function normalizeServerTerminalCreateError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("conpty.node") || message.includes("Failed to load native module")) {
+    return new Error([
+      "官方 Kimi Code Server 终端创建失败：当前 Windows 0.17.1 安装包缺少可加载的 ConPTY native 模块（conpty.node）。",
+      "Kimix 已接入 terminal create/list/close 与 attach/input/resize 接口，但需要官方 CLI 修复或补齐 native 模块后才能创建内嵌终端。",
+      `原始错误：${message}`,
+    ].join("\n"));
+  }
+  return error instanceof Error ? error : new Error(message);
+}
+
 export class KimiCodeServerClient {
   private socket: WebSocket | null = null;
   private connected: Promise<void> | null = null;
