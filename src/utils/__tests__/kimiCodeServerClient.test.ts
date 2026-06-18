@@ -3,6 +3,7 @@ import {
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
+  mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
   toServerPromptContent,
@@ -64,6 +65,13 @@ describe("KimiCodeServerClient protocol adapters", () => {
       "http://127.0.0.1:58627/api/v1/sessions/parent/tasks",
       "http://127.0.0.1:58627/api/v1/sessions/parent/terminals",
     ]);
+  });
+
+  it("merges official children with Kimix fork metadata for the session tree", () => {
+    const child = { id: "child-1", status: "idle", metadata: { parent_session_id: "parent" } };
+    const fork = { id: "fork-1", status: "idle", metadata: { forkedFrom: "parent" } };
+    const unrelated = { id: "other", status: "idle", metadata: { forkedFrom: "elsewhere" } };
+    expect(mergeServerRelatedSessions("parent", [child], [child, fork, unrelated])).toEqual([child, fork]);
   });
 
   it("uses official session action routes for compact, undo, BTW and archive", async () => {

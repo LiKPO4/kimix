@@ -22,10 +22,11 @@
 - Server Skill list / activate 已接入现有 Skills 页和 `/skill:name 参数` 入口；SDK 会话继续走同名官方 SDK 方法。
 - Server MCP list / restart 已接入现有 MCP 页，展示当前会话的真实连接状态、工具数和错误，并支持按服务 ID 重启。
 - 真实 0.17.1 探针已验证：会话发现 13 个 Skill，项目探针 Skill 激活成功；MCP 返回 1 个 connected 服务和 2 个工具；不存在服务的 restart 返回官方 `40408`。
+- 右侧会话栏已接 Server 会话树：展示当前节点、fork 分支和直接 child，支持刷新、新建 child、载入历史并切换。官方 `/children` 不包含 `:fork`，Kimix 使用创建 fork 时写入的 `metadata.forkedFrom` 合并关系。
+- 真实会话树探针已验证：官方 child 可列出和恢复；fork 不进入官方 children，但 `forkedFrom` 元数据可稳定识别，合并后得到 2 个关联节点。
 
 ## B. 后端已有基础，产品入口仍不完整
 
-- fork / children：主进程和 preload 已接，尚无完整会话树 UI。
 - background tasks：主进程和现有长程任务侧栏已有桥接，但 Server task 的实时输出、失败恢复提示仍可加强。
 - terminal：接口已接；Windows 0.17.1 缺少可加载的 `conpty.node`，当前无法完成真实创建。
 - Server session routing：仍受 `KIMIX_EXPERIMENTAL_KIMI_SERVER=1` 与 `KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS=1` 控制。
@@ -49,5 +50,5 @@
 
 ## 推荐推进顺序
 
-1. 会话树（fork / children）正式 UI。
-2. 再评估 tool catalog、文件系统、connections、独立 prompt/message 查询等边际能力。
+1. 继续补齐高价值官方能力：tool catalog 与运行时诊断。
+2. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。

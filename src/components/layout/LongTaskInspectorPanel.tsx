@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Play,
   Pause,
+  Plus,
   RefreshCw,
   RotateCcw,
   Send,
@@ -37,8 +38,10 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { BtwRound, ComposerDockCard, RightSidebarCardId, Session } from "@/types/ui";
-import type { GitGraphEntry, GitStatusFile, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { GitGraphEntry, GitStatusFile, KimiCodeBackgroundTaskInfo, KimiCodeSessionSummary, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { mapHistoryEvents } from "@/utils/eventMapper";
+import { settleInactiveEvents } from "@/utils/eventHelpers";
 import { formatReleaseDate } from "@/utils/format";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
@@ -334,9 +337,15 @@ export function LongTaskInspectorPanel({
   const permissionMode = useAppStore((state) => state.permissionMode);
   const additionalWorkDirs = useAppStore((state) => state.additionalWorkDirs);
   const updateSession = useSessionStore((state) => state.updateSession);
+  const addSession = useSessionStore((state) => state.addSession);
   const [collapsedBtwRoundIds, setCollapsedBtwRoundIds] = useState<Set<string>>(() => new Set());
   const [goalDraft, setGoalDraft] = useState("");
   const [goalBusy, setGoalBusy] = useState<"refresh" | "create" | "replace" | "pause" | "resume" | "cancel" | null>(null);
+  const [serverChildren, setServerChildren] = useState<KimiCodeSessionSummary[]>([]);
+  const [serverTreeAvailable, setServerTreeAvailable] = useState(false);
+  const [serverTreeLoading, setServerTreeLoading] = useState(false);
+  const [serverTreeBusy, setServerTreeBusy] = useState<string | null>(null);
+  const [serverTreeError, setServerTreeError] = useState<string | null>(null);
   const [dragRightCardId, setDragRightCardId] = useState<RightSidebarCardId | null>(null);
   const [rightCardDrop, setRightCardDrop] = useState<{ id: RightSidebarCardId; position: "above" | "below" } | null>(null);
   const [kimiHealthOpen, setKimiHealthOpen] = useState(false);
@@ -904,6 +913,103 @@ export function LongTaskInspectorPanel({
     } finally {
       setGoalBusy(null);
     }
+  };
+  const officialRuntimeSessionId = liveCurrentSession?.engine === "kimi-code"
+    ? liveCurrentSession.runtimeSessionId ?? liveCurrentSession.officialSessionId ?? null
+    : null;
+  const refreshServerTree = async (notifyOnError = false) => {
+    if (!officialRuntimeSessionId) {
+      setServerChildren([]);
+      setServerTreeAvailable(false);
+      setServerTreeError(null);
+      return;
+    }
+    setServerTreeLoading(true);
+    const result = await window.api.listKimiCodeChildSessions({ sessionId: officialRuntimeSessionId });
+    setServerTreeLoading(false);
+    if (!result.success) {
+      setServerChildren([]);
+      setServerTreeAvailable(false);
+      setServerTreeError(result.error);
+      if (notifyOnError) showToast(`读取官方会话树失败：${result.error}`);
+      return;
+    }
+    setServerChildren(result.data);
+    setServerTreeAvailable(true);
+    setServerTreeError(null);
+  };
+  useEffect(() => {
+    setServerChildren([]);
+    setServerTreeAvailable(false);
+    setServerTreeError(null);
+    void refreshServerTree();
+  }, [officialRuntimeSessionId]);
+
+  const openServerTreeSession = async (child: KimiCodeSessionSummary) => {
+    if (serverTreeBusy) return;
+    setServerTreeBusy(child.id);
+    const resumed = await window.api.resumeKimiCodeSession({ sessionId: child.id });
+    if (!resumed.success) {
+      setServerTreeBusy(null);
+      showToast(`载入子会话失败：${resumed.error}`);
+      return;
+    }
+    const workDir = resumed.data.workDir || child.workDir || liveCurrentSession?.projectPath || currentProject?.path || "";
+    const history = workDir
+      ? await window.api.loadKimiCodeSession({ workDir, sessionId: child.id })
+      : null;
+    const events = history?.success
+      ? settleInactiveEvents(mapHistoryEvents(Array.isArray(history.data.events) ? history.data.events : []))
+      : [];
+    const existing = useSessionStore.getState().sessions.find((session) => (
+      session.runtimeSessionId === child.id || session.officialSessionId === child.id
+    ));
+    const now = Date.now();
+    const nextSession: Session = {
+      ...(existing ?? {}),
+      id: existing?.id ?? `local-server-child-${child.id}`,
+      engine: "kimi-code",
+      runtimeSessionId: child.id,
+      officialSessionId: child.id,
+      model: existing?.model ?? liveCurrentSession?.model,
+      title: child.title?.trim() || existing?.title || "官方子会话",
+      titleLocked: Boolean(child.title?.trim() || existing?.titleLocked),
+      projectPath: workDir,
+      events: history?.success ? events : existing?.events ?? events,
+      isLoading: false,
+      createdAt: existing?.createdAt ?? child.createdAt ?? now,
+      updatedAt: Math.max(existing?.updatedAt ?? 0, child.updatedAt ?? 0, now),
+    };
+    if (existing) updateSession(existing.id, () => nextSession);
+    else addSession(nextSession);
+    setCurrentSession(nextSession);
+    setWorkspaceView("chat");
+    setServerTreeBusy(null);
+    showToast(history?.success ? `已切换到：${nextSession.title}` : `已切换到子会话，但历史读取失败：${history?.error ?? "缺少工作目录"}`);
+  };
+
+  const createServerTreeChild = async () => {
+    if (!officialRuntimeSessionId || serverTreeBusy) return;
+    const titleBase = liveCurrentSession?.title?.trim() || "当前会话";
+    const title = `${titleBase} · 子会话 ${serverChildren.length + 1}`;
+    setServerTreeBusy("create");
+    const created = await window.api.createKimiCodeChildSession({ sessionId: officialRuntimeSessionId, title });
+    if (!created.success) {
+      setServerTreeBusy(null);
+      showToast(`创建子会话失败：${created.error}`);
+      return;
+    }
+    const child: KimiCodeSessionSummary = {
+      id: created.data.sessionId,
+      title,
+      workDir: created.data.workDir,
+      sessionDir: "",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setServerChildren((current) => current.some((item) => item.id === child.id) ? current : [...current, child]);
+    setServerTreeBusy(null);
+    await openServerTreeSession(child);
   };
   const selectedGitFileCount = gitFiles.filter((file) => selectedGitFiles.has(file.path)).length;
   const selectedGitFileList = gitFiles.filter((file) => selectedGitFiles.has(file.path));
@@ -1888,6 +1994,84 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
+
+            {serverTreeAvailable && (
+              <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ padding: "16px 16px 18px" }}>
+                <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium leading-5 text-text-muted">官方会话树</div>
+                    <div className="text-[12px] leading-5 text-text-muted" style={{ marginTop: 4 }}>
+                      当前节点、分支与直接子会话
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => void refreshServerTree(true)}
+                      disabled={serverTreeLoading || Boolean(serverTreeBusy)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
+                      title="刷新会话树"
+                      aria-label="刷新会话树"
+                    >
+                      <RefreshCw size={14} className={serverTreeLoading ? "animate-spin" : ""} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void createServerTreeChild()}
+                      disabled={serverTreeLoading || Boolean(serverTreeBusy)}
+                      className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
+                    >
+                      {serverTreeBusy === "create" ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                      <span>新建子会话</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                  <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-accent-primary-light/40" style={{ padding: "12px 14px" }}>
+                    <div className="grid items-center" style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", gap: 10 }}>
+                      <GitBranch size={14} className="text-accent-primary" />
+                      <div className="min-w-0">
+                        <div className="truncate text-[13px] font-medium leading-5 text-text-primary">{liveCurrentSession?.title || "当前会话"}</div>
+                        <div className="truncate text-[11.5px] leading-5 text-text-muted">{officialRuntimeSessionId}</div>
+                      </div>
+                      <span className="rounded-full bg-surface-elevated text-[11px] text-accent-primary" style={{ height: 24, paddingLeft: 9, paddingRight: 9, display: "flex", alignItems: "center" }}>当前</span>
+                    </div>
+                  </div>
+                  {serverChildren.length > 0 ? (
+                    <div className="flex flex-col" style={{ gap: 8, paddingLeft: 14 }}>
+                      {serverChildren.map((child) => (
+                        <button
+                          key={child.id}
+                          type="button"
+                          onClick={() => void openServerTreeSession(child)}
+                          disabled={Boolean(serverTreeBusy)}
+                          className="w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-left transition-colors hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                          style={{ padding: "11px 12px" }}
+                        >
+                          <div className="grid items-center" style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", gap: 10 }}>
+                            {serverTreeBusy === child.id ? <Loader2 size={14} className="animate-spin text-text-muted" /> : <GitBranch size={14} className="text-text-muted" />}
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] font-medium leading-5 text-text-primary">{child.title || "未命名子会话"}</div>
+                              <div className="truncate text-[11.5px] leading-5 text-text-muted">
+                                {child.metadata?.forkedFrom === officialRuntimeSessionId ? "分支" : "子会话"} · {child.id}
+                              </div>
+                            </div>
+                            <ExternalLink size={13} className="text-text-muted" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-surface-base text-[12.5px] leading-5 text-text-muted" style={{ padding: "12px 14px" }}>
+                      当前节点还没有分支或子会话。派生或新建后会出现在这里。
+                    </div>
+                  )}
+                  {serverTreeError && (
+                    <div className="text-[12px] leading-5 text-accent-danger">{serverTreeError}</div>
+                  )}
+                </div>
+              </section>
+            )}
 
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("session", 7, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>

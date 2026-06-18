@@ -118,6 +118,14 @@ export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> 
   return { type: frame.type, ...payload, seq: frame.seq };
 }
 
+export function mergeServerRelatedSessions(parentId: string, children: ServerSession[], sessions: ServerSession[]): ServerSession[] {
+  const related = new Map(children.map((session) => [session.id, session]));
+  for (const session of sessions) {
+    if (session.metadata?.forkedFrom === parentId) related.set(session.id, session);
+  }
+  return [...related.values()];
+}
+
 export function normalizeServerTerminalCreateError(error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("conpty.node") || message.includes("Failed to load native module")) {

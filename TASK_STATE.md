@@ -3161,3 +3161,17 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 全量测试 21 个文件、176/176 通过；`pnpm build` 通过，renderer hash：`assets/index-BQVv66qF.js`。
 ## 下一步
 - 跑全量测试后提交本轮；随后进入 fork / children 会话树 UI。
+
+# 2026-06-18 v2.9.145 Kimi Server 会话树接入
+## 当前目标
+- 将已经桥接的 fork / children 能力接入右侧会话栏，形成可操作的官方会话关系视图。
+## 已完成
+- 右侧栏只在 Server 查询成功时显示“官方会话树”，SDK 会话不显示空壳。
+- 展示当前节点、fork 分支和直接 child；支持刷新、新建 child、读取历史并切换到关联会话。
+- Host 将官方 `/children` 与 Kimix fork 时保存的 `metadata.forkedFrom` 合并；UI 明确区分“分支”和“子会话”。
+- 版本号三处同步到 v2.9.145；新增独立真实会话树探针。
+## 验证
+- 真实 0.17.1 Server 探针通过：child 被官方 children 返回，fork 不在官方 children 中但可由 `forkedFrom` 识别，合并后共 2 个关联节点；child 可按 ID 恢复。
+- 全量测试 21 个文件、177/177 通过；`pnpm build` 通过，renderer hash：`assets/index-Dxl8HXaf.js`。
+## 下一步
+- 跑全量测试与最终构建并提交；随后继续 tool catalog / 运行时诊断。

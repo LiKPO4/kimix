@@ -9,6 +9,7 @@ import {
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
+  mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
   type ServerFrame,
@@ -571,8 +572,9 @@ export async function forkSession(
 }
 
 export async function listChildSessions(sessionId: string): Promise<KimiCodeSessionSummary[]> {
-  if (!serverSessions.has(sessionId)) throw new Error("官方子会话列表当前仅由实验性 Kimi Server 提供。");
-  return (await getServerClient().listChildren(sessionId)).map(serverSessionSummary);
+  const client = getServerClient();
+  const [children, sessions] = await Promise.all([client.listChildren(sessionId), client.listSessions()]);
+  return mergeServerRelatedSessions(sessionId, children, sessions).map(serverSessionSummary);
 }
 
 export async function createChildSession(
