@@ -66,6 +66,20 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("treats already-finished Server task cancellation as an idempotent stop result", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      code: 40904,
+      msg: "task already finished",
+      data: { cancelled: false },
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.cancelTask("session-1", "task-1")).resolves.toEqual({ cancelled: false });
+  });
+
   it("turns the upstream Windows ConPTY packaging failure into an actionable terminal error", () => {
     const normalized = normalizeServerTerminalCreateError(
       new Error("Failed to load native module: conpty.node: No such built-in module"),

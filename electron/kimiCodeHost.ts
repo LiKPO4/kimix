@@ -199,6 +199,7 @@ export type KimiCodeBackgroundTaskInfo = {
   agentId?: string;
   subagentType?: string;
   failureReason?: string;
+  outputBytes?: number;
 };
 
 export type KimiCodeServerTerminalInfo = {
@@ -945,6 +946,9 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
       startedAt: Date.parse(task.started_at ?? task.created_at),
       endedAt: task.completed_at ? Date.parse(task.completed_at) : null,
       subagentType: task.kind,
+      outputBytes: task.output_bytes,
+      stopReason: task.status === "cancelled" ? "任务已被官方 Server 标记为取消。" : undefined,
+      failureReason: task.status === "failed" && task.output_bytes ? `任务失败，已有约 ${formatBytes(task.output_bytes)} 输出可查看。` : undefined,
     }));
     return options.limit ? mapped.slice(0, options.limit) : mapped;
   }
@@ -978,6 +982,13 @@ export async function stopBackgroundTask(sessionId: string, taskId: string, reas
   const managed = getManagedSession(sessionId);
   if (!managed.session.stopBackgroundTask) throw new Error("Official Kimi Code SDK does not expose stopBackgroundTask on this session");
   await managed.session.stopBackgroundTask(taskId, reason ? { reason } : {});
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export async function listServerTerminals(sessionId: string): Promise<KimiCodeServerTerminalInfo[]> {

@@ -266,10 +266,18 @@ export class KimiCodeServerClient {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}?with_output=true&output_bytes=${outputBytes}`);
   }
 
-  cancelTask(sessionId: string, taskId: string): Promise<{ cancelled: boolean }> {
-    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}:cancel`, {
-      method: "POST", body: "{}",
+  async cancelTask(sessionId: string, taskId: string): Promise<{ cancelled: boolean }> {
+    const pathname = `/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}:cancel`;
+    const response = await fetch(`${this.endpoint}${pathname}`, {
+      method: "POST",
+      body: "{}",
+      headers: { accept: "application/json", "content-type": "application/json" },
     });
+    if (!response.ok) throw new Error(`${pathname}: HTTP ${response.status}`);
+    const envelope = await response.json() as ServerEnvelope<{ cancelled: boolean }>;
+    if (envelope.code === 0) return envelope.data;
+    if (envelope.code === 40904) return envelope.data ?? { cancelled: false };
+    throw new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
   }
 
   async listTerminals(sessionId: string): Promise<ServerTerminal[]> {

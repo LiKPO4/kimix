@@ -1471,6 +1471,7 @@ export type KimiCodeBackgroundTaskInfo = {
   agentId?: string;
   subagentType?: string;
   failureReason?: string;
+  outputBytes?: number;
 };
 
 export type KimiCodeServerTerminalInfo = {

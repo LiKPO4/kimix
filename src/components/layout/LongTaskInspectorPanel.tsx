@@ -2303,5 +2303,13 @@ function backgroundTaskSummary(task: LongTaskBackgroundTaskView) {
   if (task.status === "lost") return "SDK 认为任务状态已失联，可查看输出后决定是否继续。";
   if (task.status === "killed") return "任务已被停止。";
   if (task.status === "completed") return "后台任务已正常结束。";
+  if (typeof task.outputBytes === "number" && task.outputBytes > 0) return `后台任务正在运行，已有约 ${formatTaskOutputBytes(task.outputBytes)} 输出可查看。`;
   return task.description || task.command || "后台任务正在运行。";
+}
+
+function formatTaskOutputBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
