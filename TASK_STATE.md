@@ -5,7 +5,7 @@
 - 能力收口 TodoList（按顺序推进）：
   - [x] 已转 Server：会话创建/恢复、prompt/steer/abort、WebSocket 恢复、审批/提问、compact/undo、BTW、归档同步、usage、Skill、MCP、会话树、tool/connections 诊断。
   - [x] 半接入 UI 1：发送状态显示每次 prompt 的真实路由（Server / SDK / Server 失败后 SDK fallback）。
-  - [ ] 半接入 UI 2：评估并实施 Server 路由默认化，保留设置开关和 SDK 回滚边界。
+  - [x] 半接入 UI 2：Server 路由对新安装默认开启；保留设置显式关闭、capability gate 和失败自动 SDK fallback 三层回滚边界。
   - [ ] 半接入 UI 3：补强 Server background task 实时输出与失败恢复提示。
   - [ ] 半接入 UI 4：为 messages / prompts 查询增加诊断入口，避免扩张为第二套聊天历史。
   - [ ] 只读已接：评估模型目录对现有模型设置的低风险增强；auth/config/provider 保持只读。
@@ -25,10 +25,11 @@
 - 已完成：v2.9.153 修复老会话恢复旧 runtime 时 Server `/profile Session was not found` 直接报红错；启动恢复遇到旧 ID 不存在会创建同项目 fresh runtime，当前空闲历史会话也会后台验证/预热 runtime，让老非 Server 会话发送前先脱离失效 ID。
 - 已完成：v2.9.154 给普通发送和空态建议发送增加链路状态提示，显示“准备链路 / 恢复旧 runtime / 创建 runtime / runtime 失效重建 / 已提交给 Kimi Code”等阶段，避免长时间只显示“思考中”。
 - 已完成：v2.9.155 主进程返回每次 prompt 的真实发送路由；普通发送和空态建议发送会明确显示 Kimi Server、Kimi SDK 或 Server 失败后自动降级 SDK。
+- 已完成：v2.9.156 将 Server host/session routing 改为新安装默认开启；已有显式关闭配置继续保持 SDK，环境变量 `0` 也可强制关闭，设置页从“实验功能”改为明确的 Server 路由与回滚说明。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。
-- 下一步：按能力收口 TodoList 评估 Server 会话路由默认化及其回滚边界。
+- 下一步：补强 Server background task 实时输出与失败恢复提示。
 
 ## 2026-06-14 v2.9.87 显式会话快照迁移
 - 当前目标：放弃 dev 版 / 安装版自动共享会话状态，改为用户手动导出全部快照、另一端去重合并导入。

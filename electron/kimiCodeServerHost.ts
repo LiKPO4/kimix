@@ -45,7 +45,9 @@ export function isKimiCodeServerExperimentEnabled(
   env: NodeJS.ProcessEnv = process.env,
   settings?: { experimentalKimiServer?: boolean },
 ) {
-  return env.KIMIX_EXPERIMENTAL_KIMI_SERVER?.trim() === "1" || settings?.experimentalKimiServer === true;
+  const override = env.KIMIX_EXPERIMENTAL_KIMI_SERVER?.trim();
+  if (override !== undefined) return override === "1";
+  return settings?.experimentalKimiServer !== false;
 }
 
 export function inspectKimiCodeServerContract(

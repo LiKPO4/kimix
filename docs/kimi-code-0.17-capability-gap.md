@@ -4,7 +4,7 @@
 
 ## 结论
 
-0.17.0 的核心新增是 Kimi Code Web，以及支撑 Web 的本地 REST / WebSocket Server。Kimix 已完成 Server 主链路和恢复能力，但尚未覆盖全部 REST 能力，也还没有把 Server 路由作为默认链路。
+0.17.0 的核心新增是 Kimi Code Web，以及支撑 Web 的本地 REST / WebSocket Server。Kimix 已完成 Server 主链路和恢复能力，并将兼容探测通过的 Server 设为新安装默认路由；显式关闭和失败自动 SDK fallback 仍保留。
 
 ## A. 已接入并验证
 
@@ -34,7 +34,7 @@
 
 - background tasks：主进程和现有长程任务侧栏已有桥接，但 Server task 的实时输出、失败恢复提示仍可加强。
 - terminal：接口已接；Windows 0.17.1 缺少可加载的 `conpty.node`，当前无法完成真实创建。
-- Server session routing：仍受 `KIMIX_EXPERIMENTAL_KIMI_SERVER=1` 与 `KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS=1` 控制。
+- Server session routing：新安装默认开启；设置页可显式关闭，环境变量设为 `0` 可强制关闭，能力探测或请求失败自动回退 SDK。
 
 ## C. 官方 Server 尚未完整接入
 
@@ -47,14 +47,13 @@
 
 - terminal 实机：等待官方 Windows native 模块修复。
 - OAuth Server 写链路：本机 `POST /api/v1/oauth/login` 超过 10 秒仍无响应；官方实现会等待 device code 且请求断开未中止后台流程。Kimix 暂保留已验证的 SDK 登录入口，避免设置页请求挂起。
-- Server 默认化：需先完成 BTW、归档同步、状态字段回环和一轮 UI 回归，再考虑灰度扩大。
+- Server 默认化已完成代码与自动化验证，仍需用户完成一次新会话、旧会话和手动关闭后的实例验收。
 - 官方 0.17.1 只提供 archive、没有 unarchive；设置页“恢复归档”仍是 Kimix 本地恢复，不会反向取消官方归档标记。
 - 文件系统 REST：Kimix 已有 Electron 本地文件能力，除非需要浏览器/远程 Server 场景，否则边际收益低于会话能力。
 
 ## 推荐推进顺序
 
-1. 评估 Server 会话路由默认化所需的灰度与回滚边界。
-2. 补强 Server background task 实时输出与失败恢复提示。
-3. 为 messages / prompts 查询增加诊断入口。
-4. 评估模型目录对现有模型设置的只读增强。
-5. files/workspace 等低边际能力暂不推进。
+1. 补强 Server background task 实时输出与失败恢复提示。
+2. 为 messages / prompts 查询增加诊断入口。
+3. 评估模型目录对现有模型设置的只读增强。
+4. files/workspace 等低边际能力暂不推进。

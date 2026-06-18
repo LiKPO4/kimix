@@ -39,7 +39,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.155";
+const KIMIX_VERSION = "2.9.156";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -464,8 +464,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
-  const [experimentalKimiServer, setExperimentalKimiServer] = useState(false);
-  const [experimentalKimiServerSessions, setExperimentalKimiServerSessions] = useState(false);
+  const [experimentalKimiServer, setExperimentalKimiServer] = useState(true);
+  const [experimentalKimiServerSessions, setExperimentalKimiServerSessions] = useState(true);
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
@@ -1823,7 +1823,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Zap size={16} className="text-text-muted" />
-                    <span>实验功能</span>
+                    <span>Kimi Server 路由</span>
                   </div>
                   <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                     <button
@@ -1835,16 +1835,16 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <RefreshCw size={15} className={experimentalSettingsLoading ? "kimix-spin" : ""} />
                       <span>刷新</span>
                     </button>
-                    {settingsDragHandle("experiment", "实验功能")}
+                    {settingsDragHandle("experiment", "Kimi Server 路由")}
                   </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   <div className="flex items-start" style={{ gap: 12 }}>
                     <Zap size={18} className="mt-0.5 shrink-0 text-text-muted" />
                     <div className="kimix-settings-permission-copy">
-                      <div className="kimix-settings-permission-label">Kimi Code Server 灰度路由</div>
+                      <div className="kimix-settings-permission-label">Kimi Code Server 默认路由</div>
                       <div className="kimix-settings-permission-desc">
-                        把原来的环境变量开关收进设置页；默认关闭，保存后需要完全重启 Kimix 才会影响新会话。
+                        新安装默认使用官方 Server；能力探测或请求失败时自动回退 SDK。保存后需要完全重启 Kimix 才会影响新会话。
                       </div>
                     </div>
                   </div>
@@ -1860,7 +1860,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label">启用官方 Kimi Code Server</div>
                         <div className="kimix-settings-permission-desc">
-                          等效于 `KIMIX_EXPERIMENTAL_KIMI_SERVER=1`，允许 Kimix 启动或连接官方本地 Server。
+                          允许 Kimix 启动或连接官方本地 Server；关闭后强制使用 SDK，不再启动 Server。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServer ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
@@ -1878,7 +1878,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label">新会话使用 Server 路由</div>
                         <div className="kimix-settings-permission-desc">
-                          等效于 `KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS=1`，新会话走 REST + WebSocket；异常时仍保留 SDK 回滚路径。
+                          新会话优先走 REST + WebSocket；异常时自动降级 SDK，并在消息链路状态中标明真实路由。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServerSessions ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>

@@ -146,7 +146,9 @@ export function isKimiCodeServerSessionRoutingEnabled(
   env: NodeJS.ProcessEnv = process.env,
   settings?: { experimentalKimiServerSessions?: boolean },
 ) {
-  return env.KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS?.trim() === "1" || settings?.experimentalKimiServerSessions === true;
+  const override = env.KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS?.trim();
+  if (override !== undefined) return override === "1";
+  return settings?.experimentalKimiServerSessions !== false;
 }
 
 export function toServerPromptContent(input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>): ServerPromptPart[] {

@@ -12,11 +12,13 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("KimiCodeServerClient protocol adapters", () => {
-  it("requires a separate explicit flag for server session routing", () => {
-    expect(isKimiCodeServerSessionRoutingEnabled({})).toBe(false);
-    expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(false);
+  it("defaults to server session routing with explicit opt-out", () => {
+    expect(isKimiCodeServerSessionRoutingEnabled({})).toBe(true);
+    expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
     expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "1" })).toBe(true);
     expect(isKimiCodeServerSessionRoutingEnabled({}, { experimentalKimiServerSessions: true })).toBe(true);
+    expect(isKimiCodeServerSessionRoutingEnabled({}, { experimentalKimiServerSessions: false })).toBe(false);
+    expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "0" }, { experimentalKimiServerSessions: true })).toBe(false);
   });
 
   it("maps SDK prompt parts to the official server content shape", () => {

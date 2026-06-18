@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { inspectKimiCodeServerContract, isKimiCodeServerExperimentEnabled, KimiCodeServerHost } from "../../../electron/kimiCodeServerHost";
 
 describe("kimiCodeServerHost", () => {
-  it("keeps the experiment opt-in", () => {
-    expect(isKimiCodeServerExperimentEnabled({})).toBe(false);
+  it("defaults to server host with explicit opt-out", () => {
+    expect(isKimiCodeServerExperimentEnabled({})).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "true" })).toBe(false);
     expect(isKimiCodeServerExperimentEnabled({}, { experimentalKimiServer: true })).toBe(true);
+    expect(isKimiCodeServerExperimentEnabled({}, { experimentalKimiServer: false })).toBe(false);
   });
 
   it("detects capabilities without trusting the reported version", () => {
