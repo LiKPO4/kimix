@@ -27,6 +27,7 @@
 - Server tool catalog 与 connections 已合并为只读运行时诊断：MCP 页展示会话有效工具、builtin/Skill/MCP 来源分布、MCP 状态和当前订阅连接；右侧 Kimi 自检复用同一诊断结果。
 - 真实 0.17.1 探针已验证：当前会话返回 26 个 builtin 工具；WebSocket 完成 `client_hello` 后，connections 返回 1 个客户端且正确订阅当前 session。
 - Server auth / redacted config / model catalog / provider catalog 已接入设置页只读运行时目录；现有 SDK 模型配置和默认模型写入继续作为正式链路。
+- 每次 prompt 提交结果会回传真实路由，聊天链路状态可区分 Kimi Server、Kimi SDK 和 Server 失败后 SDK fallback。
 - 真实 0.17.1 探针已验证：认证 ready，1 个 connected OAuth Provider，模型 `kimi-code/kimi-for-coding` 的 context 为 262144，并返回 thinking、image/video input、tool use 等能力。
 
 ## B. 后端已有基础，产品入口仍不完整
@@ -53,4 +54,7 @@
 ## 推荐推进顺序
 
 1. 评估 Server 会话路由默认化所需的灰度与回滚边界。
-2. 再评估文件系统、独立 prompt/message 查询等边际能力。
+2. 补强 Server background task 实时输出与失败恢复提示。
+3. 为 messages / prompts 查询增加诊断入口。
+4. 评估模型目录对现有模型设置的只读增强。
+5. files/workspace 等低边际能力暂不推进。

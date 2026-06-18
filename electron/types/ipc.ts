@@ -1830,6 +1830,17 @@ export type KimiCodeSessionResponse = {
   error: string;
 };
 
+export type KimiCodePromptResponse = {
+  success: true;
+  data: {
+    route: "server" | "sdk" | "sdk-fallback";
+    fallbackReason?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeVoidResponse = {
   success: true;
   data: void;

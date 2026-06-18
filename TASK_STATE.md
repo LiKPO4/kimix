@@ -2,6 +2,14 @@
 
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
 - 当前目标：停止重复加固探针，按官方 0.17.1 Server 协议逐项补齐 Kimix 的实际能力缺口。
+- 能力收口 TodoList（按顺序推进）：
+  - [x] 已转 Server：会话创建/恢复、prompt/steer/abort、WebSocket 恢复、审批/提问、compact/undo、BTW、归档同步、usage、Skill、MCP、会话树、tool/connections 诊断。
+  - [x] 半接入 UI 1：发送状态显示每次 prompt 的真实路由（Server / SDK / Server 失败后 SDK fallback）。
+  - [ ] 半接入 UI 2：评估并实施 Server 路由默认化，保留设置开关和 SDK 回滚边界。
+  - [ ] 半接入 UI 3：补强 Server background task 实时输出与失败恢复提示。
+  - [ ] 半接入 UI 4：为 messages / prompts 查询增加诊断入口，避免扩张为第二套聊天历史。
+  - [ ] 只读已接：评估模型目录对现有模型设置的低风险增强；auth/config/provider 保持只读。
+  - [ ] 暂不做：OAuth Server 写登录、Windows terminal 实机、unarchive、文件系统 REST、强制迁移全部旧 SDK 会话。
 - 已完成：新增 `docs/kimi-code-0.17-capability-gap.md`，区分已接入、后端已接但 UI 不完整、尚未接入、阻塞/延后能力。
 - 已完成：Server client 新增 compact、undo、BTW start、archive 四个官方 REST 封装；compact、undo 已接回 Kimix 现有 `/compact`、`/undo` 正式入口。
 - 已完成：Server BTW 按官方返回的 `agent_id` 提交 prompt、隔离子 Agent WebSocket 事件并汇总正文/思考/结束原因，复用现有 BTW 面板且不污染主对话。
@@ -16,10 +24,11 @@
 - 已完成：修复 `start-kimix.bat` 构建后不拉起窗口的问题；`restart-kimix-dev.ps1` 不再把 `pnpm dev` 放到隐藏 cmd 后台，而是在当前 bat 窗口前台运行，避免后台进程快速退出时只显示“dev process exited”。
 - 已完成：v2.9.153 修复老会话恢复旧 runtime 时 Server `/profile Session was not found` 直接报红错；启动恢复遇到旧 ID 不存在会创建同项目 fresh runtime，当前空闲历史会话也会后台验证/预热 runtime，让老非 Server 会话发送前先脱离失效 ID。
 - 已完成：v2.9.154 给普通发送和空态建议发送增加链路状态提示，显示“准备链路 / 恢复旧 runtime / 创建 runtime / runtime 失效重建 / 已提交给 Kimi Code”等阶段，避免长时间只显示“思考中”。
+- 已完成：v2.9.155 主进程返回每次 prompt 的真实发送路由；普通发送和空态建议发送会明确显示 Kimi Server、Kimi SDK 或 Server 失败后自动降级 SDK。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。
-- 下一步：先评估 Server 会话路由默认化，再进入 files/workspace 与 messages/prompts 等边际能力。
+- 下一步：按能力收口 TodoList 评估 Server 会话路由默认化及其回滚边界。
 
 ## 2026-06-14 v2.9.87 显式会话快照迁移
 - 当前目标：放弃 dev 版 / 安装版自动共享会话状态，改为用户手动导出全部快照、另一端去重合并导入。

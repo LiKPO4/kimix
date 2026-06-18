@@ -5282,8 +5282,8 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const input = toKimiCodePromptInput(content, images);
     const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
     const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-    await kimiCodeHost.sendPrompt(sessionId, finalInput);
-    return { success: true, data: undefined };
+    const data = await kimiCodeHost.sendPrompt(sessionId, finalInput);
+    return { success: true, data };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -6094,8 +6094,8 @@ ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
   try {
     const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
     const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-    await kimiCodeHost.sendPrompt(sessionId, finalInput);
-    return { success: true, data: { sessionId } };
+    const route = await kimiCodeHost.sendPrompt(sessionId, finalInput);
+    return { success: true, data: { sessionId, ...route } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

@@ -713,12 +713,18 @@ export async function reloadIdleSessions(): Promise<{ reloaded: string[]; skippe
   return { reloaded, skipped, errors };
 }
 
-export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+export type KimiCodePromptRouteResult = {
+  route: "server" | "sdk" | "sdk-fallback";
+  fallbackReason?: string;
+};
+
+export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<KimiCodePromptRouteResult> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
     try {
       await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
+      return { route: "server" };
     } catch (error) {
       console.warn("[KimiCodeServerHost] prompt failed; falling back to SDK:", error);
       const fallback = await fallbackServerSessionToSdk(sessionId, serverManaged, error);
@@ -728,13 +734,17 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
         setStatus(sessionId, "error");
         throw sdkError;
       }
+      return {
+        route: "sdk-fallback",
+        fallbackReason: error instanceof Error ? error.message : String(error),
+      };
     }
-    return;
   }
   const managed = getManagedSession(sessionId);
   setStatus(sessionId, "running");
   try {
     await managed.session.prompt(input);
+    return { route: "sdk" };
   } catch (error) {
     setStatus(sessionId, "error");
     throw error;

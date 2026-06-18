@@ -898,6 +898,13 @@ export function Composer() {
           });
         }
         if (!res.success) throw new Error(res.error);
+        if (res.data.route === "server") {
+          updateLinkStatus("已通过 Kimi Server 提交，等待模型输出…", "success");
+        } else if (res.data.route === "sdk-fallback") {
+          updateLinkStatus("Kimi Server 提交失败，已自动降级到 SDK…", "warning");
+        } else {
+          updateLinkStatus("已通过 Kimi SDK 提交，等待模型输出…", "success");
+        }
         return;
       } catch (err) {
         console.error("Kimi Code send failed:", err);

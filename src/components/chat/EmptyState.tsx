@@ -220,6 +220,13 @@ export function EmptyState() {
         images: [],
       });
       if (!sendRes.success) throw new Error(sendRes.error);
+      if (sendRes.data.route === "server") {
+        updateLinkStatus("已通过 Kimi Server 提交，等待模型输出…", "success");
+      } else if (sendRes.data.route === "sdk-fallback") {
+        updateLinkStatus("Kimi Server 提交失败，已自动降级到 SDK…", "warning");
+      } else {
+        updateLinkStatus("已通过 Kimi SDK 提交，等待模型输出…", "success");
+      }
     } catch (err) {
       console.error("Send failed:", err);
       const message = err instanceof Error ? err.message : String(err);

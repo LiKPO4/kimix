@@ -148,6 +148,7 @@ import type {
   KimiCodeServerRuntimeDiagnosticsResponse,
   KimiCodeServerModelCatalogResponse,
   KimiCodePluginResponse,
+  KimiCodePromptResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
   KimiCodeCreateGoalRequest,
@@ -360,7 +361,7 @@ const api = {
     ipcRenderer.invoke("kimi-code:renameSession", req),
   reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:reloadSession", req),
-  sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
+  sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodePromptResponse> =>
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
     ipcRenderer.invoke("kimi-code:askBtw", req),
