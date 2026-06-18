@@ -79,13 +79,4 @@ foreach ($target in $cleanTargets) {
 Set-Location $workspace
 pnpm build
 
-$command = "set `"PATH=$nodePath;$pnpmPath;%PATH%`" && cd /d `"$workspace`" && pnpm dev > kimix-dev.log 2>&1"
-Start-Process -FilePath "cmd.exe" -ArgumentList "/d", "/s", "/c", $command -WindowStyle Hidden
-
-Start-Sleep -Seconds 8
-Get-CimInstance Win32_Process |
-  Where-Object {
-    $_.Name -eq "electron.exe" -and
-    (Test-ContainsIgnoreCase ([string]$_.CommandLine) $workspace)
-  } |
-  Select-Object ProcessId, Name, CommandLine
+pnpm dev
