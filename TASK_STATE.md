@@ -28,12 +28,13 @@
 - 已完成：v2.9.156 将 Server host/session routing 改为新安装默认开启；已有显式关闭配置继续保持 SDK，环境变量 `0` 也可强制关闭，设置页从“实验功能”改为明确的 Server 路由与回滚说明。
 - 已完成：v2.9.157 补强后台任务 UI：区分 Server/SDK 来源，映射 Server `output_preview`，运行态每 2 秒刷新；瞬时刷新失败不清空任务，保留上次结果并展示失败提示。
 - 已完成：v2.9.158 接入官方 messages 分页与 prompts 队列 GET；右侧 Kimi 自检只展示最近消息数量/角色分布和 active/queued prompt 数，不读取正文到 UI、不参与本地时间线写入。
+- 已完成：v2.9.159 修复运行中链路状态被 ChatThread 隐藏且空占位 assistant 被误标为“正在思考”；过程头现在显示准备/恢复/runtime/Server/SDK fallback 等真实链路阶段，收到真实 thinking、正文、工具或子代理事件后再切换为对应状态。
 - 已验证：真实 Kimi Code 0.17.1 新建空会话后，messages GET 返回 `code=0/items=0/has_more=false`，prompts GET 返回 `code=0/active=false/queued=0`。
 - 收口结论：Server 模型/auth/config/provider 目录保持只读已足够；files/workspace REST 与 Electron 本地文件能力重复，OAuth/terminal 有上游阻塞，强迁移旧 SDK 会话风险高，当前没有继续实现的高收益项。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。
-- 下一步：用户按 v2.9.155-v2.9.158 验收真实路由、默认 Server、后台任务和 Kimi 自检；发现实例问题再定点修复。
+- 下一步：用户在 v2.9.159 验收发送后的过程头阶段切换，并继续验收默认 Server、后台任务和 Kimi 自检。
 
 ## 2026-06-14 v2.9.87 显式会话快照迁移
 - 当前目标：放弃 dev 版 / 安装版自动共享会话状态，改为用户手动导出全部快照、另一端去重合并导入。

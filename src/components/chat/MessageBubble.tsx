@@ -24,6 +24,7 @@ interface MessageBubbleProps {
   leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[];
   leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[];
   attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[];
+  activeStatus?: Extract<TimelineEvent, { type: "status_update" }>;
   changedFiles?: string[];
   changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>;
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
@@ -157,6 +158,11 @@ function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubblePr
     eventArrayMemoEqual(prev.leadingHooks, next.leadingHooks) &&
     eventArrayMemoEqual(prev.leadingApprovals, next.leadingApprovals) &&
     eventArrayMemoEqual(prev.attachedSteers, next.attachedSteers) &&
+    (
+      prev.activeStatus === next.activeStatus ||
+      (!prev.activeStatus && !next.activeStatus) ||
+      (Boolean(prev.activeStatus && next.activeStatus) && timelineEventMemoKey(prev.activeStatus as TimelineEvent) === timelineEventMemoKey(next.activeStatus as TimelineEvent))
+    ) &&
     eventArrayMemoEqual(prev.trailingStatuses, next.trailingStatuses) &&
     stringArrayMemoEqual(prev.changedFiles, next.changedFiles) &&
     (
@@ -1016,7 +1022,7 @@ function AssistantMessageFooter({
   );
 }
 
-function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -1034,11 +1040,19 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
     leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
   const hasRecentTimelineActivity = hasActiveTimelineWorkEvents([event, ...leadingTools, ...leadingSubagents]);
   const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity) && (!event.isComplete || hasRunningProcess));
+  const hasActualThinking = Boolean(
+    event.thinking?.trim() ||
+    event.thinkingParts?.some((part) => part.text.trim().length > 0)
+  );
   const activeProcessLabel = isActiveAssistant && leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
     ? "子代理运行中"
     : isActiveAssistant && leadingTools.some((tool) => tool.status === "running")
       ? "命令运行中"
-      : undefined;
+      : isActiveAssistant && hasContent
+        ? "正在输出"
+        : isActiveAssistant && !hasActualThinking
+          ? activeStatus?.message?.trim().replace(/…$/u, "") || "等待模型响应"
+          : undefined;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const fullCopyText = useMemo(() => buildAssistantFullCopyText(event), [event.content, event.thinking, event.thinkingParts, event.timestamp]);
@@ -1099,12 +1113,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, changedFiles, changeSummary, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
 }, messageBubblePropsEqual);
