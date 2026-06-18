@@ -1274,6 +1274,23 @@ function handleServerFrame(frame: ServerFrame) {
   const payload = frame.payload && typeof frame.payload === "object"
     ? frame.payload as Record<string, unknown>
     : {};
+  if (frame.type === "kimix.server.snapshot") {
+    const session = payload.session as ServerSession | undefined;
+    const managed = serverSessions.get(sessionId);
+    if (session && managed) {
+      managed.session = session;
+      setStatus(sessionId, mapServerStatus(session.status));
+    }
+    for (const approval of Array.isArray(payload.pending_approvals) ? payload.pending_approvals : []) {
+      if (!approval || typeof approval !== "object") continue;
+      handleServerFrame({ type: "event.approval.requested", session_id: sessionId, payload: approval });
+    }
+    for (const question of Array.isArray(payload.pending_questions) ? payload.pending_questions : []) {
+      if (!question || typeof question !== "object") continue;
+      handleServerFrame({ type: "event.question.requested", session_id: sessionId, payload: question });
+    }
+    return;
+  }
   if (frame.type === "event.approval.requested") {
     const requestId = typeof payload.approval_id === "string" ? payload.approval_id : undefined;
     if (!requestId) return;
