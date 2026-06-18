@@ -386,6 +386,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:setPermission", req),
   compactKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:compact", req),
+  archiveKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:archiveSession", req),
   respondKimiCodeApproval: (req: KimiCodeApprovalResponseRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:respondApproval", req),
   respondKimiCodeQuestion: (req: KimiCodeQuestionResponseRequest): Promise<KimiCodeVoidResponse> =>

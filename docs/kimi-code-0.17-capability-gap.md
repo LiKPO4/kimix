@@ -17,6 +17,7 @@
 - Server task 重复取消的官方 `40904 already finished` 兼容。
 - Server 会话的 `compact` 与 `undo` 已复用 Kimix 现有 `/compact`、`/undo` 入口。
 - Server BTW 已按官方 `agent_id` 隔离 WebSocket 事件并汇总正文、思考和结束原因，复用现有 BTW 面板。
+- Kimix 本地归档迁移会同步调用 Server `session:archive`，并继续写入本地 tombstone 防止历史恢复回流。
 
 ## B. 后端已有基础，产品入口仍不完整
 
@@ -29,25 +30,24 @@
 
 按用户价值排序：
 
-1. `session:archive`：Server 归档与 Kimix 本地归档/tombstone 尚未双向同步。
-2. session status/profile：现有状态主要依赖 WS 和本地缓存，尚未完整消费 context token 比例等字段。
-3. skills：Server 的 list / activate 尚未接入；当前仍走 SDK Skill 能力。
-4. tools / MCP：Server 的 tools、MCP server list/restart 尚未接入；当前仍走 SDK/配置链路。
-5. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
-6. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
-7. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
-8. connections：连接列表只在探针层验证，尚无诊断入口。
+1. session status/profile：现有状态主要依赖 WS 和本地缓存，尚未完整消费 context token 比例等字段。
+2. skills：Server 的 list / activate 尚未接入；当前仍走 SDK Skill 能力。
+3. tools / MCP：Server 的 tools、MCP server list/restart 尚未接入；当前仍走 SDK/配置链路。
+4. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
+5. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
+6. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
+7. connections：连接列表只在探针层验证，尚无诊断入口。
 
 ## D. 延后或阻塞
 
 - terminal 实机：等待官方 Windows native 模块修复。
 - Server 默认化：需先完成 BTW、归档同步、状态字段回环和一轮 UI 回归，再考虑灰度扩大。
+- 官方 0.17.1 只提供 archive、没有 unarchive；设置页“恢复归档”仍是 Kimix 本地恢复，不会反向取消官方归档标记。
 - 文件系统 REST：Kimix 已有 Electron 本地文件能力，除非需要浏览器/远程 Server 场景，否则边际收益低于会话能力。
 
 ## 推荐推进顺序
 
-1. Server 归档与本地 tombstone 同步。
-2. Server session status 的 context usage 接入现有状态栏。
-3. Server Skill / MCP 状态与现有管理页统一。
-4. 会话树（fork / children）正式 UI。
-5. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。
+1. Server session status 的 context usage 接入现有状态栏。
+2. Server Skill / MCP 状态与现有管理页统一。
+3. 会话树（fork / children）正式 UI。
+4. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。

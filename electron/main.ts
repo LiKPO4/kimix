@@ -5627,6 +5627,18 @@ ipcMain.handle("kimi-code:stopBackgroundTask", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:archiveSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    await kimiCodeHost.archiveSession(sessionId);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:listServerTerminals", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

@@ -825,6 +825,17 @@ export async function compactSession(sessionId: string, instruction?: string): P
   await managed.session.compact(instruction ? { instruction } : undefined);
 }
 
+export async function archiveSession(sessionId: string): Promise<void> {
+  const managed = serverSessions.get(sessionId);
+  if (managed) {
+    await getServerClient().archiveSession(sessionId);
+    managed.session = { ...managed.session, archived: true };
+    return;
+  }
+  if (!shouldRouteNewSessionToServer()) return;
+  await getServerClient().archiveSession(sessionId);
+}
+
 export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {
   const managed = getManagedSession(sessionId);
   if (!managed.session.createGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
