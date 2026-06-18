@@ -15,7 +15,8 @@
 - approval、question、usage、后台 task、terminal 协议接入。
 - snapshot 历史去重与进行中正文恢复。
 - Server task 重复取消的官方 `40904 already finished` 兼容。
-- 本轮补齐 Server 会话的 `compact` 与 `undo` 路由，复用 Kimix 现有 `/compact`、`/undo` 入口。
+- Server 会话的 `compact` 与 `undo` 已复用 Kimix 现有 `/compact`、`/undo` 入口。
+- Server BTW 已按官方 `agent_id` 隔离 WebSocket 事件并汇总正文、思考和结束原因，复用现有 BTW 面板。
 
 ## B. 后端已有基础，产品入口仍不完整
 
@@ -28,15 +29,14 @@
 
 按用户价值排序：
 
-1. `session:btw`：REST 可启动 BTW agent，但 Kimix 还需要隔离该 agent 的 WS 事件并汇总结果，避免侧问内容串入主对话。
-2. `session:archive`：Server 归档与 Kimix 本地归档/tombstone 尚未双向同步。
-3. session status/profile：现有状态主要依赖 WS 和本地缓存，尚未完整消费 context token 比例等字段。
-4. skills：Server 的 list / activate 尚未接入；当前仍走 SDK Skill 能力。
-5. tools / MCP：Server 的 tools、MCP server list/restart 尚未接入；当前仍走 SDK/配置链路。
-6. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
-7. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
-8. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
-9. connections：连接列表只在探针层验证，尚无诊断入口。
+1. `session:archive`：Server 归档与 Kimix 本地归档/tombstone 尚未双向同步。
+2. session status/profile：现有状态主要依赖 WS 和本地缓存，尚未完整消费 context token 比例等字段。
+3. skills：Server 的 list / activate 尚未接入；当前仍走 SDK Skill 能力。
+4. tools / MCP：Server 的 tools、MCP server list/restart 尚未接入；当前仍走 SDK/配置链路。
+5. model catalog / config / OAuth：Server API 尚未取代现有 SDK 配置和登录链路。
+6. files / workspace fs：上传文件、读取、搜索、grep、git status/diff、open/reveal 等 REST 尚未接入。
+7. messages / prompts：分页读取单条消息和 prompt 队列查询尚未作为独立能力暴露。
+8. connections：连接列表只在探针层验证，尚无诊断入口。
 
 ## D. 延后或阻塞
 
@@ -46,9 +46,8 @@
 
 ## 推荐推进顺序
 
-1. Server BTW 事件隔离与结果汇总。
-2. Server 归档与本地 tombstone 同步。
-3. Server session status 的 context usage 接入现有状态栏。
-4. Server Skill / MCP 状态与现有管理页统一。
-5. 会话树（fork / children）正式 UI。
-6. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。
+1. Server 归档与本地 tombstone 同步。
+2. Server session status 的 context usage 接入现有状态栏。
+3. Server Skill / MCP 状态与现有管理页统一。
+4. 会话树（fork / children）正式 UI。
+5. 再评估文件系统、connections、独立 prompt/message 查询等边际能力。

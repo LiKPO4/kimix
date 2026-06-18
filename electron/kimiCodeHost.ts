@@ -435,9 +435,10 @@ type ServerManagedSession = {
   thinking: string;
   permission: KimiCodePermissionMode;
   planMode: boolean;
+  btwRuns: Map<string, BtwRun>;
 };
 
-type BtwRun = {
+export type BtwRun = {
   agentId: string;
   parts: string[];
   thinkingParts: string[];
@@ -688,6 +689,29 @@ export async function askBtw(
   input: string | KimiCodePromptPart[],
   options: { timeoutMs?: number } = {},
 ): Promise<KimiCodeBtwResult> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    if (serverManaged.status !== "idle" && serverManaged.status !== "completed" && serverManaged.status !== "interrupted" && serverManaged.status !== "error") {
+      throw new Error("当前轮次结束后再使用 BTW 侧问。");
+    }
+    const client = getServerClient();
+    const { agent_id: agentId } = await client.startBtwSession(sessionId);
+    const run: BtwRun = { agentId, parts: [], thinkingParts: [], ended: false };
+    serverManaged.btwRuns.set(agentId, run);
+    try {
+      await client.prompt(sessionId, input, { ...serverControls(serverManaged), agent_id: agentId });
+      await waitForBtwRun(run, options.timeoutMs ?? 120_000);
+      if (run.error) throw new Error(run.error);
+      return {
+        agentId,
+        content: run.parts.join("").trim(),
+        thinking: run.thinkingParts.join("").trim(),
+        reason: run.endReason,
+      };
+    } finally {
+      serverManaged.btwRuns.delete(agentId);
+    }
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.startBtw) throw new Error("当前 Kimi Code SDK 不支持 BTW 侧问。");
   if (managed.status !== "idle" && managed.status !== "completed" && managed.status !== "interrupted" && managed.status !== "error") {
@@ -1409,6 +1433,7 @@ async function registerServerSession(
       ? config.permission_mode
       : options.permission ?? "manual",
     planMode: typeof config.plan_mode === "boolean" ? config.plan_mode : options.planMode ?? false,
+    btwRuns: new Map(),
   };
   serverSessions.set(session.id, managed);
   await getServerClient().subscribe(session.id);
@@ -1474,6 +1499,8 @@ function handleServerFrame(frame: ServerFrame) {
     return;
   }
   const event = flattenServerEvent(frame);
+  const managed = serverSessions.get(sessionId);
+  if (managed && consumeBtwEvent(managed.btwRuns, event)) return;
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event);
   if (frame.type === "prompt.completed" && serverSessions.get(sessionId)?.status === "running") {
@@ -1609,6 +1636,15 @@ function updateBtwRunFromEvent(run: BtwRun, event: unknown) {
     run.error = typeof message === "string" ? message : "BTW 侧问失败。";
     run.ended = true;
   }
+}
+
+export function consumeBtwEvent(runs: Map<string, BtwRun>, event: unknown): boolean {
+  const agentId = getEventAgentId(event);
+  if (!agentId) return false;
+  const run = runs.get(agentId);
+  if (!run) return false;
+  updateBtwRunFromEvent(run, event);
+  return true;
 }
 
 function getEventAgentId(event: unknown): string | undefined {

@@ -3,11 +3,12 @@
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
 - 当前目标：停止重复加固探针，按官方 0.17.1 Server 协议逐项补齐 Kimix 的实际能力缺口。
 - 已完成：新增 `docs/kimi-code-0.17-capability-gap.md`，区分已接入、后端已接但 UI 不完整、尚未接入、阻塞/延后能力。
-- 已完成：Server client 新增 compact、undo、BTW start、archive 四个官方 REST 封装；其中 compact、undo 已接回 Kimix 现有 `/compact`、`/undo` 正式入口。
-- 未完成：BTW 需要隔离并汇总子 agent WebSocket 事件；归档需要和 Kimix 本地 tombstone 双向同步；session status 的 context usage 尚未接入状态栏。
+- 已完成：Server client 新增 compact、undo、BTW start、archive 四个官方 REST 封装；compact、undo 已接回 Kimix 现有 `/compact`、`/undo` 正式入口。
+- 已完成：Server BTW 按官方返回的 `agent_id` 提交 prompt、隔离子 Agent WebSocket 事件并汇总正文/思考/结束原因，复用现有 BTW 面板且不污染主对话。
+- 未完成：归档需要和 Kimix 本地 tombstone 双向同步；session status 的 context usage 尚未接入状态栏。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。
-- 下一步：实现 Server BTW 的事件隔离与结果汇总，确保侧问不污染主对话。
+- 下一步：实现 Server 归档与 Kimix 本地 tombstone 同步。
 
 ## 2026-06-14 v2.9.87 显式会话快照迁移
 - 当前目标：放弃 dev 版 / 安装版自动共享会话状态，改为用户手动导出全部快照、另一端去重合并导入。

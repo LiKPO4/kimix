@@ -333,6 +333,65 @@ async function probeKimixSnapshotReplayAdapter() {
   }
 }
 
+async function probeKimixBtwAdapter() {
+  let session;
+  let socket;
+  try {
+    session = await request("/sessions", {
+      method: "POST",
+      body: JSON.stringify({ title: "Kimix Server BTW probe", metadata: { cwd: repoRoot, source: "kimix-btw-probe" } }),
+    });
+    const ws = await openProbeSocket(session.id);
+    socket = ws.socket;
+    const started = await request(`/sessions/${encodeURIComponent(session.id)}:btw`, { method: "POST", body: "{}" });
+    const marker = `KIMIX_SERVER_BTW_${Date.now()}`;
+    const prompt = await request(`/sessions/${encodeURIComponent(session.id)}/prompts`, {
+      method: "POST",
+      body: JSON.stringify({
+        agent_id: started.agent_id,
+        content: [{ type: "text", text: `Reply with exactly: ${marker}` }],
+      }),
+    });
+    const frames = [];
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      const frame = await ws.waitFor((item) => item.session_id === session.id, Math.max(1, deadline - Date.now()));
+      frames.push(frame);
+      const payload = isRecord(frame.payload) ? frame.payload : {};
+      if (frame.type === "prompt.completed" && (payload.prompt_id ?? payload.promptId) === prompt.prompt_id) break;
+    }
+    const btwFrames = frames.filter((frame) => isRecord(frame.payload) && frame.payload.agentId === started.agent_id);
+    const text = btwFrames
+      .filter((frame) => frame.type === "assistant.delta")
+      .map((frame) => frame.payload.delta)
+      .filter((value) => typeof value === "string")
+      .join("");
+    const mainContentFrames = frames.filter((frame) => isRecord(frame.payload) && frame.payload.agentId === "main" && (
+      frame.type === "assistant.delta" || frame.type === "thinking.delta" || frame.type === "turn.ended"
+    ));
+    const ended = btwFrames.some((frame) => frame.type === "turn.ended");
+    record("Kimix Server BTW adapter", Boolean(started.agent_id && text.includes(marker) && ended && mainContentFrames.length === 0), {
+      sessionId: session.id,
+      promptId: prompt.prompt_id,
+      agentId: started.agent_id,
+      frameCount: frames.length,
+      btwFrameCount: btwFrames.length,
+      mainContentFrameCount: mainContentFrames.length,
+      containsMarker: text.includes(marker),
+      ended,
+    });
+  } catch (error) {
+    record("Kimix Server BTW adapter", false, { error: summarizeError(error), sessionId: session?.id });
+  } finally {
+    try { socket?.close(); } catch {}
+    if (session?.id) {
+      try {
+        await request(`/sessions/${encodeURIComponent(session.id)}:archive`, { method: "POST", body: "{}" });
+      } catch {}
+    }
+  }
+}
+
 async function waitForTask(sessionId, predicate, timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs;
   let latestTasks = [];
@@ -531,6 +590,7 @@ async function writeReport() {
     "",
     "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
     "- Kimix snapshot replay adapter 已用真实 Server session / prompt / snapshot 验证：history replay 有稳定标记，renderer 可跳过已存在内容并补入缺失内容。",
+    "- Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。",
     "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
     "- 当前 0.17.1 native CLI 的 `/meta` 与 OpenAPI 自报版本为 `0.0.0`；P2 必须按 endpoint / contract capability 探测，不能只按 server_version 判断。",
     "- P2 可在实验开关后新增 Kimix Server Host；现有 vendored SDK Host 继续作为默认与回滚路径。",
@@ -554,6 +614,7 @@ async function main() {
     await startServer();
     await probeContracts();
     await probeKimixSnapshotReplayAdapter();
+    await probeKimixBtwAdapter();
     await probeKimixTaskAdapter();
     await runScenario("03-refresh-replay.ts", "WS 握手、断线重连、seq replay、messages/tasks、prompt");
     await runScenario("08-pending-recovery.ts", "approval/question pending 列表与响应闭环");
