@@ -1208,7 +1208,7 @@ export function ChatThread() {
   const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
-  const hasVisibleContent = Boolean(session && session.events.length > 0 && hasVisibleConversation(session.events, runningSessionId, session.id, runtimeSessionId));
+  const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
 
   useEffect(() => {
