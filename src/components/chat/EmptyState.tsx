@@ -146,17 +146,39 @@ export function EmptyState() {
         isThinking: defaultThinking,
         isComplete: false,
       };
+      const linkStatusEvent: TimelineEvent = {
+        id: genId(),
+        type: "status_update",
+        timestamp: Date.now(),
+        message: "正在准备 Kimi Code 发送链路…",
+        source: "ipc",
+        tone: "info",
+        parentEventId: userEvent.id,
+      };
 
       updateSession(targetSession.id, (session) => ({
         ...session,
-        events: [...session.events, userEvent, responsePlaceholder],
+        events: [...session.events, userEvent, linkStatusEvent, responsePlaceholder],
         title: session.title === "新会话" ? text.slice(0, 30) + (text.length > 30 ? "..." : "") : session.title,
         updatedAt: Date.now(),
       }));
 
       setRunningSessionId(targetSession.id);
+      const updateLinkStatus = (message: string, tone: Extract<TimelineEvent, { type: "status_update" }>["tone"] = "info") => {
+        const timestamp = Date.now();
+        if (!targetSession) return;
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          events: session.events.map((event) => event.id === linkStatusEvent.id
+            ? { ...event, timestamp, message, tone }
+            : event
+          ),
+          updatedAt: timestamp,
+        }));
+      };
       let runtimeSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
       if (!runtimeSessionId) {
+        updateLinkStatus("正在创建新的 Kimi runtime…", "info");
         const createRes = await window.api.createKimiCodeSession({
           workDir: targetSession.projectPath,
           permission: permissionMode,
@@ -178,6 +200,9 @@ export function EmptyState() {
           officialSessionId: runtimeSessionId,
         };
         setCurrentSession(targetSession);
+        updateLinkStatus("新的 Kimi runtime 已就绪，准备提交给模型…", "success");
+      } else {
+        updateLinkStatus("已复用当前 Kimi runtime，准备提交给模型…", "success");
       }
       const dispatchStartedAt = Date.now();
       updateSession(targetSession.id, (session) => ({
@@ -188,6 +213,7 @@ export function EmptyState() {
         ),
         updatedAt: dispatchStartedAt,
       }));
+      updateLinkStatus("已提交给 Kimi Code，等待模型输出…", "success");
       const sendRes = await sendKimiCodePromptWithRetry({
         sessionId: runtimeSessionId,
         content: text,

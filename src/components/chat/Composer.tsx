@@ -739,6 +739,15 @@ export function Composer() {
           parentEventId: userEvent.id,
         }
       : null;
+    const linkStatusEvent: TimelineEvent = {
+      id: genId(),
+      type: "status_update",
+      timestamp: Date.now(),
+      message: "正在准备 Kimi Code 发送链路…",
+      source: "ipc",
+      tone: "info",
+      parentEventId: userEvent.id,
+    };
 
     const shouldAddUserEvent = options?.addUserEvent !== false;
     updateSession(targetSession.id, (session) => ({
@@ -747,6 +756,7 @@ export function Composer() {
         ...session.events,
         ...(shouldAddUserEvent ? [userEvent] : []),
         ...(postUserStatusEvent ? [postUserStatusEvent] : []),
+        linkStatusEvent,
         responsePlaceholder,
       ],
       title: session.title,
@@ -764,6 +774,18 @@ export function Composer() {
       const imagesForApi = toPromptImages(images);
       const sameWorkDir = (a?: string, b?: string) =>
         Boolean(a && b) && a!.replace(/\\/g, "/").toLowerCase() === b!.replace(/\\/g, "/").toLowerCase();
+      const updateLinkStatus = (message: string, tone: Extract<TimelineEvent, { type: "status_update" }>["tone"] = "info") => {
+        const timestamp = Date.now();
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          events: session.events.map((event) => event.id === linkStatusEvent.id
+            ? { ...event, timestamp, message, tone }
+            : event
+          ),
+          updatedAt: timestamp,
+        }));
+        targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+      };
 
       const ensureKimiCodeRuntime = async () => {
         const knownRuntimeSessionId = targetSession.runtimeSessionId;
@@ -773,11 +795,13 @@ export function Composer() {
           // sendPrompt below will return a session/not-active error and we will
           // rebuild the runtime once. This avoids a full preflight handshake on
           // the hot path.
+          updateLinkStatus("已复用当前 Kimi runtime，准备提交给模型…", "success");
           return knownRuntimeSessionId;
         }
 
         const knownOfficialSessionId = targetSession.officialSessionId;
         if (knownOfficialSessionId) {
+          updateLinkStatus("正在恢复旧 Kimi runtime…", "info");
           const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownOfficialSessionId });
           // Only adopt the resumed runtime when it points at this project's
           // workDir. A stale binding to the plugin-management temp session would
@@ -804,8 +828,12 @@ export function Composer() {
             // Re-apply the current UI permission mode so a resumed session honours
             // full-access (yolo) instead of keeping its persisted permission.
             await window.api.setKimiCodePermission({ sessionId: resumeRes.data.sessionId, mode: permissionMode }).catch(() => {});
+            updateLinkStatus("旧 Kimi runtime 已恢复，准备提交给模型…", "success");
             return resumeRes.data.sessionId;
           }
+          updateLinkStatus("旧 runtime 不可用，正在创建新的 Kimi runtime…", "warning");
+        } else {
+          updateLinkStatus("正在创建新的 Kimi runtime…", "info");
         }
 
         const createRes = await window.api.createKimiCodeSession({
@@ -831,6 +859,7 @@ export function Composer() {
           updatedAt: Date.now(),
         }));
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+        updateLinkStatus("新的 Kimi runtime 已就绪，准备提交给模型…", "success");
         return createRes.data.sessionId;
       };
 
@@ -848,6 +877,7 @@ export function Composer() {
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
+        updateLinkStatus("已提交给 Kimi Code，等待模型输出…", "success");
         markPromptDispatchStarted();
         let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
@@ -855,9 +885,11 @@ export function Composer() {
           images: imagesForApi,
         });
         if (!res.success && /not active|not found|session/i.test(res.error)) {
+          updateLinkStatus("当前 runtime 已失效，正在重建后重发…", "warning");
           updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
           targetSession = { ...targetSession, runtimeSessionId: undefined };
           kimiCodeSessionId = await ensureKimiCodeRuntime();
+          updateLinkStatus("已切换到新的 runtime，重新提交给 Kimi Code…", "success");
           markPromptDispatchStarted();
           res = await sendKimiCodePromptWithRetry({
             sessionId: kimiCodeSessionId,
