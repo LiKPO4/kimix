@@ -142,8 +142,11 @@ export type ServerSnapshot = {
 
 const CONTROL_TIMEOUT_MS = 5_000;
 
-export function isKimiCodeServerSessionRoutingEnabled(env: NodeJS.ProcessEnv = process.env) {
-  return env.KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS?.trim() === "1";
+export function isKimiCodeServerSessionRoutingEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+  settings?: { experimentalKimiServerSessions?: boolean },
+) {
+  return env.KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS?.trim() === "1" || settings?.experimentalKimiServerSessions === true;
 }
 
 export function toServerPromptContent(input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>): ServerPromptPart[] {

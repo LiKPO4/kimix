@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import * as settingsService from "./settingsService";
 
 const DEFAULT_PORT = 58_627;
 const START_TIMEOUT_MS = 20_000;
@@ -40,8 +41,11 @@ export type KimiCodeServerHostStatus = {
 
 type ServerEnvelope<T> = { code: number; msg?: string; data: T };
 
-export function isKimiCodeServerExperimentEnabled(env: NodeJS.ProcessEnv = process.env) {
-  return env.KIMIX_EXPERIMENTAL_KIMI_SERVER?.trim() === "1";
+export function isKimiCodeServerExperimentEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+  settings?: { experimentalKimiServer?: boolean },
+) {
+  return env.KIMIX_EXPERIMENTAL_KIMI_SERVER?.trim() === "1" || settings?.experimentalKimiServer === true;
 }
 
 export function inspectKimiCodeServerContract(
@@ -83,9 +87,11 @@ export class KimiCodeServerHost {
   constructor(private readonly env: NodeJS.ProcessEnv = process.env) {
     const port = Number(env.KIMIX_KIMI_SERVER_PORT ?? DEFAULT_PORT);
     const endpoint = env.KIMIX_KIMI_SERVER_URL?.trim() || `http://127.0.0.1:${Number.isFinite(port) ? port : DEFAULT_PORT}`;
+    const settings = settingsService.loadSettings();
+    const enabled = isKimiCodeServerExperimentEnabled(env, settings);
     this.status = {
-      enabled: isKimiCodeServerExperimentEnabled(env),
-      state: isKimiCodeServerExperimentEnabled(env) ? "stopped" : "disabled",
+      enabled,
+      state: enabled ? "stopped" : "disabled",
       endpoint: endpoint.replace(/\/+$/, ""),
       routing: "sdk",
       managed: false,

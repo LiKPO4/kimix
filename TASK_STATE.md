@@ -8,6 +8,7 @@
 - 已完成：所有 Kimix 归档入口统一通过状态迁移触发官方 Server `session:archive`，同时保留本地 tombstone；官方无 unarchive，因此本地恢复不会反向取消官方归档。
 - 已完成：会话注册和 prompt 完成后读取 Server session status，把 `context_tokens` / `max_context_tokens` / `context_usage` 转为现有 SDK 状态事件，复用 ContextRing 展示。
 - 已完成：Server Skill/MCP、会话树、tool catalog/connections 诊断，以及 auth/redacted config/model/provider 只读目录已接入现有页面；模型配置写入继续走 SDK。
+- 已完成：v2.9.148 设置页新增“实验功能”模块，`experimentalKimiServer` / `experimentalKimiServerSessions` 写入 `~/.kimix/settings.json`；主进程启动时读取该设置，等效于原 `KIMIX_EXPERIMENTAL_KIMI_SERVER` / `KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS` 环境变量，保存后需重启生效。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。

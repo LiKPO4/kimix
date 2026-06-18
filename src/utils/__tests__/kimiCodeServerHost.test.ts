@@ -6,6 +6,7 @@ describe("kimiCodeServerHost", () => {
     expect(isKimiCodeServerExperimentEnabled({})).toBe(false);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "true" })).toBe(false);
+    expect(isKimiCodeServerExperimentEnabled({}, { experimentalKimiServer: true })).toBe(true);
   });
 
   it("detects capabilities without trusting the reported version", () => {

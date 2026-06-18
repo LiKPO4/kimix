@@ -39,12 +39,13 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.9.147";
+const KIMIX_VERSION = "2.9.148";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
   | "connection"
   | "auth"
+  | "experiment"
   | "model"
   | "theme"
   | "permission"
@@ -61,6 +62,7 @@ type SettingsSectionId =
 const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "connection",
   "auth",
+  "experiment",
   "model",
   "theme",
   "permission",
@@ -170,7 +172,26 @@ function normalizeOpenAiProviderContextSize(providerName: string, baseUrl: strin
 function normalizeSettingsSectionOrder(order: unknown[]): SettingsSectionId[] {
   const known = new Set<SettingsSectionId>(DEFAULT_SETTINGS_SECTION_ORDER);
   const filtered = order.filter((item): item is SettingsSectionId => typeof item === "string" && known.has(item as SettingsSectionId));
-  return [...filtered, ...DEFAULT_SETTINGS_SECTION_ORDER.filter((item) => !filtered.includes(item))];
+  const result = [...filtered];
+  for (const item of DEFAULT_SETTINGS_SECTION_ORDER) {
+    if (result.includes(item)) continue;
+    const defaultIndex = DEFAULT_SETTINGS_SECTION_ORDER.indexOf(item);
+    const previousKnown = [...DEFAULT_SETTINGS_SECTION_ORDER.slice(0, defaultIndex)]
+      .reverse()
+      .find((candidate) => result.includes(candidate));
+    if (previousKnown) {
+      result.splice(result.indexOf(previousKnown) + 1, 0, item);
+      continue;
+    }
+    const nextKnown = DEFAULT_SETTINGS_SECTION_ORDER.slice(defaultIndex + 1)
+      .find((candidate) => result.includes(candidate));
+    if (nextKnown) {
+      result.splice(result.indexOf(nextKnown), 0, item);
+      continue;
+    }
+    result.push(item);
+  }
+  return result;
 }
 
 function readSettingsSectionOrder(): SettingsSectionId[] {
@@ -443,6 +464,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
+  const [experimentalKimiServer, setExperimentalKimiServer] = useState(false);
+  const [experimentalKimiServerSessions, setExperimentalKimiServerSessions] = useState(false);
+  const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
+  const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
+  const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
 
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
@@ -1113,11 +1139,45 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     void runImportSessionBackup(filePath);
   };
 
+  const refreshExperimentalSettings = async () => {
+    setExperimentalSettingsLoading(true);
+    const res = await window.api.getSettings();
+    setExperimentalSettingsLoading(false);
+    if (!res.success) {
+      setExperimentalSettingsMessage(`读取实验功能失败：${res.error}`);
+      return;
+    }
+    setExperimentalKimiServer(Boolean(res.data.experimentalKimiServer));
+    setExperimentalKimiServerSessions(Boolean(res.data.experimentalKimiServerSessions));
+    setExperimentalSettingsMessage("修改后需要完全重启 Kimix 才会影响新会话路由。");
+  };
+
+  const saveExperimentalSettings = async (next: { server?: boolean; sessions?: boolean }) => {
+    const serverEnabled = next.server ?? experimentalKimiServer;
+    const sessionsEnabled = next.sessions ?? experimentalKimiServerSessions;
+    const normalizedSessionsEnabled = serverEnabled ? sessionsEnabled : false;
+    setExperimentalKimiServer(serverEnabled);
+    setExperimentalKimiServerSessions(normalizedSessionsEnabled);
+    setExperimentalSettingsSaving(true);
+    const res = await window.api.saveSettings({
+      experimentalKimiServer: serverEnabled,
+      experimentalKimiServerSessions: normalizedSessionsEnabled,
+    });
+    setExperimentalSettingsSaving(false);
+    if (res.success) {
+      setExperimentalSettingsMessage("已保存；完全关闭并重新打开 Kimix 后生效。");
+      return;
+    }
+    setExperimentalSettingsMessage(`保存实验功能失败：${res.error}`);
+    void refreshExperimentalSettings();
+  };
+
   useEffect(() => {
     if (settingsOpen || variant === "workspace") {
       if (!settingsStatusCache.connection) void checkConnection(false);
       if (!settingsStatusCache.auth) void refreshAuth();
       if (!settingsStatusCache.modelConfig) void refreshModelConfig();
+      void refreshExperimentalSettings();
       loadFreezeReports();
     }
   }, [settingsOpen, variant]);
@@ -1759,7 +1819,80 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("model", 2, modelSettingsRef)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("experiment", 2)}>
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <Zap size={16} className="text-text-muted" />
+                    <span>实验功能</span>
+                  </div>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => void refreshExperimentalSettings()}
+                      disabled={experimentalSettingsLoading || experimentalSettingsSaving}
+                      className="kimix-settings-check-button"
+                    >
+                      <RefreshCw size={15} className={experimentalSettingsLoading ? "kimix-spin" : ""} />
+                      <span>刷新</span>
+                    </button>
+                    {settingsDragHandle("experiment", "实验功能")}
+                  </div>
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
+                  <div className="flex items-start" style={{ gap: 12 }}>
+                    <Zap size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">Kimi Code Server 灰度路由</div>
+                      <div className="kimix-settings-permission-desc">
+                        把原来的环境变量开关收进设置页；默认关闭，保存后需要完全重启 Kimix 才会影响新会话。
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                    <button
+                      type="button"
+                      onClick={() => void saveExperimentalSettings({ server: !experimentalKimiServer })}
+                      disabled={experimentalSettingsLoading || experimentalSettingsSaving}
+                      className={`kimix-settings-permission ${experimentalKimiServer ? "is-active" : ""}`}
+                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                    >
+                      <SelectionIndicator selected={experimentalKimiServer} />
+                      <div className="kimix-settings-permission-copy">
+                        <div className="kimix-settings-permission-label">启用官方 Kimi Code Server</div>
+                        <div className="kimix-settings-permission-desc">
+                          等效于 `KIMIX_EXPERIMENTAL_KIMI_SERVER=1`，允许 Kimix 启动或连接官方本地 Server。
+                        </div>
+                      </div>
+                      <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServer ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                        {experimentalKimiServer ? "已开启" : "关闭"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveExperimentalSettings({ sessions: !experimentalKimiServerSessions })}
+                      disabled={experimentalSettingsLoading || experimentalSettingsSaving || !experimentalKimiServer}
+                      className={`kimix-settings-permission ${experimentalKimiServerSessions ? "is-active" : ""}`}
+                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto", opacity: experimentalKimiServer ? 1 : 0.62 }}
+                    >
+                      <SelectionIndicator selected={experimentalKimiServerSessions} />
+                      <div className="kimix-settings-permission-copy">
+                        <div className="kimix-settings-permission-label">新会话使用 Server 路由</div>
+                        <div className="kimix-settings-permission-desc">
+                          等效于 `KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS=1`，新会话走 REST + WebSocket；异常时仍保留 SDK 回滚路径。
+                        </div>
+                      </div>
+                      <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServerSessions ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                        {experimentalKimiServerSessions ? "已开启" : "关闭"}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
+                    {experimentalSettingsMessage || "读取实验功能状态中..."}
+                  </div>
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("model", 3, modelSettingsRef)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Terminal size={16} className="text-text-muted" />

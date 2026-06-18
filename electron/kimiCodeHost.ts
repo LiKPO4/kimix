@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
+import * as settingsService from "./settingsService";
 import {
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
@@ -1623,7 +1624,7 @@ async function registerServerSession(
 }
 
 function shouldRouteNewSessionToServer() {
-  return isKimiCodeServerSessionRoutingEnabled() && kimiCodeServerHost.isReady();
+  return isKimiCodeServerSessionRoutingEnabled(process.env, settingsService.loadSettings()) && kimiCodeServerHost.isReady();
 }
 
 function getServerClient() {

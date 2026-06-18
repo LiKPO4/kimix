@@ -6497,6 +6497,8 @@ const SettingsSchema = z.object({
   clarificationToolEnabled: z.boolean().optional(),
   filePreviewExtensions: z.array(z.string().trim().min(1).max(16)).max(20).optional(),
   expandToolCalls: z.boolean().optional(),
+  experimentalKimiServer: z.boolean().optional(),
+  experimentalKimiServerSessions: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),
   selectedLaunchCommand: z.string().optional(),

@@ -32,6 +32,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   clarificationToolMode: "auto",
   filePreviewExtensions: ["md", "txt"],
   expandToolCalls: false,
+  experimentalKimiServer: false,
+  experimentalKimiServerSessions: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   enabledSkillNames: [],

@@ -16,6 +16,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(isKimiCodeServerSessionRoutingEnabled({})).toBe(false);
     expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(false);
     expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "1" })).toBe(true);
+    expect(isKimiCodeServerSessionRoutingEnabled({}, { experimentalKimiServerSessions: true })).toBe(true);
   });
 
   it("maps SDK prompt parts to the official server content shape", () => {

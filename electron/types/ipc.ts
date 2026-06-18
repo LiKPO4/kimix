@@ -1339,6 +1339,8 @@ export type AppSettings = {
   clarificationToolMode: "off" | "on" | "auto";
   filePreviewExtensions: string[];
   expandToolCalls: boolean;
+  experimentalKimiServer: boolean;
+  experimentalKimiServerSessions: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;
   selectedLaunchCommand?: string;
