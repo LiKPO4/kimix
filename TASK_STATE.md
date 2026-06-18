@@ -65,6 +65,7 @@
 - 2026-06-18 Kimi Code 0.17.1 P3 follow-up：Server snapshot 历史消息补偿增加 `snapshotReplay` / `snapshotMessageId` / `snapshotMessageText` 标记；renderer 收到 history replay 时会先和当前 timeline 的 assistant/tool 内容去重，已有内容跳过、缺失内容才补。`in_flight` replay 不跳过，用于断线时恢复正在生成的正文。
 - 2026-06-18 Kimi Code 0.17.1 P3 follow-up：增强 `scripts/probe-kimi-code-server.mjs`，新增真实 Server session / prompt / snapshot 探针项验证 Kimix snapshot replay adapter：history replay 有稳定标记，renderer 去重策略可跳过已存在内容并保留缺失补偿；报告只记录 text length / marker，不落完整模型正文。同步兼容官方 message content 的 `thinking` 与 `tool_result` 结构。
 - 2026-06-18 v2.9.143：收口 Kimi Server 后台任务体验；Server task stop 遇到官方 40904 already finished 时按幂等终态处理，不再在侧栏显示“停止失败”；Server task 映射补充 `outputBytes`、取消/失败摘要，右侧长程任务栏能提示已有输出可查看。三处版本号同步到 2.9.143。
+- 2026-06-18 Kimi Code 0.17.1 P3 follow-up：Server 主探针补齐真实后台任务链路；新建 session 后通过 Bash 后台任务验证 task list/get/cancel、输出元数据和重复停止 already-finished 语义。实测 9/0 通过，重复 cancel 返回官方 `40904/cancelled=false`，与 Kimix 幂等停止适配一致。
 
 ## 当前目标
 停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。

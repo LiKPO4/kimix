@@ -73,6 +73,28 @@ async function request(relativePath, options = {}) {
   return envelope.data;
 }
 
+async function requestEnvelope(relativePath, options = {}) {
+  const response = await fetch(`${apiBase}${relativePath}`, {
+    ...options,
+    headers: {
+      accept: "application/json",
+      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.headers ?? {}),
+    },
+  });
+  let envelope;
+  try {
+    envelope = await response.json();
+  } catch (error) {
+    return {
+      ok: false,
+      status: response.status,
+      envelope: { code: -1, msg: summarizeError(error), data: undefined },
+    };
+  }
+  return { ok: response.ok, status: response.status, envelope };
+}
+
 function waitForSocketFrame(queue, waiters, match, timeoutMs = 60_000) {
   const queuedIndex = queue.findIndex(match);
   if (queuedIndex >= 0) return Promise.resolve(queue.splice(queuedIndex, 1)[0]);
@@ -311,6 +333,171 @@ async function probeKimixSnapshotReplayAdapter() {
   }
 }
 
+async function waitForTask(sessionId, predicate, timeoutMs = 90_000) {
+  const deadline = Date.now() + timeoutMs;
+  let latestTasks = [];
+  while (Date.now() < deadline) {
+    const result = await request(`/sessions/${encodeURIComponent(sessionId)}/tasks`);
+    latestTasks = Array.isArray(result?.items) ? result.items : [];
+    const task = latestTasks.find(predicate);
+    if (task) return task;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error(`Task wait timed out after ${timeoutMs}ms; latest=${JSON.stringify(latestTasks.map((task) => ({
+    id: task.id,
+    kind: task.kind,
+    status: task.status,
+    description: task.description,
+  })))}`);
+}
+
+async function approvePendingBashRequests(sessionId) {
+  const result = await request(`/sessions/${encodeURIComponent(sessionId)}/approvals?status=pending`);
+  const approvals = Array.isArray(result?.items) ? result.items : [];
+  let approved = 0;
+  for (const approval of approvals) {
+    if (approval?.tool_name !== "Bash" || typeof approval?.approval_id !== "string") continue;
+    const resolved = await request(`/sessions/${encodeURIComponent(sessionId)}/approvals/${encodeURIComponent(approval.approval_id)}`, {
+      method: "POST",
+      body: JSON.stringify({ decision: "approved" }),
+    });
+    if (resolved?.resolved === true) approved += 1;
+  }
+  return approved;
+}
+
+async function waitForTaskAfterPrompt(sessionId, predicate, timeoutMs = 120_000) {
+  const deadline = Date.now() + timeoutMs;
+  let approvedCount = 0;
+  let latestTasks = [];
+  while (Date.now() < deadline) {
+    approvedCount += await approvePendingBashRequests(sessionId);
+    const result = await request(`/sessions/${encodeURIComponent(sessionId)}/tasks`);
+    latestTasks = Array.isArray(result?.items) ? result.items : [];
+    const task = latestTasks.find(predicate);
+    if (task) return { task, approvedCount };
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error(`Task wait timed out after ${timeoutMs}ms; approved=${approvedCount}; latest=${JSON.stringify(latestTasks.map((taskItem) => ({
+    id: taskItem.id,
+    kind: taskItem.kind,
+    status: taskItem.status,
+    description: taskItem.description,
+  })))}`);
+}
+
+async function getTaskWithOutput(sessionId, taskId, outputBytes = 4096) {
+  return request(`/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}?with_output=true&output_bytes=${outputBytes}`);
+}
+
+async function cancelTask(sessionId, taskId) {
+  return requestEnvelope(`/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}:cancel`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+async function probeKimixTaskAdapter() {
+  let session;
+  let socket;
+  let task;
+  try {
+    session = await request("/sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Kimix Server task probe",
+        metadata: { cwd: repoRoot, source: "kimix-task-probe" },
+        agent_config: {
+          thinking: "off",
+          permission_mode: "yolo",
+          plan_mode: false,
+        },
+      }),
+    });
+    const ws = await openProbeSocket(session.id);
+    socket = ws.socket;
+    const marker = `KIMIX_TASK_PROBE_${Date.now()}`;
+    const prompt = await request(`/sessions/${encodeURIComponent(session.id)}/prompts`, {
+      method: "POST",
+      body: JSON.stringify({
+        content: [{
+          type: "text",
+          text: [
+            "请只做一个动作：使用 Bash 工具启动后台任务，必须设置 run_in_background=true，并填写简短 description。",
+            "命令必须是下面这一行，不要改写，不要创建或修改任何文件：",
+            `node -e "let i=0; setInterval(()=>console.log('${marker}_'+(++i)),500)"`,
+            "后台任务启动后，用一句话回复“任务已启动”，不要等待命令结束。",
+          ].join("\n"),
+        }],
+      }),
+    });
+    const taskResult = await waitForTaskAfterPrompt(session.id, (item) => item.kind === "bash" && item.status === "running");
+    task = taskResult.task;
+    const runningList = await request(`/sessions/${encodeURIComponent(session.id)}/tasks?status=running`);
+    const beforeCancel = await getTaskWithOutput(session.id, task.id);
+    const firstCancel = await cancelTask(session.id, task.id);
+    const afterCancel = await waitForTask(session.id, (item) => item.id === task.id && item.status !== "running", 30_000);
+    const afterCancelWithOutput = await getTaskWithOutput(session.id, task.id);
+    const secondCancel = await cancelTask(session.id, task.id);
+    let promptCompleted = false;
+    try {
+      await ws.waitFor((frame) => {
+        if (frame.type !== "prompt.completed" || frame.session_id !== session.id) return false;
+        const payload = isRecord(frame.payload) ? frame.payload : {};
+        return (payload.prompt_id ?? payload.promptId) === prompt.prompt_id;
+      }, 30_000);
+      promptCompleted = true;
+    } catch {
+      promptCompleted = false;
+    }
+    const firstCancelOk = firstCancel.envelope?.code === 0 && firstCancel.envelope?.data?.cancelled === true;
+    const secondCancelOk = secondCancel.envelope?.code === 0 || secondCancel.envelope?.code === 40904;
+    const terminalStatusOk = ["completed", "failed", "cancelled"].includes(afterCancel.status);
+    const outputBytes = Number(afterCancelWithOutput.output_bytes ?? beforeCancel.output_bytes ?? 0);
+    record("Kimix Server task adapter", Boolean(task.id && firstCancelOk && secondCancelOk && terminalStatusOk), {
+      sessionId: session.id,
+      promptId: prompt.prompt_id,
+      taskId: task.id,
+      kind: task.kind,
+      approvedBashRequests: taskResult.approvedCount,
+      promptCompletedAfterCancel: promptCompleted,
+      runningListCount: Array.isArray(runningList?.items) ? runningList.items.length : 0,
+      beforeCancel: {
+        status: beforeCancel.status,
+        outputBytes: beforeCancel.output_bytes ?? 0,
+        hasOutputPreview: typeof beforeCancel.output_preview === "string" && beforeCancel.output_preview.length > 0,
+      },
+      firstCancel: {
+        httpStatus: firstCancel.status,
+        code: firstCancel.envelope?.code,
+        cancelled: firstCancel.envelope?.data?.cancelled,
+      },
+      afterCancel: {
+        status: afterCancel.status,
+        outputBytes,
+        hasOutputPreview: typeof afterCancelWithOutput.output_preview === "string" && afterCancelWithOutput.output_preview.length > 0,
+      },
+      secondCancel: {
+        httpStatus: secondCancel.status,
+        code: secondCancel.envelope?.code,
+        cancelled: secondCancel.envelope?.data?.cancelled,
+      },
+    });
+  } catch (error) {
+    if (session?.id && task?.id) {
+      try { await cancelTask(session.id, task.id); } catch {}
+    }
+    record("Kimix Server task adapter", false, { error: summarizeError(error), sessionId: session?.id, taskId: task?.id });
+  } finally {
+    try { socket?.close(); } catch {}
+    if (session?.id) {
+      try {
+        await request(`/sessions/${encodeURIComponent(session.id)}:archive`, { method: "POST", body: "{}" });
+      } catch {}
+    }
+  }
+}
+
 async function runScenario(file, coverage) {
   const result = await run("pnpm", ["--filter", "@moonshot-ai/server-e2e", "exec", "tsx", `scenarios/${file}`], {
     cwd: researchRepo,
@@ -344,6 +531,7 @@ async function writeReport() {
     "",
     "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
     "- Kimix snapshot replay adapter 已用真实 Server session / prompt / snapshot 验证：history replay 有稳定标记，renderer 可跳过已存在内容并补入缺失内容。",
+    "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
     "- 当前 0.17.1 native CLI 的 `/meta` 与 OpenAPI 自报版本为 `0.0.0`；P2 必须按 endpoint / contract capability 探测，不能只按 server_version 判断。",
     "- P2 可在实验开关后新增 Kimix Server Host；现有 vendored SDK Host 继续作为默认与回滚路径。",
     "",
@@ -351,7 +539,7 @@ async function writeReport() {
     "",
     "- 跨工作区会话：实验路由下 `listSessions({})` 改走 Server 全局列表，现有 UI 的“全部工作目录”入口可复用。",
     "- 官方 fork / 子会话：fork、children list/create 已接入主进程与 preload API。",
-    "- 任务管理：Server task list/get/cancel 已接入现有 Kimix 后台任务接口；真实启动、读取、取消一个 running bash 后台任务已验证。",
+    "- 任务管理：Server task list/get/cancel 已接入现有 Kimix 后台任务接口；主探针会真实启动、读取、取消一个 running bash 后台任务，并复验重复停止的 already-finished 语义。",
     "- 终端管理：terminal list 真实读取通过，create/list/close 与 WS attach/detach/input/resize 已接入主进程与 preload API。",
     "- Windows 限制：本机 0.17.1 CLI 调用 terminal create 时返回 `Failed to load native module: conpty.node`，说明接口存在但当前安装包缺少可加载的 Windows ConPTY native 模块；Kimix 将该上游错误归一为可读中文提示并保留原始错误，不伪装为成功。",
     "- 断线重放：Kimix 客户端携带 cursor 重连并触发 snapshot 恢复；history replay 已增加去重补偿，in-flight replay 用于恢复断线中正在生成的正文。",
@@ -366,6 +554,7 @@ async function main() {
     await startServer();
     await probeContracts();
     await probeKimixSnapshotReplayAdapter();
+    await probeKimixTaskAdapter();
     await runScenario("03-refresh-replay.ts", "WS 握手、断线重连、seq replay、messages/tasks、prompt");
     await runScenario("08-pending-recovery.ts", "approval/question pending 列表与响应闭环");
     await runScenario("10-prompt-queue-steer.ts", "queued prompt steer 与 WS 事件");
