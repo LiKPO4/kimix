@@ -51,6 +51,8 @@ const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
 const SESSION_OPEN_BOTTOM_SETTLE_MS = 1200;
 const SESSION_OPEN_BOTTOM_SETTLE_INTERVAL_MS = 120;
+const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
+const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
 
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   drafting: "需求澄清",
@@ -702,6 +704,8 @@ export function ChatThread() {
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
+  const lastScrollTopRef = useRef<number | null>(null);
+  const userScrollResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
@@ -843,6 +847,12 @@ export function ChatThread() {
     return true;
   };
 
+  const readScrollSize = (node: HTMLElement) => ({
+    width: node.clientWidth,
+    height: node.clientHeight,
+    scrollHeight: node.scrollHeight,
+  });
+
   const findRenderedEventNode = (eventId: string): HTMLElement | null => {
     const node = scrollRef.current;
     if (!node) return null;
@@ -959,6 +969,8 @@ export function ChatThread() {
     pendingOlderItemsScrollAnchorRef.current = null;
     resizeScrollAnchorRef.current = null;
     lastScrollSizeRef.current = null;
+    lastScrollTopRef.current = null;
+    userScrollResizeRestoreUntilRef.current = 0;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
@@ -980,13 +992,16 @@ export function ChatThread() {
   useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
-    lastScrollSizeRef.current = { width: node.clientWidth, height: node.clientHeight, scrollHeight: node.scrollHeight };
-    captureResizeScrollAnchor();
-    const observer = new ResizeObserver(() => {
+    let resizeFrame = 0;
+    lastScrollSizeRef.current = readScrollSize(node);
+    scheduleAnchorCapture();
+
+    const processResize = () => {
+      resizeFrame = 0;
       const current = scrollRef.current;
       if (!current) return;
       const previousSize = lastScrollSizeRef.current;
-      const nextSize = { width: current.clientWidth, height: current.clientHeight, scrollHeight: current.scrollHeight };
+      const nextSize = readScrollSize(current);
       lastScrollSizeRef.current = nextSize;
       if (
         !previousSize ||
@@ -999,24 +1014,40 @@ export function ChatThread() {
         return;
       }
       if (autoFollowRef.current && !userScrollRef.current) {
-        window.requestAnimationFrame(() => scrollToBottom("auto"));
+        scrollToBottom("auto");
         return;
       }
-      const token = ++scrollTokenRef.current;
-      window.requestAnimationFrame(() => {
-        if (token !== scrollTokenRef.current) return;
-        restoreResizeScrollAnchor();
-        captureResizeScrollAnchor();
-        const nodeAfterRestore = scrollRef.current;
-        if (!nodeAfterRestore) return;
-        const distance = nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
-        updateShowScrollToBottom(distance > 80);
-      });
-    });
-    observer.observe(node);
+      if (userScrollRef.current && Date.now() < userScrollResizeRestoreUntilRef.current) {
+        scheduleIdleAnchorCapture();
+        const activeNode = scrollRef.current;
+        if (activeNode) {
+          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          updateShowScrollToBottom(distance > 80);
+        }
+        return;
+      }
+      restoreResizeScrollAnchor();
+      scheduleAnchorCapture();
+      const nodeAfterRestore = scrollRef.current;
+      if (!nodeAfterRestore) return;
+      const distance = nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
+      updateShowScrollToBottom(distance > 80);
+    };
+
+    const scheduleResizeProcess = () => {
+      if (resizeFrame) return;
+      resizeFrame = window.requestAnimationFrame(processResize);
+    };
+
+    const observer = new ResizeObserver(scheduleResizeProcess);
     const contentNode = streamContentRef.current;
-    if (contentNode) observer.observe(contentNode);
-    return () => observer.disconnect();
+    observer.observe(contentNode ?? node);
+    window.addEventListener("resize", scheduleResizeProcess);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleResizeProcess);
+      if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+    };
   }, [session?.id, showOlderItems]);
 
   useLayoutEffect(() => {
@@ -1095,10 +1126,10 @@ export function ChatThread() {
     }
   };
   // Anchor capture (getBoundingClientRect + querySelectorAll) is expensive and
-  // triggers forced layout. It used to run on every scroll frame. We now coalesce
-  // repeated scroll events into a single rAF so the capture happens at most once
-  // per frame, instead of N times inside the scroll handler itself.
+  // triggers forced layout. Keep it out of the hot scroll path; scrolling only
+  // schedules one idle capture after the wheel/touch stream settles.
   const anchorCaptureFrameRef = useRef(0);
+  const anchorCaptureIdleTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const scheduleAnchorCapture = () => {
     if (anchorCaptureFrameRef.current) return;
     anchorCaptureFrameRef.current = window.requestAnimationFrame(() => {
@@ -1106,7 +1137,20 @@ export function ChatThread() {
       captureResizeScrollAnchor();
     });
   };
+  const scheduleIdleAnchorCapture = () => {
+    if (anchorCaptureIdleTimerRef.current !== null) {
+      window.clearTimeout(anchorCaptureIdleTimerRef.current);
+    }
+    anchorCaptureIdleTimerRef.current = window.setTimeout(() => {
+      anchorCaptureIdleTimerRef.current = null;
+      scheduleAnchorCapture();
+    }, SCROLL_ANCHOR_IDLE_CAPTURE_MS);
+  };
   const cancelPendingAnchorCapture = () => {
+    if (anchorCaptureIdleTimerRef.current !== null) {
+      window.clearTimeout(anchorCaptureIdleTimerRef.current);
+      anchorCaptureIdleTimerRef.current = null;
+    }
     if (anchorCaptureFrameRef.current) {
       window.cancelAnimationFrame(anchorCaptureFrameRef.current);
       anchorCaptureFrameRef.current = 0;
@@ -1116,14 +1160,17 @@ export function ChatThread() {
   const handleScroll = () => {
     const node = scrollRef.current;
     if (!node) return;
-    // Coalesce the expensive anchor capture into one rAF per frame instead of
-    // running getBoundingClientRect/querySelectorAll synchronously on every
-    // scroll event (forced reflow per frame).
-    scheduleAnchorCapture();
+    const previousScrollTop = lastScrollTopRef.current;
+    lastScrollTopRef.current = node.scrollTop;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
-    if (Date.now() < ignoreScrollUntilRef.current) return;
+    const now = Date.now();
+    if (now < ignoreScrollUntilRef.current) return;
+    if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
+      userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
+      scheduleIdleAnchorCapture();
+    }
     if (userScrollRef.current && awayFromBottom && autoFollowRef.current) {
       autoFollowRef.current = false;
       updateAutoFollow(false);

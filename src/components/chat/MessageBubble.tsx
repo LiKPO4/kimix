@@ -1,5 +1,6 @@
 import { memo, useState, useRef, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent, UserMessageImage } from "@/types/ui";
@@ -27,6 +28,142 @@ interface MessageBubbleProps {
   changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>;
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
+}
+
+function timelineEventMemoKey(event: TimelineEvent) {
+  switch (event.type) {
+    case "assistant_message":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.content,
+        event.thinking ?? "",
+        event.thinkingParts?.map((part) => `${part.timestamp}:${part.text}`).join("\u001f") ?? "",
+        event.isThinking ? 1 : 0,
+        event.isComplete ? 1 : 0,
+        event.durationMs ?? "",
+        event.agentRole ?? "",
+      ].join("\u001e");
+    case "user_message":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.content,
+        event.images?.map((image) => `${image.id ?? ""}:${image.name}:${image.filePath ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
+      ].join("\u001e");
+    case "steer_message":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.content,
+        event.status ?? "",
+        event.images?.map((image) => `${image.id ?? ""}:${image.name}:${image.filePath ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
+      ].join("\u001e");
+    case "tool_call":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.toolCallId,
+        event.toolName,
+        event.status,
+        event.rawArguments ?? "",
+        event.result === undefined ? "" : JSON.stringify(event.result),
+      ].join("\u001e");
+    case "subagent":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.agentId,
+        event.parentToolCallId ?? "",
+        event.swarmIndex ?? "",
+        event.description ?? "",
+        event.agentName,
+        event.status,
+        event.resultSummary ?? "",
+        event.error ?? "",
+        event.events.map(timelineEventMemoKey).join("\u001f"),
+      ].join("\u001e");
+    case "hook":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.eventName,
+        event.target,
+        event.phase,
+        event.action ?? "",
+        event.reason ?? "",
+      ].join("\u001e");
+    case "approval_request":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.requestId,
+        event.status,
+        event.toolName,
+        event.description,
+        event.details,
+        event.riskLevel,
+      ].join("\u001e");
+    case "status_update":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.message ?? "",
+        event.level ?? "",
+      ].join("\u001e");
+    case "change_summary":
+      return [
+        event.id,
+        event.type,
+        event.timestamp,
+        event.files.map((file) => `${file.path}:${file.additions ?? ""}:${file.deletions ?? ""}`).join("\u001f"),
+        event.additions ?? "",
+        event.deletions ?? "",
+      ].join("\u001e");
+    default:
+      return `${event.id}:${event.type}:${event.timestamp}`;
+  }
+}
+
+function eventArrayMemoEqual<T extends TimelineEvent>(a?: T[], b?: T[]) {
+  if (a === b) return true;
+  if (!a || !b) return (a?.length ?? 0) === (b?.length ?? 0);
+  if (a.length !== b.length) return false;
+  return a.every((event, index) => event === b[index] || timelineEventMemoKey(event) === timelineEventMemoKey(b[index]));
+}
+
+function stringArrayMemoEqual(a?: string[], b?: string[]) {
+  if (a === b) return true;
+  if (!a || !b) return (a?.length ?? 0) === (b?.length ?? 0);
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+}
+
+function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubbleProps) {
+  return timelineEventMemoKey(prev.event) === timelineEventMemoKey(next.event) &&
+    prev.sessionId === next.sessionId &&
+    prev.runtimeSessionId === next.runtimeSessionId &&
+    prev.hideProcessSummary === next.hideProcessSummary &&
+    eventArrayMemoEqual(prev.leadingTools, next.leadingTools) &&
+    eventArrayMemoEqual(prev.leadingSubagents, next.leadingSubagents) &&
+    eventArrayMemoEqual(prev.leadingHooks, next.leadingHooks) &&
+    eventArrayMemoEqual(prev.leadingApprovals, next.leadingApprovals) &&
+    eventArrayMemoEqual(prev.attachedSteers, next.attachedSteers) &&
+    eventArrayMemoEqual(prev.trailingStatuses, next.trailingStatuses) &&
+    stringArrayMemoEqual(prev.changedFiles, next.changedFiles) &&
+    (
+      prev.changeSummary === next.changeSummary ||
+      (!prev.changeSummary && !next.changeSummary) ||
+      (Boolean(prev.changeSummary && next.changeSummary) && timelineEventMemoKey(prev.changeSummary as TimelineEvent) === timelineEventMemoKey(next.changeSummary as TimelineEvent))
+    );
 }
 
 // Horizontal breathing room for message content. The assistant body is indented
@@ -187,41 +324,45 @@ function AttachmentThumb({
   );
 }
 
-function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
+const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
-  const currentSession = useAppStore((s) => s.currentSession);
-  const runningSessionId = useAppStore((s) => s.runningSessionId);
-  const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const permissionMode = useAppStore((s) => s.permissionMode);
-  const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
-  const updateSession = useSessionStore((s) => s.updateSession);
-  const isLatestUserMessage = Boolean(currentSession && currentSession.events.findLast((e) => e.type === "user_message")?.id === event.id);
-  const isLongTaskMessage = Boolean(currentSession?.longTask);
+  const { currentSessionId, runningSessionId, isLatestUserMessage, isLongTaskMessage } = useAppStore(useShallow((s) => {
+    const currentSession = s.currentSession;
+    return {
+      currentSessionId: currentSession?.id ?? null,
+      runningSessionId: s.runningSessionId,
+      isLatestUserMessage: Boolean(currentSession && currentSession.events.findLast((e) => e.type === "user_message")?.id === event.id),
+      isLongTaskMessage: Boolean(currentSession?.longTask),
+    };
+  }));
   const images = event.images ?? [];
   const hasText = event.content.trim().length > 0;
   const copyText = hasText ? [event.content, attachmentCopyText(images)].filter(Boolean).join("\n\n") : attachmentCopyText(images);
 
   const handleResend = async () => {
-    if (!currentSession || runningSessionId === currentSession.id) return;
+    const appState = useAppStore.getState();
+    const activeSession = appState.currentSession
+      ? useSessionStore.getState().sessions.find((session) => session.id === appState.currentSession?.id) ?? appState.currentSession
+      : null;
+    if (!activeSession || appState.runningSessionId === activeSession.id) return;
     const responsePlaceholder: TimelineEvent = {
       id: Math.random().toString(36).substring(2, 11),
       type: "assistant_message",
       timestamp: Date.now(),
       content: "",
-      isThinking: defaultThinking,
+      isThinking: appState.defaultThinking,
       isComplete: false,
     };
-    updateSession(currentSession.id, (session) => ({
+    useSessionStore.getState().updateSession(activeSession.id, (session) => ({
       ...session,
       events: [...session.events, responsePlaceholder],
       updatedAt: Date.now(),
     }));
-    setRunningSessionId(currentSession.id);
-    const runtimeSessionId = getRuntimeSessionId(currentSession);
+    appState.setRunningSessionId(activeSession.id);
+    const runtimeSessionId = getRuntimeSessionId(activeSession);
     if (!runtimeSessionId) {
-      setRunningSessionId(null);
+      appState.setRunningSessionId(null);
       return;
     }
     try {
@@ -229,15 +370,15 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
         sessionId: runtimeSessionId,
         content: contentWithFileAttachments(event.content, images),
         images: promptImages(images),
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
-        planMode: defaultPlanMode,
+        thinking: appState.defaultThinking,
+        yoloMode: appState.permissionMode === "yolo",
+        autoMode: appState.permissionMode === "auto",
+        planMode: appState.defaultPlanMode,
       });
       if (!res.success) throw new Error(res.error);
     } catch (err) {
       console.error("Resend failed:", err);
-      setRunningSessionId(null);
+      appState.setRunningSessionId(null);
     }
   };
 
@@ -278,7 +419,7 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
           </button>
           <button
             onClick={handleResend}
-            disabled={currentSession ? runningSessionId === currentSession.id || (isLongTaskMessage && !isLatestUserMessage) : false}
+            disabled={currentSessionId ? runningSessionId === currentSessionId || (isLongTaskMessage && !isLatestUserMessage) : false}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg-hover disabled:opacity-30"
             title="重新发送"
             aria-label="重新发送"
@@ -296,9 +437,9 @@ function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "u
       )}
     </div>
   );
-}
+});
 
-function SteerMessageBubble({ event, embedded = false }: { event: Extract<TimelineEvent, { type: "steer_message" }>; embedded?: boolean }) {
+const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = false }: { event: Extract<TimelineEvent, { type: "steer_message" }>; embedded?: boolean }) {
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const images = event.images ?? [];
   const hasText = event.content.trim().length > 0 && event.content.trim() !== "[图片]";
@@ -351,7 +492,7 @@ function SteerMessageBubble({ event, embedded = false }: { event: Extract<Timeli
       )}
     </div>
   );
-}
+});
 
 type ToolEvent = Extract<TimelineEvent, { type: "tool_call" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
@@ -966,4 +1107,4 @@ export const MessageBubble = memo(function MessageBubble({ event, sessionId, run
     return <SteerMessageBubble event={event} />;
   }
   return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
-});
+}, messageBubblePropsEqual);

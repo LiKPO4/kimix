@@ -53,6 +53,8 @@
 - 2026-06-17 v2.9.138：修复完整 Markdown 文件被外层 ```markdown 与内层 ```bash 同长围栏切碎的问题；渲染前自动升级外层 markdown fence，并让表格/标题修复按围栏长度识别边界。
 - 2026-06-17 v2.9.139：修复 Write/Edit 大参数工具详情直接渲染完整 JSON/content 导致页面卡顿和计时器停顿；工具详情改为结构化摘要，大字段只显示行数/字数和短预览，重复 rawArguments 不再拼接。
 - 2026-06-17 v2.9.140：修复展开较早对话后大段 Markdown 空白正文；离屏 Markdown 占位接近视口时同步渲染真实内容，并监听聊天滚动容器作为兜底。
+- 2026-06-18 v2.9.141：复核滚动卡顿 P0/P1/P2；滚动事件不再持续执行 anchor DOM 扫描，改为滚动停顿后捕获；ResizeObserver 改为 rAF 批处理并只观察内容容器；用户/引导气泡减少全局订阅，MessageBubble 增加内容级 memo 比较，避免新数组 props 击穿旧消息缓存。
+- 2026-06-18 v2.9.142：修复长会话从底部向上翻时进度条偶尔倒退；用户主动滚动期间暂停 ResizeObserver 锚点回补，滚动停顿后再捕获新锚点。
 
 ## 当前目标
 停止继续把旧 hidden runtime 作为主交互引擎修补，按新版官方 Kimi Code 文档与官方仓库迁移到 SDK / Wire 主链路。P0 探针已确认当前机器应接官方源码 `packages/node-sdk` 的 `KimiHarness` / `Session` API；P1 已新增主进程 `KimiCodeHost` 最小适配层和独立 `kimi-code:*` IPC；P2 已新增 SDK event -> Kimix timeline 独立 mapper；P3 已完成 renderer 灰度接入 `engine: "kimi-code"` 的第一版；P4 已完成队列/引导的 SDK 最小收敛；P5 已把审批 / 提问 / 权限 / Plan 的最小闭环接到 SDK。P6 已完成会话导出、插件状态 / 启停、模型配置读写、MCP / usage / background tasks runtime API 的 SDK 接入。用户已确认后续彻底不使用旧 runtime；P7 已删除正式 UI、可见入口、后端 IPC、类型兼容和依赖中的旧 runtime 链路，并通过 P7 专用 SDK 主链路连续验收。下一步进入最终构建 / diff / 重启后可做目标完成审计。
