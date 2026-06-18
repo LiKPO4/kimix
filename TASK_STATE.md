@@ -11,6 +11,7 @@
 - 已完成：v2.9.148 设置页新增“实验功能”模块，`experimentalKimiServer` / `experimentalKimiServerSessions` 写入 `~/.kimix/settings.json`；主进程启动时读取该设置，等效于原 `KIMIX_EXPERIMENTAL_KIMI_SERVER` / `KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS` 环境变量，保存后需重启生效。
 - 已完成：v2.9.149 修复 Server 路由开启后本地 Server 请求失败直接 `fetch failed`；Server create/resume/prompt 失败会标记 fallback 并继续走 SDK，避免实验开关打断正常对话。
 - 已完成：v2.9.150 修正 assistant “已处理 x 秒”计时口径，普通发送、空态发送和重试发送在真正调用 Kimi Code prompt 前刷新占位消息 timestamp，不再把会话恢复、Server 探测或 fallback 前置耗时算入模型处理时间。
+- 已完成：v2.9.151 优化普通发送前置握手：已有 runtime id 的会话直接发送，不再每条消息前 resume；Server REST 控制请求增加 5 秒超时，卡住时更快 fallback SDK。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。

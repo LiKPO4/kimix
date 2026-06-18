@@ -766,9 +766,19 @@ export function Composer() {
         Boolean(a && b) && a!.replace(/\\/g, "/").toLowerCase() === b!.replace(/\\/g, "/").toLowerCase();
 
       const ensureKimiCodeRuntime = async () => {
-        const knownSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
-        if (knownSessionId) {
-          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownSessionId });
+        const knownRuntimeSessionId = targetSession.runtimeSessionId;
+        if (knownRuntimeSessionId) {
+          // Fast path: a Kimix-created runtime id is already bound to this UI
+          // session. Do not re-resume it before every prompt; if it is stale,
+          // sendPrompt below will return a session/not-active error and we will
+          // rebuild the runtime once. This avoids a full preflight handshake on
+          // the hot path.
+          return knownRuntimeSessionId;
+        }
+
+        const knownOfficialSessionId = targetSession.officialSessionId;
+        if (knownOfficialSessionId) {
+          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownOfficialSessionId });
           // Only adopt the resumed runtime when it points at this project's
           // workDir. A stale binding to the plugin-management temp session would
           // otherwise make the assistant run against the wrong directory; drop it

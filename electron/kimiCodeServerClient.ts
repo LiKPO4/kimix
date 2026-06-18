@@ -698,8 +698,10 @@ export class KimiCodeServerClient {
   }
 
   private async request<T>(pathname: string, options?: RequestInit): Promise<T> {
+    const signal = options?.signal ?? AbortSignal.timeout(CONTROL_TIMEOUT_MS);
     const response = await fetch(`${this.endpoint}${pathname}`, {
       ...options,
+      signal,
       headers: { accept: "application/json", ...(options?.body ? { "content-type": "application/json" } : {}) },
     });
     if (!response.ok) throw new Error(`${pathname}: HTTP ${response.status}`);
