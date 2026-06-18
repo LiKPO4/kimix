@@ -118,5 +118,5 @@
 - 官方子会话：`POST /children` 创建成功，`GET /children` 可检索；已增加主进程与 preload API。
 - 任务管理：Server task list/get/cancel 已接入现有 Kimix 后台任务接口；真实启动 `bash` 后台任务、读取 running 状态并取消成功。
 - 终端管理：terminal list 真实读取通过，create/list/close 与 WS attach/detach/input/resize 已接入主进程与 preload API。
-- Windows 限制：本机 0.17.1 CLI 调用 terminal create 时返回 `Failed to load native module: conpty.node`，说明接口存在但当前安装包缺少可加载的 Windows ConPTY native 模块；Kimix 保留原始错误，不伪装为成功。
+- Windows 限制：本机 0.17.1 CLI 调用 terminal create 时返回 `Failed to load native module: conpty.node`，说明接口存在但当前安装包缺少可加载的 Windows ConPTY native 模块；Kimix 将该上游错误归一为可读中文提示并保留原始错误，不伪装为成功。
 - 断线重放：Kimix 客户端首轮 prompt 后主动断开，携带 cursor 重连，再完成第二轮；序号从 12 前进到 22，收到 2 个 `prompt.completed`。
