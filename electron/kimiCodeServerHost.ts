@@ -28,7 +28,7 @@ export type KimiCodeServerHostStatus = {
   enabled: boolean;
   state: "disabled" | "starting" | "attached" | "managed" | "fallback" | "stopped";
   endpoint: string;
-  routing: "sdk";
+  routing: "sdk" | "server";
   managed: boolean;
   capabilities?: KimiCodeServerCapabilities;
   error?: string;
@@ -90,6 +90,14 @@ export class KimiCodeServerHost {
 
   getStatus(): KimiCodeServerHostStatus {
     return { ...this.status, capabilities: this.status.capabilities ? { ...this.status.capabilities } : undefined };
+  }
+
+  isReady(): boolean {
+    return this.status.state === "attached" || this.status.state === "managed";
+  }
+
+  setRouting(routing: "sdk" | "server") {
+    this.status = { ...this.status, routing };
   }
 
   async start(): Promise<KimiCodeServerHostStatus> {

@@ -4,6 +4,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, readKimiCodeSessionMetadata } from "./sessionHistory";
+import { kimiCodeServerHost } from "./kimiCodeServerHost";
+import {
+  flattenServerEvent,
+  isKimiCodeServerSessionRoutingEnabled,
+  KimiCodeServerClient,
+  type ServerFrame,
+  type ServerSession,
+} from "./kimiCodeServerClient";
 
 type JsonObject = Record<string, unknown>;
 
@@ -401,6 +409,16 @@ type ManagedSession = {
   btwRuns: Map<string, BtwRun>;
 };
 
+type ServerManagedSession = {
+  session: ServerSession;
+  workDir: string;
+  status: KimiCodeEngineStatus;
+  model?: string;
+  thinking: string;
+  permission: KimiCodePermissionMode;
+  planMode: boolean;
+};
+
 type BtwRun = {
   agentId: string;
   parts: string[];
@@ -425,6 +443,12 @@ type StatusSink = (payload: KimiCodeStatusPayload) => void;
 
 let harness: KimiHarnessLike | null = null;
 const sessions = new Map<string, ManagedSession>();
+const serverSessions = new Map<string, ServerManagedSession>();
+const serverApprovalIds = new Set<string>();
+const serverQuestionIds = new Set<string>();
+const serverQuestionRequests = new Map<string, Record<string, unknown>>();
+let serverClient: KimiCodeServerClient | null = null;
+let unsubscribeServerFrames: (() => void) | null = null;
 const pendingApprovals = new Map<string, PendingApproval>();
 const pendingQuestions = new Map<string, PendingQuestion>();
 let eventSink: EventSink | null = null;
@@ -445,12 +469,25 @@ export function setKimiCodeStatusSink(sink: StatusSink | null) {
 }
 
 export async function createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
+  if (shouldRouteNewSessionToServer()) {
+    const client = getServerClient();
+    const session = await client.createSession(options);
+    return registerServerSession(session, options.workDir, options);
+  }
   const sdkHarness = await getHarness();
   const session = await sdkHarness.createSession(options);
   return registerSession(session, "idle", options.permission ?? "manual");
 }
 
 export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSession> {
+  const existingServer = serverSessions.get(sessionId);
+  if (existingServer) return toServerEngineSession(existingServer);
+  if (shouldRouteNewSessionToServer()) {
+    const client = getServerClient();
+    const session = await client.getSession(sessionId);
+    const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : process.cwd();
+    return registerServerSession(session, workDir, {});
+  }
   const existing = sessions.get(sessionId);
   if (existing) return toEngineSession(existing.session, existing.status);
 
@@ -508,6 +545,12 @@ export async function reloadSession(sessionId: string): Promise<void> {
 }
 
 export async function setModel(sessionId: string, model: string): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await getServerClient().updateSession(sessionId, { model });
+    serverManaged.model = model;
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.setModel) throw new Error("当前 Kimi Code SDK 不支持会话模型切换。");
   await managed.session.setModel(model);
@@ -537,6 +580,17 @@ export async function reloadIdleSessions(): Promise<{ reloaded: string[]; skippe
 }
 
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    setStatus(sessionId, "running");
+    try {
+      await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
+    } catch (error) {
+      setStatus(sessionId, "error");
+      throw error;
+    }
+    return;
+  }
   const managed = getManagedSession(sessionId);
   setStatus(sessionId, "running");
   try {
@@ -599,6 +653,12 @@ export async function askBtw(
 }
 
 export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await getServerClient().steer(sessionId, input, serverControls(serverManaged));
+    eventSink?.({ sessionId, event: syntheticSteerRecord(input, Date.now()) });
+    return;
+  }
   const managed = getManagedSession(sessionId);
   const startedAt = Date.now();
   await managed.session.steer(input);
@@ -618,23 +678,46 @@ export async function undoHistory(sessionId: string, count: number): Promise<voi
 }
 
 export async function cancel(sessionId: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    await getServerClient().abort(sessionId);
+    setStatus(sessionId, "interrupted");
+    return;
+  }
   const managed = getManagedSession(sessionId);
   settlePendingForSession(sessionId, "cancelled");
   await managed.session.cancel();
 }
 
 export async function setPlanMode(sessionId: string, enabled: boolean): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await getServerClient().updateSession(sessionId, { plan_mode: enabled });
+    serverManaged.planMode = enabled;
+    return;
+  }
   const managed = getManagedSession(sessionId);
   await managed.session.setPlanMode(enabled);
 }
 
 export async function setThinking(sessionId: string, level: string): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await getServerClient().updateSession(sessionId, { thinking: level });
+    serverManaged.thinking = level;
+    return;
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.setThinking) throw new Error("Official Kimi Code SDK does not expose setThinking on this session");
   await managed.session.setThinking(level);
 }
 
 export async function setPermission(sessionId: string, mode: KimiCodePermissionMode): Promise<void> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await getServerClient().updateSession(sessionId, { permission_mode: mode });
+    serverManaged.permission = mode;
+    return;
+  }
   const managed = getManagedSession(sessionId);
   await managed.session.setPermission(mode);
   managed.permission = mode;
@@ -681,11 +764,29 @@ export async function cancelGoal(sessionId: string, reason?: string): Promise<Ki
 }
 
 export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatus> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    const session = await getServerClient().getSession(sessionId);
+    serverManaged.session = session;
+    return {
+      model: serverManaged.model,
+      thinkingLevel: serverManaged.thinking,
+      permission: serverManaged.permission,
+      planMode: serverManaged.planMode,
+      usage: session.usage,
+    };
+  }
   const managed = getManagedSession(sessionId);
   return managed.session.getStatus();
 }
 
 export async function getUsage(sessionId: string): Promise<KimiCodeSessionUsage> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    const session = await getServerClient().getSession(sessionId);
+    serverManaged.session = session;
+    return session.usage ?? {};
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.getUsage) throw new Error("Official Kimi Code SDK does not expose getUsage on this session");
   return managed.session.getUsage();
@@ -941,6 +1042,18 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
 }
 
 export async function closeSession(sessionId: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    serverSessions.delete(sessionId);
+    await getServerClient().unsubscribe(sessionId);
+    if (serverSessions.size === 0) {
+      unsubscribeServerFrames?.();
+      unsubscribeServerFrames = null;
+      await serverClient?.close();
+      serverClient = null;
+      kimiCodeServerHost.setRouting("sdk");
+    }
+    return;
+  }
   const managed = sessions.get(sessionId);
   if (!managed) return;
   sessions.delete(sessionId);
@@ -950,7 +1063,7 @@ export async function closeSession(sessionId: string): Promise<void> {
 }
 
 export async function closeAllSessions(): Promise<void> {
-  await Promise.all([...sessions.keys()].map((sessionId) => closeSession(sessionId).catch(() => {})));
+  await Promise.all([...sessions.keys(), ...serverSessions.keys()].map((sessionId) => closeSession(sessionId).catch(() => {})));
   if (harness) {
     await harness.close();
     harness = null;
@@ -1035,11 +1148,11 @@ export async function runOneShotPrompt(options: {
 }
 
 export function getSessionWorkDir(sessionId: string): string | undefined {
-  return sessions.get(sessionId)?.session.workDir;
+  return sessions.get(sessionId)?.session.workDir ?? serverSessions.get(sessionId)?.workDir;
 }
 
 export function getActiveSessionIds(): string[] {
-  return [...sessions.keys()];
+  return [...sessions.keys(), ...serverSessions.keys()];
 }
 
 export function respondApproval(
@@ -1049,6 +1162,16 @@ export function respondApproval(
   scope?: "once" | "session",
   feedback?: string,
 ): void {
+  const serverKey = pendingKey(sessionId, requestId);
+  if (serverApprovalIds.delete(serverKey)) {
+    setStatus(sessionId, "running");
+    void getServerClient().resolveApproval(sessionId, requestId, {
+      decision: approved ? "approved" : "rejected",
+      scope: approved && scope === "session" ? "session" : undefined,
+      feedback,
+    }).catch((error) => emitServerError(sessionId, error));
+    return;
+  }
   const key = pendingKey(sessionId, requestId);
   const pending = pendingApprovals.get(key);
   if (!pending) throw new Error(`Kimi Code approval request is not pending: ${requestId}`);
@@ -1068,6 +1191,18 @@ export function respondQuestion(
   answers: Record<string, string | true>,
   skipped?: boolean,
 ): void {
+  const serverKey = pendingKey(sessionId, requestId);
+  if (serverQuestionIds.delete(serverKey)) {
+    setStatus(sessionId, "running");
+    const request = serverQuestionRequests.get(serverKey);
+    serverQuestionRequests.delete(serverKey);
+    void getServerClient().resolveQuestion(sessionId, requestId, {
+      answers: toServerQuestionAnswers(answers, request, skipped),
+      method: "click",
+    })
+      .catch((error) => emitServerError(sessionId, error));
+    return;
+  }
   const key = pendingKey(sessionId, requestId);
   const pending = pendingQuestions.get(key);
   if (!pending) throw new Error(`Kimi Code question request is not pending: ${requestId}`);
@@ -1095,6 +1230,125 @@ function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEn
   sessions.set(session.id, managed);
   emitStatus(session.id, initialStatus);
   return toEngineSession(session, initialStatus);
+}
+
+async function registerServerSession(
+  session: ServerSession,
+  workDir: string,
+  options: Partial<CreateKimiCodeSessionOptions>,
+): Promise<KimiCodeEngineSession> {
+  const config = session.agent_config ?? {};
+  const managed: ServerManagedSession = {
+    session,
+    workDir,
+    status: mapServerStatus(session.status),
+    model: typeof config.model === "string" ? config.model : options.model,
+    thinking: typeof config.thinking === "string" ? config.thinking : options.thinking ?? "off",
+    permission: config.permission_mode === "auto" || config.permission_mode === "yolo"
+      ? config.permission_mode
+      : options.permission ?? "manual",
+    planMode: typeof config.plan_mode === "boolean" ? config.plan_mode : options.planMode ?? false,
+  };
+  serverSessions.set(session.id, managed);
+  await getServerClient().subscribe(session.id);
+  kimiCodeServerHost.setRouting("server");
+  emitStatus(session.id, managed.status);
+  return toServerEngineSession(managed);
+}
+
+function shouldRouteNewSessionToServer() {
+  return isKimiCodeServerSessionRoutingEnabled() && kimiCodeServerHost.isReady();
+}
+
+function getServerClient() {
+  if (serverClient) return serverClient;
+  if (!kimiCodeServerHost.isReady()) throw new Error("Kimi Server 尚未就绪，已保留 SDK 路径。");
+  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint);
+  unsubscribeServerFrames = serverClient.onFrame(handleServerFrame);
+  return serverClient;
+}
+
+function handleServerFrame(frame: ServerFrame) {
+  const sessionId = frame.session_id;
+  if (!sessionId || !serverSessions.has(sessionId)) return;
+  const payload = frame.payload && typeof frame.payload === "object"
+    ? frame.payload as Record<string, unknown>
+    : {};
+  if (frame.type === "event.approval.requested") {
+    const requestId = typeof payload.approval_id === "string" ? payload.approval_id : undefined;
+    if (!requestId) return;
+    serverApprovalIds.add(pendingKey(sessionId, requestId));
+    setStatus(sessionId, "waiting_approval");
+    eventSink?.({ sessionId, event: { type: "kimix.approval.request", requestId, request: payload } });
+    return;
+  }
+  if (frame.type === "event.question.requested") {
+    const requestId = typeof payload.question_id === "string" ? payload.question_id : undefined;
+    if (!requestId) return;
+    serverQuestionIds.add(pendingKey(sessionId, requestId));
+    serverQuestionRequests.set(pendingKey(sessionId, requestId), payload);
+    setStatus(sessionId, "waiting_question");
+    eventSink?.({ sessionId, event: { type: "kimix.question.request", requestId, request: payload } });
+    return;
+  }
+  const event = flattenServerEvent(frame);
+  eventSink?.({ sessionId, event });
+  updateStatusFromEvent(sessionId, event);
+  if (frame.type === "prompt.completed" && serverSessions.get(sessionId)?.status === "running") {
+    setStatus(sessionId, "completed");
+  }
+}
+
+function emitServerError(sessionId: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  setStatus(sessionId, "error");
+  eventSink?.({ sessionId, event: { type: "error", message } });
+}
+
+function serverControls(managed: ServerManagedSession): Record<string, unknown> {
+  return {
+    model: managed.model ?? "kimi-code/kimi-for-coding",
+    thinking: managed.thinking,
+    permission_mode: managed.permission,
+    plan_mode: managed.planMode,
+  };
+}
+
+function toServerQuestionAnswers(
+  answers: Record<string, string | true>,
+  request: Record<string, unknown> | undefined,
+  skipped?: boolean,
+): Record<string, unknown> {
+  const questions = Array.isArray(request?.questions) ? request.questions : [];
+  return Object.fromEntries(questions.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const question = raw as { id?: unknown; options?: unknown };
+    if (typeof question.id !== "string") return [];
+    if (skipped) return [[question.id, { kind: "skipped" }]];
+    const value = answers[question.id];
+    const options = Array.isArray(question.options) ? question.options : [];
+    const option = options.find((rawOption) => {
+      if (!rawOption || typeof rawOption !== "object") return false;
+      const item = rawOption as { id?: unknown; label?: unknown };
+      return item.id === value || item.label === value;
+    }) as { id?: unknown } | undefined;
+    if (typeof option?.id === "string") return [[question.id, { kind: "single", option_id: option.id }]];
+    if (typeof value === "string") return [[question.id, { kind: "other", text: value }]];
+    const first = options[0] as { id?: unknown } | undefined;
+    return typeof first?.id === "string" ? [[question.id, { kind: "single", option_id: first.id }]] : [];
+  }));
+}
+
+function mapServerStatus(status: string): KimiCodeEngineStatus {
+  if (status === "running") return "running";
+  if (status === "awaiting_approval") return "waiting_approval";
+  if (status === "awaiting_question") return "waiting_question";
+  if (status === "aborted") return "interrupted";
+  return "idle";
+}
+
+function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSession {
+  return { sessionId: managed.session.id, workDir: managed.workDir, status: managed.status };
 }
 
 function waitForBtwRun(run: BtwRun, timeoutMs: number): Promise<void> {
@@ -1346,6 +1600,13 @@ function updateStatusFromEvent(sessionId: string, event: unknown) {
 }
 
 function setStatus(sessionId: string, status: KimiCodeEngineStatus) {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    if (serverManaged.status === status) return;
+    serverManaged.status = status;
+    emitStatus(sessionId, status);
+    return;
+  }
   const managed = sessions.get(sessionId);
   if (!managed || managed.status === status) return;
   managed.status = status;
