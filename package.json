@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.9.151",
+  "version": "2.9.152",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {

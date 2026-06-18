@@ -73,6 +73,8 @@ const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后�
 - 关键文件/命令
 - 下一步最小行动`;
 const HANDOFF_TIMEOUT_MS = 180_000;
+const KIMI_RUNTIME_PREWARM_DELAY_MS = 350;
+const KIMI_RUNTIME_PREWARM_RETRY_COOLDOWN_MS = 30_000;
 let rendererWindowFocusedHint = typeof document !== "undefined" ? document.hasFocus() : false;
 
 interface HandoffJob {
@@ -1012,6 +1014,7 @@ function App() {
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
+  const runningSessionId = useAppStore((s) => s.runningSessionId);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -1030,6 +1033,8 @@ function App() {
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
+  const runtimePrewarmInFlightRef = useRef<Set<string>>(new Set());
+  const runtimePrewarmRetryAfterRef = useRef<Map<string, number>>(new Map());
 
   useRendererLagDetector();
   useSettingsSync();
@@ -1075,6 +1080,72 @@ function App() {
       useAppStore.getState().setCurrentSession(latest);
     }
   };
+
+  useEffect(() => {
+    const session = currentSession;
+    if (!session || session.engine !== "kimi-code") return;
+    if (!session.projectPath || session.archivedAt || session.longTask) return;
+    if (session.runtimeSessionId) return;
+    if (session.events.length > 0) return;
+    if (runningSessionId === session.id || Boolean(runningSessionId && runningSessionId === session.officialSessionId)) return;
+
+    const retryAfter = runtimePrewarmRetryAfterRef.current.get(session.id) ?? 0;
+    if (runtimePrewarmInFlightRef.current.has(session.id) || retryAfter > Date.now()) return;
+
+    const timer = window.setTimeout(async () => {
+      const latest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+      if (!latest || latest.archivedAt || latest.longTask || latest.runtimeSessionId || latest.events.length > 0) return;
+      const active = useAppStore.getState().currentSession;
+      if (active?.id !== latest.id) return;
+      const activeRunningSessionId = useAppStore.getState().runningSessionId;
+      if (activeRunningSessionId === latest.id || Boolean(activeRunningSessionId && activeRunningSessionId === latest.officialSessionId)) return;
+
+      runtimePrewarmInFlightRef.current.add(latest.id);
+      try {
+        let prewarmRes: Awaited<ReturnType<typeof window.api.createKimiCodeSession>> | null = null;
+        if (latest.officialSessionId) {
+          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: latest.officialSessionId });
+          if (resumeRes.success && (!latest.projectPath || isSameLocalProjectPath(resumeRes.data.workDir, latest.projectPath))) {
+            prewarmRes = resumeRes;
+          }
+        }
+        if (!prewarmRes) {
+          prewarmRes = await window.api.createKimiCodeSession({
+            workDir: latest.projectPath,
+            permission: useAppStore.getState().permissionMode,
+            planMode: useAppStore.getState().defaultPlanMode,
+          });
+        }
+        if (!prewarmRes.success) throw new Error(prewarmRes.error);
+
+        const runtimeSessionId = prewarmRes.data.sessionId;
+        useSessionStore.getState().updateSession(latest.id, (item) => {
+          if (item.runtimeSessionId || item.events.length > 0) return item;
+          return {
+            ...item,
+            engine: "kimi-code",
+            runtimeSessionId,
+            officialSessionId: runtimeSessionId,
+            updatedAt: Date.now(),
+          };
+        });
+        syncCurrentSessionFromStore(latest.id);
+        runtimePrewarmRetryAfterRef.current.delete(latest.id);
+
+        const latestPermission = useAppStore.getState().permissionMode;
+        const latestPlanMode = useAppStore.getState().defaultPlanMode;
+        void window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode: latestPermission }).catch(() => {});
+        void window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: latestPlanMode }).catch(() => {});
+      } catch (err) {
+        runtimePrewarmRetryAfterRef.current.set(latest.id, Date.now() + KIMI_RUNTIME_PREWARM_RETRY_COOLDOWN_MS);
+        console.warn("Kimi Code runtime prewarm failed:", err);
+      } finally {
+        runtimePrewarmInFlightRef.current.delete(latest.id);
+      }
+    }, KIMI_RUNTIME_PREWARM_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [currentSession, runningSessionId]);
 
   const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
