@@ -14,6 +14,7 @@
 - 已完成：v2.9.151 优化普通发送前置握手：已有 runtime id 的会话直接发送，不再每条消息前 resume；Server REST 控制请求增加 5 秒超时，卡住时更快 fallback SDK。
 - 已完成：v2.9.152 针对“首条消息仍约 32 秒、第二条不到 1 秒”的实测差异，把空白 Kimi Code 会话 runtime 创建前移到用户输入前后台预热；预热失败不弹错误，发送时仍走原兜底创建链路。
 - 已完成：修复 `start-kimix.bat` 构建后不拉起窗口的问题；`restart-kimix-dev.ps1` 不再把 `pnpm dev` 放到隐藏 cmd 后台，而是在当前 bat 窗口前台运行，避免后台进程快速退出时只显示“dev process exited”。
+- 已完成：v2.9.153 修复老会话恢复旧 runtime 时 Server `/profile Session was not found` 直接报红错；启动恢复遇到旧 ID 不存在会创建同项目 fresh runtime，当前空闲历史会话也会后台验证/预热 runtime，让老非 Server 会话发送前先脱离失效 ID。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。

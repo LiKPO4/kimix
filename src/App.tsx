@@ -1035,6 +1035,7 @@ function App() {
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
   const runtimePrewarmInFlightRef = useRef<Set<string>>(new Set());
   const runtimePrewarmRetryAfterRef = useRef<Map<string, number>>(new Map());
+  const runtimePrewarmLastOkRef = useRef<Map<string, string>>(new Map());
 
   useRendererLagDetector();
   useSettingsSync();
@@ -1085,16 +1086,22 @@ function App() {
     const session = currentSession;
     if (!session || session.engine !== "kimi-code") return;
     if (!session.projectPath || session.archivedAt || session.longTask) return;
-    if (session.runtimeSessionId) return;
-    if (session.events.length > 0) return;
     if (runningSessionId === session.id || Boolean(runningSessionId && runningSessionId === session.officialSessionId)) return;
+    if (session.events.some((event) => event.type === "assistant_message" && !event.isComplete)) return;
 
     const retryAfter = runtimePrewarmRetryAfterRef.current.get(session.id) ?? 0;
     if (runtimePrewarmInFlightRef.current.has(session.id) || retryAfter > Date.now()) return;
+    const runtimeCandidate = session.runtimeSessionId ?? session.officialSessionId ?? null;
+    const lastOkKey = runtimeCandidate ? `${runtimeCandidate}:${permissionMode}:${defaultPlanMode}` : "";
+    if (lastOkKey) {
+      const lastOk = runtimePrewarmLastOkRef.current.get(session.id);
+      if (lastOk === lastOkKey) return;
+    }
 
     const timer = window.setTimeout(async () => {
       const latest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-      if (!latest || latest.archivedAt || latest.longTask || latest.runtimeSessionId || latest.events.length > 0) return;
+      if (!latest || latest.archivedAt || latest.longTask) return;
+      if (latest.events.some((event) => event.type === "assistant_message" && !event.isComplete)) return;
       const active = useAppStore.getState().currentSession;
       if (active?.id !== latest.id) return;
       const activeRunningSessionId = useAppStore.getState().runningSessionId;
@@ -1103,8 +1110,9 @@ function App() {
       runtimePrewarmInFlightRef.current.add(latest.id);
       try {
         let prewarmRes: Awaited<ReturnType<typeof window.api.createKimiCodeSession>> | null = null;
-        if (latest.officialSessionId) {
-          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: latest.officialSessionId });
+        const existingRuntimeId = latest.runtimeSessionId ?? latest.officialSessionId;
+        if (existingRuntimeId) {
+          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: existingRuntimeId });
           if (resumeRes.success && (!latest.projectPath || isSameLocalProjectPath(resumeRes.data.workDir, latest.projectPath))) {
             prewarmRes = resumeRes;
           }
@@ -1120,17 +1128,18 @@ function App() {
 
         const runtimeSessionId = prewarmRes.data.sessionId;
         useSessionStore.getState().updateSession(latest.id, (item) => {
-          if (item.runtimeSessionId || item.events.length > 0) return item;
+          if (item.events.some((event) => event.type === "assistant_message" && !event.isComplete)) return item;
           return {
             ...item,
             engine: "kimi-code",
             runtimeSessionId,
-            officialSessionId: runtimeSessionId,
+            officialSessionId: item.officialSessionId ?? runtimeSessionId,
             updatedAt: Date.now(),
           };
         });
         syncCurrentSessionFromStore(latest.id);
         runtimePrewarmRetryAfterRef.current.delete(latest.id);
+        runtimePrewarmLastOkRef.current.set(latest.id, `${runtimeSessionId}:${useAppStore.getState().permissionMode}:${useAppStore.getState().defaultPlanMode}`);
 
         const latestPermission = useAppStore.getState().permissionMode;
         const latestPlanMode = useAppStore.getState().defaultPlanMode;
@@ -1145,7 +1154,7 @@ function App() {
     }, KIMI_RUNTIME_PREWARM_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [currentSession, runningSessionId]);
+  }, [currentSession, runningSessionId, permissionMode, defaultPlanMode]);
 
   const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);

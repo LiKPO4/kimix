@@ -5903,11 +5903,20 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
     });
     let engineSession;
     if (request.sessionId) {
-      const resumed = await kimiCodeHost.resumeSession(request.sessionId);
+      let resumed = null;
+      try {
+        resumed = await kimiCodeHost.resumeSession(request.sessionId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!/session not found|was not found|unknown session|会话不存在|session.*missing/i.test(message)) {
+          throw err;
+        }
+        console.warn(`[Kimi Code] resume ${request.sessionId} failed; creating a fresh runtime for ${request.workDir}:`, err);
+      }
       // Guard against resuming a session whose real workDir does not match the
       // requested project (e.g. the plugin-management temp session). Adopting it
       // would bind the chat to the wrong directory. Fall back to a fresh session.
-      if (request.workDir && !sameWorkDir(resumed.workDir, request.workDir)) {
+      if (!resumed || (request.workDir && !sameWorkDir(resumed.workDir, request.workDir))) {
         engineSession = await createFresh();
       } else {
         engineSession = resumed;
