@@ -1,6 +1,7 @@
 # Kimix 长程任务状态
 
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
+- 当前修复：v2.10.1 针对 v2.10.0 启动恢复旧官方 Server runtime 时 `/profile Session was not found` 仍冒红错的问题，补齐 resume 后同步 profile 阶段的 session missing 兜底；单个旧 session 丢失不再标记 Server 整体 fallback，自动创建同项目 fresh runtime 并保留 Kimix 本地历史。
 - 发布收口：v2.10.0 汇总 v2.9.97 之后 48 个能力与稳定性提交；全量测试、生产构建和真实 Kimi Code 0.17.1 Server 主探针通过，准备由 tag 触发 GitHub Actions 多平台发布。
 - 当前目标：停止重复加固探针，按官方 0.17.1 Server 协议逐项补齐 Kimix 的实际能力缺口。
 - 能力收口 TodoList（按顺序推进）：

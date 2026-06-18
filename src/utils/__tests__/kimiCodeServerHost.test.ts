@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { inspectKimiCodeServerContract, isKimiCodeServerExperimentEnabled, KimiCodeServerHost } from "../../../electron/kimiCodeServerHost";
+import {
+  inspectKimiCodeServerContract,
+  isKimiCodeServerExperimentEnabled,
+  KimiCodeServerHost,
+} from "../../../electron/kimiCodeServerHost";
+import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
 
 describe("kimiCodeServerHost", () => {
   it("defaults to server host with explicit opt-out", () => {
@@ -44,5 +49,11 @@ describe("kimiCodeServerHost", () => {
       managed: false,
       error: "fetch failed",
     });
+  });
+
+  it("recognizes missing session errors without treating them as server runtime failures", () => {
+    expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a/profile: Session \"session_a\" was not found"))).toBe(true);
+    expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a: HTTP 404"))).toBe(true);
+    expect(isKimiCodeSessionMissingError(new Error("fetch failed"))).toBe(false);
   });
 });

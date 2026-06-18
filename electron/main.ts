@@ -5901,14 +5901,19 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
       permission,
       planMode: !!request.planMode,
     });
+    const applyResumeProfile = async (sessionId: string) => {
+      if (selectedModelAlias) await kimiCodeHost.setModel(sessionId, selectedModelAlias);
+      // Keep the resumed session's permission in sync with the requested mode.
+      await kimiCodeHost.setPermission(sessionId, permission).catch(() => {});
+      if (thinking) await kimiCodeHost.setThinking(sessionId, thinking).catch(() => {});
+    };
     let engineSession;
     if (request.sessionId) {
       let resumed = null;
       try {
         resumed = await kimiCodeHost.resumeSession(request.sessionId);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!/session not found|was not found|unknown session|会话不存在|session.*missing/i.test(message)) {
+        if (!kimiCodeHost.isKimiCodeSessionMissingError(err)) {
           throw err;
         }
         console.warn(`[Kimi Code] resume ${request.sessionId} failed; creating a fresh runtime for ${request.workDir}:`, err);
@@ -5920,10 +5925,13 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
         engineSession = await createFresh();
       } else {
         engineSession = resumed;
-        if (selectedModelAlias) await kimiCodeHost.setModel(resumed.sessionId, selectedModelAlias);
-        // Keep the resumed session's permission in sync with the requested mode.
-        await kimiCodeHost.setPermission(resumed.sessionId, permission).catch(() => {});
-        if (thinking) await kimiCodeHost.setThinking(resumed.sessionId, thinking).catch(() => {});
+        try {
+          await applyResumeProfile(resumed.sessionId);
+        } catch (err) {
+          if (!kimiCodeHost.isKimiCodeSessionMissingError(err)) throw err;
+          console.warn(`[Kimi Code] resumed session ${resumed.sessionId} vanished while applying profile; creating a fresh runtime for ${request.workDir}:`, err);
+          engineSession = await createFresh();
+        }
       }
     } else {
       engineSession = await createFresh();

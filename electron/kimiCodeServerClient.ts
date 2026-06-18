@@ -167,6 +167,11 @@ export function isKimiCodeServerSessionRoutingEnabled(
   return settings?.experimentalKimiServerSessions !== false;
 }
 
+export function isKimiCodeSessionMissingError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:HTTP\s+404|session not found|was not found|unknown session|会话不存在|session.*missing)/i.test(message);
+}
+
 export function toServerPromptContent(input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>): ServerPromptPart[] {
   if (typeof input === "string") return [{ type: "text", text: input }];
   return input.map((part) => part.type === "text"
