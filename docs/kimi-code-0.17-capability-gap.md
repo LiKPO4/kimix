@@ -32,7 +32,7 @@
 
 ## B. 后端已有基础，产品入口仍不完整
 
-- background tasks：主进程和现有长程任务侧栏已有桥接，但 Server task 的实时输出、失败恢复提示仍可加强。
+- background tasks：主进程和长程任务侧栏已桥接；展示 Server/SDK 来源与 Server 输出尾部，运行态 2 秒刷新，刷新失败保留上次成功快照。
 - terminal：接口已接；Windows 0.17.1 缺少可加载的 `conpty.node`，当前无法完成真实创建。
 - Server session routing：新安装默认开启；设置页可显式关闭，环境变量设为 `0` 可强制关闭，能力探测或请求失败自动回退 SDK。
 
@@ -53,7 +53,6 @@
 
 ## 推荐推进顺序
 
-1. 补强 Server background task 实时输出与失败恢复提示。
-2. 为 messages / prompts 查询增加诊断入口。
-3. 评估模型目录对现有模型设置的只读增强。
-4. files/workspace 等低边际能力暂不推进。
+1. 为 messages / prompts 查询增加诊断入口。
+2. 评估模型目录对现有模型设置的只读增强。
+3. files/workspace 等低边际能力暂不推进。

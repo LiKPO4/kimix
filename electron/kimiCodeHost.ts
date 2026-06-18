@@ -1143,6 +1143,8 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
       endedAt: task.completed_at ? Date.parse(task.completed_at) : null,
       subagentType: task.kind,
       outputBytes: task.output_bytes,
+      outputPreview: task.output_preview,
+      transport: "server" as const,
       stopReason: task.status === "cancelled" ? "任务已被官方 Server 标记为取消。" : undefined,
       failureReason: task.status === "failed" && task.output_bytes ? `任务失败，已有约 ${formatBytes(task.output_bytes)} 输出可查看。` : undefined,
     }));
@@ -1150,7 +1152,10 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.listBackgroundTasks) throw new Error("Official Kimi Code SDK does not expose listBackgroundTasks on this session");
-  return [...await managed.session.listBackgroundTasks(options)];
+  return [...await managed.session.listBackgroundTasks(options)].map((task) => ({
+    ...task,
+    transport: "sdk" as const,
+  }));
 }
 
 export async function getBackgroundTaskOutput(sessionId: string, taskId: string, options: { tail?: number } = {}): Promise<string> {

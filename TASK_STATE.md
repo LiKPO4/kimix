@@ -6,7 +6,7 @@
   - [x] 已转 Server：会话创建/恢复、prompt/steer/abort、WebSocket 恢复、审批/提问、compact/undo、BTW、归档同步、usage、Skill、MCP、会话树、tool/connections 诊断。
   - [x] 半接入 UI 1：发送状态显示每次 prompt 的真实路由（Server / SDK / Server 失败后 SDK fallback）。
   - [x] 半接入 UI 2：Server 路由对新安装默认开启；保留设置显式关闭、capability gate 和失败自动 SDK fallback 三层回滚边界。
-  - [ ] 半接入 UI 3：补强 Server background task 实时输出与失败恢复提示。
+  - [x] 半接入 UI 3：Server background task 显示来源与最新输出尾部；运行态 2 秒刷新，刷新失败保留上次成功结果并提示重试。
   - [ ] 半接入 UI 4：为 messages / prompts 查询增加诊断入口，避免扩张为第二套聊天历史。
   - [ ] 只读已接：评估模型目录对现有模型设置的低风险增强；auth/config/provider 保持只读。
   - [ ] 暂不做：OAuth Server 写登录、Windows terminal 实机、unarchive、文件系统 REST、强制迁移全部旧 SDK 会话。
@@ -26,10 +26,11 @@
 - 已完成：v2.9.154 给普通发送和空态建议发送增加链路状态提示，显示“准备链路 / 恢复旧 runtime / 创建 runtime / runtime 失效重建 / 已提交给 Kimi Code”等阶段，避免长时间只显示“思考中”。
 - 已完成：v2.9.155 主进程返回每次 prompt 的真实发送路由；普通发送和空态建议发送会明确显示 Kimi Server、Kimi SDK 或 Server 失败后自动降级 SDK。
 - 已完成：v2.9.156 将 Server host/session routing 改为新安装默认开启；已有显式关闭配置继续保持 SDK，环境变量 `0` 也可强制关闭，设置页从“实验功能”改为明确的 Server 路由与回滚说明。
+- 已完成：v2.9.157 补强后台任务 UI：区分 Server/SDK 来源，映射 Server `output_preview`，运行态每 2 秒刷新；瞬时刷新失败不清空任务，保留上次结果并展示失败提示。
 - 已验证：真实 0.17.1 返回认证 ready、1 个 connected OAuth Provider、1 个 262144 context 模型；Server OAuth login 启动超过 10 秒无响应，暂不替换现有 SDK 登录。
 - 阻塞：Windows 0.17.1 terminal 仍缺少可加载的 `conpty.node`，按用户要求暂缓。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`docs/kimi-code-0.17-capability-gap.md`。
-- 下一步：补强 Server background task 实时输出与失败恢复提示。
+- 下一步：为 Server messages / prompts 查询增加只读诊断入口。
 
 ## 2026-06-14 v2.9.87 显式会话快照迁移
 - 当前目标：放弃 dev 版 / 安装版自动共享会话状态，改为用户手动导出全部快照、另一端去重合并导入。

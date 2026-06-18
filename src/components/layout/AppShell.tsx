@@ -44,6 +44,10 @@ import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 
+function isBackgroundTaskTerminalStatus(status: string) {
+  return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
+}
+
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 440;
 const RIGHT_PANEL_MIN_WIDTH = 280;
@@ -1329,7 +1333,6 @@ ${isFinalStep
     })).then((groups) => {
       setLongTaskBackgroundTasks(groups.flat().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)));
     }).catch((err: unknown) => {
-      setLongTaskBackgroundTasks([]);
       setLongTaskBackgroundTasksError(err instanceof Error ? err.message : String(err));
     }).finally(() => {
       if (!options?.silent) setLongTaskBackgroundTasksLoading(false);
@@ -1444,9 +1447,10 @@ ${isFinalStep
 
   useEffect(() => {
     if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) return;
-    const timer = window.setInterval(() => refreshLongTaskBackgroundTasks({ silent: true }), 5000);
+    const hasRunningTask = longTaskBackgroundTasks.some((task) => !isBackgroundTaskTerminalStatus(task.status));
+    const timer = window.setInterval(() => refreshLongTaskBackgroundTasks({ silent: true }), hasRunningTask ? 2000 : 5000);
     return () => window.clearInterval(timer);
-  }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, refreshLongTaskBackgroundTasks]);
+  }, [longTaskBackgroundTasks, longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, refreshLongTaskBackgroundTasks]);
 
   useEffect(() => {
     if (!liveCurrentSession?.longTask) {

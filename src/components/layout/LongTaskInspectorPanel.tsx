@@ -1170,7 +1170,7 @@ export function LongTaskInspectorPanel({
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium leading-5 text-text-muted">SDK 后台任务</div>
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">Kimi 后台任务</div>
                   <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
                     {backgroundTasks.length > 0 ? `${backgroundTasks.length} 个任务` : "当前没有后台任务"}
                   </div>
@@ -1185,16 +1185,17 @@ export function LongTaskInspectorPanel({
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
                     刷新
                   </button>
-                  {rightCardDragHandle("background", "SDK 后台任务")}
+                  {rightCardDragHandle("background", "Kimi 后台任务")}
                 </div>
               </div>
               {backgroundTasksError ? (
                 <div className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
-                  读取失败：{backgroundTasksError}
+                  刷新失败：{backgroundTasksError}{backgroundTasks.length > 0 ? "（已保留上次结果）" : ""}
                 </div>
-              ) : backgroundTasksLoading && backgroundTasks.length === 0 ? (
+              ) : null}
+              {backgroundTasksLoading && backgroundTasks.length === 0 ? (
                 <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
-                  正在读取 SDK 后台任务...
+                  正在读取 Kimi 后台任务...
                 </div>
               ) : backgroundTasks.length > 0 ? (
                 <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
@@ -1224,7 +1225,7 @@ export function LongTaskInspectorPanel({
                               </span>
                             </div>
                             <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 5 }}>
-                              {roleLabel} agent · {task.taskId}
+                              {roleLabel} agent · {task.transport === "server" ? "Server" : "SDK"} · {task.taskId}
                             </div>
                           </div>
                           <span className={`shrink-0 rounded-lg text-[12px] leading-5 ${isDanger ? "bg-white/60 text-accent-danger" : isSuccess ? "bg-white/60 text-accent-success" : isWarning ? "bg-white/60 text-accent-warning" : "bg-accent-primary-light text-accent-primary"}`} style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
@@ -1234,6 +1235,11 @@ export function LongTaskInspectorPanel({
                         <div className={`text-[12.5px] leading-5 ${isDanger ? "text-accent-danger" : isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} style={{ marginTop: 9 }}>
                           {backgroundTaskSummary(task)}
                         </div>
+                        {task.outputPreview?.trim() ? (
+                          <pre className="overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-base font-mono text-[11.5px] leading-5 text-text-secondary" style={{ maxHeight: 116, marginTop: 10, padding: "10px 12px" }}>
+                            {task.outputPreview.trim()}
+                          </pre>
+                        ) : null}
                         <div className="flex flex-wrap items-center" style={{ gap: 10, marginTop: 12 }}>
                           <button
                             type="button"
