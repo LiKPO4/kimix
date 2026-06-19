@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useMemo, type ReactNode } from "react";
+import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode } from "react";
 import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
@@ -873,6 +873,8 @@ function processItemTimestamp(item: ProcessItem) {
 
 function AssistantProcessSummary({ event, tools, subagents, approvals, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
+  const contentAnchorRef = useRef<HTMLSpanElement>(null);
+  const pendingCollapseAnchorRef = useRef<{ scrollNode: HTMLElement; viewportTop: number } | null>(null);
   const thinkingBlocks = useMemo(() => getThinkingBlocks(event), [event.thinking, event.thinkingParts, event.timestamp]);
   const items: ProcessItem[] = useMemo(() => [
     ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
@@ -889,11 +891,48 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
     approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
 
+  const collapseWithStableAnchor = () => {
+    const anchor = contentAnchorRef.current;
+    const scrollNode = anchor?.closest<HTMLElement>(".kimix-chat-scroll-area");
+    if (anchor && scrollNode) {
+      pendingCollapseAnchorRef.current = {
+        scrollNode,
+        viewportTop: anchor.getBoundingClientRect().top,
+      };
+      window.dispatchEvent(new CustomEvent("kimix:intentional-chat-resize"));
+    }
+    setExpanded(false);
+  };
+
+  useLayoutEffect(() => {
+    if (expanded) return;
+    const pending = pendingCollapseAnchorRef.current;
+    const anchor = contentAnchorRef.current;
+    if (!pending || !anchor) return;
+
+    const restoreAnchor = () => {
+      if (!anchor.isConnected || !pending.scrollNode.isConnected) return;
+      const delta = anchor.getBoundingClientRect().top - pending.viewportTop;
+      if (Math.abs(delta) > 0.5) pending.scrollNode.scrollTop += delta;
+    };
+
+    restoreAnchor();
+    const frame = window.requestAnimationFrame(() => {
+      restoreAnchor();
+      pendingCollapseAnchorRef.current = null;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [expanded]);
+
   return (
     <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: expanded && hasDetails ? 8 : 12 }}>
       <button
         type="button"
-        onClick={() => hasDetails && setExpanded((value) => !value)}
+        onClick={() => {
+          if (!hasDetails) return;
+          if (expanded) collapseWithStableAnchor();
+          else setExpanded(true);
+        }}
         disabled={!hasDetails}
         className="flex h-8 max-w-full items-center rounded-lg text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
         style={{ gap: 8, paddingLeft: 4, paddingRight: 12 }}
@@ -911,7 +950,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
           <ProcessDetailList items={items} />
           <button
             type="button"
-            onClick={() => setExpanded(false)}
+            onClick={collapseWithStableAnchor}
             className="kimix-icon-text-button kimix-muted-action is-compact self-end"
             style={{ marginTop: 2, paddingLeft: 12, paddingRight: 12 }}
           >
@@ -920,6 +959,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
           </button>
         </div>
       )}
+      <span ref={contentAnchorRef} aria-hidden="true" className="block h-0" />
     </div>
   );
 }

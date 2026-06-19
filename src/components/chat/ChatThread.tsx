@@ -716,6 +716,7 @@ export function ChatThread() {
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const userScrollResizeRestoreUntilRef = useRef(0);
+  const intentionalResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
@@ -954,6 +955,14 @@ export function ChatThread() {
   };
 
   useEffect(() => {
+    const handleIntentionalResize = () => {
+      intentionalResizeRestoreUntilRef.current = Date.now() + 180;
+    };
+    window.addEventListener("kimix:intentional-chat-resize", handleIntentionalResize);
+    return () => window.removeEventListener("kimix:intentional-chat-resize", handleIntentionalResize);
+  }, []);
+
+  useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ sessionId?: string; eventId?: string; searchText?: string }>).detail;
       if (!detail?.sessionId || !detail.eventId) return;
@@ -1021,6 +1030,15 @@ export function ChatThread() {
           previousSize.scrollHeight === nextSize.scrollHeight
         )
       ) {
+        return;
+      }
+      if (Date.now() < intentionalResizeRestoreUntilRef.current) {
+        scheduleAnchorCapture();
+        const activeNode = scrollRef.current;
+        if (activeNode) {
+          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          updateShowScrollToBottom(distance > 80);
+        }
         return;
       }
       if (autoFollowRef.current && !userScrollRef.current) {
