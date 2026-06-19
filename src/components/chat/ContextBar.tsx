@@ -38,6 +38,10 @@ function formatUpdatedAt(value: number | undefined) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
+function formatTotalQuota(value: number) {
+  return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
+}
+
 function isUsageLoginExpired(message?: string) {
   return Boolean(message && /授权失败|重新登录|login|401|unauthorized/i.test(message));
 }
@@ -437,6 +441,15 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                   <UsageProgress key={period.label} period={period} now={now} />
                 ))}
               </div>
+              {usageData?.totalQuota !== undefined && (
+                <div
+                  className="flex items-center justify-between border-t border-[var(--kimix-panel-border-soft)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]"
+                  style={{ marginTop: 16, padding: "12px 2px 0" }}
+                >
+                  <span>Kimi Code 总额度</span>
+                  <span className="shrink-0">{formatTotalQuota(usageData.totalQuota)}</span>
+                </div>
+              )}
               {usageData?.message && (
                 <div className="kimix-soft-card mt-5 rounded-lg text-[12.5px] leading-relaxed" style={{ padding: "13px 12px" }}>
                   {usageData.message}

@@ -3810,10 +3810,12 @@ function parseKimiUsagePayload(payload: Record<string, unknown>) {
   const updatedAt = Date.now();
   const fiveHour = usagePeriodFromDetail("5小时", findWindowLimit(payload, 300, "MINUTE"), updatedAt + 5 * 60 * 60 * 1000);
   const weekly = usagePeriodFromDetail("本周", getRecord(payload.usage), nextWeekRefreshAt(updatedAt));
+  const totalQuota = toNumber(payload.totalQuota);
   return {
     available: [fiveHour, weekly].some((period) => period.available),
     updatedAt,
     source: "Kimi Code 官方用量接口",
+    ...(totalQuota !== undefined ? { totalQuota } : {}),
     periods: [fiveHour, weekly],
   };
 }

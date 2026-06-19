@@ -982,6 +982,7 @@ export type KimiUsageResponse = {
     available: boolean;
     updatedAt: number;
     source: string;
+    totalQuota?: number;
     periods: UsagePeriod[];
     message?: string;
   };
