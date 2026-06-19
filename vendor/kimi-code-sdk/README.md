@@ -30,6 +30,13 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 
+## Kimix runtime policy
+
+Kimix changes the SDK fallback MCP startup timeout from 30 seconds to 4 seconds.
+Servers that declare `startupTimeoutMs` keep their own value. The fallback can be
+overridden with `KIMIX_KIMI_CODE_MCP_STARTUP_TIMEOUT_MS`. The vendor script applies
+this patch after every regeneration and fails loudly if the upstream marker changes.
+
 ## How to refresh
 
 1. Update the research checkout and rebuild the SDK:

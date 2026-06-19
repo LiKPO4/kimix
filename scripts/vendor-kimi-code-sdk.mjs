@@ -23,7 +23,7 @@ import { build } from "esbuild";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const researchRepo =
@@ -36,6 +36,9 @@ const outFile = path.join(repoRoot, "vendor", "kimi-code-sdk", "index.mjs");
 // Optional native addons that consuming libraries (ws, linkedom/@mozilla/readability)
 // already guard with try/catch — never bundle native .node addons.
 const externalOptionalNatives = ["bufferutil", "utf-8-validate", "canvas"];
+const upstreamMcpTimeout = "DEFAULT_STARTUP_TIMEOUT_MS = 3e4;";
+const kimixMcpTimeout =
+  'DEFAULT_STARTUP_TIMEOUT_MS = Math.max(1, Number.parseInt(process.env.KIMIX_KIMI_CODE_MCP_STARTUP_TIMEOUT_MS ?? "4000", 10) || 4e3);';
 
 async function fileExists(p) {
   try {
@@ -81,6 +84,15 @@ async function main() {
     },
     logLevel: "error",
   });
+
+  // A failed optional MCP must not hold the first model request for the
+  // upstream 30-second default. Explicit per-server startupTimeoutMs values
+  // still win; this only narrows the fallback used by unconfigured servers.
+  const bundled = await readFile(outFile, "utf8");
+  if (!bundled.includes(upstreamMcpTimeout)) {
+    throw new Error("Upstream MCP startup-timeout marker changed; review the Kimix vendor patch before publishing.");
+  }
+  await writeFile(outFile, bundled.replace(upstreamMcpTimeout, kimixMcpTimeout), "utf8");
 
   const size = (await stat(outFile)).size;
   console.log(JSON.stringify({
