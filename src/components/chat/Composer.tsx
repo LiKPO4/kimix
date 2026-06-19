@@ -877,7 +877,7 @@ export function Composer() {
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
-        updateLinkStatus("已提交给 Kimi Code，等待模型输出…", "success");
+        updateLinkStatus("正在提交给 Kimi Code…", "info");
         markPromptDispatchStarted();
         let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
@@ -899,11 +899,16 @@ export function Composer() {
         }
         if (!res.success) throw new Error(res.error);
         if (res.data.route === "server") {
-          updateLinkStatus("已通过 Kimi Server 提交，等待模型输出…", "success");
+          updateLinkStatus("Kimi Server 已接收，等待首个模型事件…", "success");
         } else if (res.data.route === "sdk-fallback") {
-          updateLinkStatus("Kimi Server 提交失败，已自动降级到 SDK…", "warning");
+          updateLinkStatus("Kimi Server 提交失败，SDK 已接管；等待首个模型事件…", "warning");
         } else {
-          updateLinkStatus("已通过 Kimi SDK 提交，等待模型输出…", "success");
+          updateLinkStatus(
+            res.data.fallbackReason
+              ? "Kimi Server 未接管，SDK 已接收；等待首个模型事件…"
+              : "Kimi SDK 已接收，等待首个模型事件…",
+            res.data.fallbackReason ? "warning" : "success",
+          );
         }
         return;
       } catch (err) {

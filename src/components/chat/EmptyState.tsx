@@ -213,7 +213,7 @@ export function EmptyState() {
         ),
         updatedAt: dispatchStartedAt,
       }));
-      updateLinkStatus("已提交给 Kimi Code，等待模型输出…", "success");
+      updateLinkStatus("正在提交给 Kimi Code…", "info");
       const sendRes = await sendKimiCodePromptWithRetry({
         sessionId: runtimeSessionId,
         content: text,
@@ -221,11 +221,16 @@ export function EmptyState() {
       });
       if (!sendRes.success) throw new Error(sendRes.error);
       if (sendRes.data.route === "server") {
-        updateLinkStatus("已通过 Kimi Server 提交，等待模型输出…", "success");
+        updateLinkStatus("Kimi Server 已接收，等待首个模型事件…", "success");
       } else if (sendRes.data.route === "sdk-fallback") {
-        updateLinkStatus("Kimi Server 提交失败，已自动降级到 SDK…", "warning");
+        updateLinkStatus("Kimi Server 提交失败，SDK 已接管；等待首个模型事件…", "warning");
       } else {
-        updateLinkStatus("已通过 Kimi SDK 提交，等待模型输出…", "success");
+        updateLinkStatus(
+          sendRes.data.fallbackReason
+            ? "Kimi Server 未接管，SDK 已接收；等待首个模型事件…"
+            : "Kimi SDK 已接收，等待首个模型事件…",
+          sendRes.data.fallbackReason ? "warning" : "success",
+        );
       }
     } catch (err) {
       console.error("Send failed:", err);

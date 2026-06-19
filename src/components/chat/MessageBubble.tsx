@@ -14,6 +14,7 @@ import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { hasActiveTimelineWorkEvents } from "@/utils/sessionActivity";
 import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
+import { activeProcessPhaseStartedAt } from "@/utils/processTiming";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -842,7 +843,7 @@ function AssistantProcessLabel({
   }
   if (isSettledForDisplay) {
     return durationLabel
-      ? <>{completeLabel}已处理{roleLabel ? `（${roleLabel}）` : ""} {durationLabel}</>
+      ? <>{completeLabel}本轮总耗时{roleLabel ? `（${roleLabel}）` : ""} {durationLabel}</>
       : <>{completeLabel}{roleLabel ? `（${roleLabel}）` : ""}</>;
   }
   return isActivelyThinking
@@ -1058,16 +1059,20 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
     leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
   const hasRecentTimelineActivity = hasActiveTimelineWorkEvents([event, ...leadingTools, ...leadingSubagents]);
   const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity) && (!event.isComplete || hasRunningProcess));
-  const elapsedStartAt = Math.min(
-    event.timestamp,
-    activeStatus?.timestamp ?? event.timestamp,
-    ...leadingTools.map((tool) => tool.timestamp),
-    ...leadingSubagents.map((subagent) => subagent.timestamp),
-  );
   const hasActualThinking = Boolean(
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
   );
+  const elapsedStartAt = activeProcessPhaseStartedAt({
+    eventTimestamp: event.timestamp,
+    statusTimestamp: activeStatus?.timestamp,
+    thinkingTimestamps: event.thinkingParts?.filter((part) => part.text.trim()).map((part) => part.timestamp),
+    runningToolTimestamps: leadingTools.filter((tool) => tool.status === "running").map((tool) => tool.timestamp),
+    runningSubagentTimestamps: leadingSubagents
+      .filter((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
+      .map((subagent) => subagent.timestamp),
+    hasContent,
+  });
   const activeProcessLabel = isActiveAssistant && leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
     ? "子代理运行中"
     : isActiveAssistant && leadingTools.some((tool) => tool.status === "running")
@@ -1075,7 +1080,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
       : isActiveAssistant && hasContent
         ? "正在输出"
         : isActiveAssistant && !hasActualThinking
-          ? activeStatus?.message?.trim().replace(/…$/u, "") || "等待模型响应"
+          ? activeStatus?.message?.trim().replace(/…$/u, "") || "等待首个模型事件"
           : undefined;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);

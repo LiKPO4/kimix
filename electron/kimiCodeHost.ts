@@ -760,7 +760,13 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
   setStatus(sessionId, "running");
   try {
     await managed.session.prompt(input);
-    return { route: "sdk" };
+    const serverStatus = kimiCodeServerHost.getStatus();
+    return {
+      route: "sdk",
+      ...(serverStatus.enabled && !kimiCodeServerHost.isReady()
+        ? { fallbackReason: serverStatus.error ?? `Kimi Server 状态：${serverStatus.state}` }
+        : {}),
+    };
   } catch (error) {
     setStatus(sessionId, "error");
     throw error;

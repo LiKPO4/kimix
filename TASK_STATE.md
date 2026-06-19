@@ -1,6 +1,7 @@
 # Kimix 长程任务状态
 
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
+- 当前修复：v2.10.8 将运行中计时从整轮累计改为当前阶段计时：等待首事件、思考、输出、命令和子代理各自使用阶段起点；完成态明确标为“本轮总耗时”。发送状态区分 Server 已接收、Server 未接管后的 SDK、Server 失败后 SDK 接管，并由 SDK route 返回 Server fallback 原因供诊断。
 - 当前修复：v2.10.7 将启动恢复 Server session missing 提升为静默自愈：补齐 `was not found` 识别，旧 session 失效时 renderer 再次无 ID 创建 fresh runtime；fresh runtime 瞬时失败也不再生成启动红卡，由后台预热继续恢复；加载本地历史时清除已落盘的同类错误事件。
 - 当前修复：v2.10.6 折叠“本轮内容”时以过程区结束、正文开始位置为局部滚动锚点，布局收缩前后补偿 `scrollTop`，并短暂抑制通用 ResizeObserver 锚点恢复，避免正文产生大幅跳动。
 - 当前修复：v2.10.5 套餐用量悬窗承接官方用量接口的 `totalQuota`，以灰色辅助信息展示为“Kimi Code 总额度”；不将其描述为月额度。v2.10.4 已实现悬窗每次打开自动刷新及并发请求结果防覆盖。
