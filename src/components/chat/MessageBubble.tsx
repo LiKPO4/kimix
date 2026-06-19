@@ -874,8 +874,13 @@ function processItemTimestamp(item: ProcessItem) {
 
 function AssistantProcessSummary({ event, tools, subagents, approvals, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
+  const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
-  const pendingCollapseAnchorRef = useRef<{ scrollNode: HTMLElement; viewportTop: number } | null>(null);
+  const pendingToggleAnchorRef = useRef<{
+    scrollNode: HTMLElement;
+    viewportTop: number;
+    anchor: "summary" | "content";
+  } | null>(null);
   const thinkingBlocks = useMemo(() => getThinkingBlocks(event), [event.thinking, event.thinkingParts, event.timestamp]);
   const items: ProcessItem[] = useMemo(() => [
     ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
@@ -892,23 +897,25 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
     approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
 
-  const collapseWithStableAnchor = () => {
-    const anchor = contentAnchorRef.current;
+  const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
+    const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
     const scrollNode = anchor?.closest<HTMLElement>(".kimix-chat-scroll-area");
     if (anchor && scrollNode) {
-      pendingCollapseAnchorRef.current = {
+      pendingToggleAnchorRef.current = {
         scrollNode,
         viewportTop: anchor.getBoundingClientRect().top,
+        anchor: anchorKind,
       };
-      window.dispatchEvent(new CustomEvent("kimix:intentional-chat-resize"));
+      window.dispatchEvent(new CustomEvent("kimix:intentional-chat-resize", {
+        detail: { preserveViewport: true },
+      }));
     }
-    setExpanded(false);
+    setExpanded(nextExpanded);
   };
 
   useLayoutEffect(() => {
-    if (expanded) return;
-    const pending = pendingCollapseAnchorRef.current;
-    const anchor = contentAnchorRef.current;
+    const pending = pendingToggleAnchorRef.current;
+    const anchor = pending?.anchor === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
     if (!pending || !anchor) return;
 
     const restoreAnchor = () => {
@@ -920,7 +927,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
     restoreAnchor();
     const frame = window.requestAnimationFrame(() => {
       restoreAnchor();
-      pendingCollapseAnchorRef.current = null;
+      pendingToggleAnchorRef.current = null;
     });
     return () => window.cancelAnimationFrame(frame);
   }, [expanded]);
@@ -928,11 +935,11 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
   return (
     <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: expanded && hasDetails ? 8 : 12 }}>
       <button
+        ref={summaryAnchorRef}
         type="button"
         onClick={() => {
           if (!hasDetails) return;
-          if (expanded) collapseWithStableAnchor();
-          else setExpanded(true);
+          toggleWithStableAnchor(!expanded, "summary");
         }}
         disabled={!hasDetails}
         className="flex h-8 max-w-full items-center rounded-lg text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
@@ -951,7 +958,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
           <ProcessDetailList items={items} />
           <button
             type="button"
-            onClick={collapseWithStableAnchor}
+            onClick={() => toggleWithStableAnchor(false, "content")}
             className="kimix-icon-text-button kimix-muted-action is-compact self-end"
             style={{ marginTop: 2, paddingLeft: 12, paddingRight: 12 }}
           >

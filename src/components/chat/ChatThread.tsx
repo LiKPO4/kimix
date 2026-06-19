@@ -955,8 +955,16 @@ export function ChatThread() {
   };
 
   useEffect(() => {
-    const handleIntentionalResize = () => {
-      intentionalResizeRestoreUntilRef.current = Date.now() + 180;
+    const handleIntentionalResize = (event: Event) => {
+      const detail = (event as CustomEvent<{ preserveViewport?: boolean }>).detail;
+      intentionalResizeRestoreUntilRef.current = Date.now() + 240;
+      if (!detail?.preserveViewport) return;
+      cancelSessionAutoBottom();
+      scrollTokenRef.current += 1;
+      autoFollowRef.current = false;
+      userScrollRef.current = true;
+      ignoreScrollUntilRef.current = Date.now() + 240;
+      updateAutoFollow(false);
     };
     window.addEventListener("kimix:intentional-chat-resize", handleIntentionalResize);
     return () => window.removeEventListener("kimix:intentional-chat-resize", handleIntentionalResize);
