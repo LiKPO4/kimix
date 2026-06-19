@@ -13,6 +13,7 @@ import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeS
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
+import { isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import {
@@ -1221,8 +1222,7 @@ function App() {
   };
 
   const isMissingRuntimeSessionError = (err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
-    return /session not found|unknown session|会话不存在|session.*missing/i.test(message);
+    return isKimiCodeSessionMissingError(err);
   };
 
   const recoverLongTaskReviewerSession = async (uiSessionId: string, failedReviewerSessionId: string, prompt: string) => {
@@ -1921,15 +1921,28 @@ function App() {
         const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
         if (!latest && !sessionIdToStart) return;
 
-        const startRes = await window.api.startSession({
+        const startOptions = {
           workDir: activeProject.path,
           sessionId: sessionIdToStart,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
           autoMode: useAppStore.getState().permissionMode === "auto",
           planMode: useAppStore.getState().defaultPlanMode,
-        });
+        };
+        let startRes = await window.api.startSession(startOptions);
+        if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
+          console.warn(`[Kimi Code] startup session ${sessionIdToStart} is missing; creating a fresh runtime`);
+          startRes = await window.api.startSession({
+            ...startOptions,
+            sessionId: undefined,
+          });
+        }
         if (!startRes.success) {
+          if (isKimiCodeSessionMissingError(startRes.error)) {
+            console.warn("[Kimi Code] fresh startup runtime was not found; leaving recovery to background prewarm");
+            setRunningSessionId(null);
+            return;
+          }
           if (activeLocalSession) {
             const errorSession = {
               ...activeLocalSession,
@@ -2062,7 +2075,7 @@ function App() {
             .filter((session) => !isHiddenInternalSession(session))
             .map((session) => ({
               ...session,
-              events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? session.events : [])),
+              events: removeStaleKimiCodeStartupErrors(resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? session.events : []))),
             }));
           if (JSON.stringify(visibleSessions) !== storedSessions) {
             localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
@@ -2074,7 +2087,7 @@ function App() {
               ...session,
               engine: knownEngine ? rawEngine : "kimi-code",
               runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
-              events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : [])),
+              events: removeStaleKimiCodeStartupErrors(resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []))),
               isLoading: false,
             });
           });
