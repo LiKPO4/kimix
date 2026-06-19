@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-06-19 OKF v0.1 项目知识部署
+- 当前目标：把稳定项目知识部署为可移植、可校验、可长期维护的 Open Knowledge Format bundle，同时不破坏现有 `docs/`、release notes 与 `TASK_STATE.md` 的职责边界。
+- 已确认：截图引用的 `GoogleCloudPlatform/knowledge-catalog` 根目录是 Knowledge Catalog 工具/样例仓库，且根 README 声明仓库内容不是 Google 官方产品；OKF 规范提案位于其 `okf/SPEC.md`，当前版本为 `0.1 — Draft`。上游 SPEC 仅强制概念 `type`，同仓库 PoC 实现额外强制 `title/description/timestamp`，Kimix 明确以 SPEC 为规范源、额外要求标记为项目严格 profile。
+- 已实施：新增独立 `knowledge/` bundle，首批覆盖项目概览、Server/SDK 路由、MCP/Plugin 生命周期、发布流程、知识维护策略、OKF 采用决策和上游规范引用；现有高频状态与历史文档不做机械转换。
+- 已实施：新增 `scripts/validate-okf.mjs`、`pnpm knowledge:validate` 与 `pnpm knowledge:validate:spec`；严格 profile 检查必填元数据、H1、目录索引、根日志、链接与时间戳，spec-only 模式保留 OKF 宽容消费语义。
+- 已实施：新增 Knowledge CI，并将知识校验作为 tag 发布工作流的前置 job；`AGENTS.md` 和 README 已写入长期维护规则与使用入口。
+- 关键文件：`knowledge/`、`scripts/validate-okf.mjs`、`.github/workflows/knowledge.yml`、`.github/workflows/release.yml`、`AGENTS.md`、`README.md`、`package.json`。
+- 已验证：上游研究基线固定为 commit `d2b9e2e13ccb2528af555b207b3c73312757b7c5`；spec-only 与 strict 校验均通过（7 concepts / 15 Markdown / 25 links）；校验器 3 个边界测试通过；全量 24 个测试文件、191 个测试通过；`pnpm build`、两份 workflow YAML 解析与 `git diff --check` 通过。
+- 下一步：审查并只提交本轮 OKF 相关文件，不纳入历史未跟踪目录。
+
 ## 2026-06-19 v2.10.13 MCP 面板按钮反馈与插件更新
 - 当前目标：修复 MCP 面板普通服务“测试 / 授权 / 重置授权 / 删除”点击后像没反应的问题，并澄清 Plugin MCP 是否必须“加入配置”。
 - 已完成：普通 MCP 添加/删除改为直接安全维护 `mcp.json`，删除前备份；测试/授权/重置授权不再调用当前 Kimi Code 0.18.0 未暴露的 `kimi mcp ...` 子命令，而是在卡片内返回明确原因和运行态/更新入口提示。

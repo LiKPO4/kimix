@@ -26,6 +26,8 @@
     "dist:linux": "electron-vite build && electron-builder --linux",
     "test": "vitest",
     "test:run": "vitest run",
+    "knowledge:validate": "node scripts/validate-okf.mjs",
+    "knowledge:validate:spec": "node scripts/validate-okf.mjs --spec-only",
     "vendor:kimi-code-sdk": "node scripts/vendor-kimi-code-sdk.mjs"
   },
   "dependencies": {
@@ -55,6 +57,7 @@
     "electron-builder": "^26.0.0",
     "electron-vite": "^5.0.0",
     "esbuild": "^0.28.0",
+    "js-yaml": "^4.1.1",
     "jsdom": "^29.1.1",
     "typescript": "^5.7.0",
     "vite": "^6.3.0",

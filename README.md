@@ -53,6 +53,20 @@ pnpm dev
 pnpm build
 ```
 
+### 项目知识库（OKF）
+
+仓库内的 [`knowledge/`](knowledge/index.md) 是一个 Open Knowledge Format 0.1 bundle，用于保存跨会话稳定的架构、运行手册、发布流程和维护决策。高频开发过程仍记录在 `TASK_STATE.md`，不会直接灌入知识库。
+
+```bash
+# OKF 0.1 + Kimix 严格维护规则
+pnpm knowledge:validate
+
+# 仅验证 OKF 0.1 规范强制项
+pnpm knowledge:validate:spec
+```
+
+知识变更会在独立 CI 和发布构建前自动校验。维护规则见 [`knowledge/maintenance/knowledge-maintenance.md`](knowledge/maintenance/knowledge-maintenance.md)。
+
 ### 打包安装包
 
 ```bash
@@ -84,9 +98,13 @@ kimix/
 ├── electron/           # Electron 主进程
 │   ├── main.ts         # 入口文件和 IPC 处理
 │   ├── preload.ts      # Context Bridge API
-│   ├── kimiBridge.ts   # Kimi SDK 集成
+│   ├── kimiCodeHost.ts # Kimi Code SDK fallback
+│   ├── kimiCodeServerHost.ts
+│   ├── kimiCodeServerClient.ts
 │   ├── projectService.ts
 │   └── settingsService.ts
+├── knowledge/          # OKF 0.1 项目知识 bundle
+├── scripts/            # 探针、vendoring 与知识校验脚本
 ├── src/                # 渲染进程
 │   ├── components/     # React UI 组件
 │   ├── stores/         # Zustand 状态

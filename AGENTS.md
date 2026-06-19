@@ -131,6 +131,18 @@
 
 有实际状态变化再更新；过长时归档到 `TASK_HISTORY.md`。
 
+## 项目知识（OKF）
+
+- `knowledge/` 是 Kimix 唯一的 Open Knowledge Format bundle，当前固定目标版本为 OKF `0.1`；不要把整个 `docs/`、`TASK_STATE.md` 或 release notes 直接改造成 OKF。
+- `TASK_STATE.md` 记录高频任务过程；`knowledge/` 只记录跨会话仍有复用价值的稳定知识，包括架构边界、运行不变量、集成生命周期、发布流程、长期维护策略和反复事故沉淀出的 runbook。
+- 每个非保留概念文件必须是 UTF-8 Markdown + YAML frontmatter。OKF v0.1 强制 `type`；Kimix 严格 profile 还强制 `title`、单行 `description`、非空 `tags`、带时区的 ISO 8601 `timestamp`，正文 H1 必须与 `title` 一致。
+- `index.md`、`log.md` 是保留文件，不得当普通概念使用；仅 bundle 根 `index.md` 可用 frontmatter 声明 `okf_version: "0.1"`。每个目录必须维护 `index.md`，根目录必须维护 `log.md`，日期倒序。
+- 概念间优先使用 bundle 绝对链接，如 `/architecture/runtime-routing.md`；外部事实优先引用官方/一手来源，并放在 `# Sources` 或 `# Citations`。
+- 消费时必须兼容未知 `type`、未知 frontmatter 字段、缺失可选字段和部分断链；写入 Kimix bundle 时采用更严格门禁，不允许断链、缺目录索引或缺项目 profile 字段。
+- 架构、集成生命周期、发布/维护流程、稳定故障根因或 OKF 版本发生实质变化时，同轮更新相关概念、最近目录 `index.md`、必要时根 `index.md`，并在根 `log.md` 新增记录；仅格式调整不更新时间戳。
+- 提交前必须运行 `pnpm knowledge:validate`。需要区分上游规范与 Kimix 自定义门禁时，再运行 `pnpm knowledge:validate:spec`；不得把 Kimix 的额外字段要求描述成 OKF v0.1 官方强制项。
+- OKF 0.1 目前是 Draft。跟进新版本前，必须先对照官方 `SPEC.md`，新增或更新 Architecture Decision，再同步迁移 bundle 与 `scripts/validate-okf.mjs`，不得静默漂移格式。
+
 ## 交接
 
 用户说“checkpoint / 总结一下 / 准备换人 / 交接”时，输出可直接发给下一个 agent 的摘要：

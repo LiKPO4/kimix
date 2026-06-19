@@ -1,0 +1,47 @@
+name: Knowledge
+
+on:
+  pull_request:
+    paths:
+      - "knowledge/**"
+      - "scripts/validate-okf.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "AGENTS.md"
+      - ".github/workflows/knowledge.yml"
+      - ".github/workflows/release.yml"
+  push:
+    branches:
+      - master
+    paths:
+      - "knowledge/**"
+      - "scripts/validate-okf.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "AGENTS.md"
+      - ".github/workflows/knowledge.yml"
+      - ".github/workflows/release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate OKF v0.1 and Kimix profile
+        run: pnpm knowledge:validate
