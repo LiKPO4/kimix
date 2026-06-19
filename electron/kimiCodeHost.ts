@@ -65,6 +65,10 @@ type KimiHarnessLike = {
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
   getConfigDiagnostics?(): Promise<KimiCodeConfigDiagnostics>;
   setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig>;
+  listPlugins?(): Promise<readonly KimiCodePluginSummary[]>;
+  installPlugin?(source: string): Promise<KimiCodePluginSummary>;
+  setPluginEnabled?(id: string, enabled: boolean): Promise<void>;
+  setPluginMcpServerEnabled?(id: string, server: string, enabled: boolean): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -1333,6 +1337,18 @@ async function getOrCreatePluginSession(): Promise<KimiCodeSessionLike> {
   return pluginSessionPromise;
 }
 
+async function closePluginManagementSession(): Promise<void> {
+  if (!pluginSessionPromise) return;
+  const sessionPromise = pluginSessionPromise;
+  pluginSessionPromise = null;
+  try {
+    const session = await sessionPromise;
+    await session.close().catch(() => undefined);
+  } catch {
+    // Ignore a failed management-session bootstrap; the next call can create a fresh one.
+  }
+}
+
 function resolvePluginSession(sessionId?: string): Promise<KimiCodeSessionLike> | KimiCodeSessionLike {
   if (sessionId && serverSessions.has(sessionId)) return getOrCreatePluginSession();
   if (sessionId) return getManagedSession(sessionId).session;
@@ -1340,6 +1356,10 @@ function resolvePluginSession(sessionId?: string): Promise<KimiCodeSessionLike> 
 }
 
 export async function listPlugins(sessionId?: string): Promise<KimiCodePluginSummary[]> {
+  if (!sessionId) {
+    const sdkHarness = await getHarness();
+    if (sdkHarness.listPlugins) return [...await sdkHarness.listPlugins()];
+  }
   const session = await resolvePluginSession(sessionId);
   if (!session.listPlugins) throw new Error("Official Kimi Code SDK does not expose listPlugins on this session");
   return [...await session.listPlugins()];
@@ -1395,18 +1415,37 @@ export function toKimiCodeMcpServerInfo(server: ServerMcpServer): KimiCodeMcpSer
 }
 
 export async function installPlugin(source: string, sessionId?: string): Promise<KimiCodePluginSummary> {
+  if (!sessionId || serverSessions.has(sessionId)) {
+    await closePluginManagementSession();
+    const sdkHarness = await getHarness();
+    if (sdkHarness.installPlugin) return sdkHarness.installPlugin(source);
+  }
   const session = await resolvePluginSession(sessionId);
   if (!session.installPlugin) throw new Error("Official Kimi Code SDK does not expose installPlugin on this session");
   return session.installPlugin(source);
 }
 
 export async function setPluginEnabled(id: string, enabled: boolean, sessionId?: string): Promise<void> {
+  if (!sessionId) {
+    const sdkHarness = await getHarness();
+    if (sdkHarness.setPluginEnabled) {
+      await sdkHarness.setPluginEnabled(id, enabled);
+      return;
+    }
+  }
   const session = await resolvePluginSession(sessionId);
   if (!session.setPluginEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginEnabled on this session");
   await session.setPluginEnabled(id, enabled);
 }
 
 export async function setPluginMcpServerEnabled(id: string, server: string, enabled: boolean, sessionId?: string): Promise<void> {
+  if (!sessionId) {
+    const sdkHarness = await getHarness();
+    if (sdkHarness.setPluginMcpServerEnabled) {
+      await sdkHarness.setPluginMcpServerEnabled(id, server, enabled);
+      return;
+    }
+  }
   const session = await resolvePluginSession(sessionId);
   if (!session.setPluginMcpServerEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginMcpServerEnabled on this session");
   await session.setPluginMcpServerEnabled(id, server, enabled);
@@ -1534,6 +1573,7 @@ export async function closeSession(sessionId: string): Promise<void> {
 }
 
 export async function closeAllSessions(): Promise<void> {
+  await closePluginManagementSession();
   await Promise.all([...sessions.keys(), ...serverSessions.keys()].map((sessionId) => closeSession(sessionId).catch(() => {})));
   if (harness) {
     await harness.close();

@@ -23,10 +23,10 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Source commit | `55f865642f18768ac0ae5d0ac236f617f79c4ff1` (2026-06-17, "ci: release packages (#856)", tag `@moonshot-ai/kimi-code@0.17.1`) |
+| Source commit | `e6c2f51fa3ed471e983a6dc4b2977709c62a9200` (2026-06-18, "ci: release packages (#877)", tag `@moonshot-ai/kimi-code@0.18.0`) |
 | node-sdk version | `0.9.4` |
-| Validated against CLI | installed `0.17.1` / source tag `@moonshot-ai/kimi-code@0.17.1` |
-| Bundled on | 2026-06-18 |
+| Validated against CLI | installed `0.18.0` / source tag `@moonshot-ai/kimi-code@0.18.0` |
+| Bundled on | 2026-06-19 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 
@@ -45,6 +45,10 @@ this patch after every regeneration and fails loudly if the upstream marker chan
    not required by the packaged app.)
 2. Regenerate this bundle:
    `node scripts/vendor-kimi-code-sdk.mjs`
+   The script first honors `KIMIX_KIMI_CODE_RESEARCH_REPO`, then local workspace
+   checkouts such as `.kimix-upstream-kimi-code`, then the legacy `%TEMP%`
+   research checkout. This avoids Windows user-directory ACL issues during
+   esbuild dependency resolution.
 3. Re-validate compatibility by re-running the P0 probe:
    `node scripts/probe-kimi-code-sdk.mjs` (see `docs/kimi-code-sdk-probe-result.md`).
 4. Update the provenance table above and commit.

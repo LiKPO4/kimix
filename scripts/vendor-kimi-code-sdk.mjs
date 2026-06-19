@@ -21,13 +21,22 @@
 
 import { build } from "esbuild";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
+const workspaceResearchRepoCandidates = [
+  path.join(repoRoot, ".kimix-upstream-kimi-code"),
+  path.join(repoRoot, ".kimix-upstream-kimi-code-0.18.0"),
+];
+const workspaceResearchRepo = workspaceResearchRepoCandidates.find((candidate) =>
+  existsSync(path.join(candidate, "packages", "node-sdk")),
+);
 const researchRepo =
   process.env.KIMIX_KIMI_CODE_RESEARCH_REPO ??
+  workspaceResearchRepo ??
   path.join(os.homedir(), "AppData", "Local", "Temp", "kimix-kimi-code-research");
 
 const entry = path.join(researchRepo, "packages", "node-sdk", "dist", "index.mjs");

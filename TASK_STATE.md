@@ -1,5 +1,20 @@
 # Kimix 长程任务状态
 
+## 2026-06-19 v2.10.13 MCP 面板按钮反馈与插件更新
+- 当前目标：修复 MCP 面板普通服务“测试 / 授权 / 重置授权 / 删除”点击后像没反应的问题，并澄清 Plugin MCP 是否必须“加入配置”。
+- 已完成：普通 MCP 添加/删除改为直接安全维护 `mcp.json`，删除前备份；测试/授权/重置授权不再调用当前 Kimi Code 0.18.0 未暴露的 `kimi mcp ...` 子命令，而是在卡片内返回明确原因和运行态/更新入口提示。
+- 已完成：Plugin 随带 MCP 新增“更新 MCP”按钮；原“加入配置”改为“写入 mcp.json”，文案说明这是兼容旧普通 MCP 配置，不是 Kimix 使用前置条件。
+- 已完成：MCP 卡片增加局部状态反馈，运行态重启、普通 MCP 操作、Plugin 写入/更新都会在对应卡片内显示进度或错误。
+- 已完成：版本锚点同步到 v2.10.13（`package.json`、`SettingsPanel`、`Sidebar`）。
+- 已验证：`git diff --check` 通过；直接调用 `electron-vite build` 通过，输出 `out/main/index.cjs`、`out/preload/index.cjs`、`out/renderer/assets/index-W1y4oWuh.js`。
+- 部分阻塞：`pnpm build` 会先触发 pnpm install；Electron postinstall 下载二进制时被当前网络拒绝 `connect EACCES 20.205.243.166:443`，因此完整 pnpm build 未通过。源码构建本身已通过。
+- 关键文件：`electron/main.ts`、`src/components/layout/McpPanel.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`package.json`。
+- 下一步：用户用 v2.10.13 窗口复验 MCP 面板；如要恢复完整 `pnpm build`，需允许 Electron 二进制下载或配置本地/镜像缓存。
+- 2026-06-19 v2.10.14：MCP “更新 MCP”进一步对齐官方 `/plugins` 更新语义：仍调用官方 SDK `installPlugin(source)`，但不再传当前运行中会话、不再尝试热重启正在运行的 MCP；若当前会话运行态已加载该 Plugin MCP，则提示先 `/reload`、新会话或重启释放进程后再更新。后端对 `EBUSY/resource busy/locked` 增加专门说明，避免误判为更新源失败。
+- 2026-06-19 v2.10.15：修正 v2.10.14 形成“运行态 MCP 超时但更新被占用拦截”的死循环；更新 Plugin MCP 时如果当前 runtime 正在加载同名 MCP，会先调用官方 closeSession 释放当前 runtime，再调用官方 SDK `installPlugin(source)`。更新成功后提示 `/reload` 或新会话生效；若仍 EBUSY，提示关闭其它 Kimi Code/Kimix 窗口后重试。
+- 2026-06-19 v2.10.16：继续修正插件目录被 Kimix 自身占用的问题。后端 `listPlugins/installPlugin/setPluginEnabled/setPluginMcpServerEnabled` 优先使用官方 SDK harness 级插件接口，不再为插件管理创建/复用 `kimix-plugin-management` 会话；安装前会关闭残留内部插件管理会话，避免该会话加载旧 MCP 后自锁 managed 插件目录。
+- 2026-06-19 v2.10.17：跟进官方 Kimi Code 0.18.0；本机 CLI 已是 0.18.0，官方源码 tag 对应 commit `e6c2f51fa3ed471e983a6dc4b2977709c62a9200`，`packages/node-sdk` 仍为 0.9.4；已重建并刷新 `vendor/kimi-code-sdk/index.mjs`，保留 Kimix MCP fallback timeout 4 秒补丁，并新增 `docs/kimi-code-0.18-followup.md`。vendor 脚本新增工作区本地官方源码 fallback，避免 Windows `%TEMP%`/用户目录权限导致 bundle 失败。
+
 ## 2026-06-18 Kimi Code 0.17.1 能力增量回归主线
 - 当前修复：v2.10.11 修复思考过程展开/折叠的视口跳转：顶部摘要交互锚定摘要按钮，底部收起交互锚定正文起点；用户主动切换时终止进入会话后的自动贴底，并暂时抑制通用 ResizeObserver 补偿，避免重复滚动修正。v2.10.10 已将故障 MCP 的 SDK 默认启动等待由 30 秒收紧至 4 秒。
 - 当前修复：v2.10.7 将启动恢复 Server session missing 提升为静默自愈：补齐 `was not found` 识别，旧 session 失效时 renderer 再次无 ID 创建 fresh runtime；fresh runtime 瞬时失败也不再生成启动红卡，由后台预热继续恢复；加载本地历史时清除已落盘的同类错误事件。

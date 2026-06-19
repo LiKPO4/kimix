@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import type { KimiCodeMcpServerInfo, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
+import type { KimiCodeMarketplacePlugin, KimiCodeMcpServerInfo, KimiCodePluginSummary, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
 
 type KimiAuthStatus = {
   available: boolean;
@@ -185,11 +185,14 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
   const [lastTestOutput, setLastTestOutput] = useState<Record<string, string>>({});
   const [runtimeServers, setRuntimeServers] = useState<KimiCodeMcpServerInfo[]>([]);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<KimiCodeServerRuntimeDiagnostics | null>(null);
+  const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
+  const [marketplacePlugins, setMarketplacePlugins] = useState<KimiCodeMarketplacePlugin[]>([]);
+  const [cardMessages, setCardMessages] = useState<Record<string, string>>({});
   const [toolsExpanded, setToolsExpanded] = useState(false);
 
   const refresh = async (nextMessage?: string) => {
     setLoading(true);
-    const [authRes, listRes, runtimeRes, diagnosticsRes] = await Promise.all([
+    const [authRes, listRes, runtimeRes, diagnosticsRes, pluginRes, marketplaceRes] = await Promise.all([
       window.api.getKimiAuthStatus(),
       window.api.listMcpServers(),
       runtimeSessionId
@@ -198,6 +201,8 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
       runtimeSessionId
         ? window.api.getKimiCodeServerRuntimeDiagnostics({ sessionId: runtimeSessionId })
         : Promise.resolve(null),
+      window.api.listKimiCodePlugins(runtimeSessionId ? { sessionId: runtimeSessionId } : {}),
+      window.api.listKimiCodeMarketplace(),
     ]);
     setLoading(false);
     if (!authRes.success) {
@@ -212,6 +217,8 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     setAuth(authRes.data);
     setServers(listRes.data.servers);
     setPluginServers(listRes.data.pluginServers ?? []);
+    setSdkPlugins(pluginRes.success ? pluginRes.data : []);
+    setMarketplacePlugins(marketplaceRes.success ? marketplaceRes.data : []);
     setRuntimeDiagnostics(diagnosticsRes?.success ? diagnosticsRes.data : null);
     setRuntimeServers(diagnosticsRes?.success ? diagnosticsRes.data.mcpServers : runtimeRes?.success ? runtimeRes.data : []);
     setConfigPath(listRes.data.configPath);
@@ -239,17 +246,25 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     }
   };
 
+  const setCardMessage = (key: string, value: string) => {
+    setCardMessages((current) => ({ ...current, [key]: value }));
+  };
+
   const handleRestartRuntimeServer = async (server: KimiCodeMcpServerInfo) => {
     if (!runtimeSessionId) return;
+    const cardKey = `runtime:${server.id ?? server.name}`;
     await runBusy(`restart-runtime:${server.id ?? server.name}`, async () => {
+      setCardMessage(cardKey, `正在重启 ${server.name}...`);
       const res = await window.api.reconnectKimiCodeMcpServer({
         sessionId: runtimeSessionId,
         name: server.id ?? server.name,
       });
       if (!res.success) {
+        setCardMessage(cardKey, `重启失败：${res.error}`);
         setMessage(`重启 ${server.name} 失败：${res.error}`);
         return;
       }
+      setCardMessage(cardKey, `已请求重启 ${server.name}`);
       await refresh(`已请求官方 Server 重启 ${server.name}`);
     });
   };
@@ -285,8 +300,10 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
 
   const handleRemoveServer = async (name: string) => {
     await runBusy(`remove:${name}`, async () => {
+      setCardMessage(`server:${name}`, `正在删除 ${name}...`);
       const res = await window.api.removeMcpServer({ name });
       if (!res.success) {
+        setCardMessage(`server:${name}`, `删除失败：${res.error}`);
         setMessage(`移除失败：${res.error}`);
         return;
       }
@@ -295,59 +312,140 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
         delete next[name];
         return next;
       });
+      setCardMessage(`server:${name}`, res.data.message);
       await refresh(res.data.message);
     });
   };
 
   const handleAuthServer = async (name: string) => {
     await runBusy(`auth:${name}`, async () => {
+      setCardMessage(`server:${name}`, `正在授权 ${name}...`);
       setMessage(`正在授权 ${name}...`);
       const res = await window.api.authMcpServer({ name });
       if (!res.success) {
+        setCardMessage(`server:${name}`, `授权失败：${res.error}`);
         setMessage(`授权失败：${res.error}`);
         return;
       }
+      setCardMessage(`server:${name}`, res.data.message);
       setMessage(res.data.message);
     });
   };
 
   const handleResetAuth = async (name: string) => {
     await runBusy(`reset:${name}`, async () => {
+      setCardMessage(`server:${name}`, `正在重置 ${name} 的授权...`);
       setMessage(`正在重置 ${name} 的授权...`);
       const res = await window.api.resetMcpServerAuth({ name });
       if (!res.success) {
+        setCardMessage(`server:${name}`, `重置授权失败：${res.error}`);
         setMessage(`重置授权失败：${res.error}`);
         return;
       }
+      setCardMessage(`server:${name}`, res.data.message);
       setMessage(res.data.message);
     });
   };
 
   const handleTestServer = async (name: string) => {
     await runBusy(`test:${name}`, async () => {
+      setCardMessage(`server:${name}`, `正在测试 ${name}...`);
       setMessage(`正在测试 ${name}...`);
       const res = await window.api.testMcpServer({ name });
       if (!res.success) {
+        setCardMessage(`server:${name}`, `测试失败：${res.error}`);
         setMessage(`测试失败：${res.error}`);
         return;
       }
       setLastTestOutput((current) => ({ ...current, [name]: res.data.output }));
+      setCardMessage(`server:${name}`, res.data.success ? `${name} 测试通过` : `${name} 测试失败`);
       setMessage(res.data.success ? `${name} 测试通过` : `${name} 测试失败`);
     });
   };
 
   const handleImportPluginServer = async (server: PluginMcpServerInfo) => {
     await runBusy(`import-plugin:${server.manifestPath}:${server.name}`, async () => {
+      setCardMessage(`plugin:${server.pluginId}:${server.name}`, `正在写入 ${server.pluginName} / ${server.name} 到 mcp.json...`);
       setMessage(`正在将 ${server.pluginName} / ${server.name} 加入 MCP 配置...`);
       const res = await window.api.importPluginMcpServer({
         manifestPath: server.manifestPath,
         name: server.name,
       });
       if (!res.success) {
+        setCardMessage(`plugin:${server.pluginId}:${server.name}`, `写入失败：${res.error}`);
         setMessage(`加入失败：${res.error}`);
         return;
       }
+      setCardMessage(`plugin:${server.pluginId}:${server.name}`, `${res.data.message}。这是兼容写入，不是使用前置条件。`);
       await refresh(`${res.data.message}。现在可以在普通 MCP 服务卡片里测试或授权。`);
+    });
+  };
+
+  const resolvePluginUpdateSource = (server: PluginMcpServerInfo) => {
+    const sdkPlugin = sdkPlugins.find((plugin) =>
+      plugin.id === server.pluginId ||
+      plugin.displayName === server.pluginName ||
+      plugin.id === server.pluginName
+    );
+    if (sdkPlugin?.originalSource) return sdkPlugin.originalSource;
+    const marketplacePlugin = marketplacePlugins.find((plugin) =>
+      plugin.id === server.pluginId ||
+      plugin.displayName === server.pluginName ||
+      plugin.id === server.pluginName
+    );
+    if (marketplacePlugin?.source) return marketplacePlugin.source;
+    return server.pluginPath;
+  };
+
+  const isRuntimeUsingPluginServer = (server: PluginMcpServerInfo) => runtimeServers.some((item) =>
+    item.name === server.name ||
+    item.id === server.name ||
+    item.id === `plugin:${server.pluginId}:${server.name}` ||
+    item.id === `${server.pluginId}:${server.name}` ||
+    item.name === `plugin:${server.pluginId}:${server.name}`
+  );
+
+  const formatPluginUpdateError = (error: string, server: PluginMcpServerInfo) => {
+    if (/EBUSY|resource busy|locked|rmdir|ENOTEMPTY|EPERM/i.test(error)) {
+      return [
+        `更新失败：${server.pluginName} 的插件目录仍被某个 MCP / Kimi Code 进程占用，Windows 暂时不能替换。`,
+        "Kimix 已尝试释放当前会话运行态和内部插件管理会话；如果仍失败，请关闭其它 Kimi Code/Kimix 窗口后再点一次更新。",
+      ].join(" ");
+    }
+    return `更新失败：${error}`;
+  };
+
+  const handleUpdatePluginServer = async (server: PluginMcpServerInfo) => {
+    const source = resolvePluginUpdateSource(server);
+    const cardKey = `plugin:${server.pluginId}:${server.name}`;
+    await runBusy(`update-plugin:${server.pluginId}:${server.name}`, async () => {
+      if (runtimeSessionId && isRuntimeUsingPluginServer(server)) {
+        const releaseMessage = `${server.pluginName} / ${server.name} 正在当前会话运行态中加载；正在先关闭当前官方 runtime，并释放 Kimix 内部插件管理会话，再走官方插件安装链路更新...`;
+        setCardMessage(cardKey, releaseMessage);
+        setMessage(releaseMessage);
+        const closeRes = await window.api.closeKimiCodeSession({ sessionId: runtimeSessionId });
+        if (!closeRes.success) {
+          const failedMessage = `释放当前会话运行态失败：${closeRes.error}。请关闭其它 Kimi Code/Kimix 窗口后再点一次更新。`;
+          setCardMessage(cardKey, failedMessage);
+          setMessage(failedMessage);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
+      setCardMessage(cardKey, `正在通过官方插件安装链路更新 ${server.pluginName}...`);
+      setMessage(`正在通过官方插件安装链路更新 ${server.pluginName}...`);
+      const res = await window.api.installKimiCodePlugin({
+        source,
+      });
+      if (!res.success) {
+        const formatted = formatPluginUpdateError(res.error, server);
+        setCardMessage(cardKey, formatted);
+        setMessage(formatted);
+        return;
+      }
+      const successMessage = `已通过官方插件链路更新 ${res.data.displayName}。按官方语义，请 /reload 或开启新会话后生效；刚才如关闭了当前 runtime，下一次发送会重新建立连接。`;
+      setCardMessage(cardKey, successMessage);
+      await refresh(successMessage);
     });
   };
 
@@ -658,6 +756,14 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                                 {server.transport.toUpperCase()} · {server.toolCount} 个工具 · {server.status === "connected" ? "已连接" : server.status === "pending" ? "连接中" : server.status === "failed" ? "连接失败" : "未连接"}
                               </div>
                               {server.error && <div className="break-all text-[12px] leading-5 text-accent-danger" style={{ marginTop: 5 }}>{server.error}</div>}
+                              {cardMessages[`runtime:${server.id ?? server.name}`] && (
+                                <div
+                                  className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                                  style={{ marginTop: 8, padding: "8px 10px" }}
+                                >
+                                  {cardMessages[`runtime:${server.id ?? server.name}`]}
+                                </div>
+                              )}
                             </div>
                             <button
                               type="button"
@@ -686,7 +792,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                     <span>Plugin 随带 MCP</span>
                   </div>
                   <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
-                    这些服务来自已安装 Plugin 的 manifest。官方默认在新会话启用，可在 Kimi Code 的 `/plugins` 里启停。
+                    这些服务来自已安装 Plugin 的 manifest。默认会随官方 Kimi Code 会话加载，Kimix 也会直接读取运行态；不需要先写入 mcp.json 才能使用。
                   </div>
                   <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
                     {pluginServers.map((server) => (
@@ -719,15 +825,33 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                             </div>
                             <button
                               type="button"
-                              onClick={() => void handleImportPluginServer(server)}
+                              onClick={() => void handleUpdatePluginServer(server)}
                               disabled={Boolean(busyAction)}
                               className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
                             >
+                              <RefreshCw size={14} className={busyAction === `update-plugin:${server.pluginId}:${server.name}` ? "kimix-spin" : ""} />
+                              <span>{busyAction === `update-plugin:${server.pluginId}:${server.name}` ? "更新中" : "更新 MCP"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleImportPluginServer(server)}
+                              disabled={Boolean(busyAction)}
+                              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
+                              title="兼容旧版普通 MCP 配置：把这个 Plugin MCP 复制到 mcp.json。默认使用不需要这一步。"
+                            >
                               <Plus size={14} />
-                              <span>{busyAction === `import-plugin:${server.manifestPath}:${server.name}` ? "加入中" : "加入配置"}</span>
+                              <span>{busyAction === `import-plugin:${server.manifestPath}:${server.name}` ? "写入中" : "写入 mcp.json"}</span>
                             </button>
                           </div>
                         </div>
+                        {cardMessages[`plugin:${server.pluginId}:${server.name}`] && (
+                          <div
+                            className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                            style={{ marginTop: 12, padding: "9px 12px" }}
+                          >
+                            {cardMessages[`plugin:${server.pluginId}:${server.name}`]}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -807,6 +931,14 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                       <pre className="mt-3 overflow-x-auto rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", whiteSpace: "pre-wrap" }}>
                         {lastTestOutput[server.name]}
                       </pre>
+                    )}
+                    {cardMessages[`server:${server.name}`] && (
+                      <div
+                        className="rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                        style={{ marginTop: 12, padding: "9px 12px" }}
+                      >
+                        {cardMessages[`server:${server.name}`]}
+                      </div>
                     )}
                   </div>
                 ))

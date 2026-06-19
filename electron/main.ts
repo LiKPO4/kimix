@@ -1904,6 +1904,96 @@ function importPluginMcpServerToConfig(request: unknown) {
   return { message: `已将 ${pluginName} / ${serverName} 加入 MCP 配置：${imported.name}` };
 }
 
+function readMcpConfigForWrite() {
+  const paths = getKimiPaths();
+  let config: { mcpServers?: Record<string, McpServerRecord> } = {};
+  if (fs.existsSync(paths.mcpConfig)) {
+    config = JSON.parse(fs.readFileSync(paths.mcpConfig, "utf-8")) as { mcpServers?: Record<string, McpServerRecord> };
+  }
+  const mcpServers = config.mcpServers && typeof config.mcpServers === "object" && !Array.isArray(config.mcpServers)
+    ? config.mcpServers
+    : {};
+  return { paths, config, mcpServers };
+}
+
+function parseKeyValueList(values?: string[]) {
+  if (!values?.length) return undefined;
+  const entries: Record<string, string> = {};
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) {
+      throw new Error(`配置项格式应为 KEY=VALUE：${trimmed}`);
+    }
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const itemValue = trimmed.slice(separatorIndex + 1).trim();
+    if (!key) throw new Error(`配置项 Key 不能为空：${trimmed}`);
+    entries[key] = itemValue;
+  }
+  return Object.keys(entries).length ? entries : undefined;
+}
+
+function addMcpServerToConfig(request: unknown) {
+  const parsed = z.object({
+    name: z.string().trim().min(1),
+    transport: z.enum(["http", "sse", "stdio"]),
+    url: z.string().trim().optional(),
+    command: z.string().trim().optional(),
+    args: z.array(z.string().trim()).optional(),
+    env: z.array(z.string().trim()).optional(),
+    headers: z.array(z.string().trim()).optional(),
+    auth: z.literal("oauth").optional(),
+  }).parse(request);
+  const name = sanitizeMcpServerName(parsed.name);
+  if (name !== parsed.name) {
+    throw new Error(`MCP 名称只能包含字母、数字、点、下划线和短横线；建议使用：${name}`);
+  }
+  const { paths, config, mcpServers } = readMcpConfigForWrite();
+  if (mcpServers[name]) {
+    throw new Error(`MCP 服务 ${name} 已存在，请先删除旧配置或换一个名称`);
+  }
+  const server: McpServerRecord = {
+    transport: parsed.transport,
+    auth: parsed.auth,
+    env: parseKeyValueList(parsed.env),
+    headers: parseKeyValueList(parsed.headers),
+  };
+  if (parsed.transport === "http" || parsed.transport === "sse") {
+    if (!parsed.url) throw new Error(`${parsed.transport.toUpperCase()} MCP 需要填写 URL`);
+    server.url = parsed.url;
+  } else {
+    if (!parsed.command) throw new Error("stdio MCP 需要填写命令");
+    server.command = parsed.command;
+    server.args = (parsed.args ?? []).filter(Boolean);
+  }
+  fs.mkdirSync(path.dirname(paths.mcpConfig), { recursive: true });
+  backupFileIfExists(paths.mcpConfig);
+  mcpServers[name] = server;
+  fs.writeFileSync(paths.mcpConfig, `${JSON.stringify({ ...config, mcpServers }, null, 2)}\n`, "utf-8");
+  return { message: `已写入 MCP 服务 ${name} 到 mcp.json` };
+}
+
+function removeMcpServerFromConfig(request: unknown) {
+  const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
+  const { paths, config, mcpServers } = readMcpConfigForWrite();
+  if (!mcpServers[parsed.name]) {
+    throw new Error(`mcp.json 中未找到 MCP 服务 ${parsed.name}，请刷新后重试`);
+  }
+  backupFileIfExists(paths.mcpConfig);
+  delete mcpServers[parsed.name];
+  fs.writeFileSync(paths.mcpConfig, `${JSON.stringify({ ...config, mcpServers }, null, 2)}\n`, "utf-8");
+  return { message: `已从 mcp.json 删除 MCP 服务 ${parsed.name}` };
+}
+
+function unsupportedKimiMcpCliMessage(action: string, name: string) {
+  return [
+    `当前 Kimi Code CLI 未暴露 \`kimi mcp ${action}\` 子命令，Kimix 不能通过旧 CLI 入口直接操作 ${name}。`,
+    "Plugin 随带 MCP 默认会随官方 Kimi Code 会话加载，不需要写入 mcp.json 才能使用。",
+    "请在上方“当前会话运行态”查看连接状态；如需刷新插件，请点 Plugin 卡片里的“更新 MCP”。",
+  ].join(" ");
+}
+
 async function requireKimiExecutable() {
   const kimiPath = await resolveKimiCommand();
   if (!kimiPath) {
@@ -5068,34 +5158,7 @@ ipcMain.handle("kimi:listMcpServers", async () => {
 
 ipcMain.handle("kimi:addMcpServer", async (_, request: unknown) => {
   try {
-    const parsed = z.object({
-      name: z.string().trim().min(1),
-      transport: z.enum(["http", "sse", "stdio"]),
-      url: z.string().trim().optional(),
-      command: z.string().trim().optional(),
-      args: z.array(z.string().trim()).optional(),
-      env: z.array(z.string().trim()).optional(),
-      headers: z.array(z.string().trim()).optional(),
-      auth: z.literal("oauth").optional(),
-    }).parse(request);
-    const kimiPath = await requireKimiExecutable();
-    const args = ["mcp", "add", parsed.name, "--transport", parsed.transport];
-    if (parsed.auth) args.push("--auth", parsed.auth);
-    for (const envValue of parsed.env ?? []) {
-      if (envValue) args.push("--env", envValue);
-    }
-    for (const headerValue of parsed.headers ?? []) {
-      if (headerValue) args.push("--header", headerValue);
-    }
-    if (parsed.transport === "http" || parsed.transport === "sse") {
-      if (!parsed.url) throw new Error(`${parsed.transport.toUpperCase()} MCP 需要填写 URL`);
-      args.push(parsed.url);
-    } else {
-      if (!parsed.command) throw new Error("stdio MCP 需要填写命令");
-      args.push("--", parsed.command, ...(parsed.args ?? []).filter(Boolean));
-    }
-    await runCommand(kimiPath, args);
-    return { success: true, data: { message: `已添加 MCP 服务 ${parsed.name}` } };
+    return { success: true, data: addMcpServerToConfig(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5111,10 +5174,7 @@ ipcMain.handle("kimi:importPluginMcpServer", async (_, request: unknown) => {
 
 ipcMain.handle("kimi:removeMcpServer", async (_, request: unknown) => {
   try {
-    const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
-    const kimiPath = await requireKimiExecutable();
-    await runCommand(kimiPath, ["mcp", "remove", parsed.name]);
-    return { success: true, data: { message: `已移除 MCP 服务 ${parsed.name}` } };
+    return { success: true, data: removeMcpServerFromConfig(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5123,9 +5183,7 @@ ipcMain.handle("kimi:removeMcpServer", async (_, request: unknown) => {
 ipcMain.handle("kimi:authMcpServer", async (_, request: unknown) => {
   try {
     const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
-    const kimiPath = await requireKimiExecutable();
-    await runCommand(kimiPath, ["mcp", "auth", parsed.name]);
-    return { success: true, data: { message: `已完成 ${parsed.name} 的 MCP 授权` } };
+    throw new Error(unsupportedKimiMcpCliMessage("auth", parsed.name));
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5134,9 +5192,7 @@ ipcMain.handle("kimi:authMcpServer", async (_, request: unknown) => {
 ipcMain.handle("kimi:resetMcpServerAuth", async (_, request: unknown) => {
   try {
     const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
-    const kimiPath = await requireKimiExecutable();
-    await runCommand(kimiPath, ["mcp", "reset-auth", parsed.name]);
-    return { success: true, data: { message: `已重置 ${parsed.name} 的 MCP 授权` } };
+    throw new Error(unsupportedKimiMcpCliMessage("reset-auth", parsed.name));
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5145,9 +5201,7 @@ ipcMain.handle("kimi:resetMcpServerAuth", async (_, request: unknown) => {
 ipcMain.handle("kimi:testMcpServer", async (_, request: unknown) => {
   try {
     const parsed = z.object({ name: z.string().trim().min(1) }).parse(request);
-    const kimiPath = await requireKimiExecutable();
-    const result = await runCommand(kimiPath, ["mcp", "test", parsed.name]);
-    return { success: true, data: { success: true, output: result.stdout } };
+    throw new Error(unsupportedKimiMcpCliMessage("test", parsed.name));
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5851,7 +5905,14 @@ ipcMain.handle("kimi-code:installPlugin", async (_, request: unknown) => {
     if (!source) return { success: false, error: "Missing source" };
     return { success: true, data: await kimiCodeHost.installPlugin(source, sessionId) };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    const message = err instanceof Error ? err.message : String(err);
+    if (/EBUSY|resource busy|locked|rmdir|ENOTEMPTY|EPERM/i.test(message)) {
+      return {
+        success: false,
+        error: `${message}。插件目录仍被 Kimi Code/MCP 进程占用；Kimix 会先尝试关闭当前 runtime 和内部插件管理会话，如果仍失败，请关闭其它 Kimi Code/Kimix 窗口后再更新。`,
+      };
+    }
+    return { success: false, error: message };
   }
 });
 
