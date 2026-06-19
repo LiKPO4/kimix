@@ -488,7 +488,10 @@ export type KimiCodeCreateGoalInput = {
 type ManagedSession = {
   session: KimiCodeSessionLike;
   status: KimiCodeEngineStatus;
+  model?: string;
+  thinking?: string;
   permission: KimiCodePermissionMode;
+  planMode?: boolean;
   unsubscribe: () => void;
   hiddenAgentIds: Set<string>;
   btwRuns: Map<string, BtwRun>;
@@ -593,22 +596,34 @@ export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSe
   // The resumed session keeps whatever permission it was persisted with; read it
   // back from the SDK so the yolo auto-approve guard reflects reality until the
   // caller re-applies the UI permission mode via setPermission().
+  let resumedStatus: KimiCodeSessionStatus | undefined;
   let resumedPermission: KimiCodePermissionMode = "manual";
   try {
     const status = await session.getStatus();
+    resumedStatus = status;
     if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
       resumedPermission = status.permission;
     }
   } catch {
     // Best effort: fall back to "manual" if the status read fails.
   }
-  return registerSession(session, "idle", resumedPermission);
+  return registerSession(session, "idle", {
+    model: resumedStatus?.model,
+    thinking: resumedStatus?.thinkingLevel,
+    permission: resumedPermission,
+    planMode: resumedStatus?.planMode,
+  });
 }
 
 async function createSdkSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
   const sdkHarness = await getHarness();
   const session = await sdkHarness.createSession(options);
-  return registerSession(session, "idle", options.permission ?? "manual");
+  return registerSession(session, "idle", {
+    model: options.model,
+    thinking: options.thinking,
+    permission: options.permission ?? "manual",
+    planMode: options.planMode ?? false,
+  });
 }
 
 export async function forkSession(
@@ -637,16 +652,23 @@ export async function forkSession(
     title: options.title,
     metadata: options.metadata,
   });
+  let forkStatus: KimiCodeSessionStatus | undefined;
   let forkPermission: KimiCodePermissionMode = "manual";
   try {
     const status = await session.getStatus();
+    forkStatus = status;
     if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
       forkPermission = status.permission;
     }
   } catch {
     // Best effort: keep the fork usable even if status hydration is unavailable.
   }
-  return registerSession(session, "idle", forkPermission);
+  return registerSession(session, "idle", {
+    model: forkStatus?.model,
+    thinking: forkStatus?.thinkingLevel,
+    permission: forkPermission,
+    planMode: forkStatus?.planMode,
+  });
 }
 
 export async function listChildSessions(sessionId: string): Promise<KimiCodeSessionSummary[]> {
@@ -697,13 +719,16 @@ export async function reloadSession(sessionId: string): Promise<void> {
 export async function setModel(sessionId: string, model: string): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
+    if (serverManaged.model === model) return;
     await getServerClient().updateSession(sessionId, { model });
     serverManaged.model = model;
     return;
   }
   const managed = getManagedSession(sessionId);
+  if (managed.model === model) return;
   if (!managed.session.setModel) throw new Error("当前 Kimi Code SDK 不支持会话模型切换。");
   await managed.session.setModel(model);
+  managed.model = model;
 }
 
 export async function reloadIdleSessions(): Promise<{ reloaded: string[]; skipped: string[]; errors: { sessionId: string; message: string }[] }> {
@@ -890,34 +915,42 @@ export async function cancel(sessionId: string): Promise<void> {
 export async function setPlanMode(sessionId: string, enabled: boolean): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
+    if (serverManaged.planMode === enabled) return;
     await getServerClient().updateSession(sessionId, { plan_mode: enabled });
     serverManaged.planMode = enabled;
     return;
   }
   const managed = getManagedSession(sessionId);
+  if (managed.planMode === enabled) return;
   await managed.session.setPlanMode(enabled);
+  managed.planMode = enabled;
 }
 
 export async function setThinking(sessionId: string, level: string): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
+    if (serverManaged.thinking === level) return;
     await getServerClient().updateSession(sessionId, { thinking: level });
     serverManaged.thinking = level;
     return;
   }
   const managed = getManagedSession(sessionId);
+  if (managed.thinking === level) return;
   if (!managed.session.setThinking) throw new Error("Official Kimi Code SDK does not expose setThinking on this session");
   await managed.session.setThinking(level);
+  managed.thinking = level;
 }
 
 export async function setPermission(sessionId: string, mode: KimiCodePermissionMode): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
+    if (serverManaged.permission === mode) return;
     await getServerClient().updateSession(sessionId, { permission_mode: mode });
     serverManaged.permission = mode;
     return;
   }
   const managed = getManagedSession(sessionId);
+  if (managed.permission === mode) return;
   await managed.session.setPermission(mode);
   managed.permission = mode;
 }
@@ -1649,7 +1682,16 @@ export function respondQuestion(
   pending.resolve(skipped ? null : { answers, method: "enter" });
 }
 
-function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEngineStatus, permission: KimiCodePermissionMode): KimiCodeEngineSession {
+function registerSession(
+  session: KimiCodeSessionLike,
+  initialStatus: KimiCodeEngineStatus,
+  profile: {
+    model?: string;
+    thinking?: string;
+    permission: KimiCodePermissionMode;
+    planMode?: boolean;
+  },
+): KimiCodeEngineSession {
   sessions.get(session.id)?.unsubscribe();
   attachInteractionHandlers(session);
   const hiddenAgentIds = new Set<string>();
@@ -1664,7 +1706,17 @@ function registerSession(session: KimiCodeSessionLike, initialStatus: KimiCodeEn
     eventSink?.({ sessionId: session.id, event });
     updateStatusFromEvent(session.id, event);
   });
-  const managed: ManagedSession = { session, status: initialStatus, permission, unsubscribe, hiddenAgentIds, btwRuns };
+  const managed: ManagedSession = {
+    session,
+    status: initialStatus,
+    model: profile.model,
+    thinking: profile.thinking,
+    permission: profile.permission,
+    planMode: profile.planMode,
+    unsubscribe,
+    hiddenAgentIds,
+    btwRuns,
+  };
   sessions.set(session.id, managed);
   emitStatus(session.id, initialStatus);
   return toEngineSession(session, initialStatus);
@@ -1727,7 +1779,12 @@ async function fallbackServerSessionToSdk(
     planMode: serverManaged.planMode,
   });
   return sessions.get(session.id) ?? (() => {
-    registerSession(session, "running", serverManaged.permission);
+    registerSession(session, "running", {
+      model: serverManaged.model,
+      thinking: serverManaged.thinking,
+      permission: serverManaged.permission,
+      planMode: serverManaged.planMode,
+    });
     const managed = sessions.get(session.id);
     if (!managed) throw new Error("Kimi Code SDK fallback session registration failed");
     return managed;
