@@ -501,7 +501,7 @@ export function Composer() {
       setSlashCommands([]);
       return;
     }
-    void window.api.listSlashCommands({ sessionId: runtimeSessionId }).then((res) => {
+    void window.api.listKimiCodeSlashCommands({ sessionId: runtimeSessionId }).then((res) => {
       if (cancelled) return;
       if (!res.success) {
         console.warn("List slash commands failed:", res.error);

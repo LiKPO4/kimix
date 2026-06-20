@@ -327,7 +327,7 @@ export function SessionToolbar({
       showToast("当前会话没有可视化的官方 session");
       return;
     }
-    const res = await window.api.startKimiVis({ sessionId: runtimeSessionId });
+    const res = await window.api.startKimiCodeVis({ sessionId: runtimeSessionId });
     if (!res.success) {
       showToast(`打开可视化失败：${res.error}`);
     } else {

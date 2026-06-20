@@ -942,7 +942,7 @@ ${isFinalStep
 async function createSessionAndSendPrompt(projectPath: string, content: string) {
   const appState = useAppStore.getState();
   const sessionStore = useSessionStore.getState();
-  const sessionRes = await window.api.startSession({
+  const sessionRes = await window.api.startKimiCodeRuntime({
     workDir: projectPath,
     thinking: appState.defaultThinking,
     yoloMode: appState.permissionMode === "yolo",
@@ -1237,7 +1237,7 @@ function App() {
     const snapshot = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (!snapshot?.longTask) throw new Error("当前长程任务不存在，无法恢复用户审查流程");
 
-    const startRes = await window.api.startSession({
+    const startRes = await window.api.startKimiCodeRuntime({
       workDir: snapshot.projectPath,
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
@@ -1913,7 +1913,7 @@ function App() {
                 !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, activeProject.path)
               );
 
-              const res = await window.api.listSessions({ workDir: activeProject.path });
+              const res = await window.api.listKimiCodeHistorySessions({ workDir: activeProject.path });
               if (!res.success) return;
               const activeSummaries = res.data.filter(isUsableHistorySession);
               const latest = (activeRuntimeIds.size > 0
@@ -1930,10 +1930,10 @@ function App() {
                 autoMode: useAppStore.getState().permissionMode === "auto",
                 planMode: useAppStore.getState().defaultPlanMode,
               };
-              let startRes = await window.api.startSession(startOptions);
+              let startRes = await window.api.startKimiCodeRuntime(startOptions);
               if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
                 console.warn(`[Kimi Code] startup session ${sessionIdToStart} is missing; creating a fresh runtime`);
-                startRes = await window.api.startSession({
+                startRes = await window.api.startKimiCodeRuntime({
                   ...startOptions,
                   sessionId: undefined,
                 });
@@ -2199,7 +2199,7 @@ function App() {
       });
       const sourceSession = useSessionStore.getState().sessions.find((session) => session.id === detail.sourceSessionId);
       void (async () => {
-        const startRes = await window.api.startSession({
+        const startRes = await window.api.startKimiCodeRuntime({
           workDir: detail.projectPath,
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",

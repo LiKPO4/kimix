@@ -5630,7 +5630,7 @@ ipcMain.handle("kimi-code:setPluginMcpServerEnabled", async (_, request: unknown
   }
 });
 
-ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string }) => {
+ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string }) => {
   try {
     const permission = request.yoloMode ? "yolo" as const : request.autoMode ? "auto" as const : "manual" as const;
     const sameWorkDir = (a: string, b: string) =>
@@ -5691,7 +5691,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
   }
 });
 
-ipcMain.handle("kimi:listSlashCommands", async () => {
+ipcMain.handle("kimi-code:listSlashCommands", async () => {
   return {
     success: true,
     data: [
@@ -5943,7 +5943,7 @@ ipcMain.handle("kimi:closeSession", async (_, request: { sessionId: string }) =>
   }
 });
 
-ipcMain.handle("kimi:listSessions", async (_, request: { workDir: string }) => {
+ipcMain.handle("kimi-code:listHistorySessions", async (_, request: { workDir: string }) => {
   try {
     const sessions = await sessionHistory.getSessions(request.workDir);
     return { success: true, data: sessions };
@@ -5952,7 +5952,7 @@ ipcMain.handle("kimi:listSessions", async (_, request: { workDir: string }) => {
   }
 });
 
-ipcMain.handle("kimi:getUsage", async () => {
+ipcMain.handle("kimi-code:getAccountUsage", async () => {
   try {
     const accessToken = await resolveKimiAccessToken();
     const res = await fetch(KIMI_CODE_USAGE_URL, {
@@ -5978,7 +5978,7 @@ ipcMain.handle("kimi:getUsage", async () => {
   }
 });
 
-ipcMain.handle("kimi:startVis", async (_, request: unknown) => {
+ipcMain.handle("kimi-code:startVis", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const sessionId = typeof req.sessionId === "string" && req.sessionId.trim() ? req.sessionId.trim() : undefined;
@@ -6059,7 +6059,7 @@ ipcMain.handle("kimi:startVis", async (_, request: unknown) => {
   }
 });
 
-ipcMain.handle("kimi:openWebServer", async () => {
+ipcMain.handle("kimi-code:openWebServer", async () => {
   try {
     const kimiPath = await resolveKimiCommand();
     if (!kimiPath) {
@@ -6122,7 +6122,7 @@ ipcMain.handle("project:exportMarkdown", async (_, request: unknown) => {
   }
 });
 
-ipcMain.handle("kimi:exportSession", async (_, request: unknown) => {
+ipcMain.handle("kimi-code:exportSession", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     return {

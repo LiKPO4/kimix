@@ -279,7 +279,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       toast("没有找到可导出的官方会话");
       return;
     }
-    const res = await window.api.exportSession({ sessionId: exportSessionId, title });
+    const res = await window.api.exportKimiCodeSession({ sessionId: exportSessionId, title });
     if (!res.success) {
       toast(`导出失败：${res.error}`);
       return;

@@ -4,7 +4,7 @@
 - 当前目标：按风险从低到高迁移并清理旧版 Kimi 对接接口、无调用功能和过时说明，保留仍承担用户升级与历史会话读取职责的兼容逻辑。
 - 待办：
   1. ✅ 清理无调用的古早 TUI 登录、旧插件安装与 Superpowers 安装接口。
-  2. 将 Renderer 对旧 `kimi:*` IPC 的调用迁移到 `kimi-code:*`，先迁移调用方，再删除兼容入口。
+  2. ✅ 将 Renderer 对旧 `kimi:*` IPC 的调用迁移到 `kimi-code:*`，先迁移调用方，再删除兼容入口。
   3. 迁移依赖旧事件通道的 handoff 等逻辑，随后移除 `kimi:event` / `kimi:status` 双广播与旧 preload 监听。
   4. 清理无引用文件、函数、误提交运行日志和过时用户文案。
   5. 归档或删除已经失去维护价值的旧迁移计划与探针材料。
@@ -14,7 +14,8 @@
 - 关键文件：`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/App.tsx`、`src/components/`、`src/main.tsx`。
 - 已完成：删除会启动裸 `kimi` 并写入 `/login` 的旧 TUI 登录实现；删除已无 Renderer 调用且依赖不存在 CLI 子命令的旧 Plugin 安装入口；删除旧 Superpowers 下载、安装与 bootstrap IPC。历史 Superpowers 消息读取兼容继续保留。
 - 迁移进度：Renderer 的消息发送、停止轮次、关闭会话、加载历史已从旧 `sendPrompt` / `stopTurn` / `closeSession` / `loadSession` 切换到 `sendKimiCodePrompt` / `cancelKimiCodeTurn` / `closeKimiCodeSession` / `loadKimiCodeSession`；对应旧 preload 暴露已删除。
-- 下一步：将 Renderer 对旧 `kimi:*` IPC 的调用迁移到 `kimi-code:*`，先迁移调用方并验证，再删除兼容入口。
+- 迁移进度：启动 runtime、历史列表、slash 列表、会话导出、账户用量、Vis 与 Web Server 保留原有 Kimix 产品语义，但公开方法和 IPC channel 已统一迁入 `kimi-code:*` 命名空间；Renderer 已无旧会话 API 调用。
+- 下一步：删除无调用的旧会话 handler，并迁移 handoff 依赖后移除 `kimi:event` / `kimi:status` 双广播。
 
 ## 2026-06-20 v2.11.9 自动重试静默化
 - 当前目标：避免底层会话失效自动重试时，过程头短暂闪现“消息重新发送中”打扰用户。

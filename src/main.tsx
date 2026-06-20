@@ -175,7 +175,7 @@ function installBrowserPreviewApi() {
     appendLongTaskRound: () => fail("写入长程任务轮次记录"),
     generateHookRule: (): Promise<GenerateHookRuleResponse> => fail("调用规则创建 Agent"),
 
-    startSession: (): Promise<StartSessionResponse> => fail("启动会话"),
+    startKimiCodeRuntime: (): Promise<StartSessionResponse> => fail("启动会话"),
     checkKimiCli: (): Promise<CheckKimiCliResponse> => Promise.resolve({
       success: true,
       data: {
@@ -402,13 +402,13 @@ function installBrowserPreviewApi() {
     steerPrompt: () => fail("继续编辑消息"),
     approveRequest: () => fail("审批操作"),
     respondQuestion: () => fail("回答问题卡片"),
-    listSlashCommands: (): Promise<ListSlashCommandsResponse> => Promise.resolve({ success: true, data: [] }),
-    listSessions: (): Promise<ListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
-    exportSession: (): Promise<ExportSessionResponse> => fail("导出 Kimi Debug ZIP"),
+    listKimiCodeSlashCommands: (): Promise<ListSlashCommandsResponse> => Promise.resolve({ success: true, data: [] }),
+    listKimiCodeHistorySessions: (): Promise<ListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
+    exportKimiCodeSession: (): Promise<ExportSessionResponse> => fail("导出 Kimi Debug ZIP"),
     exportSessionBackup: (): Promise<ExportSessionBackupResponse> => fail("导出 Kimix 会话快照"),
     importSessionBackup: (): Promise<ImportSessionBackupResponse> => fail("导入 Kimix 会话快照"),
     exportMarkdown: (): Promise<ExportMarkdownResponse> => fail("导出 Markdown"),
-    getKimiUsage: (): Promise<KimiUsageResponse> => Promise.resolve({
+    getKimiCodeAccountUsage: (): Promise<KimiUsageResponse> => Promise.resolve({
       success: true,
       data: {
         available: false,
@@ -418,8 +418,8 @@ function installBrowserPreviewApi() {
         message: unsupported("读取 Kimi 用量"),
       },
     }),
-    startKimiVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),
-    openKimiWebServer: (): Promise<VoidResponse> => fail("打开 Kimi Web Server"),
+    startKimiCodeVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),
+    openKimiCodeWebServer: (): Promise<VoidResponse> => fail("打开 Kimi Web Server"),
     createKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("创建 Kimi Code SDK 会话"),
     resumeKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("恢复 Kimi Code SDK 会话"),
     forkKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("派生 Kimi Code SDK 会话"),

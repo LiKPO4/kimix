@@ -458,7 +458,7 @@ export function LongTaskInspectorPanel({
       return;
     }
     setKimiHealthLoading(true);
-    const res = await window.api.startSession({
+    const res = await window.api.startKimiCodeRuntime({
       workDir: projectPathForKimi,
       sessionId: liveCurrentSession.officialSessionId ?? liveCurrentSession.runtimeSessionId ?? liveCurrentSession.id,
       thinking: defaultThinking,

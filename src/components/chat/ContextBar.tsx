@@ -177,7 +177,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     setUsageLoading(true);
     setUsageLoginState("idle");
     try {
-      const res = await window.api.getKimiUsage();
+      const res = await window.api.getKimiCodeAccountUsage();
       if (usageRequestIdRef.current !== requestId) return;
       if (res.success) {
         setUsageData(res.data);

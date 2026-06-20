@@ -101,7 +101,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     if (!open || !currentProject) return;
     if (scope !== "project") return;
     let cancelled = false;
-    void window.api.listSessions({ workDir: currentProject.path }).then((res) => {
+    void window.api.listKimiCodeHistorySessions({ workDir: currentProject.path }).then((res) => {
       if (cancelled || !res.success) return;
       setSearchOnlySessions((current) => {
         const knownIds = new Set([

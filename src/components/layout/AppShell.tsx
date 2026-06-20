@@ -568,7 +568,7 @@ export function AppShell() {
     setWorkspaceView("chat");
     setCurrentSession(placeholder);
     try {
-      const sessionRes = await window.api.startSession({
+      const sessionRes = await window.api.startKimiCodeRuntime({
         workDir: project.path,
         thinking: defaultThinking,
         yoloMode: permissionMode === "yolo",
@@ -849,7 +849,7 @@ export function AppShell() {
     if (action === "toggle-sidebar") toggleSidebar();
     if (action === "toggle-terminal") openProjectTerminal();
     if (action === "open-web-server") {
-      void window.api.openKimiWebServer().then((res) => {
+      void window.api.openKimiCodeWebServer().then((res) => {
         showToast(res.success ? "已打开 Kimi Web Server" : `打开 Web Server 失败：${res.error}`);
       });
     }

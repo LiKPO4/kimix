@@ -231,8 +231,8 @@ const api = {
     ipcRenderer.invoke("hooks:generateRule", req),
 
   // Kimi
-  startSession: (req: StartSessionRequest): Promise<StartSessionResponse> =>
-    ipcRenderer.invoke("kimi:startSession", req),
+  startKimiCodeRuntime: (req: StartSessionRequest): Promise<StartSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:startRuntime", req),
   checkKimiCli: (req?: CheckKimiCliRequest): Promise<CheckKimiCliResponse> =>
     ipcRenderer.invoke("kimi:checkCli", req),
   getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> =>
@@ -285,8 +285,8 @@ const api = {
     ipcRenderer.invoke("kimi:approveRequest", req),
   respondQuestion: (req: RespondQuestionRequest): Promise<RespondQuestionResponse> =>
     ipcRenderer.invoke("kimi:respondQuestion", req),
-  listSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
-    ipcRenderer.invoke("kimi:listSlashCommands", req),
+  listKimiCodeSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
+    ipcRenderer.invoke("kimi-code:listSlashCommands", req),
   previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>
     ipcRenderer.invoke("kimi:previewImportFromCcCodex", req),
   applyImportFromCcCodex: (req: ImportCcCodexApplyRequest): Promise<ImportCcCodexApplyResponse> =>
@@ -295,22 +295,22 @@ const api = {
     ipcRenderer.invoke("kimi:previewThemeImport"),
   applyKimiThemeImport: (req: KimiThemeImportApplyRequest): Promise<KimiThemeImportApplyResponse> =>
     ipcRenderer.invoke("kimi:applyThemeImport", req),
-  listSessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
-    ipcRenderer.invoke("kimi:listSessions", req),
-  exportSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>
-    ipcRenderer.invoke("kimi:exportSession", req),
+  listKimiCodeHistorySessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
+    ipcRenderer.invoke("kimi-code:listHistorySessions", req),
+  exportKimiCodeSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:exportSession", req),
   exportSessionBackup: (req: ExportSessionBackupRequest): Promise<ExportSessionBackupResponse> =>
     ipcRenderer.invoke("project:exportSessionBackup", req),
   importSessionBackup: (req?: ImportSessionBackupRequest): Promise<ImportSessionBackupResponse> =>
     ipcRenderer.invoke("project:importSessionBackup", req),
   exportMarkdown: (req: ExportMarkdownRequest): Promise<ExportMarkdownResponse> =>
     ipcRenderer.invoke("project:exportMarkdown", req),
-  getKimiUsage: (): Promise<KimiUsageResponse> =>
-    ipcRenderer.invoke("kimi:getUsage"),
-  startKimiVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>
-    ipcRenderer.invoke("kimi:startVis", req),
-  openKimiWebServer: (): Promise<VoidResponse> =>
-    ipcRenderer.invoke("kimi:openWebServer"),
+  getKimiCodeAccountUsage: (): Promise<KimiUsageResponse> =>
+    ipcRenderer.invoke("kimi-code:getAccountUsage"),
+  startKimiCodeVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi-code:startVis", req),
+  openKimiCodeWebServer: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi-code:openWebServer"),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {
