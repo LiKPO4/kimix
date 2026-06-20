@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-06-20 v2.11.4 Server slash 官方优先路由
+- 当前目标：让 slash 命令优先进入 Kimi 官方发送链路，Kimix 只保留产品专属本地命令，并在官方发送链路失败时使用旧本地处理兜底。
+- 已完成：新增 slash 分类 helper；`/goal`、`/swarm`、`/compact`、`/undo`、`/btw`、`/reload`、`/status`、`/usage`、`/plan` 改为官方链路优先；`/theme`、`/custom-theme`、`/import-from-cc-codex` 仍由 Kimix 本地处理。
+- 已完成：版本号同步到 v2.11.4，新增对应 release notes；更新 runtime routing 知识，记录“官方 slash 优先、Kimix 专属本地、旧 SDK handler 兜底”的架构不变量。
+- 已验证：`pnpm test:run` 26 个测试文件、199/199 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-V2S8xjRU.js`；`git diff --check` 通过。
+- 边界：如果官方 Server 成功接收 prompt 但在内部判定某个 slash 未支持，Kimix 目前拿不到结构化“未处理”信号，只能把发送链路失败作为自动 fallback 条件。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/utils/slashRouting.ts`、`src/utils/__tests__/slashRouting.test.ts`、`knowledge/architecture/runtime-routing.md`。
+- 下一步：审查并窄范围提交本轮相关文件，不纳入历史未跟踪目录。
+
 ## 2026-06-19 OKF v0.1 项目知识部署
 - 当前目标：把稳定项目知识部署为可移植、可校验、可长期维护的 Open Knowledge Format bundle，同时不破坏现有 `docs/`、release notes 与 `TASK_STATE.md` 的职责边界。
 - 已确认：截图引用的 `GoogleCloudPlatform/knowledge-catalog` 根目录是 Knowledge Catalog 工具/样例仓库，且根 README 声明仓库内容不是 Google 官方产品；OKF 规范提案位于其 `okf/SPEC.md`，当前版本为 `0.1 — Draft`。上游 SPEC 仅强制概念 `type`，同仓库 PoC 实现额外强制 `title/description/timestamp`，Kimix 明确以 SPEC 为规范源、额外要求标记为项目严格 profile。

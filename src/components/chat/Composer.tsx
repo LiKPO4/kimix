@@ -16,6 +16,7 @@ import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
+import { classifySlashCommand } from "@/utils/slashRouting";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -710,7 +711,7 @@ export function Composer() {
 
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
-    if (!ensuredSession) return;
+    if (!ensuredSession) return false;
     let targetSession = ensuredSession;
     const images = options?.images ?? [];
 
@@ -900,7 +901,7 @@ export function Composer() {
         }
         if (!res.success) throw new Error(res.error);
         updateLinkStatus(kimiCodeRouteStatus(res.data.route), "success");
-        return;
+        return true;
       } catch (err) {
         console.error("Kimi Code send failed:", err);
         const message = err instanceof Error ? err.message : String(err);
@@ -922,7 +923,7 @@ export function Composer() {
             updatedAt: Date.now(),
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
-          return;
+          return false;
         }
         setRunningSessionId(null);
         updateSession(targetSession.id, (session) => ({
@@ -942,9 +943,10 @@ export function Composer() {
           ],
           updatedAt: Date.now(),
         }));
-        return;
+        return false;
       }
     }
+    return false;
   };
 
   const settlePendingClarifications = (sessionId: string, status: "skipped" | "answered" = "skipped") => {
@@ -1157,18 +1159,77 @@ export function Composer() {
     if (!match) return false;
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
-    if (name.startsWith("skill:")) return false;
-    if (!["goal", "theme", "custom-theme", "import-from-cc-codex", "compact", "plan", "btw", "undo", "swarm", "reload", "status", "usage"].includes(name)) return false;
+    const routing = classifySlashCommand(name);
+    if (routing !== "local") return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
-    if (name === "goal") {
-      await appendSlashNotice(commandNotice);
-      return handleGoalSlashCommand(content.trim(), args);
-    }
     if (name === "theme") {
       await appendSlashNotice(commandNotice);
       setWorkspaceView("settings");
       await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的 TUI 主题选择器，Kimix 使用独立的全局主题色板。");
       return true;
+    }
+    if (name === "custom-theme") {
+      await sendPromptContent(content.trim(), {
+        outboundContent: buildCustomThemeKickoffPrompt(args),
+        skipClarification: true,
+        postUserStatusMessage: `已接收本地指令：${commandNotice}`,
+      });
+      return true;
+    }
+    if (name === "import-from-cc-codex") {
+      await appendSlashNotice(commandNotice);
+      const [subcommand, previewId] = args.split(/\s+/);
+      if (subcommand === "apply") {
+        if (!previewId) {
+          await appendStatusMessage("请输入预览 ID，例如：/import-from-cc-codex apply abc12345。");
+          return true;
+        }
+        const res = await window.api.applyImportFromCcCodex({ previewId });
+        if (!res.success) {
+          await appendStatusMessage(`导入失败：${res.error}`);
+          return true;
+        }
+        const imported = res.data.imported.length;
+        const skipped = res.data.skipped.length;
+        const backups = res.data.backups.length;
+        await appendStatusMessage(`导入完成：已写入 ${imported} 项，跳过 ${skipped} 项，创建备份 ${backups} 个。请在设置/插件面板刷新确认，必要时重启 Kimi Code 会话。`);
+        return true;
+      }
+      if (args) {
+        await appendStatusMessage("当前仅支持 /import-from-cc-codex 生成安全预览，或 /import-from-cc-codex apply <预览ID> 应用预览。");
+        return true;
+      }
+      const res = await window.api.previewImportFromCcCodex({ workDir: currentProject?.path });
+      if (!res.success) {
+        await appendStatusMessage(`生成导入预览失败：${res.error}`);
+        return true;
+      }
+      const writable = res.data.items.filter((item) => item.action !== "skip");
+      const previewLines = [
+        `已生成 Claude Code / Codex 导入预览：${res.data.previewId}`,
+        `将导入：${summarizeImportPlan(res.data.items)}。`,
+        res.data.projectRoot ? `项目范围：${res.data.projectRoot}` : "项目范围：未找到 .git 根目录，仅预览用户级配置。",
+        res.data.warnings.length > 0 ? `注意：${res.data.warnings.slice(0, 2).join("；")}` : "",
+        writable.length > 0
+          ? `确认无误后发送：/import-from-cc-codex apply ${res.data.previewId}`
+          : "没有发现需要写入的新内容。",
+      ].filter(Boolean);
+      await appendStatusMessage(previewLines.join("\n"));
+      return true;
+    }
+    return false;
+  };
+
+  const handleFallbackSlashCommand = async (content: string) => {
+    const match = content.trim().match(slashCommandPattern);
+    if (!match) return false;
+    const name = match[1].toLowerCase();
+    const args = (match[2] ?? "").trim();
+    if (classifySlashCommand(name) !== "official-first") return false;
+    const commandNotice = args ? `/${name} ${args}` : `/${name}`;
+    if (name === "goal") {
+      await appendSlashNotice(commandNotice);
+      return handleGoalSlashCommand(content.trim(), args);
     }
     if (name === "swarm") {
       const normalized = args.toLowerCase();
@@ -1227,55 +1288,6 @@ export function Composer() {
           updatedAt: Date.now(),
         }));
       }
-      return true;
-    }
-    if (name === "custom-theme") {
-      await sendPromptContent(content.trim(), {
-        outboundContent: buildCustomThemeKickoffPrompt(args),
-        skipClarification: true,
-        postUserStatusMessage: `已接收本地指令：${commandNotice}`,
-      });
-      return true;
-    }
-    if (name === "import-from-cc-codex") {
-      await appendSlashNotice(commandNotice);
-      const [subcommand, previewId] = args.split(/\s+/);
-      if (subcommand === "apply") {
-        if (!previewId) {
-          await appendStatusMessage("请输入预览 ID，例如：/import-from-cc-codex apply abc12345。");
-          return true;
-        }
-        const res = await window.api.applyImportFromCcCodex({ previewId });
-        if (!res.success) {
-          await appendStatusMessage(`导入失败：${res.error}`);
-          return true;
-        }
-        const imported = res.data.imported.length;
-        const skipped = res.data.skipped.length;
-        const backups = res.data.backups.length;
-        await appendStatusMessage(`导入完成：已写入 ${imported} 项，跳过 ${skipped} 项，创建备份 ${backups} 个。请在设置/插件面板刷新确认，必要时重启 Kimi Code 会话。`);
-        return true;
-      }
-      if (args) {
-        await appendStatusMessage("当前仅支持 /import-from-cc-codex 生成安全预览，或 /import-from-cc-codex apply <预览ID> 应用预览。");
-        return true;
-      }
-      const res = await window.api.previewImportFromCcCodex({ workDir: currentProject?.path });
-      if (!res.success) {
-        await appendStatusMessage(`生成导入预览失败：${res.error}`);
-        return true;
-      }
-      const writable = res.data.items.filter((item) => item.action !== "skip");
-      const previewLines = [
-        `已生成 Claude Code / Codex 导入预览：${res.data.previewId}`,
-        `将导入：${summarizeImportPlan(res.data.items)}。`,
-        res.data.projectRoot ? `项目范围：${res.data.projectRoot}` : "项目范围：未找到 .git 根目录，仅预览用户级配置。",
-        res.data.warnings.length > 0 ? `注意：${res.data.warnings.slice(0, 2).join("；")}` : "",
-        writable.length > 0
-          ? `确认无误后发送：/import-from-cc-codex apply ${res.data.previewId}`
-          : "没有发现需要写入的新内容。",
-      ].filter(Boolean);
-      await appendStatusMessage(previewLines.join("\n"));
       return true;
     }
     if (name === "compact") {
@@ -1504,7 +1516,10 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    await sendPromptContent(trimmed, { images: imagesToSend });
+    const sent = await sendPromptContent(trimmed, { images: imagesToSend, skipClarification: trimmed.startsWith("/") });
+    if (!sent && trimmed.startsWith("/")) {
+      await handleFallbackSlashCommand(trimmed);
+    }
   };
 
   const handleApplyThemeImport = async (themeId: string) => {
