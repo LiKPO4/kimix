@@ -34,6 +34,12 @@ export function isEmptyStatusUpdate(event: Extract<TimelineEvent, { type: "statu
     (event.contextSize ?? 0) === 0;
 }
 
+export function shouldShowInlineStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {
+  const message = event.message?.trim() ?? "";
+  if (message.startsWith("模型：")) return true;
+  return !isEmptyStatusUpdate(event);
+}
+
 export function hasMetricStatus(event: Extract<TimelineEvent, { type: "status_update" }>) {
   return event.inputTokenCount !== undefined ||
     event.tokenCount !== undefined ||

@@ -6,6 +6,7 @@ import {
   getLatestMetricStatus,
   getLatestMeaningfulStatus,
   getSessionRecommendationMetrics,
+  shouldShowInlineStatusUpdate,
   shouldRecommendNewSession,
 } from "../sessionMetrics";
 import type { Session, TimelineEvent } from "@/types/ui";
@@ -110,6 +111,26 @@ describe("getLatestMetricStatus", () => {
       { id: "2", type: "status_update", timestamp: 2, message: "模型：kimi-for-coding" },
     ];
     expect(getLatestMetricStatus(events)?.contextSize).toBe(1200);
+  });
+});
+
+describe("shouldShowInlineStatusUpdate", () => {
+  it("keeps model-only statuses available for assistant footer bubbles", () => {
+    const status: Extract<TimelineEvent, { type: "status_update" }> = {
+      id: "1",
+      type: "status_update",
+      timestamp: 1,
+      message: "模型：kimi-for-coding",
+    };
+
+    expect(isEmptyStatusUpdate(status)).toBe(true);
+    expect(shouldShowInlineStatusUpdate(status)).toBe(true);
+  });
+
+  it("still hides transient retry and interrupted statuses in footer bubbles", () => {
+    expect(
+      shouldShowInlineStatusUpdate({ id: "1", type: "status_update", timestamp: 1, step: 2, message: "输出打断" }),
+    ).toBe(false);
   });
 });
 

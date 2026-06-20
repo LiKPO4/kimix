@@ -1038,7 +1038,7 @@ function AssistantMessageFooter({
       {statuses.length > 0 ? (
         <div className="flex min-w-0 max-w-full items-center justify-center" style={{ gap: 8, paddingLeft: 86, paddingRight: 86 }}>
           {statuses.map((status) => (
-            <StatusCard key={status.id} event={status} inline />
+            <StatusCard key={status.id} event={status} inline allowModelOnly />
           ))}
         </div>
       ) : (
