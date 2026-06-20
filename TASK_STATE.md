@@ -3291,3 +3291,29 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `pnpm build` 通过，renderer hash：`assets/index-BlN3VQq1.js`。
 - OKF 严格校验、v0.1 规范校验、180 天维护审计均通过。
 - `git diff --check` 通过，仅有 LF/CRLF 提示。
+
+# 2026-06-20 v2.11.1 查看菜单 Web Server 入口
+## 当前目标
+- 去掉未实现的文件树入口，把浏览器入口改为真实打开 Kimi Web Server。
+## 已完成
+- 查看菜单移除“切换文件树”。
+- “打开浏览器标签页”改为“打开 Web Server”，不再显示准备中占位。
+- 新增 `kimi:openWebServer` IPC，调用官方 `kimi web`，让 Kimi Code 启动 Web Server 并打开浏览器页面。
+- 版本号三处同步到 v2.11.1。
+## 未完成
+- 等待用户用 v2.11.1 实机复验菜单入口和浏览器页面。
+## 关键文件
+- `src/components/layout/TopMenuBar.tsx`
+- `src/components/layout/AppShell.tsx`
+- `electron/main.ts`
+- `electron/preload.ts`
+## 下一步
+- 验证菜单类型、构建和测试；实机点击“查看 → 打开 Web Server”确认浏览器页面打开。
+
+## 验证
+- 旧菜单入口搜索通过：`切换文件树`、`打开浏览器标签页`、`toggle-file-tree`、`open-browser-tab` 在 `src/`、`electron/`、`package.json` 中无残留。
+- `pnpm test:run` 通过：25 个测试文件、196/196。
+- `pnpm build` 通过，renderer hash：`assets/index-BHMqkYGH.js`。
+- `pnpm knowledge:validate` 通过。
+- `git diff --check` 通过，仅有 LF/CRLF 提示。
+- 真实命令验证：本机执行 `kimi web`，进程以 code=0 正常交给官方命令处理。

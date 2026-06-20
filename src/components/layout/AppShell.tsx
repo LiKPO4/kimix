@@ -168,8 +168,7 @@ const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: strin
   "select-all": { title: "", body: "" },
   "toggle-sidebar": { title: "", body: "" },
   "toggle-terminal": { title: "", body: "" },
-  "toggle-file-tree": { title: "", body: "" },
-  "open-browser-tab": { title: "", body: "" },
+  "open-web-server": { title: "", body: "" },
   "reload-browser-page": { title: "", body: "" },
   "toggle-diff-panel": { title: "", body: "" },
   find: { title: "", body: "" },
@@ -849,6 +848,11 @@ export function AppShell() {
     if (action === "select-all") sendDocumentCommand("selectAll");
     if (action === "toggle-sidebar") toggleSidebar();
     if (action === "toggle-terminal") openProjectTerminal();
+    if (action === "open-web-server") {
+      void window.api.openKimiWebServer().then((res) => {
+        showToast(res.success ? "已打开 Kimi Web Server" : `打开 Web Server 失败：${res.error}`);
+      });
+    }
     if (action === "toggle-diff-panel") {
       setLongTaskInspectorOpen(false);
       setDiffPanelOpen(!diffPanelOpen);
@@ -882,7 +886,7 @@ export function AppShell() {
     if (action === "mcp") {
       void openPluginWorkspace("mcp");
     }
-    if (["automations", "local-environments", "worktrees", "troubleshooting", "performance-trace", "toggle-file-tree", "open-browser-tab", "new-window"].includes(action)) {
+    if (["automations", "local-environments", "worktrees", "troubleshooting", "performance-trace", "new-window"].includes(action)) {
       openInfoTopic(action);
     }
   };

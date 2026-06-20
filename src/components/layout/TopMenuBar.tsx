@@ -30,8 +30,7 @@ type MenuAction =
   | "select-all"
   | "toggle-sidebar"
   | "toggle-terminal"
-  | "toggle-file-tree"
-  | "open-browser-tab"
+  | "open-web-server"
   | "reload-browser-page"
   | "toggle-diff-panel"
   | "find"
@@ -88,8 +87,7 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
   查看: [
     { label: "切换侧边栏", hint: "Ctrl+B", action: "toggle-sidebar" },
     { label: "打开终端", hint: "Ctrl+J", action: "toggle-terminal" },
-    { label: "切换文件树", hint: "Ctrl+Shift+E", action: "toggle-file-tree", disabled: true, note: "文件树面板暂未实现" },
-    { label: "打开浏览器标签页", hint: "Ctrl+T", action: "open-browser-tab", disabled: true, note: "内置浏览器页暂未实现" },
+    { label: "打开 Web Server", hint: "Ctrl+T", action: "open-web-server" },
     { label: "重新载入页面", hint: "Ctrl+R", action: "reload-browser-page" },
     { label: "切换文件预览", hint: "Alt+Ctrl+B", action: "toggle-diff-panel" },
     { label: "查找", hint: "Ctrl+F", action: "find" },

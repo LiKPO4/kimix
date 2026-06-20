@@ -429,6 +429,7 @@ function installBrowserPreviewApi() {
       },
     }),
     startKimiVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),
+    openKimiWebServer: (): Promise<VoidResponse> => fail("打开 Kimi Web Server"),
     createKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("创建 Kimi Code SDK 会话"),
     resumeKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("恢复 Kimi Code SDK 会话"),
     forkKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("派生 Kimi Code SDK 会话"),

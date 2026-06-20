@@ -6373,6 +6373,52 @@ ipcMain.handle("kimi:startVis", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi:openWebServer", async () => {
+  try {
+    const kimiPath = await resolveKimiCommand();
+    if (!kimiPath) {
+      return { success: false, error: "未找到 Kimi Code。请先安装并在终端运行 'kimi --version' 确认可用。" };
+    }
+
+    try {
+      await runCommand(kimiPath, ["--version"]);
+    } catch {
+      return { success: false, error: `找到 kimi 路径 ${kimiPath}，但无法运行。请检查安装是否完整。` };
+    }
+
+    const child = spawn(kimiPath, ["web"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      cwd: os.homedir(),
+      env: getKimiCodeCommandEnv(),
+    });
+
+    let exitCode: number | null | undefined;
+    child.on("error", (err) => {
+      console.error("[KIMI WEB] spawn error:", err);
+    });
+    child.on("exit", (code) => {
+      exitCode = code;
+      console.warn(`[KIMI WEB] exited with code ${code ?? "unknown"}`);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    if (exitCode !== undefined && exitCode !== 0) {
+      return {
+        success: false,
+        error: "启动 kimi web 失败。请确认 Kimi Code CLI 已更新，并支持 web 命令。",
+      };
+    }
+
+    child.unref();
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; sessionId: string }) => {
   try {
     const events = await sessionHistory.getSessionHistory(request.workDir, request.sessionId);

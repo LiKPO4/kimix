@@ -335,6 +335,8 @@ const api = {
     ipcRenderer.invoke("kimi:getUsage"),
   startKimiVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi:startVis", req),
+  openKimiWebServer: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi:openWebServer"),
 
   // Event listeners
   onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {
