@@ -429,7 +429,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     setCurrentSession(session);
     if (session.events.some((event) => event.type === "user_message" || event.type === "assistant_message")) return;
 
-    const loaded = await window.api.loadSession({
+    const loaded = await window.api.loadKimiCodeSession({
       workDir: session.projectPath,
       sessionId: getRuntimeSessionId(session) ?? session.id,
     });

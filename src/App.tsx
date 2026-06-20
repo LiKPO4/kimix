@@ -984,7 +984,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     updatedAt: Date.now(),
   }));
   useAppStore.getState().setRunningSessionId(session.id);
-  await window.api.sendPrompt({
+  await window.api.sendKimiCodePrompt({
     sessionId: session.id,
     content,
     thinking: appState.defaultThinking,
@@ -1269,7 +1269,7 @@ function App() {
     persistLongTaskMeta(latest);
     upsertLongTaskAgentProxyMessage(uiSessionId, "reviewer", "running");
 
-    const sendRes = await window.api.sendPrompt({
+    const sendRes = await window.api.sendKimiCodePrompt({
       sessionId: startRes.data.sessionId,
       content: prompt,
       thinking: defaultThinking,
@@ -1516,7 +1516,7 @@ function App() {
     syncCurrentSessionFromStore(uiSessionId);
     persistLongTaskMeta(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId));
     setRunningSessionId(uiSessionId);
-    void window.api.sendPrompt({
+    void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.executorSessionId,
       content: prompt,
       thinking: defaultThinking,
@@ -1596,7 +1596,7 @@ function App() {
       }).catch(() => {});
     }
     setRunningSessionId(uiSessionId);
-    void window.api.sendPrompt({
+    void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.reviewerSessionId,
       content: buildLongTaskReviewPrompt(latestForPrompt),
       thinking: defaultThinking,
@@ -1835,7 +1835,7 @@ function App() {
     syncCurrentSessionFromStore(uiSessionId);
     persistLongTaskMeta(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId));
     setRunningSessionId(uiSessionId);
-    void window.api.sendPrompt({
+    void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.executorSessionId,
       content: prompt,
       thinking: defaultThinking,
@@ -1976,7 +1976,7 @@ function App() {
                 return;
               }
               const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id);
-              const loaded = await window.api.loadSession({
+              const loaded = await window.api.loadKimiCodeSession({
                 workDir: activeProject.path,
                 sessionId: historySessionId,
               });
@@ -2152,7 +2152,7 @@ function App() {
     const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
       handoffJobRef.current = null;
       window.clearTimeout(job.timeoutId);
-      void window.api.closeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
+      void window.api.closeKimiCodeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
       if (status !== "completed") {
         setHandoffSessionId(null);
         setRunningSessionId(null);
@@ -2221,7 +2221,7 @@ function App() {
           timeoutId,
         };
         const prompt = buildHandoffPrompt(sourceSession);
-        const sendRes = await window.api.sendPrompt({
+        const sendRes = await window.api.sendKimiCodePrompt({
           sessionId: startRes.data.sessionId,
           content: prompt,
           thinking: useAppStore.getState().defaultThinking,
@@ -2235,7 +2235,7 @@ function App() {
         if (job?.timeoutId) window.clearTimeout(job.timeoutId);
         setHandoffSessionId(null);
         setRunningSessionId(null);
-        if (job?.runtimeSessionId) void window.api.closeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
+        if (job?.runtimeSessionId) void window.api.closeKimiCodeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
         updateRecommendationEvent(detail.sourceSessionId, detail.recommendationEventId, {
           handoffStatus: "error",
           handoffError: err instanceof Error ? err.message : String(err),

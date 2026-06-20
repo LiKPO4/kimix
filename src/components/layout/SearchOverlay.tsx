@@ -58,8 +58,8 @@ function formatResumeCommand(session: KimiCodeSessionSummary): string {
 
 function loadWithTimeout(session: Session, timeoutMs = 8000) {
   return Promise.race([
-    window.api.loadSession({ workDir: session.projectPath, sessionId: getRuntimeSessionId(session) ?? session.id }),
-    new Promise<Awaited<ReturnType<typeof window.api.loadSession>>>((resolve) => {
+    window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId: getRuntimeSessionId(session) ?? session.id }),
+    new Promise<Awaited<ReturnType<typeof window.api.loadKimiCodeSession>>>((resolve) => {
       window.setTimeout(() => resolve({ success: false, error: "加载超时" }), timeoutMs);
     }),
   ]);

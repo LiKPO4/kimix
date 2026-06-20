@@ -1137,7 +1137,7 @@ export function ChatThread() {
       ),
       updatedAt: dispatchStartedAt,
     }));
-    const res = await window.api.sendPrompt({
+    const res = await window.api.sendKimiCodePrompt({
       sessionId: runtimeSessionId,
       content: lastPrompt.content,
       images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl) : [],

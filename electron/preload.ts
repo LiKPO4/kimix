@@ -41,20 +41,14 @@ import type {
   TestMcpServerResponse,
   TestKimiModelConfigResponse,
   UpdateKimiCliResponse,
-  SendPromptRequest,
-  SendPromptResponse,
   SetPlanModeRequest,
   SetPlanModeResponse,
   SteerPromptRequest,
   SteerPromptResponse,
-  StopTurnRequest,
-  StopTurnResponse,
   ApproveRequest,
   ApproveResponse,
   RespondQuestionRequest,
   RespondQuestionResponse,
-  CloseSessionRequest,
-  CloseSessionResponse,
   ListSessionsRequest,
   ListSessionsResponse,
   ListSlashCommandsRequest,
@@ -66,8 +60,6 @@ import type {
   KimiThemeImportApplyRequest,
   KimiThemeImportApplyResponse,
   KimiThemeImportPreviewResponse,
-  LoadSessionRequest,
-  LoadSessionResponse,
   ExportSessionRequest,
   ExportSessionResponse,
   ExportSessionBackupRequest,
@@ -285,20 +277,14 @@ const api = {
     ipcRenderer.invoke("kimi:checkCliUpdate"),
   updateKimiCli: (): Promise<UpdateKimiCliResponse> =>
     ipcRenderer.invoke("kimi:updateCli"),
-  sendPrompt: (req: SendPromptRequest): Promise<SendPromptResponse> =>
-    ipcRenderer.invoke("kimi:sendPrompt", req),
   setPlanMode: (req: SetPlanModeRequest): Promise<SetPlanModeResponse> =>
     ipcRenderer.invoke("kimi:setPlanMode", req),
   steerPrompt: (req: SteerPromptRequest): Promise<SteerPromptResponse> =>
     ipcRenderer.invoke("kimi:steerPrompt", req),
-  stopTurn: (req: StopTurnRequest): Promise<StopTurnResponse> =>
-    ipcRenderer.invoke("kimi:stopTurn", req),
   approveRequest: (req: ApproveRequest): Promise<ApproveResponse> =>
     ipcRenderer.invoke("kimi:approveRequest", req),
   respondQuestion: (req: RespondQuestionRequest): Promise<RespondQuestionResponse> =>
     ipcRenderer.invoke("kimi:respondQuestion", req),
-  closeSession: (req: CloseSessionRequest): Promise<CloseSessionResponse> =>
-    ipcRenderer.invoke("kimi:closeSession", req),
   listSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
     ipcRenderer.invoke("kimi:listSlashCommands", req),
   previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>
@@ -311,8 +297,6 @@ const api = {
     ipcRenderer.invoke("kimi:applyThemeImport", req),
   listSessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
     ipcRenderer.invoke("kimi:listSessions", req),
-  loadSession: (req: LoadSessionRequest): Promise<LoadSessionResponse> =>
-    ipcRenderer.invoke("kimi:loadSession", req),
   exportSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>
     ipcRenderer.invoke("kimi:exportSession", req),
   exportSessionBackup: (req: ExportSessionBackupRequest): Promise<ExportSessionBackupResponse> =>

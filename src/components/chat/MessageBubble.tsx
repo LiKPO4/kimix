@@ -349,7 +349,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
       return;
     }
     try {
-      const res = await window.api.sendPrompt({
+      const res = await window.api.sendKimiCodePrompt({
         sessionId: runtimeSessionId,
         content: contentWithFileAttachments(event.content, images),
         images: promptImages(images),

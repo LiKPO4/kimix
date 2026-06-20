@@ -1111,7 +1111,7 @@ export function AppShell() {
     try {
       if (options?.stopRunning) {
         const runtimeSessionId = getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id;
-        await window.api.stopTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
+        await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
       }
       updateSession(liveCurrentSession.id, (session) => {
         if (!session.longTask) return session;
@@ -1263,7 +1263,7 @@ ${isFinalStep
       }));
       setCurrentSession(useSessionStore.getState().sessions.find((session) => session.id === latestSession.id) ?? latestSession);
       setRunningSessionId(latestSession.id);
-      const res = await window.api.sendPrompt({
+      const res = await window.api.sendKimiCodePrompt({
         sessionId: latestSession.longTask?.executorSessionId ?? latestSession.runtimeSessionId ?? latestSession.id,
         content: prompt,
         thinking: defaultThinking,

@@ -13,6 +13,7 @@
 - 提交策略：每个可独立验证的迁移增量单独窄范围提交；禁止 `git add .`，不处理历史未跟踪文件。
 - 关键文件：`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/App.tsx`、`src/components/`、`src/main.tsx`。
 - 已完成：删除会启动裸 `kimi` 并写入 `/login` 的旧 TUI 登录实现；删除已无 Renderer 调用且依赖不存在 CLI 子命令的旧 Plugin 安装入口；删除旧 Superpowers 下载、安装与 bootstrap IPC。历史 Superpowers 消息读取兼容继续保留。
+- 迁移进度：Renderer 的消息发送、停止轮次、关闭会话、加载历史已从旧 `sendPrompt` / `stopTurn` / `closeSession` / `loadSession` 切换到 `sendKimiCodePrompt` / `cancelKimiCodeTurn` / `closeKimiCodeSession` / `loadKimiCodeSession`；对应旧 preload 暴露已删除。
 - 下一步：将 Renderer 对旧 `kimi:*` IPC 的调用迁移到 `kimi-code:*`，先迁移调用方并验证，再删除兼容入口。
 
 ## 2026-06-20 v2.11.9 自动重试静默化
