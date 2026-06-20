@@ -1954,6 +1954,19 @@ export type KimiCodeStatusPayload = {
   status: KimiCodeEngineStatus;
 };
 
+export type LoggerWriteRequest = {
+  level?: "debug" | "info" | "warn" | "error";
+  message: string;
+  data?: unknown;
+};
+
+export type LoggerWriteResponse = {
+  success: true;
+} | {
+  success: false;
+  error: string;
+};
+
 export type WindowControlResponse = {
   success: true;
 } | {

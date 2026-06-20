@@ -14,7 +14,7 @@ import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import * as longTaskService from "./longTaskService";
-import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload } from "./types/ipc";
+import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -6268,6 +6268,44 @@ ipcMain.handle("app:cancelShutdown", async () => {
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
+});
+
+// --- 诊断日志落盘（供 renderer 主动写本地文件，方便排查"画面看不到内容"这类问题） ---
+function getDiagLogPath() {
+  return path.join(app.getPath("userData"), "diag.log");
+}
+
+function appendDiagLine(line: string) {
+  try {
+    const filePath = getDiagLogPath();
+    // 超过 2MB 则保留尾部 512KB，避免无限增长
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.size > 2 * 1024 * 1024) {
+        const buf = fs.readFileSync(filePath);
+        const tail = buf.slice(Math.max(0, buf.length - 512 * 1024));
+        fs.writeFileSync(filePath, tail);
+      }
+    } catch { /* file may not exist yet */ }
+    fs.appendFileSync(filePath, line + "\n", "utf8");
+  } catch (error) {
+    console.warn("[diag] failed to append diag.log:", error);
+  }
+}
+
+ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
+  const msg = request && typeof request === "object" && typeof (request as { message?: unknown }).message === "string"
+    ? (request as { message: string }).message
+    : typeof request === "string"
+      ? request
+      : "";
+  if (!msg) return { success: false, error: "empty message" };
+  appendDiagLine(`[${new Date().toISOString()}] ${msg}`);
+  return { success: true, data: undefined };
+});
+
+ipcMain.handle("app:getDiagLogPath", async () => {
+  return { success: true, data: getDiagLogPath() };
 });
 
 ipcMain.handle("app:openExternal", async (_, url: string) => {

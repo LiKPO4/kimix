@@ -1012,6 +1012,7 @@ export function ChatThread() {
           currentSessionId: session?.id,
           matches: session?.id === primingSessionId,
         });
+        window.api.writeDiag?.({ message: "[ChatThread] rAF setPrimedSessionId", data: { primingSessionId, currentSessionId: session?.id, matches: session?.id === primingSessionId } }).catch(() => {});
         setPrimedSessionId(primingSessionId);
         window.requestAnimationFrame(keepSessionAtBottom);
       });
@@ -1244,7 +1245,7 @@ export function ChatThread() {
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
 
   useEffect(() => {
-    console.log("[ChatThread] render state", {
+    const data = {
       sessionId: session?.id,
       primedSessionId,
       isSessionScrollPrimed,
@@ -1252,15 +1253,19 @@ export function ChatThread() {
       hasActiveTurn,
       eventsLength: session?.events.length ?? 0,
       renderItemsLength: renderItems.length,
-    });
+    };
+    console.log("[ChatThread] render state", data);
+    window.api.writeDiag?.({ message: "[ChatThread] render state", data }).catch(() => {});
     if (session?.id && !isSessionScrollPrimed) {
       const node = scrollRef.current;
-      console.log("[ChatThread] visibility check", {
+      const visibilityData = {
         sessionId: session?.id,
         domVisibility: node ? getComputedStyle(node).visibility : "no-node",
         domScrollHeight: node?.scrollHeight,
         domClientHeight: node?.clientHeight,
-      });
+      };
+      console.log("[ChatThread] visibility check", visibilityData);
+      window.api.writeDiag?.({ message: "[ChatThread] visibility check", data: visibilityData }).catch(() => {});
     }
   });
 
