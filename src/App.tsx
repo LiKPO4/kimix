@@ -1710,17 +1710,7 @@ function App() {
         if (isKimiActiveTurnError(message)) {
           updateSession(uiSessionId, (session) => ({
             ...session,
-            events: [
-              ...session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
-              {
-                id: crypto.randomUUID(),
-                type: "status_update" as const,
-                timestamp: Date.now(),
-                message: "官方仍有未结束的轮次，Kimix 已恢复运行态；队列消息会在当前轮结束后继续发送。",
-                source: "ipc" as const,
-                tone: "warning" as const,
-              },
-            ],
+            events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
             updatedAt: Date.now(),
           }));
           setRunningSessionId(uiSessionId);
@@ -2592,17 +2582,7 @@ function App() {
               if (isKimiActiveTurnError(message)) {
                 updateSession(uiSessionId, (session) => ({
                   ...session,
-                  events: [
-                    ...session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
-                    {
-                      id: crypto.randomUUID(),
-                      type: "status_update" as const,
-                      timestamp: Date.now(),
-                      message: "官方仍有未结束的轮次，Kimix 已恢复运行态；队列消息会在当前轮结束后继续发送。",
-                      source: "ipc" as const,
-                      tone: "warning" as const,
-                    },
-                  ],
+                  events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
                   updatedAt: Date.now(),
                 }));
                 setRunningSessionId(uiSessionId);

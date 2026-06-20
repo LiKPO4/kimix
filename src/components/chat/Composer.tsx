@@ -909,20 +909,13 @@ export function Composer() {
           setRunningSessionId(targetSession.id);
           updateSession(targetSession.id, (session) => ({
             ...session,
-            events: [
-              ...removeLocalSendAttempt(session.events, userEvent.id, responsePlaceholder.id, shouldAddUserEvent),
-              {
-                id: genId(),
-                type: "status_update",
-                timestamp: Date.now(),
-                message: "官方仍有未结束的轮次，Kimix 已恢复运行态。请等待当前轮结束，或点击停止后再发送新消息。",
-                source: "ipc",
-                tone: "warning",
-              },
-            ],
+            events: removeLocalSendAttempt(session.events, userEvent.id, responsePlaceholder.id, shouldAddUserEvent),
             updatedAt: Date.now(),
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: "上一轮仍在运行，请等待或停止后再发送。",
+          }));
           return false;
         }
         setRunningSessionId(null);

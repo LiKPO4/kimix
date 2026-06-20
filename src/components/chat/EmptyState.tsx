@@ -231,18 +231,17 @@ export function EmptyState() {
           setRunningSessionId(targetSession.id);
           updateSession(targetSession.id, (session) => ({
             ...session,
-            events: [
-              ...session.events.filter((event) => event.id !== userEvent.id && event.id !== responsePlaceholder.id),
-              {
-                id: genId(),
-                type: "status_update",
-                timestamp: Date.now(),
-                message: "官方仍有未结束的轮次，Kimix 已恢复运行态。请等待当前轮结束，或点击停止后再发送新消息。",
-                source: "ipc",
-                tone: "warning",
-              },
-            ],
+            events: session.events.filter((event) => (
+              event.id !== userEvent.id &&
+              event.id !== responsePlaceholder.id &&
+              event.id !== linkStatusEvent.id
+            )),
             updatedAt: Date.now(),
+          }));
+          const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession?.id);
+          if (updated) setCurrentSession(updated);
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: "上一轮仍在运行，请等待或停止后再发送。",
           }));
           return;
         }

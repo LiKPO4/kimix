@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-20 v2.11.8 活跃轮次冲突提示收口
+- 当前目标：避免“官方仍有未结束的轮次”作为消息头写入对话流。
+- 根因：正常发送前已有本地 active-turn 队列拦截；当本地运行态短暂落后于官方状态时，官方提交仍会原子拒绝新 turn，旧兜底在回滚发送后额外写入一条 `status_update`，因此显示成消息头。
+- 已完成：保留官方拒绝作为竞态兜底，但普通发送冲突时只回滚本次用户消息、发送状态和 assistant 占位，并通过 Toast 提示“上一轮仍在运行，请等待或停止后再发送”；队列自动续发冲突时静默放回队列，两者都不再生成消息头。
+- 已验证：`pnpm test:run` 26 个测试文件、200/200 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-nBQAfEN7.js`；`git diff --check` 通过。
+- 关键文件：`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/chat/EmptyState.tsx`。
+- 下一步：窄范围提交本轮竞态提示收口。
+
 ## 2026-06-20 v2.11.7 发送状态文案简化
 - 当前目标：去除对话里发送消息开头状态对 Kimi Server / Kimi SDK 链路的区分，统一成用户更容易理解的简短文案。
 - 已完成：普通发送、空态建议发送和发送结果回写统一显示“消息发送中”；runtime 失效重试时显示“消息重新发送中”，不再暴露 server/sdk/runtime 等内部实现词。
