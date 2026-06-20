@@ -2,10 +2,10 @@
 
 ## 2026-06-20 v2.11.4 Server slash 官方优先路由
 - 当前目标：让 slash 命令优先进入 Kimi 官方发送链路，Kimix 只保留产品专属本地命令，并在官方发送链路失败时使用旧本地处理兜底。
-- 已完成：新增 slash 分类 helper；`/goal`、`/swarm`、`/compact`、`/undo`、`/btw`、`/reload`、`/status`、`/usage`、`/plan` 改为官方链路优先；`/theme`、`/custom-theme`、`/import-from-cc-codex` 仍由 Kimix 本地处理。
+- 已完成：新增 slash 分类 helper；`/goal`、`/swarm`、`/compact`、`/undo`、`/btw`、`/reload`、`/status`、`/usage`、`/plan`、`/skill:...` 改为官方链路优先；`/theme`、`/custom-theme`、`/import-from-cc-codex` 仍由 Kimix 本地处理。
 - 已完成：新增真实 Server slash 探针 `pnpm probe:kimi-server-slash`，默认只跑低风险命令；`KIMIX_KIMI_SERVER_SLASH_PROBE_MUTATING=1` 时才跑 `/compact`、`/undo`、`/btw`、`/swarm off` 等可变更探针。
 - 已完成：版本号同步到 v2.11.4，新增对应 release notes；更新 runtime routing 知识，记录“官方 slash 优先、Kimix 专属本地、旧 SDK handler 兜底”的架构不变量。
-- 已验证：`pnpm probe:kimi-server-slash` 默认安全探针 5/5 通过；开启 `KIMIX_KIMI_SERVER_SLASH_PROBE_MUTATING=1` 后全量探针 9/9 通过，包括 `/compact`、`/undo`、`/btw`、`/swarm off`；`pnpm test:run` 26 个测试文件、199/199 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-V2S8xjRU.js`；`git diff --check` 通过。
+- 已验证：`pnpm probe:kimi-server-slash` 默认安全探针 8/8 通过；开启 `KIMIX_KIMI_SERVER_SLASH_PROBE_MUTATING=1` 与 `KIMIX_KIMI_SERVER_SLASH_PROBE_EXHAUSTIVE=1` 后全量探针 18/18 通过，包括 `/compact`、`/undo`、`/btw`、`/swarm on/off`、Goal start/pause/resume/cancel 和 `/skill:kimix-probe`；`pnpm test:run` 26 个测试文件、200/200 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-CnWF7KRM.js`；`git diff --check` 通过。
 - 边界：如果官方 Server 成功接收 prompt 但在内部判定某个 slash 未支持，Kimix 目前拿不到结构化“未处理”信号，只能把发送链路失败作为自动 fallback 条件。
 - 关键文件：`src/components/chat/Composer.tsx`、`src/utils/slashRouting.ts`、`src/utils/__tests__/slashRouting.test.ts`、`knowledge/architecture/runtime-routing.md`。
 - 下一步：审查并窄范围提交本轮相关文件，不纳入历史未跟踪目录。

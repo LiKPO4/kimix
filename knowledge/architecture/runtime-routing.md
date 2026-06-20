@@ -20,7 +20,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 5. Experimental or incomplete upstream capabilities remain behind capability checks or explicit settings.
 6. A transient Server failure schedules a bounded background recovery attempt. When Server becomes ready again, an idle SDK session may return to the Server route only if the Server can resolve the same official session ID; otherwise the SDK session remains authoritative.
 7. App startup must not await Kimi Server startup or session prewarm before showing the main window. The renderer should paint first; Server startup and Kimi runtime prewarm run afterward in the background.
-8. Slash commands that are also official Kimi Code commands should reach the official prompt route first. Kimix only handles product-specific slash commands locally, such as theme mapping and Claude/Codex import; local SDK-era handlers are fallback behavior after official dispatch fails.
+8. Slash commands that are also official Kimi Code commands should reach the official prompt route first, including `/skill:...`. Kimix only handles product-specific slash commands locally, such as theme mapping and Claude/Codex import; local SDK-era handlers are fallback behavior after official dispatch fails.
 
 # Main Components
 

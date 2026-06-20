@@ -15,8 +15,11 @@ describe("classifySlashCommand", () => {
     expect(classifySlashCommand("undo")).toBe("official-first");
   });
 
-  it("passes through skill and unknown slash commands", () => {
-    expect(classifySlashCommand("skill:deploy-okf-knowledge")).toBe("passthrough");
+  it("lets skill slash commands reach the official route before local fallback", () => {
+    expect(classifySlashCommand("skill:deploy-okf-knowledge")).toBe("official-first");
+  });
+
+  it("passes through unknown slash commands", () => {
     expect(classifySlashCommand("unknown")).toBe("passthrough");
   });
 });

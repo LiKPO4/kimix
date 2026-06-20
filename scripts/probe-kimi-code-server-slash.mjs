@@ -11,20 +11,33 @@ const apiBase = `${baseHttp}/api/v1`;
 const workspace = await mkdtemp(path.join(os.tmpdir(), "kimix-server-slash-probe-"));
 const commandTimeoutMs = Number(process.env.KIMIX_KIMI_SERVER_SLASH_PROBE_TIMEOUT_MS ?? 60_000);
 const includeMutating = process.env.KIMIX_KIMI_SERVER_SLASH_PROBE_MUTATING === "1";
+const includeExhaustive = process.env.KIMIX_KIMI_SERVER_SLASH_PROBE_EXHAUSTIVE === "1";
 
 const safeSlashCommands = [
   { command: "/status", risk: "safe" },
   { command: "/usage", risk: "safe" },
   { command: "/reload", risk: "safe" },
   { command: "/plan off", risk: "safe" },
+  { command: "/plan on", risk: "safe" },
+  { command: "/plan off", risk: "safe" },
   { command: "/goal status", risk: "safe" },
+  { command: "/goal show", risk: "safe" },
 ];
 
 const mutatingSlashCommands = [
   { command: "/compact 保留 Kimix slash 探针结果", risk: "mutating" },
   { command: "/undo 1", risk: "mutating" },
   { command: "/btw Kimix slash probe: reply with KIMIX_BTW_PROBE_OK", risk: "mutating" },
+  { command: "/swarm on", risk: "mutating" },
   { command: "/swarm off", risk: "mutating" },
+];
+
+const exhaustiveSlashCommands = [
+  { command: "/goal start Kimix slash probe goal：不要修改文件，只确认 Goal slash 可以创建。", risk: "exhaustive", timeoutMs: 30_000 },
+  { command: "/goal pause", risk: "exhaustive" },
+  { command: "/goal resume", risk: "exhaustive" },
+  { command: "/goal cancel", risk: "exhaustive" },
+  { command: "/skill:kimix-probe ARG_OK", risk: "exhaustive", timeoutMs: 45_000 },
 ];
 
 let server;
@@ -35,13 +48,16 @@ function summarizeError(error) {
 }
 
 async function request(route, options = {}, allowError = false) {
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const { timeoutMs: _timeoutMs, ...requestOptions } = options;
   const response = await fetch(`${apiBase}${route}`, {
-    ...options,
+    ...requestOptions,
     headers: {
       accept: "application/json",
-      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
-      ...(options.headers ?? {}),
+      ...(requestOptions.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(requestOptions.headers ?? {}),
     },
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const envelope = await response.json();
   if (!allowError && envelope.code !== 0) {
@@ -124,6 +140,8 @@ function summarizeFrame(frame) {
 
 async function probeSlashCommand(sessionId, socketProbe, item) {
   const startedAt = Date.now();
+  const timeoutMs = item.timeoutMs ?? commandTimeoutMs;
+  console.error(`▶ slash probe ${item.command}`);
   const submit = await request(`/sessions/${encodeURIComponent(sessionId)}/prompts`, {
     method: "POST",
     body: JSON.stringify({
@@ -132,8 +150,10 @@ async function probeSlashCommand(sessionId, socketProbe, item) {
       permission_mode: "manual",
       plan_mode: false,
     }),
+    timeoutMs: 15_000,
   }, true);
   if (submit.code !== 0) {
+    console.error(`✗ slash probe submit failed ${item.command}: code=${submit.code} msg=${submit.msg ?? ""}`);
     return {
       ...item,
       accepted: false,
@@ -150,8 +170,8 @@ async function probeSlashCommand(sessionId, socketProbe, item) {
       if (!["prompt.completed", "error"].includes(candidate.type)) return false;
       const candidatePromptId = extractPromptId(candidate);
       return !promptId || !candidatePromptId || candidatePromptId === promptId;
-    }, commandTimeoutMs);
-    return {
+    }, timeoutMs);
+    const result = {
       ...item,
       accepted: true,
       completed: frame.type === "prompt.completed",
@@ -159,8 +179,10 @@ async function probeSlashCommand(sessionId, socketProbe, item) {
       promptId,
       terminalFrame: summarizeFrame(frame),
     };
+    console.error(`${result.completed ? "✓" : "✗"} slash probe ${item.command} (${result.durationMs}ms)`);
+    return result;
   } catch (error) {
-    return {
+    const result = {
       ...item,
       accepted: true,
       completed: false,
@@ -168,12 +190,27 @@ async function probeSlashCommand(sessionId, socketProbe, item) {
       promptId,
       error: summarizeError(error),
     };
+    console.error(`✗ slash probe ${item.command}: ${result.error}`);
+    await request(`/sessions/${encodeURIComponent(sessionId)}:abort`, { method: "POST", body: "{}", timeoutMs: 10_000 }, true).catch(() => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return result;
   }
 }
 
 async function main() {
   await mkdir(workspace, { recursive: true });
   await writeFile(path.join(workspace, "README.md"), "Kimix Kimi Server slash probe workspace.\n", "utf8");
+  const skillDir = path.join(workspace, ".kimi-code", "skills", "kimix-probe");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(path.join(skillDir, "SKILL.md"), [
+    "---",
+    "name: kimix-probe",
+    "description: Kimix Server slash Skill probe",
+    "---",
+    "",
+    "Reply with KIMIX_SKILL_SLASH_PROBE_OK and $ARGUMENTS.",
+    "",
+  ].join("\n"), "utf8");
 
   server = spawn(executable, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
     cwd: workspace,
@@ -199,7 +236,11 @@ async function main() {
   });
   const sessionId = created.data.id;
   const socketProbe = await openProbeSocket(sessionId);
-  const commands = includeMutating ? [...safeSlashCommands, ...mutatingSlashCommands] : safeSlashCommands;
+  const commands = [
+    ...safeSlashCommands,
+    ...(includeMutating ? mutatingSlashCommands : []),
+    ...(includeExhaustive ? exhaustiveSlashCommands : []),
+  ];
   const results = [];
   for (const item of commands) {
     results.push(await probeSlashCommand(sessionId, socketProbe, item));
@@ -213,6 +254,7 @@ async function main() {
     workspace,
     sessionId,
     mutatingEnabled: includeMutating,
+    exhaustiveEnabled: includeExhaustive,
     summary: {
       total: results.length,
       completed: results.filter((item) => item.completed).length,

@@ -1220,13 +1220,21 @@ export function Composer() {
     return false;
   };
 
-  const handleFallbackSlashCommand = async (content: string) => {
+  const handleFallbackSlashCommand = async (content: string, images: ImageAttachment[] = []) => {
     const match = content.trim().match(slashCommandPattern);
     if (!match) return false;
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
     if (classifySlashCommand(name) !== "official-first") return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
+    if (name.startsWith("skill:")) {
+      const skillName = name.slice("skill:".length);
+      const applied = await applySkillCommand(skillName, args || undefined);
+      if (applied === "enabled" && (args || images.length > 0)) {
+        await sendPromptContent(args, { images, skipClarification: true });
+      }
+      return Boolean(applied);
+    }
     if (name === "goal") {
       await appendSlashNotice(commandNotice);
       return handleGoalSlashCommand(content.trim(), args);
@@ -1484,29 +1492,6 @@ export function Composer() {
       inputRef.current?.reset();
       return;
     }
-    const skillMatch = trimmed.match(skillCommandPattern);
-    if (skillMatch) {
-      const skillName = skillMatch[1];
-      const restContent = (skillMatch[2] ?? "").trim();
-      setInput("");
-      setImageAttachments([]);
-      setEditingPendingId(null);
-      inputRef.current?.reset();
-      const applied = await applySkillCommand(skillName, restContent || undefined);
-      if (applied === "enabled" && (restContent || imagesToSend.length > 0)) {
-        if (hasActiveAssistantTurn && currentSession) {
-          addPendingMessage(currentSession.id, restContent, toUserAttachments(imagesToSend));
-          if (imagesToSend.length > 0) {
-            window.dispatchEvent(new CustomEvent("kimix:toast", {
-              detail: "当前轮次还没结束，文字和附件已加入队列，等待当前轮次结束后自动发送。",
-            }));
-          }
-          return;
-        }
-        await sendPromptContent(restContent, { images: imagesToSend });
-      }
-      return;
-    }
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);
@@ -1518,7 +1503,7 @@ export function Composer() {
 
     const sent = await sendPromptContent(trimmed, { images: imagesToSend, skipClarification: trimmed.startsWith("/") });
     if (!sent && trimmed.startsWith("/")) {
-      await handleFallbackSlashCommand(trimmed);
+      await handleFallbackSlashCommand(trimmed, imagesToSend);
     }
   };
 
