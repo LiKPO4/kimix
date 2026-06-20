@@ -29,6 +29,7 @@
     "knowledge:validate": "node scripts/validate-okf.mjs",
     "knowledge:validate:spec": "node scripts/validate-okf.mjs --spec-only",
     "knowledge:audit": "node scripts/validate-okf.mjs --audit --max-age-days 180",
+    "probe:kimi-server-slash": "node scripts/probe-kimi-code-server-slash.mjs",
     "vendor:kimi-code-sdk": "node scripts/vendor-kimi-code-sdk.mjs"
   },
   "dependencies": {
