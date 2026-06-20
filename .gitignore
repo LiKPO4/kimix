@@ -5,6 +5,7 @@ node_modules
 # Build outputs
 out
 dist
+dist*/
 *.tgz
 
 # Keep build resources for electron-builder
