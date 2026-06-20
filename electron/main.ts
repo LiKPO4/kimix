@@ -6275,21 +6275,31 @@ function getDiagLogPath() {
   return path.join(app.getPath("userData"), "diag.log");
 }
 
-function appendDiagLine(line: string) {
+function getProjectDiagLogPath() {
+  // 也写一份到 process.cwd()（通常就是项目根目录），方便 agent/用户直接查看。
+  return path.join(process.cwd(), "diag.log");
+}
+
+function trimLogFile(filePath: string) {
   try {
-    const filePath = getDiagLogPath();
-    // 超过 2MB 则保留尾部 512KB，避免无限增长
+    const stat = fs.statSync(filePath);
+    if (stat.size > 2 * 1024 * 1024) {
+      const buf = fs.readFileSync(filePath);
+      const tail = buf.slice(Math.max(0, buf.length - 512 * 1024));
+      fs.writeFileSync(filePath, tail);
+    }
+  } catch { /* file may not exist yet */ }
+}
+
+function appendDiagLine(line: string) {
+  const targets = [getDiagLogPath(), getProjectDiagLogPath()];
+  for (const filePath of targets) {
     try {
-      const stat = fs.statSync(filePath);
-      if (stat.size > 2 * 1024 * 1024) {
-        const buf = fs.readFileSync(filePath);
-        const tail = buf.slice(Math.max(0, buf.length - 512 * 1024));
-        fs.writeFileSync(filePath, tail);
-      }
-    } catch { /* file may not exist yet */ }
-    fs.appendFileSync(filePath, line + "\n", "utf8");
-  } catch (error) {
-    console.warn("[diag] failed to append diag.log:", error);
+      trimLogFile(filePath);
+      fs.appendFileSync(filePath, line + "\n", "utf8");
+    } catch (error) {
+      console.warn("[diag] failed to append diag.log:", error);
+    }
   }
 }
 
