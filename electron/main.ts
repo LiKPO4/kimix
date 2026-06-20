@@ -6294,13 +6294,11 @@ function appendDiagLine(line: string) {
 }
 
 ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
-  const msg = request && typeof request === "object" && typeof (request as { message?: unknown }).message === "string"
-    ? (request as { message: string }).message
-    : typeof request === "string"
-      ? request
-      : "";
+  const req = request && typeof request === "object" ? (request as { message?: string; data?: unknown }) : {};
+  const msg = typeof req.message === "string" ? req.message : typeof request === "string" ? request : "";
   if (!msg) return { success: false, error: "empty message" };
-  appendDiagLine(`[${new Date().toISOString()}] ${msg}`);
+  const dataPart = req.data !== undefined ? ` ${JSON.stringify(req.data)}` : "";
+  appendDiagLine(`[${new Date().toISOString()}] ${msg}${dataPart}`);
   return { success: true, data: undefined };
 });
 
