@@ -1070,6 +1070,18 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, leadingToo
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
   );
+  const thinkingOnlyLoggedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hasContent && hasActualThinking && thinkingOnlyLoggedRef.current !== event.id) {
+      thinkingOnlyLoggedRef.current = event.id;
+      console.log("[AssistantMessageBubble] thinking-only assistant (body hidden)", {
+        eventId: event.id,
+        isComplete: event.isComplete,
+        thinkingLength: event.thinking?.length ?? 0,
+        thinkingPartsCount: event.thinkingParts?.length ?? 0,
+      });
+    }
+  }, [hasContent, hasActualThinking, event.id, event.isComplete, event.thinking?.length, event.thinkingParts?.length]);
   const elapsedStartAt = activeProcessPhaseStartedAt({
     eventTimestamp: event.timestamp,
     statusTimestamp: activeStatus?.timestamp,

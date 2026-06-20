@@ -904,10 +904,19 @@ export function Composer() {
         console.error("Kimi Code send failed:", err);
         const message = err instanceof Error ? err.message : String(err);
         if (isKimiActiveTurnError(message)) {
+          const afterEvents = removeLocalSendAttempt(targetSession.events, userEvent.id, responsePlaceholder.id, shouldAddUserEvent);
+          console.log("[Composer active-turn] removing local send attempt", {
+            sessionId: targetSession.id,
+            userEventId: userEvent.id,
+            placeholderId: responsePlaceholder.id,
+            shouldRemoveUserEvent: shouldAddUserEvent,
+            beforeCount: targetSession.events.length,
+            afterCount: afterEvents.length,
+          });
           setRunningSessionId(targetSession.id);
           updateSession(targetSession.id, (session) => ({
             ...session,
-            events: removeLocalSendAttempt(session.events, userEvent.id, responsePlaceholder.id, shouldAddUserEvent),
+            events: afterEvents,
             updatedAt: Date.now(),
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;

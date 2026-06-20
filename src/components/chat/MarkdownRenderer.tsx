@@ -207,6 +207,21 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     };
   }, [deferOffscreen, shouldRender]);
 
+  const deferLoggedRef = useRef(false);
+  useEffect(() => {
+    if (!deferOffscreen) {
+      deferLoggedRef.current = false;
+      return;
+    }
+    if (!shouldRender && !deferLoggedRef.current) {
+      deferLoggedRef.current = true;
+      console.log("[MarkdownRenderer] offscreen placeholder active", { contentLength: content.length });
+    }
+    if (shouldRender) {
+      deferLoggedRef.current = false;
+    }
+  }, [deferOffscreen, shouldRender, content.length]);
+
   useEffect(() => {
     hljsLinkRefCount++;
     updateHljsTheme();

@@ -203,6 +203,16 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
       const hasMoreAssistantBody = assistantBodySize(historyEvents) > assistantBodySize(session.events);
       const hasMoreDisplayableImages = displayableUserImageCount(historyEvents) > displayableUserImageCount(session.events);
+      console.log("[repairKimiCodeHistoryBodies] candidate", {
+        sessionId: session.id,
+        historySessionId: sessionId,
+        originalEventsLength: session.events.length,
+        loadedEventsLength: eventsSource.length,
+        mappedEventsLength: historyEvents.length,
+        hasMoreAssistantBody,
+        hasMoreDisplayableImages,
+        willReplace: hasMoreAssistantBody || hasMoreDisplayableImages,
+      });
       if (!hasMoreAssistantBody && !hasMoreDisplayableImages) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
@@ -1712,11 +1722,21 @@ function App() {
         const message = err instanceof Error ? err.message : String(err);
         useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
         if (isKimiActiveTurnError(message)) {
-          updateSession(uiSessionId, (session) => ({
-            ...session,
-            events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
-            updatedAt: Date.now(),
-          }));
+          updateSession(uiSessionId, (session) => {
+            const filteredEvents = session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId);
+            console.log("[App pending dispatch active-turn]", {
+              uiSessionId,
+              placeholderId,
+              userEventId,
+              beforeCount: session.events.length,
+              afterCount: filteredEvents.length,
+            });
+            return {
+              ...session,
+              events: filteredEvents,
+              updatedAt: Date.now(),
+            };
+          });
           setRunningSessionId(uiSessionId);
           return;
         }
@@ -2021,6 +2041,13 @@ function App() {
                   events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
                   isLoading: false,
                 });
+                console.log("[App startup recovery] runtimeOwner path", {
+                  historySessionId,
+                  runtimeOwnerId: runtimeOwner.id,
+                  runtimeOwnerEventsLength: runtimeOwner.events.length,
+                  loadedEventsLength: events.length,
+                  finalEventsLength: session.events.length,
+                });
                 useSessionStore.setState((state) => ({
                   sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
                 }));
@@ -2051,6 +2078,15 @@ function App() {
                 longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
                 events,
                 isLoading: false,
+              });
+
+              console.log("[App startup recovery] new/replace session path", {
+                historySessionId,
+                newSessionId: session.id,
+                activeLocalSessionId: activeLocalSession?.id,
+                activeLocalEventsLength: activeLocalSession?.events.length ?? 0,
+                loadedEventsLength: events.length,
+                finalEventsLength: session.events.length,
               });
 
               useSessionStore.setState((state) => {
@@ -2557,11 +2593,21 @@ function App() {
               const message = err instanceof Error ? err.message : String(err);
               useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
               if (isKimiActiveTurnError(message)) {
-                updateSession(uiSessionId, (session) => ({
-                  ...session,
-                  events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
-                  updatedAt: Date.now(),
-                }));
+                updateSession(uiSessionId, (session) => {
+                  const filteredEvents = session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId);
+                  console.log("[App queue dispatch active-turn]", {
+                    uiSessionId,
+                    placeholderId,
+                    userEventId,
+                    beforeCount: session.events.length,
+                    afterCount: filteredEvents.length,
+                  });
+                  return {
+                    ...session,
+                    events: filteredEvents,
+                    updatedAt: Date.now(),
+                  };
+                });
                 setRunningSessionId(uiSessionId);
                 return;
               }
