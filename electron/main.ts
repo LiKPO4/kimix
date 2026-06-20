@@ -2409,9 +2409,9 @@ function verifyRendererContent() {
         };
       })()
     `).then((result: { bodyTextLength: number; rootHtmlLength: number; rootChildCount: number }) => {
-      console.log(`[RENDERER] content check rootHtml=${result.rootHtmlLength} bodyText=${result.bodyTextLength} children=${result.rootChildCount}`);
       if (result.rootHtmlLength === 0 && result.rootChildCount === 0 && !rendererReloadedAfterBlank) {
         rendererReloadedAfterBlank = true;
+        console.log(`[RENDERER] content check rootHtml=${result.rootHtmlLength} bodyText=${result.bodyTextLength} children=${result.rootChildCount}`);
         console.warn("[RENDERER] blank root detected, reloading once");
         win.webContents.reloadIgnoringCache();
       }
