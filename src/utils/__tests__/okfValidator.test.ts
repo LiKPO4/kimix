@@ -45,4 +45,20 @@ describe("OKF validator", () => {
     expect(validate(bundle, "--spec-only")).toContain("OKF v0.1 conformance: PASS");
     expect(() => validate(bundle)).toThrow(/Kimix profile requires a non-empty string 'title'/);
   });
+
+  it("audits stale and orphan concepts deterministically", () => {
+    const bundle = createBundle('type: Reference\ntitle: Example\ndescription: Example concept.\ntags: [example]\ntimestamp: "2025-01-01T00:00:00Z"');
+    expect(() => validate(bundle, "--audit", "--now", "2026-06-20T00:00:00Z")).toThrow(/older than 180 days/);
+
+    writeFileSync(path.join(bundle, "index.md"), '---\nokf_version: "0.1"\n---\n\n# Concepts\n\n* [Concepts](concepts/index.md) - Concept directory.\n');
+    writeFileSync(path.join(bundle, "concepts", "index.md"), "# Example\n");
+    expect(() => validate(bundle, "--audit", "--now", "2025-01-02T00:00:00Z")).toThrow(/orphan concept/);
+  });
+
+  it("accepts a current, indexed bundle in maintenance audit mode", () => {
+    const bundle = createBundle('type: Reference\ntitle: Example\ndescription: Example concept.\ntags: [example]\ntimestamp: "2026-06-19T00:00:00Z"');
+    expect(validate(bundle, "--audit", "--now", "2026-06-20T00:00:00Z")).toContain(
+      "OKF v0.1 + Kimix maintenance audit (180 days): PASS",
+    );
+  });
 });

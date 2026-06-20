@@ -1,3 +1,3 @@
 # Policy
 
-* [Knowledge Maintenance Policy](knowledge-maintenance.md) - Rules for keeping this OKF bundle accurate, reviewable, and conformant.
+* [Knowledge Maintenance Policy](knowledge-maintenance.md) - End-of-task and scheduled rules for keeping this OKF bundle accurate, discoverable, and conformant.

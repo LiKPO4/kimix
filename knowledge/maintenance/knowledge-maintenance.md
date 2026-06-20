@@ -4,7 +4,7 @@ title: Knowledge Maintenance Policy
 description: Defines what belongs in the Kimix OKF bundle, when it must change, and how every update is validated and reviewed.
 resource: https://github.com/LiKPO4/kimix/tree/master/knowledge
 tags: [okf, knowledge, maintenance, governance]
-timestamp: "2026-06-19T00:00:00+08:00"
+timestamp: "2026-06-20T00:00:00+08:00"
 ---
 
 # Knowledge Maintenance Policy
@@ -36,6 +36,12 @@ The `knowledge/` directory is the portable OKF bundle. It stores stable project 
 * `pnpm knowledge:validate:spec` checks only normative OKF v0.1 requirements and reports soft guidance separately.
 * CI validates knowledge changes and the release workflow revalidates the bundle before packaging.
 * Broken links are warnings under spec-only consumption but errors for Kimix producers.
+* `pnpm knowledge:audit` additionally rejects concepts older than 180 days, duplicate titles, future-dated entries, and concepts not linked from an index.
+* GitHub Actions runs the maintenance audit every Monday and supports manual dispatch; ordinary pull requests keep the faster strict validation gate.
+
+# End-of-Task Closure
+
+Every implementation task must classify its durable knowledge impact before handoff. Agents update the bundle without prompting when architecture, lifecycle, operational, incident, or governance facts changed. If nothing durable changed, the handoff states `Knowledge: no update required` instead of creating filler content. Conflicting or unverifiable facts are escalated for a project-owner decision.
 
 # Upstream Changes
 

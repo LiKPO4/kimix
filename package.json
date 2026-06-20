@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.10.17",
+  "version": "2.10.18",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -28,6 +28,7 @@
     "test:run": "vitest run",
     "knowledge:validate": "node scripts/validate-okf.mjs",
     "knowledge:validate:spec": "node scripts/validate-okf.mjs --spec-only",
+    "knowledge:audit": "node scripts/validate-okf.mjs --audit --max-age-days 180",
     "vendor:kimi-code-sdk": "node scripts/vendor-kimi-code-sdk.mjs"
   },
   "dependencies": {

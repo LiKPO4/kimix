@@ -3249,3 +3249,20 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 全量测试 21 个文件、177/177 通过；`pnpm build` 通过，renderer hash：`assets/index-BW3gMdIH.js`。
 ## 下一步
 - 跑全量测试与最终构建并提交；随后核对 Server model catalog / config / OAuth。
+# 2026-06-20 v2.10.18 OKF 自治维护
+## 当前目标
+- 让项目知识库在日常开发中自动收尾并定期暴露维护债务，减少人工提醒。
+## 已完成
+- 新增任务结束知识变更判定规则；架构、集成、运维、事故与治理变化由 Agent 主动更新知识库。
+- 校验器新增维护审计模式，检查 180 天陈旧、孤立条目、重复标题和未来时间戳。
+- Knowledge workflow 增加每周定时及手动巡检；版本号同步到 v2.10.18。
+- `$deploy-okf-knowledge` Skill 增加自治维护边界、定期巡检、团队分发和第二项目前向验收流程；仓库保留可版本化规范源，用户目录保留自动发现安装副本。
+## 未完成
+- 仍需在第二个真实项目执行 `$deploy-okf-knowledge` 做跨项目验收。
+## 关键文件
+- `scripts/validate-okf.mjs`
+- `.github/workflows/knowledge.yml`
+- `knowledge/maintenance/knowledge-maintenance.md`
+- `tools/skills/deploy-okf-knowledge/`
+## 下一步
+- 在第二个真实项目执行 Skill 前向验收；本轮先完成全量测试、构建和窄提交。

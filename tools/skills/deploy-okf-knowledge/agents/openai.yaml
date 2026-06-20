@@ -1,0 +1,4 @@
+interface:
+  display_name: "部署 OKF 项目知识库"
+  short_description: "部署可校验、定期巡检并能自动收尾维护的 OKF 项目知识库"
+  default_prompt: "使用 $deploy-okf-knowledge 为当前项目部署 OKF 知识库、定期健康巡检和低人工维护流程。"
