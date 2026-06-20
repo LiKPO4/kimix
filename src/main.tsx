@@ -597,7 +597,9 @@ const reportStartup = (label: string) => {
 };
 reportStartup("renderer entry");
 applyCachedThemeSnapshot();
+reportStartup("after theme snapshot");
 installBrowserPreviewApi();
+reportStartup("after browser preview api");
 reportStartup("before React render");
 createRoot(rootEl).render(
   <StrictMode>

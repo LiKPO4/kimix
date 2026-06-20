@@ -14,10 +14,16 @@ if "%~1"=="--check" (
 
 echo Starting Kimix from %CD%
 echo.
-echo Cleaning old Kimix dev processes and cache before starting.
+if "%~1"=="--clean" (
+  echo Cleaning old Kimix processes, cache, rebuilding, and starting built app.
+) else if "%~1"=="--dev" (
+  echo Starting Kimix in hot-reload dev mode.
+) else (
+  echo Starting built Kimix quickly. Use --dev for hot reload or --clean for a full cache-clean rebuild.
+)
 echo.
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\restart-kimix-dev.ps1"
+PowerShell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\restart-kimix-dev.ps1" %*
 
 echo.
 echo Kimix dev process exited. Press any key to close this window.

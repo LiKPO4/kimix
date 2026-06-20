@@ -2380,9 +2380,19 @@ let taskbarOverlayIcon: Electron.NativeImage | null = null;
 let lastRendererHeartbeat: { receivedAt: number; payload: RendererHeartbeatPayload | null } | null = null;
 let rendererWatchdogTimer: NodeJS.Timeout | null = null;
 let rendererWatchdogReported = false;
+const mainStartupAt = Date.now();
 
 const RENDERER_WATCHDOG_CHECK_MS = 3000;
 const RENDERER_WATCHDOG_TIMEOUT_MS = 12000;
+
+function logMainStartup(label: string, extra?: unknown) {
+  const elapsedMs = Date.now() - mainStartupAt;
+  if (extra === undefined) {
+    console.info(`[KimixStartup] main ${label} ${elapsedMs}ms`);
+    return;
+  }
+  console.info(`[KimixStartup] main ${label} ${elapsedMs}ms`, extra);
+}
 
 const FILE_SEARCH_IGNORES = new Set([
   ".git",
@@ -3977,6 +3987,7 @@ function getDefaultProject() {
 }
 
 function createWindow() {
+  logMainStartup("createWindow:start");
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -4012,8 +4023,10 @@ function createWindow() {
     }
   });
   if (DEV_SERVER_URL) {
+    logMainStartup("loadURL:start", DEV_SERVER_URL);
     mainWindow.loadURL(DEV_SERVER_URL);
   } else {
+    logMainStartup("loadFile:start");
     mainWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
@@ -4021,6 +4034,7 @@ function createWindow() {
     console.error(`[RENDERER] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
   });
   mainWindow.webContents.once("did-finish-load", () => {
+    logMainStartup("did-finish-load");
     void restoreLastContext();
     emitWindowState();
     verifyRendererContent();
@@ -4094,9 +4108,10 @@ function scheduleKimiServerStartupAfterFirstPaint() {
   if (kimiServerStartupScheduled) return;
   kimiServerStartupScheduled = true;
   setTimeout(() => {
+    logMainStartup("kimi-server:start");
     void kimiCodeServerHost.start().then((serverStatus) => {
       if (serverStatus.enabled) {
-        console.info("[KimiCodeServerHost]", serverStatus);
+        logMainStartup("kimi-server:ready", serverStatus);
       }
     }).catch((error) => {
       console.warn("[KimiCodeServerHost] background startup failed:", error);
@@ -6880,6 +6895,7 @@ app.on("activate", () => {
 });
 
 app.whenReady().then(() => {
+  logMainStartup("app-ready");
   createWindow();
 });
 

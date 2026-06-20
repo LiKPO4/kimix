@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-06-20 v2.11.6 启动耗时日志定位与 dev 快速启动
+- 当前目标：定位用户反馈“启动花了 20 多秒”的真实耗时来源，并减少日常双击启动等待。
+- 已确认：当前用户启动路径是 `start-kimix.bat` → `scripts/restart-kimix-dev.ps1`，脚本每次都会杀旧 dev 进程、清 `out/` / Vite 缓存、执行 `pnpm build`，再进入 `pnpm dev`；后续快速启动实测进一步确认主进程 155ms 开始 loadURL，但 renderer entry/首帧约 19.8 秒，主因是 Vite dev 首次现场编译 renderer 大包，不是 Kimi Server 阻塞。
+- 已完成：`start-kimix.bat` 默认改为运行已构建的 Electron 包，有构建产物时直接启动，无产物才先 build；热更新开发改为显式 `start-kimix.bat --dev`；完整清缓存和全量 build 改为显式 `start-kimix.bat --clean`。
+- 已完成：主进程补充 `[KimixStartup] main ...` 日志，覆盖 app ready、窗口创建、loadURL/loadFile、did-finish-load、Kimi Server 后台启动和就绪；renderer 补充 theme snapshot 与 browser preview API 打点。
+- 已验证：`pnpm test:run` 26 个测试文件、200/200 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-DhQGGCwM.js`；`git diff --check` 通过；默认启动脚本实测 renderer entry 632ms、first animation frame 670ms、Kimi Server ready 3817ms。
+- 关键文件：`start-kimix.bat`、`scripts/restart-kimix-dev.ps1`、`electron/main.ts`、`src/main.tsx`。
+- 下一步：窄范围提交本轮启动优化。
+
 ## 2026-06-20 v2.11.5 完全访问权限与启动白屏修复
 - 当前目标：修复 Server 链路下“完全访问权限”仍出现工具审批卡，以及启动后约 10 秒白屏才进入主界面的问题。
 - 已确认：Kimix 三档权限 `manual` / `auto` / `yolo` 与官方 Kimi Code 权限模式一致；截图中的“完全访问权限”对应官方 `yolo`。问题是 Server approval 事件路径没有像 SDK approval handler 一样在 `yolo` 下自动批准。

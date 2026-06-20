@@ -4,6 +4,8 @@ $workspace = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $nodePath = "C:\Program Files\nodejs"
 $pnpmPath = "C:\Users\lijialin08\AppData\Roaming\npm"
 $env:Path = "$nodePath;$pnpmPath;$env:Path"
+$fullClean = $args -contains "--clean"
+$hotReloadDev = $args -contains "--dev"
 
 function Test-InWorkspace {
   param([string]$Path)
@@ -20,13 +22,28 @@ function Test-ContainsIgnoreCase {
 }
 
 function Stop-KimixProcessTree {
-  $all = Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("electron.exe", "node.exe") }
+  $all = Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe", "electron.exe", "node.exe", "esbuild.exe") }
   $targetIds = New-Object "System.Collections.Generic.HashSet[int]"
+  $protectedIds = New-Object "System.Collections.Generic.HashSet[int]"
+  $currentId = [int]$PID
+  $processById = @{}
+  foreach ($process in $all) {
+    $processById[[int]$process.ProcessId] = $process
+  }
+  while ($processById.ContainsKey($currentId)) {
+    [void]$protectedIds.Add($currentId)
+    $currentId = [int]$processById[$currentId].ParentProcessId
+  }
 
   foreach ($process in $all) {
     $commandLine = [string]$process.CommandLine
+    $isProtected = $protectedIds.Contains([int]$process.ProcessId)
     $inWorkspace = Test-ContainsIgnoreCase $commandLine $workspace
     $isKimixElectron = $process.Name -eq "electron.exe" -and $inWorkspace
+    $isKimixShell = $process.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe") -and $inWorkspace -and (
+      (Test-ContainsIgnoreCase $commandLine "start-kimix.bat") -or
+      (Test-ContainsIgnoreCase $commandLine "restart-kimix-dev.ps1")
+    )
     $isKimixNode = $process.Name -eq "node.exe" -and (
       $inWorkspace -and (
         (Test-ContainsIgnoreCase $commandLine "scripts/dev.cjs") -or
@@ -34,8 +51,9 @@ function Stop-KimixProcessTree {
         (Test-ContainsIgnoreCase $commandLine "pnpm")
       )
     )
+    $isKimixEsbuild = $process.Name -eq "esbuild.exe" -and $inWorkspace
 
-    if ($isKimixElectron -or $isKimixNode) {
+    if (-not $isProtected -and ($isKimixElectron -or $isKimixShell -or $isKimixNode -or $isKimixEsbuild)) {
       [void]$targetIds.Add([int]$process.ProcessId)
     }
   }
@@ -52,31 +70,58 @@ function Stop-KimixProcessTree {
   }
 
   foreach ($id in $targetIds) {
-    Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    if (-not $protectedIds.Contains([int]$id)) {
+      Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    }
   }
-}
 
-$cleanTargets = @(
-  (Join-Path $workspace "out"),
-  (Join-Path $workspace "node_modules\.vite"),
-  (Join-Path $workspace "node_modules\.cache")
-)
-
-foreach ($target in $cleanTargets) {
-  if (-not (Test-InWorkspace $target)) {
-    throw "Refusing to clean outside workspace: $target"
+  $deadline = (Get-Date).AddSeconds(5)
+  while ((Get-Date) -lt $deadline) {
+    $remaining = Get-CimInstance Win32_Process | Where-Object {
+      $targetIds.Contains([int]$_.ProcessId) -and -not $protectedIds.Contains([int]$_.ProcessId)
+    }
+    if (-not $remaining) {
+      return
+    }
+    Start-Sleep -Milliseconds 150
   }
 }
 
 Stop-KimixProcessTree
 
-foreach ($target in $cleanTargets) {
-  if (Test-Path -LiteralPath $target) {
-    Remove-Item -LiteralPath $target -Recurse -Force
+if ($fullClean) {
+  $cleanTargets = @(
+    (Join-Path $workspace "out"),
+    (Join-Path $workspace "node_modules\.vite"),
+    (Join-Path $workspace "node_modules\.cache")
+  )
+
+  foreach ($target in $cleanTargets) {
+    if (-not (Test-InWorkspace $target)) {
+      throw "Refusing to clean outside workspace: $target"
+    }
   }
+
+  foreach ($target in $cleanTargets) {
+    if (Test-Path -LiteralPath $target) {
+      Remove-Item -LiteralPath $target -Recurse -Force
+    }
+  }
+
+  Set-Location $workspace
+  pnpm build
+} else {
+  Set-Location $workspace
 }
 
-Set-Location $workspace
-pnpm build
-
-pnpm dev
+if ($hotReloadDev) {
+  pnpm dev
+} else {
+  $mainBundle = Join-Path $workspace "out\main\index.cjs"
+  $rendererIndex = Join-Path $workspace "out\renderer\index.html"
+  $electronBin = Join-Path $workspace "node_modules\.bin\electron.cmd"
+  if (-not (Test-Path -LiteralPath $mainBundle) -or -not (Test-Path -LiteralPath $rendererIndex)) {
+    pnpm build
+  }
+  & $electronBin .
+}

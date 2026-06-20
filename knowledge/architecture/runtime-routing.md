@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-20T00:00:00+08:00"
+timestamp: "2026-06-20T16:00:00+08:00"
 ---
 
 # Runtime Routing
@@ -22,6 +22,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 7. App startup must not await Kimi Server startup, session prewarm, official history restore, or stale runtime recovery before showing the main window. The renderer should paint first; Server startup, Kimi runtime prewarm, and official history recovery run afterward in the background.
 8. Kimix permission modes mirror official Kimi Code permission modes: `manual`, `auto`, and `yolo`. Server approval events in `yolo` mode are resolved through the official approval API without surfacing a user approval card.
 9. Slash commands that are also official Kimi Code commands should reach the official prompt route first, including `/skill:...`. Kimix only handles product-specific slash commands locally, such as theme mapping and Claude/Codex import; local SDK-era handlers are fallback behavior after official dispatch fails.
+10. Development startup should distinguish daily launch, hot-reload development, and cold-cache verification. `start-kimix.bat` defaults to the already-built Electron app so the renderer does not block first paint on Vite dev compilation; `start-kimix.bat --dev` is the explicit hot-reload path, and `start-kimix.bat --clean` kills old dev processes, clears caches, rebuilds, and then launches the built app.
 
 # Main Components
 
