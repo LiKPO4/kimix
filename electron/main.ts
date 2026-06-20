@@ -3685,19 +3685,14 @@ function createWindow() {
     icon: path.join(process.env.APP_ROOT, "..", "Kimix.png"),
   });
 
-  // Event bridge: fans out kimiCodeHost events to both the old kimi:event/status
-  // channels (used by legacy renderer sessions without an engine field) and the
-  // new kimi-code:event/status channels. Each renderer handler filters by its own
-  // session IDs, so dual-emit is safe (no duplicate UI).
+  // Kimi Code Host is the single event source for renderer sessions.
   kimiCodeHost.setKimiCodeEventSink((payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("kimi:event", payload);
       mainWindow.webContents.send("kimi-code:event", payload);
     }
   });
   kimiCodeHost.setKimiCodeStatusSink((payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("kimi:status", payload);
       mainWindow.webContents.send("kimi-code:status", payload);
     }
   });
@@ -5805,144 +5800,6 @@ ipcMain.handle("kimi:applyThemeImport", async (_, request: unknown) => {
   }
 });
 
-ipcMain.handle("kimi:setPlanMode", async (_, request: unknown) => {
-  try {
-    if (!request || typeof request !== "object") {
-      return { success: false, error: "Invalid request" };
-    }
-    const req = request as Record<string, unknown>;
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    const enabled = typeof req.enabled === "boolean" ? req.enabled : null;
-    if (!sessionId || enabled === null) {
-      return { success: false, error: "Missing sessionId or enabled" };
-    }
-    await kimiCodeHost.setPlanMode(sessionId, enabled);
-    return { success: true, data: { enabled } };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:sendPrompt", async (_, request: unknown) => {
-  if (!request || typeof request !== "object") {
-    return { success: false, error: "Invalid request" };
-  }
-  const req = request as Record<string, unknown>;
-  const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-  const content = typeof req.content === "string" ? req.content : "";
-  const images = Array.isArray(req.images)
-    ? req.images.filter((item): item is { name: string; dataUrl: string } =>
-        !!item &&
-        typeof item === "object" &&
-        typeof (item as { name?: unknown }).name === "string" &&
-        typeof (item as { dataUrl?: unknown }).dataUrl === "string" &&
-        (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
-      )
-    : [];
-  if (!sessionId || (!content && images.length === 0)) {
-    return { success: false, error: "Missing sessionId or content" };
-  }
-  const input: string | KimiCodePromptPart[] = images.length > 0
-    ? [
-        ...(content ? [{ type: "text" as const, text: content }] : []),
-        ...images.map((image) => ({ type: "image_url" as const, imageUrl: { url: image.dataUrl, id: image.name } })),
-      ]
-    : content;
-  try {
-    const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
-    const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-    const route = await kimiCodeHost.sendPrompt(sessionId, finalInput);
-    return { success: true, data: { sessionId, ...route } };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:steerPrompt", async (_, request: unknown) => {
-  if (!request || typeof request !== "object") {
-    return { success: false, error: "Invalid request" };
-  }
-  const req = request as Record<string, unknown>;
-  const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-  const content = typeof req.content === "string" ? req.content : "";
-  const images = Array.isArray(req.images)
-    ? req.images.filter((item): item is { name: string; dataUrl: string } =>
-        !!item &&
-        typeof item === "object" &&
-        typeof (item as { name?: unknown }).name === "string" &&
-        typeof (item as { dataUrl?: unknown }).dataUrl === "string" &&
-        (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
-      )
-    : [];
-  if (!sessionId || (!content && images.length === 0)) {
-    return { success: false, error: "Missing sessionId or content" };
-  }
-  const steerContent: string | KimiCodePromptPart[] = images.length > 0
-    ? [
-        ...(content ? [{ type: "text" as const, text: content }] : []),
-        ...images.map((image) => ({ type: "image_url" as const, imageUrl: { url: image.dataUrl, id: image.name } })),
-      ]
-    : content;
-  try {
-    await kimiCodeHost.steer(sessionId, steerContent);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:stopTurn", async (_, request: { sessionId: string }) => {
-  try {
-    await kimiCodeHost.cancel(request.sessionId);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:approveRequest", async (_, request: { sessionId: string; requestId: string; approved: boolean; scope?: "once" | "session" }) => {
-  try {
-    kimiCodeHost.respondApproval(request.sessionId, request.requestId, request.approved, request.scope);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:respondQuestion", async (_, request: unknown) => {
-  try {
-    if (!request || typeof request !== "object") {
-      return { success: false, error: "Invalid request" };
-    }
-    const req = request as Record<string, unknown>;
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    // The old handler used two IDs (rpcRequestId + questionRequestId); the new SDK
-    // handler uses a single requestId. The rpcRequestId is the canonical request key.
-    const requestId = typeof req.rpcRequestId === "string" ? req.rpcRequestId
-      : typeof req.questionRequestId === "string" ? req.questionRequestId
-      : "";
-    const answers = req.answers && typeof req.answers === "object" && !Array.isArray(req.answers)
-      ? Object.fromEntries(Object.entries(req.answers as Record<string, unknown>).filter(([, value]) => typeof value === "string")) as Record<string, string>
-      : {};
-    if (!sessionId || !requestId) {
-      return { success: false, error: "Missing question response fields" };
-    }
-    kimiCodeHost.respondQuestion(sessionId, requestId, answers);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:closeSession", async (_, request: { sessionId: string }) => {
-  try {
-    await kimiCodeHost.closeSession(request.sessionId);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
 ipcMain.handle("kimi-code:listHistorySessions", async (_, request: { workDir: string }) => {
   try {
     const sessions = await sessionHistory.getSessions(request.workDir);
@@ -6100,15 +5957,6 @@ ipcMain.handle("kimi-code:openWebServer", async () => {
 
     child.unref();
     return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi:loadSession", async (_, request: { workDir: string; sessionId: string }) => {
-  try {
-    const events = await sessionHistory.getSessionHistory(request.workDir, request.sessionId);
-    return { success: true, data: { sessionId: request.sessionId, events } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

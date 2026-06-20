@@ -1353,16 +1353,6 @@ export type SettingsResponse = {
 
 export type SaveSettingsRequest = Partial<AppSettings>;
 
-export type KimiEventPayload = {
-  sessionId: string;
-  event: unknown;
-}
-
-export type KimiStatusPayload = {
-  sessionId: string;
-  status: "idle" | "running" | "error" | "interrupted" | "completed";
-}
-
 export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
 
 export type KimiCodeEngineStatus =

@@ -2244,56 +2244,18 @@ function App() {
     };
     window.addEventListener("kimix:startHandoff", handleStartHandoff);
 
-    const unsubscribeEvent = window.api.onKimiEvent((payload) => {
-      if (!payload.event) return;
+    const unsubscribeKimiCodeEvent = window.api.onKimiCodeEvent((payload) => {
       const currentHandoffJob = handoffJobRef.current;
       if (currentHandoffJob?.runtimeSessionId === payload.sessionId) {
         const mapped = mapStreamEvent(payload.event);
         if (mapped) currentHandoffJob.events = mergeEvents(currentHandoffJob.events, mapped);
         const terminalStatus = getHandoffTerminalStatus(payload.event);
-        if (terminalStatus) {
-          void finishHandoffJob(currentHandoffJob, terminalStatus);
-        }
+        if (terminalStatus) void finishHandoffJob(currentHandoffJob, terminalStatus);
         return;
       }
-      const mapped = mapStreamEvent(payload.event);
-      if (mapped) {
-        const uiSessionId = resolveUiSessionId(payload.sessionId);
-        const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-        if (targetSession?.engine === "kimi-code" || targetSession?.longTask) return;
-        const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
-        const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
-        markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
-        if (mappedWithRole.type === "question_request" && mappedWithRole.status === "pending") {
-          const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedWithRole)}`;
-          if (!notifiedQuestionRequestRef.current.has(notifyKey)) {
-            notifiedQuestionRequestRef.current.add(notifyKey);
-            notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedWithRole));
-          }
-        }
-        if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
-          mergeHiddenLongTaskEvent(payload.sessionId, mappedWithRole);
-          if (shouldMirrorHiddenLongTaskEvent(mappedWithRole)) {
-            enqueueStreamEvent(uiSessionId, mappedWithRole);
-          }
-          if (mappedWithRole.type === "error" || mappedWithRole.type === "question_request") {
-            flushStreamEvents();
-            persistLocalConversationState();
-          }
-          return;
-        }
-        enqueueStreamEvent(uiSessionId, mappedWithRole);
-        if (mappedWithRole.type === "question_request") {
-          flushStreamEvents();
-          persistLocalConversationState();
-        }
-      }
-    });
-
-    const unsubscribeKimiCodeEvent = window.api.onKimiCodeEvent((payload) => {
       const uiSessionId = resolveUiSessionId(payload.sessionId);
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      if (targetSession?.engine !== "kimi-code" && !targetSession?.longTask) return;
+      if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
@@ -2365,9 +2327,20 @@ function App() {
     });
 
     const unsubscribeKimiCodeStatus = window.api.onKimiCodeStatus((payload) => {
+      const handoffJob = handoffJobRef.current;
+      if (handoffJob?.runtimeSessionId === payload.sessionId) {
+        if (payload.status === "running") {
+          setRunningSessionId(handoffJob.sourceSessionId);
+          return;
+        }
+        if (["completed", "error", "interrupted"].includes(payload.status)) {
+          void finishHandoffJob(handoffJob, payload.status as "completed" | "error" | "interrupted");
+          return;
+        }
+      }
       const uiSessionId = resolveUiSessionId(payload.sessionId);
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      if (targetSession?.engine !== "kimi-code" && !targetSession?.longTask) return;
+      if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
 
       if (payload.status === "running") {
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -2423,7 +2396,7 @@ function App() {
       dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
     });
 
-    const unsubscribeStatus = window.api.onKimiStatus((payload) => {
+    const unsubscribeLongTaskStatus = window.api.onKimiCodeStatus((payload) => {
       const handoffJob = handoffJobRef.current;
       if (handoffJob?.runtimeSessionId === payload.sessionId) {
         if (payload.status === "running") {
@@ -2611,8 +2584,7 @@ function App() {
     });
 
     return () => {
-      unsubscribeEvent();
-      unsubscribeStatus();
+      unsubscribeLongTaskStatus();
       unsubscribeKimiCodeEvent();
       unsubscribeKimiCodeStatus();
       unsubscribeBootstrap();

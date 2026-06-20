@@ -398,10 +398,6 @@ function installBrowserPreviewApi() {
       },
     }),
     updateKimiCli: (): Promise<UpdateKimiCliResponse> => fail("更新 Kimi Code"),
-    setPlanMode: () => fail("切换 Plan 模式"),
-    steerPrompt: () => fail("继续编辑消息"),
-    approveRequest: () => fail("审批操作"),
-    respondQuestion: () => fail("回答问题卡片"),
     listKimiCodeSlashCommands: (): Promise<ListSlashCommandsResponse> => Promise.resolve({ success: true, data: [] }),
     listKimiCodeHistorySessions: (): Promise<ListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
     exportKimiCodeSession: (): Promise<ExportSessionResponse> => fail("导出 Kimi Debug ZIP"),
@@ -465,8 +461,6 @@ function installBrowserPreviewApi() {
     setKimiCodePluginEnabled: (): Promise<VoidResponse> => fail("切换 Kimi Code SDK 插件状态"),
     setKimiCodePluginMcpServerEnabled: (): Promise<VoidResponse> => fail("切换 Kimi Code SDK Plugin MCP 状态"),
 
-    onKimiEvent: () => () => {},
-    onKimiStatus: () => () => {},
     onKimiCodeEvent: () => () => {},
     onKimiCodeStatus: () => () => {},
 

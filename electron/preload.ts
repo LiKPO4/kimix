@@ -41,14 +41,6 @@ import type {
   TestMcpServerResponse,
   TestKimiModelConfigResponse,
   UpdateKimiCliResponse,
-  SetPlanModeRequest,
-  SetPlanModeResponse,
-  SteerPromptRequest,
-  SteerPromptResponse,
-  ApproveRequest,
-  ApproveResponse,
-  RespondQuestionRequest,
-  RespondQuestionResponse,
   ListSessionsRequest,
   ListSessionsResponse,
   ListSlashCommandsRequest,
@@ -108,8 +100,6 @@ import type {
   GenerateHookRuleResponse,
   SettingsResponse,
   SaveSettingsRequest,
-  KimiEventPayload,
-  KimiStatusPayload,
   KimiCodeApprovalResponseRequest,
   KimiCodeCreateSessionRequest,
   KimiCodeEventPayload,
@@ -277,14 +267,6 @@ const api = {
     ipcRenderer.invoke("kimi:checkCliUpdate"),
   updateKimiCli: (): Promise<UpdateKimiCliResponse> =>
     ipcRenderer.invoke("kimi:updateCli"),
-  setPlanMode: (req: SetPlanModeRequest): Promise<SetPlanModeResponse> =>
-    ipcRenderer.invoke("kimi:setPlanMode", req),
-  steerPrompt: (req: SteerPromptRequest): Promise<SteerPromptResponse> =>
-    ipcRenderer.invoke("kimi:steerPrompt", req),
-  approveRequest: (req: ApproveRequest): Promise<ApproveResponse> =>
-    ipcRenderer.invoke("kimi:approveRequest", req),
-  respondQuestion: (req: RespondQuestionRequest): Promise<RespondQuestionResponse> =>
-    ipcRenderer.invoke("kimi:respondQuestion", req),
   listKimiCodeSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
     ipcRenderer.invoke("kimi-code:listSlashCommands", req),
   previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>
@@ -313,16 +295,6 @@ const api = {
     ipcRenderer.invoke("kimi-code:openWebServer"),
 
   // Event listeners
-  onKimiEvent: (callback: (payload: KimiEventPayload) => void) => {
-    const handler = (_: unknown, payload: KimiEventPayload) => callback(payload);
-    ipcRenderer.on("kimi:event", handler);
-    return () => ipcRenderer.off("kimi:event", handler);
-  },
-  onKimiStatus: (callback: (payload: KimiStatusPayload) => void) => {
-    const handler = (_: unknown, payload: KimiStatusPayload) => callback(payload);
-    ipcRenderer.on("kimi:status", handler);
-    return () => ipcRenderer.off("kimi:status", handler);
-  },
   createKimiCodeSession: (req: KimiCodeCreateSessionRequest): Promise<KimiCodeSessionResponse> =>
     ipcRenderer.invoke("kimi-code:createSession", req),
   resumeKimiCodeSession: (req: KimiCodeResumeSessionRequest): Promise<KimiCodeSessionResponse> =>
