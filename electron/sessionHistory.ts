@@ -1,8 +1,8 @@
 /**
  * Self-contained session history and listing utilities.
  *
- * Extracted from kimiBridge.ts to remove the dependency on the old
- * @moonshot-ai/kimi-agent-sdk npm package (parseEventPayload, createKimiPaths).
+ * Extracted from the former bridge layer so history parsing no longer depends on
+ * a runtime SDK import.
  *
  * All functions operate purely on the filesystem — no SDK imports, no harness lifecycle.
  * The same wire.jsonl format is used by both old prompt-mode and new kimi-code sessions.
@@ -16,7 +16,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 
 // ---------------------------------------------------------------------------
-// Types (local replacements for old npm SDK types)
+// Types
 // ---------------------------------------------------------------------------
 
 export interface SessionHistoryEvent {
@@ -351,16 +351,11 @@ async function readSessionModelFromShareDir(
 }
 
 // ---------------------------------------------------------------------------
-// Event parsing (local passthrough; no longer depends on old SDK's parseEventPayload)
+// Event parsing (local passthrough)
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal local replacement for the old @moonshot-ai/kimi-agent-sdk parseEventPayload.
- *
- * In the old codebase this function did typed validation and coercion of wire.jsonl
- * message records into StreamEvent objects. The renderer's mapHistoryEvents then
- * further shapes them for UI display. Here we simply pass through the type and payload
- * — the renderer handles the rest.
+ * Passes wire.jsonl message records through for renderer-side history mapping.
  */
 function parseEventPayload(
   type: string,

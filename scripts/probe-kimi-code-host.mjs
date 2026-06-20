@@ -95,7 +95,7 @@ async function main() {
     );
 
     const steering = waitForTurn(session, () =>
-      session.prompt("请分三条简短说明 SDK host 为什么比 hidden TUI 更适合桌面 UI。"),
+      session.prompt("请分三条简短说明 KimiCodeHost 为什么适合桌面 UI。"),
     );
     await new Promise((resolve) => setTimeout(resolve, 800));
     await session.steer("补充一句：steer 必须保持同一个官方 sessionId。");

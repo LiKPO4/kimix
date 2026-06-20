@@ -1,9 +1,7 @@
 /**
  * Hook runner: applies UserPromptSubmit hooks to outgoing prompts.
  *
- * Recovered from the deleted kimiBridge.ts (applyPromptSubmitHooks and its
- * dependency graph). Now self-contained — no dependency on the old
- * @moonshot-ai/kimi-agent-sdk or the legacy event bridge.
+ * Self-contained: no runtime SDK import and no legacy event bridge dependency.
  */
 
 import { exec } from "node:child_process";
