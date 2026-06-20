@@ -1154,8 +1154,12 @@ function App() {
 
         const latestPermission = useAppStore.getState().permissionMode;
         const latestPlanMode = useAppStore.getState().defaultPlanMode;
-        void window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode: latestPermission }).catch(() => {});
-        void window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: latestPlanMode }).catch(() => {});
+        void window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode: latestPermission }).catch((err) => {
+          console.warn("[App] setKimiCodePermission failed:", err);
+        });
+        void window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: latestPlanMode }).catch((err) => {
+          console.warn("[App] setKimiCodePlanMode failed:", err);
+        });
       } catch (err) {
         runtimePrewarmRetryAfterRef.current.set(latest.id, Date.now() + KIMI_RUNTIME_PREWARM_RETRY_COOLDOWN_MS);
         console.warn("Kimi Code runtime prewarm failed:", err);
