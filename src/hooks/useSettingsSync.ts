@@ -46,7 +46,9 @@ export function useSettingsSync() {
           notificationMode: state.notificationMode,
           clarificationToolMode: state.clarificationToolMode,
           filePreviewExtensions: state.filePreviewExtensions,
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn("[SettingsSync] 设置保存失败，UI 状态与磁盘可能不一致:", err);
+        });
       }
     });
 
