@@ -3317,3 +3317,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `pnpm knowledge:validate` 通过。
 - `git diff --check` 通过，仅有 LF/CRLF 提示。
 - 真实命令验证：本机执行 `kimi web`，进程以 code=0 正常交给官方命令处理。
+
+# 2026-06-20 v2.11.2 启动白屏排查与旧 Server 会话硬化
+## 当前目标
+- 排查用户反馈启动后白屏，并降低旧 Server session 缺失导致启动期状态异常的风险。
+## 已完成
+- 干净 dev 与生产 preview 均能渲染主界面，版本显示 v2.11.1，未复现构建产物必现白屏。
+- 发现启动日志中旧 Server session 在新 Server 中返回 missing 后仍短暂保留绑定。
+- 恢复旧会话应用 profile 失败且为 session missing 时，先关闭旧绑定再创建新 runtime。
+- 初始 status refresh 遇到 session missing 时移除 stale Server binding，不再继续保留脏状态。
+- 版本号三处同步到 v2.11.2。
+## 未完成
+- 等待用户用 v2.11.2 启动复验是否仍白屏。
+## 关键文件
+- `electron/main.ts`
+- `electron/kimiCodeHost.ts`
+- `src/components/layout/Sidebar.tsx`
+- `src/components/settings/SettingsPanel.tsx`
+## 下一步
+- 跑构建、全量测试和知识校验；如用户侧仍白屏，要求回传截图和当前版本号，优先排查旧进程/缓存或特定窗口状态。

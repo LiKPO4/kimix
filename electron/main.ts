@@ -5993,6 +5993,7 @@ ipcMain.handle("kimi:startSession", async (_, request: { workDir: string; sessio
         } catch (err) {
           if (!kimiCodeHost.isKimiCodeSessionMissingError(err)) throw err;
           console.warn(`[Kimi Code] resumed session ${resumed.sessionId} vanished while applying profile; creating a fresh runtime for ${request.workDir}:`, err);
+          await kimiCodeHost.closeSession(resumed.sessionId).catch(() => {});
           engineSession = await createFresh();
         }
       }

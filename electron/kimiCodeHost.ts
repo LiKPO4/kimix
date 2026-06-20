@@ -1830,6 +1830,11 @@ async function registerServerSession(
   serverSessions.set(session.id, managed);
   await getServerClient().subscribe(session.id);
   void refreshServerSessionStatus(session.id, true).catch((error) => {
+    if (isKimiCodeSessionMissingError(error)) {
+      serverSessions.delete(session.id);
+      console.warn(`[KimiCodeServerHost] session ${session.id} vanished during initial status refresh; removed stale Server binding.`);
+      return;
+    }
     console.warn(`[KimiCodeServerHost] refresh initial status failed for ${session.id}:`, error);
   });
   kimiCodeServerHost.setRouting("server");
