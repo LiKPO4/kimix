@@ -3,7 +3,7 @@
 ## 2026-06-20 古早接口与功能残留迁移
 - 当前目标：按风险从低到高迁移并清理旧版 Kimi 对接接口、无调用功能和过时说明，保留仍承担用户升级与历史会话读取职责的兼容逻辑。
 - 待办：
-  1. 清理无调用的古早 TUI 登录、旧插件安装与 Superpowers 安装接口。
+  1. ✅ 清理无调用的古早 TUI 登录、旧插件安装与 Superpowers 安装接口。
   2. 将 Renderer 对旧 `kimi:*` IPC 的调用迁移到 `kimi-code:*`，先迁移调用方，再删除兼容入口。
   3. 迁移依赖旧事件通道的 handoff 等逻辑，随后移除 `kimi:event` / `kimi:status` 双广播与旧 preload 监听。
   4. 清理无引用文件、函数、误提交运行日志和过时用户文案。
@@ -12,7 +12,8 @@
 - 保留边界：`~/.kimi` 配置迁移、历史会话解析、历史 Superpowers 消息识别等读取兼容，在明确支持截止策略前不删除。
 - 提交策略：每个可独立验证的迁移增量单独窄范围提交；禁止 `git add .`，不处理历史未跟踪文件。
 - 关键文件：`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/App.tsx`、`src/components/`、`src/main.tsx`。
-- 下一步：清理第一批无调用的古早接口，并通过测试、知识校验与构建后提交。
+- 已完成：删除会启动裸 `kimi` 并写入 `/login` 的旧 TUI 登录实现；删除已无 Renderer 调用且依赖不存在 CLI 子命令的旧 Plugin 安装入口；删除旧 Superpowers 下载、安装与 bootstrap IPC。历史 Superpowers 消息读取兼容继续保留。
+- 下一步：将 Renderer 对旧 `kimi:*` IPC 的调用迁移到 `kimi-code:*`，先迁移调用方并验证，再删除兼容入口。
 
 ## 2026-06-20 v2.11.9 自动重试静默化
 - 当前目标：避免底层会话失效自动重试时，过程头短暂闪现“消息重新发送中”打扰用户。

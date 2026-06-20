@@ -1129,57 +1129,6 @@ export type ImportSkillArchiveResponse = {
   error: string;
 };
 
-export type InstallKimiPluginRequest = {
-  url: string;
-};
-
-export type InstallKimiPluginResponse = {
-  success: true;
-  data: {
-    message: string;
-    output: string;
-    skills: SkillInfo[];
-    enabledNames: string[];
-    enabledDir: string;
-  };
-} | {
-  success: false;
-  error: string;
-};
-
-export type InstallSuperpowersResponse = {
-  success: true;
-  data: {
-    installed: SkillInfo[];
-    skills: SkillInfo[];
-    enabledNames: string[];
-    enabledDir: string;
-  };
-} | {
-  success: false;
-  error: string;
-};
-
-export type SuperpowersBootstrapResponse = {
-  success: true;
-  data: {
-    enabled: boolean;
-    content: string;
-    agentFile?: string;
-    skillsDir?: string;
-    enabledNames?: string[];
-    superpowerSkills?: string[];
-    agentFileExists?: boolean;
-    skillsDirExists?: boolean;
-    legacyAgentFileExists?: boolean;
-    usingSkillPath?: string;
-    diagnostics?: string[];
-  };
-} | {
-  success: false;
-  error: string;
-};
-
 export type AppInfoResponse = {
   success: true;
   data: {

@@ -24,30 +24,11 @@ const KIMI_CODE_INSTALL_BASE_URL = "https://code.kimi.com/kimi-code";
 const KIMI_CODE_BINARY_BASE_URL = `${KIMI_CODE_INSTALL_BASE_URL}/binaries`;
 const KIMI_CODE_INSTALL_PS1_URL = "https://code.kimi.com/kimi-code/install.ps1";
 const KIMI_CODE_INSTALL_SH_URL = "https://code.kimi.com/kimi-code/install.sh";
-const SUPERPOWERS_ZIP_URL = "https://github.com/obra/superpowers/archive/refs/heads/main.zip";
-const SUPERPOWERS_GIT_URL = "https://github.com/obra/superpowers.git";
 const DEFAULT_PROJECT_ID = "default-kimi-project";
 const DEFAULT_PROJECT_DISPLAY_NAME = "Kimix 默认项目";
-const SUPERPOWERS_SKILL_NAMES = [
-  "brainstorming",
-  "dispatching-parallel-agents",
-  "executing-plans",
-  "finishing-a-development-branch",
-  "receiving-code-review",
-  "requesting-code-review",
-  "subagent-driven-development",
-  "systematic-debugging",
-  "test-driven-development",
-  "using-git-worktrees",
-  "using-superpowers",
-  "verification-before-completion",
-  "writing-plans",
-  "writing-skills",
-];
 
 const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "Interrupt", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
 const HOOK_ACTIONS = ["allow", "block", "notify", "run_command"] as const;
-let activeKimiLoginProcess: ReturnType<typeof spawn> | null = null;
 let kimiServerStartupScheduled = false;
 
 function prependProcessPath(dir: string) {
@@ -1060,77 +1041,6 @@ function clearKimiCredential(shareDir: string) {
 
 function stripAnsi(input: string) {
   return input.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g, "");
-}
-
-function startKimiInteractiveLogin(kimiPath: string): Promise<{ verificationUrl?: string; message: string }> {
-  if (activeKimiLoginProcess && !activeKimiLoginProcess.killed) {
-    return Promise.resolve({ message: "Kimi 登录流程已启动，请在浏览器中完成授权" });
-  }
-
-  return new Promise((resolve, reject) => {
-    let output = "";
-    let resolved = false;
-    let openedUrl = "";
-    const child = spawn(kimiPath, [], {
-      cwd: os.homedir(),
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, NO_COLOR: "1" },
-    });
-    activeKimiLoginProcess = child;
-
-    const finish = (result: { verificationUrl?: string; message: string }) => {
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timer);
-      resolve(result);
-    };
-
-    const handleOutput = (chunk: Buffer | string) => {
-      output += stripAnsi(chunk.toString());
-      const matched = output.match(/https?:\/\/[^\s"'<>]*(?:authorize_device|authorize)[^\s"'<>]*/i);
-      if (matched && !openedUrl) {
-        openedUrl = matched[0];
-        void shell.openExternal(openedUrl).catch(() => {});
-        finish({
-          verificationUrl: openedUrl,
-          message: "已打开 Kimi 登录链接，请在浏览器中完成授权；完成后返回 Kimix 点击刷新",
-        });
-      }
-    };
-
-    const timer = setTimeout(() => {
-      finish({
-        verificationUrl: openedUrl || undefined,
-        message: openedUrl
-          ? "已打开 Kimi 登录链接，请在浏览器中完成授权；完成后返回 Kimix 点击刷新"
-          : "已启动 Kimi 登录流程，但暂未捕获到授权链接，请稍后重试",
-      });
-    }, 15000);
-
-    child.stdout.on("data", handleOutput);
-    child.stderr.on("data", handleOutput);
-    child.on("error", (err) => {
-      if (activeKimiLoginProcess === child) activeKimiLoginProcess = null;
-      if (!resolved) {
-        clearTimeout(timer);
-        reject(err);
-      }
-    });
-    child.on("close", (code) => {
-      if (activeKimiLoginProcess === child) activeKimiLoginProcess = null;
-      if (!resolved) {
-        clearTimeout(timer);
-        if (code === 0) {
-          resolve({ message: "Kimi 登录流程已完成" });
-        } else {
-          reject(new Error(stripAnsi(output).trim() || `Kimi 登录流程退出，代码 ${code ?? "unknown"}`));
-        }
-      }
-    });
-
-    child.stdin.write("/login\n");
-  });
 }
 
 async function getKimiAuthStatus() {
@@ -3303,10 +3213,6 @@ function importedSkillsDir() {
   return path.join(os.homedir(), ".kimix", "skills");
 }
 
-function superpowersSkillsDir() {
-  return path.join(importedSkillsDir(), "superpowers");
-}
-
 function sanitizeSkillDirName(name: string) {
   return (name || "imported-skill").replace(/[<>:"/\\|?*\x00-\x1f]+/g, "_").trim() || "imported-skill";
 }
@@ -3371,54 +3277,6 @@ function extractArchiveSafe(archivePath: string, targetDir: string) {
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.writeFileSync(targetPath, entry.getData());
   }
-}
-
-async function downloadFile(url: string, targetPath: string) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`下载失败：HTTP ${res.status}`);
-  }
-  const buffer = Buffer.from(await res.arrayBuffer());
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.writeFileSync(targetPath, buffer);
-}
-
-function findCachedSuperpowersSkillsRoot() {
-  const candidates: string[] = [];
-  try {
-    const tempEntries = fs.readdirSync(os.tmpdir(), { withFileTypes: true });
-    for (const entry of tempEntries) {
-      if (!entry.isDirectory() || !entry.name.startsWith("kimix-superpowers-check-")) continue;
-      candidates.push(path.join(os.tmpdir(), entry.name, "skills"));
-    }
-  } catch {
-    // Temp directory may be inaccessible in restricted environments.
-  }
-  candidates.push(
-    path.join(os.homedir(), ".codex", "plugins", "cache", "superpowers", "skills"),
-    path.join(os.homedir(), ".claude", "plugins", "superpowers", "skills"),
-  );
-  return candidates.find((candidate) => fs.existsSync(path.join(candidate, "using-superpowers", "SKILL.md"))) ?? null;
-}
-
-async function cloneSuperpowersTo(targetDir: string) {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn("git", ["clone", "--depth", "1", SUPERPOWERS_GIT_URL, targetDir], {
-      windowsHide: true,
-      stdio: "pipe",
-    });
-    let output = "";
-    child.stdout?.on("data", (chunk) => { output += String(chunk); });
-    child.stderr?.on("data", (chunk) => { output += String(chunk); });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(output.trim() || `git clone exited with ${code}`));
-    });
-  });
 }
 
 function findSkillFiles(root: string) {
@@ -3489,134 +3347,6 @@ function importSkillArchive(archivePath: string) {
   }
 }
 
-function validateKimiPluginUrl(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed) throw new Error("请输入 Plugin URL");
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    throw new Error("Plugin URL 格式无效，请输入 https 地址");
-  }
-  if (parsed.protocol !== "https:") {
-    throw new Error("Plugin URL 只支持 https 地址");
-  }
-  const hostname = parsed.hostname.toLowerCase();
-  const pathname = parsed.pathname.toLowerCase();
-  if (hostname === "github.com") {
-    const parts = parsed.pathname.split("/").filter(Boolean);
-    if (parts.length < 2) {
-      throw new Error("GitHub Plugin URL 至少需要包含 owner/repo");
-    }
-    return trimmed;
-  }
-  if (pathname.endsWith(".zip")) {
-    return trimmed;
-  }
-  throw new Error("当前入口支持 GitHub Plugin URL 或官方 ZIP Plugin URL");
-}
-
-function normalizePluginInstallError(output: string) {
-  const text = output.trim();
-  if (/unknown command|too many arguments|expected 0 arguments|invalid command|error: unknown/i.test(text)) {
-    return [
-      "当前 Kimi Code 未暴露 `kimi plugin install` 命令，请升级 Kimi Code 或等待官方支持后重试。",
-      text ? `Kimi Code 输出：\n${text}` : "",
-    ].filter(Boolean).join("\n\n");
-  }
-  return text || "安装 Kimi Plugin 失败";
-}
-
-async function installKimiPluginFromUrl(request: unknown) {
-  const url = request && typeof request === "object" && typeof (request as { url?: unknown }).url === "string"
-    ? validateKimiPluginUrl((request as { url: string }).url)
-    : validateKimiPluginUrl("");
-  const kimiPath = await requireKimiExecutable();
-  let output = "";
-  try {
-    output = await runLongCommand(kimiPath, ["plugin", "install", url], 2 * 60 * 1000);
-  } catch (err) {
-    throw new Error(normalizePluginInstallError(err instanceof Error ? err.message : String(err)));
-  }
-  const settings = settingsService.loadSettings();
-  return {
-    message: "Kimi Plugin 安装完成，已刷新本地插件列表",
-    output,
-    skills: listLocalSkills(),
-    enabledNames: settings.enabledSkillNames ?? [],
-    enabledDir: settings.enabledSkillsDir || enabledSkillsDir(),
-  };
-}
-
-function findSuperpowersSkillsRoot(root: string) {
-  const candidates = [
-    path.join(root, "skills"),
-    ...fs.readdirSync(root, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => path.join(root, entry.name, "skills")),
-  ];
-  const found = candidates.find((candidate) => (
-    fs.existsSync(path.join(candidate, "using-superpowers", "SKILL.md"))
-  ));
-  if (!found) {
-    throw new Error("Superpowers 压缩包内未找到 skills/using-superpowers/SKILL.md");
-  }
-  return found;
-}
-
-async function installSuperpowersSkills() {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-superpowers-"));
-  try {
-    const errors: string[] = [];
-    let sourceSkillsRoot = findCachedSuperpowersSkillsRoot();
-    if (!sourceSkillsRoot) {
-      const cloneDir = path.join(tempDir, "repo");
-      try {
-        await cloneSuperpowersTo(cloneDir);
-        sourceSkillsRoot = path.join(cloneDir, "skills");
-      } catch (err) {
-        errors.push(`git clone: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-    if (!sourceSkillsRoot || !fs.existsSync(path.join(sourceSkillsRoot, "using-superpowers", "SKILL.md"))) {
-      const archivePath = path.join(tempDir, "superpowers.zip");
-      try {
-        await downloadFile(SUPERPOWERS_ZIP_URL, archivePath);
-        const extractedDir = path.join(tempDir, "extracted");
-        extractArchiveSafe(archivePath, extractedDir);
-        sourceSkillsRoot = findSuperpowersSkillsRoot(extractedDir);
-      } catch (err) {
-        errors.push(`zip download: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-    if (!sourceSkillsRoot || !fs.existsSync(path.join(sourceSkillsRoot, "using-superpowers", "SKILL.md"))) {
-      throw new Error(`安装 Superpowers 失败：${errors.join("；") || "未找到可用的 Superpowers skills"}`);
-    }
-    const targetRoot = superpowersSkillsDir();
-    fs.rmSync(targetRoot, { recursive: true, force: true });
-    fs.mkdirSync(targetRoot, { recursive: true });
-    copyDirectorySafe(sourceSkillsRoot, targetRoot);
-
-    const allSkills = listLocalSkills();
-    const installed = allSkills.filter((skill) => path.resolve(skill.path).startsWith(path.resolve(targetRoot)));
-    const installedNames = installed.map((skill) => skill.name);
-    const settings = settingsService.loadSettings();
-    const enabledNames = Array.from(new Set([
-      ...(settings.enabledSkillNames ?? []),
-      ...SUPERPOWERS_SKILL_NAMES.filter((name) => installedNames.includes(name)),
-    ]));
-    const synced = syncEnabledSkills(enabledNames);
-    return {
-      installed,
-      skills: listLocalSkills(),
-      enabledNames: synced.enabledNames,
-      enabledDir: synced.enabledDir,
-    };
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
-}
-
 function syncEnabledSkills(names: string[]) {
   const uniqueNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
   const allSkills = listLocalSkills();
@@ -3633,57 +3363,6 @@ function syncEnabledSkills(names: string[]) {
   }
   settingsService.saveSettings({ enabledSkillNames: uniqueNames, enabledSkillsDir: targetDir });
   return { enabledNames: uniqueNames, enabledDir: targetDir };
-}
-
-function readSuperpowersBootstrap() {
-  const settings = settingsService.loadSettings();
-  const enabledNames = settings.enabledSkillNames ?? [];
-  const skillsDir = settings.enabledSkillsDir || enabledSkillsDir();
-  const diagnostics: string[] = [];
-  if (!enabledNames.includes("using-superpowers")) {
-    diagnostics.push("using-superpowers 未启用");
-    return {
-      enabled: false,
-      content: "",
-      skillsDir,
-      enabledNames,
-      superpowerSkills: [],
-      skillsDirExists: fs.existsSync(skillsDir),
-      diagnostics,
-    };
-  }
-  const skills = listLocalSkills().filter((item) => enabledNames.includes(item.name));
-  const usingSkill = skills.find((item) => item.name === "using-superpowers");
-  if (!usingSkill || !fs.existsSync(usingSkill.path)) {
-    diagnostics.push("using-superpowers 已勾选，但没有找到对应 SKILL.md");
-    return {
-      enabled: false,
-      content: "",
-      skillsDir,
-      enabledNames,
-      superpowerSkills: [],
-      skillsDirExists: fs.existsSync(skillsDir),
-      diagnostics,
-    };
-  }
-  const superpowerSkills = skills
-    .filter((item) => path.resolve(item.path).includes(`${path.sep}superpowers${path.sep}`))
-    .map((item) => item.name)
-    .sort();
-  diagnostics.push(`using-superpowers 已启用：${usingSkill.path}`);
-  diagnostics.push(`--skills-dir：${skillsDir}`);
-  diagnostics.push("Kimix 自定义 Superpowers agent prompt 已停用，Superpowers 由官方 plugin 接管。");
-  if (superpowerSkills.length === 0) diagnostics.push("未识别到来自 superpowers 目录的 Skill");
-  return {
-    enabled: true,
-    content: "",
-    skillsDir,
-    enabledNames,
-    superpowerSkills,
-    skillsDirExists: fs.existsSync(skillsDir),
-    usingSkillPath: usingSkill.path,
-    diagnostics,
-  };
 }
 
 type KimiOAuthToken = {
@@ -4759,30 +4438,6 @@ ipcMain.handle("project:importSkillArchive", async (_, request: unknown) => {
     }
     const imported = importSkillArchive(archivePath);
     return { success: true, data: { imported, skills: listLocalSkills() } };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("project:installKimiPlugin", async (_, request: unknown) => {
-  try {
-    return { success: true, data: await installKimiPluginFromUrl(request) };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("project:installSuperpowers", async () => {
-  try {
-    return { success: true, data: await installSuperpowersSkills() };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("project:getSuperpowersBootstrap", async () => {
-  try {
-    return { success: true, data: readSuperpowersBootstrap() };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

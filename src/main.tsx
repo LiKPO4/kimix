@@ -57,7 +57,6 @@ import type {
   ImportPluginMcpServerRequest,
   TestMcpServerResponse,
   SaveEnabledSkillsResponse,
-  InstallKimiPluginResponse,
   SearchProjectFilesResponse,
   SettingsResponse,
   StartSessionResponse,
@@ -170,10 +169,6 @@ function installBrowserPreviewApi() {
     saveEnabledSkills: (): Promise<SaveEnabledSkillsResponse> =>
       Promise.resolve({ success: true, data: { enabledNames: [], enabledDir: "" } }),
     importSkillArchive: () => fail("导入技能包"),
-    installKimiPlugin: (): Promise<InstallKimiPluginResponse> => fail("安装 Kimi Plugin"),
-    installSuperpowers: () => fail("安装 Superpowers"),
-    getSuperpowersBootstrap: () => Promise.resolve({ success: true, data: { enabled: false, content: "" } }),
-
     listLongTasks: (): Promise<ListLongTasksResponse> => Promise.resolve({ success: true, data: [] }),
     createLongTask: () => fail("创建长程任务"),
     getLongTaskDetail: () => fail("读取长程任务详情"),

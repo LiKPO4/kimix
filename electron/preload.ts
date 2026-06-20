@@ -96,12 +96,8 @@ import type {
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
   ListSkillsResponse,
-  InstallKimiPluginRequest,
-  InstallKimiPluginResponse,
   ImportSkillArchiveRequest,
   ImportSkillArchiveResponse,
-  InstallSuperpowersResponse,
-  SuperpowersBootstrapResponse,
   SaveEnabledSkillsRequest,
   SaveEnabledSkillsResponse,
   OpenTerminalRequest,
@@ -228,13 +224,6 @@ const api = {
     ipcRenderer.invoke("project:saveEnabledSkills", req),
   importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
     ipcRenderer.invoke("project:importSkillArchive", req),
-  installKimiPlugin: (req: InstallKimiPluginRequest): Promise<InstallKimiPluginResponse> =>
-    ipcRenderer.invoke("project:installKimiPlugin", req),
-  installSuperpowers: (): Promise<InstallSuperpowersResponse> =>
-    ipcRenderer.invoke("project:installSuperpowers"),
-  getSuperpowersBootstrap: (): Promise<SuperpowersBootstrapResponse> =>
-    ipcRenderer.invoke("project:getSuperpowersBootstrap"),
-
   // Long tasks
   listLongTasks: (req: ListLongTasksRequest): Promise<ListLongTasksResponse> =>
     ipcRenderer.invoke("longTasks:list", req),
