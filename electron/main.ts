@@ -48,6 +48,7 @@ const SUPERPOWERS_SKILL_NAMES = [
 const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "Interrupt", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
 const HOOK_ACTIONS = ["allow", "block", "notify", "run_command"] as const;
 let activeKimiLoginProcess: ReturnType<typeof spawn> | null = null;
+let kimiServerStartupScheduled = false;
 
 function prependProcessPath(dir: string) {
   if (!dir) return;
@@ -4025,6 +4026,7 @@ function createWindow() {
     emitWindowState();
     verifyRendererContent();
     startRendererWatchdog();
+    scheduleKimiServerStartupAfterFirstPaint();
   });
 
   mainWindow.on("focus", clearTaskbarAttention);
@@ -4087,6 +4089,20 @@ function createWindow() {
   mainWindow.on("restore", emitWindowState);
   mainWindow.on("enter-full-screen", emitWindowState);
   mainWindow.on("leave-full-screen", emitWindowState);
+}
+
+function scheduleKimiServerStartupAfterFirstPaint() {
+  if (kimiServerStartupScheduled) return;
+  kimiServerStartupScheduled = true;
+  setTimeout(() => {
+    void kimiCodeServerHost.start().then((serverStatus) => {
+      if (serverStatus.enabled) {
+        console.info("[KimiCodeServerHost]", serverStatus);
+      }
+    }).catch((error) => {
+      console.warn("[KimiCodeServerHost] background startup failed:", error);
+    });
+  }, 2_000);
 }
 
 async function restoreLastContext() {
@@ -6855,11 +6871,7 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(async () => {
-  const serverStatus = await kimiCodeServerHost.start();
-  if (serverStatus.enabled) {
-    console.info("[KimiCodeServerHost]", serverStatus);
-  }
+app.whenReady().then(() => {
   createWindow();
 });
 

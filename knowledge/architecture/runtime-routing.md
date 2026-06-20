@@ -19,6 +19,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 4. SDK refreshes must be regenerated from an identified upstream tag and commit, with provenance recorded under `vendor/kimi-code-sdk/README.md`.
 5. Experimental or incomplete upstream capabilities remain behind capability checks or explicit settings.
 6. A transient Server failure schedules a bounded background recovery attempt. When Server becomes ready again, an idle SDK session may return to the Server route only if the Server can resolve the same official session ID; otherwise the SDK session remains authoritative.
+7. App startup must not await Kimi Server startup or session prewarm before showing the main window. The renderer should paint first; Server startup and Kimi runtime prewarm run afterward in the background.
 
 # Main Components
 

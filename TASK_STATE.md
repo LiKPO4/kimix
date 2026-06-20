@@ -3336,3 +3336,24 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/settings/SettingsPanel.tsx`
 ## 下一步
 - 跑构建、全量测试和知识校验；如用户侧仍白屏，要求回传截图和当前版本号，优先排查旧进程/缓存或特定窗口状态。
+
+# 2026-06-20 v2.11.3 启动首屏预热延后
+## 当前目标
+- 解决“启动 Kimi 后白屏很久才有内容”的加载体验问题。
+## 已完成
+- 将当前会话 Kimi runtime 预热从 350ms 延后到 3000ms，先让主界面完成首屏显示。
+- 预热恢复旧 runtime 遇到 session missing 时，清理本地 `runtimeSessionId` / `officialSessionId`，避免后续启动反复恢复同一个失效会话。
+- Kimi Server 启动从 app ready 串行阻塞改为窗口 `did-finish-load` 后延迟 2 秒后台启动，避免 Server 探测/启动挡住主界面。
+- 版本号三处同步到 v2.11.3。
+## 未完成
+- 等待用户实机复验启动白屏时长。
+## 关键文件
+- `src/App.tsx`
+- `src/components/layout/Sidebar.tsx`
+- `src/components/settings/SettingsPanel.tsx`
+## 下一步
+- 跑生产构建/预览截图、全量测试和知识校验；用户用 v2.11.3 复验主界面是否先出现，再后台连接 Kimi。
+
+## 验证
+- `pnpm build` 通过，renderer hash：`assets/index-DaR0L8bW.js`。
+- `pnpm preview` 生产预览日志顺序已变为 renderer content check 先出现，Kimi Server 后台启动日志后出现。
