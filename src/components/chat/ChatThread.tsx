@@ -1004,9 +1004,15 @@ export function ChatThread() {
     if (session?.id) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_SETTLE_MS;
       keepSessionAtBottom();
+      const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
         keepSessionAtBottom();
-        setPrimedSessionId(session.id);
+        console.log("[ChatThread] rAF setPrimedSessionId", {
+          primingSessionId,
+          currentSessionId: session?.id,
+          matches: session?.id === primingSessionId,
+        });
+        setPrimedSessionId(primingSessionId);
         window.requestAnimationFrame(keepSessionAtBottom);
       });
     }
@@ -1236,6 +1242,27 @@ export function ChatThread() {
   const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
+
+  useEffect(() => {
+    console.log("[ChatThread] render state", {
+      sessionId: session?.id,
+      primedSessionId,
+      isSessionScrollPrimed,
+      hasVisibleContent,
+      hasActiveTurn,
+      eventsLength: session?.events.length ?? 0,
+      renderItemsLength: renderItems.length,
+    });
+    if (session?.id && !isSessionScrollPrimed) {
+      const node = scrollRef.current;
+      console.log("[ChatThread] visibility check", {
+        sessionId: session?.id,
+        domVisibility: node ? getComputedStyle(node).visibility : "no-node",
+        domScrollHeight: node?.scrollHeight,
+        domClientHeight: node?.clientHeight,
+      });
+    }
+  });
 
   useEffect(() => {
     const pending = pendingFocusEventRef.current;
