@@ -481,6 +481,7 @@ contextBridge.exposeInMainWorld("api", api);
 
 // Debug: log renderer DOM content after load
 window.addEventListener("DOMContentLoaded", () => {
+  if (process.env.NODE_ENV === "production") return;
   setTimeout(() => {
     console.log("[KIMIX RENDERER] DOM ready, root content length:", document.getElementById("root")?.innerHTML?.length ?? 0);
   }, 2000);
