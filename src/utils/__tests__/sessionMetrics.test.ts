@@ -7,6 +7,7 @@ import {
   getLatestMeaningfulStatus,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
+  shouldRenderStandaloneStatusUpdate,
   shouldRecommendNewSession,
 } from "../sessionMetrics";
 import type { Session, TimelineEvent } from "@/types/ui";
@@ -131,6 +132,33 @@ describe("shouldShowInlineStatusUpdate", () => {
     expect(
       shouldShowInlineStatusUpdate({ id: "1", type: "status_update", timestamp: 1, step: 2, message: "输出打断" }),
     ).toBe(false);
+  });
+});
+
+describe("shouldRenderStandaloneStatusUpdate", () => {
+  it("hides prompt-link ipc statuses from the standalone message stream", () => {
+    expect(
+      shouldRenderStandaloneStatusUpdate({
+        id: "1",
+        type: "status_update",
+        timestamp: 1,
+        message: "消息发送中",
+        source: "ipc",
+        parentEventId: "user-1",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps normal statuses eligible for standalone rendering", () => {
+    expect(
+      shouldRenderStandaloneStatusUpdate({
+        id: "1",
+        type: "status_update",
+        timestamp: 1,
+        message: "已接收本地指令：/status",
+        source: "slash",
+      }),
+    ).toBe(true);
   });
 });
 

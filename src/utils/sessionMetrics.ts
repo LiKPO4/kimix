@@ -40,6 +40,11 @@ export function shouldShowInlineStatusUpdate(event: Extract<TimelineEvent, { typ
   return !isEmptyStatusUpdate(event);
 }
 
+export function shouldRenderStandaloneStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {
+  if (event.source === "ipc" && event.parentEventId) return false;
+  return true;
+}
+
 export function hasMetricStatus(event: Extract<TimelineEvent, { type: "status_update" }>) {
   return event.inputTokenCount !== undefined ||
     event.tokenCount !== undefined ||

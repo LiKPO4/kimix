@@ -17,6 +17,7 @@ import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
+import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
@@ -313,6 +314,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, leadin
     case "question_request":
       return <QuestionCard event={event} />;
     case "status_update":
+      if (!shouldRenderStandaloneStatusUpdate(event)) return null;
       return <StatusCard event={event} />;
     case "file_artifact":
       return <FileCard event={event} />;
@@ -584,7 +586,9 @@ function buildRenderItems(
       items.push({ type: "plan_preview", id: `plan-preview-${planPath}`, path: planPath, projectPath: mergedChangeSummary?.projectPath });
     }
     if (turnSettled && !assistantAttached) {
-      statusEvents.forEach((event) => items.push({ type: "event", event }));
+      statusEvents
+        .filter(shouldRenderStandaloneStatusUpdate)
+        .forEach((event) => items.push({ type: "event", event }));
     }
     if (!assistantAttached && subagents.length === 1) {
       subagents.forEach((event) => items.push({ type: "event", event }));
