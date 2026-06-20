@@ -56,6 +56,7 @@ import type {
   ImportPluginMcpServerRequest,
   TestMcpServerResponse,
   SaveEnabledSkillsResponse,
+  PrepareKimiSkillResponse,
   SearchProjectFilesResponse,
   SettingsResponse,
   StartSessionResponse,
@@ -167,6 +168,7 @@ function installBrowserPreviewApi() {
     listSkills: (): Promise<ListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
     saveEnabledSkills: (): Promise<SaveEnabledSkillsResponse> =>
       Promise.resolve({ success: true, data: { enabledNames: [], enabledDir: "" } }),
+    prepareKimiSkill: (): Promise<PrepareKimiSkillResponse> => fail("迁移 Skill 到 Kimi Code"),
     importSkillArchive: () => fail("导入技能包"),
     listLongTasks: (): Promise<ListLongTasksResponse> => Promise.resolve({ success: true, data: [] }),
     createLongTask: () => fail("创建长程任务"),

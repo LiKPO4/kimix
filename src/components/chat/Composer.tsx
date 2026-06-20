@@ -1286,10 +1286,14 @@ export function Composer() {
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name.startsWith("skill:")) {
       const skillName = name.slice("skill:".length);
-      const applied = await applySkillCommand(skillName, args || undefined);
-      if (applied === "enabled" && (args || images.length > 0)) {
-        await sendPromptContent(args, { images, skipClarification: true });
-      }
+      await appendLocalEvent({
+        id: genId(),
+        type: "user_message",
+        timestamp: Date.now(),
+        content: content.trim(),
+        images: toUserAttachments(images),
+      });
+      await applySkillCommand(skillName, args || undefined);
       return true;
     }
     if (name === "goal") {
@@ -1447,86 +1451,50 @@ export function Composer() {
   const applySkillCommand = async (skillName: string, args?: string) => {
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
-    const officialSkillRes = await window.api.listKimiCodeSkills({ sessionId: runtime.runtimeSessionId });
-    if (officialSkillRes.success) {
-      const normalizedName = skillName.trim().toLowerCase();
-      const officialSkill = officialSkillRes.data.find((item) => item.name.toLowerCase() === normalizedName);
-      if (officialSkill) {
-        const activateRes = await window.api.activateKimiCodeSkill({
-          sessionId: runtime.runtimeSessionId,
-          name: officialSkill.name,
-          args: args || undefined,
-        });
-        await appendLocalEvent({
-          id: genId(),
-          type: activateRes.success ? "status_update" : "error",
-          timestamp: Date.now(),
-          message: activateRes.success ? `已激活官方 Skill：${officialSkill.name}` : `激活 Skill 失败：${activateRes.error}`,
-          source: "ui",
-        });
-        return activateRes.success ? "activated" as const : false;
-      }
-    }
-
-    const skillRes = await window.api.listSkills();
-    if (!skillRes.success) {
-      await appendLocalEvent({
-        id: genId(),
-        type: "error",
-        timestamp: Date.now(),
-        message: `启用 Skill 失败：${skillRes.error}`,
-        source: "ui",
-      });
-      return false;
-    }
-
     const normalizedName = skillName.trim().toLowerCase();
-    const skill = skillRes.data.skills.find((item) => (
-      item.name.toLowerCase() === normalizedName ||
-      item.path.toLowerCase().includes(`\\${normalizedName}\\skill.md`) ||
-      item.path.toLowerCase().includes(`/${normalizedName}/skill.md`)
-    ));
-    if (!skill) {
-      await appendLocalEvent({
-        id: genId(),
-        type: "error",
-        timestamp: Date.now(),
-        message: `未找到 Skill：${skillName}。请在左侧“技能”面板确认名称后再发送。`,
-        source: "ui",
-      });
+    const findOfficialSkill = async () => {
+      const result = await window.api.listKimiCodeSkills({ sessionId: runtime.runtimeSessionId });
+      return result.success
+        ? result.data.find((item) => item.name.toLowerCase() === normalizedName)
+        : undefined;
+    };
+
+    let officialSkill = await findOfficialSkill();
+    let migrated = false;
+    if (!officialSkill) {
+      const prepareRes = await window.api.prepareKimiSkill({ name: skillName });
+      if (!prepareRes.success) {
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `调用 Skill 失败：${prepareRes.error}`, source: "ui" });
+        return false;
+      }
+      migrated = prepareRes.data.copied;
+      const reloadRes = await window.api.reloadKimiCodeSession({ sessionId: runtime.runtimeSessionId });
+      if (!reloadRes.success) {
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已迁移，但会话重载失败：${reloadRes.error}`, source: "ui" });
+        return false;
+      }
+      officialSkill = await findOfficialSkill();
+    }
+    if (!officialSkill) {
+      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Server 未识别 Skill：${skillName}。请新建会话后重试。`, source: "ui" });
       return false;
     }
 
-    const nextNames = Array.from(new Set([...skillRes.data.enabledNames, skill.name]));
-    const saveRes = await window.api.saveEnabledSkills({ names: nextNames });
-    if (!saveRes.success) {
-      await appendLocalEvent({
-        id: genId(),
-        type: "error",
-        timestamp: Date.now(),
-        message: `启用 Skill 失败：${saveRes.error}`,
-        source: "ui",
-      });
-      return false;
-    }
-
-    const targetSession = await ensureSession();
-    if (!targetSession) return false;
-    setSlashCommands([]);
-    updateSession(targetSession.id, (session) => ({
-      ...session,
-      events: [
-        ...session.events,
-        {
-          id: genId(),
-          type: "status_update",
-          timestamp: Date.now(),
-          message: `已启用 Skill：${skill.name}`,
-        },
-      ],
-      updatedAt: Date.now(),
-    }));
-    return "enabled" as const;
+    const activateRes = await window.api.activateKimiCodeSkill({
+      sessionId: runtime.runtimeSessionId,
+      name: officialSkill.name,
+      args: args || undefined,
+    });
+    await appendLocalEvent({
+      id: genId(),
+      type: activateRes.success ? "status_update" : "error",
+      timestamp: Date.now(),
+      message: activateRes.success
+        ? `${migrated ? "已迁移并" : "已"}调用 Skill：${officialSkill.name}`
+        : `调用 Skill 失败：${activateRes.error}`,
+      source: "ui",
+    });
+    return activateRes.success;
   };
 
   const handleSend = async () => {

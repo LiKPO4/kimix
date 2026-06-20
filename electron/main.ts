@@ -13,6 +13,7 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
+import { prepareSkillDirectoryForKimi } from "./skillMigration";
 import * as longTaskService from "./longTaskService";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
 
@@ -3365,6 +3366,15 @@ function syncEnabledSkills(names: string[]) {
   return { enabledNames: uniqueNames, enabledDir: targetDir };
 }
 
+function prepareLocalSkillForKimi(name: string) {
+  const normalizedName = name.trim().toLowerCase();
+  if (!normalizedName) throw new Error("Skill 名称不能为空");
+  const skill = listLocalSkills().find((item) => item.name.toLowerCase() === normalizedName);
+  if (!skill) throw new Error(`未找到 Skill：${name}`);
+
+  return prepareSkillDirectoryForKimi(skill.path, skill.name, resolveKimiShareDir());
+}
+
 type KimiOAuthToken = {
   access_token: string;
   refresh_token: string;
@@ -4396,6 +4406,17 @@ ipcMain.handle("project:saveEnabledSkills", async (_, request: unknown) => {
       ? (request as { names: unknown[] }).names.filter((item): item is string => typeof item === "string")
       : [];
     return { success: true, data: syncEnabledSkills(names) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:prepareKimiSkill", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { name?: unknown } : {};
+    const name = typeof req.name === "string" ? req.name.trim() : "";
+    if (!name) return { success: false, error: "Missing Skill name" };
+    return { success: true, data: prepareLocalSkillForKimi(name) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

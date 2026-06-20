@@ -1114,6 +1114,22 @@ export type SaveEnabledSkillsResponse = {
   error: string;
 };
 
+export type PrepareKimiSkillRequest = {
+  name: string;
+};
+
+export type PrepareKimiSkillResponse = {
+  success: true;
+  data: {
+    name: string;
+    path: string;
+    copied: boolean;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type ImportSkillArchiveRequest = {
   archivePath?: string;
 };

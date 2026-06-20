@@ -84,6 +84,8 @@ import type {
   ImportSkillArchiveResponse,
   SaveEnabledSkillsRequest,
   SaveEnabledSkillsResponse,
+  PrepareKimiSkillRequest,
+  PrepareKimiSkillResponse,
   OpenTerminalRequest,
   AppInfoResponse,
   CheckUpdateResponse,
@@ -206,6 +208,8 @@ const api = {
     ipcRenderer.invoke("project:listSkills"),
   saveEnabledSkills: (req: SaveEnabledSkillsRequest): Promise<SaveEnabledSkillsResponse> =>
     ipcRenderer.invoke("project:saveEnabledSkills", req),
+  prepareKimiSkill: (req: PrepareKimiSkillRequest): Promise<PrepareKimiSkillResponse> =>
+    ipcRenderer.invoke("project:prepareKimiSkill", req),
   importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
     ipcRenderer.invoke("project:importSkillArchive", req),
   // Long tasks
