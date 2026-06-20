@@ -435,12 +435,6 @@ const api = {
   openExternal: (url: string): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:openExternal", url),
 
-  // 诊断日志落盘（renderer → main → userData/diag.log）
-  writeDiag: (req?: LoggerWriteRequest): Promise<LoggerWriteResponse> =>
-    ipcRenderer.invoke("app:writeDiag", req),
-  getDiagLogPath: (): Promise<{ success: true; data: string }> =>
-    ipcRenderer.invoke("app:getDiagLogPath"),
-
   chooseExecutable: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:chooseExecutable"),
   launchExecutable: (): Promise<VoidResponse> =>
@@ -466,12 +460,6 @@ const api = {
     ipcRenderer.invoke("app:scheduleShutdown", req),
   cancelShutdown: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:cancelShutdown"),
-
-  // 诊断日志落盘（renderer → main → userData/diag.log）
-  writeDiag: (message: string): Promise<VoidResponse> =>
-    ipcRenderer.invoke("app:writeDiag", { message }),
-  getDiagLogPath: (): Promise<{ success: boolean; data?: string; error?: string }> =>
-    ipcRenderer.invoke("app:getDiagLogPath"),
 
   // Bootstrap
   onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {
