@@ -282,7 +282,7 @@ type CompletionItem = {
   detail?: string;
   insertText: string;
   commandName?: string;
-  kind: "agent" | "plugin" | "file" | "slash";
+  kind: "agent" | "plugin" | "file" | "slash" | "skill";
 };
 
 const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
@@ -386,6 +386,7 @@ export function Composer() {
   const [previewImage, setPreviewImage] = useState<ImageAttachment | null>(null);
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [slashCommands, setSlashCommands] = useState<CompletionItem[]>([]);
+  const [skillItems, setSkillItems] = useState<CompletionItem[]>([]);
   const [themeImportPreview, setThemeImportPreview] = useState<ThemeImportPreview | null>(null);
   const [themeImportApplyingId, setThemeImportApplyingId] = useState<string | null>(null);
   const [fileItems, setFileItems] = useState<CompletionItem[]>([]);
@@ -527,9 +528,20 @@ export function Composer() {
   }, [currentSession?.id, currentSession?.longTask?.activeAgent]);
 
   const activeCompletion = getActiveCompletion(input);
+  const isSkillCompletion = activeCompletion?.mode === "slash" && activeCompletion.query.toLowerCase().startsWith("skill:");
+  const skillCompletionQuery = isSkillCompletion ? activeCompletion.query.slice("skill:".length).trim().toLowerCase() : "";
   const slashCompletionSource = slashCommands.length > 0 ? slashCommands : sdkSlashCommandItems;
+  const filteredSkillItems = isSkillCompletion
+    ? skillItems.filter((item) => {
+        if (!skillCompletionQuery) return true;
+        return item.label.toLowerCase().includes(skillCompletionQuery) ||
+          item.detail?.toLowerCase().includes(skillCompletionQuery);
+      })
+    : [];
   const filteredSlashItems = activeCompletion?.mode === "slash"
-    ? slashCompletionSource.filter((item) => {
+    ? isSkillCompletion
+      ? filteredSkillItems
+      : slashCompletionSource.filter((item) => {
         const rawQuery = activeCompletion.query.toLowerCase().trimStart();
         const query = rawQuery.replace(/\s+/g, " ");
         const commandText = item.label.replace(/^\//, "").toLowerCase().replace(/\s+/g, " ");
@@ -569,6 +581,59 @@ export function Composer() {
   useEffect(() => {
     setActiveCompletionIndex(0);
   }, [activeCompletion?.mode, activeCompletion?.query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const byName = new Map<string, CompletionItem>();
+    const pushSkill = (source: string, name: string, description?: string, sourceLabel?: string) => {
+      const normalized = name.trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (byName.has(key)) return;
+      const detail = [description?.trim(), sourceLabel?.trim()].filter(Boolean).join(" · ");
+      byName.set(key, {
+        id: "skill-" + source + "-" + key,
+        label: normalized,
+        detail: detail || "可通过 /skill 调用",
+        insertText: "/skill:" + normalized + " ",
+        commandName: "skill",
+        kind: "skill",
+      });
+    };
+
+    const loadSkills = async () => {
+      const runtimeSessionId = currentSession ? getRuntimeSessionId(currentSession) : undefined;
+      if (runtimeSessionId) {
+        const officialRes = await window.api.listKimiCodeSkills({ sessionId: runtimeSessionId });
+        if (!cancelled && officialRes.success) {
+          officialRes.data.forEach((skill) => {
+            pushSkill("official", skill.name, skill.description, skill.source || "官方 Skill");
+          });
+        }
+      }
+
+      const localRes = await window.api.listSkills();
+      if (!cancelled && localRes.success) {
+        localRes.data.skills.forEach((skill) => {
+          pushSkill("local", skill.name, skill.description, skill.sourceLabel || skill.source);
+        });
+      }
+
+      if (!cancelled) {
+        setSkillItems(Array.from(byName.values()).sort((left, right) => left.label.localeCompare(right.label)));
+      }
+    };
+
+    void loadSkills().catch((err) => {
+      if (cancelled) return;
+      console.warn("List skills failed:", err);
+      setSkillItems([]);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession?.id, currentSession?.runtimeSessionId, currentSession?.officialSessionId]);
 
   useEffect(() => {
     if (!activeCompletion || completionItems.length === 0) return;
@@ -2214,7 +2279,7 @@ export function Composer() {
               </>
             ) : (
               <>
-                <div className="px-2 pb-1.5 text-[13px] text-[var(--kimix-panel-text-muted)]">命令</div>
+                <div className="px-2 pb-1.5 text-[13px] text-[var(--kimix-panel-text-muted)]">{isSkillCompletion ? "Skill" : "命令"}</div>
                 {completionItems.length > 0 ? completionItems.map((item, index) => (
                   <button
                     ref={(node) => { completionItemRefs.current[item.id] = node; }}
@@ -2224,14 +2289,16 @@ export function Composer() {
                     className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                     style={{ paddingLeft: 10, paddingRight: 12 }}
                   >
-                    <TerminalSquare size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
+                    {item.kind === "skill"
+                      ? <Puzzle size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
+                      : <TerminalSquare size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />}
                     <span className="shrink-0">{item.label}</span>
                     {item.detail && <span className="min-w-0 truncate text-[var(--kimix-panel-text-muted)]">{item.detail}</span>}
                   </button>
                 )) : (
                   <div className="flex items-center gap-2 px-2 py-1.5 text-[var(--kimix-panel-text-muted)]">
                     <AtSign size={14} />
-                    <span>正在从 Agent 加载命令，或当前会话未返回 slash_commands</span>
+                    <span>{isSkillCompletion ? "正在加载已有 Skill，或当前没有可调用的 Skill" : "正在从 Agent 加载命令，或当前会话未返回 slash_commands"}</span>
                   </div>
                 )}
               </>
