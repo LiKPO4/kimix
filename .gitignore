@@ -15,6 +15,7 @@ dist
 # Logs
 logs
 *.log
+*.err
 npm-debug.log*
 pnpm-debug.log*
 

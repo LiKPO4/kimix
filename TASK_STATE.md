@@ -16,6 +16,7 @@
 - 迁移进度：Renderer 的消息发送、停止轮次、关闭会话、加载历史已从旧 `sendPrompt` / `stopTurn` / `closeSession` / `loadSession` 切换到 `sendKimiCodePrompt` / `cancelKimiCodeTurn` / `closeKimiCodeSession` / `loadKimiCodeSession`；对应旧 preload 暴露已删除。
 - 迁移进度：启动 runtime、历史列表、slash 列表、会话导出、账户用量、Vis 与 Web Server 保留原有 Kimix 产品语义，但公开方法和 IPC channel 已统一迁入 `kimi-code:*` 命名空间；Renderer 已无旧会话 API 调用。
 - 迁移进度：handoff、长程任务和缺少 `engine` 字段的历史本地会话已统一消费 `kimi-code:event` / `kimi-code:status`；旧双广播、旧 preload 监听及无调用旧会话 handler 已删除。
+- 清理进度：删除无引用的旧 Kimi 类型、会话 hooks、TodoCard 和误提交 dev 日志；增加 `*.err` 忽略规则；slash 与浏览器预览文案不再暴露旧 SDK/未实现边界描述。
 - 下一步：清理无引用文件、函数、误提交日志和过时用户文案。
 
 ## 2026-06-20 v2.11.9 自动重试静默化
