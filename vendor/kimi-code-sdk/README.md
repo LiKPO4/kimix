@@ -49,12 +49,15 @@ this patch after every regeneration and fails loudly if the upstream marker chan
    checkouts such as `.kimix-upstream-kimi-code`, then the legacy `%TEMP%`
    research checkout. This avoids Windows user-directory ACL issues during
    esbuild dependency resolution.
-3. Re-validate compatibility by re-running the P0 probe:
-   `node scripts/probe-kimi-code-sdk.mjs` (see `docs/kimi-code-sdk-probe-result.md`).
+3. Re-validate compatibility by running the current host smoke probe:
+   `node scripts/probe-kimi-code-host.mjs`.
 4. Update the provenance table above and commit.
 
-## Strategic risk (tracked in `KIMI_CODE_SDK_MIGRATION_PLAN.md`, audit item 1b)
+## Strategic risk
 
 Kimix's main interaction depends on an SDK the vendor has not publicly released or
 documented. If Moonshot restructures or stops shipping `packages/node-sdk`, this
 vendored bundle is the pinned, known-good fallback — keep tracking the upstream repo.
+
+Historical migration and probe notes are archived under `docs/archive/`; they should
+not be used as the current integration source of truth.

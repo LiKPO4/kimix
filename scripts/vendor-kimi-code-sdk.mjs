@@ -15,9 +15,9 @@
 //   KIMIX_KIMI_CODE_RESEARCH_REPO=/path/to/kimi-code  node scripts/vendor-kimi-code-sdk.mjs
 // (defaults to %LOCALAPPDATA%/Temp/kimix-kimi-code-research on Windows)
 //
-// After running, re-validate with the self-containment + createSession smoke that
-// scripts/probe-kimi-code-sdk.mjs performs, then commit the regenerated bundle and
-// update vendor/kimi-code-sdk/README.md with the new source commit / versions.
+// After running, re-validate with scripts/probe-kimi-code-host.mjs, then commit the
+// regenerated bundle and update vendor/kimi-code-sdk/README.md with the new source
+// commit / versions.
 
 import { build } from "esbuild";
 import { execFileSync } from "node:child_process";
