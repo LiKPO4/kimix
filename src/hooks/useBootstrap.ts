@@ -53,8 +53,12 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setNotificationMode(res.data.notificationMode);
           setters.setClarificationToolMode(res.data.clarificationToolMode);
           setters.setFilePreviewExtensions(res.data.filePreviewExtensions ?? ["md", "txt"]);
+        } else {
+          console.warn("[useBootstrap] getSettings failed:", res.error);
         }
-      }).catch(() => {});
+      }).catch((err) => {
+        console.warn("[useBootstrap] getSettings threw:", err);
+      });
     }
 
     window.api.listRecentProjects().then((res) => {
@@ -63,7 +67,11 @@ export function useBootstrap(setters: BootstrapSetters) {
         if (!useAppStore.getState().currentProject && res.data[0]) {
           useAppStore.setState({ currentProject: res.data[0] });
         }
+      } else {
+        console.warn("[useBootstrap] listRecentProjects failed:", res.error);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn("[useBootstrap] listRecentProjects threw:", err);
+    });
   }, [setters]);
 }
