@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-20 v2.11.7 发送状态文案简化
+- 当前目标：去除对话里发送消息开头状态对 Kimi Server / Kimi SDK 链路的区分，统一成用户更容易理解的简短文案。
+- 已完成：普通发送、空态建议发送和发送结果回写统一显示“消息发送中”；runtime 失效重试时显示“消息重新发送中”，不再暴露 server/sdk/runtime 等内部实现词。
+- 已完成：设置页 Server 路由说明同步改为“对话里只显示简洁发送状态”；版本号同步到 v2.11.7，新增 release notes。
+- 已验证：`pnpm test:run` 26 个测试文件、200/200 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-CoB148OV.js`；`git diff --check` 通过。
+- 关键文件：`src/utils/kimiCodeRouteStatus.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/EmptyState.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：窄范围提交本轮文案优化。
+
 ## 2026-06-20 v2.11.6 启动耗时日志定位与 dev 快速启动
 - 当前目标：定位用户反馈“启动花了 20 多秒”的真实耗时来源，并减少日常双击启动等待。
 - 已确认：当前用户启动路径是 `start-kimix.bat` → `scripts/restart-kimix-dev.ps1`，脚本每次都会杀旧 dev 进程、清 `out/` / Vite 缓存、执行 `pnpm build`，再进入 `pnpm dev`；后续快速启动实测进一步确认主进程 155ms 开始 loadURL，但 renderer entry/首帧约 19.8 秒，主因是 Vite dev 首次现场编译 renderer 大包，不是 Kimi Server 阻塞。

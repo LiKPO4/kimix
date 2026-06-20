@@ -39,7 +39,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.11.6";
+const KIMIX_VERSION = "2.11.7";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -1878,7 +1878,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label">新会话使用 Server 路由</div>
                         <div className="kimix-settings-permission-desc">
-                          新会话优先走 REST + WebSocket；异常时自动降级 SDK，并在消息链路状态中标明真实路由。
+                          新会话优先走 REST + WebSocket；异常时自动降级 SDK，对话里只显示简洁发送状态。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServerSessions ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
