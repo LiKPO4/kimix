@@ -3,9 +3,8 @@
 ## 2026-06-20 v2.11.19 Skill 真实调用修复
 - 当前目标：修复本地/Codex Skill 虽出现在 `/skill:` 补全中，发送后却丢失 Skill 前缀并作为普通文本交给 Agent 的问题。
 - 根因：官方会话未识别本地 Skill 时，旧逻辑只写入 Kimix 的“已启用”设置，随后剥掉 `/skill:<name>` 并发送参数正文；该设置没有接入 Kimi Server 的 Skill 扫描目录，因此不构成真实 Skill 调用。
-- 已完成：用户消息保留完整 Skill 指令；本地 Skill 会先无覆盖迁移到 Kimi Code 用户 Skill 目录，重载并再次确认 Server 可见后才调用官方激活接口；迁移、识别或激活失败时明确报错，不再降级为普通消息。
-- 已验证：Skill 目录迁移测试覆盖完整目录复制和同名目标不覆盖；全量测试 27 个文件、207/207 通过，OKF 严格校验、生产构建及 `git diff --check` 通过。
-- 部分验证：独立 Server 探针因当前环境启动超时未完成；需用户在 v2.11.19 新窗口实际调用 `/skill:find-skills ...`，确认 Agent 按 Skill 执行。
+- 已完成：用户消息保留完整 Skill 指令；本地 Skill 会先无覆盖迁移到 Kimi Code 用户 Skill 目录，再通过官方 fork 保留上下文并刷新 Skill 注册表，确认 Server 可见后才调用官方激活接口；迁移、识别或激活失败时明确报错，不再降级为普通消息。
+- 已验证：Skill 目录迁移测试覆盖完整目录复制和同名目标不覆盖；真实 Server 探针确认原会话创建后迁入 Skill 时直接激活返回 `40415`，fork 后会发现并成功激活同一 Skill；全量测试 27 个文件、207/207 通过，OKF 严格校验、生产构建及 `git diff --check` 通过。
 - 关键文件：`src/components/chat/Composer.tsx`、`electron/skillMigration.ts`、`electron/main.ts`、`electron/preload.ts`。
 - 下一步：窄范围提交后由用户实机验收 Skill 指令显示和调用结果。
 

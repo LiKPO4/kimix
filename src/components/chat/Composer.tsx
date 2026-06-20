@@ -1451,9 +1451,10 @@ export function Composer() {
   const applySkillCommand = async (skillName: string, args?: string) => {
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
+    let runtimeSessionId = runtime.runtimeSessionId;
     const normalizedName = skillName.trim().toLowerCase();
     const findOfficialSkill = async () => {
-      const result = await window.api.listKimiCodeSkills({ sessionId: runtime.runtimeSessionId });
+      const result = await window.api.listKimiCodeSkills({ sessionId: runtimeSessionId });
       return result.success
         ? result.data.find((item) => item.name.toLowerCase() === normalizedName)
         : undefined;
@@ -1468,11 +1469,27 @@ export function Composer() {
         return false;
       }
       migrated = prepareRes.data.copied;
-      const reloadRes = await window.api.reloadKimiCodeSession({ sessionId: runtime.runtimeSessionId });
-      if (!reloadRes.success) {
-        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已迁移，但会话重载失败：${reloadRes.error}`, source: "ui" });
+      const forkRes = await window.api.forkKimiCodeSession({
+        sessionId: runtimeSessionId,
+        forkId: `skill-${crypto.randomUUID()}`,
+        title: currentSession?.title,
+      });
+      if (!forkRes.success) {
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已迁移，但会话刷新失败：${forkRes.error}`, source: "ui" });
         return false;
       }
+      const previousRuntimeSessionId = runtimeSessionId;
+      runtimeSessionId = forkRes.data.sessionId;
+      updateSession(runtime.uiSessionId, (session) => ({
+        ...session,
+        engine: "kimi-code",
+        runtimeSessionId,
+        officialSessionId: runtimeSessionId,
+        updatedAt: Date.now(),
+      }));
+      const refreshedSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+      if (refreshedSession) setCurrentSession(refreshedSession);
+      await window.api.closeKimiCodeSession({ sessionId: previousRuntimeSessionId }).catch(() => undefined);
       officialSkill = await findOfficialSkill();
     }
     if (!officialSkill) {
@@ -1481,7 +1498,7 @@ export function Composer() {
     }
 
     const activateRes = await window.api.activateKimiCodeSkill({
-      sessionId: runtime.runtimeSessionId,
+      sessionId: runtimeSessionId,
       name: officialSkill.name,
       args: args || undefined,
     });

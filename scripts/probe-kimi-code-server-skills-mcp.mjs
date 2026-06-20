@@ -32,18 +32,6 @@ async function waitUntilReady() {
 }
 
 async function main() {
-  const skillDir = path.join(workspace, ".kimi-code", "skills", "kimix-probe");
-  await mkdir(skillDir, { recursive: true });
-  await writeFile(path.join(skillDir, "SKILL.md"), [
-    "---",
-    "name: kimix-probe",
-    "description: Kimix Server Skill activation probe",
-    "---",
-    "",
-    "Reply with KIMIX_SKILL_PROBE_OK and $ARGUMENTS.",
-    "",
-  ].join("\n"), "utf8");
-
   server = spawn(executable, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
     cwd: workspace,
     env: { ...process.env, KIMI_CODE_NO_AUTO_UPDATE: "1" },
@@ -60,9 +48,30 @@ async function main() {
     body: JSON.stringify({ metadata: { cwd: workspace, source: "kimix-skill-mcp-probe" } }),
   });
   const sessionId = created.data.id;
-  const skills = await request(`/sessions/${encodeURIComponent(sessionId)}/skills`);
+  const skillsBeforeMigration = await request(`/sessions/${encodeURIComponent(sessionId)}/skills`);
+  const skillDir = path.join(workspace, ".kimi-code", "skills", "kimix-probe");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(path.join(skillDir, "SKILL.md"), [
+    "---",
+    "name: kimix-probe",
+    "description: Kimix Server Skill activation probe",
+    "---",
+    "",
+    "Reply with KIMIX_SKILL_PROBE_OK and $ARGUMENTS.",
+    "",
+  ].join("\n"), "utf8");
+  const directActivation = await request(`/sessions/${encodeURIComponent(sessionId)}/skills/kimix-probe:activate`, {
+    method: "POST",
+    body: JSON.stringify({ args: "ARG_SHOULD_REQUIRE_FORK" }),
+  }, true);
+  const forked = await request(`/sessions/${encodeURIComponent(sessionId)}:fork`, {
+    method: "POST",
+    body: JSON.stringify({ title: "Kimix live Skill probe" }),
+  });
+  const activationSessionId = forked.data.id;
+  const skills = await request(`/sessions/${encodeURIComponent(activationSessionId)}/skills`);
   const probeSkill = skills.data.skills.find((skill) => skill.name === "kimix-probe");
-  const activation = await request(`/sessions/${encodeURIComponent(sessionId)}/skills/kimix-probe:activate`, {
+  const activation = await request(`/sessions/${encodeURIComponent(activationSessionId)}/skills/kimix-probe:activate`, {
     method: "POST",
     body: JSON.stringify({ args: "ARG_OK" }),
   });
@@ -73,10 +82,22 @@ async function main() {
   }, true);
 
   console.log(JSON.stringify({
-    ok: Boolean(probeSkill && activation.data?.activated && missingRestart.code === 40408),
+    ok: Boolean(
+      !skillsBeforeMigration.data.skills.some((skill) => skill.name === "kimix-probe") &&
+      directActivation.code === 40415 &&
+      probeSkill &&
+      activation.data?.activated &&
+      missingRestart.code === 40408
+    ),
     cli: executable,
     sessionId,
-    skills: { count: skills.data.skills.length, probeSkill },
+    activationSessionId,
+    directActivation: { code: directActivation.code, msg: directActivation.msg },
+    skills: {
+      discoveredBeforeMigration: skillsBeforeMigration.data.skills.some((skill) => skill.name === "kimix-probe"),
+      count: skills.data.skills.length,
+      probeSkill,
+    },
     activation: activation.data,
     mcp: { count: mcp.data.servers.length, servers: mcp.data.servers },
     missingRestart: { code: missingRestart.code, msg: missingRestart.msg },
@@ -84,6 +105,7 @@ async function main() {
   }, null, 2));
 
   await request(`/sessions/${encodeURIComponent(sessionId)}:archive`, { method: "POST", body: "{}" }, true);
+  await request(`/sessions/${encodeURIComponent(activationSessionId)}:archive`, { method: "POST", body: "{}" }, true);
 }
 
 try {

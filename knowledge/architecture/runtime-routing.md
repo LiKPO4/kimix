@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-20T22:32:41+08:00"
+timestamp: "2026-06-20T22:36:04+08:00"
 ---
 
 # Runtime Routing
@@ -21,7 +21,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 6. A transient Server failure schedules a bounded background recovery attempt. When Server becomes ready again, an idle SDK session may return to the Server route only if the Server can resolve the same official session ID; otherwise the SDK session remains authoritative.
 7. App startup must not await Kimi Server startup, session prewarm, official history restore, or stale runtime recovery before showing the main window. The renderer should paint first; Server startup, Kimi runtime prewarm, and official history recovery run afterward in the background.
 8. Kimix permission modes mirror official Kimi Code permission modes: `manual`, `auto`, and `yolo`. Server approval events in `yolo` mode are resolved through the official approval API without surfacing a user approval card.
-9. Slash commands that have an official Kimi Code API should use that API instead of being sent as ordinary prompt text. `/skill:<name>` must resolve the Skill from the official session list and call the official activation endpoint. A local/Codex Skill candidate may be copied without overwrite into the Kimi Code user Skill directory, but Kimix must reload and confirm that the runtime can see it before activation; migration or activation failure must not fall through to a plain prompt with the Skill prefix removed. Kimix-only commands, such as theme mapping and Claude/Codex bulk import, remain local.
+9. Slash commands that have an official Kimi Code API should use that API instead of being sent as ordinary prompt text. `/skill:<name>` must resolve the Skill from the official session list and call the official activation endpoint. A local/Codex Skill candidate may be copied without overwrite into the Kimi Code user Skill directory; because a running Server session keeps its initial Skill registry, Kimix must fork that session to preserve context while refreshing the registry, switch the visible session to the forked runtime, and confirm visibility before activation. Migration or activation failure must not fall through to a plain prompt with the Skill prefix removed. Kimix-only commands, such as theme mapping and Claude/Codex bulk import, remain local.
 10. Development startup should distinguish daily launch, hot-reload development, and cold-cache verification. `start-kimix.bat` defaults to the already-built Electron app so the renderer does not block first paint on Vite dev compilation; `start-kimix.bat --dev` is the explicit hot-reload path, and `start-kimix.bat --clean` kills old dev processes, clears caches, rebuilds, and then launches the built app.
 11. Renderer runtime events and statuses use only the `kimi-code:event` and `kimi-code:status` IPC channels. Handoff jobs, long tasks, and sessions restored from older local data share this canonical event source; the main process must not duplicate Host events onto legacy `kimi:event` or `kimi:status` channels.
 

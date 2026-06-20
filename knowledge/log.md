@@ -1,7 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-20
-* **Skill routing**: Required `/skill:<name>` to use official Skill activation rather than ordinary prompt fallback. Local/Codex candidates may be migrated without overwrite into the Kimi Code user Skill directory, then must be visible to the runtime before activation.
+* **Skill routing**: Required `/skill:<name>` to use official Skill activation rather than ordinary prompt fallback. Local/Codex candidates may be migrated without overwrite into the Kimi Code user Skill directory; the active session is then forked to retain context while refreshing its Skill registry before activation.
 * **Runtime routing**: Consolidated renderer event delivery onto `kimi-code:event` and `kimi-code:status`; handoff, long-task, and legacy local-session handling now consume the same canonical Host event stream instead of duplicated legacy IPC broadcasts.
 * **Startup**: Split daily launch, hot-reload development, and cold-cache verification. `start-kimix.bat` now defaults to the already-built Electron app to avoid Vite dev renderer compile white screens; `--dev` keeps hot reload and `--clean` keeps the full cache-clean rebuild path. Startup logs now separate main-window, renderer, and Kimi Server timings.
 * **Runtime routing**: Clarified that startup must defer official history restore and stale runtime recovery until after renderer first paint; Server `yolo` approvals are auto-resolved via the official approval API.
