@@ -887,11 +887,9 @@ export function Composer() {
           images: imagesForApi,
         });
         if (!res.success && /not active|not found|session/i.test(res.error)) {
-          updateLinkStatus("消息重新发送中", "warning");
           updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
           targetSession = { ...targetSession, runtimeSessionId: undefined };
           kimiCodeSessionId = await ensureKimiCodeRuntime();
-          updateLinkStatus("消息重新发送中", "warning");
           markPromptDispatchStarted();
           res = await sendKimiCodePromptWithRetry({
             sessionId: kimiCodeSessionId,
