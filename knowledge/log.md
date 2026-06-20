@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-06-21
+* **Skill lifecycle correction**: Required Agent Skill synchronization on direct `/skill:` activation as well as ordinary prompts, and made newly created flattened registrations invalidate the active Server registry even when packaged source mtimes are older than the session.
+* **Skill history correction**: Added persisted-session migration so cached `<kimi-skill-loaded>` payloads and synthetic activation titles cannot bypass raw official history sanitization.
+
 ## 2026-06-20
 * **Skill lifecycle**: Added post-install synchronization from `~/.agents/skills` and timestamp-based runtime refresh before the next ordinary prompt, using an official fork to retain context while loading the new Skill registry. Nested Agent Skills are flattened into direct registration directories while preserving their slash-qualified route names.
 * **Skill history**: Prevented official `<kimi-skill-loaded>` instruction payloads from appearing as user messages after history reload; retained only concise user-triggered commands or model-triggered Skill status.

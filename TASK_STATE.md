@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-21 v2.11.21 Skill 子路由与缓存历史修复
+- 当前目标：修复 v2.11.20 中子 Skill 仍未进入当前会话清单，以及旧会话仍显示完整 `<kimi-skill-loaded>` 指令的问题。
+- 根因：直接 `/skill:` 分支绕过了 Agent Skill 全量同步；首次刷新时间又可能大于安装包自带的旧文件 mtime，导致新展平的子 Skill 被误判为已加载。历史侧栏对已有本地事件直接返回，旧缓存未经过官方历史映射器。
+- 已完成：所有 Skill 激活前先同步 Agent Skills；只要创建了新的顶层或展平注册项就强制 fork 刷新；应用启动恢复本地会话时迁移 Skill 载荷消息和合成英文标题。
+- 关键文件：`src/components/chat/Composer.tsx`、`electron/skillMigration.ts`、`src/utils/eventHelpers.ts`、`src/App.tsx`。
+- 已验证：真实 Server 探针确认嵌套目录不注册、展平后的 slash 子 Skill 可注册且 fork 后可见；全量测试 27 个文件、213/213 通过，OKF 严格校验、生产构建和 `git diff --check` 通过。
+- 下一步：窄范围提交后等待 v2.11.21 实机验收父/子 Skill 调用与旧缓存迁移。
+
 ## 2026-06-20 v2.11.20 安装后 Skill 自动刷新
 - 当前目标：修复 `find-skills` 已将 Skill 安装到 `~/.agents/skills`，但下一条普通消息仍无法使用新 Skill 的问题。
 - 根因：Kimix 本地扫描遗漏标准 `.agents/skills` 目录；同时 Server 会话的 Skill 注册表固定在创建时，普通消息发送前没有检测安装变化并刷新 runtime。

@@ -1449,6 +1449,7 @@ export function Composer() {
   };
 
   const applySkillCommand = async (skillName: string, args?: string) => {
+    if (!(await refreshInstalledAgentSkillsBeforePrompt())) return false;
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
     let runtimeSessionId = runtime.runtimeSessionId;

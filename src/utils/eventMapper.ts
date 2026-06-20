@@ -1,5 +1,5 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
-import { isLegacyKimiWorkDirError } from "./eventHelpers";
+import { isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { restoreAssistantProgressParagraphs } from "./assistantParagraphs";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 
@@ -488,19 +488,6 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
   };
 }
 
-function summarizeSkillActivation(content: string): { name: string; args: string; trigger: string } | null {
-  const marker = content.match(/<kimi-skill-loaded\b([^>]*)>/i);
-  if (!marker) return null;
-  const readAttribute = (name: string) => marker[1].match(new RegExp(`\\b${name}="([^"]*)"`, "i"))?.[1] ?? "";
-  const skillName = readAttribute("name").trim();
-  if (!skillName) return null;
-  return {
-    name: skillName,
-    args: readAttribute("args").trim(),
-    trigger: readAttribute("trigger").trim().toLowerCase(),
-  };
-}
-
 function normalizeUserContent(content: string): string {
   return content
     .split("\n")
@@ -652,7 +639,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     case "TurnBegin": {
       const userMessage = extractUserMessage(payload.user_input);
       if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
-      const skillActivation = summarizeSkillActivation(userMessage.content);
+      const skillActivation = parseKimiSkillActivation(userMessage.content);
       if (skillActivation?.trigger === "model-tool") {
         return {
           id: generateId(),

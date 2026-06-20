@@ -19,6 +19,7 @@ import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/uti
 import {
   settleInactiveEvents,
   sanitizePersistedEvents,
+  sanitizeKimiSkillActivationTitle,
   closeOpenCompaction,
   latestAssistantContent,
   latestAssistantVisibleOrThinkingContent,
@@ -2095,6 +2096,7 @@ function App() {
             .filter((session) => !isHiddenInternalSession(session))
             .map((session) => ({
               ...session,
+              title: typeof session.title === "string" ? sanitizeKimiSkillActivationTitle(session.title) : "新会话",
               events: removeStaleKimiCodeStartupErrors(resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? session.events : []))),
             }));
           if (JSON.stringify(visibleSessions) !== storedSessions) {

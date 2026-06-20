@@ -94,5 +94,12 @@ export function syncAgentSkillDirectories(agentSkillsRoot: string, kimiHome: str
       warnings.push(`${entry.name}：${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  return { names, copiedNames, latestModifiedAt, warnings };
+  return {
+    names,
+    copiedNames,
+    // A newly flattened Skill is a registry change even when its source mtime
+    // predates the current session (common after installing a packaged bundle).
+    latestModifiedAt: copiedNames.length > 0 ? Date.now() : latestModifiedAt,
+    warnings,
+  };
 }

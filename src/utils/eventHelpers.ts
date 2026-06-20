@@ -5,10 +5,45 @@ export function isLegacyKimiWorkDirError(message: string) {
   return /unknown option\s+['"]?--work-dir['"]?/i.test(message);
 }
 
+export function parseKimiSkillActivation(content: string): { name: string; args: string; trigger: string } | null {
+  const marker = content.match(/<kimi-skill-loaded\b([^>]*)>/i);
+  if (!marker) return null;
+  const readAttribute = (name: string) => marker[1].match(new RegExp(`\\b${name}="([^"]*)"`, "i"))?.[1] ?? "";
+  const skillName = readAttribute("name").trim();
+  if (!skillName) return null;
+  return {
+    name: skillName,
+    args: readAttribute("args").trim(),
+    trigger: readAttribute("trigger").trim().toLowerCase(),
+  };
+}
+
+export function sanitizeKimiSkillActivationTitle(title: string) {
+  const match = title.match(/^User activated the skill\s+["“]([^"”]+)["”]/i);
+  return match ? `使用 ${match[1]}` : title;
+}
+
 export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[] {
-  return events.filter((event) => (
-    event.type !== "error" || !isLegacyKimiWorkDirError(event.message)
-  ));
+  return events.flatMap((event) => {
+    if (event.type === "error" && isLegacyKimiWorkDirError(event.message)) return [];
+    if (event.type !== "user_message") return [event];
+    const activation = parseKimiSkillActivation(event.content);
+    if (!activation) return [event];
+    if (activation.trigger === "model-tool") {
+      return [{
+        id: event.id,
+        type: "status_update" as const,
+        timestamp: event.timestamp,
+        message: `已调用 Skill：${activation.name}`,
+        source: "skill",
+        tone: "info" as const,
+      }];
+    }
+    return [{
+      ...event,
+      content: `/skill:${activation.name}${activation.args ? ` ${activation.args}` : ""}`,
+    }];
+  });
 }
 
 export function latestAssistantContent(events: TimelineEvent[]) {
