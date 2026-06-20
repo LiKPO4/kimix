@@ -13,7 +13,7 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
-import { prepareSkillDirectoryForKimi } from "./skillMigration";
+import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
 import * as longTaskService from "./longTaskService";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
 
@@ -3082,6 +3082,7 @@ function listLocalSkills() {
     path.join(os.homedir(), ".kimi-code", "skills"),
     path.join(os.homedir(), ".kimi-code", "plugins"),
     path.join(os.homedir(), ".kimi", "skills"),
+    path.join(os.homedir(), ".agents", "skills"),
     path.join(os.homedir(), ".config", "agents", "skills"),
     path.join(os.homedir(), ".codex", "skills"),
   ];
@@ -3373,6 +3374,11 @@ function prepareLocalSkillForKimi(name: string) {
   if (!skill) throw new Error(`未找到 Skill：${name}`);
 
   return prepareSkillDirectoryForKimi(skill.path, skill.name, resolveKimiShareDir());
+}
+
+function syncInstalledAgentSkillsForKimi() {
+  const agentSkillsRoot = path.join(os.homedir(), ".agents", "skills");
+  return syncAgentSkillDirectories(agentSkillsRoot, resolveKimiShareDir());
 }
 
 type KimiOAuthToken = {
@@ -4417,6 +4423,14 @@ ipcMain.handle("project:prepareKimiSkill", async (_, request: unknown) => {
     const name = typeof req.name === "string" ? req.name.trim() : "";
     if (!name) return { success: false, error: "Missing Skill name" };
     return { success: true, data: prepareLocalSkillForKimi(name) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:syncKimiAgentSkills", async () => {
+  try {
+    return { success: true, data: syncInstalledAgentSkillsForKimi() };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

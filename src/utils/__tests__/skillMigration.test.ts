@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { prepareSkillDirectoryForKimi } from "../../../electron/skillMigration";
+import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "../../../electron/skillMigration";
 
 const temporaryRoots: string[] = [];
 
@@ -41,5 +41,25 @@ describe("prepareSkillDirectoryForKimi", () => {
 
     expect(result.copied).toBe(false);
     expect(fs.readFileSync(path.join(target, "SKILL.md"), "utf8")).toBe("existing\n");
+  });
+
+  it("synchronizes newly installed top-level Agent Skills with their sub-skills", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-agent-skill-sync-"));
+    temporaryRoots.push(root);
+    const agentRoot = path.join(root, ".agents", "skills");
+    const gameSkill = path.join(agentRoot, "game-development");
+    const kimiHome = path.join(root, ".kimi-code");
+    fs.mkdirSync(path.join(gameSkill, "game-design"), { recursive: true });
+    fs.writeFileSync(path.join(gameSkill, "SKILL.md"), "---\nname: game-development\n---\n", "utf8");
+    fs.writeFileSync(path.join(gameSkill, "game-design", "SKILL.md"), "---\nname: game-design\n---\n", "utf8");
+
+    const result = syncAgentSkillDirectories(agentRoot, kimiHome);
+
+    expect(result.names).toEqual(["game-development", "game-development/game-design"]);
+    expect(result.copiedNames).toEqual(["game-development", "game-development/game-design"]);
+    expect(result.latestModifiedAt).toBeGreaterThan(0);
+    expect(fs.existsSync(path.join(kimiHome, "skills", "game-development", "game-design", "SKILL.md"))).toBe(true);
+    expect(fs.readFileSync(path.join(kimiHome, "skills", "game-development_game-design", "SKILL.md"), "utf8"))
+      .toContain("name: game-development/game-design");
   });
 });

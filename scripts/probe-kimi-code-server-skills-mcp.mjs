@@ -5,7 +5,10 @@ import path from "node:path";
 
 const executable = process.env.KIMIX_KIMI_EXECUTABLE ?? path.join(os.homedir(), ".kimi-code", "bin", "kimi.exe");
 const port = Number(process.env.KIMIX_KIMI_SERVER_PROBE_PORT ?? 58_641);
-const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+const externalEndpoint = process.env.KIMIX_KIMI_SERVER_ENDPOINT?.replace(/\/+$/, "");
+const baseUrl = externalEndpoint
+  ? `${externalEndpoint}${externalEndpoint.endsWith("/api/v1") ? "" : "/api/v1"}`
+  : `http://127.0.0.1:${port}/api/v1`;
 const workspace = await mkdtemp(path.join(os.tmpdir(), "kimix-server-skill-mcp-"));
 let server;
 
@@ -32,15 +35,17 @@ async function waitUntilReady() {
 }
 
 async function main() {
-  server = spawn(executable, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
-    cwd: workspace,
-    env: { ...process.env, KIMI_CODE_NO_AUTO_UPDATE: "1" },
-    windowsHide: true,
-    shell: false,
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  if (!externalEndpoint) {
+    server = spawn(executable, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
+      cwd: workspace,
+      env: { ...process.env, KIMI_CODE_NO_AUTO_UPDATE: "1" },
+      windowsHide: true,
+      shell: false,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+  }
   let stderr = "";
-  server.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4_000); });
+  server?.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4_000); });
   await waitUntilReady();
 
   const created = await request("/sessions", {
@@ -60,6 +65,28 @@ async function main() {
     "Reply with KIMIX_SKILL_PROBE_OK and $ARGUMENTS.",
     "",
   ].join("\n"), "utf8");
+  const subSkillDir = path.join(skillDir, "game-design");
+  await mkdir(subSkillDir, { recursive: true });
+  await writeFile(path.join(subSkillDir, "SKILL.md"), [
+    "---",
+    "name: game-design",
+    "description: Nested Skill discovery probe",
+    "---",
+    "",
+    "Reply with KIMIX_SUB_SKILL_PROBE_OK.",
+    "",
+  ].join("\n"), "utf8");
+  const flattenedSubSkillDir = path.join(workspace, ".kimi-code", "skills", "kimix-probe_game-design");
+  await mkdir(flattenedSubSkillDir, { recursive: true });
+  await writeFile(path.join(flattenedSubSkillDir, "SKILL.md"), [
+    "---",
+    "name: kimix-probe/game-design",
+    "description: Flattened sub-Skill discovery probe",
+    "---",
+    "",
+    "Reply with KIMIX_SUB_SKILL_PROBE_OK.",
+    "",
+  ].join("\n"), "utf8");
   const directActivation = await request(`/sessions/${encodeURIComponent(sessionId)}/skills/kimix-probe:activate`, {
     method: "POST",
     body: JSON.stringify({ args: "ARG_SHOULD_REQUIRE_FORK" }),
@@ -71,6 +98,7 @@ async function main() {
   const activationSessionId = forked.data.id;
   const skills = await request(`/sessions/${encodeURIComponent(activationSessionId)}/skills`);
   const probeSkill = skills.data.skills.find((skill) => skill.name === "kimix-probe");
+  const probeSubSkill = skills.data.skills.find((skill) => skill.name === "kimix-probe/game-design");
   const activation = await request(`/sessions/${encodeURIComponent(activationSessionId)}/skills/kimix-probe:activate`, {
     method: "POST",
     body: JSON.stringify({ args: "ARG_OK" }),
@@ -81,28 +109,34 @@ async function main() {
     body: "{}",
   }, true);
 
-  console.log(JSON.stringify({
-    ok: Boolean(
+  const ok = Boolean(
       !skillsBeforeMigration.data.skills.some((skill) => skill.name === "kimix-probe") &&
       directActivation.code === 40415 &&
       probeSkill &&
+      probeSubSkill &&
       activation.data?.activated &&
       missingRestart.code === 40408
-    ),
+  );
+  console.log(JSON.stringify({
+    ok,
     cli: executable,
+    endpoint: baseUrl,
     sessionId,
     activationSessionId,
     directActivation: { code: directActivation.code, msg: directActivation.msg },
     skills: {
       discoveredBeforeMigration: skillsBeforeMigration.data.skills.some((skill) => skill.name === "kimix-probe"),
       count: skills.data.skills.length,
+      projectSkills: skills.data.skills.filter((skill) => skill.source === "project"),
       probeSkill,
+      probeSubSkill,
     },
     activation: activation.data,
     mcp: { count: mcp.data.servers.length, servers: mcp.data.servers },
     missingRestart: { code: missingRestart.code, msg: missingRestart.msg },
     stderr,
   }, null, 2));
+  if (!ok) process.exitCode = 1;
 
   await request(`/sessions/${encodeURIComponent(sessionId)}:archive`, { method: "POST", body: "{}" }, true);
   await request(`/sessions/${encodeURIComponent(activationSessionId)}:archive`, { method: "POST", body: "{}" }, true);

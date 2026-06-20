@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-20T22:36:04+08:00"
+timestamp: "2026-06-20T23:14:26+08:00"
 ---
 
 # Runtime Routing
@@ -24,6 +24,8 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 9. Slash commands that have an official Kimi Code API should use that API instead of being sent as ordinary prompt text. `/skill:<name>` must resolve the Skill from the official session list and call the official activation endpoint. A local/Codex Skill candidate may be copied without overwrite into the Kimi Code user Skill directory; because a running Server session keeps its initial Skill registry, Kimix must fork that session to preserve context while refreshing the registry, switch the visible session to the forked runtime, and confirm visibility before activation. Migration or activation failure must not fall through to a plain prompt with the Skill prefix removed. Kimix-only commands, such as theme mapping and Claude/Codex bulk import, remain local.
 10. Development startup should distinguish daily launch, hot-reload development, and cold-cache verification. `start-kimix.bat` defaults to the already-built Electron app so the renderer does not block first paint on Vite dev compilation; `start-kimix.bat --dev` is the explicit hot-reload path, and `start-kimix.bat --clean` kills old dev processes, clears caches, rebuilds, and then launches the built app.
 11. Renderer runtime events and statuses use only the `kimi-code:event` and `kimi-code:status` IPC channels. Handoff jobs, long tasks, and sessions restored from older local data share this canonical event source; the main process must not duplicate Host events onto legacy `kimi:event` or `kimi:status` channels.
+12. Agent Skills installed by Skill workflows under `~/.agents/skills` are synchronized without overwrite into the Kimi Code user Skill directory before the next ordinary prompt. Because Server discovery only registers direct children of the Skill root, nested Agent Skills are also copied as top-level registration directories while their frontmatter names preserve full routes such as `game-development/game-design`. Kimix records the newest synchronized Skill timestamp on the visible session; when installed Skills are newer than the active Server registry, the runtime must be forked before prompt submission so context is retained and the new registry is loaded.
+13. Official Skill activation prompts contain `<kimi-skill-loaded>` internal instructions in wire history. History mapping must never expose that payload as user-authored text: user-triggered activation is summarized as `/skill:<name> [args]`, while model-triggered activation is represented as Skill status metadata.
 
 # Main Components
 

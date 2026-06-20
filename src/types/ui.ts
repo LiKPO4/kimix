@@ -96,6 +96,8 @@ export interface Session {
   runtimeSessionId?: string;
   /** 官方 kimi session id（从 wire/screen 抓取并持久化），用于重启后 `kimi -S` 恢复上下文。 */
   officialSessionId?: string;
+  /** 当前官方 runtime 已加载到的本地 Agent Skill 最新修改时间。 */
+  skillRegistrySyncedAt?: number;
   titleLocked?: boolean;
   model?: string | null;
   longTask?: LongTaskSessionMeta;

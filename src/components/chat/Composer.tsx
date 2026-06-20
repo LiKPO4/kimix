@@ -1469,27 +1469,13 @@ export function Composer() {
         return false;
       }
       migrated = prepareRes.data.copied;
-      const forkRes = await window.api.forkKimiCodeSession({
-        sessionId: runtimeSessionId,
-        forkId: `skill-${crypto.randomUUID()}`,
-        title: currentSession?.title,
-      });
-      if (!forkRes.success) {
-        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已迁移，但会话刷新失败：${forkRes.error}`, source: "ui" });
-        return false;
-      }
-      const previousRuntimeSessionId = runtimeSessionId;
-      runtimeSessionId = forkRes.data.sessionId;
-      updateSession(runtime.uiSessionId, (session) => ({
-        ...session,
-        engine: "kimi-code",
+      const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
+        runtime.uiSessionId,
         runtimeSessionId,
-        officialSessionId: runtimeSessionId,
-        updatedAt: Date.now(),
-      }));
-      const refreshedSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
-      if (refreshedSession) setCurrentSession(refreshedSession);
-      await window.api.closeKimiCodeSession({ sessionId: previousRuntimeSessionId }).catch(() => undefined);
+        Date.now(),
+      );
+      if (!refreshedRuntimeSessionId) return false;
+      runtimeSessionId = refreshedRuntimeSessionId;
       officialSkill = await findOfficialSkill();
     }
     if (!officialSkill) {
@@ -1502,6 +1488,16 @@ export function Composer() {
       name: officialSkill.name,
       args: args || undefined,
     });
+    if (activateRes.success) {
+      const targetSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+      if (targetSession && (targetSession.title === "新会话" || /^User activated the skill\b/i.test(targetSession.title))) {
+        const nextTitle = (args?.trim() || `使用 ${officialSkill.name}`).slice(0, 48);
+        updateSession(runtime.uiSessionId, (session) => ({ ...session, title: nextTitle, updatedAt: Date.now() }));
+        const renamedSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+        if (renamedSession) setCurrentSession(renamedSession);
+        await window.api.renameKimiCodeSession({ sessionId: runtimeSessionId, title: nextTitle }).catch(() => undefined);
+      }
+    }
     await appendLocalEvent({
       id: genId(),
       type: activateRes.success ? "status_update" : "error",
@@ -1512,6 +1508,66 @@ export function Composer() {
       source: "ui",
     });
     return activateRes.success;
+  };
+
+  const forkRuntimeForSkillRegistry = async (uiSessionId: string, runtimeSessionId: string, syncedAt: number) => {
+    const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    const forkRes = await window.api.forkKimiCodeSession({
+      sessionId: runtimeSessionId,
+      forkId: `skill-${crypto.randomUUID()}`,
+      title: targetSession?.title,
+    });
+    if (!forkRes.success) {
+      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已安装，但会话刷新失败：${forkRes.error}`, source: "ui" });
+      return null;
+    }
+
+    const nextRuntimeSessionId = forkRes.data.sessionId;
+    updateSession(uiSessionId, (session) => ({
+      ...session,
+      engine: "kimi-code",
+      runtimeSessionId: nextRuntimeSessionId,
+      officialSessionId: nextRuntimeSessionId,
+      skillRegistrySyncedAt: syncedAt,
+      updatedAt: Date.now(),
+    }));
+    const refreshedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (refreshedSession) setCurrentSession(refreshedSession);
+    await window.api.closeKimiCodeSession({ sessionId: runtimeSessionId }).catch(() => undefined);
+    return nextRuntimeSessionId;
+  };
+
+  const refreshInstalledAgentSkillsBeforePrompt = async () => {
+    const syncRes = await window.api.syncKimiAgentSkills();
+    if (!syncRes.success) {
+      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `刷新已安装 Skill 失败：${syncRes.error}`, source: "ui" });
+      return false;
+    }
+    if (syncRes.data.warnings.length > 0) {
+      console.warn("Some installed Agent Skills could not be synchronized:", syncRes.data.warnings);
+    }
+    if (syncRes.data.names.length === 0 || syncRes.data.latestModifiedAt <= 0) return true;
+
+    const targetSession = currentSession
+      ? useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession
+      : null;
+    if (!targetSession) return true;
+    if ((targetSession.skillRegistrySyncedAt ?? 0) >= syncRes.data.latestModifiedAt) return true;
+
+    const runtimeSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
+    if (!runtimeSessionId) {
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        skillRegistrySyncedAt: syncRes.data.latestModifiedAt,
+        updatedAt: Date.now(),
+      }));
+      return true;
+    }
+    return Boolean(await forkRuntimeForSkillRegistry(
+      targetSession.id,
+      runtimeSessionId,
+      syncRes.data.latestModifiedAt,
+    ));
   };
 
   const handleSend = async () => {
@@ -1539,6 +1595,7 @@ export function Composer() {
       inputRef.current?.reset();
       return;
     }
+    if (!trimmed.startsWith("/") && !(await refreshInstalledAgentSkillsBeforePrompt())) return;
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);

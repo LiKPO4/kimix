@@ -941,6 +941,31 @@ describe("mergeEvents", () => {
 });
 
 describe("mapHistoryEvents", () => {
+  it("collapses internal user-triggered Skill instructions into the original slash command", () => {
+    const result = mapHistoryEvents([{
+      type: "TurnBegin",
+      payload: {
+        user_input: [{
+          type: "text",
+          text: 'User activated the skill "find-skills". Follow the loaded skill instructions.\n\n<kimi-skill-loaded name="find-skills" trigger="user-slash" args="找一个游戏策划 skill">\ninternal instructions\n</kimi-skill-loaded>',
+        }],
+      },
+    }]);
+
+    expect(result).toMatchObject([{ type: "user_message", content: "/skill:find-skills 找一个游戏策划 skill" }]);
+  });
+
+  it("keeps model-triggered Skill instructions out of user message bubbles", () => {
+    const result = mapHistoryEvents([{
+      type: "TurnBegin",
+      payload: {
+        user_input: 'Skill tool loaded instructions.\n\n<kimi-skill-loaded name="game-development" trigger="model-tool" args="分析项目">\ninternal instructions\n</kimi-skill-loaded>',
+      },
+    }]);
+
+    expect(result).toMatchObject([{ type: "status_update", message: "已调用 Skill：game-development" }]);
+  });
+
   it("maps an array of raw events", () => {
     const raw = [
       { type: "TurnBegin", payload: { user_input: "Hi" } },

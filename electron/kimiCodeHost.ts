@@ -1511,11 +1511,12 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   const sessions = [...await sdkHarness.listSessions(workDir ? { workDir } : {})];
   // SDK may return empty title/lastPrompt; backfill from state.json if available.
   for (const session of sessions) {
+    session.title = sanitizeSkillActivationTitle(session.title);
     if (session.title?.trim() && session.lastPrompt?.trim()) continue;
     try {
       const metadata = readKimiCodeSessionMetadata(session.sessionDir);
       if (!session.title?.trim() && metadata?.title?.trim()) {
-        session.title = metadata.title.trim();
+        session.title = sanitizeSkillActivationTitle(metadata.title.trim());
       }
       if (!session.lastPrompt?.trim() && metadata?.lastPrompt?.trim()) {
         session.lastPrompt = metadata.lastPrompt.trim();
@@ -2053,11 +2054,17 @@ function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSes
   return { sessionId: managed.session.id, workDir: managed.workDir, status: managed.status };
 }
 
+function sanitizeSkillActivationTitle(title?: string) {
+  if (!title) return title;
+  const match = title.match(/^User activated the skill\s+["“]([^"”]+)["”]/i);
+  return match ? `使用 ${match[1]}` : title;
+}
+
 function serverSessionSummary(session: ServerSession): KimiCodeSessionSummary {
   const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : "";
   return {
     id: session.id,
-    title: session.title,
+    title: sanitizeSkillActivationTitle(session.title),
     workDir,
     sessionDir: "",
     createdAt: session.created_at ? Date.parse(session.created_at) : 0,

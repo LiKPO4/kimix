@@ -1130,6 +1130,19 @@ export type PrepareKimiSkillResponse = {
   error: string;
 };
 
+export type SyncKimiAgentSkillsResponse = {
+  success: true;
+  data: {
+    names: string[];
+    copiedNames: string[];
+    latestModifiedAt: number;
+    warnings: string[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type ImportSkillArchiveRequest = {
   archivePath?: string;
 };

@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-06-20 v2.11.20 安装后 Skill 自动刷新
+- 当前目标：修复 `find-skills` 已将 Skill 安装到 `~/.agents/skills`，但下一条普通消息仍无法使用新 Skill 的问题。
+- 根因：Kimix 本地扫描遗漏标准 `.agents/skills` 目录；同时 Server 会话的 Skill 注册表固定在创建时，普通消息发送前没有检测安装变化并刷新 runtime。
+- 已完成：纳入 `.agents/skills` 扫描；发送普通消息前静默同步新安装的顶层 Skill（连同子 Skill），按最新修改时间判断当前 runtime 是否过期，必要时通过官方 fork 保留上下文并刷新注册表后再发送。
+- 子 Skill 兼容：真实探针确认 Server 不扫描嵌套目录但接受带 `/` 的 Skill 名称；同步时将子 Skill 额外展平到 Kimi Code Skill 根目录，并把副本名称改为原始完整路由（如 `game-development/game-design`）。
+- 同轮修复：历史加载会把官方 `<kimi-skill-loaded>` 内部指令压缩为简短 Skill 调用信息，模型自动调用不再伪装成用户消息；Skill 首轮激活会生成正常会话标题。
+- 关键文件：`electron/skillMigration.ts`、`electron/main.ts`、`src/components/chat/Composer.tsx`、`src/types/ui.ts`。
+- 已验证：真实 Server 探针确认旧会话直接激活返回 `40415`，官方 fork 后可发现顶层及展平的嵌套 Skill 并成功激活；全量测试 27 个文件、210/210 通过，OKF 严格校验、生产构建及 `git diff --check` 通过。
+- 下一步：窄范围提交后，由用户在 v2.11.20 实机验收安装后调用、消息显示和旧会话标题。
+
 ## 2026-06-20 v2.11.19 Skill 真实调用修复
 - 当前目标：修复本地/Codex Skill 虽出现在 `/skill:` 补全中，发送后却丢失 Skill 前缀并作为普通文本交给 Agent 的问题。
 - 根因：官方会话未识别本地 Skill 时，旧逻辑只写入 Kimix 的“已启用”设置，随后剥掉 `/skill:<name>` 并发送参数正文；该设置没有接入 Kimi Server 的 Skill 扫描目录，因此不构成真实 Skill 调用。
