@@ -92,10 +92,6 @@ function parseFencedCodeBoundary(line: string): FencedCodeBoundary | null {
   };
 }
 
-function isFencedCodeBoundary(line: string) {
-  return Boolean(parseFencedCodeBoundary(line));
-}
-
 function isClosingFence(boundary: FencedCodeBoundary, opener: FencedCodeBoundary) {
   return boundary.markerChar === opener.markerChar && boundary.markerLength >= opener.markerLength;
 }

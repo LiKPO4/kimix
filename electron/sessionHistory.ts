@@ -68,14 +68,6 @@ export function candidateKimiShareDirs() {
 // Config helpers
 // ---------------------------------------------------------------------------
 
-export function collectKimiModelEnv(): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([key, value]) => key.startsWith("KIMI_MODEL_") && typeof value === "string",
-    ),
-  ) as Record<string, string>;
-}
-
 export function readDefaultKimiModelFromConfig(): string | null {
   const configPath = path.join(resolveKimiShareDir(), "config.toml");
   if (!fs.existsSync(configPath)) return null;

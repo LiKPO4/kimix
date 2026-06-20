@@ -31,19 +31,8 @@ function formatDuration(ms: number) {
   return `${minutes}分钟`;
 }
 
-function formatUpdatedAt(value: number | undefined) {
-  if (!value) return "尚未刷新";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "尚未刷新";
-  return date.toLocaleString("zh-CN", { hour12: false });
-}
-
 function formatTotalQuota(value: number) {
   return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
-}
-
-function isUsageLoginExpired(message?: string) {
-  return Boolean(message && /授权失败|重新登录|login|401|unauthorized/i.test(message));
 }
 
 function formatRefreshTime(value: number | undefined, now: number) {
@@ -75,10 +64,6 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
       </div>
     </div>
   );
-}
-
-function formatPluginSource(source: string | undefined) {
-  return source === "marketplace" ? "Marketplace" : "Installed";
 }
 
 export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void }) {

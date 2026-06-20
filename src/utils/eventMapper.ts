@@ -426,10 +426,6 @@ function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: Timeli
   return result;
 }
 
-function extractUserInput(input: unknown): string {
-  return extractUserMessage(input).content;
-}
-
 function stripKimixClarificationInstruction(content: string): string {
   if (content.startsWith("【Kimix Hooks 上下文】")) {
     const markerIndex = content.indexOf(HOOK_CONTEXT_MARKER);

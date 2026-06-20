@@ -413,19 +413,6 @@ function floodFill(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, poi
   ctx.putImageData(imageData, 0, 0);
 }
 
-function replaceColor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, fromColor: string, toColor: string) {
-  const from = hexToRgba(fromColor);
-  const to = hexToRgba(toColor);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  for (let index = 0; index < data.length; index += 4) {
-    if (colorsMatch(data, index, from)) {
-      setPixel(data, index, to);
-    }
-  }
-  ctx.putImageData(imageData, 0, 0);
-}
-
 export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
