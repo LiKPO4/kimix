@@ -23,7 +23,7 @@ if "%~1"=="--clean" (
 )
 echo.
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\restart-kimix-dev.ps1" %*
+PowerShell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\restart-kimix-dev.ps1" --dev %*
 
 echo.
 echo Kimix dev process exited. Press any key to close this window.
