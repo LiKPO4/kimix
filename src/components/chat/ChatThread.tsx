@@ -1238,16 +1238,6 @@ export function ChatThread() {
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
 
   useEffect(() => {
-    if (!isSessionScrollPrimed) {
-      console.log("[ChatThread] scroll area hidden (not primed)", {
-        sessionId: session?.id,
-        primedSessionId,
-        isSessionScrollPrimed,
-      });
-    }
-  }, [isSessionScrollPrimed, primedSessionId, session?.id]);
-
-  useEffect(() => {
     const pending = pendingFocusEventRef.current;
     if (!pending || !session || pending.sessionId !== session.id) return;
     window.requestAnimationFrame(() => {
@@ -1272,18 +1262,6 @@ export function ChatThread() {
   }, [showOlderItems, visibleRenderItems.length]);
 
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
-    console.log("[ChatThread] empty state reached", {
-      hasSession: Boolean(session),
-      sessionId: session?.id,
-      eventsLength: session?.events.length ?? 0,
-      visibleEventsLength: visibleEvents.length,
-      renderItemsLength: renderItems.length,
-      hasActiveTurn,
-      hasPendingMessage,
-      hasVisibleContent,
-      runningSessionId,
-      isSessionScrollPrimed,
-    });
     return <EmptyState />;
   }
 

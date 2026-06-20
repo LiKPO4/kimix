@@ -437,6 +437,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
     if (isHiddenInternalSession({ ...session, events })) {
       deleteSession(session.id);
+      if (currentSession?.id === session.id) {
+        setCurrentSession(null);
+      }
       return;
     }
     updateSession(session.id, (current) => ({
@@ -761,7 +764,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.11.10</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.11.11</span>
         </button>
       </div>
     </aside>

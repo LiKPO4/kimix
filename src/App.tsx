@@ -203,16 +203,6 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
       const hasMoreAssistantBody = assistantBodySize(historyEvents) > assistantBodySize(session.events);
       const hasMoreDisplayableImages = displayableUserImageCount(historyEvents) > displayableUserImageCount(session.events);
-      console.log("[repairKimiCodeHistoryBodies] candidate", {
-        sessionId: session.id,
-        historySessionId: sessionId,
-        originalEventsLength: session.events.length,
-        loadedEventsLength: eventsSource.length,
-        mappedEventsLength: historyEvents.length,
-        hasMoreAssistantBody,
-        hasMoreDisplayableImages,
-        willReplace: hasMoreAssistantBody || hasMoreDisplayableImages,
-      });
       if (!hasMoreAssistantBody && !hasMoreDisplayableImages) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
@@ -2038,23 +2028,16 @@ function App() {
                   runtimeSessionId: startRes.data.sessionId,
                   officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
                   model: runtimeOwner.model ?? startRes.data.model ?? null,
-                  events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
-                  isLoading: false,
-                });
-                console.log("[App startup recovery] runtimeOwner path", {
-                  historySessionId,
-                  runtimeOwnerId: runtimeOwner.id,
-                  runtimeOwnerEventsLength: runtimeOwner.events.length,
-                  loadedEventsLength: events.length,
-                  finalEventsLength: session.events.length,
-                });
-                useSessionStore.setState((state) => ({
-                  sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
-                }));
-                useAppStore.setState({ currentSession: session });
-                setRunningSessionId(null);
-                return;
-              }
+                events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
+                isLoading: false,
+              });
+              useSessionStore.setState((state) => ({
+                sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
+              }));
+              useAppStore.setState({ currentSession: session });
+              setRunningSessionId(null);
+              return;
+            }
 
               const longTasksRes = await window.api.listLongTasks({ projectPath: activeProject.path });
               const matchedLongTask = longTasksRes.success
@@ -2077,19 +2060,10 @@ function App() {
                 officialSessionId: historySessionId,
                 longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
                 events,
-                isLoading: false,
-              });
+              isLoading: false,
+            });
 
-              console.log("[App startup recovery] new/replace session path", {
-                historySessionId,
-                newSessionId: session.id,
-                activeLocalSessionId: activeLocalSession?.id,
-                activeLocalEventsLength: activeLocalSession?.events.length ?? 0,
-                loadedEventsLength: events.length,
-                finalEventsLength: session.events.length,
-              });
-
-              useSessionStore.setState((state) => {
+            useSessionStore.setState((state) => {
                 const existing = state.sessions.find((item) => item.id === session.id);
                 if (existing?.archivedAt) {
                   // Preserve local archive state; do not resurrect an archived session just because

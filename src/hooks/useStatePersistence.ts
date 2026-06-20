@@ -49,14 +49,6 @@ export function useStatePersistence() {
 
     const unsubscribeSessionPersistence = useSessionStore.subscribe((state, prev) => {
       if (state.sessions === prev.sessions && state.pendingMessages === prev.pendingMessages) return;
-      const hiddenSessions = state.sessions.filter((session) => isHiddenInternalSession(session));
-      if (hiddenSessions.length > 0) {
-        console.log("[useStatePersistence] hidden sessions will be removed:", hiddenSessions.map((session) => ({
-          id: session.id,
-          title: session.title,
-          eventCount: session.events?.length ?? 0,
-        })));
-      }
       const visibleSessions = state.sessions.filter((session) => !isHiddenInternalSession(session));
       if (visibleSessions.length !== state.sessions.length) {
         useSessionStore.setState({ sessions: visibleSessions });
