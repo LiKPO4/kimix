@@ -18,11 +18,15 @@ export const KIMIX_FALLBACK_SLASH_COMMANDS = new Set([
 
 export type SlashRoutingDecision = "local" | "official-first" | "passthrough";
 
+export function shouldActivateSkillBeforePrompt(name: string): boolean {
+  return name.trim().toLowerCase().startsWith("skill:");
+}
+
 export function classifySlashCommand(name: string): SlashRoutingDecision {
   const normalized = name.trim().toLowerCase();
   if (!normalized) return "passthrough";
   if (KIMIX_LOCAL_SLASH_COMMANDS.has(normalized)) return "local";
-  if (normalized.startsWith("skill:")) return "official-first";
+  if (shouldActivateSkillBeforePrompt(normalized)) return "official-first";
   if (KIMIX_FALLBACK_SLASH_COMMANDS.has(normalized)) return "official-first";
   return "passthrough";
 }

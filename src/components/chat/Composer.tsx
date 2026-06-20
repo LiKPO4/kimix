@@ -16,7 +16,7 @@ import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
-import { classifySlashCommand } from "@/utils/slashRouting";
+import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -1290,7 +1290,7 @@ export function Composer() {
       if (applied === "enabled" && (args || images.length > 0)) {
         await sendPromptContent(args, { images, skipClarification: true });
       }
-      return Boolean(applied);
+      return true;
     }
     if (name === "goal") {
       await appendSlashNotice(commandNotice);
@@ -1541,7 +1541,12 @@ export function Composer() {
       addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
       return;
     }
-    const slashHandled = trimmed.startsWith("/") ? await handleSdkSlashCommand(trimmed) : false;
+    const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
+    const slashHandled = trimmed.startsWith("/")
+      ? shouldActivateSkillBeforePrompt(slashName)
+        ? await handleFallbackSlashCommand(trimmed, imagesToSend)
+        : await handleSdkSlashCommand(trimmed)
+      : false;
     if (slashHandled) {
       setInput("");
       setImageAttachments([]);

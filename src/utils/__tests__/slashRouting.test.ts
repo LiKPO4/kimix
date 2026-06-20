@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifySlashCommand } from "../slashRouting";
+import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "../slashRouting";
 
 describe("classifySlashCommand", () => {
   it("keeps Kimix-only slash commands local", () => {
@@ -17,6 +17,11 @@ describe("classifySlashCommand", () => {
 
   it("lets skill slash commands reach the official route before local fallback", () => {
     expect(classifySlashCommand("skill:deploy-okf-knowledge")).toBe("official-first");
+  });
+
+  it("activates skill slash commands before sending them as prompts", () => {
+    expect(shouldActivateSkillBeforePrompt("skill:find-skills")).toBe(true);
+    expect(shouldActivateSkillBeforePrompt("goal")).toBe(false);
   });
 
   it("passes through unknown slash commands", () => {
