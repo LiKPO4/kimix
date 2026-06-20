@@ -518,6 +518,7 @@ function installBrowserPreviewApi() {
     notifyTurnComplete: () => okVoid(),
     getDraggedFilePath: () => "",
     reportRendererHeartbeat: () => {},
+    reportRendererStartup: () => {},
     clearTaskbarAttention: () => okVoid(),
     scheduleShutdown: () => fail("延迟关机"),
     cancelShutdown: () => fail("取消关机"),
@@ -591,10 +592,18 @@ window.addEventListener("unhandledrejection", (event) => {
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element not found");
+const reportStartup = (label: string) => {
+  window.api?.reportRendererStartup?.({ label, elapsedMs: performance.now() });
+};
+reportStartup("renderer entry");
 applyCachedThemeSnapshot();
 installBrowserPreviewApi();
+reportStartup("before React render");
 createRoot(rootEl).render(
   <StrictMode>
     <App />
   </StrictMode>
 );
+requestAnimationFrame(() => {
+  reportStartup("first animation frame");
+});

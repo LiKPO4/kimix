@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-20
+* **Runtime routing**: Clarified that startup must defer official history restore and stale runtime recovery until after renderer first paint; Server `yolo` approvals are auto-resolved via the official approval API.
 * **Runtime routing**: Added the slash command rule that official Kimi Code commands, including `/skill:...`, route through Server/SDK prompt dispatch first, while Kimix-only commands stay local and SDK-era handlers act as fallback.
 * **Runtime routing**: Documented that app startup must show the renderer before Kimi Server startup or runtime prewarm.
 * **Runtime routing**: Added bounded Server recovery and safe promotion of idle SDK sessions when the same official session ID is available.

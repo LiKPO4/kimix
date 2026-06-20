@@ -1921,6 +1921,14 @@ function handleServerFrame(frame: ServerFrame) {
   if (frame.type === "event.approval.requested") {
     const requestId = typeof payload.approval_id === "string" ? payload.approval_id : undefined;
     if (!requestId) return;
+    if (serverSessions.get(sessionId)?.permission === "yolo") {
+      setStatus(sessionId, "running");
+      void getServerClient().resolveApproval(sessionId, requestId, {
+        decision: "approved",
+        scope: "session",
+      }).catch((error) => emitServerError(sessionId, error));
+      return;
+    }
     serverApprovalIds.add(pendingKey(sessionId, requestId));
     setStatus(sessionId, "waiting_approval");
     eventSink?.({ sessionId, event: { type: "kimix.approval.request", requestId, request: payload } });

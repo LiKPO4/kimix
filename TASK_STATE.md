@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-06-20 v2.11.5 完全访问权限与启动白屏修复
+- 当前目标：修复 Server 链路下“完全访问权限”仍出现工具审批卡，以及启动后约 10 秒白屏才进入主界面的问题。
+- 已确认：Kimix 三档权限 `manual` / `auto` / `yolo` 与官方 Kimi Code 权限模式一致；截图中的“完全访问权限”对应官方 `yolo`。问题是 Server approval 事件路径没有像 SDK approval handler 一样在 `yolo` 下自动批准。
+- 已完成：Server session 收到 approval 时若当前 permission 为 `yolo`，直接通过官方 approval API 按 session 批准，不再发 UI 审批卡。
+- 已完成：启动 bootstrap 先设置本地 currentProject/currentSession，让主界面先渲染；官方 session 列表、runtime start、history load 延后到首屏后 1.2 秒后台执行，避免 stale runtime 恢复拖慢首屏。
+- 已完成：新增 `[KimixStartup]` renderer 启动打点并在主进程转发，后续可区分 renderer entry、React render、first animation frame 与 Kimi Server 后台启动时序。
+- 已验证：`pnpm test:run` 26 个测试文件、200/200 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过，renderer hash `index-CzYRi0f4.js`；`git diff --check` 通过；`pnpm preview` 启动日志显示 renderer entry 841ms、React render 843ms、first animation frame 881ms，且 root 内容检查非空，Kimi Server 与 stale runtime 恢复均发生在首帧之后。
+- 未完成：需要用户用 v2.11.5 实际复验“完全访问权限”下 `/goal ...` 不再弹审批卡，以及安装/dev 实际启动是否不再白屏 10 秒。
+- 关键文件：`electron/kimiCodeHost.ts`、`electron/main.ts`、`src/App.tsx`、`src/main.tsx`。
+- 下一步：运行测试、OKF 校验、build、preview 启动时序验证后提交。
+
 ## 2026-06-20 v2.11.4 Server slash 官方优先路由
 - 当前目标：让 slash 命令优先进入 Kimi 官方发送链路，Kimix 只保留产品专属本地命令，并在官方发送链路失败时使用旧本地处理兜底。
 - 已完成：新增 slash 分类 helper；`/goal`、`/swarm`、`/compact`、`/undo`、`/btw`、`/reload`、`/status`、`/usage`、`/plan`、`/skill:...` 改为官方链路优先；`/theme`、`/custom-theme`、`/import-from-cc-codex` 仍由 Kimix 本地处理。

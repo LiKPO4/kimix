@@ -114,6 +114,7 @@ import type {
   TriggerShortcutRequest,
   TurnCompleteNotificationRequest,
   RendererHeartbeatPayload,
+  RendererStartupMark,
   ScheduleShutdownRequest,
   GenerateHookRuleRequest,
   GenerateHookRuleResponse,
@@ -499,6 +500,8 @@ const api = {
   getDraggedFilePath: (file: File): string => webUtils.getPathForFile(file),
   reportRendererHeartbeat: (payload: RendererHeartbeatPayload): void =>
     ipcRenderer.send("app:rendererHeartbeat", payload),
+  reportRendererStartup: (payload: RendererStartupMark): void =>
+    ipcRenderer.send("app:rendererStartup", payload),
   clearTaskbarAttention: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:clearTaskbarAttention"),
   scheduleShutdown: (req: ScheduleShutdownRequest): Promise<VoidResponse> =>

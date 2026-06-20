@@ -4020,7 +4020,6 @@ function createWindow() {
   mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     console.error(`[RENDERER] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
   });
-
   mainWindow.webContents.once("did-finish-load", () => {
     void restoreLastContext();
     emitWindowState();
@@ -6720,6 +6719,15 @@ ipcMain.on("app:rendererHeartbeat", (_, payload: unknown) => {
     payload: payload && typeof payload === "object" ? payload as RendererHeartbeatPayload : null,
   };
   rendererWatchdogReported = false;
+});
+
+ipcMain.on("app:rendererStartup", (_, payload: unknown) => {
+  const data = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  const label = typeof data.label === "string" ? data.label : "unknown";
+  const elapsedMs = typeof data.elapsedMs === "number" && Number.isFinite(data.elapsedMs)
+    ? Math.round(data.elapsedMs)
+    : -1;
+  console.info(`[KimixStartup] ${label} ${elapsedMs}ms`);
 });
 
 ipcMain.handle("app:clearTaskbarAttention", async () => {

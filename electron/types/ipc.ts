@@ -1722,6 +1722,11 @@ export type KimiCodeApprovalResponseRequest = {
   feedback?: string;
 };
 
+export type RendererStartupMark = {
+  label: string;
+  elapsedMs: number;
+};
+
 export type KimiCodeQuestionResponseRequest = {
   sessionId: string;
   requestId: string;

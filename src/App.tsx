@@ -1906,171 +1906,179 @@ function App() {
           currentSession: activeLocalSession ?? useAppStore.getState().currentSession,
         });
 
-        const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
-        const activeRuntimeIds = new Set([
-          activeLocalSession?.id,
-          activeLocalSession?.officialSessionId,
-          activeLocalSession?.runtimeSessionId,
-          activeLocalSession?.longTask?.executorSessionId,
-          activeLocalSession?.longTask?.reviewerSessionId,
-        ].filter((id): id is string => Boolean(id)));
-        const isUsableHistorySession = (session: { id: string; title?: string; lastPrompt?: string }) => (
-          !hiddenHandoffSessionIds.has(session.id) &&
-          !isHiddenInternalSession(session) &&
-          !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, activeProject.path)
-        );
+        window.setTimeout(() => {
+          void (async () => {
+            try {
+              const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
+              const activeRuntimeIds = new Set([
+                activeLocalSession?.id,
+                activeLocalSession?.officialSessionId,
+                activeLocalSession?.runtimeSessionId,
+                activeLocalSession?.longTask?.executorSessionId,
+                activeLocalSession?.longTask?.reviewerSessionId,
+              ].filter((id): id is string => Boolean(id)));
+              const isUsableHistorySession = (session: { id: string; title?: string; lastPrompt?: string }) => (
+                !hiddenHandoffSessionIds.has(session.id) &&
+                !isHiddenInternalSession(session) &&
+                !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, activeProject.path)
+              );
 
-        const res = await window.api.listSessions({ workDir: activeProject.path });
-        if (!res.success) return;
-        const activeSummaries = res.data.filter(isUsableHistorySession);
-        const latest = (activeRuntimeIds.size > 0
-          ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))
-          : undefined) ?? activeSummaries[0];
-        const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
-        if (!latest && !sessionIdToStart) return;
+              const res = await window.api.listSessions({ workDir: activeProject.path });
+              if (!res.success) return;
+              const activeSummaries = res.data.filter(isUsableHistorySession);
+              const latest = (activeRuntimeIds.size > 0
+                ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))
+                : undefined) ?? activeSummaries[0];
+              const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
+              if (!latest && !sessionIdToStart) return;
 
-        const startOptions = {
-          workDir: activeProject.path,
-          sessionId: sessionIdToStart,
-          thinking: useAppStore.getState().defaultThinking,
-          yoloMode: useAppStore.getState().permissionMode === "yolo",
-          autoMode: useAppStore.getState().permissionMode === "auto",
-          planMode: useAppStore.getState().defaultPlanMode,
-        };
-        let startRes = await window.api.startSession(startOptions);
-        if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
-          console.warn(`[Kimi Code] startup session ${sessionIdToStart} is missing; creating a fresh runtime`);
-          startRes = await window.api.startSession({
-            ...startOptions,
-            sessionId: undefined,
-          });
-        }
-        if (!startRes.success) {
-          if (isKimiCodeSessionMissingError(startRes.error)) {
-            console.warn("[Kimi Code] fresh startup runtime was not found; leaving recovery to background prewarm");
-            setRunningSessionId(null);
-            return;
-          }
-          if (activeLocalSession) {
-            const errorSession = {
-              ...activeLocalSession,
-              events: [
-                ...activeLocalSession.events,
-                {
-                  id: crypto.randomUUID(),
-                  type: "error" as const,
-                  timestamp: Date.now(),
-                  message: `恢复上次 Kimi Code 会话失败：${startRes.error}`,
-                  canDismiss: false,
-                },
-              ],
-              isLoading: false,
-              updatedAt: Date.now(),
-            };
-            useSessionStore.setState((state) => ({
-              sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
-            }));
-            useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
-            setRunningSessionId(null);
-          } else {
-            window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `恢复 Kimi Code 会话失败：${startRes.error}` }));
-          }
-          return;
-        }
-        const historySessionId = latest?.id ?? sessionIdToStart ?? startRes.data.sessionId;
-        if (hasArchivedLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id, activeProject.path)) {
-          setRunningSessionId(null);
-          return;
-        }
-        const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id);
-        const loaded = await window.api.loadSession({
-          workDir: activeProject.path,
-          sessionId: historySessionId,
-        });
-        if (!loaded.success) {
-          if (activeLocalSession) {
-            const errorSession = {
-              ...activeLocalSession,
-              runtimeSessionId: startRes.data.sessionId,
-              events: [
-                ...activeLocalSession.events,
-                {
-                  id: crypto.randomUUID(),
-                  type: "error" as const,
-                  timestamp: Date.now(),
-                  message: `读取上次 Kimi Code 历史失败：${loaded.error}`,
-                  canDismiss: false,
-                },
-              ],
-              isLoading: false,
-              updatedAt: Date.now(),
-            };
-            useSessionStore.setState((state) => ({
-              sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
-            }));
-            useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
-            setRunningSessionId(null);
-          }
-          return;
-        }
-        const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
+              const startOptions = {
+                workDir: activeProject.path,
+                sessionId: sessionIdToStart,
+                thinking: useAppStore.getState().defaultThinking,
+                yoloMode: useAppStore.getState().permissionMode === "yolo",
+                autoMode: useAppStore.getState().permissionMode === "auto",
+                planMode: useAppStore.getState().defaultPlanMode,
+              };
+              let startRes = await window.api.startSession(startOptions);
+              if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
+                console.warn(`[Kimi Code] startup session ${sessionIdToStart} is missing; creating a fresh runtime`);
+                startRes = await window.api.startSession({
+                  ...startOptions,
+                  sessionId: undefined,
+                });
+              }
+              if (!startRes.success) {
+                if (isKimiCodeSessionMissingError(startRes.error)) {
+                  console.warn("[Kimi Code] fresh startup runtime was not found; leaving recovery to background prewarm");
+                  setRunningSessionId(null);
+                  return;
+                }
+                if (activeLocalSession) {
+                  const errorSession = {
+                    ...activeLocalSession,
+                    events: [
+                      ...activeLocalSession.events,
+                      {
+                        id: crypto.randomUUID(),
+                        type: "error" as const,
+                        timestamp: Date.now(),
+                        message: `恢复上次 Kimi Code 会话失败：${startRes.error}`,
+                        canDismiss: false,
+                      },
+                    ],
+                    isLoading: false,
+                    updatedAt: Date.now(),
+                  };
+                  useSessionStore.setState((state) => ({
+                    sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
+                  }));
+                  useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
+                  setRunningSessionId(null);
+                } else {
+                  window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `恢复 Kimi Code 会话失败：${startRes.error}` }));
+                }
+                return;
+              }
+              const historySessionId = latest?.id ?? sessionIdToStart ?? startRes.data.sessionId;
+              if (hasArchivedLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id, activeProject.path)) {
+                setRunningSessionId(null);
+                return;
+              }
+              const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id);
+              const loaded = await window.api.loadSession({
+                workDir: activeProject.path,
+                sessionId: historySessionId,
+              });
+              if (!loaded.success) {
+                if (activeLocalSession) {
+                  const errorSession = {
+                    ...activeLocalSession,
+                    runtimeSessionId: startRes.data.sessionId,
+                    events: [
+                      ...activeLocalSession.events,
+                      {
+                        id: crypto.randomUUID(),
+                        type: "error" as const,
+                        timestamp: Date.now(),
+                        message: `读取上次 Kimi Code 历史失败：${loaded.error}`,
+                        canDismiss: false,
+                      },
+                    ],
+                    isLoading: false,
+                    updatedAt: Date.now(),
+                  };
+                  useSessionStore.setState((state) => ({
+                    sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
+                  }));
+                  useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
+                  setRunningSessionId(null);
+                }
+                return;
+              }
+              const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
 
-        if (runtimeOwner) {
-          const session = hydrateLongTaskProgressFromHistory({
-            ...runtimeOwner,
-            runtimeSessionId: startRes.data.sessionId,
-            officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
-            model: runtimeOwner.model ?? startRes.data.model ?? null,
-            events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
-            isLoading: false,
-          });
-          useSessionStore.setState((state) => ({
-            sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
-          }));
-          useAppStore.setState({ currentSession: session });
-          setRunningSessionId(null);
-          return;
-        }
+              if (runtimeOwner) {
+                const session = hydrateLongTaskProgressFromHistory({
+                  ...runtimeOwner,
+                  runtimeSessionId: startRes.data.sessionId,
+                  officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
+                  model: runtimeOwner.model ?? startRes.data.model ?? null,
+                  events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
+                  isLoading: false,
+                });
+                useSessionStore.setState((state) => ({
+                  sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
+                }));
+                useAppStore.setState({ currentSession: session });
+                setRunningSessionId(null);
+                return;
+              }
 
-        const longTasksRes = await window.api.listLongTasks({ projectPath: activeProject.path });
-        const matchedLongTask = longTasksRes.success
-          ? longTasksRes.data.find((task) => (
-            task.executorSessionId === historySessionId ||
-            task.reviewerSessionId === historySessionId ||
-            task.executorSessionId === startRes.data.sessionId ||
-            task.reviewerSessionId === startRes.data.sessionId
-          ))
-          : undefined;
+              const longTasksRes = await window.api.listLongTasks({ projectPath: activeProject.path });
+              const matchedLongTask = longTasksRes.success
+                ? longTasksRes.data.find((task) => (
+                  task.executorSessionId === historySessionId ||
+                  task.reviewerSessionId === historySessionId ||
+                  task.executorSessionId === startRes.data.sessionId ||
+                  task.reviewerSessionId === startRes.data.sessionId
+                ))
+                : undefined;
 
-        const session = hydrateLongTaskProgressFromHistory({
-          id: startRes.data.sessionId,
-          model: startRes.data.model ?? null,
-          title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
-          projectPath: activeProject.path,
-          createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
-          updatedAt: latest?.updatedAt ?? activeLocalSession?.updatedAt ?? Date.now(),
-          runtimeSessionId: startRes.data.sessionId,
-          officialSessionId: historySessionId,
-          longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
-          events,
-          isLoading: false,
-        });
+              const session = hydrateLongTaskProgressFromHistory({
+                id: startRes.data.sessionId,
+                model: startRes.data.model ?? null,
+                title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
+                projectPath: activeProject.path,
+                createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
+                updatedAt: latest?.updatedAt ?? activeLocalSession?.updatedAt ?? Date.now(),
+                runtimeSessionId: startRes.data.sessionId,
+                officialSessionId: historySessionId,
+                longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
+                events,
+                isLoading: false,
+              });
 
-        useSessionStore.setState((state) => {
-          const existing = state.sessions.find((item) => item.id === session.id);
-          if (existing?.archivedAt) {
-            // Preserve local archive state; do not resurrect an archived session just because
-            // its history was rediscovered from the SDK store.
-            return state;
-          }
-          return {
-            sessions: existing
-              ? state.sessions.map((item) => (item.id === session.id ? session : item))
-              : [session, ...state.sessions],
-          };
-        });
-        useAppStore.setState({ currentSession: session });
-        setRunningSessionId(null);
+              useSessionStore.setState((state) => {
+                const existing = state.sessions.find((item) => item.id === session.id);
+                if (existing?.archivedAt) {
+                  // Preserve local archive state; do not resurrect an archived session just because
+                  // its history was rediscovered from the SDK store.
+                  return state;
+                }
+                return {
+                  sessions: existing
+                    ? state.sessions.map((item) => (item.id === session.id ? session : item))
+                    : [session, ...state.sessions],
+                };
+              });
+              useAppStore.setState({ currentSession: session });
+              setRunningSessionId(null);
+            } catch {
+              setRunningSessionId(null);
+            }
+          })();
+        }, 1_200);
       }).catch(() => {});
     });
 
