@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { displayProjectName } from "@/utils/projectDisplay";
 
 const FALLBACK_SUGGESTIONS = [
@@ -220,18 +221,7 @@ export function EmptyState() {
         images: [],
       });
       if (!sendRes.success) throw new Error(sendRes.error);
-      if (sendRes.data.route === "server") {
-        updateLinkStatus("Kimi Server 已接收，等待首个模型事件…", "success");
-      } else if (sendRes.data.route === "sdk-fallback") {
-        updateLinkStatus("Kimi Server 提交失败，SDK 已接管；等待首个模型事件…", "warning");
-      } else {
-        updateLinkStatus(
-          sendRes.data.fallbackReason
-            ? "Kimi Server 未接管，SDK 已接收；等待首个模型事件…"
-            : "Kimi SDK 已接收，等待首个模型事件…",
-          sendRes.data.fallbackReason ? "warning" : "success",
-        );
-      }
+      updateLinkStatus(kimiCodeRouteStatus(sendRes.data.route), "success");
     } catch (err) {
       console.error("Send failed:", err);
       const message = err instanceof Error ? err.message : String(err);

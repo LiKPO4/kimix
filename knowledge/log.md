@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-20
+* **Runtime routing**: Added bounded Server recovery and safe promotion of idle SDK sessions when the same official session ID is available.
 * **Automation**: Added end-of-task knowledge classification and a weekly maintenance audit for stale, orphaned, duplicated, or future-dated concepts.
 
 ## 2026-06-19

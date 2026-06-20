@@ -3266,3 +3266,28 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `tools/skills/deploy-okf-knowledge/`
 ## 下一步
 - 在第二个真实项目执行 Skill 前向验收；本轮先完成全量测试、构建和窄提交。
+
+# 2026-06-20 v2.11.0 Kimi Server 接管恢复优化
+## 当前目标
+- 减少会话长期停留在 SDK 链路的情况，并隐藏面向开发者的内部回退细节。
+## 已完成
+- SDK 链路发送时会按 30 秒冷却触发 Server 后台恢复，不阻塞当前消息。
+- Server 就绪后，空闲 SDK 会话仅在 Server 能解析同一官方会话 ID 时安全晋升，无法解析则继续保留 SDK 上下文。
+- 发送结果统一为“使用kimi server链路已发送消息”或“kimi sdk链路已发送消息”。
+- 版本号三处同步到 v2.11.0。
+## 未完成
+- 等待用户用 v2.11.0 实机复验 Server 恢复与两种发送文案。
+## 关键文件
+- `electron/kimiCodeHost.ts`
+- `src/utils/kimiCodeRouteStatus.ts`
+- `src/components/chat/Composer.tsx`
+- `src/components/chat/EmptyState.tsx`
+## 下一步
+- 启动 v2.11.0，分别验证 Server 与 SDK 路由文案；在 Server 暂时失败并恢复后，再次发送应可安全切回 Server。
+
+## 验证
+- 路由相关测试通过：3 个测试文件、20/20。
+- 全量测试通过：25 个测试文件、196/196。
+- `pnpm build` 通过，renderer hash：`assets/index-BlN3VQq1.js`。
+- OKF 严格校验、v0.1 规范校验、180 天维护审计均通过。
+- `git diff --check` 通过，仅有 LF/CRLF 提示。

@@ -14,6 +14,7 @@ import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 
 function genId(): string {
@@ -898,18 +899,7 @@ export function Composer() {
           });
         }
         if (!res.success) throw new Error(res.error);
-        if (res.data.route === "server") {
-          updateLinkStatus("Kimi Server 已接收，等待首个模型事件…", "success");
-        } else if (res.data.route === "sdk-fallback") {
-          updateLinkStatus("Kimi Server 提交失败，SDK 已接管；等待首个模型事件…", "warning");
-        } else {
-          updateLinkStatus(
-            res.data.fallbackReason
-              ? "Kimi Server 未接管，SDK 已接收；等待首个模型事件…"
-              : "Kimi SDK 已接收，等待首个模型事件…",
-            res.data.fallbackReason ? "warning" : "success",
-          );
-        }
+        updateLinkStatus(kimiCodeRouteStatus(res.data.route), "success");
         return;
       } catch (err) {
         console.error("Kimi Code send failed:", err);

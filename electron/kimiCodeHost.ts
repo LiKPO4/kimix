@@ -542,6 +542,8 @@ const serverQuestionIds = new Set<string>();
 const serverQuestionRequests = new Map<string, Record<string, unknown>>();
 let serverClient: KimiCodeServerClient | null = null;
 let unsubscribeServerFrames: (() => void) | null = null;
+let serverRecoveryPromise: Promise<void> | null = null;
+let nextServerRecoveryAt = 0;
 const pendingApprovals = new Map<string, PendingApproval>();
 const pendingQuestions = new Map<string, PendingQuestion>();
 let eventSink: EventSink | null = null;
@@ -764,7 +766,7 @@ export type KimiCodePromptRouteResult = {
 };
 
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<KimiCodePromptRouteResult> {
-  const serverManaged = serverSessions.get(sessionId);
+  const serverManaged = serverSessions.get(sessionId) ?? await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
     try {
@@ -786,6 +788,7 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
     }
   }
   const managed = getManagedSession(sessionId);
+  scheduleServerRecovery();
   setStatus(sessionId, "running");
   try {
     await managed.session.prompt(input);
@@ -800,6 +803,50 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
     setStatus(sessionId, "error");
     throw error;
   }
+}
+
+async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManagedSession | undefined> {
+  const sdkManaged = sessions.get(sessionId);
+  if (!sdkManaged || !shouldRouteNewSessionToServer()) return undefined;
+  if (sdkManaged.status === "running" || sdkManaged.status === "waiting_approval" || sdkManaged.status === "waiting_question") {
+    return undefined;
+  }
+  try {
+    const client = getServerClient();
+    const session = await client.getSession(sessionId);
+    const workDir = typeof session.metadata?.cwd === "string"
+      ? session.metadata.cwd
+      : getSessionWorkDir(sessionId) ?? process.cwd();
+    await registerServerSession(session, workDir, {
+      model: sdkManaged.model,
+      thinking: sdkManaged.thinking,
+      permission: sdkManaged.permission,
+      planMode: sdkManaged.planMode,
+    });
+    sessions.delete(sessionId);
+    sdkManaged.unsubscribe();
+    return serverSessions.get(sessionId);
+  } catch (error) {
+    serverSessions.delete(sessionId);
+    if (!isKimiCodeSessionMissingError(error)) {
+      markServerRuntimeFailure(error);
+      console.warn("[KimiCodeServerHost] SDK session promotion failed; keeping SDK route:", error);
+    }
+    return undefined;
+  }
+}
+
+function scheduleServerRecovery() {
+  const status = kimiCodeServerHost.getStatus();
+  if (!status.enabled || kimiCodeServerHost.isReady() || serverRecoveryPromise || Date.now() < nextServerRecoveryAt) return;
+  if (!isKimiCodeServerSessionRoutingEnabled(process.env, settingsService.loadSettings())) return;
+  nextServerRecoveryAt = Date.now() + 30_000;
+  serverRecoveryPromise = kimiCodeServerHost.start()
+    .then(() => undefined)
+    .catch((error) => console.warn("[KimiCodeServerHost] background recovery failed:", error))
+    .finally(() => {
+      serverRecoveryPromise = null;
+    });
 }
 
 export async function setSwarmMode(sessionId: string, enabled: boolean, trigger: "manual" | "task" = "manual"): Promise<void> {
