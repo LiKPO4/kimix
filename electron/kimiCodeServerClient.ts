@@ -473,6 +473,10 @@ export class KimiCodeServerClient {
     return this.request("/api/v1/config", { method: "POST", body: JSON.stringify(patch) });
   }
 
+  setDefaultModel(modelId: string): Promise<Record<string, unknown>> {
+    return this.request(`/api/v1/models/${encodeURIComponent(modelId)}:set_default`, { method: "POST", body: "{}" });
+  }
+
   async listModels(): Promise<ServerModelCatalogItem[]> {
     const result = await this.request<{ items: ServerModelCatalogItem[] }>("/api/v1/models");
     return result.items;

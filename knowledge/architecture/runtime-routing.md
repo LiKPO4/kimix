@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T15:46:00+08:00"
+timestamp: "2026-06-21T15:48:00+08:00"
 ---
 
 # Runtime Routing
@@ -39,7 +39,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 24. Server-backed project text previews prefer the official `fs:read` under the same session-root match. Kimix accepts only non-truncated UTF-8 text up to 1 MiB and otherwise reuses the existing local extension, containment, and size checks. The latest-plan sentinel and user-home Kimi plan paths remain local because they are outside the official session workspace.
 25. Official Web folder browsing and Electron folder selection are platform adapters, not competing sources of truth. Kimix retains the OS-native directory dialog because it provides the narrowest desktop permission and full platform integration; `/fs:home` and `/fs:browse` are required by browser clients that cannot open that dialog. Server image prompts must use the official message content schema: local data URLs are uploaded through `/files` and referenced as an image file source, while ordinary URLs use an image URL source. The conversion helper may retain a base64 source only when no upload capability is supplied, but active Server prompt, steer, and BTW routes always supply it. The legacy `image_url` payload is not sent to Server 0.18.
 26. Managed OAuth follows the active runtime boundary. When Server is ready, auth status, device login, pending-flow cancellation, and logout use the official Server endpoints; SDK login and local credential cleanup remain compatibility fallbacks only when Server is unavailable or its OAuth route fails. A local credential file alone must not override an authenticated or unauthenticated state reported by a ready Server.
-27. Global configuration mutations use the official Server merge endpoint whenever Server is ready. Kimix converts its camelCase SDK-facing patch into the Server snake_case wire schema, including nested Provider and model fields, then reloads the richer SDK config view for existing settings UI consumers. SDK mutation remains the fallback for Server failures. Destructive model or Provider deletion is not inferred from merge semantics and requires a separately verified official route.
+27. Global configuration mutations use official Server routes whenever Server is ready. A default-model-only mutation uses the catalog's dedicated `:set_default` action so the Server validates the model alias; other non-destructive mutations use the config merge endpoint after Kimix converts its camelCase SDK-facing patch into the Server snake_case wire schema, including nested Provider and model fields. The richer SDK config view is then reloaded for existing settings UI consumers, with SDK mutation retained as the Server-failure fallback. Server 0.18 exposes no model or Provider deletion route, so Kimix's guarded local deletion remains an explicit desktop extension rather than a claimed native capability.
 
 # Main Components
 

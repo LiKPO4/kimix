@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Official default model**: Routed default-model-only changes through the catalog action, clarified concise settings messages, and documented that Server 0.18 has no destructive model or Provider route.
 * **Official config writes**: Routed non-destructive global config mutations through the Server merge API with explicit camelCase-to-wire conversion and SDK fallback.
 * **Official OAuth lifecycle**: Preferred Server auth state, device login, pending-flow cancellation, and logout while retaining SDK and local-credential fallbacks for unavailable or failed Server routes.
 * **Official file uploads**: Routed local Server prompt images through the multipart `/files` lifecycle and referenced the returned file ID across prompt, steer, and BTW routes.

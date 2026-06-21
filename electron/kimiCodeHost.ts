@@ -1664,7 +1664,12 @@ export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeCon
   const sdkHarness = await getHarness();
   if (kimiCodeServerHost.isReady()) {
     try {
-      await getServerClient().setConfig(toServerConfigPatch(patch as Record<string, unknown>));
+      const entries = Object.entries(patch);
+      if (entries.length === 1 && typeof patch.defaultModel === "string") {
+        await getServerClient().setDefaultModel(patch.defaultModel);
+      } else {
+        await getServerClient().setConfig(toServerConfigPatch(patch as Record<string, unknown>));
+      }
       return sdkHarness.getConfig({ reload: true });
     } catch (error) {
       console.warn("[KimiCodeServerHost] config update failed; falling back to SDK:", error);

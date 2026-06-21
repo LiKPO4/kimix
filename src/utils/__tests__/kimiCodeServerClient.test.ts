@@ -164,6 +164,19 @@ describe("KimiCodeServerClient protocol adapters", () => {
     }));
   });
 
+  it("sets the default model through the dedicated official route", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      code: 0, data: { default_model: "openai/gpt" },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.setDefaultModel("openai/gpt")).resolves.toMatchObject({ default_model: "openai/gpt" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:58627/api/v1/models/openai%2Fgpt:set_default",
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    );
+  });
+
   it("searches files through the official session-scoped filesystem route", async () => {
     const calls: Array<{ url: string; method?: string; body?: BodyInit | null }> = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {

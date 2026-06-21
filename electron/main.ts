@@ -4758,7 +4758,7 @@ ipcMain.handle("kimi:saveOpenAiProvider", async (_, request: unknown) => {
   try {
     const config = await saveOpenAiProviderConfigWithSdk(request);
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
-    return { success: true, data: { ...config, message: `已通过官方 SDK 保存 OpenAI-compatible Provider${buildConfigReloadSuffix(reloadResult)}` } };
+    return { success: true, data: { ...config, message: `已保存 OpenAI-compatible Provider${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -4768,7 +4768,7 @@ ipcMain.handle("kimi:setDefaultModel", async (_, request: unknown) => {
   try {
     const config = await setDefaultKimiModelWithSdk(request);
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
-    return { success: true, data: { ...config, message: `已通过官方 SDK 切换使用模型${buildConfigReloadSuffix(reloadResult)}` } };
+    return { success: true, data: { ...config, message: `已切换使用模型${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -4778,7 +4778,7 @@ ipcMain.handle("kimi:setModelAdaptiveThinking", async (_, request: unknown) => {
   try {
     const config = await setKimiModelAdaptiveThinkingWithSdk(request);
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
-    return { success: true, data: { ...config, message: `已通过官方 SDK 更新自适应思考${buildConfigReloadSuffix(reloadResult)}` } };
+    return { success: true, data: { ...config, message: `已更新自适应思考${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
