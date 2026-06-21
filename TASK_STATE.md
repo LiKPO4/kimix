@@ -13,6 +13,14 @@
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
 - 下一步：继续扫描剩余旧版/非官方接口残留，优先处理会影响主聊天体验的项。
 
+## 2026-06-21 v2.11.41 Server 路由文案收口
+- 当前目标：清理设置页中会误导用户的旧“实验功能”、SDK、REST/WebSocket 等内部路由文案。
+- 根因：Server 已是默认主链路，设置页仍沿用早期实验开关命名和内部技术描述，容易让用户误以为功能仍处于实验态或需要理解底层链路。
+- 已完成：保留兼容字段名不迁移设置文件；设置页展示统一改为“Server 路由 / 兼容链路”；版本号同步到 v2.11.41。
+- 关键文件：`src/components/settings/SettingsPanel.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`。
+- 已验证：OKF 严格校验通过；生产构建与 `git diff --check` 通过。
+- 下一步：验证并窄范围提交后，继续扫描剩余旧版/非官方接口残留。
+
 ## 2026-06-21 v2.11.40 历史待处理项补偿
 - 当前目标：恢复 Server 历史会话时补齐官方 pending approvals/questions，避免用户打开历史会话时看不到待处理卡片。
 - 根因：Kimix 实时订阅和 WebSocket 重连 snapshot 已能补 pending 项，但 `loadServerSessionHistory` 只把 snapshot messages 转为历史事件，漏掉了 snapshot 的 `pending_approvals` 与 `pending_questions`。

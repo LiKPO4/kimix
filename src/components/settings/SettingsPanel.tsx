@@ -39,7 +39,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.11.40";
+const KIMIX_VERSION = "2.11.41";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -1143,7 +1143,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     const res = await window.api.getSettings();
     setExperimentalSettingsLoading(false);
     if (!res.success) {
-      setExperimentalSettingsMessage(`读取实验功能失败：${res.error}`);
+      setExperimentalSettingsMessage(`读取 Server 路由失败：${res.error}`);
       return;
     }
     setExperimentalKimiServer(Boolean(res.data.experimentalKimiServer));
@@ -1167,7 +1167,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       setExperimentalSettingsMessage("已保存；完全关闭并重新打开 Kimix 后生效。");
       return;
     }
-    setExperimentalSettingsMessage(`保存实验功能失败：${res.error}`);
+    setExperimentalSettingsMessage(`保存 Server 路由失败：${res.error}`);
     void refreshExperimentalSettings();
   };
 
@@ -1828,7 +1828,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">Kimi Code Server 默认路由</div>
                       <div className="kimix-settings-permission-desc">
-                        新安装默认使用官方 Server；能力探测或请求失败时自动回退 SDK。保存后需要完全重启 Kimix 才会影响新会话。
+                        新安装默认使用官方 Server；不可用时自动回退兼容链路。保存后需要完全重启 Kimix 才会影响新会话。
                       </div>
                     </div>
                   </div>
@@ -1844,7 +1844,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label">启用官方 Kimi Code Server</div>
                         <div className="kimix-settings-permission-desc">
-                          允许 Kimix 启动或连接官方本地 Server；关闭后强制使用 SDK，不再启动 Server。
+                          允许 Kimix 启动或连接官方本地 Server；关闭后使用兼容链路，不再启动 Server。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServer ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
@@ -1862,7 +1862,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label">新会话使用 Server 路由</div>
                         <div className="kimix-settings-permission-desc">
-                          新会话优先走 REST + WebSocket；异常时自动降级 SDK，对话里只显示简洁发送状态。
+                          新会话优先使用官方 Server；异常时自动使用兼容链路，对话里只显示简洁发送状态。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServerSessions ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
@@ -1871,7 +1871,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </button>
                   </div>
                   <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
-                    {experimentalSettingsMessage || "读取实验功能状态中..."}
+                    {experimentalSettingsMessage || "读取 Server 路由状态中..."}
                   </div>
                 </div>
               </div>
