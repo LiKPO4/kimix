@@ -15,6 +15,7 @@ import { formatAssistantTurnDuration, reliableAssistantDurationMs } from "@/util
 import { hasActiveTimelineWorkEvents } from "@/utils/sessionActivity";
 import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
+import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -983,11 +984,14 @@ function AssistantMessageFooter({
   hookBadgeEvents: Extract<TimelineEvent, { type: "hook" }>[];
   showActions: boolean;
 }) {
+  const visibleStatuses = statuses.filter(shouldShowInlineStatusUpdate);
+  const hasVisibleStatuses = visibleStatuses.length > 0;
   return (
     <div
-      className="relative flex min-h-[28px] min-w-0 items-center justify-center"
+      className="relative flex min-w-0 items-center justify-center"
       style={{
-        marginTop: 3,
+        minHeight: hasVisibleStatuses ? 28 : 0,
+        marginTop: hasVisibleStatuses ? 3 : 0,
       }}
     >
       <div
@@ -1029,9 +1033,9 @@ function AssistantMessageFooter({
           </button>
         )}
       </div>
-      {statuses.length > 0 ? (
+      {hasVisibleStatuses ? (
         <div className="flex min-w-0 max-w-full items-center justify-center" style={{ gap: 8, paddingLeft: 86, paddingRight: 86 }}>
-          {statuses.map((status) => (
+          {visibleStatuses.map((status) => (
             <StatusCard key={status.id} event={status} inline allowModelOnly />
           ))}
         </div>
