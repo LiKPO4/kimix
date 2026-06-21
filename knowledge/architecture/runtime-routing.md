@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T00:16:00+08:00"
+timestamp: "2026-06-21T09:14:00+08:00"
 ---
 
 # Runtime Routing
@@ -26,6 +26,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 11. Renderer runtime events and statuses use only the `kimi-code:event` and `kimi-code:status` IPC channels. Handoff jobs, long tasks, and sessions restored from older local data share this canonical event source; the main process must not duplicate Host events onto legacy `kimi:event` or `kimi:status` channels.
 12. Agent Skills installed by Skill workflows under `~/.agents/skills` are synchronized without overwrite into the Kimi Code user Skill directory before every prompt path that may use them, including direct `/skill:` activation. Because Server discovery only registers direct children of the Skill root, nested Agent Skills are also copied as top-level registration directories while their frontmatter names preserve full routes such as `game-development/game-design`. Creating any new synchronized registration entry invalidates the active Server registry regardless of the source file's older mtime; the runtime must be forked before activation or prompt submission so context is retained and the new registry is loaded.
 13. Official Skill activation prompts contain `<kimi-skill-loaded>` internal instructions in wire history. Neither raw history mapping nor persisted local-session restoration may expose that payload as user-authored text: user-triggered activation is summarized as `/skill:<name> [args]`, while model-triggered activation is represented as Skill status metadata. Persisted official titles beginning with `User activated the skill` are migrated to a concise local title during restoration.
+14. Server text deltas may be interleaved with tool or subagent lifecycle events at arbitrary token boundaries. Renderer process-boundary formatting must not insert whitespace while Markdown inline syntax is still open. If persisted assistant Markdown contains an unmatched strong-emphasis marker, startup recovery should prefer the canonical completed message from official history over the locally accumulated stream.
 
 # Main Components
 

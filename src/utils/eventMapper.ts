@@ -83,11 +83,19 @@ function appendAssistantContent(existingContent: string, incomingContent: string
     existingContent.endsWith("\n") ||
     incomingContent.startsWith("\n") ||
     isInsideUnclosedInlineCode(existingContent) ||
+    isInsideUnclosedStrongEmphasis(existingContent) ||
     incomingContent.trim().length < 8
   ) {
     return existingContent + incomingContent;
   }
   return restoreAssistantProgressParagraphs(`${existingContent}\n\n${incomingContent}`);
+}
+
+function isInsideUnclosedStrongEmphasis(content: string) {
+  const currentLine = content.split(/\r?\n/).pop() ?? "";
+  const asteriskPairs = currentLine.match(/\*\*/g)?.length ?? 0;
+  const underscorePairs = currentLine.match(/__/g)?.length ?? 0;
+  return asteriskPairs % 2 === 1 || underscorePairs % 2 === 1;
 }
 
 function isInsideUnclosedInlineCode(content: string) {

@@ -236,6 +236,26 @@ describe("mergeEvents", () => {
     expect(assistant.content).toBe("先读取关键文件确认当前代码状态。\n\n现在开始并行修复批次1的安全类P0问题。");
   });
 
+  it("does not split an unfinished bold label across a tool boundary", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "- **Achiever**：图鉴\n- **", isThinking: false, isComplete: false },
+      { id: "2", type: "tool_call", timestamp: 2, toolCallId: "tc-1", toolName: "Read", status: "completed", arguments: {}, rawArguments: "{}" },
+      { id: "3", type: "tool_result", timestamp: 3, toolCallId: "tc-1", toolName: "Read", result: "ok" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "4",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "Explorer**：骰子组合、法宝协同",
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.content).toBe("- **Achiever**：图鉴\n- **Explorer**：骰子组合、法宝协同");
+  });
+
   it("keeps inline code path fragments together across tool boundaries", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "- `lib", isThinking: false, isComplete: false },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
+import { hasMalformedAssistantMarkdown, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -55,5 +55,26 @@ describe("sanitizePersistedEvents", () => {
   it("sanitizes cached official Skill activation titles", () => {
     expect(sanitizeKimiSkillActivationTitle('User activated the skill "find-skills".'))
       .toBe("使用 find-skills");
+  });
+});
+
+describe("hasMalformedAssistantMarkdown", () => {
+  it("detects a bold marker split onto its own line", () => {
+    const malformed: TimelineEvent[] = [{
+      id: "assistant-2",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "- **Achiever**：图鉴\n- **\n\nExplorer**：骰子组合",
+      isThinking: false,
+      isComplete: true,
+    }];
+    const canonical: TimelineEvent[] = [{
+      ...malformed[0],
+      type: "assistant_message",
+      content: "- **Achiever**：图鉴\n- **Explorer**：骰子组合",
+    }];
+
+    expect(hasMalformedAssistantMarkdown(malformed)).toBe(true);
+    expect(hasMalformedAssistantMarkdown(canonical)).toBe(false);
   });
 });

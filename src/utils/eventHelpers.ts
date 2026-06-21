@@ -23,6 +23,27 @@ export function sanitizeKimiSkillActivationTitle(title: string) {
   return match ? `使用 ${match[1]}` : title;
 }
 
+function hasUnclosedStrongEmphasisLine(content: string) {
+  let insideFence = false;
+  for (const line of content.split(/\r?\n/)) {
+    const fenceCount = line.match(/```/g)?.length ?? 0;
+    const visibleLine = insideFence ? "" : line.replace(/```[\s\S]*$/, "");
+    if (visibleLine) {
+      const asteriskPairs = visibleLine.match(/\*\*/g)?.length ?? 0;
+      const underscorePairs = visibleLine.match(/__/g)?.length ?? 0;
+      if (asteriskPairs % 2 === 1 || underscorePairs % 2 === 1) return true;
+    }
+    if (fenceCount % 2 === 1) insideFence = !insideFence;
+  }
+  return false;
+}
+
+export function hasMalformedAssistantMarkdown(events: TimelineEvent[]) {
+  return events.some((event) => (
+    event.type === "assistant_message" && hasUnclosedStrongEmphasisLine(event.content)
+  ));
+}
+
 export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[] {
   return events.flatMap((event) => {
     if (event.type === "error" && isLegacyKimiWorkDirError(event.message)) return [];

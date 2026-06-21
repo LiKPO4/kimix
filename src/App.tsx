@@ -20,6 +20,7 @@ import {
   settleInactiveEvents,
   sanitizePersistedEvents,
   sanitizeKimiSkillActivationTitle,
+  hasMalformedAssistantMarkdown,
   closeOpenCompaction,
   latestAssistantContent,
   latestAssistantVisibleOrThinkingContent,
@@ -169,6 +170,7 @@ function needsKimiCodeHistoryRepair(session: Session) {
         event.isComplete &&
         event.content.trim().length === 0
       )) ||
+      hasMalformedAssistantMarkdown(session.events) ||
       hasPossiblyLostUserImages(session.events)
     );
 }
@@ -204,7 +206,8 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
       const hasMoreAssistantBody = assistantBodySize(historyEvents) > assistantBodySize(session.events);
       const hasMoreDisplayableImages = displayableUserImageCount(historyEvents) > displayableUserImageCount(session.events);
-      if (!hasMoreAssistantBody && !hasMoreDisplayableImages) continue;
+      const repairsMalformedMarkdown = hasMalformedAssistantMarkdown(session.events) && !hasMalformedAssistantMarkdown(historyEvents);
+      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
         sessions: state.sessions.map((item) => item.id === session.id
