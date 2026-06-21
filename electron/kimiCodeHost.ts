@@ -8,6 +8,8 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as settingsService from "./settingsService";
 import {
   flattenServerEvent,
+  getKimiCodeSessionAlreadyExistsId,
+  isKimiCodeSessionAlreadyExistsError,
   isKimiCodeSessionMissingError,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
@@ -571,6 +573,7 @@ export function setKimiCodeStatusSink(sink: StatusSink | null) {
 }
 
 export { isKimiCodeSessionMissingError };
+export { isKimiCodeSessionAlreadyExistsError };
 
 export async function createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
   if (shouldRouteNewSessionToServer()) {
@@ -579,6 +582,13 @@ export async function createSession(options: CreateKimiCodeSessionOptions): Prom
       const session = await client.createSession(options);
       return registerServerSession(session, options.workDir, options);
     } catch (error) {
+      const existingSessionId = getKimiCodeSessionAlreadyExistsId(error);
+      if (existingSessionId) {
+        const client = getServerClient();
+        const session = await client.getSession(existingSessionId);
+        const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : options.workDir;
+        return registerServerSession(session, workDir, options);
+      }
       markServerRuntimeFailure(error);
       console.warn("[KimiCodeServerHost] create session failed; falling back to SDK:", error);
     }

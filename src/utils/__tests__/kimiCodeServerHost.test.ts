@@ -5,6 +5,7 @@ import {
   KimiCodeServerHost,
 } from "../../../electron/kimiCodeServerHost";
 import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
+import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
 describe("kimiCodeServerHost", () => {
   it("defaults to server host with explicit opt-out", () => {
@@ -56,5 +57,12 @@ describe("kimiCodeServerHost", () => {
     expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a: HTTP 404"))).toBe(true);
     expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a:archive: session session_a does not exist"))).toBe(true);
     expect(isKimiCodeSessionMissingError(new Error("fetch failed"))).toBe(false);
+  });
+
+  it("recognizes already-existing server session errors", () => {
+    const error = new Error('Session "session_30c60f3b-e2cc-4295-9540-fffcbfe2c7c" already exists');
+    expect(isKimiCodeSessionAlreadyExistsError(error)).toBe(true);
+    expect(getKimiCodeSessionAlreadyExistsId(error)).toBe("session_30c60f3b-e2cc-4295-9540-fffcbfe2c7c");
+    expect(isKimiCodeSessionAlreadyExistsError(new Error("fetch failed"))).toBe(false);
   });
 });

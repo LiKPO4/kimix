@@ -218,6 +218,18 @@ export function isKimiCodeSessionMissingError(error: unknown) {
   return /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i.test(message);
 }
 
+export function getKimiCodeSessionAlreadyExistsId(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/already exists/i.test(message)) return null;
+  return message.match(/Session\s+"([^"]+)"/i)?.[1]
+    ?? message.match(/\bsession[_-][0-9a-z-]+/i)?.[0]
+    ?? null;
+}
+
+export function isKimiCodeSessionAlreadyExistsError(error: unknown) {
+  return getKimiCodeSessionAlreadyExistsId(error) !== null;
+}
+
 export function toServerConfigPatch(patch: Record<string, unknown>): Record<string, unknown> {
   const topLevelKeys: Record<string, string> = {
     defaultProvider: "default_provider",
