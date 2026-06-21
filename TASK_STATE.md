@@ -3,6 +3,7 @@
 ## 2026-06-21 官方能力对齐 todolist
 - 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。
 - 补充扫描：
+  - ✅ P0：/skill 消息发送后过程头延迟到首个模型事件才出现；根因是 Skill 前置激活在创建本地 assistant 占位前执行。已改为先创建用户消息和过程头占位，再执行 Skill 激活并发送 prompt。
   - ✅ P0：创建 Server 会话时遇到 Session already exists 被渲染成错误卡；已识别 already exists 并接管已有 Server 会话，不再向用户暴露冲突错误。
   - ✅ P0：归档已被官方删除的 Server 会话时会弹出 /api/v1/... does not exist 技术错误；已将这类 session missing 视为幂等成功，本地隐藏镜像并不再提示底层接口。
   - ✅ P0：消息信息气泡不能因空指标或纯时间状态被判空而消失；已恢复 footer 固定间距，除静默重试/中断类瞬态状态外，footer 状态至少显示时间信息。

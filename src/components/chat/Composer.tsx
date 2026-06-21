@@ -776,7 +776,7 @@ export function Composer() {
     return session;
   };
 
-  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
+  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string; beforePrompt?: () => Promise<boolean> }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
@@ -947,6 +947,10 @@ export function Composer() {
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
         updateLinkStatus("消息发送中", "info");
+        if (options?.beforePrompt) {
+          const ready = await options.beforePrompt();
+          if (!ready) throw new Error("Skill 准备失败，消息未发送。");
+        }
         markPromptDispatchStarted();
         let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
@@ -1288,13 +1292,6 @@ export function Composer() {
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name.startsWith("skill:")) {
       const skillName = name.slice("skill:".length);
-      await appendLocalEvent({
-        id: genId(),
-        type: "user_message",
-        timestamp: Date.now(),
-        content: content.trim(),
-        images: toUserAttachments(images),
-      });
       await applySkillCommand(skillName, args || undefined);
       return true;
     }
@@ -1586,10 +1583,26 @@ export function Composer() {
       return;
     }
     const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
+    if (shouldActivateSkillBeforePrompt(slashName)) {
+      const match = trimmed.match(slashCommandPattern);
+      const skillName = match?.[1]?.slice("skill:".length) ?? "";
+      const skillArgs = (match?.[2] ?? "").trim();
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      if (!hasActiveAssistantTurn && activeSession) {
+        settlePendingClarifications(activeSession.id);
+      }
+      await sendPromptContent(trimmed, {
+        images: imagesToSend,
+        skipClarification: true,
+        beforePrompt: () => applySkillCommand(skillName, skillArgs || undefined),
+      });
+      return;
+    }
     const slashHandled = trimmed.startsWith("/")
-      ? shouldActivateSkillBeforePrompt(slashName)
-        ? await handleFallbackSlashCommand(trimmed, imagesToSend)
-        : await handleSdkSlashCommand(trimmed)
+      ? await handleSdkSlashCommand(trimmed)
       : false;
     if (slashHandled) {
       setInput("");
