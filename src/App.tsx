@@ -8,6 +8,7 @@ import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
+import { reconcileOfficialSessionCatalog } from "@/utils/sessionCatalog";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
@@ -1035,6 +1036,7 @@ function App() {
   const updateSession = useSessionStore((s) => s.updateSession);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const currentSession = useAppStore((s) => s.currentSession);
+  const currentProject = useAppStore((s) => s.currentProject);
   const currentSessionRef = useRef(currentSession);
   currentSessionRef.current = currentSession;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -1088,6 +1090,27 @@ function App() {
     setFilePreviewExtensions,
     setRecentProjects,
   });
+
+  useEffect(() => {
+    const projectPath = currentProject?.path;
+    if (!projectPath) return;
+    let cancelled = false;
+    void window.api.listKimiCodeHistorySessions({ workDir: projectPath }).then((res) => {
+      if (cancelled || !res.success) return;
+      const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
+      const visibleOfficialSessions = res.data.filter((session) => (
+        !hiddenHandoffSessionIds.has(session.id) &&
+        !isHiddenInternalSession(session) &&
+        !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, projectPath)
+      ));
+      useSessionStore.setState((state) => ({
+        sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath),
+      }));
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProject?.path]);
 
   const syncCurrentSessionFromStore = (uiSessionId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -1943,6 +1966,9 @@ function App() {
               const res = await window.api.listKimiCodeHistorySessions({ workDir: activeProject.path });
               if (!res.success) return;
               const activeSummaries = res.data.filter(isUsableHistorySession);
+              useSessionStore.setState((state) => ({
+                sessions: reconcileOfficialSessionCatalog(state.sessions, activeSummaries, activeProject.path),
+              }));
               const latest = (activeRuntimeIds.size > 0
                 ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))
                 : undefined) ?? activeSummaries[0];

@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T09:33:00+08:00"
+timestamp: "2026-06-21T10:02:00+08:00"
 ---
 
 # Runtime Routing
@@ -28,6 +28,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 13. Official Skill activation prompts contain `<kimi-skill-loaded>` internal instructions in wire history. Neither raw history mapping nor persisted local-session restoration may expose that payload as user-authored text: user-triggered activation is summarized as `/skill:<name> [args]`, while model-triggered activation is represented as Skill status metadata. Persisted official titles beginning with `User activated the skill` are migrated to a concise local title during restoration.
 14. Server text deltas may be interleaved with tool, compaction, or subagent lifecycle events at arbitrary token boundaries, including inside words, Markdown constructs, list items, and headings. Renderer process events must never synthesize whitespace into assistant content; text deltas are concatenated exactly, and line breaks come only from Server content. Startup recovery reconciles recent locally accumulated assistant bodies with canonical completed official history so previously cached assembly errors are replaced.
 15. The assistant process timer measures one complete user turn, from the initiating user message until the terminal turn event. Thinking, output, tool, subagent, status, and steer phase transitions may change the process label but must not reset the elapsed-time anchor. Completed duration prefers the user-turn interval over assistant-phase duration fields.
+16. The sidebar's local session catalog is a recoverable mirror, not the source of truth for official session existence. Startup and project switches reconcile every visible, non-archived official session into lightweight local entries; message bodies remain lazy-loaded, and reconciliation must preserve richer local events, titles, and archive tombstones.
 
 # Main Components
 
