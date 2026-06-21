@@ -35,6 +35,7 @@ import { settleInactiveEvents } from "@/utils/eventHelpers";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { sessionToMarkdown } from "@/utils/markdownExport";
+import { useArchiveSession } from "@/hooks/useArchiveSession";
 
 export type SessionMenuEntry =
   | { type: "separator" }
@@ -113,7 +114,7 @@ export function SessionToolbar({
 
   const addSession = useSessionStore((s) => s.addSession);
   const updateSession = useSessionStore((s) => s.updateSession);
-  const archiveSession = useSessionStore((s) => s.archiveSession);
+  const archiveSession = useArchiveSession();
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const currentSession = useAppStore((s) => s.currentSession);
   const liveCurrentSessionFromHook = useLiveSession(currentSession?.id);
@@ -173,12 +174,16 @@ export function SessionToolbar({
     showToast("已重命名");
   };
 
-  const archiveCurrentSession = () => {
+  const archiveCurrentSession = async () => {
     if (!liveCurrentSession) {
       showToast("当前没有对话");
       return;
     }
-    archiveSession(liveCurrentSession.id);
+    const result = await archiveSession(liveCurrentSession.id);
+    if (!result.success) {
+      showToast(`归档失败：${result.error}`);
+      return;
+    }
     setCurrentSession(null);
     showToast("已归档对话");
   };

@@ -49,7 +49,7 @@ messages / prompts 已在 Kimi 自检接入只读摘要；最近消息数量/角
 - terminal 实机：等待官方 Windows native 模块修复。
 - OAuth Server 写链路：本机 `POST /api/v1/oauth/login` 超过 10 秒仍无响应；官方实现会等待 device code 且请求断开未中止后台流程。Kimix 暂保留已验证的 SDK 登录入口，避免设置页请求挂起。
 - Server 默认化已完成代码与自动化验证，仍需用户完成一次新会话、旧会话和手动关闭后的实例验收。
-- 官方 0.17.1 只提供 archive、没有 unarchive；设置页“恢复归档”仍是 Kimix 本地恢复，不会反向取消官方归档标记。
+- 官方 0.17.1 只提供 archive、没有 unarchive；Kimix 已移除无法反向取消官方归档的本地“恢复”入口，并改为官方归档成功后才更新本地状态。
 - 文件系统 REST：Kimix 已有 Electron 本地文件能力，除非需要浏览器/远程 Server 场景，否则边际收益低于会话能力。
 - 模型目录写入：Server auth/config/model/provider 目录继续只读；Kimix 现有 SDK 配置承担正式写入，避免两套配置与凭据状态互相覆盖。
 - 旧会话强迁移：保留按需恢复与 fresh runtime 重绑，不批量改写历史 runtime id。

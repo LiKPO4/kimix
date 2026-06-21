@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T10:02:00+08:00"
+timestamp: "2026-06-21T12:24:00+08:00"
 ---
 
 # Runtime Routing
@@ -29,6 +29,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 14. Server text deltas may be interleaved with tool, compaction, or subagent lifecycle events at arbitrary token boundaries, including inside words, Markdown constructs, list items, and headings. Renderer process events must never synthesize whitespace into assistant content; text deltas are concatenated exactly, and line breaks come only from Server content. Startup recovery reconciles recent locally accumulated assistant bodies with canonical completed official history so previously cached assembly errors are replaced.
 15. The assistant process timer measures one complete user turn, from the initiating user message until the terminal turn event. Thinking, output, tool, subagent, status, and steer phase transitions may change the process label but must not reset the elapsed-time anchor. Completed duration prefers the user-turn interval over assistant-phase duration fields.
 16. The sidebar's local session catalog is a recoverable mirror, not the source of truth for official session existence. Startup and project switches reconcile every visible, non-archived official session into lightweight local entries; message bodies remain lazy-loaded, and reconciliation must preserve richer local events, titles, and archive tombstones.
+17. Official archive state is authoritative. Kimix may mark a session locally archived and create an archive tombstone only after the official archive request succeeds. Official failure leaves the visible local session intact. Because the official API has no unarchive operation, Kimix must not offer a local-only restore that would split local and official state; an unavailable official archive capability is an explicit error, not a successful local fallback.
 
 # Main Components
 

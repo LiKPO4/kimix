@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, RotateCcw, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
@@ -39,7 +39,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.11.25";
+const KIMIX_VERSION = "2.11.26";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -444,7 +444,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       archivedAt: session.archivedAt ?? 0,
     }));
   }, [archivedSessionItems]);
-  const restoreSession = useSessionStore((s) => s.restoreSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
@@ -1268,14 +1267,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     .split("|")
     .map((value) => Number(value) || 0);
 
-  const handleRestoreSession = (sessionId: string) => {
-    restoreSession(sessionId);
-    const restored = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
-    if (restored) setCurrentSession({ ...restored, archivedAt: undefined });
-  };
-
   const handleDeleteArchivedSession = (session: ArchivedSessionSummary) => {
-    const ok = window.confirm(`彻底删除归档对话「${session.title}」？此操作不可恢复。`);
+    const ok = window.confirm(`从 Kimix 本机移除归档记录「${session.title}」？官方归档状态不会改变。`);
     if (!ok) return;
     deleteSession(session.id);
     const current = useAppStore.getState().currentSession;
@@ -1617,21 +1610,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <div className="flex shrink-0 items-center justify-end" style={{ gap: 8 }}>
                             <button
                               type="button"
-                              onClick={() => handleRestoreSession(session.id)}
-                              className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
-                              style={{ minWidth: 70, justifyContent: "center" }}
-                            >
-                              <RotateCcw size={13} />
-                              恢复
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => handleDeleteArchivedSession(session)}
                               className="kimix-icon-text-button is-compact shrink-0 text-accent-danger hover:bg-accent-danger-light"
                               style={{ minWidth: 70, justifyContent: "center" }}
                             >
                               <Trash2 size={13} />
-                              删除
+                              移除记录
                             </button>
                           </div>
                         </div>

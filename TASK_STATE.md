@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-21 v2.11.26 官方归档语义对齐
+- 当前目标：确认 Kimix 归档行为是否与官方一致，并消除本地与官方归档状态分叉。
+- 根因：Kimix 先本地归档再异步请求官方，官方失败不会回滚；设置页还提供官方不存在的 unarchive“恢复”操作；SDK 路径在无法调用官方归档时会静默返回成功。
+- 已完成：官方归档成功后才写本地状态与 tombstone；失败时保留会话并提示；Server 归档后停止订阅；移除本地恢复入口；SDK 无官方能力时明确失败；设置页明确只可移除本地归档记录。
+- 关键文件：`src/utils/sessionArchive.ts`、`src/hooks/useArchiveSession.ts`、`electron/kimiCodeHost.ts`、`src/hooks/useStatePersistence.ts`、`src/components/layout/Sidebar.tsx`、`src/components/layout/SessionToolbar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 已验证：官方优先顺序、成功后本地归档、失败不隐藏测试通过；全量测试 30 个文件、224/224 通过，OKF 严格校验、180 天维护审计、生产构建和 `git diff --check` 通过。
+- 下一步：窄范围提交后，等待 v2.11.26 实机验收单个归档、批量归档和失败提示。
+
 ## 2026-06-21 v2.11.25 非归档会话目录对账
 - 当前目标：修复 Kimi Server 网页仍正常可见的非归档会话偶尔未出现在 Kimix 项目侧栏的问题。
 - 根因：Kimix 侧栏只读取本地会话镜像；启动恢复虽然取得完整官方会话列表，但只将一条最新会话写回本地，缓存缺项和项目切换后其余官方会话无法自行恢复。

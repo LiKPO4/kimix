@@ -64,14 +64,6 @@ export function useStatePersistence() {
           const previous = previousSessionsById.get(session.id);
           if (!previous?.archivedAt && session.archivedAt) {
             rememberArchivedSessionTombstone(session);
-            const officialSessionId = session.runtimeSessionId ?? session.officialSessionId ?? session.id;
-            void window.api.archiveKimiCodeSession({ sessionId: officialSessionId }).then((result) => {
-              if (!result.success) {
-                console.warn(`Sync official archive failed for ${officialSessionId}: ${result.error}`);
-              }
-            }).catch((error) => {
-              console.warn(`Sync official archive failed for ${officialSessionId}:`, error);
-            });
           } else if (previous?.archivedAt && !session.archivedAt) {
             forgetArchivedSessionTombstone(session);
           }

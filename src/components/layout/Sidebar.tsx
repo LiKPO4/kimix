@@ -10,6 +10,7 @@ import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { useArchiveSession } from "@/hooks/useArchiveSession";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -68,7 +69,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
-  const archiveSession = useSessionStore((s) => s.archiveSession);
+  const archiveSession = useArchiveSession();
   const updateSession = useSessionStore((s) => s.updateSession);
 
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
@@ -262,14 +263,18 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     toast(res.success ? "已在资源管理器中打开" : `打开失败：${res.error}`);
   };
 
-  const archiveProjectSessions = (project: Project) => {
+  const archiveProjectSessions = async (project: Project) => {
     const targets = sessions.filter((session) => isSameProjectPath(session.projectPath, project.path) && !session.archivedAt && !isHiddenInternalSession(session));
-    targets.forEach((session) => archiveSession(session.id));
-    if (currentSession && isSameProjectPath(currentSession.projectPath, project.path)) {
+    const results = await Promise.all(targets.map((session) => archiveSession(session.id)));
+    const archivedIds = new Set(targets.filter((_, index) => results[index].success).map((session) => session.id));
+    const failedCount = results.length - archivedIds.size;
+    if (currentSession && archivedIds.has(currentSession.id)) {
       setCurrentSession(null);
     }
     setOpenProjectMenu(null);
-    toast(targets.length > 0 ? `已归档 ${targets.length} 个对话` : "没有可归档的对话");
+    if (targets.length === 0) toast("没有可归档的对话");
+    else if (failedCount > 0) toast(`已归档 ${archivedIds.size} 个对话，${failedCount} 个失败`);
+    else toast(`已归档 ${archivedIds.size} 个对话`);
   };
 
   const exportSessionArchive = async (sessionId: string, title: string) => {
@@ -646,7 +651,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 <SquarePen size={14} className="text-text-secondary" />
                                 <span>重命名项目</span>
                               </button>
-                              <button onClick={() => archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                              <button onClick={() => void archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                 <Archive size={14} className="text-text-secondary" />
                                 <span>归档对话</span>
                               </button>
@@ -727,10 +732,16 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      archiveSession(s.id);
-                                      if (currentSession?.id === s.id) {
-                                        setCurrentSession(null);
-                                      }
+                                      void archiveSession(s.id).then((result) => {
+                                        if (!result.success) {
+                                          toast(`归档失败：${result.error}`);
+                                          return;
+                                        }
+                                        if (currentSession?.id === s.id) {
+                                          setCurrentSession(null);
+                                        }
+                                        toast("已归档对话");
+                                      });
                                     }}
                                     className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-accent-danger/10 hover:text-accent-danger group-hover:opacity-100"
                                     title="归档会话"
@@ -764,7 +775,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.11.25</span>
+          <span className="ml-auto text-[13px] text-text-muted">v2.11.26</span>
         </button>
       </div>
     </aside>

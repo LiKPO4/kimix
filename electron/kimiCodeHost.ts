@@ -1020,10 +1020,16 @@ export async function archiveSession(sessionId: string): Promise<void> {
   const managed = serverSessions.get(sessionId);
   if (managed) {
     await getServerClient().archiveSession(sessionId);
-    managed.session = { ...managed.session, archived: true };
+    serverSessions.delete(sessionId);
+    settlePendingForSession(sessionId, "cancelled");
+    await getServerClient().unsubscribe(sessionId).catch((error) => {
+      console.warn(`[KimiCodeServerHost] unsubscribe archived session ${sessionId} failed:`, error);
+    });
     return;
   }
-  if (!shouldRouteNewSessionToServer()) return;
+  if (!shouldRouteNewSessionToServer()) {
+    throw new Error("当前官方 Kimi Code SDK 未公开归档接口，请启用 Kimi Server 后重试。");
+  }
   await getServerClient().archiveSession(sessionId);
 }
 
@@ -1502,6 +1508,7 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   if (shouldRouteNewSessionToServer()) {
     const normalizedWorkDir = workDir ? path.resolve(workDir).toLowerCase() : undefined;
     return (await getServerClient().listSessions())
+      .filter((session) => session.archived !== true)
       .filter((session) => !normalizedWorkDir || (
         typeof session.metadata?.cwd === "string" && path.resolve(session.metadata.cwd).toLowerCase() === normalizedWorkDir
       ))

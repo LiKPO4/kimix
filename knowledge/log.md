@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Archive lifecycle**: Made official archive success authoritative, removed local-only unarchive, stopped Server subscriptions after archive, and changed unavailable SDK archive capability from silent success to an explicit error.
 * **Session discovery**: Made the local sidebar catalog a recoverable mirror of every visible non-archived official session, with lazy message loading and preservation of local content and archive tombstones.
 * **Canonical text assembly**: Removed process-boundary paragraph guessing from assistant delta merging; recent cached assistant bodies now reconcile against official completed history to repair arbitrary word, list, and heading splits.
 * **Turn timing**: Unified live and completed assistant timing around the initiating user message; process phase changes no longer reset elapsed time, and user-facing durations use Chinese minute/second units.

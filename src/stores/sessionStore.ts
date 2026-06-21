@@ -19,7 +19,6 @@ export interface SessionStore {
   loadHistory: (sessionId: string, events: TimelineEvent[]) => void;
   deleteSession: (id: string) => void;
   archiveSession: (id: string) => void;
-  restoreSession: (id: string) => void;
   setRecentProjects: (projects: Project[]) => void;
   addPendingMessage: (sessionId: string, content: string, images?: UserMessageImage[]) => void;
   updatePendingMessage: (id: string, content: string) => void;
@@ -77,13 +76,6 @@ export const useSessionStore = create<SessionStore>((set) => ({
     set((state) => ({
       sessions: state.sessions.map((s) =>
         s.id === id ? { ...s, archivedAt: Date.now(), updatedAt: Date.now() } : s
-      ),
-    })),
-
-  restoreSession: (id) =>
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === id ? { ...s, archivedAt: undefined, updatedAt: Date.now() } : s
       ),
     })),
 
