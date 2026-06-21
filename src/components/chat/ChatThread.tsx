@@ -50,8 +50,8 @@ function useAnimatedDots(active: boolean) {
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
-const SESSION_OPEN_BOTTOM_SETTLE_MS = 10_000;
-const SESSION_OPEN_BOTTOM_SETTLE_INTERVAL_MS = 120;
+const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 10_000;
+const SESSION_LAYOUT_STABLE_MS = 320;
 const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
 const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
 
@@ -797,21 +797,35 @@ export function ChatThread() {
     }, 460);
   };
 
-  const keepSessionAtBottom = () => {
+  const settleSessionAtBottom = () => {
     if (!scrollRef.current || !autoFollowRef.current || userScrollRef.current) {
       cancelSessionAutoBottom();
       return;
     }
     scrollToBottom("auto");
-    if (Date.now() >= sessionAutoBottomUntilRef.current) {
-      clearSessionAutoBottomTimer();
+    const remaining = sessionAutoBottomUntilRef.current - Date.now();
+    if (remaining <= 0) {
+      cancelSessionAutoBottom();
       return;
     }
     clearSessionAutoBottomTimer();
     sessionAutoBottomTimerRef.current = window.setTimeout(() => {
       sessionAutoBottomTimerRef.current = null;
-      keepSessionAtBottom();
-    }, SESSION_OPEN_BOTTOM_SETTLE_INTERVAL_MS);
+      if (!autoFollowRef.current || userScrollRef.current) {
+        cancelSessionAutoBottom();
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (!autoFollowRef.current || userScrollRef.current) {
+            cancelSessionAutoBottom();
+            return;
+          }
+          scrollToBottom("auto");
+          cancelSessionAutoBottom();
+        });
+      });
+    }, Math.min(SESSION_LAYOUT_STABLE_MS, remaining));
   };
 
   const enableAutoFollow = () => {
@@ -1009,11 +1023,11 @@ export function ChatThread() {
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
     if (session?.id) {
-      sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_SETTLE_MS;
-      keepSessionAtBottom();
+      sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
+      settleSessionAtBottom();
       const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
-        keepSessionAtBottom();
+        settleSessionAtBottom();
         console.log("[ChatThread] rAF setPrimedSessionId", {
           primingSessionId,
           currentSessionId: session?.id,
@@ -1021,7 +1035,7 @@ export function ChatThread() {
         });
         window.api.writeDiag?.({ message: "[ChatThread] rAF setPrimedSessionId", data: { primingSessionId, currentSessionId: session?.id, matches: session?.id === primingSessionId } }).catch(() => {});
         setPrimedSessionId(primingSessionId);
-        window.requestAnimationFrame(keepSessionAtBottom);
+        window.requestAnimationFrame(settleSessionAtBottom);
       });
     }
     return () => {
@@ -1061,6 +1075,12 @@ export function ChatThread() {
           const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
           updateShowScrollToBottom(distance > 80);
         }
+        return;
+      }
+      if (Date.now() < sessionAutoBottomUntilRef.current && !userScrollRef.current) {
+        autoFollowRef.current = true;
+        updateAutoFollow(true);
+        settleSessionAtBottom();
         return;
       }
       if (autoFollowRef.current && !userScrollRef.current) {
@@ -1105,7 +1125,7 @@ export function ChatThread() {
     if (isSettlingOpenedSession) {
       autoFollowRef.current = true;
       updateAutoFollow(true);
-      keepSessionAtBottom();
+      settleSessionAtBottom();
       return;
     }
     if (isAutoFollowRef.current) {
