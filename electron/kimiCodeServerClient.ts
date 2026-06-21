@@ -305,6 +305,10 @@ export class KimiCodeServerClient {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages?${query}`);
   }
 
+  getSnapshot(sessionId: string): Promise<ServerSnapshot> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`);
+  }
+
   listPrompts(sessionId: string): Promise<{ active: ServerPromptSummary | null; queued: ServerPromptSummary[] }> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`);
   }
@@ -753,6 +757,16 @@ function snapshotMessageToServerFrames(
   if (!isRecord(message)) return [];
   const role = typeof message.role === "string" ? message.role : "";
   if (role === "user") {
+    const messageText = contentToText(message.content);
+    if (replayMode === "history" && messageText) {
+      return [{
+        type: "TurnBegin",
+        session_id: sessionId,
+        seq,
+        epoch,
+        payload: snapshotReplayPayload({ user_input: message.content }, replayMode, snapshotMessageId(message, role), messageText, role),
+      }];
+    }
     return replayMode === "in_flight"
       ? [{ type: "turn.started", session_id: sessionId, seq, epoch, payload: { type: "turn.started" } }]
       : [];

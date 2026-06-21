@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T18:54:00+08:00"
+timestamp: "2026-06-21T19:05:00+08:00"
 ---
 
 # Runtime Routing
@@ -31,6 +31,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 16. The sidebar's local session catalog is a recoverable mirror, not the source of truth for official session existence. Startup and project switches reconcile the successful official Server session list into lightweight local entries; message bodies remain lazy-loaded, and reconciliation must preserve richer local events, titles, archive tombstones, local-only sessions, long-task sessions, SDK fallback history, and other-project sessions. When the successful Server list is authoritative, official mirror sessions from the same project that are missing from that list are locally archived so external official archive actions hide in Kimix too.
 17. Official archive state is authoritative. Kimix may mark a session locally archived and create an archive tombstone only after the official archive request succeeds. Official failure leaves the visible local session intact. Because the official API has no unarchive operation, Kimix must not offer a local-only restore that would split local and official state; an unavailable official archive capability is an explicit error, not a successful local fallback.
 18. Server sessions must not fall through to SDK-only feature handlers. If the official Server API has not exposed a capability such as Goal, Swarm, or direct runtime reload, Kimix reports an explicit unsupported-capability error and keeps the session on the Server route instead of looking it up in the SDK session table or presenting a metadata refresh as a successful reload.
+19. Loading a Server-backed session history prefers the official Server snapshot over the local mirror. Snapshot messages are replayed through the same event-mapping path as live Server events, including historical user messages and content.part assistant chunks. If the snapshot is unavailable, Kimix falls back to the local mirror so offline SDK and legacy sessions remain openable.
 
 # Main Components
 

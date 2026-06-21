@@ -258,6 +258,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
       session: { id: "session-1", status: "idle" },
       messages: {
         items: [
+          { id: "msg-user", role: "user", content: [{ type: "text", text: "用户历史问题" }] },
           { id: "msg-history", role: "assistant", content: [{ type: "text", text: "历史消息可按需补偿" }] },
         ],
       },
@@ -271,6 +272,15 @@ describe("KimiCodeServerClient protocol adapters", () => {
     }, "session-1");
 
     expect(frames[0]).toMatchObject({
+      type: "TurnBegin",
+      payload: {
+        snapshotReplay: "history",
+        snapshotMessageId: "msg-user",
+        snapshotMessageText: "用户历史问题",
+        user_input: [{ type: "text", text: "用户历史问题" }],
+      },
+    });
+    expect(frames[1]).toMatchObject({
       type: "content.part",
       payload: {
         snapshotReplay: "history",
@@ -279,7 +289,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
         part: { type: "text", text: "历史消息可按需补偿" },
       },
     });
-    expect(frames.slice(2)).toEqual([
+    expect(frames.slice(3)).toEqual([
       { type: "turn.started", session_id: "session-1", seq: 42, epoch: "epoch-1", payload: { type: "turn.started" } },
       {
         type: "content.part",

@@ -1069,4 +1069,34 @@ describe("mapHistoryEvents", () => {
     expect(tool?.status).toBe("success");
     expect(tool?.result).toBe("D:/WORKS\n");
   });
+
+  it("maps official Server snapshot history replay into user and assistant messages", () => {
+    const result = mapHistoryEvents([
+      {
+        type: "TurnBegin",
+        payload: {
+          snapshotReplay: "history",
+          user_input: [{ type: "text", text: "用户历史问题" }],
+        },
+        time: "2026-06-21T10:00:00.000Z",
+      },
+      {
+        type: "content.part",
+        payload: {
+          snapshotReplay: "history",
+          part: { type: "text", text: "官方历史回答" },
+        },
+        time: "2026-06-21T10:00:01.000Z",
+      },
+      {
+        type: "turn.ended",
+        payload: { snapshotReplay: "history" },
+        time: "2026-06-21T10:00:02.000Z",
+      },
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ type: "user_message", content: "用户历史问题" });
+    expect(result[1]).toMatchObject({ type: "assistant_message", content: "官方历史回答", isComplete: true });
+  });
 });

@@ -1544,6 +1544,28 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   return sessions;
 }
 
+export async function loadServerSessionHistory(sessionId: string): Promise<{ events: Array<{ type: string; payload: unknown; time?: unknown }>; source: "server" }> {
+  const snapshot = await getServerClient().getSnapshot(sessionId);
+  const frames = snapshotMessagesToServerFrames(snapshot, sessionId);
+  return {
+    events: frames.map((frame) => ({
+      type: frame.type,
+      payload: frame.payload ?? {},
+      time: serverReplayTimestamp(frame),
+    })),
+    source: "server",
+  };
+}
+
+function serverReplayTimestamp(frame: ServerFrame): unknown {
+  const payload = frame.payload && typeof frame.payload === "object"
+    ? frame.payload as Record<string, unknown>
+    : {};
+  const createdAt = payload.created_at ?? payload.createdAt;
+  if (typeof createdAt === "string" || typeof createdAt === "number") return createdAt;
+  return typeof frame.seq === "number" ? frame.seq : undefined;
+}
+
 export async function exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult> {
   const sdkHarness = await getHarness();
   return sdkHarness.exportSession({

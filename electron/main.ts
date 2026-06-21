@@ -5541,8 +5541,16 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
     const workDir = typeof req.workDir === "string" ? req.workDir : "";
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!workDir || !sessionId) return { success: false, error: "Missing workDir or sessionId" };
+    if (kimiCodeHost.isListingSessionsFromServer()) {
+      try {
+        const history = await kimiCodeHost.loadServerSessionHistory(sessionId);
+        return { success: true, data: { sessionId, events: history.events, source: history.source } };
+      } catch (error) {
+        console.warn("[KimiCodeServerHost] load official session history failed; falling back to local mirror:", error);
+      }
+    }
     const events = await sessionHistory.getSessionHistory(workDir, sessionId);
-    return { success: true, data: { sessionId, events } };
+    return { success: true, data: { sessionId, events, source: "local" } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

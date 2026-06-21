@@ -1805,6 +1805,7 @@ export type KimiCodeLoadSessionResponse = {
   data: {
     sessionId: string;
     events: Array<{ type: string; payload: unknown; time?: unknown }>;
+    source?: "server" | "local";
   };
 } | {
   success: false;

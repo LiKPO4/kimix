@@ -648,20 +648,22 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
     }
 
-    case "ContentPart": {
-      const partType = payload.type;
-      if (partType === "text" && isString(payload.text)) {
+    case "ContentPart":
+    case "content.part": {
+      const part = type === "content.part" && isRecord(payload.part) ? payload.part : payload;
+      const partType = part.type;
+      if (partType === "text" && isString(part.text)) {
         return {
           id: generateId(),
           type: "assistant_message",
           timestamp: eventTimestamp,
-          content: payload.text,
+          content: part.text,
           isThinking: false,
           isComplete: false,
         };
       }
-      if (partType === "think" && isString(payload.think)) {
-        if (isKimixSyntheticThinking(payload.think)) return null;
+      if (partType === "think" && isString(part.think)) {
+        if (isKimixSyntheticThinking(part.think)) return null;
         const id = generateId();
         const timestamp = eventTimestamp;
         return {
@@ -669,8 +671,8 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           type: "assistant_message",
           timestamp,
           content: "",
-          thinking: payload.think,
-          thinkingParts: [{ id: generateId(), timestamp, text: payload.think }],
+          thinking: part.think,
+          thinkingParts: [{ id: generateId(), timestamp, text: part.think }],
           isThinking: true,
           isComplete: false,
         };

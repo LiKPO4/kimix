@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Official history source**: Made Server snapshots the preferred source for loading session history, including user-message replay and content.part assistant chunks, with local mirror fallback for unavailable snapshots and legacy sessions.
 * **Session catalog authority**: Switched startup and project-change catalog reconciliation to the successful official Server session list; missing same-project official mirrors are locally archived while SDK fallback, local-only, long-task, and other-project sessions are preserved.
 * **Runtime capability boundary**: Marked Goal, Swarm, and direct reload as unsupported on Server sessions until official Server APIs exist; these paths must fail explicitly instead of falling through to SDK-only session lookup or pretending a metadata refresh is a reload.
 * **Archive lifecycle**: Made official archive success authoritative, removed local-only unarchive, stopped Server subscriptions after archive, and changed unavailable SDK archive capability from silent success to an explicit error.
