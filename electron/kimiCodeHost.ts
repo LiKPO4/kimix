@@ -1526,6 +1526,7 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   const sessions = [...await sdkHarness.listSessions(workDir ? { workDir } : {})];
   // SDK may return empty title/lastPrompt; backfill from state.json if available.
   for (const session of sessions) {
+    session.source = "sdk";
     session.title = sanitizeSkillActivationTitle(session.title);
     if (session.title?.trim() && session.lastPrompt?.trim()) continue;
     try {
@@ -1862,6 +1863,10 @@ function shouldRouteNewSessionToServer() {
   return isKimiCodeServerSessionRoutingEnabled(process.env, settingsService.loadSettings()) && kimiCodeServerHost.isReady();
 }
 
+export function isListingSessionsFromServer() {
+  return shouldRouteNewSessionToServer();
+}
+
 function markServerRuntimeFailure(error: unknown) {
   kimiCodeServerHost.markFallback(error);
   unsubscribeServerFrames?.();
@@ -2085,6 +2090,7 @@ function serverSessionSummary(session: ServerSession): KimiCodeSessionSummary {
     createdAt: session.created_at ? Date.parse(session.created_at) : 0,
     updatedAt: session.updated_at ? Date.parse(session.updated_at) : 0,
     archived: session.archived,
+    source: "server",
     metadata: session.metadata,
   };
 }

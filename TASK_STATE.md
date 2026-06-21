@@ -5,13 +5,21 @@
 - 待办：
   1. ✅ P0：Goal / Swarm 仍是 SDK-only 能力，Server 会话误调用时会报 “Kimi Code session is not active”；已改为清晰能力边界，Server 会话显式提示暂未公开对应 API。
   2. ✅ P0：/reload 在 Server 会话只刷新 session 信息却提示“已重载配置”；已改为显式失败，明确 Server 暂无直接 reload API。
-  3. P1：外部网页归档后，本地对账目前只增不减；需在安全边界内同步隐藏官方已归档会话。
+  3. ✅ P1：外部网页归档后，本地对账目前只增不减；已改为 Server 官方列表成功返回时双向对账，缺失的同项目官方镜像会本地隐藏。
   4. P1：历史正文加载仍优先本地镜像；Server 可用时应优先使用官方 snapshot/messages，再回落本地。
   5. P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步。
   6. P1：Slash 清单仍偏硬编码；需按 Server OpenAPI 和 SDK capability 裁剪，不暴露不可用项。
   7. P2：Workspace、文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表等仍需逐项评估官方 API 对齐。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：进入 P1，优先处理外部网页归档后的本地对账同步。
+- 下一步：继续 P1，处理历史正文优先官方 snapshot/messages，再回落本地镜像。
+
+## 2026-06-21 v2.11.28 官方目录双向对账
+- 当前目标：修复官方网页归档会话后，Kimix 本地侧栏仍显示旧会话的问题。
+- 根因：启动和项目切换时读取的是本地历史镜像，且目录对账只会把官方可见项补进本地，不会隐藏官方已经不可见的旧镜像。
+- 已完成：启动/项目切换改用官方 Server 会话列表对账；仅在 Server 列表成功返回时执行缺失隐藏；保护 SDK fallback、本地-only、长程任务和其他项目会话；Server title/lastPrompt 可生成本地占位标题。
+- 关键文件：`src/App.tsx`、`src/utils/sessionCatalog.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`。
+- 已验证：目录对账单测 9/9、全量测试 30 个文件 229/229、OKF 严格校验、180 天维护审计、生产构建和 `git diff --check` 通过。
+- 下一步：窄范围提交后，继续处理 P1 历史正文优先官方 snapshot/messages。
 
 ## 2026-06-21 v2.11.27 Server-only 能力边界
 - 当前目标：处理官方能力对齐 P0，避免 Server 会话误走 SDK-only 的 Goal / Swarm / reload。

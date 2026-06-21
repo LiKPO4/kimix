@@ -455,7 +455,7 @@ function installBrowserPreviewApi() {
     getKimiCodeBackgroundTaskOutput: (): Promise<KimiCodeBackgroundTaskOutputResponse> => fail("读取 Kimi Code SDK 后台任务输出"),
     getKimiCodeBackgroundTaskOutputPath: (): Promise<KimiCodeBackgroundTaskOutputPathResponse> => fail("读取 Kimi Code SDK 后台任务输出路径"),
     stopKimiCodeBackgroundTask: (): Promise<VoidResponse> => fail("停止 Kimi Code SDK 后台任务"),
-    listKimiCodeSessions: (): Promise<KimiCodeListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
+    listKimiCodeSessions: (): Promise<KimiCodeListSessionsResponse> => Promise.resolve({ success: true, data: [], source: "sdk" }),
     listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> => Promise.resolve({ success: true, data: [] }),
     listKimiCodeSkills: (): Promise<KimiCodeListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
     activateKimiCodeSkill: () => fail("激活 Kimi Code Skill"),

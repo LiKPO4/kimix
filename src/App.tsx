@@ -1095,7 +1095,7 @@ function App() {
     const projectPath = currentProject?.path;
     if (!projectPath) return;
     let cancelled = false;
-    void window.api.listKimiCodeHistorySessions({ workDir: projectPath }).then((res) => {
+    void window.api.listKimiCodeSessions({ workDir: projectPath }).then((res) => {
       if (cancelled || !res.success) return;
       const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
       const visibleOfficialSessions = res.data.filter((session) => (
@@ -1104,7 +1104,7 @@ function App() {
         !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, projectPath)
       ));
       useSessionStore.setState((state) => ({
-        sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath),
+        sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath, { source: res.source }),
       }));
     }).catch(() => {});
     return () => {
@@ -1963,11 +1963,11 @@ function App() {
                 !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, activeProject.path)
               );
 
-              const res = await window.api.listKimiCodeHistorySessions({ workDir: activeProject.path });
+              const res = await window.api.listKimiCodeSessions({ workDir: activeProject.path });
               if (!res.success) return;
               const activeSummaries = res.data.filter(isUsableHistorySession);
               useSessionStore.setState((state) => ({
-                sessions: reconcileOfficialSessionCatalog(state.sessions, activeSummaries, activeProject.path),
+                sessions: reconcileOfficialSessionCatalog(state.sessions, activeSummaries, activeProject.path, { source: res.source }),
               }));
               const latest = (activeRuntimeIds.size > 0
                 ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))

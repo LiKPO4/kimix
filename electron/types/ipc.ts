@@ -1562,6 +1562,7 @@ export type KimiCodeSessionSummary = {
   createdAt: number;
   updatedAt: number;
   archived?: boolean;
+  source?: "server" | "sdk";
   metadata?: Record<string, unknown>;
 };
 
@@ -1944,6 +1945,7 @@ export type KimiCodeListServerTerminalsResponse = {
 export type KimiCodeListSessionsResponse = {
   success: true;
   data: KimiCodeSessionSummary[];
+  source?: "server" | "sdk";
 } | {
   success: false;
   error: string;

@@ -6,6 +6,9 @@ export interface OfficialSessionCatalogItem {
   workDir: string;
   updatedAt: number;
   brief?: string;
+  title?: string;
+  lastPrompt?: string;
+  source?: "server" | "sdk";
 }
 
 function normalizeProjectPath(projectPath: string | undefined) {
@@ -21,7 +24,23 @@ function belongsToOfficialSession(session: Session, officialId: string) {
 }
 
 function catalogTitle(item: OfficialSessionCatalogItem) {
-  return truncateSessionTitle(item.brief?.trim() || "新会话") || "新会话";
+  return truncateSessionTitle(item.brief?.trim() || item.title?.trim() || item.lastPrompt?.trim() || "新会话") || "新会话";
+}
+
+function isOfficialMirrorSession(session: Session, projectPath: string) {
+  return session.engine === "kimi-code" &&
+    !session.longTask &&
+    !session.archivedAt &&
+    normalizeProjectPath(session.projectPath) === normalizeProjectPath(projectPath) &&
+    Boolean(session.officialSessionId || session.runtimeSessionId || !session.id.startsWith("local-"));
+}
+
+function officialSessionIds(session: Session) {
+  return [
+    session.id,
+    session.officialSessionId,
+    session.runtimeSessionId,
+  ].filter((id): id is string => Boolean(id));
 }
 
 /**
@@ -32,8 +51,16 @@ export function reconcileOfficialSessionCatalog(
   sessions: Session[],
   officialSessions: OfficialSessionCatalogItem[],
   projectPath: string,
+  options: { source?: "server" | "sdk" } = {},
 ): Session[] {
   const normalizedProjectPath = normalizeProjectPath(projectPath);
+  const serverAuthoritative = options.source === "server" || officialSessions.some((session) => session.source === "server");
+  const visibleOfficialIds = new Set(
+    officialSessions
+      .filter((official) => normalizeProjectPath(official.workDir || projectPath) === normalizedProjectPath)
+      .map((official) => official.id)
+      .filter(Boolean),
+  );
   let changed = false;
   let next = sessions;
 
@@ -67,6 +94,17 @@ export function reconcileOfficialSessionCatalog(
       isLoading: false,
     });
     changed = true;
+  }
+
+  if (serverAuthoritative) {
+    const archivedAt = Date.now();
+    next.forEach((session, index) => {
+      if (!isOfficialMirrorSession(session, projectPath)) return;
+      if (officialSessionIds(session).some((id) => visibleOfficialIds.has(id))) return;
+      if (next === sessions) next = [...sessions];
+      next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };
+      changed = true;
+    });
   }
 
   if (!changed) return sessions;

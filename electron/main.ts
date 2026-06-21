@@ -5516,7 +5516,8 @@ ipcMain.handle("kimi-code:listSessions", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const workDir = typeof req.workDir === "string" ? req.workDir : undefined;
-    return { success: true, data: await kimiCodeHost.listSessions(workDir) };
+    const source = kimiCodeHost.isListingSessionsFromServer() ? "server" : "sdk";
+    return { success: true, data: await kimiCodeHost.listSessions(workDir), source };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

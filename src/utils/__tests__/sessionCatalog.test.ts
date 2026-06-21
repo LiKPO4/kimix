@@ -27,6 +27,15 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0]).toMatchObject({ officialSessionId: "official-1", title: "第一条", events: [] });
   });
 
+  it("官方 Server 目录项使用 title 或 lastPrompt 生成占位标题", () => {
+    const result = reconcileOfficialSessionCatalog([], [
+      { id: "official-title", workDir: "D:\\work\\demo", updatedAt: 200, title: "官方标题", source: "server" },
+      { id: "official-prompt", workDir: "D:\\work\\demo", updatedAt: 100, lastPrompt: "上一条用户消息", source: "server" },
+    ], "D:\\work\\demo", { source: "server" });
+
+    expect(result.map((session) => session.title)).toEqual(["官方标题", "上一条用户消息"]);
+  });
+
   it("按官方 id 对账且保留本地正文和标题", () => {
     const existing = localSession({
       officialSessionId: "official-1",
@@ -59,5 +68,56 @@ describe("reconcileOfficialSessionCatalog", () => {
     ], "D:\\work\\demo");
 
     expect(result).toEqual([]);
+  });
+
+  it("官方 Server 列表缺失的同项目镜像会被本地归档", () => {
+    const vanished = localSession({ id: "official-1", officialSessionId: "official-1", updatedAt: 100 });
+    const visible = localSession({ id: "official-2", officialSessionId: "official-2", updatedAt: 90 });
+    const result = reconcileOfficialSessionCatalog([vanished, visible], [
+      { id: "official-2", workDir: "D:\\work\\demo", updatedAt: 200, brief: "仍可见", source: "server" },
+    ], "D:\\work\\demo", { source: "server" });
+
+    const archived = result.find((session) => session.id === "official-1");
+    expect(archived?.archivedAt).toBeTypeOf("number");
+    expect(result.find((session) => session.id === "official-2")?.archivedAt).toBeUndefined();
+  });
+
+  it("官方 Server 空列表也会隐藏同项目旧镜像", () => {
+    const vanished = localSession({ id: "official-1", officialSessionId: "official-1" });
+    const result = reconcileOfficialSessionCatalog([vanished], [], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
+  it("SDK 来源列表不隐藏缺失的本地镜像", () => {
+    const existing = localSession({ id: "official-1", officialSessionId: "official-1" });
+    const result = reconcileOfficialSessionCatalog([existing], [], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result[0]).toBe(existing);
+    expect(result[0].archivedAt).toBeUndefined();
+  });
+
+  it("不因官方缺失隐藏本地-only、长程任务或其他项目会话", () => {
+    const localOnly = localSession({ id: "local-abc", officialSessionId: undefined, runtimeSessionId: undefined });
+    const longTask = localSession({
+      id: "official-long",
+      officialSessionId: "official-long",
+      longTask: {
+        taskId: "task-1",
+        title: "长程任务",
+        stage: "running",
+        activeAgent: "executor",
+        executorSessionId: "official-long",
+        reviewerSessionId: "official-review",
+        bigPlanPath: "big.md",
+        reviewQueuePath: "review.md",
+        currentStep: 1,
+        targetStep: null,
+      },
+    });
+    const otherProject = localSession({ id: "official-other", officialSessionId: "official-other", projectPath: "D:\\work\\other" });
+    const result = reconcileOfficialSessionCatalog([localOnly, longTask, otherProject], [], "D:\\work\\demo", { source: "server" });
+
+    expect(result.map((session) => session.archivedAt)).toEqual([undefined, undefined, undefined]);
   });
 });
