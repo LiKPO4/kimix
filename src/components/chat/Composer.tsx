@@ -131,7 +131,7 @@ function buildCustomThemeKickoffPrompt(request: string) {
   return [
     "【Kimix 官方 /custom-theme 兼容执行】",
     "",
-    "当前 Kimix 通过 Kimi Code SDK 发送消息，SDK 不会触发官方 TUI 的 slash dispatcher；因此请你直接完成官方 /custom-theme 本该做的工作。",
+    "当前 Kimix 通过兼容链路发送主题生成请求，不会触发官方终端界面的 slash 分发器；因此请你直接完成官方 /custom-theme 本该做的工作。",
     "",
     `用户主题需求：${themeRequest}`,
     "",
@@ -318,7 +318,7 @@ type ThemeImportPreview = {
 };
 
 const sdkSlashCommandItems: CompletionItem[] = [
-  { id: "slash-goal", label: "/goal", detail: "SDK Goal 入口；Server 会话暂不支持", insertText: "/goal ", commandName: "goal", kind: "slash" },
+  { id: "slash-goal", label: "/goal", detail: "兼容 Goal 入口；Server 会话暂不支持", insertText: "/goal ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-status", label: "/goal status", detail: "查看当前 Goal 状态", insertText: "/goal status ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-show", label: "/goal show", detail: "显示当前 Goal 状态", insertText: "/goal show ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-start", label: "/goal start", detail: "启动一个新 Goal", insertText: "/goal start ", commandName: "goal", kind: "slash" },
@@ -330,11 +330,11 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-goal-cancel", label: "/goal cancel", detail: "取消并清除当前 Goal", insertText: "/goal cancel ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-next", label: "/goal next", detail: "排队后续 Goal", insertText: "/goal next ", commandName: "goal", kind: "slash" },
   { id: "slash-goal-next-template", label: "/goal next 继续收尾并整理剩余风险", detail: "带目标模板：排队后续 Goal", insertText: "/goal next 继续收尾并整理剩余风险", commandName: "goal", kind: "slash" },
-  { id: "slash-swarm", label: "/swarm", detail: "SDK Swarm 入口；Server 会话暂不支持", insertText: "/swarm ", commandName: "swarm", kind: "slash" },
-  { id: "slash-swarm-template", label: "/swarm 并行检查最近改动并给出修复建议", detail: "通过 SDK 兼容链路发起 Swarm 任务", insertText: "/swarm 并行检查最近改动并给出修复建议", commandName: "swarm", kind: "slash" },
-  { id: "slash-swarm-on", label: "/swarm on", detail: "开启 SDK Swarm 模式", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
-  { id: "slash-swarm-off", label: "/swarm off", detail: "关闭 SDK Swarm 模式", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
-  { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
+  { id: "slash-swarm", label: "/swarm", detail: "兼容 Swarm 入口；Server 会话暂不支持", insertText: "/swarm ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-template", label: "/swarm 并行检查最近改动并给出修复建议", detail: "通过兼容链路发起 Swarm 任务", insertText: "/swarm 并行检查最近改动并给出修复建议", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-on", label: "/swarm on", detail: "开启 Swarm 模式", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
+  { id: "slash-swarm-off", label: "/swarm off", detail: "关闭 Swarm 模式", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
+  { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方终端主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
   { id: "slash-custom-theme", label: "/custom-theme", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
   { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
   { id: "slash-import-from-cc-codex", label: "/import-from-cc-codex", detail: "预览并导入 Claude Code / Codex 配置", insertText: "/import-from-cc-codex", commandName: "import-from-cc-codex", kind: "slash" },
@@ -345,7 +345,7 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-plan-off", label: "/plan off", detail: "关闭 Plan 模式", insertText: "/plan off ", commandName: "plan", kind: "slash" },
   { id: "slash-status", label: "/status", detail: "显示当前 Kimi Code 会话状态", insertText: "/status", commandName: "status", kind: "slash" },
   { id: "slash-usage", label: "/usage", detail: "显示当前 Kimi Code 会话用量", insertText: "/usage", commandName: "usage", kind: "slash" },
-  { id: "slash-reload", label: "/reload", detail: "SDK 会话重载配置；Server 会话暂不支持", insertText: "/reload", commandName: "reload", kind: "slash" },
+  { id: "slash-reload", label: "/reload", detail: "重载当前会话配置；Server 会话暂不支持", insertText: "/reload", commandName: "reload", kind: "slash" },
   { id: "slash-btw", label: "/btw", detail: "侧问，不影响主轮次", insertText: "/btw ", commandName: "btw", kind: "slash" },
   { id: "slash-btw-template", label: "/btw 这个函数是谁调用的", detail: "带问题模板：侧问，不影响主轮次", insertText: "/btw 这个函数是谁调用的", commandName: "btw", kind: "slash" },
   { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo ", commandName: "undo", kind: "slash" },
@@ -1224,7 +1224,7 @@ export function Composer() {
     if (name === "theme") {
       await appendSlashNotice(commandNotice);
       setWorkspaceView("settings");
-      await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的 TUI 主题选择器，Kimix 使用独立的全局主题色板。");
+      await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的主题选择器，Kimix 使用独立的全局主题色板。");
       return true;
     }
     if (name === "custom-theme") {
@@ -1393,7 +1393,7 @@ export function Composer() {
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const res = await window.api.reloadKimiCodeSession({ sessionId: runtime.runtimeSessionId });
-      await appendStatusMessage(res.success ? "已重载当前 SDK 会话配置。" : `重载失败：${res.error}`);
+      await appendStatusMessage(res.success ? "已重载当前会话配置。" : `重载失败：${res.error}`);
       return true;
     }
     if (name === "status") {
@@ -1681,7 +1681,7 @@ export function Composer() {
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
     const runtimeSessionId = getRuntimeSessionId(activeSession);
     if (!activeSession || !canSteerActiveTurn || !runtimeSessionId) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "当前没有可引导的 SDK 运行轮次，消息会留在队列里等待本轮结束。" }));
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "当前没有可引导的运行轮次，消息会留在队列里等待本轮结束。" }));
       return;
     }
     const steerId = insertLocalSteerMessage(activeSession.id, trimmed || (imagesToSend.length > 0 ? "[附件]" : ""), imagesToSend);
@@ -1888,7 +1888,7 @@ export function Composer() {
     const runtimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
     if (!runtimeSessionId || !activeSession || !canSteerActiveTurn) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "当前没有可引导的 SDK 运行轮次，这条消息会继续排队等待本轮结束。",
+        detail: "当前没有可引导的运行轮次，这条消息会继续排队等待本轮结束。",
       }));
       return;
     }

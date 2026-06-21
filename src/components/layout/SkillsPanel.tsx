@@ -225,7 +225,7 @@ export function SkillsPanel({
     setSdkPluginToggling(null);
     if (!res.success) {
       setSdkPlugins((items) => items.map((item) => item.id === plugin.id ? { ...item, enabled: plugin.enabled } : item));
-      setMessage(`切换 SDK Plugin 失败：${res.error}`);
+      setMessage(`切换官方插件失败：${res.error}`);
       return;
     }
     void refreshSdkPlugins(`${plugin.displayName} 已${nextEnabled ? "启用" : "停用"}`);
@@ -382,7 +382,7 @@ export function SkillsPanel({
               <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
                 <div className="font-medium text-[var(--kimix-panel-text)]">官方插件商店</div>
                 <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                  以下为官方 Marketplace 在架插件，可一键安装到 Kimi Code SDK（含 Superpowers）。
+                  以下为官方 Marketplace 在架插件，可一键安装到 Kimi Code。
                 </div>
                 {marketplace.length > 0 && (
                   <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>

@@ -3,7 +3,7 @@ import type { SlashCommandInfo } from "./types/ipc";
 export type KimiCodeSlashRuntime = "server" | "sdk";
 
 const COMMON_SLASH_COMMANDS: SlashCommandInfo[] = [
-  { name: "theme", description: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", aliases: [] },
+  { name: "theme", description: "打开 Kimix 主题设置；官方终端主题仅供参考", aliases: [] },
   { name: "custom-theme", description: "Kimix 兼容生成官方主题 JSON；生成后可在设置里导入", aliases: [] },
   { name: "custom-theme 做一套低饱和绿色主题", description: "Kimix 兼容生成官方主题 JSON", aliases: [] },
   { name: "import-from-cc-codex", description: "预览并导入 Claude Code / Codex 配置", aliases: [] },
@@ -22,7 +22,7 @@ const COMMON_SLASH_COMMANDS: SlashCommandInfo[] = [
 ];
 
 const SDK_ONLY_SLASH_COMMANDS: SlashCommandInfo[] = [
-  { name: "goal", description: "SDK Goal 入口", aliases: [] },
+  { name: "goal", description: "兼容 Goal 入口", aliases: [] },
   { name: "goal status", description: "查看当前 Goal 状态", aliases: [] },
   { name: "goal show", description: "显示当前 Goal 状态", aliases: [] },
   { name: "goal start", description: "启动一个新 Goal", aliases: [] },
@@ -34,11 +34,11 @@ const SDK_ONLY_SLASH_COMMANDS: SlashCommandInfo[] = [
   { name: "goal cancel", description: "取消并清除当前 Goal", aliases: [] },
   { name: "goal next", description: "排队后续 Goal", aliases: [] },
   { name: "goal next 继续收尾并整理剩余风险", description: "带目标模板：排队后续 Goal", aliases: [] },
-  { name: "swarm", description: "SDK Swarm 入口", aliases: [] },
-  { name: "swarm 并行检查最近改动并给出修复建议", description: "通过 SDK 兼容链路发起 Swarm 任务", aliases: [] },
-  { name: "swarm on", description: "开启 SDK Swarm 模式", aliases: [] },
-  { name: "swarm off", description: "关闭 SDK Swarm 模式", aliases: [] },
-  { name: "reload", description: "重载 SDK 会话配置", aliases: [] },
+  { name: "swarm", description: "兼容 Swarm 入口", aliases: [] },
+  { name: "swarm 并行检查最近改动并给出修复建议", description: "通过兼容链路发起 Swarm 任务", aliases: [] },
+  { name: "swarm on", description: "开启 Swarm 模式", aliases: [] },
+  { name: "swarm off", description: "关闭 Swarm 模式", aliases: [] },
+  { name: "reload", description: "重载当前会话配置", aliases: [] },
 ];
 
 export function listKimiCodeSlashCommands(runtime: KimiCodeSlashRuntime): SlashCommandInfo[] {
