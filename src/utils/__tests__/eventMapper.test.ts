@@ -332,6 +332,26 @@ describe("mergeEvents", () => {
     expect(assistant.durationMs).toBe(31_000);
   });
 
+  it("uses the whole user turn even when a valid assistant phase duration exists", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1_000, content: "开始处理" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 21_000, content: "处理中", isThinking: false, isComplete: false, durationMs: 5_000 },
+    ];
+    const incoming: TimelineEvent = {
+      id: "turn-end",
+      type: "assistant_message",
+      timestamp: 32_000,
+      content: "",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 11_000,
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.durationMs).toBe(31_000);
+  });
+
   it("merges streaming tool calls by toolCallId", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "read", status: "running", arguments: { path: "a" }, rawArguments: '{"path":"a"}' },

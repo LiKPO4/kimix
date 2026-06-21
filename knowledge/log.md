@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Turn timing**: Unified live and completed assistant timing around the initiating user message; process phase changes no longer reset elapsed time, and user-facing durations use Chinese minute/second units.
 * **Streaming Markdown**: Prevented tool or subagent boundaries from inserting paragraph breaks inside unfinished strong-emphasis syntax, and added canonical official-history recovery for previously cached malformed assistant Markdown.
 * **Skill lifecycle correction**: Required Agent Skill synchronization on direct `/skill:` activation as well as ordinary prompts, and made newly created flattened registrations invalidate the active Server registry even when packaged source mtimes are older than the session.
 * **Skill history correction**: Added persisted-session migration so cached `<kimi-skill-loaded>` payloads and synthetic activation titles cannot bypass raw official history sanitization.

@@ -10,3 +10,9 @@ export function reliableAssistantDurationMs(durationMs: unknown): number | undef
 export function reliableAssistantDurationBetween(start: number, end: number): number | undefined {
   return reliableAssistantDurationMs(end - start);
 }
+
+export function formatAssistantTurnDuration(ms: number): string {
+  const seconds = ms > 0 ? Math.max(1, Math.round(ms / 1000)) : 0;
+  if (seconds < 60) return `${seconds}秒`;
+  return `${Math.floor(seconds / 60)}分${seconds % 60}秒`;
+}

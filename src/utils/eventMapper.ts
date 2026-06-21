@@ -300,7 +300,7 @@ function appendAfterConfirmedSteer(
 function findTurnAnchorTimestamp(events: TimelineEvent[], beforeIndex: number): number | undefined {
   for (let index = beforeIndex - 1; index >= 0; index -= 1) {
     const event = events[index];
-    if (event.type === "user_message" || event.type === "steer_message") return event.timestamp;
+    if (event.type === "user_message") return event.timestamp;
   }
   return undefined;
 }
@@ -312,16 +312,17 @@ function completedAssistantDuration(
   completedAt: number,
   incomingDurationMs?: number,
 ): number | undefined {
+  const turnStartedAt = findTurnAnchorTimestamp(events, assistantIndex);
+  const turnDuration = turnStartedAt !== undefined
+    ? reliableAssistantDurationBetween(turnStartedAt, completedAt)
+    : undefined;
+  if (turnDuration !== undefined) return turnDuration;
+
   const direct =
     reliableAssistantDurationMs(incomingDurationMs) ??
     reliableAssistantDurationMs(assistant.durationMs) ??
     reliableAssistantDurationBetween(assistant.timestamp, completedAt);
-  if (direct !== undefined) return direct;
-
-  const turnStartedAt = findTurnAnchorTimestamp(events, assistantIndex);
-  return turnStartedAt !== undefined
-    ? reliableAssistantDurationBetween(turnStartedAt, completedAt)
-    : undefined;
+  return direct;
 }
 
 function countTextLines(value: string): number {
