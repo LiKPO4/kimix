@@ -128,6 +128,18 @@ describe("shouldShowInlineStatusUpdate", () => {
     expect(shouldShowInlineStatusUpdate(status)).toBe(true);
   });
 
+  it("keeps zero metric statuses visible for assistant footer bubbles", () => {
+    expect(
+      shouldShowInlineStatusUpdate({ id: "1", type: "status_update", timestamp: 1, tokenCount: 0, inputTokenCount: 0, contextSize: 0, contextLimit: 256000 }),
+    ).toBe(true);
+  });
+
+  it("keeps timestamp-only statuses visible for assistant footer bubbles", () => {
+    expect(
+      shouldShowInlineStatusUpdate({ id: "1", type: "status_update", timestamp: 1 }),
+    ).toBe(true);
+  });
+
   it("still hides transient retry and interrupted statuses in footer bubbles", () => {
     expect(
       shouldShowInlineStatusUpdate({ id: "1", type: "status_update", timestamp: 1, step: 2, message: "输出打断" }),

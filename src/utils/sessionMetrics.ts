@@ -37,7 +37,8 @@ export function isEmptyStatusUpdate(event: Extract<TimelineEvent, { type: "statu
 export function shouldShowInlineStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {
   const message = event.message?.trim() ?? "";
   if (message.startsWith("模型：")) return true;
-  return !isEmptyStatusUpdate(event);
+  if (message && event.step !== undefined && /^(?:步骤\s*\d+\s*)?(?:中断|重试|输出打断|正在重试)/.test(message)) return false;
+  return true;
 }
 
 export function shouldRenderStandaloneStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {

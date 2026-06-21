@@ -988,10 +988,9 @@ function AssistantMessageFooter({
   const hasVisibleStatuses = visibleStatuses.length > 0;
   return (
     <div
-      className="relative flex min-w-0 items-center justify-center"
+      className="relative flex min-h-[28px] min-w-0 items-center justify-center"
       style={{
-        minHeight: hasVisibleStatuses ? 28 : 0,
-        marginTop: hasVisibleStatuses ? 3 : 0,
+        marginTop: 3,
       }}
     >
       <div
