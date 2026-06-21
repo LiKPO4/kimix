@@ -6,6 +6,7 @@ import {
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
+  snapshotToHistoryFrames,
   toServerConfigPatch,
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
@@ -547,6 +548,34 @@ describe("KimiCodeServerClient protocol adapters", () => {
           snapshotMessageText: "工具输出",
           snapshotRole: "tool",
         },
+      },
+    ]);
+  });
+
+  it("adds pending approvals and questions when loading a server snapshot as history", () => {
+    const frames = snapshotToHistoryFrames({
+      as_of_seq: 12,
+      epoch: "epoch-pending",
+      session: { id: "session-1", status: "awaiting_question" },
+      messages: { items: [] },
+      pending_approvals: [{ approval_id: "approval-1", tool_name: "Bash", description: "运行命令" }],
+      pending_questions: [{ question_id: "question-1", questions: [{ id: "q1", question: "继续吗？", options: [] }] }],
+    }, "session-1");
+
+    expect(frames).toEqual([
+      {
+        type: "event.approval.requested",
+        session_id: "session-1",
+        seq: 12,
+        epoch: "epoch-pending",
+        payload: { approval_id: "approval-1", tool_name: "Bash", description: "运行命令" },
+      },
+      {
+        type: "event.question.requested",
+        session_id: "session-1",
+        seq: 12,
+        epoch: "epoch-pending",
+        payload: { question_id: "question-1", questions: [{ id: "q1", question: "继续吗？", options: [] }] },
       },
     ]);
   });

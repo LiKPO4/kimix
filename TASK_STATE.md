@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传、OAuth 生命周期、配置 merge 写入和默认模型专用路由已对齐；目录选择保留 Electron 原生实现；官方 0.18 未提供模型/Provider 删除；消息详情分页、审批/问题列表仍需逐项处理。Server Terminal 属于官方 Web/终端通道，不是 Kimix 主交互必须补齐的 UI。
+  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传、OAuth 生命周期、配置 merge 写入、默认模型专用路由和历史加载待处理审批/问题补偿已对齐；目录选择保留 Electron 原生实现；官方 0.18 未提供模型/Provider 删除；消息详情分页仍需逐项处理。Server Terminal 属于官方 Web/终端通道，不是 Kimix 主交互必须补齐的 UI。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，审计消息详情分页与审批/问题列表补偿。
+- 下一步：继续 P2，审计消息详情分页是否需要接入完整分页 UI。
+
+## 2026-06-21 v2.11.40 历史待处理项补偿
+- 当前目标：恢复 Server 历史会话时补齐官方 pending approvals/questions，避免用户打开历史会话时看不到待处理卡片。
+- 根因：Kimix 实时订阅和 WebSocket 重连 snapshot 已能补 pending 项，但 `loadServerSessionHistory` 只把 snapshot messages 转为历史事件，漏掉了 snapshot 的 `pending_approvals` 与 `pending_questions`。
+- 已完成：新增历史加载专用 snapshot frame 转换，保留消息 replay 逻辑，同时为 pending approval/question 合成官方事件；实时 snapshot 恢复路径不变，避免运行中重复渲染。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 已验证：Server Client 定向测试 22/22；全量测试 32 个文件、245/245；OKF 严格校验与 180 天维护审计通过；生产构建与 `git diff --check` 通过。
+- 下一步：验证并窄范围提交后，审计消息详情分页。
 
 ## 2026-06-21 v2.11.39 官方默认模型路由
 - 当前目标：优先使用官方模型目录的 `:set_default` 专用接口，并确认模型与 Provider 删除边界。

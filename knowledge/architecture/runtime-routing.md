@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T15:48:00+08:00"
+timestamp: "2026-06-21T15:56:00+08:00"
 ---
 
 # Runtime Routing
@@ -40,6 +40,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 25. Official Web folder browsing and Electron folder selection are platform adapters, not competing sources of truth. Kimix retains the OS-native directory dialog because it provides the narrowest desktop permission and full platform integration; `/fs:home` and `/fs:browse` are required by browser clients that cannot open that dialog. Server image prompts must use the official message content schema: local data URLs are uploaded through `/files` and referenced as an image file source, while ordinary URLs use an image URL source. The conversion helper may retain a base64 source only when no upload capability is supplied, but active Server prompt, steer, and BTW routes always supply it. The legacy `image_url` payload is not sent to Server 0.18.
 26. Managed OAuth follows the active runtime boundary. When Server is ready, auth status, device login, pending-flow cancellation, and logout use the official Server endpoints; SDK login and local credential cleanup remain compatibility fallbacks only when Server is unavailable or its OAuth route fails. A local credential file alone must not override an authenticated or unauthenticated state reported by a ready Server.
 27. Global configuration mutations use official Server routes whenever Server is ready. A default-model-only mutation uses the catalog's dedicated `:set_default` action so the Server validates the model alias; other non-destructive mutations use the config merge endpoint after Kimix converts its camelCase SDK-facing patch into the Server snake_case wire schema, including nested Provider and model fields. The richer SDK config view is then reloaded for existing settings UI consumers, with SDK mutation retained as the Server-failure fallback. Server 0.18 exposes no model or Provider deletion route, so Kimix's guarded local deletion remains an explicit desktop extension rather than a claimed native capability.
+28. Server session restoration must replay both message history and outstanding interaction gates. Live WebSocket resync continues to use message frames plus explicit pending approval/question synthesis in the frame handler, while one-shot history loading uses a history-specific snapshot conversion that appends pending approval/question events after message replay. This keeps reopened sessions actionable without duplicating pending cards during live recovery.
 
 # Main Components
 

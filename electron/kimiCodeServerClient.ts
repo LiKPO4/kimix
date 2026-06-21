@@ -314,6 +314,21 @@ export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, session
   ];
 }
 
+export function snapshotToHistoryFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
+  const frames = snapshotMessagesToServerFrames(snapshot, sessionId);
+  const seq = snapshot.as_of_seq;
+  const epoch = snapshot.epoch;
+  for (const approval of snapshot.pending_approvals ?? []) {
+    if (!approval || typeof approval !== "object") continue;
+    frames.push({ type: "event.approval.requested", session_id: sessionId, seq, epoch, payload: approval });
+  }
+  for (const question of snapshot.pending_questions ?? []) {
+    if (!question || typeof question !== "object") continue;
+    frames.push({ type: "event.question.requested", session_id: sessionId, seq, epoch, payload: question });
+  }
+  return frames;
+}
+
 export class KimiCodeServerClient {
   private socket: WebSocket | null = null;
   private connected: Promise<void> | null = null;
