@@ -1772,6 +1772,12 @@ export function getActiveSessionIds(): string[] {
   return [...sessions.keys(), ...serverSessions.keys()];
 }
 
+export function getSessionRuntimeKind(sessionId: string): "server" | "sdk" | null {
+  if (serverSessions.has(sessionId)) return "server";
+  if (sessions.has(sessionId)) return "sdk";
+  return null;
+}
+
 export function respondApproval(
   sessionId: string,
   requestId: string,

@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Runtime-aware Slash catalog**: Made Slash completion depend on the active Server or SDK session and use a conservative catalog while runtime identity is unavailable, preventing Server sessions from advertising SDK-only Goal, Swarm, or reload actions.
 * **Prompt queue coordination**: Added a lightweight official prompt-queue check before local pending-message dispatch; Server active/queued prompts defer local shift, and abort no longer reports interruption while official prompts remain.
 * **Official history source**: Made Server snapshots the preferred source for loading session history, including user-message replay and content.part assistant chunks, with local mirror fallback for unavailable snapshots and legacy sessions.
 * **Session catalog authority**: Switched startup and project-change catalog reconciliation to the successful official Server session list; missing same-project official mirrors are locally archived while SDK fallback, local-only, long-task, and other-project sessions are preserved.

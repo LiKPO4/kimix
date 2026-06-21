@@ -353,6 +353,10 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-skill", label: "/skill:", detail: "通过官方链路调用 Skill", insertText: "/skill:", commandName: "skill", kind: "slash" },
 ];
 
+const conservativeSlashCommandItems = sdkSlashCommandItems.filter(
+  (item) => !["goal", "swarm", "reload"].includes(item.commandName ?? ""),
+);
+
 const mentionBaseItems: CompletionItem[] = [
   { id: "agent-explorer", label: "Explorer Fast", detail: "快速探索代码库", insertText: "@Explorer Fast ", kind: "agent" },
   { id: "agent-implementer", label: "Implementer Safe", detail: "实现代码", insertText: "@Implementer Safe ", kind: "agent" },
@@ -492,10 +496,7 @@ export function Composer() {
       setSlashCommands([]);
       return;
     }
-    if (currentSession.engine === "kimi-code") {
-      setSlashCommands(sdkSlashCommandItems);
-      return;
-    }
+    setSlashCommands(conservativeSlashCommandItems);
     let cancelled = false;
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) {
@@ -530,7 +531,7 @@ export function Composer() {
   const activeCompletion = getActiveCompletion(input);
   const isSkillCompletion = activeCompletion?.mode === "slash" && activeCompletion.query.toLowerCase().startsWith("skill:");
   const skillCompletionQuery = isSkillCompletion ? activeCompletion.query.slice("skill:".length).trim().toLowerCase() : "";
-  const slashCompletionSource = slashCommands.length > 0 ? slashCommands : sdkSlashCommandItems;
+  const slashCompletionSource = slashCommands.length > 0 ? slashCommands : conservativeSlashCommandItems;
   const filteredSkillItems = isSkillCompletion
     ? skillItems.filter((item) => {
         if (!skillCompletionQuery) return true;

@@ -8,10 +8,18 @@
   3. ✅ P1：外部网页归档后，本地对账目前只增不减；已改为 Server 官方列表成功返回时双向对账，缺失的同项目官方镜像会本地隐藏。
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
-  6. P1：Slash 清单仍偏硬编码；需按 Server OpenAPI 和 SDK capability 裁剪，不暴露不可用项。
+  6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
   7. P2：Workspace、文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表等仍需逐项评估官方 API 对齐。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P1，处理 Slash 清单按 Server/SDK 能力动态裁剪。
+- 下一步：进入 P2，先审计 Workspace 与官方 `/workspaces` 的数据模型和迁移边界。
+
+## 2026-06-21 v2.11.31 Slash 运行时能力清单
+- 当前目标：让 Slash 补全只展示当前运行时真正可用的命令，避免 Server 会话继续出现 SDK-only 入口。
+- 根因：Composer 对 `kimi-code` 会话直接采用完整静态清单，绕过了主进程能力查询；主进程的查询本身也忽略 sessionId 并固定返回同一组命令。
+- 已完成：主进程按活动会话识别 Server/SDK 运行时；Server 清单排除 Goal、Swarm、reload，SDK 清单保留兼容入口；渲染层统一查询运行时清单，查询中、查询失败或会话尚未恢复时使用不含 SDK-only 项的保守集合。
+- 关键文件：`electron/kimiCodeSlashCommands.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`src/components/chat/Composer.tsx`。
+- 已验证：运行时清单与 Slash 路由定向测试 8/8；全量测试 32 个文件 236/236；OKF 严格校验、180 天维护审计、生产构建及差异检查通过。
+- 下一步：验证并窄范围提交后，进入 P2 Workspace 官方能力审计。
 
 ## 2026-06-21 v2.11.30 官方 Prompt 队列门禁
 - 当前目标：避免 Kimix 本地 pendingMessages 与官方 Server prompts active/queued 状态不同步导致重复派发或停止状态误判。
