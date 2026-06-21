@@ -3,6 +3,7 @@
 ## 2026-06-21 官方能力对齐 todolist
 - 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。
 - 补充扫描：
+  - ✅ P1：浏览器预览兜底、主进程能力缺失错误、配置导出失败和事件 mapper 默认错误仍会透出 Kimi Code SDK；已统一收口为 Kimi Code / 兼容链路口径。
   - ✅ P1：Slash/Skill/插件页仍有 SDK、TUI、Superpowers 等用户不需要理解的内部口径；已收口为“兼容能力 / 终端主题 / 官方插件”。
 - 待办：
   1. ✅ P0：Goal / Swarm 仍是 SDK-only 能力，Server 会话误调用时会报 “Kimi Code session is not active”；已改为清晰能力边界，Server 会话显式提示暂未公开对应 API。

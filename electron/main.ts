@@ -1417,7 +1417,7 @@ async function readKimiModelConfigAfterSdkSet(expectedDefaultModel: string) {
   if (reloaded.defaultModel === expectedDefaultModel) return reloaded;
   const disk = readKimiModelConfig();
   if (disk.defaultModel === expectedDefaultModel) return disk;
-  throw new Error(`Kimi Code SDK 未将默认模型持久化为 ${expectedDefaultModel}`);
+  throw new Error(`Kimi Code 未将默认模型持久化为 ${expectedDefaultModel}`);
 }
 
 async function reloadIdleKimiCodeSessionsAfterConfigChange() {
@@ -2774,7 +2774,7 @@ async function exportKimiSessionArchive(request: { sessionId?: string; title?: s
   } catch (sdkError) {
     fallbackKimiPath = await resolveKimiCommand();
     if (!fallbackKimiPath) {
-      throw new Error(`官方 SDK 导出失败，且未找到 Kimi Code fallback：${sdkError instanceof Error ? sdkError.message : String(sdkError)}`);
+      throw new Error(`官方配置导出失败，且未找到 Kimi Code 兼容配置：${sdkError instanceof Error ? sdkError.message : String(sdkError)}`);
     }
     console.warn("[kimi-code] SDK export failed, falling back to CLI export:", sdkError);
   }

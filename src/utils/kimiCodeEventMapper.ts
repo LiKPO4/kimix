@@ -465,7 +465,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "error",
         timestamp,
-        message: isString(event.message) ? event.message : "Kimi Code SDK error",
+        message: isString(event.message) ? event.message : "Kimi Code error",
         source: "sdk",
         canDismiss: true,
       };
@@ -475,7 +475,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "status_update",
         timestamp,
-        message: isString(event.message) ? event.message : "Kimi Code SDK warning",
+        message: isString(event.message) ? event.message : "Kimi Code warning",
       };
 
     default:

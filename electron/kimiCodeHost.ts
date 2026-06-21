@@ -556,8 +556,8 @@ let statusSink: StatusSink | null = null;
 const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
 const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
 const SERVER_RELOAD_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂不支持直接重载配置；如需刷新 Skill、Plugin 或配置，请新建或 fork 会话。";
-const SERVER_GOAL_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Goal API；请使用 SDK 会话或等待官方 Server 支持。";
-const SERVER_SWARM_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Swarm API；请使用 SDK 会话或等待官方 Server 支持。";
+const SERVER_GOAL_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Goal API；请使用兼容会话或等待官方 Server 支持。";
+const SERVER_SWARM_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Swarm API；请使用兼容会话或等待官方 Server 支持。";
 let nextRequestId = 0;
 let activeLoginAbort: AbortController | null = null;
 const KIMI_CODE_MANAGED_PROVIDER_NAME = "managed:kimi-code";
@@ -658,7 +658,7 @@ export async function forkSession(
     });
   }
   const sdkHarness = await getHarness();
-  if (!sdkHarness.forkSession) throw new Error("当前 Kimi Code SDK 不支持会话派生。");
+  if (!sdkHarness.forkSession) throw new Error("当前兼容链路不支持会话派生。");
   const session = await sdkHarness.forkSession({
     id: sessionId,
     forkId: options.forkId,
@@ -713,7 +713,7 @@ export async function renameSession(sessionId: string, title: string): Promise<v
     return;
   }
   const sdkHarness = await getHarness();
-  if (!sdkHarness.renameSession) throw new Error("当前 Kimi Code SDK 不支持会话重命名。");
+  if (!sdkHarness.renameSession) throw new Error("当前兼容链路不支持会话重命名。");
   await sdkHarness.renameSession({ id: sessionId, title });
 }
 
@@ -723,7 +723,7 @@ export async function reloadSession(sessionId: string): Promise<void> {
     throw new Error(SERVER_RELOAD_UNSUPPORTED_MESSAGE);
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.reloadSession) throw new Error("当前 Kimi Code SDK 不支持会话重载。");
+  if (!managed.session.reloadSession) throw new Error("当前兼容链路不支持会话重载。");
   await managed.session.reloadSession();
 }
 
@@ -737,7 +737,7 @@ export async function setModel(sessionId: string, model: string): Promise<void> 
   }
   const managed = getManagedSession(sessionId);
   if (managed.model === model) return;
-  if (!managed.session.setModel) throw new Error("当前 Kimi Code SDK 不支持会话模型切换。");
+  if (!managed.session.setModel) throw new Error("当前兼容链路不支持会话模型切换。");
   await managed.session.setModel(model);
   managed.model = model;
 }
@@ -857,14 +857,14 @@ function scheduleServerRecovery() {
 export async function setSwarmMode(sessionId: string, enabled: boolean, trigger: "manual" | "task" = "manual"): Promise<void> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_SWARM_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.setSwarmMode) throw new Error("当前 Kimi Code SDK 不支持 Swarm 模式。");
+  if (!managed.session.setSwarmMode) throw new Error("当前兼容链路不支持 Swarm 模式。");
   await managed.session.setSwarmMode(enabled, trigger);
 }
 
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_SWARM_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.swarm) throw new Error("当前 Kimi Code SDK 不支持 Swarm。");
+  if (!managed.session.swarm) throw new Error("当前兼容链路不支持 Swarm。");
   setStatus(sessionId, "running");
   try {
     await managed.session.swarm(input);
@@ -903,7 +903,7 @@ export async function askBtw(
     }
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.startBtw) throw new Error("当前 Kimi Code SDK 不支持 BTW 侧问。");
+  if (!managed.session.startBtw) throw new Error("当前兼容链路不支持 BTW 侧问。");
   if (managed.status !== "idle" && managed.status !== "completed" && managed.status !== "interrupted" && managed.status !== "error") {
     throw new Error("当前轮次结束后再使用 BTW 侧问。");
   }
@@ -955,7 +955,7 @@ export async function undoHistory(sessionId: string, count: number): Promise<voi
     return;
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.undoHistory) throw new Error("Official Kimi Code SDK does not expose undoHistory on this session");
+  if (!managed.session.undoHistory) throw new Error("当前兼容链路不支持撤回历史。");
   await managed.session.undoHistory(count);
 }
 
@@ -996,7 +996,7 @@ export async function setThinking(sessionId: string, level: string): Promise<voi
   }
   const managed = getManagedSession(sessionId);
   if (managed.thinking === level) return;
-  if (!managed.session.setThinking) throw new Error("Official Kimi Code SDK does not expose setThinking on this session");
+  if (!managed.session.setThinking) throw new Error("当前兼容链路不支持切换思考强度。");
   await managed.session.setThinking(level);
   managed.thinking = level;
 }
@@ -1021,7 +1021,7 @@ export async function compactSession(sessionId: string, instruction?: string): P
     return;
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.compact) throw new Error("Official Kimi Code SDK does not expose compact on this session");
+  if (!managed.session.compact) throw new Error("当前兼容链路不支持上下文压缩。");
   await managed.session.compact(instruction ? { instruction } : undefined);
 }
 
@@ -1037,7 +1037,7 @@ export async function archiveSession(sessionId: string): Promise<void> {
     return;
   }
   if (!shouldRouteNewSessionToServer()) {
-    throw new Error("当前官方 Kimi Code SDK 未公开归档接口，请启用 Kimi Server 后重试。");
+    throw new Error("当前兼容链路未公开归档接口，请启用 Kimi Server 后重试。");
   }
   await getServerClient().archiveSession(sessionId);
 }
@@ -1045,7 +1045,7 @@ export async function archiveSession(sessionId: string): Promise<void> {
 export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.createGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  if (!managed.session.createGoal) throw new Error("当前兼容链路不支持官方 Goal。");
   const goal = await managed.session.createGoal(input);
   return { goal };
 }
@@ -1053,14 +1053,14 @@ export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInp
 export async function getGoal(sessionId: string): Promise<KimiCodeGoalState> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.getGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  if (!managed.session.getGoal) throw new Error("当前兼容链路不支持官方 Goal。");
   return managed.session.getGoal();
 }
 
 export async function pauseGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.pauseGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  if (!managed.session.pauseGoal) throw new Error("当前兼容链路不支持官方 Goal。");
   const goal = await managed.session.pauseGoal({ reason });
   return { goal };
 }
@@ -1068,7 +1068,7 @@ export async function pauseGoal(sessionId: string, reason?: string): Promise<Kim
 export async function resumeGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.resumeGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  if (!managed.session.resumeGoal) throw new Error("当前兼容链路不支持官方 Goal。");
   const goal = await managed.session.resumeGoal({ reason });
   return { goal };
 }
@@ -1076,7 +1076,7 @@ export async function resumeGoal(sessionId: string, reason?: string): Promise<Ki
 export async function cancelGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
   if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
-  if (!managed.session.cancelGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
+  if (!managed.session.cancelGoal) throw new Error("当前兼容链路不支持官方 Goal。");
   const goal = await managed.session.cancelGoal({ reason });
   return { goal: null, cancelledGoal: goal };
 }
@@ -1098,13 +1098,13 @@ export async function getUsage(sessionId: string): Promise<KimiCodeSessionUsage>
     return session.usage ?? {};
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.getUsage) throw new Error("Official Kimi Code SDK does not expose getUsage on this session");
+  if (!managed.session.getUsage) throw new Error("当前兼容链路不支持读取会话用量。");
   return managed.session.getUsage();
 }
 
 export async function getManagedUsage(providerName?: string): Promise<unknown> {
   const sdkHarness = await getHarness();
-  if (!sdkHarness.auth?.getManagedUsage) throw new Error("Official Kimi Code SDK does not expose auth.getManagedUsage on this harness");
+  if (!sdkHarness.auth?.getManagedUsage) throw new Error("当前兼容链路不支持读取套餐用量。");
   return sdkHarness.auth.getManagedUsage(providerName);
 }
 
@@ -1113,7 +1113,7 @@ export async function login(
   options: { onDeviceCode?: (data: KimiCodeDeviceAuthorization) => void } = {},
 ): Promise<KimiCodeLoginResult> {
   const sdkHarness = await getHarness();
-  if (!sdkHarness.auth?.login) throw new Error("Official Kimi Code SDK does not expose auth.login on this harness");
+  if (!sdkHarness.auth?.login) throw new Error("当前兼容链路不支持登录。");
   activeLoginAbort?.abort();
   let deviceAuthorization: KimiCodeDeviceAuthorization | undefined;
   const controller = new AbortController();
@@ -1166,13 +1166,13 @@ export async function listMcpServers(sessionId: string): Promise<KimiCodeMcpServ
     return (await getServerClient().listMcpServers()).map(toKimiCodeMcpServerInfo);
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.listMcpServers) throw new Error("Official Kimi Code SDK does not expose listMcpServers on this session");
+  if (!managed.session.listMcpServers) throw new Error("当前兼容链路不支持读取 MCP 服务。");
   return [...await managed.session.listMcpServers()];
 }
 
 export async function getMcpStartupMetrics(sessionId: string): Promise<KimiCodeMcpStartupMetrics> {
   const managed = getManagedSession(sessionId);
-  if (!managed.session.getMcpStartupMetrics) throw new Error("Official Kimi Code SDK does not expose getMcpStartupMetrics on this session");
+  if (!managed.session.getMcpStartupMetrics) throw new Error("当前兼容链路不支持读取 MCP 启动指标。");
   return managed.session.getMcpStartupMetrics();
 }
 
@@ -1185,7 +1185,7 @@ export async function reconnectMcpServer(sessionId: string, name: string): Promi
     return;
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.reconnectMcpServer) throw new Error("Official Kimi Code SDK does not expose reconnectMcpServer on this session");
+  if (!managed.session.reconnectMcpServer) throw new Error("当前兼容链路不支持重连 MCP 服务。");
   await managed.session.reconnectMcpServer(name);
 }
 
@@ -1364,7 +1364,7 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
     return options.limit ? mapped.slice(0, options.limit) : mapped;
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.listBackgroundTasks) throw new Error("Official Kimi Code SDK does not expose listBackgroundTasks on this session");
+  if (!managed.session.listBackgroundTasks) throw new Error("当前兼容链路不支持读取后台任务。");
   return [...await managed.session.listBackgroundTasks(options)].map((task) => ({
     ...task,
     transport: "sdk" as const,
@@ -1377,14 +1377,14 @@ export async function getBackgroundTaskOutput(sessionId: string, taskId: string,
     return task.output_preview ?? "";
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.getBackgroundTaskOutput) throw new Error("Official Kimi Code SDK does not expose getBackgroundTaskOutput on this session");
+  if (!managed.session.getBackgroundTaskOutput) throw new Error("当前兼容链路不支持读取后台任务输出。");
   return managed.session.getBackgroundTaskOutput(taskId, options);
 }
 
 export async function getBackgroundTaskOutputPath(sessionId: string, taskId: string): Promise<string | undefined> {
   if (serverSessions.has(sessionId)) return undefined;
   const managed = getManagedSession(sessionId);
-  if (!managed.session.getBackgroundTaskOutputPath) throw new Error("Official Kimi Code SDK does not expose getBackgroundTaskOutputPath on this session");
+  if (!managed.session.getBackgroundTaskOutputPath) throw new Error("当前兼容链路不支持读取后台任务输出路径。");
   return managed.session.getBackgroundTaskOutputPath(taskId);
 }
 
@@ -1394,7 +1394,7 @@ export async function stopBackgroundTask(sessionId: string, taskId: string, reas
     return;
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.stopBackgroundTask) throw new Error("Official Kimi Code SDK does not expose stopBackgroundTask on this session");
+  if (!managed.session.stopBackgroundTask) throw new Error("当前兼容链路不支持停止后台任务。");
   await managed.session.stopBackgroundTask(taskId, reason ? { reason } : {});
 }
 
@@ -1497,7 +1497,7 @@ export async function listPlugins(sessionId?: string): Promise<KimiCodePluginSum
     if (sdkHarness.listPlugins) return [...await sdkHarness.listPlugins()];
   }
   const session = await resolvePluginSession(sessionId);
-  if (!session.listPlugins) throw new Error("Official Kimi Code SDK does not expose listPlugins on this session");
+  if (!session.listPlugins) throw new Error("当前兼容链路不支持读取插件列表。");
   return [...await session.listPlugins()];
 }
 
@@ -1506,7 +1506,7 @@ export async function listSkills(sessionId?: string): Promise<KimiCodeSkillSumma
     return (await getServerClient().listSkills(sessionId)).map(toKimiCodeSkillSummary);
   }
   const session = await resolvePluginSession(sessionId);
-  if (!session.listSkills) throw new Error("Official Kimi Code SDK does not expose listSkills on this session");
+  if (!session.listSkills) throw new Error("当前兼容链路不支持读取 Skill 列表。");
   return [...await session.listSkills()];
 }
 
@@ -1516,7 +1516,7 @@ export async function activateSkill(sessionId: string, name: string, args?: stri
     return;
   }
   const managed = getManagedSession(sessionId);
-  if (!managed.session.activateSkill) throw new Error("Official Kimi Code SDK does not expose activateSkill on this session");
+  if (!managed.session.activateSkill) throw new Error("当前兼容链路不支持激活 Skill。");
   await managed.session.activateSkill(name, args);
 }
 
@@ -1557,7 +1557,7 @@ export async function installPlugin(source: string, sessionId?: string): Promise
     if (sdkHarness.installPlugin) return sdkHarness.installPlugin(source);
   }
   const session = await resolvePluginSession(sessionId);
-  if (!session.installPlugin) throw new Error("Official Kimi Code SDK does not expose installPlugin on this session");
+  if (!session.installPlugin) throw new Error("当前兼容链路不支持安装插件。");
   return session.installPlugin(source);
 }
 
@@ -1570,7 +1570,7 @@ export async function setPluginEnabled(id: string, enabled: boolean, sessionId?:
     }
   }
   const session = await resolvePluginSession(sessionId);
-  if (!session.setPluginEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginEnabled on this session");
+  if (!session.setPluginEnabled) throw new Error("当前兼容链路不支持切换插件状态。");
   await session.setPluginEnabled(id, enabled);
 }
 
@@ -1583,7 +1583,7 @@ export async function setPluginMcpServerEnabled(id: string, server: string, enab
     }
   }
   const session = await resolvePluginSession(sessionId);
-  if (!session.setPluginMcpServerEnabled) throw new Error("Official Kimi Code SDK does not expose setPluginMcpServerEnabled on this session");
+  if (!session.setPluginMcpServerEnabled) throw new Error("当前兼容链路不支持切换 Plugin MCP 状态。");
   await session.setPluginMcpServerEnabled(id, server, enabled);
 }
 
@@ -1690,7 +1690,7 @@ function normalizeCatalogMaxContextSize(providerId: string, baseUrl: string | nu
 export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntry[]> {
   const sdk = await loadSdk();
   if (!sdk.fetchCatalog || !sdk.inferWireType || !sdk.catalogProviderModels || !sdk.catalogBaseUrl) {
-    throw new Error("当前 Kimi Code SDK 未暴露 Provider catalog API");
+    throw new Error("当前兼容链路未公开 Provider catalog API");
   }
   const catalogUrl = sdk.DEFAULT_CATALOG_URL ?? "https://models.dev/api.json";
   const catalog = await sdk.fetchCatalog(catalogUrl);
@@ -2015,14 +2015,14 @@ async function fallbackServerSessionToSdk(
       planMode: serverManaged.planMode,
     });
     const managed = sessions.get(session.id);
-    if (!managed) throw new Error("Kimi Code SDK fallback session registration failed");
+    if (!managed) throw new Error("兼容链路会话注册失败。");
     return managed;
   })();
 }
 
 function getServerClient() {
   if (serverClient) return serverClient;
-  if (!kimiCodeServerHost.isReady()) throw new Error("Kimi Server 尚未就绪，已保留 SDK 路径。");
+  if (!kimiCodeServerHost.isReady()) throw new Error("Kimi Server 尚未就绪，已保留兼容链路。");
   serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint);
   unsubscribeServerFrames = serverClient.onFrame(handleServerFrame);
   return serverClient;

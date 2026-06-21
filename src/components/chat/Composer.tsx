@@ -1191,7 +1191,7 @@ export function Composer() {
       const current = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
       if (current.success && current.data.goal) {
         syncOfficialGoal(runtime.uiSessionId, current.data.goal);
-        await appendStatusMessage("Kimi Code 0.12.0 已默认提供 Goal 队列；当前 Kimix 依赖的 SDK 尚未暴露队列管理 API。当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。");
+        await appendStatusMessage("Kimi Code 已默认提供 Goal 队列；当前兼容链路尚未公开队列管理能力。当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。");
         return true;
       }
     }
