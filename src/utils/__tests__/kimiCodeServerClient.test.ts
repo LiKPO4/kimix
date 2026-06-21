@@ -26,9 +26,11 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(toServerPromptContent([
       { type: "text", text: "look" },
       { type: "image_url", imageUrl: { url: "data:image/png;base64,AA==", id: "img-1" } },
+      { type: "image_url", imageUrl: { url: "https://example.com/image.png" } },
     ])).toEqual([
       { type: "text", text: "look" },
-      { type: "image_url", image_url: { url: "data:image/png;base64,AA==", id: "img-1" } },
+      { type: "image", source: { kind: "base64", media_type: "image/png", data: "AA==" } },
+      { type: "image", source: { kind: "url", url: "https://example.com/image.png" } },
     ]);
   });
 

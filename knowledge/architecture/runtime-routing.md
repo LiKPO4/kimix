@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T15:22:00+08:00"
+timestamp: "2026-06-21T15:27:00+08:00"
 ---
 
 # Runtime Routing
@@ -37,6 +37,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 22. Kimix projects and official Server workspaces overlap by root path but are not interchangeable records. Kimix retains local-only pinning, ordering, Git, and long-task metadata. Before creating a Server session, the client idempotently registers or touches the root through the official workspace API and creates the session with the returned `workspace_id` and canonical root; registration failure follows the existing SDK fallback instead of creating a partially aligned Server session.
 23. Session-scoped filesystem APIs are preferred for Server-backed UI actions. File mention search uses the official `fs:search` only when the active Server session root matches the requested Kimix project root; SDK sessions, empty queries, unavailable sessions, and failed official requests retain the bounded local filesystem fallback. This root check prevents a renderer request from using another project's session as a filesystem capability.
 24. Server-backed project text previews prefer the official `fs:read` under the same session-root match. Kimix accepts only non-truncated UTF-8 text up to 1 MiB and otherwise reuses the existing local extension, containment, and size checks. The latest-plan sentinel and user-home Kimi plan paths remain local because they are outside the official session workspace.
+25. Official Web folder browsing and Electron folder selection are platform adapters, not competing sources of truth. Kimix retains the OS-native directory dialog because it provides the narrowest desktop permission and full platform integration; `/fs:home` and `/fs:browse` are required by browser clients that cannot open that dialog. Server image prompts, however, must use the official message content schema: data URLs become `image` content with a base64 source, and ordinary URLs become `image` content with a URL source. The legacy `image_url` payload is not sent to Server 0.18.
 
 # Main Components
 

@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace 的 Server 会话注册与绑定、`@文件` 搜索和项目文本预览已对齐；文件浏览/上传、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace、`@文件` 搜索、项目文本预览和 Server 图片消息格式已对齐；目录选择保留 Electron 原生实现；文件上传、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，审计官方目录浏览与 Kimix 项目选择器的适用边界。
+- 下一步：继续 P2，评估官方 `/files` 上传是否应替代当前图片 base64 与本地附件路径。
+
+## 2026-06-21 v2.11.35 官方图片消息格式
+- 当前目标：完成目录浏览边界审计，并修复 Server 图片消息仍使用旧式 payload 的协议偏差。
+- 根因：官方 `/fs:home`、`/fs:browse` 用于 Web 无法调用系统选择器的场景，Kimix Electron 原生目录对话框不应被重复实现替换；但 Server prompt 把图片转换为 `image_url`，不符合官方 0.18 `image.source` 协议。
+- 已完成：明确目录选择器属于桌面适配并保留；Server 图片 data URL 转为官方 `image + base64 source`，普通 URL 转为 `image + url source`；SDK 输入格式保持不变。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 已验证：Server Client 定向测试 16/16；全量测试 32 个文件、239/239；OKF 严格校验与 180 天维护审计通过；生产构建与 `git diff --check` 通过。
+- 下一步：验证并窄范围提交后，评估官方文件上传链路。
 
 ## 2026-06-21 v2.11.34 Server 文件预览优先
 - 当前目标：让 Server 会话中的项目文本预览优先使用官方会话级 `fs:read`，同时保持现有安全和兼容边界。

@@ -1,6 +1,6 @@
 export type ServerPromptPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string; id?: string } };
+  | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } };
 
 export type ServerSession = {
   id: string;
@@ -206,9 +206,15 @@ export function isKimiCodeSessionMissingError(error: unknown) {
 
 export function toServerPromptContent(input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>): ServerPromptPart[] {
   if (typeof input === "string") return [{ type: "text", text: input }];
-  return input.map((part) => part.type === "text"
-    ? { type: "text", text: part.text ?? "" }
-    : { type: "image_url", image_url: { url: part.imageUrl?.url ?? "", id: part.imageUrl?.id } });
+  return input.map((part) => {
+    if (part.type === "text") return { type: "text", text: part.text ?? "" };
+    const url = part.imageUrl?.url ?? "";
+    const dataUrl = url.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
+    if (dataUrl) {
+      return { type: "image", source: { kind: "base64", media_type: dataUrl[1], data: dataUrl[2] } };
+    }
+    return { type: "image", source: { kind: "url", url } };
+  });
 }
 
 export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> {
