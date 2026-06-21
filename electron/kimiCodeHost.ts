@@ -640,7 +640,14 @@ export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSe
 
 async function createSdkSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
   const sdkHarness = await getHarness();
-  const session = await sdkHarness.createSession(options);
+  let session: KimiCodeSessionLike;
+  try {
+    session = await sdkHarness.createSession(options);
+  } catch (error) {
+    const existingSessionId = getKimiCodeSessionAlreadyExistsId(error);
+    if (!existingSessionId) throw error;
+    session = await sdkHarness.resumeSession({ id: existingSessionId });
+  }
   return registerSession(session, "idle", {
     model: options.model,
     thinking: options.thinking,

@@ -12,7 +12,7 @@ import { reconcileOfficialSessionCatalog } from "@/utils/sessionCatalog";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
-import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
@@ -1758,8 +1758,31 @@ function App() {
       }).then((res) => {
         if (res.success) return;
         throw new Error(res.error);
-      }).catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
+      }).catch(async (err) => {
+        let message = err instanceof Error ? err.message : String(err);
+        const existingRuntimeId = getKimiAlreadyExistsSessionId(message);
+        if (existingRuntimeId) {
+          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: existingRuntimeId });
+          if (resumeRes.success) {
+            updateSession(uiSessionId, (session) => ({
+              ...session,
+              engine: "kimi-code" as const,
+              runtimeSessionId: resumeRes.data.sessionId,
+              officialSessionId: resumeRes.data.sessionId,
+              updatedAt: Date.now(),
+            }));
+            syncCurrentSessionFromStore(uiSessionId);
+            const retryRes = await sendKimiCodePromptWithRetry({
+              sessionId: resumeRes.data.sessionId,
+              content: contentWithFileAttachments(next.content, next.images),
+              images: promptImages(next.images),
+            });
+            if (retryRes.success) return;
+            message = retryRes.error;
+          } else {
+            message = resumeRes.error;
+          }
+        }
         useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
         if (isKimiActiveTurnError(message)) {
           updateSession(uiSessionId, (session) => {

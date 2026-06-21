@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "../kimiCodeSendRetry";
+import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "../kimiCodeSendRetry";
 
 describe("kimiCodeSendRetry", () => {
   afterEach(() => {
@@ -10,6 +10,16 @@ describe("kimiCodeSendRetry", () => {
   it("recognizes official active turn errors", () => {
     expect(isKimiActiveTurnError("Cannot launch a new turn while another turn (ID 5) is active")).toBe(true);
     expect(isKimiActiveTurnError("network unavailable")).toBe(false);
+  });
+
+  it("extracts already-existing session ids", () => {
+    expect(getKimiAlreadyExistsSessionId('Session "session_c9bf8475-65a8-405e-8674-8640bbcfe46" already exists')).toBe(
+      "session_c9bf8475-65a8-405e-8674-8640bbcfe46",
+    );
+    expect(getKimiAlreadyExistsSessionId("session_c9bf8475-65a8-405e-8674-8640bbcfe46 already exists")).toBe(
+      "session_c9bf8475-65a8-405e-8674-8640bbcfe46",
+    );
+    expect(getKimiAlreadyExistsSessionId("fetch failed")).toBeNull();
   });
 
   it("does not cancel an active turn after retrying", async () => {
