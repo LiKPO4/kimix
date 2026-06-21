@@ -46,4 +46,16 @@ describe("official-first session archive", () => {
     expect(result).toEqual({ success: false, error: "WebSocket error" });
     expect(archiveLocal).not.toHaveBeenCalled();
   });
+
+  it("官方会话已不存在时按幂等成功隐藏本地镜像", async () => {
+    const archiveLocal = vi.fn();
+    const result = await archiveSessionOfficialFirst(
+      session({ officialSessionId: "session_2c277849-ac4a-4489-9ecc-2af3c038ea37" }),
+      async () => ({ success: false, error: "/api/v1/sessions/session_2c277849-ac4a-4489-9ecc-2af3c038ea37:archive: session session_2c277849-ac4a-4489-9ecc-2af3c038ea37 does not exist" }),
+      archiveLocal,
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(archiveLocal).toHaveBeenCalledWith("local-1");
+  });
 });

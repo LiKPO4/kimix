@@ -1,4 +1,5 @@
 import type { Session } from "@/types/ui";
+import { isKimiCodeSessionMissingError } from "./kimiCodeSessionRecovery";
 
 export type OfficialArchiveResult = { success: true; data: void } | { success: false; error: string };
 
@@ -17,8 +18,18 @@ export async function archiveSessionOfficialFirst(
     if (!officialSessionId) return { success: false, error: "没有可归档的官方会话" };
     try {
       const result = await archiveOfficial(officialSessionId);
-      if (!result.success) return result;
+      if (!result.success) {
+        if (isKimiCodeSessionMissingError(result.error)) {
+          archiveLocal(session.id);
+          return { success: true };
+        }
+        return result;
+      }
     } catch (error) {
+      if (isKimiCodeSessionMissingError(error)) {
+        archiveLocal(session.id);
+        return { success: true };
+      }
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }

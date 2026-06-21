@@ -215,7 +215,7 @@ export function isKimiCodeServerSessionRoutingEnabled(
 
 export function isKimiCodeSessionMissingError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:HTTP\s+404|session not found|was not found|unknown session|会话不存在|session.*missing)/i.test(message);
+  return /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i.test(message);
 }
 
 export function toServerConfigPatch(patch: Record<string, unknown>): Record<string, unknown> {

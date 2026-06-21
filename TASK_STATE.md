@@ -3,6 +3,7 @@
 ## 2026-06-21 官方能力对齐 todolist
 - 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。
 - 补充扫描：
+  - ✅ P0：归档已被官方删除的 Server 会话时会弹出 /api/v1/... does not exist 技术错误；已将这类 session missing 视为幂等成功，本地隐藏镜像并不再提示底层接口。
   - ✅ P0：消息信息气泡不能因空指标或纯时间状态被判空而消失；已恢复 footer 固定间距，除静默重试/中断类瞬态状态外，footer 状态至少显示时间信息。
   - ✅ P1：浏览器预览兜底、主进程能力缺失错误、配置导出失败和事件 mapper 默认错误仍会透出 Kimi Code SDK；已统一收口为 Kimi Code / 兼容链路口径。
   - ✅ P1：Slash/Skill/插件页仍有 SDK、TUI、Superpowers 等用户不需要理解的内部口径；已收口为“兼容能力 / 终端主题 / 官方插件”。

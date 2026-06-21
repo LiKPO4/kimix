@@ -54,6 +54,7 @@ describe("kimiCodeServerHost", () => {
   it("recognizes missing session errors without treating them as server runtime failures", () => {
     expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a/profile: Session \"session_a\" was not found"))).toBe(true);
     expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a: HTTP 404"))).toBe(true);
+    expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a:archive: session session_a does not exist"))).toBe(true);
     expect(isKimiCodeSessionMissingError(new Error("fetch failed"))).toBe(false);
   });
 });
