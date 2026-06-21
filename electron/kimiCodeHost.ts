@@ -14,6 +14,7 @@ import {
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
+  toServerConfigPatch,
   type ServerFrame,
   type ServerAuthSummary,
   type ServerMcpServer,
@@ -1661,6 +1662,14 @@ export async function getConfigDiagnostics(): Promise<KimiCodeConfigDiagnostics>
 
 export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig> {
   const sdkHarness = await getHarness();
+  if (kimiCodeServerHost.isReady()) {
+    try {
+      await getServerClient().setConfig(toServerConfigPatch(patch as Record<string, unknown>));
+      return sdkHarness.getConfig({ reload: true });
+    } catch (error) {
+      console.warn("[KimiCodeServerHost] config update failed; falling back to SDK:", error);
+    }
+  }
   return sdkHarness.setConfig(patch);
 }
 

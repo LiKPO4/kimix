@@ -6,6 +6,7 @@ import {
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
+  toServerConfigPatch,
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
 
@@ -138,6 +139,29 @@ describe("KimiCodeServerClient protocol adapters", () => {
       { url: "http://127.0.0.1:58627/api/v1/oauth/login", method: "DELETE" },
       { url: "http://127.0.0.1:58627/api/v1/oauth/logout", method: "POST" },
     ]);
+  });
+
+  it("maps and writes configuration through the official merge route", async () => {
+    const patch = toServerConfigPatch({
+      defaultModel: "openai/gpt",
+      providers: { openai: { type: "openai", apiKey: "secret", baseUrl: "https://api.example", defaultModel: "gpt" } },
+      models: { "openai/gpt": { provider: "openai", model: "gpt", maxContextSize: 128000, adaptiveThinking: true } },
+    });
+    expect(patch).toEqual({
+      default_model: "openai/gpt",
+      providers: { openai: { type: "openai", api_key: "secret", base_url: "https://api.example", default_model: "gpt" } },
+      models: { "openai/gpt": { provider: "openai", model: "gpt", max_context_size: 128000, adaptive_thinking: true } },
+    });
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({
+      code: 0, data: { providers: {}, default_model: "openai/gpt" },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.setConfig(patch)).resolves.toMatchObject({ default_model: "openai/gpt" });
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:58627/api/v1/config", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify(patch),
+    }));
   });
 
   it("searches files through the official session-scoped filesystem route", async () => {

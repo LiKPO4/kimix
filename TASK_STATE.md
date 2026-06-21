@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传和 OAuth 生命周期已对齐；目录选择保留 Electron 原生实现；配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传、OAuth 生命周期和配置 merge 写入已对齐；目录选择保留 Electron 原生实现；模型/Provider 删除、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，审计配置与默认模型写入是否能迁移到官方 Server API。
+- 下一步：继续 P2，审计模型与 Provider 删除的官方能力边界。
+
+## 2026-06-21 v2.11.38 官方配置写入
+- 当前目标：让新增 Provider、模型配置、默认模型与 adaptive thinking 修改优先走官方 Server `/config` merge API。
+- 根因：官方 0.18 已公开配置写接口，但 Kimix 所有设置变更仍先调用 SDK；同时 Kimix 使用 camelCase，不能原样发送给官方 wire schema。
+- 已完成：增加顶层、Provider 与模型字段的 camelCase 到 snake_case 转换；Server 就绪时优先官方配置写入并重新读取 SDK 完整配置；官方失败时回落既有 SDK 写入。删除语义未混入本次 merge 迁移。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 已验证：Server Client 定向测试 20/20；全量测试 32 个文件、243/243；OKF 严格校验与 180 天维护审计通过；生产构建与 `git diff --check` 通过。
+- 下一步：验证并窄范围提交后，审计模型与 Provider 删除能力。
 
 ## 2026-06-21 v2.11.37 官方 OAuth 生命周期
 - 当前目标：让登录状态、设备授权、取消未完成授权和退出优先走官方 Server OAuth API。

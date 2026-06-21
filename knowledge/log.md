@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Official config writes**: Routed non-destructive global config mutations through the Server merge API with explicit camelCase-to-wire conversion and SDK fallback.
 * **Official OAuth lifecycle**: Preferred Server auth state, device login, pending-flow cancellation, and logout while retaining SDK and local-credential fallbacks for unavailable or failed Server routes.
 * **Official file uploads**: Routed local Server prompt images through the multipart `/files` lifecycle and referenced the returned file ID across prompt, steer, and BTW routes.
 * **Official image content**: Kept the Electron-native folder picker as a platform adapter and replaced legacy Server `image_url` prompt payloads with official image base64/URL sources.

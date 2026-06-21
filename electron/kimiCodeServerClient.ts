@@ -218,6 +218,40 @@ export function isKimiCodeSessionMissingError(error: unknown) {
   return /(?:HTTP\s+404|session not found|was not found|unknown session|会话不存在|session.*missing)/i.test(message);
 }
 
+export function toServerConfigPatch(patch: Record<string, unknown>): Record<string, unknown> {
+  const topLevelKeys: Record<string, string> = {
+    defaultProvider: "default_provider",
+    defaultModel: "default_model",
+    defaultThinking: "default_thinking",
+  };
+  const providerKeys: Record<string, string> = {
+    apiKey: "api_key",
+    baseUrl: "base_url",
+    defaultModel: "default_model",
+    customHeaders: "custom_headers",
+  };
+  const modelKeys: Record<string, string> = {
+    maxContextSize: "max_context_size",
+    maxOutputSize: "max_output_size",
+    displayName: "display_name",
+    reasoningKey: "reasoning_key",
+    adaptiveThinking: "adaptive_thinking",
+  };
+  const rename = (value: unknown, keys: Record<string, string>) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [keys[key] ?? key, item]));
+  };
+  return Object.fromEntries(Object.entries(patch).map(([key, value]) => {
+    if (key === "providers" && value && typeof value === "object" && !Array.isArray(value)) {
+      return [key, Object.fromEntries(Object.entries(value).map(([id, provider]) => [id, rename(provider, providerKeys)]))];
+    }
+    if (key === "models" && value && typeof value === "object" && !Array.isArray(value)) {
+      return [key, Object.fromEntries(Object.entries(value).map(([id, model]) => [id, rename(model, modelKeys)]))];
+    }
+    return [topLevelKeys[key] ?? key, value];
+  }));
+}
+
 export async function toServerPromptContent(
   input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>,
   upload?: ServerPromptUpload,
@@ -433,6 +467,10 @@ export class KimiCodeServerClient {
 
   getRedactedConfig(): Promise<Record<string, unknown>> {
     return this.request("/api/v1/config");
+  }
+
+  setConfig(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return this.request("/api/v1/config", { method: "POST", body: JSON.stringify(patch) });
   }
 
   async listModels(): Promise<ServerModelCatalogItem[]> {
