@@ -7,11 +7,19 @@
   2. ✅ P0：/reload 在 Server 会话只刷新 session 信息却提示“已重载配置”；已改为显式失败，明确 Server 暂无直接 reload API。
   3. ✅ P1：外部网页归档后，本地对账目前只增不减；已改为 Server 官方列表成功返回时双向对账，缺失的同项目官方镜像会本地隐藏。
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
-  5. P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步。
+  5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. P1：Slash 清单仍偏硬编码；需按 Server OpenAPI 和 SDK capability 裁剪，不暴露不可用项。
   7. P2：Workspace、文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表等仍需逐项评估官方 API 对齐。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P1，处理 Kimix 自有 pendingMessages 与官方 prompts active/queued 队列补偿同步。
+- 下一步：继续 P1，处理 Slash 清单按 Server/SDK 能力动态裁剪。
+
+## 2026-06-21 v2.11.30 官方 Prompt 队列门禁
+- 当前目标：避免 Kimix 本地 pendingMessages 与官方 Server prompts active/queued 状态不同步导致重复派发或停止状态误判。
+- 根因：收到 completed 状态后，Kimix 立即 shift 下一条本地消息；但官方 Server 可能仍有 active/queued prompt。Server abort 后也直接标记 interrupted，没有复查官方队列。
+- 已完成：新增轻量官方 prompt queue IPC；普通会话和长程任务自动派发前先核对官方队列；Server busy 时保留本地待发消息；abort 后若官方仍有 prompt 则保持 running 状态；SDK 和查询失败路径继续使用原本地队列逻辑。
+- 关键文件：electron/kimiCodeHost.ts、electron/main.ts、electron/preload.ts、electron/types/ipc.ts、src/App.tsx、src/utils/promptQueue.ts。
+- 已验证：队列定向测试通过；全量测试 31 个文件 233/233、OKF 严格校验、180 天维护审计、生产构建和 git diff --check 通过。
+- 下一步：窄范围提交后，继续处理 P1 Slash 清单按 Server/SDK 能力动态裁剪。
 
 ## 2026-06-21 v2.11.29 官方历史正文优先
 - 当前目标：让历史正文加载优先使用官方 Server snapshot/messages，减少本地镜像与官方网页显示不一致。

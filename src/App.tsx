@@ -14,6 +14,7 @@ import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeS
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
+import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
@@ -324,6 +325,11 @@ function removeMatchingPendingSteerMessage(uiSessionId: string, content: string)
     if (!match) return state;
     return { pendingMessages: state.pendingMessages.filter((msg) => msg.id !== match.id) };
   });
+}
+
+async function shouldWaitForOfficialPromptQueue(runtimeSessionId: string) {
+  const response = await window.api.getKimiCodePromptQueue({ sessionId: runtimeSessionId }).catch(() => null);
+  return shouldDeferLocalPendingDispatch(response?.success ? response.data : null);
 }
 
 function summarizeNotificationBody(content: string): string {
@@ -1700,17 +1706,25 @@ function App() {
     return true;
   };
 
-  const dispatchNextPendingKimiMessage = (uiSessionId: string, runtimeSessionId: string) => {
+  const dispatchNextPendingKimiMessage = async (uiSessionId: string, runtimeSessionId: string) => {
     if (pendingQueueDispatchRef.current.has(uiSessionId)) return false;
-    const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (latestSession && hasPendingQuestion(latestSession.events)) {
-      persistLocalConversationState();
-      return false;
-    }
-    const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
-    if (!next) return false;
-
     pendingQueueDispatchRef.current.add(uiSessionId);
+    let dispatched = false;
+    try {
+      const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+      if (latestSession && hasPendingQuestion(latestSession.events)) {
+        persistLocalConversationState();
+        return false;
+      }
+      if (await shouldWaitForOfficialPromptQueue(runtimeSessionId)) {
+        setRunningSessionId(uiSessionId);
+        persistLocalConversationState();
+        return false;
+      }
+      const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
+      if (!next) return false;
+      dispatched = true;
+
     const userEventId = Math.random().toString(36).substring(2, 11);
     const placeholderId = Math.random().toString(36).substring(2, 11);
     updateSession(uiSessionId, (session) => ({
@@ -1787,6 +1801,9 @@ function App() {
     }, 300);
     timersRef.current.push(timer);
     return true;
+    } finally {
+      if (!dispatched) pendingQueueDispatchRef.current.delete(uiSessionId);
+    }
   };
 
   const dispatchLongTaskExecutorFromReview = (uiSessionId: string, runtimeSessionId: string) => {
@@ -2447,7 +2464,7 @@ function App() {
       notifyTurnComplete(uiSessionId, payload.sessionId, undefined, assistantContent);
       runtimeTurnStartRef.current.delete(payload.sessionId);
 
-      dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
+      void dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
     });
 
     const unsubscribeLongTaskStatus = window.api.onKimiCodeStatus((payload) => {
@@ -2565,8 +2582,14 @@ function App() {
           return;
         }
 
-        const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
-        if (next) {
+        void shouldWaitForOfficialPromptQueue(payload.sessionId).then((shouldWait) => {
+          if (shouldWait) {
+            setRunningSessionId(uiSessionId);
+            persistLocalConversationState();
+            return;
+          }
+          const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
+          if (next) {
           const userEventId = Math.random().toString(36).substring(2, 11);
           const placeholderId = Math.random().toString(36).substring(2, 11);
           updateSession(uiSessionId, (session) => ({
@@ -2642,8 +2665,9 @@ function App() {
               setRunningSessionId(null);
             });
           }, 300);
-          timersRef.current.push(timer);
-        }
+            timersRef.current.push(timer);
+          }
+        });
       }
     });
 

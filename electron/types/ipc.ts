@@ -1919,6 +1919,19 @@ export type KimiCodeServerRuntimeDiagnosticsResponse = {
   error: string;
 };
 
+export type KimiCodePromptQueueResponse = {
+  success: true;
+  data: {
+    supported: boolean;
+    activeId: string | null;
+    activeStatus: string | null;
+    queuedIds: string[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeServerModelCatalogResponse = {
   success: true;
   data: KimiCodeServerModelCatalog;

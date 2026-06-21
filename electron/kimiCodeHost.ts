@@ -957,8 +957,10 @@ export async function undoHistory(sessionId: string, count: number): Promise<voi
 
 export async function cancel(sessionId: string): Promise<void> {
   if (serverSessions.has(sessionId)) {
-    await getServerClient().abort(sessionId);
-    setStatus(sessionId, "interrupted");
+    const client = getServerClient();
+    await client.abort(sessionId);
+    const prompts = await client.listPrompts(sessionId).catch(() => null);
+    setStatus(sessionId, prompts && (prompts.active || prompts.queued.length > 0) ? "running" : "interrupted");
     return;
   }
   const managed = getManagedSession(sessionId);
@@ -1229,6 +1231,24 @@ export async function getServerRuntimeDiagnostics(sessionId: string): Promise<Ki
       activeStatus: prompts.active?.status ?? null,
       queuedCount: prompts.queued.length,
     },
+  };
+}
+
+export async function getPromptQueueState(sessionId: string): Promise<{
+  supported: boolean;
+  activeId: string | null;
+  activeStatus: string | null;
+  queuedIds: string[];
+}> {
+  if (!serverSessions.has(sessionId)) {
+    return { supported: false, activeId: null, activeStatus: null, queuedIds: [] };
+  }
+  const prompts = await getServerClient().listPrompts(sessionId);
+  return {
+    supported: true,
+    activeId: prompts.active?.prompt_id ?? null,
+    activeStatus: prompts.active?.status ?? null,
+    queuedIds: prompts.queued.map((prompt) => prompt.prompt_id),
   };
 }
 

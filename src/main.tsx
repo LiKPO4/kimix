@@ -44,6 +44,7 @@ import type {
   KimiCodeListMcpServersResponse,
   KimiCodeMcpStartupMetricsResponse,
   KimiCodeServerRuntimeDiagnosticsResponse,
+  KimiCodePromptQueueResponse,
   KimiCodeServerModelCatalogResponse,
   KimiCodeListBackgroundTasksResponse,
   KimiCodeBackgroundTaskOutputResponse,
@@ -449,6 +450,10 @@ function installBrowserPreviewApi() {
     listKimiCodeMcpServers: (): Promise<KimiCodeListMcpServersResponse> => fail("读取 Kimi Code SDK MCP 服务"),
     getKimiCodeMcpStartupMetrics: (): Promise<KimiCodeMcpStartupMetricsResponse> => fail("读取 Kimi Code SDK MCP 启动指标"),
     getKimiCodeServerRuntimeDiagnostics: (): Promise<KimiCodeServerRuntimeDiagnosticsResponse> => fail("读取 Kimi Server 运行时诊断"),
+    getKimiCodePromptQueue: (): Promise<KimiCodePromptQueueResponse> => Promise.resolve({
+      success: true,
+      data: { supported: false, activeId: null, activeStatus: null, queuedIds: [] },
+    }),
     getKimiCodeServerModelCatalog: (): Promise<KimiCodeServerModelCatalogResponse> => fail("读取 Kimi Server 模型目录"),
     reconnectKimiCodeMcpServer: (): Promise<VoidResponse> => fail("重连 Kimi Code SDK MCP 服务"),
     listKimiCodeBackgroundTasks: (): Promise<KimiCodeListBackgroundTasksResponse> => fail("读取 Kimi Code SDK 后台任务"),
