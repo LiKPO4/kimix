@@ -113,6 +113,38 @@ describe("KimiCodeServerClient protocol adapters", () => {
     }]);
   });
 
+  it("reads text through the official session-scoped filesystem route", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => new Response(JSON.stringify({
+      code: 0,
+      data: {
+        path: "README.md",
+        content: "# Readme",
+        encoding: "utf-8",
+        size: 8,
+        truncated: false,
+        etag: "etag-1",
+        mime: "text/markdown",
+        is_binary: false,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.readFile("session/1", "README.md")).resolves.toMatchObject({
+      path: "README.md",
+      content: "# Readme",
+      encoding: "utf-8",
+      is_binary: false,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:58627/api/v1/sessions/session%2F1/fs:read",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ path: "README.md", offset: 0, length: 1_048_576, encoding: "utf-8" }),
+      }),
+    );
+  });
+
   it("registers the official workspace before creating a Server session", async () => {
     const calls: Array<{ url: string; method?: string; body?: BodyInit | null }> = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {

@@ -34,6 +34,19 @@ export type ServerFsSearchHit = {
   match_positions: number[];
 };
 
+export type ServerFsReadResult = {
+  path: string;
+  content: string;
+  encoding: "utf-8" | "base64";
+  size: number;
+  truncated: boolean;
+  etag: string;
+  mime: string;
+  language_id?: string;
+  line_count?: number;
+  is_binary: boolean;
+};
+
 export type ServerSessionStatus = {
   status: string;
   model?: string;
@@ -305,6 +318,18 @@ export class KimiCodeServerClient {
         query,
         limit: Math.max(1, Math.min(200, Math.floor(limit))),
         follow_gitignore: true,
+      }),
+    });
+  }
+
+  readFile(sessionId: string, filePath: string, length = 1_048_576): Promise<ServerFsReadResult> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/fs:read`, {
+      method: "POST",
+      body: JSON.stringify({
+        path: filePath,
+        offset: 0,
+        length: Math.max(1, Math.min(10_485_760, Math.floor(length))),
+        encoding: "utf-8",
       }),
     });
   }

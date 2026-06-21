@@ -998,6 +998,7 @@ export type OpenPathRequest = {
 export type ReadTextFileRequest = {
   path: string;
   projectPath?: string;
+  sessionId?: string;
 }
 
 export type ReadTextFileResponse = {

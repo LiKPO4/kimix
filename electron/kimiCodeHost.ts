@@ -1269,6 +1269,22 @@ export async function searchServerSessionFiles(
     .map((item) => ({ path: item.path, name: item.name }));
 }
 
+export async function readServerSessionTextFile(
+  sessionId: string,
+  workDir: string,
+  filePath: string,
+): Promise<{ path: string; content: string } | undefined> {
+  const managed = serverSessions.get(sessionId);
+  if (!managed) return undefined;
+  const expectedRoot = path.resolve(workDir).replace(/\\/g, "/").toLowerCase();
+  const sessionRoot = path.resolve(managed.workDir).replace(/\\/g, "/").toLowerCase();
+  if (expectedRoot !== sessionRoot) return undefined;
+  const result = await getServerClient().readFile(sessionId, filePath);
+  if (result.is_binary || result.encoding !== "utf-8") throw new Error("Only text files can be read");
+  if (result.truncated || result.size > 1_048_576) throw new Error("Text file is too large");
+  return { path: result.path, content: result.content };
+}
+
 export async function getServerModelCatalog(): Promise<KimiCodeServerModelCatalog> {
   const client = getServerClient();
   const [auth, config, models, providers] = await Promise.all([

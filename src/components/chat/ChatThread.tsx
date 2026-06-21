@@ -129,7 +129,7 @@ function splitUserAttachedStatuses(events: TimelineEvent[]) {
   return { events: remaining, attachedByUserId };
 }
 
-function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: string }) {
+function PlanPreviewCard({ path, projectPath, sessionId }: { path: string; projectPath?: string; sessionId?: string }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -137,7 +137,7 @@ function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: st
   const loadPlan = () => {
     setLoading(true);
     setError("");
-    void window.api.readTextFile({ path, projectPath }).then((res) => {
+    void window.api.readTextFile({ path, projectPath, sessionId }).then((res) => {
       if (res.success) {
         setContent(res.data.content);
       } else {
@@ -152,7 +152,7 @@ function PlanPreviewCard({ path, projectPath }: { path: string; projectPath?: st
 
   useEffect(() => {
     loadPlan();
-  }, [path, projectPath]);
+  }, [path, projectPath, sessionId]);
 
   return (
     <div className="w-full overflow-hidden rounded-[var(--radius-md)] border border-accent-primary-soft bg-accent-primary-light">
@@ -1358,7 +1358,7 @@ export function ChatThread() {
               {item.type === "tool_group"
                 ? <ToolGroup tools={item.tools} />
                 : item.type === "plan_preview"
-                  ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} />
+                  ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
                     : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />

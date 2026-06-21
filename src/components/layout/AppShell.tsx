@@ -947,7 +947,11 @@ export function AppShell() {
     setPreviewError("");
     setPreviewContent("");
     setPreviewResolvedPath("");
-    window.api.readTextFile({ projectPath: previewProjectPath, path: previewFile.path }).then((res) => {
+    window.api.readTextFile({
+      projectPath: previewProjectPath,
+      sessionId: liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : undefined,
+      path: previewFile.path,
+    }).then((res) => {
       if (cancelled) return;
       setPreviewLoading(false);
       if (!res.success) {
@@ -964,7 +968,7 @@ export function AppShell() {
     return () => {
       cancelled = true;
     };
-  }, [previewProjectPath, previewFile?.path]);
+  }, [liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, liveCurrentSession?.officialSessionId, previewProjectPath, previewFile?.path]);
 
   const btwTransientState = btwTransientBySessionId[btwSessionId] ?? EMPTY_BTW_TRANSIENT_STATE;
   const btwState: BtwPanelState = liveCurrentSession
@@ -1382,7 +1386,11 @@ ${isFinalStep
     if (!options?.silent) {
       setSessionPlanState((state) => ({ ...state, loading: true, path: sessionPlanPath, error: null }));
     }
-    void window.api.readTextFile({ projectPath: liveCurrentSessionProjectPath, path: pathToRead }).then((res) => {
+    void window.api.readTextFile({
+      projectPath: liveCurrentSessionProjectPath,
+      sessionId: liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : undefined,
+      path: pathToRead,
+    }).then((res) => {
       if (res.success) {
         setSessionPlanState({
           loading: false,
@@ -1405,7 +1413,15 @@ ${isFinalStep
         message: undefined,
       });
     });
-  }, [hasLongTaskMeta, liveCurrentSessionProjectPath, longTaskInspectorOpen, sessionPlanPath]);
+  }, [
+    hasLongTaskMeta,
+    liveCurrentSession?.id,
+    liveCurrentSession?.officialSessionId,
+    liveCurrentSession?.runtimeSessionId,
+    liveCurrentSessionProjectPath,
+    longTaskInspectorOpen,
+    sessionPlanPath,
+  ]);
 
   const refreshSessionLongTasks = useCallback((options?: { silent?: boolean }) => {
     const pathForTasks = liveCurrentSession?.projectPath ?? currentProject?.path;

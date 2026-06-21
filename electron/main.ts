@@ -4478,6 +4478,7 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
     const req = request as Record<string, unknown>;
     const requestPath = typeof req.path === "string" ? req.path : "";
     const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
     if (requestPath.trim() === "__latest_kimi_plan__") {
       const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
       const hasPlanFile = fs.existsSync(kimiPlansDir) && fs.readdirSync(kimiPlansDir, { withFileTypes: true })
@@ -4493,6 +4494,18 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
             message: "Kimi 还没有生成 Plan 文件",
           },
         };
+      }
+    }
+    const normalizedRequestPath = requestPath.trim().replace(/\\/g, "/");
+    const isKimiPlanPath = normalizedRequestPath.startsWith(".kimi/plans/") || normalizedRequestPath.startsWith(".kimi-code/plans/");
+    if (sessionId && projectPath && requestPath.trim() && !isKimiPlanPath) {
+      try {
+        const official = await kimiCodeHost.readServerSessionTextFile(sessionId, projectPath, requestPath);
+        if (official) {
+          return { success: true, data: { ...official, updatedAt: 0 } };
+        }
+      } catch (error) {
+        console.warn("[KimiCodeServerHost] official file read failed; using local fallback:", error);
       }
     }
     const { resolvedFile, updatedAt } = resolveReadableTextFile(requestPath, projectPath);

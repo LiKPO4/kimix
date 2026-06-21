@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Official file preview**: Routed Server-backed project text previews through session-scoped `fs:read` with root matching, UTF-8 and size gates, while keeping user-home Kimi plan files on the local path.
 * **Official file search**: Routed Server-backed file mentions through the session-scoped official filesystem search with project-root validation, retaining local search for SDK, empty-query, unavailable, and failure paths.
 * **Official workspace binding**: New Server sessions now register or touch their project root through the official workspace API and use the returned workspace ID and canonical root, while Kimix keeps local project-only metadata separate.
 * **Runtime-aware Slash catalog**: Made Slash completion depend on the active Server or SDK session and use a conservative catalog while runtime identity is unavailable, preventing Server sessions from advertising SDK-only Goal, Swarm, or reload actions.

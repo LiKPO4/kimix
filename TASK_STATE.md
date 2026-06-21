@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace 的 Server 会话注册与绑定、`@文件` 官方搜索已对齐；文件读取/浏览/上传、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace 的 Server 会话注册与绑定、`@文件` 搜索和项目文本预览已对齐；文件浏览/上传、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，让 Server 会话的文件预览优先使用官方 `fs:read`。
+- 下一步：继续 P2，审计官方目录浏览与 Kimix 项目选择器的适用边界。
+
+## 2026-06-21 v2.11.34 Server 文件预览优先
+- 当前目标：让 Server 会话中的项目文本预览优先使用官方会话级 `fs:read`，同时保持现有安全和兼容边界。
+- 根因：预览面板、会话 Plan 卡片和侧栏 Plan 读取均只调用本地文件系统，未使用 Server 已提供的会话工作区读取接口。
+- 已完成：读取请求可携带 runtime session ID；仅在 Server 会话根与项目根一致时调用官方 `fs:read`；限制 UTF-8 文本和 1 MiB，二进制/超限/官方失败回落既有本地校验；`__latest_kimi_plan__` 与用户目录 Kimi Plan 明确保留本地读取。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/types/ipc.ts`、`src/components/layout/AppShell.tsx`、`src/components/chat/ChatThread.tsx`。
+- 已验证：Server Client 定向测试 16/16；全量测试 32 个文件 239/239；OKF 严格校验、180 天维护审计、生产构建及差异检查通过。
+- 下一步：验证并窄范围提交后，审计官方目录浏览能力。
 
 ## 2026-06-21 v2.11.33 Server 文件搜索优先
 - 当前目标：让 Server 会话的 `@文件` 补全使用官方工作区文件搜索，而不是始终由 Kimix 递归扫描磁盘。
