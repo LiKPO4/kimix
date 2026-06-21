@@ -139,6 +139,14 @@ function assistantBodySize(events: TimelineEvent[]) {
     .reduce((sum, event) => sum + event.content.trim().length, 0);
 }
 
+function assistantBodyText(events: TimelineEvent[]) {
+  return events
+    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
+    .map((event) => event.content)
+    .filter((content) => content.trim().length > 0)
+    .join("\n\n");
+}
+
 function displayableUserImageCount(events: TimelineEvent[]) {
   return events
     .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
@@ -167,8 +175,7 @@ function needsKimiCodeHistoryRepair(session: Session) {
     (
       session.events.some((event) => (
         event.type === "assistant_message" &&
-        event.isComplete &&
-        event.content.trim().length === 0
+        (event.content.trim().length > 0 || (event.isComplete && event.content.trim().length === 0))
       )) ||
       hasMalformedAssistantMarkdown(session.events) ||
       hasPossiblyLostUserImages(session.events)
@@ -207,7 +214,9 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       const hasMoreAssistantBody = assistantBodySize(historyEvents) > assistantBodySize(session.events);
       const hasMoreDisplayableImages = displayableUserImageCount(historyEvents) > displayableUserImageCount(session.events);
       const repairsMalformedMarkdown = hasMalformedAssistantMarkdown(session.events) && !hasMalformedAssistantMarkdown(historyEvents);
-      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown) continue;
+      const canonicalAssistantBody = assistantBodyText(historyEvents);
+      const repairsStreamAssembly = Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(session.events);
+      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown && !repairsStreamAssembly) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
         sessions: state.sessions.map((item) => item.id === session.id

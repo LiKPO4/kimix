@@ -1,6 +1,5 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
 import { isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
-import { restoreAssistantProgressParagraphs } from "./assistantParagraphs";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -75,27 +74,10 @@ function normalizeNativeToolProgress(payload: Record<string, unknown>, source: R
   return update.kind === "stderr" ? `[stderr] ${text}` : text;
 }
 
-function appendAssistantContent(existingContent: string, incomingContent: string, paragraphBreak: boolean): string {
+function appendAssistantContent(existingContent: string, incomingContent: string): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
-  if (
-    !paragraphBreak ||
-    existingContent.endsWith("\n") ||
-    incomingContent.startsWith("\n") ||
-    isInsideUnclosedInlineCode(existingContent) ||
-    isInsideUnclosedStrongEmphasis(existingContent) ||
-    incomingContent.trim().length < 8
-  ) {
-    return existingContent + incomingContent;
-  }
-  return restoreAssistantProgressParagraphs(`${existingContent}\n\n${incomingContent}`);
-}
-
-function isInsideUnclosedStrongEmphasis(content: string) {
-  const currentLine = content.split(/\r?\n/).pop() ?? "";
-  const asteriskPairs = currentLine.match(/\*\*/g)?.length ?? 0;
-  const underscorePairs = currentLine.match(/__/g)?.length ?? 0;
-  return asteriskPairs % 2 === 1 || underscorePairs % 2 === 1;
+  return existingContent + incomingContent;
 }
 
 function isInsideUnclosedInlineCode(content: string) {
@@ -103,10 +85,6 @@ function isInsideUnclosedInlineCode(content: string) {
   const withoutFences = currentLine.replace(/```/g, "");
   const inlineBackticks = withoutFences.match(/`/g)?.length ?? 0;
   return inlineBackticks % 2 === 1;
-}
-
-function isAssistantProcessBoundary(event: TimelineEvent): boolean {
-  return !["assistant_message", "status_update", "todo", "steer_message"].includes(event.type);
 }
 
 function normalizeComparableContent(content: string): string {
@@ -1063,11 +1041,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         }
         return appendAfterConfirmedSteer(existing, [incoming]);
       }
-      const shouldBreakParagraph = eventsAfterOpenAssistant.some(isAssistantProcessBoundary);
       const updated: typeof last = {
         ...last,
         agentRole: incoming.agentRole ?? last.agentRole,
-        content: appendAssistantContent(last.content, incoming.content, shouldBreakParagraph),
+        content: appendAssistantContent(last.content, incoming.content),
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
         thinkingParts: incoming.thinkingParts
           ? [...(last.thinkingParts ?? []), ...incoming.thinkingParts]

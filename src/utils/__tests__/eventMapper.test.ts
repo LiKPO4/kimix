@@ -217,7 +217,7 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("Hello");
   });
 
-  it("separates assistant content resumed after a tool boundary", () => {
+  it("preserves exact assistant delta concatenation across a tool boundary", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "先读取关键文件确认当前代码状态。", isThinking: false, isComplete: false },
       { id: "2", type: "tool_call", timestamp: 2, toolCallId: "tc-1", toolName: "Read", status: "completed", arguments: {}, rawArguments: "{}" },
@@ -233,7 +233,7 @@ describe("mergeEvents", () => {
     };
     const result = mergeEvents(existing, incoming);
     const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
-    expect(assistant.content).toBe("先读取关键文件确认当前代码状态。\n\n现在开始并行修复批次1的安全类P0问题。");
+    expect(assistant.content).toBe("先读取关键文件确认当前代码状态。现在开始并行修复批次1的安全类P0问题。");
   });
 
   it("does not split an unfinished bold label across a tool boundary", () => {
@@ -254,6 +254,23 @@ describe("mergeEvents", () => {
     const result = mergeEvents(existing, incoming);
     const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
     expect(assistant.content).toBe("- **Achiever**：图鉴\n- **Explorer**：骰子组合、法宝协同");
+  });
+
+  it("does not split list text or words at arbitrary process boundaries", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "4. **负面骰子标签化**：让玩家有 informed", isThinking: false, isComplete: false },
+      { id: "2", type: "subagent", timestamp: 2, agentId: "agent-1", agentName: "reviewer", status: "completed", events: [] },
+    ];
+    const choice: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: " choice。\n5. **奖励多样性**：增加构筑资源。\n\n# 二、2D 游戏分析（game", isThinking: false, isComplete: false };
+    const afterChoice = mergeEvents(existing, choice);
+    const boundary: TimelineEvent = { id: "4", type: "tool_call", timestamp: 4, toolCallId: "tc-2", toolName: "Read", status: "success", arguments: {} };
+    const afterBoundary = mergeEvents(afterChoice, boundary);
+    const suffix: TimelineEvent = { id: "5", type: "assistant_message", timestamp: 5, content: "-development/2d-games）", isThinking: false, isComplete: false };
+    const result = mergeEvents(afterBoundary, suffix);
+    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect(assistant.content).toContain("informed choice。\n5. **奖励多样性**");
+    expect(assistant.content).toContain("# 二、2D 游戏分析（game-development/2d-games）");
   });
 
   it("keeps inline code path fragments together across tool boundaries", () => {
@@ -1046,7 +1063,7 @@ describe("mapHistoryEvents", () => {
     const assistant = result.find((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
     const compaction = result.find((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction");
     const tool = result.find((event): event is Extract<TimelineEvent, { type: "tool_call" }> => event.type === "tool_call");
-    expect(assistant?.content).toBe("压缩前\n\n继续输出后半段内容");
+    expect(assistant?.content).toBe("压缩前继续输出后半段内容");
     expect(assistant?.isComplete).toBe(true);
     expect(compaction?.phase).toBe("end");
     expect(tool?.status).toBe("success");
