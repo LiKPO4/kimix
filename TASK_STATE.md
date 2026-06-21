@@ -9,9 +9,9 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传、OAuth 生命周期、配置 merge 写入和默认模型专用路由已对齐；目录选择保留 Electron 原生实现；官方 0.18 未提供模型/Provider 删除；交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传、OAuth 生命周期、配置 merge 写入和默认模型专用路由已对齐；目录选择保留 Electron 原生实现；官方 0.18 未提供模型/Provider 删除；消息详情分页、审批/问题列表仍需逐项处理。Server Terminal 属于官方 Web/终端通道，不是 Kimix 主交互必须补齐的 UI。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，审计交互式 Terminal UI 与官方终端生命周期的差距。
+- 下一步：继续 P2，审计消息详情分页与审批/问题列表补偿。
 
 ## 2026-06-21 v2.11.39 官方默认模型路由
 - 当前目标：优先使用官方模型目录的 `:set_default` 专用接口，并确认模型与 Provider 删除边界。
@@ -19,7 +19,7 @@
 - 已完成：仅修改默认模型时调用官方专用接口；其他配置仍使用 merge 路由；设置成功提示不再固定声称“通过官方 SDK”；删除逻辑继续作为 Kimix 本地配置扩展，不伪装成 Server 原生能力。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
 - 已验证：Server Client 定向测试 21/21；全量测试 32 个文件、244/244；OKF 严格校验与 180 天维护审计通过；生产构建与 `git diff --check` 通过。
-- 下一步：验证并窄范围提交后，审计交互式 Terminal UI。
+- 下一步：验证并窄范围提交后，审计消息详情分页与审批/问题列表补偿。
 
 ## 2026-06-21 v2.11.38 官方配置写入
 - 当前目标：让新增 Provider、模型配置、默认模型与 adaptive thinking 修改优先走官方 Server `/config` merge API。
