@@ -103,6 +103,18 @@ export type ServerAuthSummary = {
   managed_provider: { name: string; status: "authenticated" | "expired" | "revoked" | "unauthenticated" } | null;
 };
 
+export type ServerOAuthFlow = {
+  flow_id: string;
+  provider: string;
+  verification_uri: string;
+  verification_uri_complete: string;
+  user_code: string;
+  expires_in: number;
+  interval: number;
+  status: "pending";
+  expires_at: string;
+};
+
 export type ServerModelCatalogItem = {
   provider: string;
   model: string;
@@ -405,6 +417,18 @@ export class KimiCodeServerClient {
 
   getAuthSummary(): Promise<ServerAuthSummary> {
     return this.request("/api/v1/auth");
+  }
+
+  startOAuthLogin(): Promise<ServerOAuthFlow> {
+    return this.request("/api/v1/oauth/login", { method: "POST", body: "{}" });
+  }
+
+  cancelOAuthLogin(): Promise<{ cancelled: boolean; status: string }> {
+    return this.request("/api/v1/oauth/login", { method: "DELETE" });
+  }
+
+  logoutOAuth(): Promise<{ logged_out: boolean; provider: string }> {
+    return this.request("/api/v1/oauth/logout", { method: "POST", body: "{}" });
   }
 
   getRedactedConfig(): Promise<Record<string, unknown>> {

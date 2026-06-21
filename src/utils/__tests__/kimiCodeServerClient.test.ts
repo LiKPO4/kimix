@@ -114,6 +114,32 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("uses the official OAuth lifecycle routes", async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method });
+      const data = init?.method === "DELETE"
+        ? { cancelled: true, status: "cancelled" }
+        : url.endsWith("/logout")
+          ? { logged_out: true, provider: "kimi-code" }
+          : {
+              flow_id: "flow-1", provider: "kimi-code", verification_uri: "https://auth.example",
+              verification_uri_complete: "https://auth.example/code", user_code: "CODE", expires_in: 600,
+              interval: 5, status: "pending", expires_at: "2026-06-21T16:00:00Z",
+            };
+      return new Response(JSON.stringify({ code: 0, data }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.startOAuthLogin()).resolves.toMatchObject({ flow_id: "flow-1" });
+    await expect(client.cancelOAuthLogin()).resolves.toMatchObject({ cancelled: true });
+    await expect(client.logoutOAuth()).resolves.toMatchObject({ logged_out: true });
+    expect(calls).toEqual([
+      { url: "http://127.0.0.1:58627/api/v1/oauth/login", method: "POST" },
+      { url: "http://127.0.0.1:58627/api/v1/oauth/login", method: "DELETE" },
+      { url: "http://127.0.0.1:58627/api/v1/oauth/logout", method: "POST" },
+    ]);
+  });
+
   it("searches files through the official session-scoped filesystem route", async () => {
     const calls: Array<{ url: string; method?: string; body?: BodyInit | null }> = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {

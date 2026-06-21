@@ -1052,7 +1052,11 @@ async function getKimiAuthStatus() {
   const shareDir = resolveKimiShareDir();
   let defaultModel: string | undefined;
   try { const c = await kimiCodeHost.getConfig(); defaultModel = c.defaultModel; } catch { /* use undefined */ }
-  const loggedIn = hasUsableKimiCredential(shareDir);
+  const serverAuth = await kimiCodeHost.getServerAuthSummaryIfReady().catch(() => undefined);
+  const loggedIn = serverAuth
+    ? serverAuth.managed_provider?.status === "authenticated"
+    : hasUsableKimiCredential(shareDir);
+  defaultModel = serverAuth?.default_model ?? defaultModel;
   const needsRelogin = !loggedIn && hasKimiCodeOAuthReloginNotice();
   return {
     available: Boolean(kimiPath),
@@ -4829,6 +4833,23 @@ ipcMain.handle("kimi:login", async () => {
       };
     }
     try {
+      const serverFlow = await kimiCodeHost.startServerOAuthLogin().catch((error) => {
+        console.warn("[KimiCodeServerHost] OAuth login failed; falling back to SDK:", error);
+        return undefined;
+      });
+      if (serverFlow) {
+        const verificationUrl = serverFlow.verification_uri_complete || serverFlow.verification_uri;
+        if (verificationUrl) await shell.openExternal(verificationUrl);
+        const status = await getKimiAuthStatus();
+        return {
+          success: true,
+          data: {
+            ...status,
+            verificationUrl,
+            message: "已打开 Kimi 登录链接，请在浏览器中完成授权；完成后返回 Kimix 点击刷新或重新发送消息",
+          },
+        };
+      }
       const loginFlow = await kimiCodeHost.login("managed:kimi-code", {
         onDeviceCode: (data) => {
           const url = data.verificationUriComplete || data.verificationUri;
@@ -4859,7 +4880,11 @@ ipcMain.handle("kimi:login", async () => {
 
 ipcMain.handle("kimi:logout", async () => {
   try {
-    clearKimiCredential(resolveKimiShareDir());
+    const loggedOutByServer = await kimiCodeHost.logoutServerOAuth().catch((error) => {
+      console.warn("[KimiCodeServerHost] OAuth logout failed; falling back to local credential cleanup:", error);
+      return false;
+    });
+    if (!loggedOutByServer) clearKimiCredential(resolveKimiShareDir());
     const status = await getKimiAuthStatus();
     return {
       success: true,

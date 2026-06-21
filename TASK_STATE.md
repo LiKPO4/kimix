@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式和文件上传已对齐；目录选择保留 Electron 原生实现；OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式、文件上传和 OAuth 生命周期已对齐；目录选择保留 Electron 原生实现；配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，审计 OAuth 登录、取消与退出是否能安全迁移到官方 Server。
+- 下一步：继续 P2，审计配置与默认模型写入是否能迁移到官方 Server API。
+
+## 2026-06-21 v2.11.37 官方 OAuth 生命周期
+- 当前目标：让登录状态、设备授权、取消未完成授权和退出优先走官方 Server OAuth API。
+- 根因：Kimix 虽读取了 Server `/auth` 诊断，但登录固定调用 SDK，退出仅删除本地凭据文件，可能与 Server 运行态不一致。
+- 已完成：Server 就绪时以官方 `/auth` 判断登录；登录调用官方设备授权并打开验证页；退出前取消未完成授权，再调用官方 logout；Server 不可用或 OAuth 调用失败时保留 SDK 登录与本地凭据清理兼容路径。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 已验证：Server Client 定向测试 19/19；全量测试 32 个文件、242/242；OKF 严格校验与 180 天维护审计通过；生产构建与 `git diff --check` 通过。
+- 下一步：验证并窄范围提交后，审计官方配置与默认模型写入能力。
 
 ## 2026-06-21 v2.11.36 官方图片上传
 - 当前目标：让 Server 会话中的本地图片先走官方 `/files` 上传，再通过 `file_id` 发送 prompt。

@@ -15,7 +15,9 @@ import {
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
   type ServerFrame,
+  type ServerAuthSummary,
   type ServerMcpServer,
+  type ServerOAuthFlow,
   type ServerSession,
   type ServerSkill,
   type ServerSessionStatus,
@@ -1318,6 +1320,24 @@ export async function getServerModelCatalog(): Promise<KimiCodeServerModelCatalo
       models: provider.models ?? [],
     })),
   };
+}
+
+export async function getServerAuthSummaryIfReady(): Promise<ServerAuthSummary | undefined> {
+  if (!kimiCodeServerHost.isReady()) return undefined;
+  return getServerClient().getAuthSummary();
+}
+
+export async function startServerOAuthLogin(): Promise<ServerOAuthFlow | undefined> {
+  if (!kimiCodeServerHost.isReady()) return undefined;
+  activeLoginAbort?.abort();
+  return getServerClient().startOAuthLogin();
+}
+
+export async function logoutServerOAuth(): Promise<boolean> {
+  if (!kimiCodeServerHost.isReady()) return false;
+  await getServerClient().cancelOAuthLogin().catch(() => undefined);
+  await getServerClient().logoutOAuth();
+  return true;
 }
 
 export async function listBackgroundTasks(sessionId: string, options: { activeOnly?: boolean; limit?: number } = {}): Promise<KimiCodeBackgroundTaskInfo[]> {
