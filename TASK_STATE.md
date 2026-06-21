@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace、文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表等仍需逐项评估官方 API 对齐。
+  7. P2：Workspace 的 Server 会话注册与绑定已对齐；文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：进入 P2，先审计 Workspace 与官方 `/workspaces` 的数据模型和迁移边界。
+- 下一步：继续 P2，审计并接入官方文件服务能力。
+
+## 2026-06-21 v2.11.32 官方 Workspace 会话绑定
+- 当前目标：在不覆盖 Kimix 项目扩展数据的前提下，让新建 Server 会话使用官方 Workspace 生命周期。
+- 根因：Kimix 项目还承载置顶、排序、Git 和长程任务，不能被官方 Workspace 直接替代；但 Server 会话此前只传 `metadata.cwd`，没有调用 `/workspaces`，也没有携带官方 `workspace_id`。
+- 已完成：创建 Server 会话前先通过官方 `/workspaces` 幂等注册/刷新工作目录，再使用官方返回的规范 root 与 workspace ID 创建会话；Server 失败仍保持既有 SDK fallback。Kimix 项目目录继续保存本地扩展字段。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 已验证：Server Client 定向测试 14/14；全量测试 32 个文件 237/237；OKF 严格校验、180 天维护审计、生产构建及差异检查通过。
+- 下一步：验证并窄范围提交后，继续审计官方文件服务。
 
 ## 2026-06-21 v2.11.31 Slash 运行时能力清单
 - 当前目标：让 Slash 补全只展示当前运行时真正可用的命令，避免 Server 会话继续出现 SDK-only 入口。

@@ -15,6 +15,17 @@ export type ServerSession = {
   usage?: Record<string, unknown>;
 };
 
+export type ServerWorkspace = {
+  id: string;
+  root: string;
+  name: string;
+  is_git_repo: boolean;
+  branch: string | null;
+  created_at: string;
+  last_opened_at: string;
+  session_count: number;
+};
+
 export type ServerSessionStatus = {
   status: string;
   model?: string;
@@ -247,11 +258,13 @@ export class KimiCodeServerClient {
     planMode?: boolean;
     metadata?: Record<string, unknown>;
   }): Promise<ServerSession> {
+    const workspace = await this.createWorkspace(input.workDir);
     return this.request("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({
         id: input.id,
-        metadata: { ...input.metadata, cwd: input.workDir },
+        workspace_id: workspace.id,
+        metadata: { ...input.metadata, cwd: workspace.root },
         agent_config: {
           model: input.model,
           thinking: input.thinking ?? "off",
@@ -259,6 +272,13 @@ export class KimiCodeServerClient {
           plan_mode: input.planMode ?? false,
         },
       }),
+    });
+  }
+
+  createWorkspace(root: string, name?: string): Promise<ServerWorkspace> {
+    return this.request("/api/v1/workspaces", {
+      method: "POST",
+      body: JSON.stringify(name ? { root, name } : { root }),
     });
   }
 

@@ -88,6 +88,63 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("registers the official workspace before creating a Server session", async () => {
+    const calls: Array<{ url: string; method?: string; body?: BodyInit | null }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method, body: init?.body });
+      const data = url.endsWith("/workspaces")
+        ? {
+            id: "wd_repo_123456789abc",
+            root: "D:/repo",
+            name: "repo",
+            is_git_repo: true,
+            branch: "main",
+            created_at: "2026-06-21T00:00:00Z",
+            last_opened_at: "2026-06-21T00:00:00Z",
+            session_count: 0,
+          }
+        : {
+            id: "session-1",
+            workspace_id: "wd_repo_123456789abc",
+            status: "idle",
+            metadata: { cwd: "D:/repo" },
+          };
+      return new Response(JSON.stringify({ code: 0, data }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.createSession({
+      workDir: "D:\\repo",
+      model: "kimi-code/kimi-for-coding",
+      permission: "auto",
+    })).resolves.toMatchObject({ workspace_id: "wd_repo_123456789abc" });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:58627/api/v1/workspaces",
+        method: "POST",
+        body: JSON.stringify({ root: "D:\\repo" }),
+      },
+      {
+        url: "http://127.0.0.1:58627/api/v1/sessions",
+        method: "POST",
+        body: JSON.stringify({
+          workspace_id: "wd_repo_123456789abc",
+          metadata: { cwd: "D:/repo" },
+          agent_config: {
+            model: "kimi-code/kimi-for-coding",
+            thinking: "off",
+            permission_mode: "auto",
+            plan_mode: false,
+          },
+        }),
+      },
+    ]);
+  });
+
   it("merges official children with Kimix fork metadata for the session tree", () => {
     const child = { id: "child-1", status: "idle", metadata: { parent_session_id: "parent" } };
     const fork = { id: "fork-1", status: "idle", metadata: { forkedFrom: "parent" } };
