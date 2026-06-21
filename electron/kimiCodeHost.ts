@@ -551,6 +551,9 @@ let statusSink: StatusSink | null = null;
 
 const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
 const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
+const SERVER_RELOAD_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂不支持直接重载配置；如需刷新 Skill、Plugin 或配置，请新建或 fork 会话。";
+const SERVER_GOAL_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Goal API；请使用 SDK 会话或等待官方 Server 支持。";
+const SERVER_SWARM_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Swarm API；请使用 SDK 会话或等待官方 Server 支持。";
 let nextRequestId = 0;
 let activeLoginAbort: AbortController | null = null;
 const KIMI_CODE_MANAGED_PROVIDER_NAME = "managed:kimi-code";
@@ -713,9 +716,7 @@ export async function renameSession(sessionId: string, title: string): Promise<v
 export async function reloadSession(sessionId: string): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    serverManaged.session = await getServerClient().getSession(sessionId);
-    setStatus(sessionId, mapServerStatus(serverManaged.session.status));
-    return;
+    throw new Error(SERVER_RELOAD_UNSUPPORTED_MESSAGE);
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.reloadSession) throw new Error("当前 Kimi Code SDK 不支持会话重载。");
@@ -850,12 +851,14 @@ function scheduleServerRecovery() {
 }
 
 export async function setSwarmMode(sessionId: string, enabled: boolean, trigger: "manual" | "task" = "manual"): Promise<void> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_SWARM_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.setSwarmMode) throw new Error("当前 Kimi Code SDK 不支持 Swarm 模式。");
   await managed.session.setSwarmMode(enabled, trigger);
 }
 
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_SWARM_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.swarm) throw new Error("当前 Kimi Code SDK 不支持 Swarm。");
   setStatus(sessionId, "running");
@@ -1034,6 +1037,7 @@ export async function archiveSession(sessionId: string): Promise<void> {
 }
 
 export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.createGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
   const goal = await managed.session.createGoal(input);
@@ -1041,12 +1045,14 @@ export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInp
 }
 
 export async function getGoal(sessionId: string): Promise<KimiCodeGoalState> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.getGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
   return managed.session.getGoal();
 }
 
 export async function pauseGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.pauseGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
   const goal = await managed.session.pauseGoal({ reason });
@@ -1054,6 +1060,7 @@ export async function pauseGoal(sessionId: string, reason?: string): Promise<Kim
 }
 
 export async function resumeGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.resumeGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
   const goal = await managed.session.resumeGoal({ reason });
@@ -1061,6 +1068,7 @@ export async function resumeGoal(sessionId: string, reason?: string): Promise<Ki
 }
 
 export async function cancelGoal(sessionId: string, reason?: string): Promise<KimiCodeGoalState> {
+  if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
   const managed = getManagedSession(sessionId);
   if (!managed.session.cancelGoal) throw new Error("当前 Kimi Code SDK 不支持官方 Goal。");
   const goal = await managed.session.cancelGoal({ reason });

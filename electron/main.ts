@@ -5712,7 +5712,7 @@ ipcMain.handle("kimi-code:listSlashCommands", async () => {
   return {
     success: true,
     data: [
-      { name: "goal", description: "Goal 总入口；直接跟目标会启动", aliases: [] },
+      { name: "goal", description: "SDK Goal 入口；Server 会话暂不支持", aliases: [] },
       { name: "goal status", description: "查看当前 Goal 状态", aliases: [] },
       { name: "goal show", description: "显示当前 Goal 状态", aliases: [] },
       { name: "goal start", description: "启动一个新 Goal", aliases: [] },
@@ -5724,10 +5724,10 @@ ipcMain.handle("kimi-code:listSlashCommands", async () => {
       { name: "goal cancel", description: "取消并清除当前 Goal", aliases: [] },
       { name: "goal next", description: "排队后续 Goal", aliases: [] },
       { name: "goal next 继续收尾并整理剩余风险", description: "带目标模板：排队后续 Goal", aliases: [] },
-      { name: "swarm", description: "官方 Swarm 总入口；可跟任务或 on/off", aliases: [] },
-      { name: "swarm 并行检查最近改动并给出修复建议", description: "通过官方链路发起 Swarm 任务", aliases: [] },
-      { name: "swarm on", description: "开启官方 Swarm 模式", aliases: [] },
-      { name: "swarm off", description: "关闭官方 Swarm 模式", aliases: [] },
+      { name: "swarm", description: "SDK Swarm 入口；Server 会话暂不支持", aliases: [] },
+      { name: "swarm 并行检查最近改动并给出修复建议", description: "通过 SDK 兼容链路发起 Swarm 任务", aliases: [] },
+      { name: "swarm on", description: "开启 SDK Swarm 模式", aliases: [] },
+      { name: "swarm off", description: "关闭 SDK Swarm 模式", aliases: [] },
       { name: "theme", description: "打开 Kimix 主题设置；官方 TUI 主题仅供参考", aliases: [] },
       { name: "custom-theme", description: "Kimix 兼容生成官方主题 JSON；生成后可在设置里导入", aliases: [] },
       { name: "custom-theme 做一套低饱和绿色主题", description: "Kimix 兼容生成官方主题 JSON", aliases: [] },

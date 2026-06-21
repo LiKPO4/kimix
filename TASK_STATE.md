@@ -1,5 +1,26 @@
 # Kimix 长程任务状态
 
+## 2026-06-21 官方能力对齐 todolist
+- 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。
+- 待办：
+  1. ✅ P0：Goal / Swarm 仍是 SDK-only 能力，Server 会话误调用时会报 “Kimi Code session is not active”；已改为清晰能力边界，Server 会话显式提示暂未公开对应 API。
+  2. ✅ P0：/reload 在 Server 会话只刷新 session 信息却提示“已重载配置”；已改为显式失败，明确 Server 暂无直接 reload API。
+  3. P1：外部网页归档后，本地对账目前只增不减；需在安全边界内同步隐藏官方已归档会话。
+  4. P1：历史正文加载仍优先本地镜像；Server 可用时应优先使用官方 snapshot/messages，再回落本地。
+  5. P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步。
+  6. P1：Slash 清单仍偏硬编码；需按 Server OpenAPI 和 SDK capability 裁剪，不暴露不可用项。
+  7. P2：Workspace、文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表等仍需逐项评估官方 API 对齐。
+- 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
+- 下一步：进入 P1，优先处理外部网页归档后的本地对账同步。
+
+## 2026-06-21 v2.11.27 Server-only 能力边界
+- 当前目标：处理官方能力对齐 P0，避免 Server 会话误走 SDK-only 的 Goal / Swarm / reload。
+- 根因：Goal / Swarm 仍由 SDK 暴露，官方 Server OpenAPI 暂未提供；/reload 在 Server 分支只刷新 session metadata 却返回成功，造成伪重载。
+- 已完成：Server 会话调用 Goal / Swarm / reload 时返回明确的不支持提示；Slash 补全文案标注 SDK 兼容能力；版本号同步到 v2.11.27。
+- 关键文件：`electron/kimiCodeHost.ts`、`src/components/chat/Composer.tsx`、`electron/main.ts`、`knowledge/architecture/runtime-routing.md`。
+- 已验证：全量测试 30 个文件、224/224 通过；OKF 严格校验、180 天维护审计、生产构建和 `git diff --check` 通过。
+- 下一步：处理 P1 外部归档同步，避免官方网页归档后 Kimix 侧栏继续显示旧会话。
+
 ## 2026-06-21 v2.11.26 官方归档语义对齐
 - 当前目标：确认 Kimix 归档行为是否与官方一致，并消除本地与官方归档状态分叉。
 - 根因：Kimix 先本地归档再异步请求官方，官方失败不会回滚；设置页还提供官方不存在的 unarchive“恢复”操作；SDK 路径在无法调用官方归档时会静默返回成功。
