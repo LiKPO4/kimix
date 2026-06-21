@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Prompt runtime recovery**: Made prompt dispatch re-register persisted sessions missing from active runtime maps; queued prompts can rebuild a truly missing runtime in the same project and retain recoverable failures locally without exposing internal session errors.
 * **Server history gates**: Added a history-specific snapshot replay path that restores pending approval and question events when reopening Server sessions, while preserving the live resync path.
 * **Official default model**: Routed default-model-only changes through the catalog action, clarified concise settings messages, and documented that Server 0.18 has no destructive model or Provider route.
 * **Official config writes**: Routed non-destructive global config mutations through the Server merge API with explicit camelCase-to-wire conversion and SDK fallback.

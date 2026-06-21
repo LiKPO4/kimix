@@ -15,7 +15,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
-import { isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
+import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import {
@@ -1760,27 +1760,47 @@ function App() {
         throw new Error(res.error);
       }).catch(async (err) => {
         let message = err instanceof Error ? err.message : String(err);
-        const existingRuntimeId = getKimiAlreadyExistsSessionId(message);
-        if (existingRuntimeId) {
-          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: existingRuntimeId });
-          if (resumeRes.success) {
+        const alreadyExistingRuntimeId = getKimiAlreadyExistsSessionId(message);
+        const shouldRecoverRuntime = Boolean(alreadyExistingRuntimeId) ||
+          isKimiCodeSessionInactiveError(message) ||
+          isKimiCodeSessionMissingError(message);
+        if (shouldRecoverRuntime) {
+          const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+          let recoveryRes = await window.api.resumeKimiCodeSession({
+            sessionId: alreadyExistingRuntimeId ?? runtimeSessionId,
+          });
+          if (
+            recoveryRes.success &&
+            latestSession?.projectPath &&
+            !isSameLocalProjectPath(recoveryRes.data.workDir, latestSession.projectPath)
+          ) {
+            recoveryRes = { success: false, error: "Recovered session belongs to another project" };
+          }
+          if (!recoveryRes.success && latestSession?.projectPath) {
+            recoveryRes = await window.api.createKimiCodeSession({
+              workDir: latestSession.projectPath,
+              permission: useAppStore.getState().permissionMode,
+              planMode: useAppStore.getState().defaultPlanMode,
+            });
+          }
+          if (recoveryRes.success) {
             updateSession(uiSessionId, (session) => ({
               ...session,
               engine: "kimi-code" as const,
-              runtimeSessionId: resumeRes.data.sessionId,
-              officialSessionId: resumeRes.data.sessionId,
+              runtimeSessionId: recoveryRes.data.sessionId,
+              officialSessionId: recoveryRes.data.sessionId,
               updatedAt: Date.now(),
             }));
             syncCurrentSessionFromStore(uiSessionId);
             const retryRes = await sendKimiCodePromptWithRetry({
-              sessionId: resumeRes.data.sessionId,
+              sessionId: recoveryRes.data.sessionId,
               content: contentWithFileAttachments(next.content, next.images),
               images: promptImages(next.images),
             });
             if (retryRes.success) return;
             message = retryRes.error;
           } else {
-            message = resumeRes.error;
+            message = recoveryRes.error;
           }
         }
         useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
@@ -1801,6 +1821,19 @@ function App() {
             };
           });
           setRunningSessionId(uiSessionId);
+          return;
+        }
+        if (
+          isKimiCodeSessionInactiveError(message) ||
+          isKimiCodeSessionMissingError(message) ||
+          Boolean(getKimiAlreadyExistsSessionId(message))
+        ) {
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            events: session.events.filter((event) => event.id !== placeholderId && event.id !== userEventId),
+            updatedAt: Date.now(),
+          }));
+          setRunningSessionId(null);
           return;
         }
         updateSession(uiSessionId, (session) => ({

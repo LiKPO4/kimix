@@ -788,7 +788,12 @@ export type KimiCodePromptRouteResult = {
 };
 
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<KimiCodePromptRouteResult> {
-  const serverManaged = serverSessions.get(sessionId) ?? await promoteSdkSessionToServer(sessionId);
+  let serverManaged = serverSessions.get(sessionId);
+  if (!serverManaged && !sessions.has(sessionId)) {
+    await resumeSession(sessionId);
+    serverManaged = serverSessions.get(sessionId);
+  }
+  serverManaged ??= await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
     try {
@@ -2016,14 +2021,21 @@ async function fallbackServerSessionToSdk(
   serverSessions.delete(sessionId);
   markServerRuntimeFailure(error);
   const sdkHarness = await getHarness();
-  const session = await sdkHarness.createSession({
-    id: sessionId,
-    workDir: serverManaged.workDir,
-    model: serverManaged.model,
-    thinking: serverManaged.thinking,
-    permission: serverManaged.permission,
-    planMode: serverManaged.planMode,
-  });
+  let session: KimiCodeSessionLike;
+  try {
+    session = await sdkHarness.createSession({
+      id: sessionId,
+      workDir: serverManaged.workDir,
+      model: serverManaged.model,
+      thinking: serverManaged.thinking,
+      permission: serverManaged.permission,
+      planMode: serverManaged.planMode,
+    });
+  } catch (createError) {
+    const existingSessionId = getKimiCodeSessionAlreadyExistsId(createError);
+    if (!existingSessionId) throw createError;
+    session = await sdkHarness.resumeSession({ id: existingSessionId });
+  }
   return sessions.get(session.id) ?? (() => {
     registerSession(session, "running", {
       model: serverManaged.model,

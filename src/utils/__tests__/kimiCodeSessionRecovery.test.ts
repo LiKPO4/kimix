@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "../kimiCodeSessionRecovery";
+import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "../kimiCodeSessionRecovery";
 
 describe("Kimi Code session recovery", () => {
   const missingMessage = "恢复上次 Kimi Code 会话失败：/api/v1/sessions/session_fb2569cb-6649-4a2d-a879-3ecb1e532141/profile: Session \"session_fb2569cb-6649-4a2d-a879-3ecb1e532141\" was not found";
 
   it("recognizes the Server profile missing-session response", () => {
     expect(isKimiCodeSessionMissingError(missingMessage)).toBe(true);
+  });
+
+  it("recognizes an inactive runtime binding without treating arbitrary errors as inactive", () => {
+    expect(isKimiCodeSessionInactiveError("Kimi Code session is not active: session_a")).toBe(true);
+    expect(isKimiCodeSessionInactiveError("Kimi Server session is not active: session_a")).toBe(true);
+    expect(isKimiCodeSessionInactiveError("network unavailable")).toBe(false);
   });
 
   it("removes only persisted startup missing-session errors", () => {

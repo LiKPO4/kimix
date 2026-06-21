@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T15:56:00+08:00"
+timestamp: "2026-06-21T20:45:00+08:00"
 ---
 
 # Runtime Routing
@@ -41,6 +41,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 26. Managed OAuth follows the active runtime boundary. When Server is ready, auth status, device login, pending-flow cancellation, and logout use the official Server endpoints; SDK login and local credential cleanup remain compatibility fallbacks only when Server is unavailable or its OAuth route fails. A local credential file alone must not override an authenticated or unauthenticated state reported by a ready Server.
 27. Global configuration mutations use official Server routes whenever Server is ready. A default-model-only mutation uses the catalog's dedicated `:set_default` action so the Server validates the model alias; other non-destructive mutations use the config merge endpoint after Kimix converts its camelCase SDK-facing patch into the Server snake_case wire schema, including nested Provider and model fields. The richer SDK config view is then reloaded for existing settings UI consumers, with SDK mutation retained as the Server-failure fallback. Server 0.18 exposes no model or Provider deletion route, so Kimix's guarded local deletion remains an explicit desktop extension rather than a claimed native capability.
 28. Server session restoration must replay both message history and outstanding interaction gates. Live WebSocket resync continues to use message frames plus explicit pending approval/question synthesis in the frame handler, while one-shot history loading uses a history-specific snapshot conversion that appends pending approval/question events after message replay. This keeps reopened sessions actionable without duplicating pending cards during live recovery.
+29. Prompt dispatch is idempotent across runtime-map churn. If a persisted official session ID is absent from both active Server and SDK maps, the Host resumes and re-registers it before sending. A queued renderer prompt retries against that recovered runtime; if the official session no longer exists, Kimix creates a fresh runtime in the same project, updates the visible binding, and retries without exposing internal `already exists` or `session is not active` errors. A final recoverable failure preserves the message in the local queue instead of discarding it.
 
 # Main Components
 

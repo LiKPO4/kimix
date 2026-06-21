@@ -3,6 +3,7 @@
 ## 2026-06-21 官方能力对齐 todolist
 - 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。
 - 补充扫描：
+  - ✅ P0：排队消息可能命中已从主进程活动映射移除、但仍持久存在的 runtime，并显示 session is not active；已在统一发送入口恢复缺失映射，排队路径恢复失败时创建当前项目的新 runtime 并静默重发。
   - ✅ P0：应用启动自动恢复会话时，置底早于历史正文补全和 Markdown 布局稳定结束；已改为监听内容尺寸变化，连续稳定后执行最终置底，用户主动滚动立即取消。
   - ✅ P0：/skill 消息发送后过程头延迟到首个模型事件才出现；根因是 Skill 前置激活在创建本地 assistant 占位前执行。已改为先创建用户消息和过程头占位，再执行 Skill 激活并发送 prompt。
   - ✅ P0：创建 Server 会话时遇到 Session already exists 被渲染成错误卡；已识别 already exists 并接管已有 Server 会话，不再向用户暴露冲突错误。
