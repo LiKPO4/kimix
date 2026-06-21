@@ -26,6 +26,14 @@ export type ServerWorkspace = {
   session_count: number;
 };
 
+export type ServerFsSearchHit = {
+  path: string;
+  name: string;
+  kind: "file" | "directory" | "symlink";
+  score: number;
+  match_positions: number[];
+};
+
 export type ServerSessionStatus = {
   status: string;
   model?: string;
@@ -288,6 +296,17 @@ export class KimiCodeServerClient {
 
   getSessionStatus(sessionId: string): Promise<ServerSessionStatus> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/status`);
+  }
+
+  searchFiles(sessionId: string, query: string, limit = 50): Promise<{ items: ServerFsSearchHit[]; truncated: boolean }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/fs:search`, {
+      method: "POST",
+      body: JSON.stringify({
+        query,
+        limit: Math.max(1, Math.min(200, Math.floor(limit))),
+        follow_gitignore: true,
+      }),
+    });
   }
 
   async listSkills(sessionId: string): Promise<ServerSkill[]> {

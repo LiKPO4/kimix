@@ -1252,6 +1252,23 @@ export async function getPromptQueueState(sessionId: string): Promise<{
   };
 }
 
+export async function searchServerSessionFiles(
+  sessionId: string,
+  workDir: string,
+  query: string,
+  limit: number,
+): Promise<Array<{ path: string; name: string }> | undefined> {
+  const managed = serverSessions.get(sessionId);
+  if (!managed) return undefined;
+  const expectedRoot = path.resolve(workDir).replace(/\\/g, "/").toLowerCase();
+  const sessionRoot = path.resolve(managed.workDir).replace(/\\/g, "/").toLowerCase();
+  if (expectedRoot !== sessionRoot) return undefined;
+  const result = await getServerClient().searchFiles(sessionId, query, limit);
+  return result.items
+    .filter((item) => item.kind === "file")
+    .map((item) => ({ path: item.path, name: item.name }));
+}
+
 export async function getServerModelCatalog(): Promise<KimiCodeServerModelCatalog> {
   const client = getServerClient();
   const [auth, config, models, providers] = await Promise.all([

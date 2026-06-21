@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T15:13:00+08:00"
+timestamp: "2026-06-21T15:18:00+08:00"
 ---
 
 # Runtime Routing
@@ -35,6 +35,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 20. Kimix local pending messages remain editable local intent until dispatched. Before shifting a local pending message after a terminal status, Server-backed sessions query the official prompts active/queued state; any official pending prompt defers local dispatch. SDK sessions and unavailable queue queries preserve the local fallback behavior. After Server abort, runtime status remains running when the official prompt queue is still non-empty instead of reporting a false interruption.
 21. Slash completion is a runtime capability view, not a global static catalog. The main process derives the catalog from the active Server or SDK session; Server sessions must not advertise SDK-only Goal, Swarm, or reload commands. Unknown or not-yet-restored sessions use the conservative Server-compatible catalog so a transient lookup failure cannot expose an unavailable action.
 22. Kimix projects and official Server workspaces overlap by root path but are not interchangeable records. Kimix retains local-only pinning, ordering, Git, and long-task metadata. Before creating a Server session, the client idempotently registers or touches the root through the official workspace API and creates the session with the returned `workspace_id` and canonical root; registration failure follows the existing SDK fallback instead of creating a partially aligned Server session.
+23. Session-scoped filesystem APIs are preferred for Server-backed UI actions. File mention search uses the official `fs:search` only when the active Server session root matches the requested Kimix project root; SDK sessions, empty queries, unavailable sessions, and failed official requests retain the bounded local filesystem fallback. This root check prevents a renderer request from using another project's session as a filesystem capability.
 
 # Main Components
 

@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace 的 Server 会话注册与绑定已对齐；文件服务、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace 的 Server 会话注册与绑定、`@文件` 官方搜索已对齐；文件读取/浏览/上传、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，审计并接入官方文件服务能力。
+- 下一步：继续 P2，让 Server 会话的文件预览优先使用官方 `fs:read`。
+
+## 2026-06-21 v2.11.33 Server 文件搜索优先
+- 当前目标：让 Server 会话的 `@文件` 补全使用官方工作区文件搜索，而不是始终由 Kimix 递归扫描磁盘。
+- 根因：Composer 只把项目路径传给本地 `project:searchFiles`；即使 Server 已接管，会话级 `fs:search` 的工作区边界、gitignore 和排序也完全未使用。
+- 已完成：搜索请求携带当前 runtime session ID；主进程仅在该 Server 会话与项目根匹配且查询非空时调用官方 `fs:search`，过滤为文件候选；SDK、空查询、会话未恢复或官方失败时回落现有本地搜索。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/types/ipc.ts`、`src/components/chat/Composer.tsx`。
+- 已验证：Server Client 定向测试 15/15；全量测试 32 个文件 238/238；OKF 严格校验、180 天维护审计、生产构建及差异检查通过。
+- 下一步：验证并窄范围提交后，继续迁移 Server 文件预览读取。
 
 ## 2026-06-21 v2.11.32 官方 Workspace 会话绑定
 - 当前目标：在不覆盖 Kimix 项目扩展数据的前提下，让新建 Server 会话使用官方 Workspace 生命周期。

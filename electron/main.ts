@@ -4361,7 +4361,7 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     if (!request || typeof request !== "object") {
       return { success: false, error: "Invalid request" };
     }
-    const req = request as { projectPath?: unknown; query?: unknown; limit?: unknown };
+    const req = request as { projectPath?: unknown; sessionId?: unknown; query?: unknown; limit?: unknown };
     if (typeof req.projectPath !== "string" || !req.projectPath) {
       return { success: false, error: "Invalid project path" };
     }
@@ -4370,6 +4370,15 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     }
     const query = typeof req.query === "string" ? req.query : "";
     const limit = typeof req.limit === "number" ? req.limit : 40;
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    if (sessionId && query.trim()) {
+      try {
+        const official = await kimiCodeHost.searchServerSessionFiles(sessionId, req.projectPath, query, limit);
+        if (official) return { success: true, data: official };
+      } catch (error) {
+        console.warn("[KimiCodeServerHost] official file search failed; using local fallback:", error);
+      }
+    }
     return { success: true, data: searchProjectFiles(req.projectPath, query, limit) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

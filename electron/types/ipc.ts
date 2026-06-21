@@ -1060,6 +1060,7 @@ export type OpenTerminalRequest = {
 
 export type SearchProjectFilesRequest = {
   projectPath: string;
+  sessionId?: string;
   query?: string;
   limit?: number;
 }

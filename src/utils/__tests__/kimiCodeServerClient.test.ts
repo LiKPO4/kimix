@@ -88,6 +88,31 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("searches files through the official session-scoped filesystem route", async () => {
+    const calls: Array<{ url: string; method?: string; body?: BodyInit | null }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method, body: init?.body });
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          items: [{ path: "src/App.tsx", name: "App.tsx", kind: "file", score: 10, match_positions: [4] }],
+          truncated: false,
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.searchFiles("session/1", "app", 12)).resolves.toMatchObject({
+      items: [{ path: "src/App.tsx", kind: "file" }],
+      truncated: false,
+    });
+    expect(calls).toEqual([{
+      url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1/fs:search",
+      method: "POST",
+      body: JSON.stringify({ query: "app", limit: 12, follow_gitignore: true }),
+    }]);
+  });
+
   it("registers the official workspace before creating a Server session", async () => {
     const calls: Array<{ url: string; method?: string; body?: BodyInit | null }> = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {

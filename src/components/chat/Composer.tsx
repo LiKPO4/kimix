@@ -653,6 +653,7 @@ export function Composer() {
     const timer = window.setTimeout(() => {
       void window.api.searchProjectFiles({
         projectPath: currentProject.path,
+        sessionId: activeRuntimeSessionId,
         query,
         limit: 12,
       }).then((res) => {
@@ -670,7 +671,7 @@ export function Composer() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeCompletion?.mode, activeCompletion?.query, currentProject?.path]);
+  }, [activeCompletion?.mode, activeCompletion?.query, activeRuntimeSessionId, currentProject?.path]);
 
   const addImageFiles = async (files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
