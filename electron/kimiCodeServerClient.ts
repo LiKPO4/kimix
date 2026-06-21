@@ -1,6 +1,8 @@
 export type ServerPromptPart =
   | { type: "text"; text: string }
-  | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } };
+  | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } };
+
+type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
 
 export type ServerSession = {
   id: string;
@@ -204,17 +206,28 @@ export function isKimiCodeSessionMissingError(error: unknown) {
   return /(?:HTTP\s+404|session not found|was not found|unknown session|会话不存在|session.*missing)/i.test(message);
 }
 
-export function toServerPromptContent(input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>): ServerPromptPart[] {
+export async function toServerPromptContent(
+  input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>,
+  upload?: ServerPromptUpload,
+): Promise<ServerPromptPart[]> {
   if (typeof input === "string") return [{ type: "text", text: input }];
-  return input.map((part) => {
+  return Promise.all(input.map(async (part) => {
     if (part.type === "text") return { type: "text", text: part.text ?? "" };
     const url = part.imageUrl?.url ?? "";
     const dataUrl = url.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
     if (dataUrl) {
+      if (upload) {
+        const file = await upload({
+          name: part.imageUrl?.id?.trim() || "image",
+          mediaType: dataUrl[1],
+          data: dataUrl[2],
+        });
+        return { type: "image", source: { kind: "file", file_id: file.id } };
+      }
       return { type: "image", source: { kind: "base64", media_type: dataUrl[1], data: dataUrl[2] } };
     }
     return { type: "image", source: { kind: "url", url } };
-  });
+  }));
 }
 
 export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> {
@@ -338,6 +351,13 @@ export class KimiCodeServerClient {
         encoding: "utf-8",
       }),
     });
+  }
+
+  uploadFile(input: { name: string; mediaType: string; data: string }): Promise<{ id: string; name: string; media_type: string; size: number }> {
+    const form = new FormData();
+    form.append("name", input.name);
+    form.append("file", new Blob([Buffer.from(input.data, "base64")], { type: input.mediaType }), input.name);
+    return this.request("/api/v1/files", { method: "POST", body: form });
   }
 
   async listSkills(sessionId: string): Promise<ServerSkill[]> {
@@ -474,9 +494,13 @@ export class KimiCodeServerClient {
   }
 
   async prompt(sessionId: string, input: unknown, controls: Record<string, unknown>) {
+    const content = await toServerPromptContent(
+      input as Parameters<typeof toServerPromptContent>[0],
+      (file) => this.uploadFile(file),
+    );
     const result = await this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
       method: "POST",
-      body: JSON.stringify({ content: toServerPromptContent(input as Parameters<typeof toServerPromptContent>[0]), ...controls }),
+      body: JSON.stringify({ content, ...controls }),
     });
     await this.waitFor((frame) => {
       if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
@@ -487,9 +511,13 @@ export class KimiCodeServerClient {
   }
 
   async steer(sessionId: string, input: unknown, controls: Record<string, unknown>) {
+    const content = await toServerPromptContent(
+      input as Parameters<typeof toServerPromptContent>[0],
+      (file) => this.uploadFile(file),
+    );
     const queued = await this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
       method: "POST",
-      body: JSON.stringify({ content: toServerPromptContent(input as Parameters<typeof toServerPromptContent>[0]), ...controls }),
+      body: JSON.stringify({ content, ...controls }),
     });
     await this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
       method: "POST",
@@ -805,10 +833,11 @@ export class KimiCodeServerClient {
 
   private async request<T>(pathname: string, options?: RequestInit): Promise<T> {
     const signal = options?.signal ?? AbortSignal.timeout(CONTROL_TIMEOUT_MS);
+    const hasJsonBody = Boolean(options?.body) && !(options?.body instanceof FormData);
     const response = await fetch(`${this.endpoint}${pathname}`, {
       ...options,
       signal,
-      headers: { accept: "application/json", ...(options?.body ? { "content-type": "application/json" } : {}) },
+      headers: { accept: "application/json", ...(hasJsonBody ? { "content-type": "application/json" } : {}) },
     });
     if (!response.ok) throw new Error(`${pathname}: HTTP ${response.status}`);
     const envelope = await response.json() as ServerEnvelope<T>;

@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-21
+* **Official file uploads**: Routed local Server prompt images through the multipart `/files` lifecycle and referenced the returned file ID across prompt, steer, and BTW routes.
 * **Official image content**: Kept the Electron-native folder picker as a platform adapter and replaced legacy Server `image_url` prompt payloads with official image base64/URL sources.
 * **Official file preview**: Routed Server-backed project text previews through session-scoped `fs:read` with root matching, UTF-8 and size gates, while keeping user-home Kimi plan files on the local path.
 * **Official file search**: Routed Server-backed file mentions through the session-scoped official filesystem search with project-root validation, retaining local search for SDK, empty-query, unavailable, and failure paths.

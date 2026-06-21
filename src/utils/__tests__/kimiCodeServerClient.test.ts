@@ -21,17 +21,41 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "0" }, { experimentalKimiServerSessions: true })).toBe(false);
   });
 
-  it("maps SDK prompt parts to the official server content shape", () => {
-    expect(toServerPromptContent("hello")).toEqual([{ type: "text", text: "hello" }]);
-    expect(toServerPromptContent([
+  it("maps SDK prompt parts to the official server content shape", async () => {
+    await expect(toServerPromptContent("hello")).resolves.toEqual([{ type: "text", text: "hello" }]);
+    await expect(toServerPromptContent([
       { type: "text", text: "look" },
       { type: "image_url", imageUrl: { url: "data:image/png;base64,AA==", id: "img-1" } },
       { type: "image_url", imageUrl: { url: "https://example.com/image.png" } },
-    ])).toEqual([
+    ])).resolves.toEqual([
       { type: "text", text: "look" },
       { type: "image", source: { kind: "base64", media_type: "image/png", data: "AA==" } },
       { type: "image", source: { kind: "url", url: "https://example.com/image.png" } },
     ]);
+  });
+
+  it("uploads inline images and references the official file id", async () => {
+    const upload = vi.fn(async () => ({ id: "file-1" }));
+    await expect(toServerPromptContent([
+      { type: "image_url", imageUrl: { url: "data:image/png;base64,AA==", id: "shot.png" } },
+    ], upload)).resolves.toEqual([
+      { type: "image", source: { kind: "file", file_id: "file-1" } },
+    ]);
+    expect(upload).toHaveBeenCalledWith({ name: "shot.png", mediaType: "image/png", data: "AA==" });
+  });
+
+  it("uploads files through the official multipart route", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({
+      code: 0,
+      data: { id: "file-1", name: "shot.png", media_type: "image/png", size: 1 },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.uploadFile({ name: "shot.png", mediaType: "image/png", data: "AA==" })).resolves.toMatchObject({ id: "file-1" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://127.0.0.1:58627/api/v1/files");
+    expect(init?.body).toBeInstanceOf(FormData);
+    expect((init?.headers as Record<string, string>)["content-type"]).toBeUndefined();
   });
 
   it("flattens websocket event payloads into the SDK-compatible event shape", () => {

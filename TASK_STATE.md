@@ -9,9 +9,17 @@
   4. ✅ P1：历史正文加载仍优先本地镜像；已改为 Server 可用时优先使用官方 snapshot，再回落本地镜像。
   5. ✅ P1：Kimix 自有 pendingMessages 未与官方 prompts active/queued 队列补偿同步；已增加官方队列门禁，Server busy 时不会提前 shift 本地消息。
   6. ✅ P1：Slash 清单仍偏硬编码；已按当前 Server/SDK 运行时动态裁剪，不再向 Server 会话暴露 Goal、Swarm、reload。
-  7. P2：Workspace、`@文件` 搜索、项目文本预览和 Server 图片消息格式已对齐；目录选择保留 Electron 原生实现；文件上传、OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
+  7. P2：Workspace、`@文件` 搜索、项目文本预览、图片消息格式和文件上传已对齐；目录选择保留 Electron 原生实现；OAuth、配置/模型写入、交互式 Terminal、消息详情分页、审批/问题列表仍需逐项处理。
 - 边界：长程任务、Kimix 主题、Claude/Codex 导入、本地会话备份、Hooks、项目启动命令属于 Kimix 扩展，不按官方未对齐处理。
-- 下一步：继续 P2，评估官方 `/files` 上传是否应替代当前图片 base64 与本地附件路径。
+- 下一步：继续 P2，审计 OAuth 登录、取消与退出是否能安全迁移到官方 Server。
+
+## 2026-06-21 v2.11.36 官方图片上传
+- 当前目标：让 Server 会话中的本地图片先走官方 `/files` 上传，再通过 `file_id` 发送 prompt。
+- 根因：v2.11.35 已把图片转换为官方 `image.source`，但 data URL 仍直接内嵌为 base64，没有复用官方 Web 的文件生命周期。
+- 已完成：新增 multipart 文件上传；本地图片上传成功后转换为官方 file source；prompt、steer 与 BTW 共用同一转换入口；网络图片继续使用 URL source；未提供上传器的纯转换场景保留 base64 source。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 已验证：Server Client 定向测试 18/18；全量测试 32 个文件、241/241；OKF 严格校验与 180 天维护审计通过；生产构建与 `git diff --check` 通过。
+- 下一步：验证并窄范围提交后，审计官方 OAuth 生命周期。
 
 ## 2026-06-21 v2.11.35 官方图片消息格式
 - 当前目标：完成目录浏览边界审计，并修复 Server 图片消息仍使用旧式 payload 的协议偏差。
