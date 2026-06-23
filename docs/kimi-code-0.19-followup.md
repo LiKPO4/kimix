@@ -15,7 +15,7 @@
 ## Follow-up Todolist
 
 1. [x] Refresh Kimix's vendored SDK bundle from official node SDK `0.10.0`, keeping the Kimix MCP fallback startup timeout patch.
-2. [ ] Add probes for 0.19.0 session/workspace changes:
+2. [x] Add probes for 0.19.0 session/workspace changes:
    - [x] SDK `additionalDirs` on create/resume/session summary.
    - [x] `session.addAdditionalDir(path, { persist })`.
    - [x] Server `/sessions/{id}/snapshot` schema and timeout compatibility.
