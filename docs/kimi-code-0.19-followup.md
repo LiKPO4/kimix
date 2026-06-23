@@ -18,11 +18,11 @@
 2. [ ] Add probes for 0.19.0 session/workspace changes:
    - [x] SDK `additionalDirs` on create/resume/session summary.
    - [x] `session.addAdditionalDir(path, { persist })`.
-   - [ ] Server `/sessions/{id}/snapshot` schema and timeout compatibility.
+   - [x] Server `/sessions/{id}/snapshot` schema and timeout compatibility.
 3. [x] Wire `additionalDirs` through Kimix runtime creation/resume where official APIs expose it, while keeping existing project root safety boundaries.
-4. [ ] Review Server snapshot usage after upstream direct disk reader changes; keep Kimix history and pending approval/question recovery compatible with the 0.19.0 schema.
-5. [ ] Review safety-policy block event mapping so Kimix does not display a blocked turn as a normal completed answer.
-6. [ ] Review local image upload/media handling against upstream real image format sniffing; prefer official Server upload behavior where possible.
+4. [x] Review Server snapshot usage after upstream direct disk reader changes; keep Kimix history and pending approval/question recovery compatible with the 0.19.0 schema.
+5. [x] Review safety-policy block event mapping so Kimix does not display a blocked turn as a normal completed answer.
+6. [x] Review local image upload/media handling against upstream real image format sniffing; prefer official Server upload behavior where possible.
 7. [ ] Decide whether Ctrl+B background task transfer and `/tasks` need Kimix UI follow-up; defer if the Server/SDK API is not product-ready for Kimix.
 
 ## Upstream Notes
@@ -39,10 +39,14 @@
 - Kimix now passes the configured extra work directories into SDK-backed create/resume/startRuntime paths. The 0.19 Server `/sessions` REST schema does not expose an explicit `additionalDirs` field, so Server sessions still rely on upstream workspace-local config support until an official REST route is available.
 - Snapshot and safety-policy changes affect the main chat correctness path and should be probed before deeper UI work.
 - Image MIME sniffing is relevant to Kimix because the app supports local image attachments and already uses Server `/files` when available.
+- `node scripts/probe-kimi-code-0.19.mjs` now covers both SDK `additionalDirs` and Server snapshot schema. The 0.19 Server snapshot currently returns `as_of_seq`, `epoch`, `session`, `messages`, `in_flight_turn`, `pending_approvals`, and `pending_questions`, which matches Kimix's live recovery and one-shot history adapters.
+- Kimix maps `turn.ended` with `reason: "filtered"` to a concise user-facing error instead of normal assistant completion.
+- Kimix now sniffs PNG/JPEG/GIF/WebP magic bytes from inline data URLs before base64 fallback or official `/files` upload, so mismatched browser MIME labels do not leak into the Server prompt payload.
 
 ## Verification Plan
 
 - Regenerated `vendor/kimi-code-sdk/index.mjs` from the 0.19.0 upstream checkout.
 - `node scripts/probe-kimi-code-0.19.mjs` verified SDK `additionalDirs` create, `session.addAdditionalDir(..., { persist: false })`, session summary update, and resume input.
+- The same probe verified Server `/sessions/{id}/snapshot` schema on the local 0.19 Server.
 - Run host smoke probes and targeted 0.19.0 probes.
 - Run `pnpm knowledge:validate`, relevant tests, `pnpm build`, and `git diff --check` before committing.

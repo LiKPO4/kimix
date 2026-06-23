@@ -9,14 +9,14 @@
   - 官方 node SDK 版本从 `0.9.4` 升到 `0.10.0`。
 - 待办：
   1. [x] 刷新 `vendor/kimi-code-sdk/index.mjs` 与 provenance，保留 Kimix MCP fallback 4 秒补丁。
-  2. [ ] 增加 0.19 探针：SDK `additionalDirs` create/resume/session summary、`session.addAdditionalDir(path, { persist })` 已通过；Server snapshot schema/timeout 待补。
+  2. [x] 增加 0.19 探针：SDK `additionalDirs` create/resume/session summary、`session.addAdditionalDir(path, { persist })` 已通过；Server snapshot schema/timeout 已通过。
   3. [x] 将官方 `additionalDirs` 能力接入 Kimix 创建/恢复 runtime；Server `/sessions` REST schema 暂未公开显式 additionalDirs 字段，Server 会话仍依赖上游 `.kimi-code/local.toml` 能力或后续官方 API。
-  4. [ ] 核对 Server snapshot 直接磁盘读取后的历史、pending approval/question 恢复兼容性。
-  5. [ ] 核对 safety-policy block 事件映射，避免被 Kimix 当作普通完成轮次。
-  6. [ ] 核对图片真实格式 sniffing 与 Kimix 本地图片/Server `/files` 上传链路。
+  4. [x] 核对 Server snapshot 直接磁盘读取后的历史、pending approval/question 恢复兼容性；0.19 snapshot schema 与 Kimix message replay、pending approval/question 合成路径兼容。
+  5. [x] 核对 safety-policy block 事件映射；`turn.ended` 的 `reason: "filtered"` 会显示为“模型安全策略拦截了本轮回复”，不再当普通完成轮次。
+  6. [x] 核对图片真实格式 sniffing 与 Kimix 本地图片/Server `/files` 上传链路；Server prompt 转换会在 base64 fallback 和 `/files` 上传前按 PNG/JPEG/GIF/WebP 魔数修正 media type。
   7. [ ] 评估 Ctrl+B 后台任务转移与 `/tasks` 是否需要 Kimix UI 跟进；官方接口不成熟则延后。
 - 关键文件：`docs/kimi-code-0.19-followup.md`、`scripts/vendor-kimi-code-sdk.mjs`、`vendor/kimi-code-sdk/README.md`、`vendor/kimi-code-sdk/index.mjs`、`electron/kimiCodeHost.ts`、`electron/kimiCodeServerClient.ts`。
-- 下一步：补 Server snapshot 0.19 兼容探针，再核对 safety-policy block 和图片 MIME sniffing。
+- 下一步：评估 Ctrl+B 后台任务转移与 `/tasks` 是否需要 Kimix UI 跟进；官方接口不成熟则延后。
 
 ## 2026-06-21 官方能力对齐 todolist
 - 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。

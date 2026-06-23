@@ -274,18 +274,46 @@ export async function toServerPromptContent(
     const url = part.imageUrl?.url ?? "";
     const dataUrl = url.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
     if (dataUrl) {
+      const mediaType = sniffImageMediaType(dataUrl[2]) ?? dataUrl[1];
       if (upload) {
         const file = await upload({
           name: part.imageUrl?.id?.trim() || "image",
-          mediaType: dataUrl[1],
+          mediaType,
           data: dataUrl[2],
         });
         return { type: "image", source: { kind: "file", file_id: file.id } };
       }
-      return { type: "image", source: { kind: "base64", media_type: dataUrl[1], data: dataUrl[2] } };
+      return { type: "image", source: { kind: "base64", media_type: mediaType, data: dataUrl[2] } };
     }
     return { type: "image", source: { kind: "url", url } };
   }));
+}
+
+function sniffImageMediaType(base64: string): string | undefined {
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(base64, "base64");
+  } catch {
+    return undefined;
+  }
+  if (bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) {
+    return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (bytes.length >= 6) {
+    const header = bytes.subarray(0, 6).toString("ascii");
+    if (header === "GIF87a" || header === "GIF89a") return "image/gif";
+  }
+  if (bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+    bytes.subarray(8, 12).toString("ascii") === "WEBP") {
+    return "image/webp";
+  }
+  return undefined;
 }
 
 export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> {

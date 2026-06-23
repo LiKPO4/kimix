@@ -46,6 +46,23 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(upload).toHaveBeenCalledWith({ name: "shot.png", mediaType: "image/png", data: "AA==" });
   });
 
+  it("sniffs inline image bytes before sending base64 content or uploading files", async () => {
+    const pngBytes = "iVBORw0KGgo=";
+    await expect(toServerPromptContent([
+      { type: "image_url", imageUrl: { url: `data:image/jpeg;base64,${pngBytes}`, id: "shot.jpg" } },
+    ])).resolves.toEqual([
+      { type: "image", source: { kind: "base64", media_type: "image/png", data: pngBytes } },
+    ]);
+
+    const upload = vi.fn(async () => ({ id: "file-png" }));
+    await expect(toServerPromptContent([
+      { type: "image_url", imageUrl: { url: `data:image/jpeg;base64,${pngBytes}`, id: "shot.jpg" } },
+    ], upload)).resolves.toEqual([
+      { type: "image", source: { kind: "file", file_id: "file-png" } },
+    ]);
+    expect(upload).toHaveBeenCalledWith({ name: "shot.jpg", mediaType: "image/png", data: pngBytes });
+  });
+
   it("uploads files through the official multipart route", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({
       code: 0,

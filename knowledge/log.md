@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-23
+* **Kimi Code 0.19 correctness probes**: Added the Server snapshot schema probe, confirmed 0.19 snapshot fields remain compatible with Kimix history and pending-gate replay, mapped `reason: filtered` turns as safety-policy blocks, and aligned inline image MIME handling with upstream byte sniffing.
 * **Kimi Code 0.19 runtime routing**: Refreshed the vendored SDK to official node-sdk `0.10.0` and wired Kimix extra work directories into SDK-backed create/resume/startRuntime through official `additionalDirs`; Server REST still has no explicit additionalDirs create field, so Kimix treats that as an upstream capability boundary.
 
 ## 2026-06-21

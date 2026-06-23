@@ -317,6 +317,21 @@ describe("reduceKimiCodeEvents", () => {
     expect(assistant.isThinking).toBe(false);
   });
 
+  it("maps provider safety-policy filtered turns as an error instead of normal completion", () => {
+    const events = reduceKimiCodeEvents([], [
+      { type: "assistant.delta", delta: "部分输出" },
+      { type: "turn.ended", reason: "filtered" },
+    ], testOptions());
+
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe("assistant_message");
+    expect(events[1]).toMatchObject({
+      type: "error",
+      message: "模型安全策略拦截了本轮回复",
+      source: "sdk",
+    });
+  });
+
   it("reduces Kimi Code wire loop events without losing the final text body", () => {
     const events = reduceKimiCodeEvents([], [
       {

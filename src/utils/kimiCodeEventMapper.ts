@@ -310,6 +310,16 @@ export function mapKimiCodeEvent(
     }
 
     case "turn.ended":
+      if (event.reason === "filtered") {
+        return {
+          id: getId(options),
+          type: "error",
+          timestamp,
+          message: "模型安全策略拦截了本轮回复",
+          source: "sdk",
+          canDismiss: true,
+        };
+      }
       return {
         id: getId(options),
         type: "assistant_message",
