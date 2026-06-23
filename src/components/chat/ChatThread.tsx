@@ -51,6 +51,7 @@ const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
 const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 20_000;
+const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
 const SESSION_LAYOUT_STABLE_MS = 320;
 const SESSION_LAYOUT_STABLE_PASSES = 3;
 const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
@@ -855,6 +856,20 @@ export function ChatThread() {
     scrollToBottom("smooth");
   };
 
+  const settleUserSubmittedMessageAtBottom = () => {
+    autoFollowRef.current = true;
+    userScrollRef.current = false;
+    sessionAutoBottomUntilRef.current = Date.now() + USER_SUBMIT_BOTTOM_MAX_WAIT_MS;
+    sessionAutoBottomStableRef.current = null;
+    updateAutoFollow(true);
+    updateShowScrollToBottom(false);
+    scrollToBottom("auto");
+    window.requestAnimationFrame(() => {
+      scrollToBottom("auto");
+      settleSessionAtBottom();
+    });
+  };
+
   const pauseAutoFollowForUser = () => {
     cancelSessionAutoBottom();
     userScrollRef.current = true;
@@ -1026,6 +1041,16 @@ export function ChatThread() {
     window.addEventListener("kimix:focus-timeline-event", handler);
     return () => window.removeEventListener("kimix:focus-timeline-event", handler);
   }, [session?.id, showOlderItems]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
+      if (!detail?.sessionId || detail.sessionId !== session?.id) return;
+      settleUserSubmittedMessageAtBottom();
+    };
+    window.addEventListener("kimix:user-message-submitted", handler);
+    return () => window.removeEventListener("kimix:user-message-submitted", handler);
+  }, [session?.id]);
 
   useLayoutEffect(() => {
     setPrimedSessionId(null);

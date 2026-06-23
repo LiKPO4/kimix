@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-23 v2.11.56 手动发送消息置底
+- 当前目标：修复用户手动发送消息后，聊天流可能仍停留在历史阅读位置、不主动滚到底部的问题；不改变队列消息自动发送时的滚动策略。
+- 根因：用户向上阅读后 `userScrollRef` 会关闭自动跟随；普通发送只追加用户消息和助手占位，没有显式恢复本会话的 auto-follow。
+- 已完成：`Composer` 在手动提交用户消息后派发 `kimix:user-message-submitted`；`ChatThread` 监听后恢复自动跟随、立即滚到底部，并开启 6 秒布局稳定置底窗口；队列消息发送显式跳过该触发。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/components/chat/ChatThread.tsx`。
+- 下一步：完成构建、测试、知识校验和窄范围提交后，请用户用 v2.11.56 复验手动发送消息时是否立即置底。
+
 ## 2026-06-23 Kimi Code 0.19.0 跟进 todolist
 - 当前目标：按官方 Kimi Code 0.19.0 增量跟进 Kimix；先刷新 vendored SDK，再探针验证 multi-directory workspace、snapshot、safety-policy 和图片 MIME 行为。
 - 已确认：

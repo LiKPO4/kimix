@@ -778,7 +778,7 @@ export function Composer() {
     return session;
   };
 
-  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string; beforePrompt?: () => Promise<boolean> }) => {
+  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string; beforePrompt?: () => Promise<boolean> }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
@@ -833,6 +833,11 @@ export function Composer() {
       title: session.title,
       updatedAt: Date.now(),
     }));
+    if (shouldAddUserEvent && options?.manualSubmitAutoScroll !== false) {
+      window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
+        detail: { sessionId: targetSession.id },
+      }));
+    }
     targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
 
     const effectiveEngine = "kimi-code";
@@ -1901,6 +1906,7 @@ export function Composer() {
       filePath: image.filePath,
     }));
     await sendPromptContent(pending.content, {
+      manualSubmitAutoScroll: false,
       images: pendingAttachments,
     });
   };
