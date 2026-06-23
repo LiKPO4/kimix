@@ -23,7 +23,7 @@
 4. [x] Review Server snapshot usage after upstream direct disk reader changes; keep Kimix history and pending approval/question recovery compatible with the 0.19.0 schema.
 5. [x] Review safety-policy block event mapping so Kimix does not display a blocked turn as a normal completed answer.
 6. [x] Review local image upload/media handling against upstream real image format sniffing; prefer official Server upload behavior where possible.
-7. [ ] Decide whether Ctrl+B background task transfer and `/tasks` need Kimix UI follow-up; defer if the Server/SDK API is not product-ready for Kimix.
+7. [x] Decide whether Ctrl+B background task transfer and `/tasks` need Kimix UI follow-up; defer if the Server/SDK API is not product-ready for Kimix.
 
 ## Upstream Notes
 
@@ -42,6 +42,7 @@
 - `node scripts/probe-kimi-code-0.19.mjs` now covers both SDK `additionalDirs` and Server snapshot schema. The 0.19 Server snapshot currently returns `as_of_seq`, `epoch`, `session`, `messages`, `in_flight_turn`, `pending_approvals`, and `pending_questions`, which matches Kimix's live recovery and one-shot history adapters.
 - Kimix maps `turn.ended` with `reason: "filtered"` to a concise user-facing error instead of normal assistant completion.
 - Kimix now sniffs PNG/JPEG/GIF/WebP magic bytes from inline data URLs before base64 fallback or official `/files` upload, so mismatched browser MIME labels do not leak into the Server prompt payload.
+- Kimix already maps Server `/tasks` to the existing background-task panel for list/get/cancel. Official 0.19 SDK exposes `session.detachBackgroundTask(taskId)` for foreground-to-background handoff, so Kimix exposes that as a compatibility-chain IPC. Server 0.19 does not expose an equivalent detach REST route; Kimix therefore does not add a misleading Server UI button.
 
 ## Verification Plan
 

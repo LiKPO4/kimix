@@ -108,6 +108,7 @@ type KimiCodeSessionLike = {
   getBackgroundTaskOutput?(taskId: string, options?: { tail?: number }): Promise<string>;
   getBackgroundTaskOutputPath?(taskId: string): Promise<string | undefined>;
   stopBackgroundTask?(taskId: string, options?: { reason?: string }): Promise<void>;
+  detachBackgroundTask?(taskId: string): Promise<KimiCodeBackgroundTaskInfo | undefined>;
   createGoal?(input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalSnapshot>;
   getGoal?(): Promise<KimiCodeGoalState>;
   pauseGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
@@ -1424,6 +1425,16 @@ export async function stopBackgroundTask(sessionId: string, taskId: string, reas
   const managed = getManagedSession(sessionId);
   if (!managed.session.stopBackgroundTask) throw new Error("当前兼容链路不支持停止后台任务。");
   await managed.session.stopBackgroundTask(taskId, reason ? { reason } : {});
+}
+
+export async function detachBackgroundTask(sessionId: string, taskId: string): Promise<KimiCodeBackgroundTaskInfo | undefined> {
+  if (serverSessions.has(sessionId)) {
+    throw new Error("官方 Server 暂未公开前台任务转后台接口。已在后台运行的任务仍可查看、复制输出或停止。");
+  }
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.detachBackgroundTask) throw new Error("当前兼容链路不支持前台任务转后台。");
+  const task = await managed.session.detachBackgroundTask(taskId);
+  return task ? { ...task, transport: "sdk" as const } : undefined;
 }
 
 function formatBytes(bytes: number): string {

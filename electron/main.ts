@@ -5451,6 +5451,18 @@ ipcMain.handle("kimi-code:stopBackgroundTask", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:detachBackgroundTask", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const taskId = typeof req.taskId === "string" ? req.taskId.trim() : "";
+    if (!sessionId || !taskId) return { success: false, error: "Missing sessionId or taskId" };
+    return { success: true, data: await kimiCodeHost.detachBackgroundTask(sessionId, taskId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:getServerRuntimeDiagnostics", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

@@ -105,12 +105,14 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await client.listChildren("parent");
     await client.createChild("parent", { title: "child" });
     await client.listTasks("parent");
+    await client.getTask("parent", "task/1", 4096);
     await client.listTerminals("parent");
     expect(calls).toEqual([
       "http://127.0.0.1:58627/api/v1/sessions/parent:fork",
       "http://127.0.0.1:58627/api/v1/sessions/parent/children?page_size=100",
       "http://127.0.0.1:58627/api/v1/sessions/parent/children",
       "http://127.0.0.1:58627/api/v1/sessions/parent/tasks",
+      "http://127.0.0.1:58627/api/v1/sessions/parent/tasks/task%2F1?with_output=true&output_bytes=4096",
       "http://127.0.0.1:58627/api/v1/sessions/parent/terminals",
     ]);
   });

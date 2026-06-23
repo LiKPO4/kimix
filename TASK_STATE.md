@@ -14,9 +14,9 @@
   4. [x] 核对 Server snapshot 直接磁盘读取后的历史、pending approval/question 恢复兼容性；0.19 snapshot schema 与 Kimix message replay、pending approval/question 合成路径兼容。
   5. [x] 核对 safety-policy block 事件映射；`turn.ended` 的 `reason: "filtered"` 会显示为“模型安全策略拦截了本轮回复”，不再当普通完成轮次。
   6. [x] 核对图片真实格式 sniffing 与 Kimix 本地图片/Server `/files` 上传链路；Server prompt 转换会在 base64 fallback 和 `/files` 上传前按 PNG/JPEG/GIF/WebP 魔数修正 media type。
-  7. [ ] 评估 Ctrl+B 后台任务转移与 `/tasks` 是否需要 Kimix UI 跟进；官方接口不成熟则延后。
+  7. [x] 评估 Ctrl+B 后台任务转移与 `/tasks` 是否需要 Kimix UI 跟进；Server `/tasks` 已接入 Kimix 后台任务面板的列表/输出/停止，官方 SDK 的前台转后台能力已补成兼容链路 IPC；Server 0.19 暂无等价 detach REST 路由，不新增误导性 UI。
 - 关键文件：`docs/kimi-code-0.19-followup.md`、`scripts/vendor-kimi-code-sdk.mjs`、`vendor/kimi-code-sdk/README.md`、`vendor/kimi-code-sdk/index.mjs`、`electron/kimiCodeHost.ts`、`electron/kimiCodeServerClient.ts`。
-- 下一步：评估 Ctrl+B 后台任务转移与 `/tasks` 是否需要 Kimix UI 跟进；官方接口不成熟则延后。
+- 下一步：0.19 当前跟进项已处理完；下一轮可做一遍轻量 review 后准备发布。
 
 ## 2026-06-21 官方能力对齐 todolist
 - 当前目标：继续扫平 Kimix 与官方 Kimi Code Server 的能力差异；能走官方原生 API 的优先迁移，官方未公开能力不得伪装为已对齐。

@@ -109,6 +109,7 @@ import type {
   KimiCodeBackgroundTaskOutputPathResponse,
   KimiCodeBackgroundTaskOutputResponse,
   KimiCodeBackgroundTaskRequest,
+  KimiCodeBackgroundTaskResponse,
   KimiCodeChildSessionRequest,
   KimiCodeInstallPluginRequest,
   KimiCodeListBackgroundTasksRequest,
@@ -381,6 +382,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:getBackgroundTaskOutputPath", req),
   stopKimiCodeBackgroundTask: (req: KimiCodeBackgroundTaskRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:stopBackgroundTask", req),
+  detachKimiCodeBackgroundTask: (req: KimiCodeBackgroundTaskRequest): Promise<KimiCodeBackgroundTaskResponse> =>
+    ipcRenderer.invoke("kimi-code:detachBackgroundTask", req),
   listKimiCodeServerTerminals: (req: KimiCodeSessionRequest): Promise<KimiCodeListServerTerminalsResponse> =>
     ipcRenderer.invoke("kimi-code:listServerTerminals", req),
   createKimiCodeServerTerminal: (req: KimiCodeServerTerminalRequest): Promise<KimiCodeServerTerminalResponse> =>

@@ -1918,6 +1918,14 @@ export type KimiCodeBackgroundTaskOutputPathResponse = {
   error: string;
 };
 
+export type KimiCodeBackgroundTaskResponse = {
+  success: true;
+  data?: KimiCodeBackgroundTaskInfo;
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeServerRuntimeDiagnosticsResponse = {
   success: true;
   data: KimiCodeServerRuntimeDiagnostics;
