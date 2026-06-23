@@ -43,6 +43,7 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { settleInactiveEvents } from "@/utils/eventHelpers";
 import { formatReleaseDate } from "@/utils/format";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { displayProjectName } from "@/utils/projectDisplay";
@@ -961,7 +962,10 @@ export function LongTaskInspectorPanel({
   const openServerTreeSession = async (child: KimiCodeSessionSummary) => {
     if (serverTreeBusy) return;
     setServerTreeBusy(child.id);
-    const resumed = await window.api.resumeKimiCodeSession({ sessionId: child.id });
+    const resumed = await window.api.resumeKimiCodeSession({
+      sessionId: child.id,
+      additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+    });
     if (!resumed.success) {
       setServerTreeBusy(null);
       showToast(`载入子会话失败：${resumed.error}`);

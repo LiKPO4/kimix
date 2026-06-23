@@ -43,6 +43,7 @@ import { LongTaskInspectorPanel, type BtwPanelState, type LongTaskBackgroundTask
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
 function isBackgroundTaskTerminalStatus(status: string) {
   return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
@@ -574,6 +575,7 @@ export function AppShell() {
         yoloMode: permissionMode === "yolo",
         autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -1546,7 +1548,10 @@ ${isFinalStep
     }
     const existing = getRuntimeSessionId(liveCurrentSession);
     if (existing) {
-      const res = await window.api.resumeKimiCodeSession({ sessionId: existing });
+      const res = await window.api.resumeKimiCodeSession({
+        sessionId: existing,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+      });
       if (!res.success) throw new Error(res.error);
       updateSession(liveCurrentSession.id, (session) => ({
         ...session,
@@ -1561,6 +1566,7 @@ ${isFinalStep
       workDir: liveCurrentSession.projectPath,
       permission: permissionMode,
       planMode: defaultPlanMode,
+      additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
     });
     if (!res.success) throw new Error(res.error);
     updateSession(liveCurrentSession.id, (session) => ({

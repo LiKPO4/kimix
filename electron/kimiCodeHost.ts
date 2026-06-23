@@ -63,7 +63,7 @@ type KimiHarnessLike = {
     getManagedUsage(providerName?: string): Promise<unknown>;
   };
   createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeSessionLike>;
-  resumeSession(input: { id: string }): Promise<KimiCodeSessionLike>;
+  resumeSession(input: { id: string; additionalDirs?: readonly string[] }): Promise<KimiCodeSessionLike>;
   forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
   renameSession?(input: { id: string; title: string }): Promise<void>;
   listSessions(options?: { workDir?: string; sessionId?: string }): Promise<KimiCodeSessionSummary[]>;
@@ -85,6 +85,7 @@ type KimiCodeConfigDiagnostics = {
 type KimiCodeSessionLike = {
   id: string;
   workDir: string;
+  summary?: KimiCodeSessionSummary;
   prompt(input: string | KimiCodePromptPart[]): Promise<void>;
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
@@ -147,12 +148,14 @@ export type CreateKimiCodeSessionOptions = {
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   metadata?: JsonObject;
+  additionalDirs?: readonly string[];
 };
 
 export type KimiCodeEngineSession = {
   sessionId: string;
   workDir: string;
   status: KimiCodeEngineStatus;
+  additionalDirs?: readonly string[];
 };
 
 export type KimiCodeSessionSummary = {
@@ -165,6 +168,7 @@ export type KimiCodeSessionSummary = {
   updatedAt: number;
   archived?: boolean;
   metadata?: JsonObject;
+  additionalDirs?: readonly string[];
 };
 
 export type KimiCodeSessionStatus = {
@@ -502,6 +506,7 @@ type ManagedSession = {
   thinking?: string;
   permission: KimiCodePermissionMode;
   planMode?: boolean;
+  additionalDirs: readonly string[];
   unsubscribe: () => void;
   hiddenAgentIds: Set<string>;
   btwRuns: Map<string, BtwRun>;
@@ -515,6 +520,7 @@ type ServerManagedSession = {
   thinking: string;
   permission: KimiCodePermissionMode;
   planMode: boolean;
+  additionalDirs: readonly string[];
   btwRuns: Map<string, BtwRun>;
 };
 
@@ -596,7 +602,7 @@ export async function createSession(options: CreateKimiCodeSessionOptions): Prom
   return createSdkSession(options);
 }
 
-export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSession> {
+export async function resumeSession(sessionId: string, options: { additionalDirs?: readonly string[] } = {}): Promise<KimiCodeEngineSession> {
   const existingServer = serverSessions.get(sessionId);
   if (existingServer) return toServerEngineSession(existingServer);
   if (shouldRouteNewSessionToServer()) {
@@ -615,7 +621,7 @@ export async function resumeSession(sessionId: string): Promise<KimiCodeEngineSe
   if (existing) return toEngineSession(existing.session, existing.status);
 
   const sdkHarness = await getHarness();
-  const session = await sdkHarness.resumeSession({ id: sessionId });
+  const session = await sdkHarness.resumeSession({ id: sessionId, additionalDirs: options.additionalDirs });
   // The resumed session keeps whatever permission it was persisted with; read it
   // back from the SDK so the yolo auto-approve guard reflects reality until the
   // caller re-applies the UI permission mode via setPermission().
@@ -646,7 +652,7 @@ async function createSdkSession(options: CreateKimiCodeSessionOptions): Promise<
   } catch (error) {
     const existingSessionId = getKimiCodeSessionAlreadyExistsId(error);
     if (!existingSessionId) throw error;
-    session = await sdkHarness.resumeSession({ id: existingSessionId });
+    session = await sdkHarness.resumeSession({ id: existingSessionId, additionalDirs: options.additionalDirs });
   }
   return registerSession(session, "idle", {
     model: options.model,
@@ -1955,6 +1961,7 @@ function registerSession(
     thinking: profile.thinking,
     permission: profile.permission,
     planMode: profile.planMode,
+    additionalDirs: session.summary?.additionalDirs ?? [],
     unsubscribe,
     hiddenAgentIds,
     btwRuns,
@@ -1980,6 +1987,7 @@ async function registerServerSession(
       ? config.permission_mode
       : options.permission ?? "manual",
     planMode: typeof config.plan_mode === "boolean" ? config.plan_mode : options.planMode ?? false,
+    additionalDirs: options.additionalDirs ?? [],
     btwRuns: new Map(),
   };
   serverSessions.set(session.id, managed);
@@ -2030,11 +2038,12 @@ async function fallbackServerSessionToSdk(
       thinking: serverManaged.thinking,
       permission: serverManaged.permission,
       planMode: serverManaged.planMode,
+      additionalDirs: serverManaged.additionalDirs,
     });
   } catch (createError) {
     const existingSessionId = getKimiCodeSessionAlreadyExistsId(createError);
     if (!existingSessionId) throw createError;
-    session = await sdkHarness.resumeSession({ id: existingSessionId });
+    session = await sdkHarness.resumeSession({ id: existingSessionId, additionalDirs: serverManaged.additionalDirs });
   }
   return sessions.get(session.id) ?? (() => {
     registerSession(session, "running", {
@@ -2216,7 +2225,7 @@ function mapServerStatus(status: string): KimiCodeEngineStatus {
 }
 
 function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSession {
-  return { sessionId: managed.session.id, workDir: managed.workDir, status: managed.status };
+  return { sessionId: managed.session.id, workDir: managed.workDir, status: managed.status, additionalDirs: managed.additionalDirs };
 }
 
 function sanitizeSkillActivationTitle(title?: string) {
@@ -2227,6 +2236,9 @@ function sanitizeSkillActivationTitle(title?: string) {
 
 function serverSessionSummary(session: ServerSession): KimiCodeSessionSummary {
   const workDir = typeof session.metadata?.cwd === "string" ? session.metadata.cwd : "";
+  const additionalDirs = Array.isArray(session.metadata?.additionalDirs)
+    ? session.metadata.additionalDirs.filter((item): item is string => typeof item === "string")
+    : undefined;
   return {
     id: session.id,
     title: sanitizeSkillActivationTitle(session.title),
@@ -2237,6 +2249,7 @@ function serverSessionSummary(session: ServerSession): KimiCodeSessionSummary {
     archived: session.archived,
     source: "server",
     metadata: session.metadata,
+    additionalDirs,
   };
 }
 
@@ -2535,6 +2548,7 @@ function toEngineSession(session: KimiCodeSessionLike, status: KimiCodeEngineSta
     sessionId: session.id,
     workDir: session.workDir,
     status,
+    additionalDirs: session.summary?.additionalDirs ?? [],
   };
 }
 

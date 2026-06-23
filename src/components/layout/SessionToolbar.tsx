@@ -36,6 +36,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
 export type SessionMenuEntry =
   | { type: "separator" }
@@ -365,7 +366,10 @@ export function SessionToolbar({
     }
     setUndoBusy(true);
     try {
-      const resumed = await window.api.resumeKimiCodeSession({ sessionId: runtimeSessionId });
+      const resumed = await window.api.resumeKimiCodeSession({
+        sessionId: runtimeSessionId,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+      });
       if (!resumed.success) {
         showToast(`恢复会话失败：${resumed.error}`);
         return;

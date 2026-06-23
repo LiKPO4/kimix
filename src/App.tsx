@@ -18,6 +18,7 @@ import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import {
   settleInactiveEvents,
   sanitizePersistedEvents,
@@ -961,6 +962,7 @@ ${isFinalStep
 
 async function createSessionAndSendPrompt(projectPath: string, content: string) {
   const appState = useAppStore.getState();
+  const additionalWorkDirs = normalizeAdditionalWorkDirs(appState.additionalWorkDirs);
   const sessionStore = useSessionStore.getState();
   const sessionRes = await window.api.startKimiCodeRuntime({
     workDir: projectPath,
@@ -968,6 +970,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     yoloMode: appState.permissionMode === "yolo",
     autoMode: appState.permissionMode === "auto",
     planMode: appState.defaultPlanMode,
+    additionalWorkDirs,
   });
   if (!sessionRes.success) throw new Error(sessionRes.error);
 
@@ -1157,7 +1160,10 @@ function App() {
         let prewarmRes: Awaited<ReturnType<typeof window.api.createKimiCodeSession>> | null = null;
         const existingRuntimeId = latest.runtimeSessionId ?? latest.officialSessionId;
         if (existingRuntimeId) {
-          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: existingRuntimeId });
+          const resumeRes = await window.api.resumeKimiCodeSession({
+            sessionId: existingRuntimeId,
+            additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+          });
           if (resumeRes.success && (!latest.projectPath || isSameLocalProjectPath(resumeRes.data.workDir, latest.projectPath))) {
             prewarmRes = resumeRes;
           } else if (!resumeRes.success && isKimiCodeSessionMissingError(resumeRes.error)) {
@@ -1175,6 +1181,7 @@ function App() {
             workDir: latest.projectPath,
             permission: useAppStore.getState().permissionMode,
             planMode: useAppStore.getState().defaultPlanMode,
+            additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
           });
         }
         if (!prewarmRes.success) throw new Error(prewarmRes.error);
@@ -1288,6 +1295,7 @@ function App() {
       thinking: defaultThinking,
       yoloMode: permissionMode === "yolo",
       autoMode: permissionMode === "auto",
+      additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
     });
     if (!startRes.success) throw new Error(startRes.error);
 
@@ -1768,6 +1776,7 @@ function App() {
           const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
           let recoveryRes = await window.api.resumeKimiCodeSession({
             sessionId: alreadyExistingRuntimeId ?? runtimeSessionId,
+            additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
           });
           if (
             recoveryRes.success &&
@@ -1781,6 +1790,7 @@ function App() {
               workDir: latestSession.projectPath,
               permission: useAppStore.getState().permissionMode,
               planMode: useAppStore.getState().defaultPlanMode,
+              additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
             });
           }
           if (recoveryRes.success) {
@@ -2055,6 +2065,7 @@ function App() {
                 yoloMode: useAppStore.getState().permissionMode === "yolo",
                 autoMode: useAppStore.getState().permissionMode === "auto",
                 planMode: useAppStore.getState().defaultPlanMode,
+                additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
               };
               let startRes = await window.api.startKimiCodeRuntime(startOptions);
               if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
@@ -2331,6 +2342,7 @@ function App() {
           thinking: useAppStore.getState().defaultThinking,
           yoloMode: useAppStore.getState().permissionMode === "yolo",
           autoMode: useAppStore.getState().permissionMode === "auto",
+          additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
         });
         if (!startRes.success) throw new Error(startRes.error);
         rememberHiddenHandoffSession(startRes.data.sessionId);

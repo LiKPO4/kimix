@@ -17,6 +17,7 @@ import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimi
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -409,6 +410,7 @@ export function Composer() {
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
   const setThemePalette = useAppStore((s) => s.setThemePalette);
   const upsertKimiThemePalette = useAppStore((s) => s.upsertKimiThemePalette);
@@ -871,7 +873,10 @@ export function Composer() {
         const knownOfficialSessionId = targetSession.officialSessionId;
         if (knownOfficialSessionId) {
           updateLinkStatus("消息发送中", "info");
-          const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownOfficialSessionId });
+          const resumeRes = await window.api.resumeKimiCodeSession({
+            sessionId: knownOfficialSessionId,
+            additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+          });
           // Only adopt the resumed runtime when it points at this project's
           // workDir. A stale binding to the plugin-management temp session would
           // otherwise make the assistant run against the wrong directory; drop it
@@ -909,6 +914,7 @@ export function Composer() {
           workDir: targetSession.projectPath,
           permission: permissionMode,
           planMode: defaultPlanMode,
+          additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         });
         if (!createRes.success) throw new Error(createRes.error);
         const model = createRes.data.model ?? targetSession.model ?? await getDefaultKimiModel();
@@ -1072,7 +1078,10 @@ export function Composer() {
     if (!targetSession) return null;
     const knownSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
     if (knownSessionId) {
-      const resumeRes = await window.api.resumeKimiCodeSession({ sessionId: knownSessionId });
+      const resumeRes = await window.api.resumeKimiCodeSession({
+        sessionId: knownSessionId,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+      });
       if (resumeRes.success) {
         updateSession(targetSession.id, (session) => ({
           ...session,
@@ -1090,6 +1099,7 @@ export function Composer() {
       workDir: targetSession.projectPath,
       permission: permissionMode,
       planMode: defaultPlanMode,
+      additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
     });
     if (!createRes.success) throw new Error(createRes.error);
     updateSession(targetSession.id, (session) => ({

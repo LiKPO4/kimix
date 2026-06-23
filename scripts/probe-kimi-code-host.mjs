@@ -9,7 +9,7 @@ const officialRepo =
   path.join(os.homedir(), "AppData", "Local", "Temp", "kimix-kimi-code-research");
 const sdkEntry =
   process.env.KIMIX_KIMI_CODE_SDK_ENTRY ??
-  path.join(officialRepo, "packages", "node-sdk", "dist", "index.mjs");
+  path.join(repoRoot, "vendor", "kimi-code-sdk", "index.mjs");
 const probeRoot = path.join(os.tmpdir(), "kimix-kimi-code-host-probe");
 const workDir = path.join(probeRoot, "work");
 const timeoutMs = Number(process.env.KIMIX_HOST_PROBE_TIMEOUT_MS ?? 180_000);
@@ -69,15 +69,18 @@ async function main() {
   await mkdir(workDir, { recursive: true });
   await writeFile(path.join(workDir, "README.md"), "Kimix KimiCodeHost probe directory.\n", "utf-8");
 
-  const { KimiHarness } = await import(pathToFileURL(sdkEntry).href);
-  const harness = new KimiHarness({
+  const sdk = await import(pathToFileURL(sdkEntry).href);
+  const options = {
     homeDir: process.env.KIMI_CODE_HOME,
     identity: {
       userAgentProduct: "kimi-code-cli",
       version: process.env.KIMI_CODE_SMOKE_VERSION ?? "0.6.0",
     },
     uiMode: "kimix-host-probe",
-  });
+  };
+  const harness = typeof sdk.createKimiHarness === "function"
+    ? sdk.createKimiHarness(options)
+    : new sdk.KimiHarness(options);
 
   try {
     const config = await harness.getConfig();

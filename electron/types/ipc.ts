@@ -1403,6 +1403,7 @@ export type KimiCodeSessionInfo = {
   sessionId: string;
   workDir: string;
   status: KimiCodeEngineStatus;
+  additionalDirs?: readonly string[];
 };
 
 export type KimiCodeSessionStatus = {
@@ -1575,10 +1576,14 @@ export type KimiCodeCreateSessionRequest = {
   thinking?: string;
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
+  additionalDirs?: string[];
+  additionalWorkDirs?: string[];
 };
 
 export type KimiCodeResumeSessionRequest = {
   sessionId: string;
+  additionalDirs?: string[];
+  additionalWorkDirs?: string[];
 };
 
 export type KimiCodeForkSessionRequest = {

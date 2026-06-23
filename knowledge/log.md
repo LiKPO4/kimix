@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+## 2026-06-23
+* **Kimi Code 0.19 runtime routing**: Refreshed the vendored SDK to official node-sdk `0.10.0` and wired Kimix extra work directories into SDK-backed create/resume/startRuntime through official `additionalDirs`; Server REST still has no explicit additionalDirs create field, so Kimix treats that as an upstream capability boundary.
+
 ## 2026-06-21
 * **Prompt runtime recovery**: Made prompt dispatch re-register persisted sessions missing from active runtime maps; queued prompts can rebuild a truly missing runtime in the same project and retain recoverable failures locally without exposing internal session errors.
 * **Server history gates**: Added a history-specific snapshot replay path that restores pending approval and question events when reopening Server sessions, while preserving the live resync path.

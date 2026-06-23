@@ -5002,6 +5002,22 @@ function parseKimiCodeImages(value: unknown) {
     : [];
 }
 
+function normalizeAdditionalDirs(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const dirs: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const key = path.resolve(trimmed).replace(/\\/g, "/").toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dirs.push(trimmed);
+  }
+  return dirs;
+}
+
 ipcMain.handle("kimi-code:createSession", async (_, request: unknown) => {
   try {
     if (!request || typeof request !== "object") return { success: false, error: "Invalid request" };
@@ -5009,6 +5025,7 @@ ipcMain.handle("kimi-code:createSession", async (_, request: unknown) => {
     const workDir = typeof req.workDir === "string" ? req.workDir : "";
     if (!workDir) return { success: false, error: "Missing workDir" };
     const permission = req.permission === "manual" || req.permission === "auto" || req.permission === "yolo" ? req.permission : undefined;
+    const additionalDirs = normalizeAdditionalDirs(req.additionalDirs ?? req.additionalWorkDirs);
     const data = await kimiCodeHost.createSession({
       workDir,
       id: typeof req.id === "string" ? req.id : undefined,
@@ -5016,7 +5033,8 @@ ipcMain.handle("kimi-code:createSession", async (_, request: unknown) => {
       thinking: typeof req.thinking === "string" ? req.thinking : undefined,
       permission,
       planMode: typeof req.planMode === "boolean" ? req.planMode : undefined,
-      metadata: { source: "kimix-p1" },
+      additionalDirs,
+      metadata: { source: "kimix-p1", additionalDirs },
     });
     return { success: true, data };
   } catch (err) {
@@ -5029,7 +5047,7 @@ ipcMain.handle("kimi-code:resumeSession", async (_, request: unknown) => {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!sessionId) return { success: false, error: "Missing sessionId" };
-    return { success: true, data: await kimiCodeHost.resumeSession(sessionId) };
+    return { success: true, data: await kimiCodeHost.resumeSession(sessionId, { additionalDirs: normalizeAdditionalDirs(req.additionalDirs ?? req.additionalWorkDirs) }) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5715,8 +5733,9 @@ ipcMain.handle("kimi-code:setPluginMcpServerEnabled", async (_, request: unknown
   }
 });
 
-ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string }) => {
+ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string; additionalWorkDirs?: string[]; additionalDirs?: string[] }) => {
   try {
+    const additionalDirs = normalizeAdditionalDirs(request.additionalDirs ?? request.additionalWorkDirs);
     const permission = request.yoloMode ? "yolo" as const : request.autoMode ? "auto" as const : "manual" as const;
     const sameWorkDir = (a: string, b: string) =>
       path.resolve(a).replace(/\\/g, "/").toLowerCase() === path.resolve(b).replace(/\\/g, "/").toLowerCase();
@@ -5733,6 +5752,7 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
       thinking,
       permission,
       planMode: !!request.planMode,
+      additionalDirs,
     });
     const applyResumeProfile = async (sessionId: string) => {
       if (selectedModelAlias) await kimiCodeHost.setModel(sessionId, selectedModelAlias);
@@ -5744,7 +5764,7 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
     if (request.sessionId) {
       let resumed = null;
       try {
-        resumed = await kimiCodeHost.resumeSession(request.sessionId);
+        resumed = await kimiCodeHost.resumeSession(request.sessionId, { additionalDirs });
       } catch (err) {
         if (!kimiCodeHost.isKimiCodeSessionMissingError(err)) {
           throw err;

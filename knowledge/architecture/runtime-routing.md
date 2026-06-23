@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-21T20:45:00+08:00"
+timestamp: "2026-06-23T11:36:00+08:00"
 ---
 
 # Runtime Routing
@@ -42,6 +42,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 27. Global configuration mutations use official Server routes whenever Server is ready. A default-model-only mutation uses the catalog's dedicated `:set_default` action so the Server validates the model alias; other non-destructive mutations use the config merge endpoint after Kimix converts its camelCase SDK-facing patch into the Server snake_case wire schema, including nested Provider and model fields. The richer SDK config view is then reloaded for existing settings UI consumers, with SDK mutation retained as the Server-failure fallback. Server 0.18 exposes no model or Provider deletion route, so Kimix's guarded local deletion remains an explicit desktop extension rather than a claimed native capability.
 28. Server session restoration must replay both message history and outstanding interaction gates. Live WebSocket resync continues to use message frames plus explicit pending approval/question synthesis in the frame handler, while one-shot history loading uses a history-specific snapshot conversion that appends pending approval/question events after message replay. This keeps reopened sessions actionable without duplicating pending cards during live recovery.
 29. Prompt dispatch is idempotent across runtime-map churn. If a persisted official session ID is absent from both active Server and SDK maps, the Host resumes and re-registers it before sending. A queued renderer prompt retries against that recovered runtime; if the official session no longer exists, Kimix creates a fresh runtime in the same project, updates the visible binding, and retries without exposing internal `already exists` or `session is not active` errors. A final recoverable failure preserves the message in the local queue instead of discarding it.
+30. Extra work directories follow the official Kimi Code 0.19 `additionalDirs` model. Kimix's stored `additionalWorkDirs` are normalized and passed into SDK-backed create, resume, and start-runtime paths so the official session owns multi-directory context. Server `/sessions` does not currently expose an explicit `additionalDirs` request field, so Kimix must not send invented REST fields; Server-backed sessions may only gain this capability through upstream workspace-local config or a future official route.
 
 # Main Components
 
@@ -59,3 +60,4 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 
 * [Kimi Code 0.17 capability audit](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-0.17-capability-gap.md)
 * [Kimi Code 0.18 follow-up](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-0.18-followup.md)
+* [Kimi Code 0.19 follow-up](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-0.19-followup.md)

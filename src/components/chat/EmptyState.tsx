@@ -6,6 +6,7 @@ import type { Session, TimelineEvent } from "@/types/ui";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { displayProjectName } from "@/utils/projectDisplay";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
 const FALLBACK_SUGGESTIONS = [
   { icon: Sparkles, text: "分析当前项目结构，列出最值得优先处理的 3 个问题，并说明验证方式" },
@@ -58,6 +59,7 @@ export function EmptyState() {
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -184,6 +186,7 @@ export function EmptyState() {
           workDir: targetSession.projectPath,
           permission: permissionMode,
           planMode: defaultPlanMode,
+          additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         });
         if (!createRes.success) throw new Error(createRes.error);
         runtimeSessionId = createRes.data.sessionId;
