@@ -20,6 +20,7 @@ const LONG_TASK_ORIGINAL_MARKER = "\n\n用户初始需求：\n";
 const SUPERPOWERS_BOOTSTRAP_MARKER = "\n\n【用户当前消息】\n";
 const SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER = "\n\n用户当前消息：\n";
 const HOOK_CONTEXT_MARKER = "\n\n【用户当前消息】\n";
+const OFFICIAL_SYSTEM_REMINDER_PATTERN = /(?:^|\r?\n)[ \t]*<system-reminder\b[^>]*>[\s\S]*?<\/system-reminder>[ \t]*(?=\r?\n|$)/gi;
 
 type ExtractedUserMessage = {
   content: string;
@@ -447,8 +448,20 @@ function stripKimixClarificationInstruction(content: string): string {
   return stripKimixClarificationInstruction(content.slice(markerIndex + CLARIFICATION_ORIGINAL_MARKER.length));
 }
 
+function stripOfficialSystemReminders(content: string): string {
+  if (!content.includes("<system-reminder")) return content;
+  return content
+    .replace(OFFICIAL_SYSTEM_REMINDER_PATTERN, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function sanitizeUserMessageText(content: string): string {
+  return stripOfficialSystemReminders(stripKimixClarificationInstruction(content));
+}
+
 function extractUserMessage(input: unknown): ExtractedUserMessage {
-  if (isString(input)) return { content: stripKimixClarificationInstruction(input), images: [] };
+  if (isString(input)) return { content: sanitizeUserMessageText(input), images: [] };
   if (!Array.isArray(input)) return { content: "", images: [] };
 
   const textParts: string[] = [];
@@ -456,7 +469,8 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
   input.forEach((part, index) => {
     if (!isRecord(part)) return;
     if (part.type === "text" && isString(part.text)) {
-      textParts.push(part.text);
+      const text = sanitizeUserMessageText(part.text);
+      if (text) textParts.push(text);
       return;
     }
     if (part.type === "image_url") {
@@ -470,7 +484,7 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
     }
   });
   return {
-    content: stripKimixClarificationInstruction(textParts.filter(Boolean).join("\n")),
+    content: sanitizeUserMessageText(textParts.filter(Boolean).join("\n")),
     images,
   };
 }

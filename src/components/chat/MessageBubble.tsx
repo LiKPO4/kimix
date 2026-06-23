@@ -969,6 +969,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
 
 function AssistantMessageFooter({
   statuses,
+  fallbackLabel,
   onCopy,
   onCopyAll,
   copied,
@@ -977,6 +978,7 @@ function AssistantMessageFooter({
   showActions,
 }: {
   statuses: Extract<TimelineEvent, { type: "status_update" }>[];
+  fallbackLabel: string;
   onCopy: () => void;
   onCopyAll: () => void;
   copied: boolean;
@@ -1039,10 +1041,24 @@ function AssistantMessageFooter({
           ))}
         </div>
       ) : (
-        <span className="min-w-0" />
+        <div className="flex min-w-0 max-w-full items-center justify-center" style={{ paddingLeft: 86, paddingRight: 86 }}>
+          <div
+            className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-[13px] leading-[18px] text-text-muted"
+            style={{ paddingLeft: 13, paddingRight: 13, paddingTop: 5, paddingBottom: 5 }}
+          >
+            <span className="truncate">{fallbackLabel}</span>
+          </div>
+        </div>
       )}
     </div>
   );
+}
+
+function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean): string {
+  if (isActiveAssistant) return "消息处理中";
+  const duration = reliableAssistantDurationMs(event.durationMs);
+  if (duration !== undefined) return `已完成 · 用时 ${formatAssistantTurnDuration(duration)}`;
+  return event.isComplete ? "已完成" : "消息处理中";
 }
 
 function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; turnStartedAt?: number; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
@@ -1083,6 +1099,8 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const fullCopyText = useMemo(() => buildAssistantFullCopyText(event), [event.content, event.thinking, event.thinkingParts, event.timestamp]);
+  const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
+  const footerFallbackLabel = assistantFooterFallbackLabel(event, isActiveAssistant);
 
   return (
     <div className="group flex justify-start">
@@ -1103,7 +1121,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
           </div>
         )}
 
-        {(hasContent || changeSummary || trailingStatuses.length > 0) && (
+        {shouldShowBodyFooter && (
           <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
             {hasContent && (
               <>
@@ -1122,9 +1140,10 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
 
             {changeSummary && <ChangeCard event={changeSummary} />}
 
-            {(hasContent || changeSummary || trailingStatuses.length > 0) && (
+            {shouldShowBodyFooter && (
               <AssistantMessageFooter
                 statuses={trailingStatuses}
+                fallbackLabel={footerFallbackLabel}
                 onCopy={() => void trigger(event.content)}
                 onCopyAll={() => void triggerAll(fullCopyText || event.content)}
                 copied={copied}

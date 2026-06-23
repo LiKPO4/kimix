@@ -27,6 +27,30 @@ describe("mapStreamEvent", () => {
     expect(mapStreamEvent({ type: "TurnBegin", payload: { user_input: "" } })).toBeNull();
   });
 
+  it("ignores official system-reminder TurnBegin text", () => {
+    expect(mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: "<system-reminder>\nAuto permission mode is active.\n</system-reminder>",
+      },
+    })).toBeNull();
+  });
+
+  it("removes official system-reminder parts from array user_input", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "text", text: "<system-reminder>\nAuto permission mode is active.\n</system-reminder>" },
+          { type: "text", text: "真实用户消息" },
+        ],
+      },
+    });
+    const user = event as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(user.type).toBe("user_message");
+    expect(user.content).toBe("真实用户消息");
+  });
+
   it("maps ContentPart text to assistant_message", () => {
     const event = mapStreamEvent({
       type: "ContentPart",

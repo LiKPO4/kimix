@@ -50,8 +50,9 @@ function useAnimatedDots(active: boolean) {
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
-const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 10_000;
+const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 20_000;
 const SESSION_LAYOUT_STABLE_MS = 320;
+const SESSION_LAYOUT_STABLE_PASSES = 3;
 const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
 const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
 
@@ -717,6 +718,7 @@ export function ChatThread() {
   const scrollToBottomButtonRef = useRef<HTMLButtonElement>(null);
   const sessionAutoBottomUntilRef = useRef(0);
   const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
   const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
@@ -774,6 +776,7 @@ export function ChatThread() {
 
   const cancelSessionAutoBottom = () => {
     sessionAutoBottomUntilRef.current = 0;
+    sessionAutoBottomStableRef.current = null;
     clearSessionAutoBottomTimer();
   };
 
@@ -798,7 +801,8 @@ export function ChatThread() {
   };
 
   const settleSessionAtBottom = () => {
-    if (!scrollRef.current || !autoFollowRef.current || userScrollRef.current) {
+    const node = scrollRef.current;
+    if (!node || !autoFollowRef.current || userScrollRef.current) {
       cancelSessionAutoBottom();
       return;
     }
@@ -806,6 +810,21 @@ export function ChatThread() {
     const remaining = sessionAutoBottomUntilRef.current - Date.now();
     if (remaining <= 0) {
       cancelSessionAutoBottom();
+      return;
+    }
+    const previousStable = sessionAutoBottomStableRef.current;
+    const nextStable = {
+      scrollHeight: node.scrollHeight,
+      clientHeight: node.clientHeight,
+      count: previousStable &&
+        previousStable.scrollHeight === node.scrollHeight &&
+        previousStable.clientHeight === node.clientHeight
+          ? previousStable.count + 1
+          : 1,
+    };
+    sessionAutoBottomStableRef.current = nextStable;
+    if (nextStable.count >= SESSION_LAYOUT_STABLE_PASSES) {
+      clearSessionAutoBottomTimer();
       return;
     }
     clearSessionAutoBottomTimer();
@@ -822,7 +841,7 @@ export function ChatThread() {
             return;
           }
           scrollToBottom("auto");
-          cancelSessionAutoBottom();
+          settleSessionAtBottom();
         });
       });
     }, Math.min(SESSION_LAYOUT_STABLE_MS, remaining));
@@ -1024,6 +1043,7 @@ export function ChatThread() {
     updateShowScrollToBottom(false);
     if (session?.id) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
+      sessionAutoBottomStableRef.current = null;
       settleSessionAtBottom();
       const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
