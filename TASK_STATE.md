@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.58 前端 polish 第一轮
+- 当前目标：在不改变 Kimix 暖纸编辑器风格的前提下，按三轮计划优化前端整齐度和美观性；本轮先做全局质感基线。
+- 已完成：新增 `docs/frontend-polish-plan.md` 持久化三轮方案；共享按钮、弱操作和侧栏导航增加克制按压反馈；补充标题/短文案换行、等宽数字工具类和 Markdown 图片 inset outline；版本号同步到 v2.11.58。
+- 边界：本轮不调整聊天消息布局、侧栏列表结构、设置页卡片结构和插件页信息架构，避免把基线 polish 扩大成重设计。
+- 关键文件：`docs/frontend-polish-plan.md`、`src/index.css`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，进入第二轮聊天区整齐度优化。
+
 ## 2026-06-26 v2.11.57 Kimi Code 0.20.0 跟进
 - 当前目标：跟进官方 Kimi Code 0.20.0，优先落地影响 Kimix 主聊天链路的 SDK 刷新、Markdown 行间 LaTeX 和显式 `/reload` 插件 Skill 刷新。
 - 已确认：本机 `kimi --version` 与 npm latest 均为 `0.20.0`；官方 tag `@moonshot-ai/kimi-code@0.20.0` 对应 checkout commit `5f36e763ca671a2a67b4b9e5c42a611511a1e6b3`，node SDK 版本仍为 `0.10.0`。
