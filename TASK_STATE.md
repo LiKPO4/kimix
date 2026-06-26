@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.62 顶部刷新按钮语义修复
+- 当前目标：修复顶部工具栏环形箭头按钮语义危险的问题，避免用户把“撤销官方历史上一轮”误认为页面刷新。
+- 已完成：将该按钮改为调用 `window.api.reloadWindow()` 的页面重新载入；按钮文案同步为“重新载入页面 (Ctrl+R)”；移除工具栏上的撤销官方历史入口；版本号同步到 v2.11.62。
+- 边界：保留 slash `/undo` 的显式命令入口，本轮只移除易误点的工具栏按钮。
+- 关键文件：`src/components/layout/SessionToolbar.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.62 复验按钮 tooltip 与刷新行为。
+
 ## 2026-06-26 v2.11.61 侧栏折叠崩溃与 Skill 标题裁切修复
 - 当前目标：修复用户截图反馈的左上角侧栏折叠崩溃和插件页 Skill 标题下半部分裁切。
 - 已完成：将 `Sidebar` 的会话分组 `useMemo` 移到折叠早返回之前，避免 hooks 数量随 `sidebarOpen` 变化；放松 Skill 标题列的垂直裁切并固定标题 24px 行盒；版本号同步到 v2.11.61。
@@ -2274,6 +2281,7 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `electron/kimiCodeHost.ts` 新增 `undoHistory(sessionId, count)` wrapper，要求当前 Session 暴露官方 `undoHistory` 方法。
 - `electron/main.ts` / `electron/preload.ts` / `electron/types/ipc.ts` 新增 `kimi-code:undoHistory` / `undoKimiCodeHistory`，默认撤销 1 步，IPC 侧限制 count 为 1-10。
 - `SessionToolbar` 新增“撤销官方历史上一轮”图标按钮：仅普通 Kimi Code 会话、非运行中、存在用户/steer 轮次时启用；长程任务会话禁用，避免误撤销编排器内部轮次。
+- 后续 v2.11.62 已移除该工具栏图标入口，避免刷新图标语义误导；显式 `/undo` 命令仍保留。
 - 撤销流程先 resume 官方 session，再调用 `undoKimiCodeHistory({ count: 1 })`，随后用 `loadKimiCodeSession` 读取官方 wire 历史并用 `mapHistoryEvents` 刷新本地时间线，不做本地假删除。
 - 浏览器预览 mock 补齐 `undoKimiCodeHistory`。
 - 版本号三处同步到 v2.8.256。
