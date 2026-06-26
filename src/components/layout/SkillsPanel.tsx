@@ -632,8 +632,8 @@ export function SkillsPanel({
                     <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? "border-[var(--accent-blue)] bg-[var(--accent-blue)] text-white" : "border-[var(--kimix-selection-idle-border)] text-transparent"}`}>
                       <Check size={13} />
                     </span>
-                    <span className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-                      <span className="block truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ lineHeight: "22px" }}>{skill.name}</span>
+                    <span className="flex min-h-0 min-w-0 flex-col">
+                      <span className="block min-w-0 truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ lineHeight: "24px", minHeight: 24 }} title={skill.name}>{skill.name}</span>
                       <span className="mt-2 flex min-w-0 flex-wrap items-center" style={{ gap: 6 }}>
                         <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${trust.className}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
                           {trust.label}

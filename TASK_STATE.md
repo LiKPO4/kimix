@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.61 侧栏折叠崩溃与 Skill 标题裁切修复
+- 当前目标：修复用户截图反馈的左上角侧栏折叠崩溃和插件页 Skill 标题下半部分裁切。
+- 已完成：将 `Sidebar` 的会话分组 `useMemo` 移到折叠早返回之前，避免 hooks 数量随 `sidebarOpen` 变化；放松 Skill 标题列的垂直裁切并固定标题 24px 行盒；版本号同步到 v2.11.61。
+- 边界：本轮只修复 v2.11.60 UI polish 回归，不继续扩大插件页信息架构或侧栏视觉重设计。
+- 关键文件：`src/components/layout/Sidebar.tsx`、`src/components/layout/SkillsPanel.tsx`、`package.json`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.61 复验折叠按钮和插件页标题。
+
 ## 2026-06-26 v2.11.60 前端 polish 第三轮
 - 当前目标：完成三轮前端 polish 的第三轮，收拢侧栏、插件页和弹窗的局部整齐度。
 - 已完成：统一侧栏项目行与设置入口留白；统一插件列表项、状态胶囊和 Skill 卡片 hover 层级；统一常用弹窗关闭按钮命中区；版本号同步到 v2.11.60。

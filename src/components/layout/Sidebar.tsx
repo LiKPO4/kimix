@@ -327,6 +327,22 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     toast("已从侧栏移除项目");
   };
 
+  const { visibleSessions, sessionsByProjectPath } = useMemo(() => {
+    const visible = currentSession && !sessions.some((session) => session.id === currentSession.id)
+      ? [currentSession, ...sessions]
+      : sessions;
+    const byProject = new Map<string, Session[]>();
+    for (const session of visible) {
+      if (session.archivedAt || isHiddenInternalSession(session)) continue;
+      const projectKey = normalizeProjectPath(session.projectPath);
+      if (!projectKey) continue;
+      const items = byProject.get(projectKey);
+      if (items) items.push(session);
+      else byProject.set(projectKey, [session]);
+    }
+    return { visibleSessions: visible, sessionsByProjectPath: byProject };
+  }, [currentSession, sessions]);
+
   if (!sidebarOpen) {
     return (
       <aside
@@ -400,22 +416,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       </aside>
     );
   }
-
-  const { visibleSessions, sessionsByProjectPath } = useMemo(() => {
-    const visible = currentSession && !sessions.some((session) => session.id === currentSession.id)
-      ? [currentSession, ...sessions]
-      : sessions;
-    const byProject = new Map<string, Session[]>();
-    for (const session of visible) {
-      if (session.archivedAt || isHiddenInternalSession(session)) continue;
-      const projectKey = normalizeProjectPath(session.projectPath);
-      if (!projectKey) continue;
-      const items = byProject.get(projectKey);
-      if (items) items.push(session);
-      else byProject.set(projectKey, [session]);
-    }
-    return { visibleSessions: visible, sessionsByProjectPath: byProject };
-  }, [currentSession, sessions]);
 
   const projectSessions = (projectPath: string) =>
     sessionsByProjectPath.get(normalizeProjectPath(projectPath)) ?? [];
@@ -774,7 +774,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.11.60</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.11.61</span>
         </button>
       </div>
     </aside>
