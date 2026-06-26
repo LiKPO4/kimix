@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.67 Kimi Web token 页回归修复
+- 当前目标：解释并修复顶部浏览器按钮打开 Kimi Web 后出现 “Server token required” 手输 token 页的问题。
+- 已完成：移除 `kimi web --no-open` 路径，点击当前会话入口时先让官方 `kimi web` 完成自己的浏览器打开/认证流程，再打开 `/sessions/<sessionId>` 深链；版本号同步到 v2.11.67。
+- 边界：本轮不读取、不存储、不展示官方 bearer token。
+- 关键文件：`electron/main.ts`、`src/components/layout/SessionToolbar.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.67 复验是否不再出现 token 输入页。
+
 ## 2026-06-26 v2.11.66 顶部 Kimi Web 会话入口
 - 当前目标：将顶部工具栏重复的“打开终端”一级按钮改为浏览器入口，点击后打开当前会话的官方 Kimi Web 页面。
 - 已完成：工具栏一级按钮改为浏览器图标；点击时若当前是 Kimi Code 会话则打开 `kimi web` 的 `/sessions/<sessionId>` 深链，否则打开 Kimi Web 首页；项目下拉菜单中的“打开终端”保留；版本号同步到 v2.11.66。

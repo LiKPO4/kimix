@@ -6024,7 +6024,7 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
     }
 
     const port = process.env.KIMIX_KIMI_WEB_PORT || process.env.KIMIX_KIMI_SERVER_PORT || "58627";
-    const child = spawn(kimiPath, ["web", "--port", port, ...(sessionId ? ["--no-open"] : [])], {
+    const child = spawn(kimiPath, ["web", "--port", port], {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -6052,6 +6052,8 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
 
     child.unref();
     if (sessionId) {
+      // Let the official `kimi web` opener seed its server-token auth first,
+      // then navigate to the session deep link on the same origin.
       await shell.openExternal(`http://127.0.0.1:${port}/sessions/${encodeURIComponent(sessionId)}`);
     }
     return { success: true, data: undefined };
