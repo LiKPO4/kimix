@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+## 2026-06-26
+* **Runtime routing**: Documented managed Server process protection: exited foreground children and repeated WebSocket reconnect failures must demote Server routing and enter bounded recovery instead of keeping a stale ready state.
+
 ## 2026-06-23
 * **Background task boundary**: Confirmed Server 0.19 exposes `/tasks` list/get/cancel but no foreground-to-background detach REST route; Kimix keeps Server task viewing in the existing panel and exposes SDK `detachBackgroundTask` only on the compatibility chain.
 * **Kimi Code 0.19 correctness probes**: Added the Server snapshot schema probe, confirmed 0.19 snapshot fields remain compatible with Kimix history and pending-gate replay, mapped `reason: filtered` turns as safety-policy blocks, and aligned inline image MIME handling with upstream byte sniffing.

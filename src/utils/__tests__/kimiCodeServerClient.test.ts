@@ -11,7 +11,34 @@ import {
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+class FailingWebSocket {
+  static OPEN = 1;
+  readyState = 0;
+  private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+
+  constructor(readonly url: string) {}
+
+  addEventListener(type: string, listener: (...args: unknown[]) => void) {
+    const list = this.listeners.get(type) ?? [];
+    list.push(listener);
+    this.listeners.set(type, list);
+  }
+
+  close() {
+    this.emit("close");
+  }
+
+  send() {}
+
+  emit(type: string, ...args: unknown[]) {
+    for (const listener of this.listeners.get(type) ?? []) listener(...args);
+  }
+}
 
 describe("KimiCodeServerClient protocol adapters", () => {
   it("defaults to server session routing with explicit opt-out", () => {
@@ -75,6 +102,40 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(url).toBe("http://127.0.0.1:58627/api/v1/files");
     expect(init?.body).toBeInstanceOf(FormData);
     expect((init?.headers as Record<string, string>)["content-type"]).toBeUndefined();
+  });
+
+  it("notifies after repeated websocket reconnect failures", async () => {
+    vi.useFakeTimers();
+    const sockets: FailingWebSocket[] = [];
+    vi.stubGlobal("WebSocket", class extends FailingWebSocket {
+      constructor(url: string) {
+        super(url);
+        sockets.push(this);
+      }
+    });
+    const onRuntimeFailure = vi.fn();
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627", {
+      onRuntimeFailure,
+      reconnectFailureThreshold: 2,
+    });
+
+    const subscribe = client.subscribe("session-1");
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    sockets[0].emit("error");
+    await expect(subscribe).rejects.toThrow("Kimi Server WebSocket 连接失败");
+    sockets[0].emit("close");
+
+    await vi.advanceTimersByTimeAsync(250);
+    await vi.waitFor(() => expect(sockets).toHaveLength(2));
+    sockets[1].emit("error");
+    sockets[1].emit("close");
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.waitFor(() => expect(sockets).toHaveLength(3));
+    sockets[2].emit("error");
+    await vi.waitFor(() => expect(onRuntimeFailure).toHaveBeenCalledTimes(1));
+
+    vi.useRealTimers();
+    await client.close();
   });
 
   it("flattens websocket event payloads into the SDK-compatible event shape", () => {

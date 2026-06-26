@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.65 Kimi Server 断连保护
+- 当前目标：排查并修复 Kimix 自管 Kimi Server 长时间运行后进程退出或 WebSocket 断连时仍被当作在线的问题。
+- 已完成：自管 foreground server child 退出后 Host 立即降回 stopped/sdk；WebSocket 连续重连失败会通知 runtime failure，清理旧 client 并进入既有后台恢复；版本号同步到 v2.11.65。
+- 边界：官方 `kimi web` 入口仍由 CLI 自身托管，本轮未改为长期托管或保活官方浏览器 Web UI daemon。
+- 关键文件：`electron/kimiCodeServerHost.ts`、`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`src/utils/__tests__/kimiCodeServerHost.test.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 下一步：验证并提交后，请用户用 v2.11.65 复验 Kimix 后台 Kimi Server 长时间打开是否仍断连；若实际断的是官方 `kimi web` 浏览器页，再做 `kimi web` 启动/探活/重开策略。
+
 ## 2026-06-26 v2.11.64 语音快捷键焦点修复
 - 当前目标：修复点击会话输入区语音快捷键后 Composer 输入框丢失焦点，导致系统语音输入无法写入当前输入框的问题。
 - 已完成：麦克风按钮 `mousedown` 阶段阻止按钮夺焦；触发系统语音快捷键前后都主动 focus Composer 输入框；版本号同步到 v2.11.64。

@@ -105,6 +105,9 @@ export class KimiCodeServerHost {
   }
 
   isReady(): boolean {
+    if (this.status.state === "managed" && this.child?.exitCode !== null) {
+      this.markStopped(new Error(`Kimi Server 进程已退出：${String(this.child?.exitCode)}`));
+    }
     return this.status.state === "attached" || this.status.state === "managed";
   }
 
@@ -152,6 +155,16 @@ export class KimiCodeServerHost {
       this.child.stderr?.on("data", (chunk) => {
         this.stderr = `${this.stderr}${chunk.toString()}`.slice(-4_000);
       });
+      this.child.once("error", (error) => {
+        if (this.child && this.status.state === "starting") {
+          this.stderr = `${this.stderr}\n${errorMessage(error)}`.trim().slice(-4_000);
+        }
+      });
+      this.child.once("close", (code, signal) => {
+        if (this.status.state !== "managed") return;
+        const detail = signal ? `signal ${signal}` : `code ${String(code)}`;
+        this.markStopped(new Error(`Kimi Server 进程已退出：${detail}`));
+      });
       const capabilities = await this.waitUntilReady();
       this.status = { ...this.status, state: "managed", managed: true, capabilities };
     } catch (error) {
@@ -165,6 +178,17 @@ export class KimiCodeServerHost {
       };
     }
     return this.getStatus();
+  }
+
+  private markStopped(error: unknown) {
+    this.child = null;
+    this.status = {
+      ...this.status,
+      state: this.status.enabled ? "stopped" : "disabled",
+      routing: "sdk",
+      managed: false,
+      error: errorMessage(error),
+    };
   }
 
   async stop(): Promise<void> {

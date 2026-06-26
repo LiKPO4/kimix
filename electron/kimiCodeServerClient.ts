@@ -3,6 +3,10 @@ export type ServerPromptPart =
   | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } };
 
 type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
+type ServerClientOptions = {
+  onRuntimeFailure?: (error: Error) => void;
+  reconnectFailureThreshold?: number;
+};
 
 export type ServerSession = {
   id: string;
@@ -387,8 +391,9 @@ export class KimiCodeServerClient {
   private closing = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
+  private runtimeFailureNotified = false;
 
-  constructor(readonly endpoint: string) {}
+  constructor(readonly endpoint: string, private readonly options: ServerClientOptions = {}) {}
 
   async createSession(input: {
     workDir: string;
@@ -836,6 +841,7 @@ export class KimiCodeServerClient {
     if (ack.code !== 0) throw new Error(`Kimi Server handshake 失败：${ack.msg ?? ack.code}`);
     this.reconnectAttempt = 0;
     await this.handleAckResync(ack);
+    this.runtimeFailureNotified = false;
     if (reconnecting) {
       for (const sessionId of this.subscribed) await this.recoverSnapshot(sessionId);
     }
@@ -888,8 +894,18 @@ export class KimiCodeServerClient {
     this.reconnectAttempt += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      void this.ensureConnected().catch(() => this.scheduleReconnect());
+      void this.ensureConnected().catch((error) => {
+        this.notifyRuntimeFailureAfterRepeatedReconnects(error);
+        if (!this.runtimeFailureNotified) this.scheduleReconnect();
+      });
     }, delay);
+  }
+
+  private notifyRuntimeFailureAfterRepeatedReconnects(error: unknown) {
+    const threshold = this.options.reconnectFailureThreshold ?? 3;
+    if (this.runtimeFailureNotified || this.reconnectAttempt < threshold) return;
+    this.runtimeFailureNotified = true;
+    this.options.onRuntimeFailure?.(error instanceof Error ? error : new Error(String(error)));
   }
 
   private cursorPayload(sessionIds: Iterable<string>) {

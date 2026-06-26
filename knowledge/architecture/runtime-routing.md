@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-23T11:36:00+08:00"
+timestamp: "2026-06-26T21:40:00+08:00"
 ---
 
 # Runtime Routing
@@ -46,6 +46,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 31. Kimi Code 0.19 Server snapshots are compatible with Kimix's replay adapters when they expose `as_of_seq`, `epoch`, `session`, `messages`, `in_flight_turn`, `pending_approvals`, and `pending_questions`. Live resync and history loading must keep pending approvals/questions as explicit synthesized events. Provider safety-policy blocks use `turn.ended` with `reason: "filtered"` and must be surfaced as a concise blocked-turn error, not as normal completion.
 32. Server image prompts should trust the actual image bytes over a browser-provided data URL MIME label. Kimix sniffs PNG, JPEG, GIF, and WebP magic bytes before base64 fallback or official `/files` upload, then sends the corrected media type through the official image content schema.
 33. Background task management is split by official surface. Server sessions use official `/tasks` list/get/cancel for already-backgrounded work. The SDK compatibility chain may call official `session.detachBackgroundTask(taskId)` to move a foreground task into background, but Server 0.19 has no equivalent detach REST route; Kimix must report that boundary instead of offering a Server UI action that cannot complete.
+34. Kimix-managed foreground Server processes must not remain logically ready after the child exits. Host state returns to SDK routing when the managed process closes, and repeated WebSocket reconnect failures notify the same runtime-failure path so bounded background recovery can restart or reattach instead of leaving the renderer on a dead connection.
 
 # Main Components
 

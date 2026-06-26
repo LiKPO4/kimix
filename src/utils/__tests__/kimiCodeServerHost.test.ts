@@ -52,6 +52,30 @@ describe("kimiCodeServerHost", () => {
     });
   });
 
+  it("drops a managed server out of ready state after the child exits", () => {
+    const host = new KimiCodeServerHost({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" });
+    const internals = host as unknown as {
+      child: { exitCode: number };
+      status: ReturnType<KimiCodeServerHost["getStatus"]>;
+    };
+    internals.child = { exitCode: 1 };
+    internals.status = {
+      enabled: true,
+      state: "managed",
+      endpoint: "http://127.0.0.1:58627",
+      routing: "server",
+      managed: true,
+    };
+
+    expect(host.isReady()).toBe(false);
+    expect(host.getStatus()).toMatchObject({
+      state: "stopped",
+      routing: "sdk",
+      managed: false,
+      error: "Kimi Server 进程已退出：1",
+    });
+  });
+
   it("recognizes missing session errors without treating them as server runtime failures", () => {
     expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a/profile: Session \"session_a\" was not found"))).toBe(true);
     expect(isKimiCodeSessionMissingError(new Error("/api/v1/sessions/session_a: HTTP 404"))).toBe(true);
