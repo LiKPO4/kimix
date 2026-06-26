@@ -1,9 +1,12 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import "katex/dist/katex.min.css";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
@@ -323,8 +326,8 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     [wrapLongLines]
   );
 
-  const remarkPlugins = useMemo(() => [remarkGfm], []);
-  const rehypePlugins = useMemo(() => [rehypeHighlight], []);
+  const remarkPlugins = useMemo(() => [remarkGfm, remarkMath], []);
+  const rehypePlugins = useMemo(() => [rehypeKatex, rehypeHighlight], []);
   const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(normalizedContent);
 
   useLayoutEffect(() => {

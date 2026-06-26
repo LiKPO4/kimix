@@ -2008,6 +2008,25 @@ button.bg-accent-primary:disabled:hover,
   box-sizing: border-box;
 }
 
+.markdown-body .katex {
+  color: var(--text-primary);
+}
+
+.markdown-body .katex-display {
+  max-width: 100%;
+  margin: 12px 0 14px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-base);
+  box-sizing: border-box;
+}
+
+.markdown-body .katex-display > .katex {
+  max-width: 100%;
+}
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;

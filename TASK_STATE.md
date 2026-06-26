@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.57 Kimi Code 0.20.0 跟进
+- 当前目标：跟进官方 Kimi Code 0.20.0，优先落地影响 Kimix 主聊天链路的 SDK 刷新、Markdown 行间 LaTeX 和显式 `/reload` 插件 Skill 刷新。
+- 已确认：本机 `kimi --version` 与 npm latest 均为 `0.20.0`；官方 tag `@moonshot-ai/kimi-code@0.20.0` 对应 checkout commit `5f36e763ca671a2a67b4b9e5c42a611511a1e6b3`，node SDK 版本仍为 `0.10.0`。
+- 已完成：刷新 `vendor/kimi-code-sdk/index.mjs` 并更新 provenance；Markdown 接入 `remark-math`/`rehype-katex`；SDK 显式 `/reload` 传入 `forcePluginSessionStartReminder: true`；版本号同步到 v2.11.57。
+- 边界：Server `/reload` 暂无确认公开 REST 路由，继续显式提示不支持；shell 模式、`kimi web --host`、插件页重设计、web 文件逐行 diff、会话分页/标题同步列为后续产品评估。
+- 关键文件：`docs/kimi-code-0.20-followup.md`、`scripts/probe-kimi-code-0.20.mjs`、`vendor/kimi-code-sdk/README.md`、`vendor/kimi-code-sdk/index.mjs`、`src/components/chat/MarkdownRenderer.tsx`、`src/index.css`、`electron/kimiCodeHost.ts`。
+- 下一步：运行 0.20 探针、主机探针、测试、知识校验、构建和 diff 检查后窄范围提交。
+
 ## 2026-06-23 v2.11.56 手动发送消息置底
 - 当前目标：修复用户手动发送消息后，聊天流可能仍停留在历史阅读位置、不主动滚到底部的问题；不改变队列消息自动发送时的滚动策略。
 - 根因：用户向上阅读后 `userScrollRef` 会关闭自动跟随；普通发送只追加用户消息和助手占位，没有显式恢复本会话的 auto-follow。

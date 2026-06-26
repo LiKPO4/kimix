@@ -90,7 +90,7 @@ type KimiCodeSessionLike = {
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
   setSwarmMode?(enabled: boolean, trigger?: "manual" | "task"): Promise<void>;
-  reloadSession?(): Promise<unknown>;
+  reloadSession?(options?: { forcePluginSessionStartReminder?: boolean }): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
   setModel?(model: string): Promise<void>;
@@ -748,7 +748,7 @@ export async function reloadSession(sessionId: string): Promise<void> {
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.reloadSession) throw new Error("当前兼容链路不支持会话重载。");
-  await managed.session.reloadSession();
+  await managed.session.reloadSession({ forcePluginSessionStartReminder: true });
 }
 
 export async function setModel(sessionId: string, model: string): Promise<void> {
