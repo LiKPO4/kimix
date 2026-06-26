@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.60 前端 polish 第三轮
+- 当前目标：完成三轮前端 polish 的第三轮，收拢侧栏、插件页和弹窗的局部整齐度。
+- 已完成：统一侧栏项目行与设置入口留白；统一插件列表项、状态胶囊和 Skill 卡片 hover 层级；统一常用弹窗关闭按钮命中区；版本号同步到 v2.11.60。
+- 边界：本轮不做官方 0.20 `/plugins` 四标签信息架构重设计，不改设置页业务字段和会话数据结构。
+- 关键文件：`src/index.css`、`src/components/layout/Sidebar.tsx`、`src/components/layout/SkillsPanel.tsx`、`src/components/layout/DialogSystem.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.60 截图验收三轮前端 polish 效果。
+
 ## 2026-06-26 v2.11.59 前端 polish 第二轮
 - 当前目标：在不改变 Kimix 暖纸编辑器风格的前提下，推进第二轮聊天区整齐度优化。
 - 已完成：统一聊天区折叠行、Assistant 过程行和滚动到底部浮动按钮的留白、轻触反馈与视觉层级；版本号同步到 v2.11.59。

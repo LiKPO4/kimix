@@ -564,8 +564,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           <div aria-hidden style={{ position: "absolute", left: 12, right: 12, bottom: -5, height: 2, borderRadius: 2, background: "var(--accent-blue)", zIndex: 10 }} />
                         )}
                         <div
-                          style={{ paddingLeft: 20, paddingRight: 10 }}
-                          className={`group/project relative flex h-9 w-full items-center gap-1 rounded-lg text-[15px] transition-colors ${
+                          className={`kimix-sidebar-project-row group/project relative flex h-9 w-full items-center text-[15px] ${
                             isActive
                               ? "bg-surface-hover text-text-primary"
                               : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
@@ -603,13 +602,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
                             {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                           </button>
-                          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
+                          <div className="kimix-sidebar-project-row-actions flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenProjectMenu((current) => current === project.id ? null : project.id);
                               }}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+                              className="kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
                               title="项目菜单"
                               aria-label="项目菜单"
                             >
@@ -775,7 +774,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto text-[13px] text-text-muted">v2.11.59</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.11.60</span>
         </button>
       </div>
     </aside>

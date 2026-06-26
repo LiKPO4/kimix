@@ -391,8 +391,8 @@ export function SkillsPanel({
                       return (
                         <div
                           key={plugin.id}
-                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
-                          style={{ padding: "10px 12px" }}
+                          className="kimix-plugin-list-item"
+                          style={{ padding: "12px 14px" }}
                         >
                           <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                             <div className="min-w-0">
@@ -403,8 +403,7 @@ export function SkillsPanel({
                               type="button"
                               onClick={() => void installMarketplacePlugin(plugin)}
                               disabled={Boolean(installingMarketId) || installed}
-                              className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
-                              style={{ paddingLeft: 10, paddingRight: 10 }}
+                              className="kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {installed ? "已安装" : installingMarketId === plugin.id ? "安装中" : "安装"}
                             </button>
@@ -526,8 +525,8 @@ export function SkillsPanel({
                       {sdkPlugins.map((plugin) => (
                         <div
                           key={plugin.id}
-                          className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
-                          style={{ padding: "10px 12px" }}
+                          className="kimix-plugin-list-item"
+                          style={{ padding: "12px 14px" }}
                         >
                           <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                             <div className="min-w-0">
@@ -541,8 +540,7 @@ export function SkillsPanel({
                               type="button"
                               onClick={() => void toggleSdkPlugin(plugin)}
                               disabled={Boolean(sdkPluginToggling)}
-                              className={`shrink-0 rounded-full text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
-                              style={{ paddingLeft: 9, paddingRight: 9 }}
+                              className={`kimix-plugin-status-pill shrink-0 text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
                             >
                               {sdkPluginToggling === plugin.id ? "处理中" : sdkPluginStateLabel(plugin)}
                             </button>
@@ -621,7 +619,7 @@ export function SkillsPanel({
                   onClick={() => {
                     if (!officialPlugin) void toggleSkill(skill.name);
                   }}
-                  className={`h-full w-full overflow-hidden rounded-xl border text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
+                  className={`kimix-skill-card h-full w-full overflow-hidden rounded-xl border text-left hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
                   style={{
                     padding: "14px 18px",
                     cursor: officialPlugin ? "default" : undefined,

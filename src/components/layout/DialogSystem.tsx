@@ -211,7 +211,7 @@ function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchC
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary"
+            className="kimix-modal-close-button shrink-0"
             aria-label="关闭"
           >
             <X size={16} />
@@ -343,7 +343,7 @@ function HelpDialogPanel({
               {dialog === "about" ? "关于 Kimix" : dialog === "updates" ? "更新记录" : dialog === "shortcuts" ? "键盘快捷键" : infoTopic?.title}
             </span>
           </div>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={onClose} aria-label="关闭">
+          <button className="kimix-modal-close-button" onClick={onClose} aria-label="关闭">
             <X size={16} />
           </button>
         </div>
