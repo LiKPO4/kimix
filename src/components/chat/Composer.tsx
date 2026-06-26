@@ -1788,7 +1788,10 @@ export function Composer() {
 
   const handleVoiceShortcut = async () => {
     const shortcut = voiceShortcut.trim() || "Win+H";
+    inputRef.current?.focus();
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 40));
     const res = await window.api.triggerShortcut({ shortcut });
+    inputRef.current?.focus();
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: res.success ? `已触发语音快捷键：${shortcut}` : `语音快捷键失败：${res.error}`,
     }));
@@ -2588,7 +2591,14 @@ export function Composer() {
             </button>
 
             <ContextRing />
-            <button disabled={!canUseComposer} onClick={() => void handleVoiceShortcut()} className={iconButtonClass} title={`语音快捷键：${voiceShortcut || "Win+H"}`} aria-label="语音">
+            <button
+              disabled={!canUseComposer}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void handleVoiceShortcut()}
+              className={iconButtonClass}
+              title={`语音快捷键：${voiceShortcut || "Win+H"}`}
+              aria-label="语音"
+            >
               <Mic size={16} />
             </button>
 

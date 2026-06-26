@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.64 语音快捷键焦点修复
+- 当前目标：修复点击会话输入区语音快捷键后 Composer 输入框丢失焦点，导致系统语音输入无法写入当前输入框的问题。
+- 已完成：麦克风按钮 `mousedown` 阶段阻止按钮夺焦；触发系统语音快捷键前后都主动 focus Composer 输入框；版本号同步到 v2.11.64。
+- 边界：本轮只修复会话 Composer 语音按钮，不调整设置页语音快捷键配置逻辑。
+- 关键文件：`src/components/chat/Composer.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.64 复验语音输入是否落在当前会话输入框。
+
 ## 2026-06-26 v2.11.63 页面刷新后回到原会话
 - 当前目标：优化顶部“重新载入页面”按钮，刷新后回到刷新前所在会话。
 - 已完成：刷新前同步调用 `persistLocalConversationState()` 和 `persistLocalActiveContext()`，确保当前会话列表与活动上下文立即落盘；版本号同步到 v2.11.63。
