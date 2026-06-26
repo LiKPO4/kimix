@@ -81,8 +81,7 @@ export const ToolCard = memo(function ToolCard({ event }: ToolCardProps) {
       <div className="w-full">
         <button
           onClick={() => setExpanded((value) => !value)}
-          className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-text-muted transition-colors hover:bg-surface-hover"
-          style={{ gap: 8, paddingLeft: 4, paddingRight: 10 }}
+          className="kimix-chat-collapse-row w-full text-left text-[14.5px] leading-none text-text-muted hover:bg-surface-hover"
         >
           {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
           <Icon size={15} className="shrink-0" />

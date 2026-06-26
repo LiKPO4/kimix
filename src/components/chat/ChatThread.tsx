@@ -219,8 +219,7 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
     <div className="w-full">
       <button
         onClick={() => setExpanded((value) => !value)}
-        className="flex h-8 w-full items-center rounded-lg text-left text-[14.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ gap: 8, paddingLeft: 4, paddingRight: 10 }}
+        className="kimix-chat-collapse-row w-full text-left text-[14.5px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"
       >
         {expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
         <Wrench size={15} className="shrink-0" />
@@ -1445,14 +1444,11 @@ export function ChatThread() {
             tabIndex={-1}
             title="滚动到底部"
             onClick={enableAutoFollow}
-            className="flex items-center justify-center rounded-full border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)] shadow-[0_8px_22px_rgba(15,15,15,0.10)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text)]"
+            className="kimix-chat-floating-action flex items-center justify-center"
             style={{
-              width: 38,
-              height: 38,
               opacity: 0,
               pointerEvents: "none",
               transform: "translateY(6px) scale(0.96)",
-              transition: "opacity 120ms ease, transform 120ms ease, background-color var(--duration-base) var(--ease-hover), color var(--duration-base) var(--ease-hover)",
               willChange: "opacity, transform",
             }}
           >

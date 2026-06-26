@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.59 前端 polish 第二轮
+- 当前目标：在不改变 Kimix 暖纸编辑器风格的前提下，推进第二轮聊天区整齐度优化。
+- 已完成：统一聊天区折叠行、Assistant 过程行和滚动到底部浮动按钮的留白、轻触反馈与视觉层级；版本号同步到 v2.11.59。
+- 边界：本轮不重排消息正文、不调整侧栏/设置/插件页结构，不处理官方 0.20 插件页大改版。
+- 关键文件：`src/index.css`、`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/components/chat/ToolCard.tsx`。
+- 下一步：验证并提交后，进入第三轮侧栏、设置、插件和弹窗整齐度优化。
+
 ## 2026-06-26 v2.11.58 前端 polish 第一轮
 - 当前目标：在不改变 Kimix 暖纸编辑器风格的前提下，按三轮计划优化前端整齐度和美观性；本轮先做全局质感基线。
 - 已完成：新增 `docs/frontend-polish-plan.md` 持久化三轮方案；共享按钮、弱操作和侧栏导航增加克制按压反馈；补充标题/短文案换行、等宽数字工具类和 Markdown 图片 inset outline；版本号同步到 v2.11.58。

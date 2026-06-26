@@ -588,8 +588,8 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
+        className="kimix-chat-process-row grid w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9 }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Brain size={15} />
@@ -626,8 +626,8 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
+        className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={14} />
@@ -667,8 +667,8 @@ function ApprovalProcessItem({ approval }: { approval: ApprovalEvent }) {
         type="button"
         onClick={() => canExpand && setExpanded((value) => !value)}
         disabled={!canExpand}
-        className="grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ minHeight: 42, gap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
+        className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gap: 9 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           <ShieldCheck size={14} />
@@ -715,8 +715,8 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ minHeight: 42, gridTemplateColumns: "18px auto minmax(0, 1fr) minmax(52px, auto) 18px 18px", columnGap: 9, paddingLeft: 14, paddingRight: 14, paddingTop: 3, paddingBottom: 3 }}
+        className="kimix-chat-process-row grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ gridTemplateColumns: "18px auto minmax(0, 1fr) minmax(52px, auto) 18px 18px", columnGap: 9 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           {isRunning ? (
@@ -937,8 +937,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
           toggleWithStableAnchor(!expanded, "summary");
         }}
         disabled={!hasDetails}
-        className="flex h-8 max-w-full items-center rounded-lg text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
-        style={{ gap: 8, paddingLeft: 4, paddingRight: 12 }}
+        className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
       >
         {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
         <span className="shrink-0">{label}</span>
