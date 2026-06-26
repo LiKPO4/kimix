@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.63 页面刷新后回到原会话
+- 当前目标：优化顶部“重新载入页面”按钮，刷新后回到刷新前所在会话。
+- 已完成：刷新前同步调用 `persistLocalConversationState()` 和 `persistLocalActiveContext()`，确保当前会话列表与活动上下文立即落盘；版本号同步到 v2.11.63。
+- 边界：本轮只处理工具栏刷新按钮；浏览器/菜单 Ctrl+R 的既有路径暂不扩大修改。
+- 关键文件：`src/components/layout/SessionToolbar.tsx`、`src/utils/persistence.ts`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.63 复验点击刷新后是否回到原会话。
+
 ## 2026-06-26 v2.11.62 顶部刷新按钮语义修复
 - 当前目标：修复顶部工具栏环形箭头按钮语义危险的问题，避免用户把“撤销官方历史上一轮”误认为页面刷新。
 - 已完成：将该按钮改为调用 `window.api.reloadWindow()` 的页面重新载入；按钮文案同步为“重新载入页面 (Ctrl+R)”；移除工具栏上的撤销官方历史入口；版本号同步到 v2.11.62。

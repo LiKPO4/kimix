@@ -35,6 +35,7 @@ import { settleInactiveEvents } from "@/utils/eventHelpers";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
+import { persistLocalActiveContext, persistLocalConversationState } from "@/utils/persistence";
 
 export type SessionMenuEntry =
   | { type: "separator" }
@@ -339,6 +340,8 @@ export function SessionToolbar({
   }
 
   const reloadKimixWindow = () => {
+    persistLocalConversationState();
+    persistLocalActiveContext();
     if (typeof window.api.reloadWindow === "function") {
       void window.api.reloadWindow();
       return;
