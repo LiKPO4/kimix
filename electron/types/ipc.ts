@@ -1059,6 +1059,10 @@ export type OpenTerminalRequest = {
   path: string;
 }
 
+export type KimiCodeOpenWebRequest = {
+  sessionId?: string;
+}
+
 export type SearchProjectFilesRequest = {
   projectPath: string;
   sessionId?: string;

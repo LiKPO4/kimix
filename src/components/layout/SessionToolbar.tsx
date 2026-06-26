@@ -11,6 +11,7 @@ import {
   FileText,
   FolderOpen,
   GitBranch,
+  Globe2,
   History,
   Laptop,
   Link,
@@ -301,6 +302,18 @@ export function SessionToolbar({
     setProjectMenuOpen(false);
   };
 
+  const openCurrentSessionInKimiWeb = async () => {
+    const runtimeSessionId = liveCurrentSession?.engine === "kimi-code"
+      ? getRuntimeSessionId(liveCurrentSession)
+      : undefined;
+    const res = await window.api.openKimiCodeWebServer(runtimeSessionId ? { sessionId: runtimeSessionId } : undefined);
+    if (!res.success) {
+      showToast(`打开 Kimi Web 失败：${res.error}`);
+      return;
+    }
+    showToast(runtimeSessionId ? "已在 Kimi Web 打开当前会话" : "已打开 Kimi Web");
+  };
+
   const launchExecutable = async () => {
     const res = await window.api.launchExecutable();
     if (!res.success) {
@@ -551,13 +564,12 @@ export function SessionToolbar({
           )}
         </div>
         <button
-          onClick={openProjectTerminal}
-          disabled={!projectPath}
+          onClick={() => void openCurrentSessionInKimiWeb()}
           className="kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
-          title="终端"
-          aria-label="终端"
+          title="在 Kimi Web 打开当前会话"
+          aria-label="在 Kimi Web 打开当前会话"
         >
-          <SquareTerminal size={15} />
+          <Globe2 size={15} />
         </button>
         <button
           onClick={reloadKimixWindow}

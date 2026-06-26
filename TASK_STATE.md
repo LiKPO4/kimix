@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.66 顶部 Kimi Web 会话入口
+- 当前目标：将顶部工具栏重复的“打开终端”一级按钮改为浏览器入口，点击后打开当前会话的官方 Kimi Web 页面。
+- 已完成：工具栏一级按钮改为浏览器图标；点击时若当前是 Kimi Code 会话则打开 `kimi web` 的 `/sessions/<sessionId>` 深链，否则打开 Kimi Web 首页；项目下拉菜单中的“打开终端”保留；版本号同步到 v2.11.66。
+- 边界：本轮不改官方 `kimi web --host`、token 或 daemon 保活策略。
+- 关键文件：`src/components/layout/SessionToolbar.tsx`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`。
+- 下一步：验证并提交后，请用户用 v2.11.66 点击顶部浏览器图标复验是否打开当前会话。
+
 ## 2026-06-26 v2.11.65 Kimi Server 断连保护
 - 当前目标：排查并修复 Kimix 自管 Kimi Server 长时间运行后进程退出或 WebSocket 断连时仍被当作在线的问题。
 - 已完成：自管 foreground server child 退出后 Host 立即降回 stopped/sdk；WebSocket 连续重连失败会通知 runtime failure，清理旧 client 并进入既有后台恢复；版本号同步到 v2.11.65。

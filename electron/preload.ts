@@ -117,6 +117,7 @@ import type {
   KimiCodeListSessionsRequest,
   KimiCodeListSessionsResponse,
   KimiCodeListServerTerminalsResponse,
+  KimiCodeOpenWebRequest,
   KimiCodeLoadSessionRequest,
   KimiCodeLoadSessionResponse,
   KimiCodeListMcpServersResponse,
@@ -302,8 +303,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:getAccountUsage"),
   startKimiCodeVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi-code:startVis", req),
-  openKimiCodeWebServer: (): Promise<VoidResponse> =>
-    ipcRenderer.invoke("kimi-code:openWebServer"),
+  openKimiCodeWebServer: (req?: KimiCodeOpenWebRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi-code:openWebServer", req),
 
   // Event listeners
   createKimiCodeSession: (req: KimiCodeCreateSessionRequest): Promise<KimiCodeSessionResponse> =>

@@ -6008,8 +6008,10 @@ ipcMain.handle("kimi-code:startVis", async (_, request: unknown) => {
   }
 });
 
-ipcMain.handle("kimi-code:openWebServer", async () => {
+ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
   try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" && req.sessionId.trim() ? req.sessionId.trim() : undefined;
     const kimiPath = await resolveKimiCommand();
     if (!kimiPath) {
       return { success: false, error: "未找到 Kimi Code。请先安装并在终端运行 'kimi --version' 确认可用。" };
@@ -6021,7 +6023,8 @@ ipcMain.handle("kimi-code:openWebServer", async () => {
       return { success: false, error: `找到 kimi 路径 ${kimiPath}，但无法运行。请检查安装是否完整。` };
     }
 
-    const child = spawn(kimiPath, ["web"], {
+    const port = process.env.KIMIX_KIMI_WEB_PORT || process.env.KIMIX_KIMI_SERVER_PORT || "58627";
+    const child = spawn(kimiPath, ["web", "--port", port, ...(sessionId ? ["--no-open"] : [])], {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -6048,6 +6051,9 @@ ipcMain.handle("kimi-code:openWebServer", async () => {
     }
 
     child.unref();
+    if (sessionId) {
+      await shell.openExternal(`http://127.0.0.1:${port}/sessions/${encodeURIComponent(sessionId)}`);
+    }
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
