@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.11.68 Kimi Web 双标签 token 页修复
+- 当前目标：修复顶部浏览器按钮先打开正常 Kimi Web、又额外打开一个需要 token 的 `/sessions/...` 标签页的问题。
+- 已完成：撤掉 Kimix 自己补开的会话深链，只调用官方 `kimi web` 打开流程；按钮提示改为“已打开 Kimi Web”；版本号同步到 v2.11.68。
+- 边界：本轮不读取、不存储、不展示官方 bearer token；当前入口不再承诺直达当前会话。
+- 关键文件：`electron/main.ts`、`src/components/layout/SessionToolbar.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：验证并提交后，请用户用 v2.11.68 复验是否只打开一个已认证的 Kimi Web 标签页。
+
 ## 2026-06-26 v2.11.67 Kimi Web token 页回归修复
 - 当前目标：解释并修复顶部浏览器按钮打开 Kimi Web 后出现 “Server token required” 手输 token 页的问题。
 - 已完成：移除 `kimi web --no-open` 路径，点击当前会话入口时先让官方 `kimi web` 完成自己的浏览器打开/认证流程，再打开 `/sessions/<sessionId>` 深链；版本号同步到 v2.11.67。

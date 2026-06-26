@@ -6008,10 +6008,8 @@ ipcMain.handle("kimi-code:startVis", async (_, request: unknown) => {
   }
 });
 
-ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
+ipcMain.handle("kimi-code:openWebServer", async () => {
   try {
-    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" && req.sessionId.trim() ? req.sessionId.trim() : undefined;
     const kimiPath = await resolveKimiCommand();
     if (!kimiPath) {
       return { success: false, error: "未找到 Kimi Code。请先安装并在终端运行 'kimi --version' 确认可用。" };
@@ -6051,11 +6049,6 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
     }
 
     child.unref();
-    if (sessionId) {
-      // Let the official `kimi web` opener seed its server-token auth first,
-      // then navigate to the session deep link on the same origin.
-      await shell.openExternal(`http://127.0.0.1:${port}/sessions/${encodeURIComponent(sessionId)}`);
-    }
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
