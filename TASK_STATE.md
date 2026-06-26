@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-26 v2.12.0 中版本发布整理
+- 当前目标：将近期 Kimi Code 0.19/0.20 跟进、会话恢复、自动置底、消息元信息、界面整理、刷新恢复、语音焦点、Kimi Web 入口与 server 断连恢复等改动整理为中版本发布。
+- 已完成：版本号同步到 v2.12.0，新增对应 release notes，准备通过 GitHub Actions tag 发布。
+- 边界：不手动构建或上传产物；发布仅通过 push tag 触发 Actions。
+- 关键文件：`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`docs/release-notes/v2.12.0.md`。
+- 下一步：验证通过后提交、推送 `master`，再推送 `v2.12.0` tag。
+
 ## 2026-06-26 v2.11.68 Kimi Web 双标签 token 页修复
 - 当前目标：修复顶部浏览器按钮先打开正常 Kimi Web、又额外打开一个需要 token 的 `/sessions/...` 标签页的问题。
 - 已完成：撤掉 Kimix 自己补开的会话深链，只调用官方 `kimi web` 打开流程；按钮提示改为“已打开 Kimi Web”；版本号同步到 v2.11.68。
