@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-27 v2.12.4 Kimi Web 单页直达修复
+- 当前目标：修复 v2.12.3 仍会打开两个 Kimi Web 标签页，且第二个裸 deep link 缺少 token 后进入 `/login` 的问题。
+- 根因：官方 Web deep link 需要 `#token=<server-token>` fragment；v2.12.3 先让官方 opener 打开首页，再由 Kimix 裸开 `/sessions/<sessionId>`，第二页没有继承认证态。
+- 已完成：当前会话入口改为 `kimi web --no-open` 隐式启动，读取官方 `server.token` 后只打开一个 `/sessions/<sessionId>#token=...` 页面；无当前会话时仍走官方默认 opener；版本号同步到 v2.12.4。
+- 边界：`server.token` 只在运行时读取并放进 URL fragment，不写入日志、release notes 或持久配置。
+- 关键文件：`electron/main.ts`、版本号三处、`docs/release-notes/v2.12.4.md`。
+- 下一步：验证并提交后，请用户用 v2.12.4 复验浏览器按钮是否只打开一个当前会话标签页。
+
 ## 2026-06-27 v2.12.3 Kimi Code 0.20.1 Web 跟进
 - 当前目标：跟进官方 Kimi Code 0.20.1 修复 `kimi web --no-open` / Web token 相关问题，恢复 Kimix 当前会话直达 Kimi Web 的体验。
 - 已确认：本机 `kimi --version` 与 npm latest `@moonshot-ai/kimi-code` 均为 `0.20.1`；`kimi web --help` 仍支持 `--no-open`。

@@ -523,6 +523,15 @@ function resolveKimiShareDir() {
   return current;
 }
 
+function readKimiServerToken() {
+  try {
+    const token = fs.readFileSync(path.join(resolveKimiShareDir(), "server.token"), "utf8").trim();
+    return token || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function backupFileIfExists(filePath: string) {
   if (!fs.existsSync(filePath)) return;
   const backup = `${filePath}.kimix-backup-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}`;
@@ -6024,7 +6033,8 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
     }
 
     const port = process.env.KIMIX_KIMI_WEB_PORT || process.env.KIMIX_KIMI_SERVER_PORT || "58627";
-    const child = spawn(kimiPath, ["web", "--port", port], {
+    const args = ["web", "--port", port, ...(sessionId ? ["--no-open"] : [])];
+    const child = spawn(kimiPath, args, {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
@@ -6052,7 +6062,15 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
 
     child.unref();
     if (sessionId) {
-      await shell.openExternal(`http://127.0.0.1:${port}/sessions/${encodeURIComponent(sessionId)}`);
+      const token = readKimiServerToken();
+      if (!token) {
+        return {
+          success: false,
+          error: "Kimi Web 已启动，但未读取到官方 server token。请先在终端运行 kimi web 确认官方 Web 可正常打开。",
+        };
+      }
+      const baseUrl = `http://127.0.0.1:${port}/sessions/${encodeURIComponent(sessionId)}`;
+      await shell.openExternal(`${baseUrl}#token=${encodeURIComponent(token)}`);
     }
     return { success: true, data: undefined };
   } catch (err) {
