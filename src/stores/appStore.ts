@@ -4,7 +4,7 @@ import { DEFAULT_CUSTOM_THEME_PALETTE, DEFAULT_KIMI_THEME_PRESETS, DEFAULT_THEME
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
-const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "session", "diffs"];
+const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
 
 function readRightSidebarCardOrder(): RightSidebarCardId[] {
   try {

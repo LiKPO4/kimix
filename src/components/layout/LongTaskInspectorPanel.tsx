@@ -2019,7 +2019,7 @@ export function LongTaskInspectorPanel({
             </section>
 
             {serverTreeAvailable && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ padding: "16px 16px 18px" }}>
+              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("serverTree", 7, { padding: "16px 16px 18px" })}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5 text-text-muted">官方会话树</div>
@@ -2047,6 +2047,7 @@ export function LongTaskInspectorPanel({
                       {serverTreeBusy === "create" ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                       <span>新建子会话</span>
                     </button>
+                    {rightCardDragHandle("serverTree", "官方会话树")}
                   </div>
                 </div>
                 <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
@@ -2096,7 +2097,7 @@ export function LongTaskInspectorPanel({
               </section>
             )}
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("session", 7, { padding: "16px 16px 18px" })}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("session", 8, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="text-[13px] font-medium leading-5 text-text-muted">会话信息</div>
                 {rightCardDragHandle("session", "会话信息")}
