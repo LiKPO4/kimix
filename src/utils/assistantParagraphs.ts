@@ -384,8 +384,8 @@ export function restoreMarkdownTables(content: string) {
 export function restoreInlineMarkdownHeadings(content: string) {
   if (!content.includes("#")) return content;
   return mapMarkdownOutsideFences(content, (segment) => segment.replace(
-    /([^`\n])([。！？；：.!?:;])\s+(#{1,6}\s+\S)/g,
-    "$1$2\n\n$3",
+    /([^`\n])([。！？；：.!?:;])\s+(#{1,6})\s*(\S)/g,
+    "$1$2\n\n$3 $4",
   ));
 }
 

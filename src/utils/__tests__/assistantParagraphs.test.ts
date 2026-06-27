@@ -8,6 +8,12 @@ describe("restoreInlineMarkdownHeadings", () => {
     );
   });
 
+  it("restores headings even when the streamed chunk lost the heading space", () => {
+    expect(restoreInlineMarkdownHeadings("你还有别的需要注意的地方吗？ ##本轮总结\n目标：同步 key")).toBe(
+      "你还有别的需要注意的地方吗？\n\n## 本轮总结\n目标：同步 key",
+    );
+  });
+
   it("keeps existing line-start headings unchanged", () => {
     expect(restoreInlineMarkdownHeadings("你好霖江路。\n\n## 本轮目标\n检查状态")).toBe(
       "你好霖江路。\n\n## 本轮目标\n检查状态",
