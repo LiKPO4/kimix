@@ -303,12 +303,15 @@ export function SessionToolbar({
   };
 
   const openCurrentSessionInKimiWeb = async () => {
-    const res = await window.api.openKimiCodeWebServer();
+    const runtimeSessionId = liveCurrentSession?.engine === "kimi-code"
+      ? getRuntimeSessionId(liveCurrentSession)
+      : undefined;
+    const res = await window.api.openKimiCodeWebServer(runtimeSessionId ? { sessionId: runtimeSessionId } : undefined);
     if (!res.success) {
       showToast(`打开 Kimi Web 失败：${res.error}`);
       return;
     }
-    showToast("已打开 Kimi Web");
+    showToast(runtimeSessionId ? "已在 Kimi Web 打开当前会话" : "已打开 Kimi Web");
   };
 
   const launchExecutable = async () => {

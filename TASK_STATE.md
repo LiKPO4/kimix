@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-27 v2.12.3 Kimi Code 0.20.1 Web 跟进
+- 当前目标：跟进官方 Kimi Code 0.20.1 修复 `kimi web --no-open` / Web token 相关问题，恢复 Kimix 当前会话直达 Kimi Web 的体验。
+- 已确认：本机 `kimi --version` 与 npm latest `@moonshot-ai/kimi-code` 均为 `0.20.1`；`kimi web --help` 仍支持 `--no-open`。
+- 已完成：工具栏浏览器按钮重新传入当前官方 runtime session id；主进程先启动官方 `kimi web`，再打开 `/sessions/<sessionId>` 深链，保留官方认证初始化兜底；版本号同步到 v2.12.3。
+- 边界：本轮不改为纯 `kimi web --no-open`，避免浏览器认证态未种好时再次出现 token 页。
+- 关键文件：`electron/main.ts`、`src/components/layout/SessionToolbar.tsx`、版本号三处、`docs/release-notes/v2.12.3.md`。
+- 下一步：验证并提交后，请用户用 v2.12.3 点击工具栏浏览器按钮复验是否直接进入当前会话。
+
 ## 2026-06-27 v2.12.2 流式 Markdown 标题修复
 - 当前目标：修复助手输出中正文后直接粘连 `##本轮总结` 时，Markdown 标题没有被恢复成独立标题的问题。
 - 已完成：扩展流式 Markdown heading 修复规则，支持 heading marker 后缺失空格的 `##标题` 形态，并补测试；版本号同步到 v2.12.2。
