@@ -100,8 +100,8 @@ The follow-up audit keeps the existing style and focuses on applying the establi
 
 ### Round 3: Motion and Surface Details
 
-- [ ] Add a project-wide `prefers-reduced-motion` fallback for non-essential movement.
-- [ ] Either wire the unused entrance animation helpers into appropriate overlays or remove them.
-- [ ] Add restrained enter/exit treatment to Toast and frequently used dialogs without animating page load.
-- [ ] Add the neutral light/dark inset outline to the large image preview.
-- [ ] Review elevated overlays for redundant hard-border plus heavy-shadow combinations while retaining input and divider borders.
+- [x] Add a project-wide `prefers-reduced-motion` fallback for non-essential movement.
+- [x] Either wire the unused entrance animation helpers into appropriate overlays or remove them.
+- [x] Add restrained enter/exit treatment to Toast and frequently used dialogs without animating page load.
+- [x] Add the neutral light/dark inset outline to the large image preview.
+- [x] Review elevated overlays for redundant hard-border plus heavy-shadow combinations while retaining input and divider borders.

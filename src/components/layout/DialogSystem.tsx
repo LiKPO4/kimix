@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo } from "@electron/types/ipc";
 import { formatDownloadPercent, formatDownloadDetail, formatReleaseDate, type DownloadProgressInfo } from "@/utils/format";
+import { useRef } from "react";
+import { usePresence } from "@/hooks/usePresence";
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -67,11 +69,12 @@ function KimiOnboardingDialog({
   onOpenSettings,
   copyToClipboard,
 }: KimiOnboardingProps) {
-  if (!show && !installBusy) return null;
+  const presence = usePresence(show || installBusy);
+  if (!presence.mounted) return null;
   const showDownloadPercent = installPhase === "binary" && installPercent > 0;
   return (
-    <div className="kimix-onboarding-overlay fixed inset-0 z-[118] flex items-center justify-center" style={{ padding: 24 }}>
-      <div className="kimix-onboarding-card w-full max-w-[560px] rounded-[18px] border shadow-[0_26px_80px_rgba(35,31,25,0.18)]" style={{ padding: "22px 24px" }}>
+    <div className={`kimix-onboarding-overlay kimix-presence-overlay fixed inset-0 z-[118] flex items-center justify-center ${presence.visible ? "is-visible" : ""}`} style={{ padding: 24 }}>
+      <div className={`kimix-onboarding-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`} style={{ padding: "22px 24px" }}>
         <div className="flex items-start justify-between" style={{ gap: 16 }}>
           <div className="flex min-w-0 items-start" style={{ gap: 14 }}>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-primary-light text-accent-primary">
@@ -195,11 +198,12 @@ interface LaunchCommandDialogProps {
 }
 
 function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchCommandDialogProps) {
-  if (!open) return null;
+  const presence = usePresence(open);
+  if (!presence.mounted) return null;
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5" onMouseDown={onClose}>
+    <div className={`kimix-presence-overlay fixed inset-0 z-[95] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`} onMouseDown={onClose}>
       <div
-        className="kimix-modal-card w-full max-w-[520px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]"
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[520px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
         style={{ padding: "22px 24px 24px" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -252,18 +256,22 @@ interface ShutdownDialogProps {
 }
 
 function ShutdownDialog({ dialog, onCancel }: ShutdownDialogProps) {
-  if (!dialog) return null;
+  const presence = usePresence(Boolean(dialog));
+  const retainedDialog = useRef(dialog);
+  if (dialog) retainedDialog.current = dialog;
+  if (!presence.mounted || !retainedDialog.current) return null;
+  const visibleDialog = retainedDialog.current;
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5">
-      <div className="kimix-modal-card w-full max-w-[460px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" style={{ padding: "22px 24px" }}>
+    <div className={`kimix-presence-overlay fixed inset-0 z-[130] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`}>
+      <div className={`kimix-modal-card kimix-presence-content w-full max-w-[460px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`} style={{ padding: "22px 24px" }}>
         <div className="text-[18px] font-semibold leading-6 text-text-primary">长程任务已完成</div>
         <div className="mt-3 text-[14px] leading-6 text-text-secondary">
-          「{dialog.taskTitle}」已执行完成。已按你的设置安排关机。
+          「{visibleDialog.taskTitle}」已执行完成。已按你的设置安排关机。
         </div>
         <div className="mt-5 rounded-xl border border-border-subtle bg-surface-base text-center" style={{ padding: "18px 16px" }}>
           <div className="text-[13px] leading-5 text-text-muted">距离关机还有</div>
           <div className="kimix-tabular-nums mt-1 font-mono text-[34px] font-semibold leading-[1.2] text-text-primary">
-            {Math.floor(dialog.remainingSeconds / 60)}:{String(dialog.remainingSeconds % 60).padStart(2, "0")}
+            {Math.floor(visibleDialog.remainingSeconds / 60)}:{String(visibleDialog.remainingSeconds % 60).padStart(2, "0")}
           </div>
         </div>
         <div className="mt-5 flex justify-end" style={{ gap: 12 }}>
@@ -328,19 +336,26 @@ function HelpDialogPanel({
   onCheckCliUpdate,
   kimiInstallBusy,
 }: HelpDialogProps) {
-  if (!dialog) return null;
+  const presence = usePresence(Boolean(dialog));
+  const retainedDialog = useRef(dialog);
+  const retainedInfoTopic = useRef(infoTopic);
+  if (dialog) retainedDialog.current = dialog;
+  if (infoTopic) retainedInfoTopic.current = infoTopic;
+  if (!presence.mounted || !retainedDialog.current) return null;
+  const visibleDialog = retainedDialog.current;
+  const visibleInfoTopic = infoTopic ?? retainedInfoTopic.current;
   const showCliDownloadPercent = cliUpdateState.progressPhase === "binary" && cliUpdateState.progressPercent > 0;
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5" onMouseDown={onClose}>
-      <div className="kimix-modal-card w-full max-w-[560px] rounded-[18px] border shadow-[0_28px_90px_rgba(25,23,20,0.24)]" onMouseDown={(e) => e.stopPropagation()}>
+    <div className={`kimix-presence-overlay fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`} onMouseDown={onClose}>
+      <div className={`kimix-modal-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "16px 20px" }}>
           <div className="flex items-center gap-2.5 text-[18px] font-semibold text-text-primary">
-            {dialog === "about" && <Info size={18} />}
-            {dialog === "updates" && <History size={18} />}
-            {dialog === "shortcuts" && <Keyboard size={18} />}
-            {dialog === "info" && <HelpCircle size={18} />}
+            {visibleDialog === "about" && <Info size={18} />}
+            {visibleDialog === "updates" && <History size={18} />}
+            {visibleDialog === "shortcuts" && <Keyboard size={18} />}
+            {visibleDialog === "info" && <HelpCircle size={18} />}
             <span>
-              {dialog === "about" ? "关于 Kimix" : dialog === "updates" ? "更新记录" : dialog === "shortcuts" ? "键盘快捷键" : infoTopic?.title}
+              {visibleDialog === "about" ? "关于 Kimix" : visibleDialog === "updates" ? "更新记录" : visibleDialog === "shortcuts" ? "键盘快捷键" : visibleInfoTopic?.title}
             </span>
           </div>
           <button className="kimix-modal-close-button" onClick={onClose} aria-label="关闭">
@@ -348,7 +363,7 @@ function HelpDialogPanel({
           </button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto" style={{ padding: 22 }}>
-          {dialog === "about" && (
+          {visibleDialog === "about" && (
             <div className="space-y-4 text-[14.5px] leading-7 text-text-secondary">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-hover text-text-primary">
@@ -369,7 +384,7 @@ function HelpDialogPanel({
             </div>
           )}
 
-          {dialog === "updates" && (
+          {visibleDialog === "updates" && (
             <div className="flex flex-col text-[14.5px] text-text-secondary" style={{ gap: 16 }}>
               <div className="grid rounded-xl border border-border-subtle bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                 <div className="min-w-0">
@@ -504,7 +519,7 @@ function HelpDialogPanel({
             </div>
           )}
 
-          {dialog === "shortcuts" && (
+          {visibleDialog === "shortcuts" && (
             <div className="grid gap-2 text-[14px] text-text-secondary">
               {["Ctrl+B 切换侧边栏", "Ctrl+K 聚焦输入框", "Ctrl+N 新对话", "Ctrl+O 打开项目", "Ctrl+R 重新载入页面", "Ctrl++ 放大", "Ctrl+- 缩小", "Ctrl+0 实际大小", "F11 切换全屏", "Esc 停止当前任务"].map((line) => (
                 <div key={line} className="rounded-lg bg-surface-base" style={{ padding: "10px 14px" }}>{line}</div>
@@ -512,11 +527,11 @@ function HelpDialogPanel({
             </div>
           )}
 
-          {dialog === "info" && infoTopic && (
+          {visibleDialog === "info" && visibleInfoTopic && (
             <div className="space-y-4 text-[14.5px] leading-7 text-text-secondary">
-              <p>{infoTopic.body}</p>
-              {infoTopic.url && (
-                <button className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light" onClick={() => window.api.openExternal(infoTopic.url!)}>
+              <p>{visibleInfoTopic.body}</p>
+              {visibleInfoTopic.url && (
+                <button className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light" onClick={() => window.api.openExternal(visibleInfoTopic.url!)}>
                   打开相关页面 <ExternalLink size={13} />
                 </button>
               )}

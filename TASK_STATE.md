@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-29 v2.12.8 前端规整第三轮
+- 当前目标：完成前端 TodoList 第三轮动效与表面细节治理，收束本轮不改变风格的前端统一工作。
+- 已完成：新增通用 `usePresence` 延迟卸载机制；Toast、设置、启动命令、帮助、引导和关机弹窗获得克制的进出场；移除未使用的旧入场动画；新增全局 reduced-motion 兜底；大图预览增加纯黑/纯白 10% 内描边；模态浮层改用带中性 ring 的统一阴影，移除重复硬边框；版本号同步到 v2.12.8。
+- 边界：不引入 motion 依赖，不改变弹窗布局、尺寸和业务行为；输入框、分隔线和内容卡片边框继续保留。
+- 关键文件：`src/hooks/usePresence.ts`、`src/components/layout/ToastSystem.tsx`、`src/components/layout/DialogSystem.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/index.css`、版本号三处。
+- 验收：`usePresence` 局部测试 1/1、`pnpm test:run` 259/259、`pnpm knowledge:validate`、`git diff --check` 与 `pnpm build` 通过。
+- 下一步：由用户复验弹窗开关、Toast、大图明暗主题边缘和系统 reduced-motion 设置；若无回归，本轮三阶段前端规整即可收口。
+
 ## 2026-06-29 v2.12.7 前端规整第二轮
 - 当前目标：完成前端 TodoList 第二轮共享组件一致性治理，不改变既有布局与视觉风格。
 - 已完成：动态时长、Token、上下文百分比、安装进度和 diff 计数统一使用等宽数字；工具栏按下反馈统一为 `scale(0.96)`；消息与代码块复制状态改为共享 CSS 双图标 cross-fade；上下文入口及常用关闭按钮复用共享图标动作类；版本号同步到 v2.12.7。

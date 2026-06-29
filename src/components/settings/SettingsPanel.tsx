@@ -15,6 +15,7 @@ import {
 } from "@/utils/sessionBackup";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import type { KimiCodeServerModelCatalog } from "@electron/types/ipc";
+import { usePresence } from "@/hooks/usePresence";
 
 type FreezeReport = {
   at: string;
@@ -39,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.12.7";
+const KIMIX_VERSION = "2.12.8";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -393,6 +394,7 @@ function normalizeFilePreviewExtensions(value: string | string[]) {
 
 export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "modal" | "workspace"; onBackToChat?: () => void }) {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
+  const settingsPresence = usePresence(settingsOpen || variant === "workspace");
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const theme = useAppStore((s) => s.theme);
   const setTheme = useAppStore((s) => s.setTheme);
@@ -1213,7 +1215,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     return () => window.removeEventListener("kimix:focus-auth-settings", handleFocusAuthSettings);
   }, []);
 
-  if (!settingsOpen && variant === "modal") return null;
+  if (!settingsPresence.mounted && variant === "modal") return null;
 
   const themes: { value: Theme; label: string; icon: typeof Sun }[] = [
     { value: "light", label: "浅色", icon: Sun },
@@ -1276,7 +1278,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   };
 
   const content = (
-      <div className={variant === "workspace" ? "kimix-settings-panel is-workspace" : "kimix-settings-panel"} onClick={(e) => e.stopPropagation()}>
+      <div className={variant === "workspace" ? "kimix-settings-panel is-workspace" : `kimix-settings-panel kimix-presence-content ${settingsPresence.visible ? "is-visible" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className={variant === "workspace" ? "kimix-workspace-header" : "kimix-settings-header"}>
           <div className={variant === "workspace" ? "kimix-workspace-header-copy" : "min-w-0"}>
             <div className={variant === "workspace" ? "kimix-workspace-header-title" : "flex min-w-0 items-center gap-2.5 text-[20px] font-semibold leading-7 text-[var(--kimix-panel-text)]"}>
@@ -2411,7 +2413,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
+      className={`kimix-presence-overlay fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] ${settingsPresence.visible ? "is-visible" : ""}`}
       onClick={() => setSettingsOpen(false)}
       role="dialog"
       aria-modal="true"

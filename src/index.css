@@ -136,6 +136,7 @@
   --shadow-hover: 0 2px 8px rgba(25, 23, 20, 0.06);
   --shadow-elevated: 0 8px 24px rgba(25, 23, 20, 0.08), 0 2px 6px rgba(25, 23, 20, 0.04);
   --shadow-floating: 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
 
   /* Spacing Tokens (reference) */
   --space-1: 4px;
@@ -263,6 +264,7 @@
   --kimix-media-thumb-border-hover: var(--border-strong);
   --kimix-strong-button-bg: #E7ECF2;
   --kimix-strong-button-text: #18202A;
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 24px 64px rgba(0, 0, 0, 0.28);
 }
 
 /* ── Base ── */
@@ -953,10 +955,10 @@ button.bg-accent-primary:disabled:hover,
   width: min(448px, calc(100vw - 40px));
   max-height: 78vh;
   overflow: hidden;
-  border: 1px solid var(--border-default);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--surface-elevated);
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--shadow-overlay);
   color: var(--text-primary);
 }
 
@@ -1885,6 +1887,12 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-preview-image {
   background: var(--surface-elevated);
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+
+[data-theme="dark"] .kimix-preview-image {
+  outline-color: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Chat Banner ── */
@@ -1976,10 +1984,11 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-modal-card,
 .kimix-onboarding-card {
-  border-color: var(--border-default);
+  border: 0;
   background: var(--surface-elevated);
   color: var(--text-primary);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
 }
 
 .kimix-modal-close-button {
@@ -2071,66 +2080,55 @@ button.bg-accent-primary:disabled:hover,
   animation: kimix-spin 0.9s linear infinite;
 }
 
-/* ── Entrance Animations ── */
+/* ── Overlay Presence ── */
 
-@keyframes kimix-fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.kimix-presence-overlay {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-in;
 }
 
-.kimix-fade-in-up {
-  animation: kimix-fade-in-up var(--duration-enter) var(--ease-enter) forwards;
+.kimix-presence-overlay.is-visible {
+  pointer-events: auto;
+  opacity: 1;
+  transition-duration: var(--duration-enter);
+  transition-timing-function: var(--ease-enter);
 }
 
-@keyframes kimix-scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.kimix-presence-content {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  filter: blur(4px);
+  transition: opacity 150ms ease-in,
+              transform 150ms ease-in,
+              filter 150ms ease-in;
 }
 
-.kimix-scale-in {
-  animation: kimix-scale-in var(--duration-enter) var(--ease-enter) forwards;
+.kimix-presence-content.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition-duration: var(--duration-enter);
+  transition-timing-function: var(--ease-enter);
 }
 
-/* ── Toast Animation ── */
-
-@keyframes kimix-toast-enter {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-8px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
+.kimix-toast {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+  filter: blur(4px);
+  box-shadow: var(--shadow-overlay);
+  transition: opacity 150ms ease-in,
+              transform 150ms ease-in,
+              filter 150ms ease-in;
 }
 
-/* ── Message Stagger Entrance ── */
-
-@keyframes kimix-message-enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.kimix-message-enter {
-  animation: kimix-message-enter var(--duration-enter) var(--ease-enter) forwards;
+.kimix-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  filter: blur(0);
+  transition-duration: var(--duration-enter);
+  transition-timing-function: var(--ease-enter);
 }
 
 /* ── Button Micro Scale ── */
@@ -2161,6 +2159,17 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-breathe {
   animation: kimix-breathe 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── Markdown Body ── */
