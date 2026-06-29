@@ -10,6 +10,7 @@ import "katex/dist/katex.min.css";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
+import { StateIconSwap } from "@/components/common/StateIconSwap";
 
 interface MarkdownRendererProps {
   content: string;
@@ -106,7 +107,11 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
           title="复制代码"
           aria-label="复制代码"
         >
-          {copied ? <Check size={13} /> : <Copy size={13} />}
+          <StateIconSwap
+            active={copied}
+            activeIcon={<Check size={13} />}
+            inactiveIcon={<Copy size={13} />}
+          />
           <span>{copied ? "已复制" : "复制"}</span>
         </button>
       </div>

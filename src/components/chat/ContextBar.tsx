@@ -50,7 +50,7 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
     <div style={{ paddingTop: 2, paddingBottom: 3 }}>
       <div className="flex items-center justify-between gap-5 text-[14px] leading-5">
         <span className="font-medium text-[var(--kimix-panel-text-secondary)]">{period.label}</span>
-        <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">{period.available ? `已用 ${percent.toFixed(0)}%` : "0%"}</span>
+        <span className="kimix-tabular-nums shrink-0 text-[var(--kimix-panel-text-muted)]">{period.available ? `已用 ${percent.toFixed(0)}%` : "0%"}</span>
       </div>
       <div className="kimix-progress-track mt-2 h-2 overflow-hidden rounded-full">
         <div
@@ -59,8 +59,8 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
         />
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">
-        <span className="shrink-0">{formatRefreshTime(period.refreshAt, now)}</span>
-        <span className="min-w-0 truncate">{formatUsage(period)}</span>
+        <span className="kimix-tabular-nums shrink-0">{formatRefreshTime(period.refreshAt, now)}</span>
+        <span className="kimix-tabular-nums min-w-0 truncate">{formatUsage(period)}</span>
       </div>
     </div>
   );
@@ -432,7 +432,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                   style={{ marginTop: 16, padding: "12px 2px 0" }}
                 >
                   <span>Kimi Code 总额度</span>
-                  <span className="shrink-0">{formatTotalQuota(usageData.totalQuota)}</span>
+                  <span className="kimix-tabular-nums shrink-0">{formatTotalQuota(usageData.totalQuota)}</span>
                 </div>
               )}
               {usageData?.message && (

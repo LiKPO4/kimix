@@ -153,7 +153,7 @@ export function ContextRing() {
     >
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+        className="kimix-inline-icon-action is-roomy rounded-xl text-text-muted hover:bg-surface-hover hover:text-text-primary"
         aria-label="上下文使用情况"
       >
         <CircularProgress percent={percent} size={18} strokeWidth={2.5} />
@@ -185,10 +185,10 @@ export function ContextRing() {
           </div>
           {hasContextStatus ? (
             <>
-              <div className="text-[14px] font-medium text-text-primary">
+              <div className="kimix-tabular-nums text-[14px] font-medium text-text-primary">
                 {percent.toFixed(0)}% 已用（剩余 {remaining.toFixed(0)}%）
               </div>
-              <div className="text-[13px] text-text-muted" style={{ marginTop: 4 }}>
+              <div className="kimix-tabular-nums text-[13px] text-text-muted" style={{ marginTop: 4 }}>
                 已用 {formatK(used)} 标记，共 {formatK(contextLimit)}
               </div>
             </>
@@ -214,7 +214,7 @@ export function ContextRing() {
             <div className="mt-4 border-t border-border-subtle" style={{ paddingTop: 14 }}>
               <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 7 }}>
                 <span className="text-[13px] text-text-muted">推荐会话长度：</span>
-                <span className={`shrink-0 text-[13px] ${recommendation.remainingTurns === 0 ? "text-accent-warning" : "text-text-secondary"}`}>
+                <span className={`kimix-tabular-nums shrink-0 text-[13px] ${recommendation.remainingTurns === 0 ? "text-accent-warning" : "text-text-secondary"}`}>
                   剩余 {recommendation.remainingTurns}/{recommendation.turnLimit} 轮
                 </span>
               </div>
@@ -228,7 +228,7 @@ export function ContextRing() {
                   }}
                 />
               </div>
-              <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
+              <div className="kimix-tabular-nums mt-2 text-[12.5px] leading-5 text-text-muted">
                 已进行 {recommendation.turnCount} 轮，达到上限后会在每轮末尾提示开启新对话。
               </div>
             </div>

@@ -52,12 +52,12 @@ export const StatusCard = memo(function StatusCard({ event, inline = false, allo
           ? "bg-accent-danger-light text-accent-danger"
           : "bg-surface-hover text-text-muted";
   const details = [
-    event.planMode === true ? "Plan" : "",
-    event.message ? compactModelText(event.message) : "",
-    formatTimestamp(event.timestamp),
-    event.tokenCount !== undefined ? `Tokens: ${formatK(event.tokenCount)}` : "",
-    event.contextSize !== undefined ? `Context: ${formatContext(event, detailedContext)}` : "",
-  ].filter(Boolean);
+    { text: event.planMode === true ? "Plan" : "", tabular: false },
+    { text: event.message ? compactModelText(event.message) : "", tabular: false },
+    { text: formatTimestamp(event.timestamp), tabular: true },
+    { text: event.tokenCount !== undefined ? `Tokens: ${formatK(event.tokenCount)}` : "", tabular: true },
+    { text: event.contextSize !== undefined ? `Context: ${formatContext(event, detailedContext)}` : "", tabular: true },
+  ].filter((detail) => Boolean(detail.text));
 
   const pill = (
       <div
@@ -65,7 +65,7 @@ export const StatusCard = memo(function StatusCard({ event, inline = false, allo
         style={{ gap: 12, paddingLeft: inline ? 13 : 16, paddingRight: inline ? 13 : 16, paddingTop: inline ? 5 : 6, paddingBottom: inline ? 5 : 6, fontSize: 13, lineHeight: "18px" }}
       >
         {details.map((detail, index) => (
-          <span key={`${event.id}-${index}`} className="truncate">{detail}</span>
+          <span key={`${event.id}-${index}`} className={`${detail.tabular ? "kimix-tabular-nums " : ""}truncate`}>{detail.text}</span>
         ))}
       </div>
   );

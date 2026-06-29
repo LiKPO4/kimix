@@ -2141,7 +2141,7 @@ export function LongTaskInspectorPanel({
                       style={{ padding: "12px 12px" }}
                     >
                       <div className="truncate text-[13px] font-medium leading-5 text-text-primary">{diff.filePath}</div>
-                      <div className="mt-1 text-[12px] leading-5 text-text-muted">+{diff.additions} / -{diff.deletions}</div>
+                      <div className="kimix-tabular-nums mt-1 text-[12px] leading-5 text-text-muted">+{diff.additions} / -{diff.deletions}</div>
                     </button>
                   ))}
                 </div>
@@ -2244,7 +2244,7 @@ export function LongTaskInspectorPanel({
                       <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{file.path}</span>
                       <span className="mt-1 block text-[12px] leading-5 text-text-muted">{gitStatusLabel(file.status)}</span>
                     </button>
-                    <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ minWidth: 58, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
+                    <span className="kimix-tabular-nums shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ minWidth: 58, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
                       +{file.additions ?? 0} / -{file.deletions ?? 0}
                     </span>
                     <button
@@ -2299,7 +2299,7 @@ export function LongTaskInspectorPanel({
                         <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{diff.filePath}</span>
                         <span className="mt-1 block text-[12px] leading-5 text-text-muted">{formatReleaseDate(new Date(diff.timestamp).toISOString())}</span>
                       </span>
-                      <span className="shrink-0 rounded-full bg-surface-base text-[12px] leading-5 text-text-muted" style={{ minWidth: 58, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
+                      <span className="kimix-tabular-nums shrink-0 rounded-full bg-surface-base text-[12px] leading-5 text-text-muted" style={{ minWidth: 58, paddingLeft: 8, paddingRight: 8, textAlign: "center" }}>
                         +{diff.additions} / -{diff.deletions}
                       </span>
                     </button>

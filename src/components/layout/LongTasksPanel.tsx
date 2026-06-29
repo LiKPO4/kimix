@@ -338,7 +338,7 @@ export function LongTasksPanel() {
               </div>
             </div>
           </div>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={() => setOpen(false)} aria-label="关闭长程任务">
+          <button className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={() => setOpen(false)} aria-label="关闭长程任务">
             <X size={16} />
           </button>
         </div>

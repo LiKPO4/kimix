@@ -88,7 +88,7 @@ export const ToolCard = memo(function ToolCard({ event }: ToolCardProps) {
           <span className="min-w-0 flex-1 truncate">
             {statusText} {meta.label}
           </span>
-          {duration && <span className="shrink-0 text-text-muted">{duration}</span>}
+          {duration && <span className="kimix-tabular-nums shrink-0 text-text-muted">{duration}</span>}
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
         </button>
         {expanded && (

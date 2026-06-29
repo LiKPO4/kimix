@@ -321,6 +321,31 @@ li,
   font-variant-numeric: tabular-nums;
 }
 
+.kimix-state-icon-swap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.kimix-state-icon-swap > span {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  scale: 0.25;
+  filter: blur(4px);
+  transition: opacity 300ms cubic-bezier(0.2, 0, 0, 1),
+              scale 300ms cubic-bezier(0.2, 0, 0, 1),
+              filter 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.kimix-state-icon-swap > span.is-visible {
+  opacity: 1;
+  scale: 1;
+  filter: blur(0);
+}
+
 /* Paper Texture Overlay */
 body::before {
   content: "";
@@ -639,7 +664,9 @@ body::before {
               border-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
               box-shadow var(--duration-base) var(--ease-hover),
-              transform var(--duration-base) var(--ease-hover);
+              transform var(--duration-base) var(--ease-hover),
+              scale var(--duration-fast) var(--ease-hover);
+  transform-origin: center;
 }
 
 .kimix-toolbar-button:hover:not(:disabled) {
@@ -654,6 +681,7 @@ body::before {
 
 .kimix-toolbar-button:active:not(:disabled) {
   transform: translateY(0);
+  scale: 0.96;
 }
 
 .kimix-toolbar-button:disabled {

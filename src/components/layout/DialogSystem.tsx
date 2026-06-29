@@ -111,7 +111,7 @@ function KimiOnboardingDialog({
             <div style={{ marginTop: 12 }}>
               <div className="flex items-center justify-between text-[12.5px] leading-5 text-text-muted">
                 <span>{showDownloadPercent ? "下载进度" : "安装状态"}</span>
-                {showDownloadPercent && <span>{Math.max(0, Math.min(100, Math.round(installPercent)))}%</span>}
+                {showDownloadPercent && <span className="kimix-tabular-nums">{Math.max(0, Math.min(100, Math.round(installPercent)))}%</span>}
               </div>
               {showDownloadPercent ? (
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent-primary-light">
@@ -262,7 +262,7 @@ function ShutdownDialog({ dialog, onCancel }: ShutdownDialogProps) {
         </div>
         <div className="mt-5 rounded-xl border border-border-subtle bg-surface-base text-center" style={{ padding: "18px 16px" }}>
           <div className="text-[13px] leading-5 text-text-muted">距离关机还有</div>
-          <div className="mt-1 font-mono text-[34px] font-semibold leading-[1.2] text-text-primary">
+          <div className="kimix-tabular-nums mt-1 font-mono text-[34px] font-semibold leading-[1.2] text-text-primary">
             {Math.floor(dialog.remainingSeconds / 60)}:{String(dialog.remainingSeconds % 60).padStart(2, "0")}
           </div>
         </div>
@@ -416,7 +416,7 @@ function HelpDialogPanel({
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-[12.5px] leading-5 text-text-muted">
                         <span>{showCliDownloadPercent ? "下载进度" : "安装状态"}</span>
-                        {showCliDownloadPercent && <span>{Math.max(0, Math.min(100, Math.round(cliUpdateState.progressPercent)))}%</span>}
+                        {showCliDownloadPercent && <span className="kimix-tabular-nums">{Math.max(0, Math.min(100, Math.round(cliUpdateState.progressPercent)))}%</span>}
                       </div>
                       {showCliDownloadPercent ? (
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent-primary-light">

@@ -266,7 +266,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
                 >
                   <div className="grid items-center border-b border-[var(--kimix-panel-divider)]" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "9px 12px" }}>
                     <code className="min-w-0 truncate text-xs text-text-secondary">{diff.path}</code>
-                    <span className="shrink-0 text-xs">
+                    <span className="kimix-tabular-nums shrink-0 text-xs">
                       <span className="text-accent-green">+{diff.additions ?? 0}</span>
                       <span className="text-text-muted" style={{ marginLeft: 7, marginRight: 7 }}>/</span>
                       <span className="text-accent-red">-{diff.deletions ?? 0}</span>

@@ -93,10 +93,10 @@ The follow-up audit keeps the existing style and focuses on applying the establi
 
 ### Round 2: Shared Component Consistency
 
-- [ ] Apply tabular numerals to changing durations, token counts, percentages, progress, and diff totals.
-- [ ] Align toolbar and icon-action press feedback around the shared `scale(0.96)` behavior.
-- [ ] Replace high-frequency loading/success icon swaps with the shared CSS cross-fade pattern.
-- [ ] Consolidate remaining ad hoc icon actions onto shared compact/default action classes.
+- [x] Apply tabular numerals to changing durations, token counts, percentages, progress, and diff totals.
+- [x] Align toolbar and icon-action press feedback around the shared `scale(0.96)` behavior.
+- [x] Replace high-frequency loading/success icon swaps with the shared CSS cross-fade pattern.
+- [x] Consolidate remaining ad hoc icon actions onto shared compact/default action classes.
 
 ### Round 3: Motion and Surface Details
 

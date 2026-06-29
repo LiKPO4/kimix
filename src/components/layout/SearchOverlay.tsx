@@ -300,7 +300,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none placeholder:text-text-muted"
             placeholder="搜索对话、回复、思考、工具和状态"
           />
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={onClose} aria-label="关闭搜索">
+          <button className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={onClose} aria-label="关闭搜索">
             <X size={16} />
           </button>
         </div>

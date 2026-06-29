@@ -251,7 +251,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
               : <FileText size={14} className="shrink-0 text-text-muted" />}
             <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{file.path}</span>
           </button>
-          <div className="flex items-center justify-self-end text-[13.5px]" style={{ gap: 8, minWidth: 72 }}>
+          <div className="kimix-tabular-nums flex items-center justify-self-end text-[13.5px]" style={{ gap: 8, minWidth: 72 }}>
             <span className="text-accent-success">+{file.additions ?? 0}</span>
             <span className="text-accent-danger">-{file.deletions ?? 0}</span>
           </div>
@@ -314,9 +314,9 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
         >
           {canExpand && (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
           <span className="truncate">文件变更</span>
-          <span className="shrink-0 text-[13.5px] text-text-muted">{files.length} 个</span>
-          <span className="shrink-0 text-accent-success">+{additions}</span>
-          <span className="shrink-0 text-accent-danger">-{deletions}</span>
+          <span className="kimix-tabular-nums shrink-0 text-[13.5px] text-text-muted">{files.length} 个</span>
+          <span className="kimix-tabular-nums shrink-0 text-accent-success">+{additions}</span>
+          <span className="kimix-tabular-nums shrink-0 text-accent-danger">-{deletions}</span>
         </button>
         <button
           type="button"

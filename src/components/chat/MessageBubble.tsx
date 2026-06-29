@@ -16,6 +16,7 @@ import { hasActiveTimelineWorkEvents } from "@/utils/sessionActivity";
 import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
+import { StateIconSwap } from "@/components/common/StateIconSwap";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -393,7 +394,11 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
             title="复制"
             aria-label="复制"
           >
-            {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+            <StateIconSwap
+              active={copied}
+              activeIcon={<Check size={13} className="text-accent-success" />}
+              inactiveIcon={<Copy size={13} />}
+            />
           </button>
           <button
             onClick={handleResend}
@@ -634,7 +639,7 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
         </span>
         <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
         <span className="min-w-0 flex-1 truncate leading-5">{describeTool(tool)}</span>
-        <span className="w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
+        <span className="kimix-tabular-nums w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
           <span className={`h-1.5 w-1.5 rounded-full ${tool.status === "error" ? "bg-accent-danger" : tool.status === "running" ? "bg-accent-warning" : "bg-accent-success"}`} />
         </span>
@@ -940,7 +945,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
         className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
       >
         {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
-        <span className="shrink-0">{label}</span>
+        <span className="kimix-tabular-nums shrink-0">{label}</span>
         {hasDetails && (
           <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
             {summary}
@@ -1006,7 +1011,11 @@ function AssistantMessageFooter({
               title="复制"
               aria-label="复制"
             >
-              {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+              <StateIconSwap
+                active={copied}
+                activeIcon={<Check size={13} className="text-accent-success" />}
+                inactiveIcon={<Copy size={13} />}
+              />
             </button>
             <button
               onClick={onCopyAll}
@@ -1015,7 +1024,11 @@ function AssistantMessageFooter({
               title="全部复制（含思考）"
               aria-label="全部复制（含思考）"
             >
-              {copiedAll ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+              <StateIconSwap
+                active={copiedAll}
+                activeIcon={<Check size={13} className="text-accent-success" />}
+                inactiveIcon={<Copy size={13} />}
+              />
               <span>全部</span>
             </button>
           </>
@@ -1045,7 +1058,7 @@ function AssistantMessageFooter({
             className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-[13px] leading-[18px] text-text-muted"
             style={{ paddingLeft: 13, paddingRight: 13, paddingTop: 5, paddingBottom: 5 }}
           >
-            <span className="truncate">{fallbackLabel}</span>
+            <span className="kimix-tabular-nums truncate">{fallbackLabel}</span>
           </div>
         </div>
       )}

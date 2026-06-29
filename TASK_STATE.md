@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-29 v2.12.7 前端规整第二轮
+- 当前目标：完成前端 TodoList 第二轮共享组件一致性治理，不改变既有布局与视觉风格。
+- 已完成：动态时长、Token、上下文百分比、安装进度和 diff 计数统一使用等宽数字；工具栏按下反馈统一为 `scale(0.96)`；消息与代码块复制状态改为共享 CSS 双图标 cross-fade；上下文入口及常用关闭按钮复用共享图标动作类；版本号同步到 v2.12.7。
+- 边界：不引入 motion 依赖，不改变控件尺寸、业务行为或页面结构；本轮不处理 reduced-motion、Toast/弹窗进出场和大图预览描边。
+- 关键文件：`src/components/common/StateIconSwap.tsx`、`src/index.css`、聊天状态与 diff 组件、`docs/frontend-polish-plan.md`、版本号三处。
+- 验收：`pnpm test:run` 258/258、`pnpm knowledge:validate`、`git diff --check` 与 `pnpm build` 通过；全仓 `tsc --noEmit` 仍被既有跨模块类型债阻断，本轮新增组件未出现在错误列表中。
+- 下一步：由用户复验数字稳定性、复制图标切换与工具栏按压反馈；随后进入第三轮动效和表面细节。
+
 ## 2026-06-29 v2.12.6 前端规整第一轮
 - 当前目标：持久化新一轮前端审计 TodoList，并按顺序完成第一轮交互结构与可达性治理。
 - 已完成：`docs/frontend-polish-plan.md` 新增三轮 TodoList；修复 Composer 附件卡嵌套按钮；侧栏会话操作扩为 28px 固定操作列并移除 `transition-all`；侧栏与消息 hover 操作增加键盘 focus-within 可见性；Composer 子控件恢复全局 focus-visible；版本号同步到 v2.12.6。
