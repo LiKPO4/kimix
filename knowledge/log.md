@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+## 2026-06-29
+* **Kimi Web readiness**: Documented that browser session deep links must wait for the official health endpoint because a successful launcher exit can precede daemon port and WebSocket readiness, especially while replacing a stale lock.
+
 ## 2026-06-26
 * **Runtime routing**: Documented managed Server process protection: exited foreground children and repeated WebSocket reconnect failures must demote Server routing and enter bounded recovery instead of keeping a stale ready state.
 

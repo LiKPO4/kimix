@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-26T21:40:00+08:00"
+timestamp: "2026-06-29T10:45:00+08:00"
 ---
 
 # Runtime Routing
@@ -47,6 +47,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 32. Server image prompts should trust the actual image bytes over a browser-provided data URL MIME label. Kimix sniffs PNG, JPEG, GIF, and WebP magic bytes before base64 fallback or official `/files` upload, then sends the corrected media type through the official image content schema.
 33. Background task management is split by official surface. Server sessions use official `/tasks` list/get/cancel for already-backgrounded work. The SDK compatibility chain may call official `session.detachBackgroundTask(taskId)` to move a foreground task into background, but Server 0.19 has no equivalent detach REST route; Kimix must report that boundary instead of offering a Server UI action that cannot complete.
 34. Kimix-managed foreground Server processes must not remain logically ready after the child exits. Host state returns to SDK routing when the managed process closes, and repeated WebSocket reconnect failures notify the same runtime-failure path so bounded background recovery can restart or reattach instead of leaving the renderer on a dead connection.
+35. Opening the official Kimi Web UI is gated by `/api/v1/healthz`, not by a fixed delay or the `kimi web` launcher exit code. The launcher may exit successfully before its daemon has replaced a stale lock and bound the REST/WebSocket port. Kimix opens the authenticated session deep link only after the health envelope reports `code=0` and `data.ok=true`; timeout leaves the browser closed and reports an explicit startup error.
 
 # Main Components
 

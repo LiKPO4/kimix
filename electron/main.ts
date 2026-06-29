@@ -532,6 +532,24 @@ function readKimiServerToken() {
   }
 }
 
+async function waitForKimiWebReady(port: string, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  const healthUrl = `http://127.0.0.1:${port}/api/v1/healthz`;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(healthUrl, { signal: AbortSignal.timeout(1_500) });
+      if (response.ok) {
+        const envelope = await response.json() as { code?: unknown; data?: { ok?: unknown } };
+        if (envelope.code === 0 && envelope.data?.ok === true) return;
+      }
+    } catch {
+      // The daemon may still be replacing a stale lock or binding the port.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  throw new Error("Kimi Web 启动超时，实时服务尚未就绪。请稍后重试。");
+}
+
 function backupFileIfExists(filePath: string) {
   if (!fs.existsSync(filePath)) return;
   const backup = `${filePath}.kimix-backup-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}`;
@@ -6051,8 +6069,6 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
       console.warn(`[KIMI WEB] exited with code ${code ?? "unknown"}`);
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
     if (exitCode !== undefined && exitCode !== 0) {
       return {
         success: false,
@@ -6060,6 +6076,7 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
       };
     }
 
+    await waitForKimiWebReady(port);
     child.unref();
     if (sessionId) {
       const token = readKimiServerToken();

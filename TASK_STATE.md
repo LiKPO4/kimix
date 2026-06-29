@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-29 v2.12.5 Kimi Web 启动就绪门禁
+- 当前目标：修复从 Kimix 打开 Kimi Web 当前会话后，页面刚启动就连续提示 `WebSocket error` 的问题。
+- 根因：现场发现 `~/.kimi-code/server/lock` 指向已退出 PID，58627 无监听；官方 `kimi web --no-open` 可清理陈旧 lock 并重启 daemon，但实际端口就绪约需 7 秒。Kimix 仅固定等待 3 秒且只检查启动命令退出码，导致浏览器早于实时服务打开。
+- 已完成：浏览器入口改为轮询 `/api/v1/healthz`，仅在 `code=0` 且 `data.ok=true` 后读取 token 并打开当前会话；最长等待 20 秒，超时明确报错且不打开半连接页面；版本号同步到 v2.12.5。
+- 关键文件：`electron/main.ts`、版本号三处、`docs/release-notes/v2.12.5.md`、`knowledge/architecture/runtime-routing.md`。
+- 下一步：验证并提交后，请用户用 v2.12.5 复验首次打开是否不再出现 WebSocket 错误。
+
 ## 2026-06-27 v2.12.4 Kimi Web 单页直达修复
 - 当前目标：修复 v2.12.3 仍会打开两个 Kimi Web 标签页，且第二个裸 deep link 缺少 token 后进入 `/login` 的问题。
 - 根因：官方 Web deep link 需要 `#token=<server-token>` fragment；v2.12.3 先让官方 opener 打开首页，再由 Kimix 裸开 `/sessions/<sessionId>`，第二页没有继承认证态。
