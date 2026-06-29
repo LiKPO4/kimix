@@ -386,10 +386,10 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
             {event.content}
           </div>
         )}
-        <div className="mt-2.5 flex justify-end opacity-0 transition-opacity group-hover:opacity-100" style={{ gap: 10 }}>
+        <div className="mt-2.5 flex justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" style={{ gap: 10 }}>
           <button
             onClick={() => trigger(copyText)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg-hover"
+            className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary"
             title="复制"
             aria-label="复制"
           >
@@ -398,7 +398,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
           <button
             onClick={handleResend}
             disabled={currentSessionId ? runningSessionId === currentSessionId || (isLongTaskMessage && !isLatestUserMessage) : false}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg-hover disabled:opacity-30"
+            className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary disabled:opacity-30"
             title="重新发送"
             aria-label="重新发送"
           >
@@ -995,14 +995,14 @@ function AssistantMessageFooter({
       }}
     >
       <div
-        className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover:opacity-100"
-        style={{ gap: 4 }}
+        className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+        style={{ gap: 6 }}
       >
         {showActions && (
           <>
             <button
               onClick={onCopy}
-              className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover"
+              className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary"
               title="复制"
               aria-label="复制"
             >
@@ -1010,8 +1010,8 @@ function AssistantMessageFooter({
             </button>
             <button
               onClick={onCopyAll}
-              className="flex h-6 items-center rounded-md text-[12px] text-text-muted transition-colors hover:bg-bg-hover"
-              style={{ gap: 4, paddingLeft: 7, paddingRight: 7 }}
+              className="kimix-muted-action flex h-8 items-center rounded-md text-[12px] text-text-muted"
+              style={{ gap: 5, paddingLeft: 9, paddingRight: 9 }}
               title="全部复制（含思考）"
               aria-label="全部复制（含思考）"
             >
@@ -1023,8 +1023,8 @@ function AssistantMessageFooter({
         {showActions && hookBadgeEvents.length > 0 && (
           <button
             type="button"
-            className="flex h-6 items-center rounded-md text-[12px] text-text-muted transition-colors hover:bg-bg-hover"
-            style={{ gap: 4, paddingLeft: 7, paddingRight: 7 }}
+            className="kimix-muted-action flex h-8 items-center rounded-md text-[12px] text-text-muted"
+            style={{ gap: 5, paddingLeft: 9, paddingRight: 9 }}
             title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
             aria-label="Hook 命中"
           >

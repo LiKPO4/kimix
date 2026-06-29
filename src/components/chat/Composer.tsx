@@ -2392,16 +2392,21 @@ export function Composer() {
             {imageAttachments.map((attachment) => {
               const isImage = Boolean(attachment.dataUrl);
               return (
-                <button
+                <div
                   key={attachment.id}
-                  type="button"
-                  onClick={() => isImage && setPreviewImage(attachment as ImageAttachment & { dataUrl: string })}
                   className={`kimix-media-thumb group relative overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors ${isImage ? "h-20 w-20" : "h-20 w-[176px]"}`}
-                  title={isImage ? "点击查看图片" : attachment.filePath || attachment.name}
-                  aria-label={`${isImage ? "查看图片" : "附件文件"} ${attachment.name}`}
+                  title={isImage ? undefined : attachment.filePath || attachment.name}
                 >
                   {isImage ? (
-                    <img src={attachment.dataUrl} alt={attachment.name} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setPreviewImage(attachment as ImageAttachment & { dataUrl: string })}
+                      className="block h-full w-full"
+                      title="点击查看图片"
+                      aria-label={`查看图片 ${attachment.name}`}
+                    >
+                      <img src={attachment.dataUrl} alt={attachment.name} className="h-full w-full object-cover" />
+                    </button>
                   ) : (
                     <div className="flex h-full min-w-0 flex-col justify-center text-[var(--kimix-panel-text)]" style={{ gap: 5, paddingLeft: 14, paddingRight: 34 }}>
                       <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
@@ -2420,14 +2425,10 @@ export function Composer() {
                       setImageAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
                       if (previewImage?.id === attachment.id) setPreviewImage(null);
                     }}
-                    className="absolute rounded-full bg-accent-danger/85 text-white opacity-95 transition-colors hover:bg-accent-danger"
+                    className="kimix-inline-icon-action is-roomy absolute z-10 rounded-full bg-accent-danger/85 text-white opacity-95 hover:bg-accent-danger"
                     style={{
                       top: 6,
                       right: 6,
-                      width: 25,
-                      height: 25,
-                      display: "grid",
-                      placeItems: "center",
                       padding: 0,
                       lineHeight: 0,
                     }}
@@ -2436,7 +2437,7 @@ export function Composer() {
                   >
                     <X size={13} style={{ display: "block" }} />
                   </button>
-                </button>
+                </div>
               );
             })}
           </div>

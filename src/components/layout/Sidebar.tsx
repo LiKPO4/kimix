@@ -602,7 +602,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
                             {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                           </button>
-                          <div className="kimix-sidebar-project-row-actions flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100">
+                          <div className="kimix-sidebar-project-row-actions flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100 group-focus-within/project:opacity-100">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -699,55 +699,59 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                   >
                                     {s.title}
                                   </button>
-                                  <span className="flex h-5 min-w-[34px] shrink-0 items-center justify-end text-[12px] text-text-muted">
-                                    {isSessionBusy ? (
-                                      <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
-                                    ) : (
-                                      formatRelativeTime(s.updatedAt)
-                                    )}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void exportSessionMarkdown(s.id);
-                                    }}
-                                    className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
-                                    title="导出 Markdown"
-                                    aria-label="导出 Markdown"
-                                  >
-                                    <FileText size={11} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void exportSessionArchive(s.id, s.title);
-                                    }}
-                                    className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-surface-hover hover:text-text-primary group-hover:opacity-100"
-                                    title="导出 Kimi 调试包"
-                                    aria-label="导出 Kimi 调试包"
-                                  >
-                                    <Download size={11} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void archiveSession(s.id).then((result) => {
-                                        if (!result.success) {
-                                          toast(`归档失败：${result.error}`);
-                                          return;
-                                        }
-                                        if (currentSession?.id === s.id) {
-                                          setCurrentSession(null);
-                                        }
-                                        toast("已归档对话");
-                                      });
-                                    }}
-                                    className="rounded p-0.5 text-text-muted opacity-0 transition-all hover:bg-accent-danger/10 hover:text-accent-danger group-hover:opacity-100"
-                                    title="归档会话"
-                                    aria-label="归档会话"
-                                  >
-                                    <Archive size={11} />
-                                  </button>
+                                  <div className="relative h-7 w-[84px] shrink-0">
+                                    <span className="absolute inset-0 flex items-center justify-end text-[12px] text-text-muted transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+                                      {isSessionBusy ? (
+                                        <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
+                                      ) : (
+                                        formatRelativeTime(s.updatedAt)
+                                      )}
+                                    </span>
+                                    <div className="absolute inset-0 flex items-center justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void exportSessionMarkdown(s.id);
+                                        }}
+                                        className="kimix-inline-icon-action text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                        title="导出 Markdown"
+                                        aria-label="导出 Markdown"
+                                      >
+                                        <FileText size={13} />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void exportSessionArchive(s.id, s.title);
+                                        }}
+                                        className="kimix-inline-icon-action text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                        title="导出 Kimi 调试包"
+                                        aria-label="导出 Kimi 调试包"
+                                      >
+                                        <Download size={13} />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void archiveSession(s.id).then((result) => {
+                                            if (!result.success) {
+                                              toast(`归档失败：${result.error}`);
+                                              return;
+                                            }
+                                            if (currentSession?.id === s.id) {
+                                              setCurrentSession(null);
+                                            }
+                                            toast("已归档对话");
+                                          });
+                                        }}
+                                        className="kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
+                                        title="归档会话"
+                                        aria-label="归档会话"
+                                      >
+                                        <Archive size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                               );
                             })}
@@ -774,7 +778,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.5</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.6</span>
         </button>
       </div>
     </aside>

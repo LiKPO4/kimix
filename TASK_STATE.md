@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-06-29 v2.12.6 前端规整第一轮
+- 当前目标：持久化新一轮前端审计 TodoList，并按顺序完成第一轮交互结构与可达性治理。
+- 已完成：`docs/frontend-polish-plan.md` 新增三轮 TodoList；修复 Composer 附件卡嵌套按钮；侧栏会话操作扩为 28px 固定操作列并移除 `transition-all`；侧栏与消息 hover 操作增加键盘 focus-within 可见性；Composer 子控件恢复全局 focus-visible；版本号同步到 v2.12.6。
+- 边界：窄侧栏会话行保持 32px 密度，三个操作点采用无重叠的 28px 热区；本轮不处理动态数字、图标 cross-fade 或 reduced-motion。
+- 关键文件：`docs/frontend-polish-plan.md`、`src/index.css`、`src/components/layout/Sidebar.tsx`、`src/components/chat/MessageBubble.tsx`、`src/components/chat/Composer.tsx`、版本号三处。
+- 下一步：验证并提交第一轮；随后进入第二轮共享组件统一。
+
 ## 2026-06-29 v2.12.5 Kimi Web 启动就绪门禁
 - 当前目标：修复从 Kimix 打开 Kimi Web 当前会话后，页面刚启动就连续提示 `WebSocket error` 的问题。
 - 根因：现场发现 `~/.kimi-code/server/lock` 指向已退出 PID，58627 无监听；官方 `kimi web --no-open` 可清理陈旧 lock 并重启 daemon，但实际端口就绪约需 7 秒。Kimix 仅固定等待 3 秒且只检查启动命令退出码，导致浏览器早于实时服务打开。

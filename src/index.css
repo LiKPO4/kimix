@@ -515,12 +515,6 @@ body::before {
   outline: none;
 }
 
-.kimix-composer-surface *,
-.kimix-composer-surface *:focus,
-.kimix-composer-surface *:focus-visible {
-  outline: none;
-}
-
 /* ── Layout ── */
 
 .kimix-content-x {
@@ -715,6 +709,31 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-muted-action:active:not(:disabled) {
+  scale: 0.96;
+}
+
+.kimix-inline-icon-action {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover),
+              opacity var(--duration-base) var(--ease-hover),
+              scale var(--duration-fast) var(--ease-hover);
+  transform-origin: center;
+}
+
+.kimix-inline-icon-action.is-roomy {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+
+.kimix-inline-icon-action:active:not(:disabled) {
   scale: 0.96;
 }
 
