@@ -3875,12 +3875,12 @@ ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) => 
     lastOpenedAt: Date.now(),
     gitBranch: await projectService.getGitBranch(p),
   };
-	  await projectService.addRecentProject(project);
-	  return {
-	    success: true,
-	    data: project,
-	  };
-	});
+    await projectService.addRecentProject(project);
+    return {
+      success: true,
+      data: project,
+    };
+  });
 
 ipcMain.handle("project:chooseDirectory", async (_, request?: { defaultPath?: string }) => {
   try {
@@ -3906,8 +3906,8 @@ ipcMain.handle("project:listRecent", async () => {
   let projects = projectService.getRecentProjects();
   if (projects.length === 0) {
     const defaultProject = getDefaultProject();
-	    await projectService.addRecentProject(defaultProject);
-	    projects = projectService.getRecentProjects();
+      await projectService.addRecentProject(defaultProject);
+      projects = projectService.getRecentProjects();
   }
   return { success: true, data: projects };
 });

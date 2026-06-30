@@ -571,10 +571,6 @@ export function AppShell() {
     try {
       const sessionRes = await window.api.startKimiCodeRuntime({
         workDir: project.path,
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
-        planMode: defaultPlanMode,
         additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
       });
       if (!sessionRes.success) {
@@ -1115,15 +1111,15 @@ export function AppShell() {
     if (!liveCurrentSession?.longTask || longTaskControlBusy) return;
     setLongTaskControlBusy(true);
     let latestSession = liveCurrentSession;
-	    try {
-	      if (options?.stopRunning) {
-	        // 长任务需按 activeAgent 选择正确的 runtime，而非总是 executor
-	        const longTask = liveCurrentSession.longTask;
-	        const runtimeSessionId = longTask && longTask.activeAgent === "reviewer" && longTask.reviewerSessionId !== longTask.executorSessionId
-	          ? longTask.reviewerSessionId
-	          : (getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id);
-	        await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
-	      }
+      try {
+        if (options?.stopRunning) {
+          // 长任务需按 activeAgent 选择正确的 runtime，而非总是 executor
+          const longTask = liveCurrentSession.longTask;
+          const runtimeSessionId = longTask && longTask.activeAgent === "reviewer" && longTask.reviewerSessionId !== longTask.executorSessionId
+            ? longTask.reviewerSessionId
+            : (getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id);
+          await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
+        }
       updateSession(liveCurrentSession.id, (session) => {
         if (!session.longTask) return session;
         const nextMeta = {
@@ -1281,9 +1277,6 @@ ${isFinalStep
       const res = await window.api.sendKimiCodePrompt({
         sessionId: latestSession.longTask?.executorSessionId ?? latestSession.runtimeSessionId ?? latestSession.id,
         content: prompt,
-        thinking: defaultThinking,
-        yoloMode: permissionMode === "yolo",
-        autoMode: permissionMode === "auto",
       });
       if (!res.success) throw new Error(res.error);
       showToast(wasRecovering ? "已继续长程任务" : "已启动长程任务");

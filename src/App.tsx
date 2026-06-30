@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
@@ -46,7 +46,7 @@ import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
-import { reportError } from "@/utils/reportError";
+import { logError } from "@/utils/reportError";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -558,11 +558,11 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
         currentStep: latest.longTask.currentStep,
         targetStep: latest.longTask.targetStep,
         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
-	      },
-	    }).catch(logError("persistLongTaskMeta"));
-	  }
+        },
+      }).catch(logError("persistLongTaskMeta"));
+    }
 
-	  const active = useAppStore.getState().currentSession;
+    const active = useAppStore.getState().currentSession;
   if (active?.id === uiSessionId) {
     if (latest) useAppStore.getState().setCurrentSession(latest);
   }
@@ -831,7 +831,7 @@ function applyLongTaskProgressFromLatestOutput(uiSessionId: string, runtimeSessi
         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
       },
       }).catch(logError("persistLongTaskMeta"));
-	    const active = useAppStore.getState().currentSession;
+      const active = useAppStore.getState().currentSession;
     if (active?.id === uiSessionId) useAppStore.getState().setCurrentSession(latest);
   }
   return latest ?? current;
@@ -1006,10 +1006,6 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
   const sessionStore = useSessionStore.getState();
   const sessionRes = await window.api.startKimiCodeRuntime({
     workDir: projectPath,
-    thinking: appState.defaultThinking,
-    yoloMode: appState.permissionMode === "yolo",
-    autoMode: appState.permissionMode === "auto",
-    planMode: appState.defaultPlanMode,
     additionalWorkDirs,
   });
   if (!sessionRes.success) throw new Error(sessionRes.error);
@@ -1050,10 +1046,6 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
   await window.api.sendKimiCodePrompt({
     sessionId: session.id,
     content,
-    thinking: appState.defaultThinking,
-    yoloMode: appState.permissionMode === "yolo",
-    autoMode: appState.permissionMode === "auto",
-    planMode: appState.defaultPlanMode,
   });
 }
 
@@ -1119,34 +1111,34 @@ function App() {
     }
   }, [setRunningSessionId]);
 
-	  useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
-	  const bootstrapSetters = useMemo(() => ({
-	    setTheme,
-	    setThemePalette,
-	    setCustomThemePalette,
-	    setKimiThemePalettes,
-	    setPermissionMode,
-	    setDefaultThinking,
-	    setDefaultPlanMode,
-	    setAdditionalWorkDirs,
-	    setDetailedContext,
-	    setStatusUpdateDisplay,
-	    setSessionRecommendationEnabled,
-	    setSessionRecommendationTurnLimit,
-	    setVoiceShortcut,
-	    setNotificationMode,
-	    setClarificationToolMode,
-	    setFilePreviewExtensions,
-	    setRecentProjects,
-	  }), [
-	    setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
-	    setPermissionMode, setDefaultThinking, setDefaultPlanMode,
-	    setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
-	    setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
-	    setVoiceShortcut, setNotificationMode, setClarificationToolMode,
-	    setFilePreviewExtensions, setRecentProjects,
-	  ]);
-	  useBootstrap(bootstrapSetters);
+    useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
+    const bootstrapSetters = useMemo(() => ({
+      setTheme,
+      setThemePalette,
+      setCustomThemePalette,
+      setKimiThemePalettes,
+      setPermissionMode,
+      setDefaultThinking,
+      setDefaultPlanMode,
+      setAdditionalWorkDirs,
+      setDetailedContext,
+      setStatusUpdateDisplay,
+      setSessionRecommendationEnabled,
+      setSessionRecommendationTurnLimit,
+      setVoiceShortcut,
+      setNotificationMode,
+      setClarificationToolMode,
+      setFilePreviewExtensions,
+      setRecentProjects,
+    }), [
+      setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
+      setPermissionMode, setDefaultThinking, setDefaultPlanMode,
+      setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
+      setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
+      setVoiceShortcut, setNotificationMode, setClarificationToolMode,
+      setFilePreviewExtensions, setRecentProjects,
+    ]);
+    useBootstrap(bootstrapSetters);
 
   useEffect(() => {
     const projectPath = currentProject?.path;
@@ -1163,11 +1155,11 @@ function App() {
       useSessionStore.setState((state) => ({
         sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath, { source: res.source }),
       }));
-	    }).catch(logError("listKimiCodeSessions"));
-	    return () => {
-	      cancelled = true;
-	    };
-	  }, [currentProject?.path]);
+      }).catch(logError("listKimiCodeSessions"));
+      return () => {
+        cancelled = true;
+      };
+    }, [currentProject?.path]);
 
   const syncCurrentSessionFromStore = (uiSessionId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -1340,9 +1332,6 @@ function App() {
 
     const startRes = await window.api.startKimiCodeRuntime({
       workDir: snapshot.projectPath,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
       additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
     });
     if (!startRes.success) throw new Error(startRes.error);
@@ -1374,9 +1363,6 @@ function App() {
     const sendRes = await window.api.sendKimiCodePrompt({
       sessionId: startRes.data.sessionId,
       content: prompt,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
     });
     if (!sendRes.success) throw new Error(sendRes.error);
   };
@@ -1621,9 +1607,6 @@ function App() {
     void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.executorSessionId,
       content: prompt,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -1694,16 +1677,13 @@ function App() {
           currentStep: latestForPrompt.longTask.currentStep,
           targetStep: latestForPrompt.longTask.targetStep,
           reviewedReviewItems: latestForPrompt.longTask.reviewedReviewItems ?? [],
-	        },
-	      }).catch(logError("updateLongTaskState"));
-	    }
-	    setRunningSessionId(uiSessionId);
-	    void window.api.sendKimiCodePrompt({
+          },
+        }).catch(logError("updateLongTaskState"));
+      }
+      setRunningSessionId(uiSessionId);
+      void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.reviewerSessionId,
       content: buildLongTaskReviewPrompt(latestForPrompt),
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -2019,9 +1999,6 @@ function App() {
     void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.executorSessionId,
       content: prompt,
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -2109,10 +2086,6 @@ function App() {
               const startOptions = {
                 workDir: activeProject.path,
                 sessionId: sessionIdToStart,
-                thinking: useAppStore.getState().defaultThinking,
-                yoloMode: useAppStore.getState().permissionMode === "yolo",
-                autoMode: useAppStore.getState().permissionMode === "auto",
-                planMode: useAppStore.getState().defaultPlanMode,
                 additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
               };
               let startRes = await window.api.startKimiCodeRuntime(startOptions);
@@ -2390,9 +2363,6 @@ function App() {
       void (async () => {
         const startRes = await window.api.startKimiCodeRuntime({
           workDir: detail.projectPath,
-          thinking: useAppStore.getState().defaultThinking,
-          yoloMode: useAppStore.getState().permissionMode === "yolo",
-          autoMode: useAppStore.getState().permissionMode === "auto",
           additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
         });
         if (!startRes.success) throw new Error(startRes.error);
@@ -2414,9 +2384,6 @@ function App() {
         const sendRes = await window.api.sendKimiCodePrompt({
           sessionId: startRes.data.sessionId,
           content: prompt,
-          thinking: useAppStore.getState().defaultThinking,
-          yoloMode: useAppStore.getState().permissionMode === "yolo",
-          autoMode: useAppStore.getState().permissionMode === "auto",
         });
         if (!sendRes.success) throw new Error(sendRes.error);
       })().catch((err) => {
@@ -2528,7 +2495,23 @@ function App() {
           return;
         }
       }
+
       const uiSessionId = resolveUiSessionId(payload.sessionId);
+
+      // Server 会话 mid-turn 失败后已迁移到新的 SDK 会话：更新本地 runtime id。
+      if (payload.migratedTo) {
+        updateSession(uiSessionId, (session) => ({
+          ...session,
+          runtimeSessionId: payload.migratedTo,
+          officialSessionId: undefined,
+          updatedAt: Date.now(),
+        }));
+        if (useAppStore.getState().currentSession?.id === uiSessionId) {
+          const latest = useSessionStore.getState().sessions.find((s) => s.id === uiSessionId);
+          if (latest) useAppStore.getState().setCurrentSession(latest);
+        }
+      }
+
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
       // longTask 会话由专属监听器 (unsubscribeLongTaskStatus) 单独处理，通用监听器跳过避免重复执行

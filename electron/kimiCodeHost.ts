@@ -442,6 +442,8 @@ export type KimiCodeEventPayload = {
 export type KimiCodeStatusPayload = {
   sessionId: string;
   status: KimiCodeEngineStatus;
+  /** 当 Server 会话被迁移到 SDK 会话时，提供新的 runtime session id。 */
+  migratedTo?: string;
 };
 
 export type KimiCodeApprovalResult = {
@@ -550,8 +552,19 @@ type StatusSink = (payload: KimiCodeStatusPayload) => void;
 let harness: KimiHarnessLike | null = null;
 const sessions = new Map<string, ManagedSession>();
 const serverSessions = new Map<string, ServerManagedSession>();
+/** Server 会话 mid-turn 失败后迁移到 SDK 会话的映射（old server id -> new sdk id）。 */
+const serverSessionMigrations = new Map<string, string>();
 const serverApprovalIds = new Set<string>();
 const serverQuestionIds = new Set<string>();
+
+function resolveMigratedSessionId(sessionId: string): string {
+  return serverSessionMigrations.get(sessionId) ?? sessionId;
+}
+
+function recordServerSessionMigration(serverSessionId: string, sdkSessionId: string): void {
+  serverSessionMigrations.set(serverSessionId, sdkSessionId);
+}
+
 const serverQuestionRequests = new Map<string, Record<string, unknown>>();
 let serverClient: KimiCodeServerClient | null = null;
 let unsubscribeServerFrames: (() => void) | null = null;
@@ -660,6 +673,34 @@ async function createSdkSession(options: CreateKimiCodeSessionOptions): Promise<
     thinking: options.thinking,
     permission: options.permission ?? "manual",
     planMode: options.planMode ?? false,
+  });
+}
+
+async function createSdkFallbackSession(
+  _serverSessionId: string,
+  serverManaged: ServerManagedSession,
+): Promise<KimiCodeEngineSession> {
+  const sdkHarness = await getHarness();
+  let session: KimiCodeSessionLike;
+  try {
+    session = await sdkHarness.createSession({
+      workDir: serverManaged.workDir,
+      model: serverManaged.model,
+      thinking: serverManaged.thinking,
+      permission: serverManaged.permission,
+      planMode: serverManaged.planMode,
+      additionalDirs: serverManaged.additionalDirs,
+    });
+  } catch (error) {
+    const existingSessionId = getKimiCodeSessionAlreadyExistsId(error);
+    if (!existingSessionId) throw error;
+    session = await sdkHarness.resumeSession({ id: existingSessionId, additionalDirs: serverManaged.additionalDirs });
+  }
+  return registerSession(session, "idle", {
+    model: serverManaged.model,
+    thinking: serverManaged.thinking,
+    permission: serverManaged.permission,
+    planMode: serverManaged.planMode,
   });
 }
 
@@ -795,6 +836,7 @@ export type KimiCodePromptRouteResult = {
 };
 
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<KimiCodePromptRouteResult> {
+  sessionId = resolveMigratedSessionId(sessionId);
   let serverManaged = serverSessions.get(sessionId);
   if (!serverManaged && !sessions.has(sessionId)) {
     await resumeSession(sessionId);
@@ -807,14 +849,17 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
       await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
       return { route: "server" };
     } catch (error) {
-	      console.warn("[KimiCodeServerHost] prompt failed mid-turn; error will propagate to caller without fallback:", error);
-	      // Don't fallback mid-turn: mark server runtime failure, delete server session,
-	      // next turn will naturally switch to the SDK session (still in sessions map).
-	      markServerRuntimeFailure(error);
-	      serverSessions.delete(sessionId);
-	      setStatus(sessionId, "error");
-	      throw error;
-	    }
+      console.warn("[KimiCodeServerHost] prompt failed mid-turn; error will propagate to caller without fallback:", error);
+      // Don't fallback mid-turn: create a fresh SDK session for the next turn,
+      // notify the renderer of the migration, then propagate the error.
+      const fallbackSession = await createSdkFallbackSession(sessionId, serverManaged);
+      recordServerSessionMigration(sessionId, fallbackSession.sessionId);
+      statusSink?.({ sessionId, status: "error", migratedTo: fallbackSession.sessionId });
+      markServerRuntimeFailure(error);
+      serverSessions.delete(sessionId);
+      setStatus(sessionId, "error");
+      throw error;
+    }
   }
   const managed = getManagedSession(sessionId);
   scheduleServerRecovery();
@@ -955,6 +1000,7 @@ export async function askBtw(
 }
 
 export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     await getServerClient().steer(sessionId, input, serverControls(serverManaged));
@@ -984,6 +1030,7 @@ export async function undoHistory(sessionId: string, count: number): Promise<voi
 }
 
 export async function cancel(sessionId: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     const client = getServerClient();
     await client.abort(sessionId);
@@ -1050,6 +1097,7 @@ export async function compactSession(sessionId: string, instruction?: string): P
 }
 
 export async function archiveSession(sessionId: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const managed = serverSessions.get(sessionId);
   if (managed) {
     await getServerClient().archiveSession(sessionId);
@@ -1763,6 +1811,7 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
 }
 
 export async function closeSession(sessionId: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     serverSessions.delete(sessionId);
     await getServerClient().unsubscribe(sessionId);
@@ -2031,50 +2080,14 @@ function markServerRuntimeFailure(error: unknown) {
   scheduleServerRecovery();
 }
 
-async function fallbackServerSessionToSdk(
-  sessionId: string,
-  serverManaged: ServerManagedSession,
-  error: unknown,
-): Promise<ManagedSession> {
-  serverSessions.delete(sessionId);
-  markServerRuntimeFailure(error);
-  const sdkHarness = await getHarness();
-  let session: KimiCodeSessionLike;
-  try {
-    session = await sdkHarness.createSession({
-      id: sessionId,
-      workDir: serverManaged.workDir,
-      model: serverManaged.model,
-      thinking: serverManaged.thinking,
-      permission: serverManaged.permission,
-      planMode: serverManaged.planMode,
-      additionalDirs: serverManaged.additionalDirs,
-    });
-  } catch (createError) {
-    const existingSessionId = getKimiCodeSessionAlreadyExistsId(createError);
-    if (!existingSessionId) throw createError;
-    session = await sdkHarness.resumeSession({ id: existingSessionId, additionalDirs: serverManaged.additionalDirs });
-  }
-  return sessions.get(session.id) ?? (() => {
-    registerSession(session, "running", {
-      model: serverManaged.model,
-      thinking: serverManaged.thinking,
-      permission: serverManaged.permission,
-      planMode: serverManaged.planMode,
-    });
-    const managed = sessions.get(session.id);
-    if (!managed) throw new Error("兼容链路会话注册失败。");
-    return managed;
-  })();
-}
-
 function getServerClient() {
   if (serverClient) return serverClient;
   if (!kimiCodeServerHost.isReady()) throw new Error("Kimi Server 尚未就绪，已保留兼容链路。");
-	  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint, {
-	    onReconnecting: () => kimiCodeServerHost.markReconnecting(),
-	    onRuntimeFailure: markServerRuntimeFailure,
-	  });
+  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint, {
+    onReconnecting: () => kimiCodeServerHost.markReconnecting(),
+    onReconnected: () => kimiCodeServerHost.markReconnected(),
+    onRuntimeFailure: markServerRuntimeFailure,
+  });
   unsubscribeServerFrames = serverClient.onFrame(handleServerFrame);
   return serverClient;
 }

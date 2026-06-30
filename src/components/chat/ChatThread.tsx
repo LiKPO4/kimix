@@ -1222,10 +1222,6 @@ export function ChatThread() {
       sessionId: runtimeSessionId,
       content: lastPrompt.content,
       images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl) : [],
-      thinking: defaultThinking,
-      yoloMode: permissionMode === "yolo",
-      autoMode: permissionMode === "auto",
-      planMode: defaultPlanMode,
     });
     if (!res.success) {
       setRunningSessionId(null);
@@ -1318,7 +1314,7 @@ export function ChatThread() {
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
 
-	  useEffect(() => {
+    useEffect(() => {
     const pending = pendingFocusEventRef.current;
     if (!pending || !session || pending.sessionId !== session.id) return;
     window.requestAnimationFrame(() => {

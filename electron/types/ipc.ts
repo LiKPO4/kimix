@@ -2030,6 +2030,8 @@ export type KimiCodeEventPayload = {
 export type KimiCodeStatusPayload = {
   sessionId: string;
   status: KimiCodeEngineStatus;
+  /** 当 Server 会话被迁移到 SDK 会话时，提供新的 runtime session id。 */
+  migratedTo?: string;
 };
 
 export type LoggerWriteRequest = {

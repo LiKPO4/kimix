@@ -124,6 +124,16 @@ export class KimiCodeServerHost {
     };
   }
 
+  /** WebSocket 重连成功后恢复状态，使 isReady() 重新可用。 */
+  markReconnected() {
+    const nextState = this.child ? "managed" : "attached";
+    this.status = {
+      ...this.status,
+      state: nextState,
+      error: undefined,
+    };
+  }
+
   markFallback(error: unknown) {
     this.child?.kill();
     this.child = null;

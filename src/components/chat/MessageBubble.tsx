@@ -350,10 +350,6 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
         sessionId: runtimeSessionId,
         content: contentWithFileAttachments(event.content, images),
         images: promptImages(images),
-        thinking: appState.defaultThinking,
-        yoloMode: appState.permissionMode === "yolo",
-        autoMode: appState.permissionMode === "auto",
-        planMode: appState.defaultPlanMode,
       });
       if (!res.success) throw new Error(res.error);
     } catch (err) {

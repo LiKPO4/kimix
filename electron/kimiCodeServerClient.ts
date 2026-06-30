@@ -5,6 +5,7 @@ export type ServerPromptPart =
 type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
 type ServerClientOptions = {
   onReconnecting?: () => void;
+  onReconnected?: () => void;
   onRuntimeFailure?: (error: Error) => void;
   reconnectFailureThreshold?: number;
 };
@@ -207,9 +208,9 @@ export type ServerSnapshot = {
   pending_questions?: unknown[];
 };
 
-	const CONTROL_TIMEOUT_MS = 5_000;
-	const PROMPT_TIMEOUT_MS = 120_000;
-	const UPLOAD_TIMEOUT_MS = 300_000;
+  const CONTROL_TIMEOUT_MS = 5_000;
+  const PROMPT_TIMEOUT_MS = 120_000;
+  const UPLOAD_TIMEOUT_MS = 300_000;
 
 export function isKimiCodeServerSessionRoutingEnabled(
   env: NodeJS.ProcessEnv = process.env,
@@ -866,6 +867,7 @@ export class KimiCodeServerClient {
     await this.handleAckResync(ack);
     this.runtimeFailureNotified = false;
     if (reconnecting) {
+      this.options.onReconnected?.();
       for (const sessionId of this.subscribed) await this.recoverSnapshot(sessionId);
     }
   }
@@ -1010,16 +1012,14 @@ export class KimiCodeServerClient {
       headers: { accept: "application/json", ...(hasJsonBody ? { "content-type": "application/json" } : {}) },
     });
     if (!response.ok) {
-	      const err = new Error(`${pathname}: HTTP ${response.status}`);
-	      (err as Record<string, unknown>).statusCode = response.status;
-	      throw err;
-	    }
-	    const envelope = await response.json() as ServerEnvelope<T>;
-	    if (envelope.code !== 0) {
-	      const err = new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
-	      (err as Record<string, unknown>).statusCode = envelope.code;
-	      throw err;
-	    }
+      const err = Object.assign(new Error(`${pathname}: HTTP ${response.status}`), { statusCode: response.status });
+      throw err;
+    }
+    const envelope = await response.json() as ServerEnvelope<T>;
+    if (envelope.code !== 0) {
+      const err = Object.assign(new Error(`${pathname}: ${envelope.msg ?? envelope.code}`), { statusCode: envelope.code });
+      throw err;
+    }
     return envelope.data;
   }
 }

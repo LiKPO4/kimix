@@ -202,9 +202,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setWorkspaceView("chat");
       setCurrentSession(session);
       setExpandedProjectIds((current) => new Set([...current, project.id]));
-	    } catch (err) {
-	      reportError(err, { context: "createSessionForProject", userVisible: true });
-	    } finally {
+      } catch (err) {
+        reportError(err, { context: "createSessionForProject", userVisible: true });
+      } finally {
       setCreatingSessionProjectPath(null);
     }
   };
@@ -812,7 +812,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.19</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.20</span>
         </button>
       </div>
     </aside>
