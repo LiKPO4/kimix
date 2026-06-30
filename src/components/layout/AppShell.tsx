@@ -1114,11 +1114,15 @@ export function AppShell() {
     if (!liveCurrentSession?.longTask || longTaskControlBusy) return;
     setLongTaskControlBusy(true);
     let latestSession = liveCurrentSession;
-    try {
-      if (options?.stopRunning) {
-        const runtimeSessionId = getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id;
-        await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
-      }
+	    try {
+	      if (options?.stopRunning) {
+	        // 长任务需按 activeAgent 选择正确的 runtime，而非总是 executor
+	        const longTask = liveCurrentSession.longTask;
+	        const runtimeSessionId = longTask && longTask.activeAgent === "reviewer" && longTask.reviewerSessionId !== longTask.executorSessionId
+	          ? longTask.reviewerSessionId
+	          : (getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id);
+	        await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
+	      }
       updateSession(liveCurrentSession.id, (session) => {
         if (!session.longTask) return session;
         const nextMeta = {
