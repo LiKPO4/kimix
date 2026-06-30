@@ -115,6 +115,15 @@ export class KimiCodeServerHost {
     this.status = { ...this.status, routing };
   }
 
+  /** 标记 WebSocket 连接断开正在重连，不清除 server sessions。 */
+  markReconnecting() {
+    this.status = {
+      ...this.status,
+      state: "starting",
+      error: "Kimi Server 连接断开，正在重连…",
+    };
+  }
+
   markFallback(error: unknown) {
     this.child?.kill();
     this.child = null;

@@ -2071,9 +2071,10 @@ async function fallbackServerSessionToSdk(
 function getServerClient() {
   if (serverClient) return serverClient;
   if (!kimiCodeServerHost.isReady()) throw new Error("Kimi Server 尚未就绪，已保留兼容链路。");
-  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint, {
-    onRuntimeFailure: markServerRuntimeFailure,
-  });
+	  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint, {
+	    onReconnecting: () => kimiCodeServerHost.markReconnecting(),
+	    onRuntimeFailure: markServerRuntimeFailure,
+	  });
   unsubscribeServerFrames = serverClient.onFrame(handleServerFrame);
   return serverClient;
 }

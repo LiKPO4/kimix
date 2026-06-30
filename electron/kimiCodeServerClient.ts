@@ -4,6 +4,7 @@ export type ServerPromptPart =
 
 type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
 type ServerClientOptions = {
+  onReconnecting?: () => void;
   onRuntimeFailure?: (error: Error) => void;
   reconnectFailureThreshold?: number;
 };
@@ -206,7 +207,9 @@ export type ServerSnapshot = {
   pending_questions?: unknown[];
 };
 
-const CONTROL_TIMEOUT_MS = 5_000;
+	const CONTROL_TIMEOUT_MS = 5_000;
+	const PROMPT_TIMEOUT_MS = 120_000;
+	const UPLOAD_TIMEOUT_MS = 300_000;
 
 export function isKimiCodeServerSessionRoutingEnabled(
   env: NodeJS.ProcessEnv = process.env,
@@ -479,7 +482,7 @@ export class KimiCodeServerClient {
     const form = new FormData();
     form.append("name", input.name);
     form.append("file", new Blob([Buffer.from(input.data, "base64")], { type: input.mediaType }), input.name);
-    return this.request("/api/v1/files", { method: "POST", body: form });
+    return this.request("/api/v1/files", { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
   }
 
   async listSkills(sessionId: string): Promise<ServerSkill[]> {
@@ -643,6 +646,7 @@ export class KimiCodeServerClient {
     const result = await this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
       method: "POST",
       body: JSON.stringify({ content, ...controls }),
+      timeoutMs: PROMPT_TIMEOUT_MS,
     });
     await this.waitFor((frame) => {
       if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
@@ -660,10 +664,12 @@ export class KimiCodeServerClient {
     const queued = await this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
       method: "POST",
       body: JSON.stringify({ content, ...controls }),
+      timeoutMs: PROMPT_TIMEOUT_MS,
     });
     await this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
       method: "POST",
       body: JSON.stringify({ prompt_ids: [queued.prompt_id] }),
+      timeoutMs: PROMPT_TIMEOUT_MS,
     });
     return queued;
   }
@@ -893,7 +899,11 @@ export class KimiCodeServerClient {
       return;
     }
     this.queued.push(frame);
-    if (this.queued.length > 2_000) this.queued.splice(0, this.queued.length - 2_000);
+    if (this.queued.length > 2_000) {
+      const dropped = this.queued.length - 2_000;
+      this.queued.splice(0, dropped);
+      console.warn(`[KimiCodeServerClient] frame queue overflow: dropped ${dropped} oldest frames`);
+    }
   }
 
   private handleSocketClose(socket: WebSocket) {
@@ -901,6 +911,10 @@ export class KimiCodeServerClient {
     this.socket = null;
     this.connected = null;
     if (this.closing || this.subscribed.size === 0) return;
+    // 首次重连立即通知前端，不等 3 次失败后再报
+    if (this.reconnectAttempt === 0) {
+      this.options.onReconnecting?.();
+    }
     this.scheduleReconnect();
   }
 
@@ -984,11 +998,13 @@ export class KimiCodeServerClient {
     });
   }
 
-  private async request<T>(pathname: string, options?: RequestInit): Promise<T> {
-    const signal = options?.signal ?? AbortSignal.timeout(CONTROL_TIMEOUT_MS);
-    const hasJsonBody = Boolean(options?.body) && !(options?.body instanceof FormData);
+  private async request<T>(pathname: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
+    const { timeoutMs, ...fetchOptions } = options ?? {};
+    const timeout = timeoutMs ?? CONTROL_TIMEOUT_MS;
+    const signal = fetchOptions.signal ?? AbortSignal.timeout(timeout);
+    const hasJsonBody = Boolean(fetchOptions.body) && !(fetchOptions.body instanceof FormData);
     const response = await fetch(`${this.endpoint}${pathname}`, {
-      ...options,
+      ...fetchOptions,
       signal,
       headers: { accept: "application/json", ...(hasJsonBody ? { "content-type": "application/json" } : {}) },
     });
