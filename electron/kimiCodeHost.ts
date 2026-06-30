@@ -1764,15 +1764,10 @@ export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeCon
   return sdkHarness.setConfig(patch);
 }
 
-function normalizeCatalogMaxContextSize(providerId: string, baseUrl: string | null, modelId: string, value: number | null) {
+function normalizeCatalogMaxContextSize(value: number | null) {
   const fallback = 262144;
   const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  const signature = `${providerId} ${baseUrl ?? ""} ${modelId}`.toLowerCase();
-  // DeepSeek V4 系列上下文为 1M；V3/chat/coder 等旧系列为 64K。
-  let limit = 1048576;
-  if (/deepseek-v4/.test(signature)) limit = 1000000;
-  else if (signature.includes("deepseek")) limit = 65536;
-  return Math.max(1, Math.min(limit, input));
+  return Math.max(1, input);
 }
 
 export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntry[]> {
@@ -1794,7 +1789,7 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
           return {
             id: model.id,
             name: typeof model.name === "string" && model.name.length > 0 ? model.name : null,
-            maxContextSize: normalizeCatalogMaxContextSize(providerId, baseUrl, model.id, rawMaxContextSize),
+            maxContextSize: normalizeCatalogMaxContextSize(rawMaxContextSize),
             thinking: Boolean(model.capability?.thinking),
             toolUse: model.capability?.tool_use !== false,
           };

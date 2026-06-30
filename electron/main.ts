@@ -1152,19 +1152,10 @@ function setTopLevelTomlString(raw: string, key: string, value: string) {
 
 type SavedOpenAiProviderConfig = z.infer<typeof SaveOpenAiProviderConfigSchema> & { apiKey: string };
 
-function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
-  const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
-  // DeepSeek V4 系列上下文为 1M；V3/chat/coder 等旧系列为 64K。
-  if (/deepseek-v4/.test(signature)) return 1000000;
-  if (signature.includes("deepseek")) return 65536;
-  return 1048576;
-}
-
-function normalizeOpenAiProviderContextSize(config: Pick<z.infer<typeof OpenAiProviderBaseConfigSchema>, "providerName" | "baseUrl" | "model" | "maxContextSize">) {
+function normalizeOpenAiProviderContextSize(config: Pick<z.infer<typeof OpenAiProviderBaseConfigSchema>, "maxContextSize">) {
   const fallback = 262144;
   const input = typeof config.maxContextSize === "number" && Number.isFinite(config.maxContextSize) ? config.maxContextSize : fallback;
-  const limit = getOpenAiProviderContextLimit(config.providerName, config.baseUrl, config.model);
-  return Math.max(1, Math.min(limit, input));
+  return Math.max(1, input);
 }
 
 function isDeepSeekModelConfig(summary: ReturnType<typeof readKimiModelConfig>, modelAlias?: string | null) {

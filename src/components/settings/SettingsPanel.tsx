@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.12.22";
+const KIMIX_VERSION = "2.12.23";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -157,19 +157,10 @@ const settingsStatusCache: {
   kimiEnvironment: null,
 };
 
-function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
-  const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
-  // DeepSeek V4 系列上下文为 1M；V3/chat/coder 等旧系列为 64K。
-  if (/deepseek-v4/.test(signature)) return 1000000;
-  if (signature.includes("deepseek")) return 65536;
-  return 1048576;
-}
-
-function normalizeOpenAiProviderContextSize(providerName: string, baseUrl: string, model: string, value: number | null | undefined) {
+function normalizeOpenAiProviderContextSize(value: number | null | undefined) {
   const fallback = 262144;
   const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  const limit = getOpenAiProviderContextLimit(providerName, baseUrl, model);
-  return Math.max(1, Math.min(limit, input));
+  return Math.max(1, input);
 }
 
 function normalizeSettingsSectionOrder(order: unknown[]): SettingsSectionId[] {
@@ -732,7 +723,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     if (!contextText || !Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1048576) {
       return null;
     }
-    const normalizedContextSize = normalizeOpenAiProviderContextSize(providerDraft.providerName, providerDraft.baseUrl, providerDraft.model, contextSize);
+    const normalizedContextSize = normalizeOpenAiProviderContextSize(contextSize);
     return {
       providerName: providerDraft.providerName.trim(),
       modelAlias: providerDraft.modelAlias.trim(),
@@ -758,7 +749,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   };
 
   const fillProviderDraftFromCatalog = (provider: KimiProviderCatalogEntry, model: KimiProviderCatalogEntry["models"][number]) => {
-    const normalizedContextSize = normalizeOpenAiProviderContextSize(provider.providerId, provider.baseUrl ?? "", model.id, model.maxContextSize);
+    const normalizedContextSize = normalizeOpenAiProviderContextSize(model.maxContextSize);
     setProviderDraft((current) => ({
       ...current,
       providerName: provider.providerId,
@@ -767,8 +758,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       model: model.id,
       maxContextSize: String(normalizedContextSize),
     }));
-    const capped = typeof model.maxContextSize === "number" && model.maxContextSize > normalizedContextSize;
-    setProviderMessage(`已从官方 catalog 填入 ${provider.providerId}/${model.id}${capped ? `，Context 已按服务商上限收敛到 ${normalizedContextSize}` : ""}，请补 API Key 后测试或保存。`);
+    setProviderMessage(`已从官方 catalog 填入 ${provider.providerId}/${model.id}，请补 API Key 后测试或保存。`);
   };
 
   const handleLoadProviderCatalog = async () => {
