@@ -3847,7 +3847,7 @@ async function restoreLastContext() {
       }
     : recentProject ?? defaultProject;
 
-  projectService.addRecentProject(project);
+  await projectService.addRecentProject(project);
 
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send("kimix:bootstrap", { project });
@@ -3875,12 +3875,12 @@ ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) => 
     lastOpenedAt: Date.now(),
     gitBranch: await projectService.getGitBranch(p),
   };
-  projectService.addRecentProject(project);
-  return {
-    success: true,
-    data: project,
-  };
-});
+	  await projectService.addRecentProject(project);
+	  return {
+	    success: true,
+	    data: project,
+	  };
+	});
 
 ipcMain.handle("project:chooseDirectory", async (_, request?: { defaultPath?: string }) => {
   try {
@@ -3906,8 +3906,8 @@ ipcMain.handle("project:listRecent", async () => {
   let projects = projectService.getRecentProjects();
   if (projects.length === 0) {
     const defaultProject = getDefaultProject();
-    projectService.addRecentProject(defaultProject);
-    projects = projectService.getRecentProjects();
+	    await projectService.addRecentProject(defaultProject);
+	    projects = projectService.getRecentProjects();
   }
   return { success: true, data: projects };
 });
@@ -3967,7 +3967,7 @@ ipcMain.handle("project:addRecent", async (_, project: unknown) => {
   if (!parsed.success) {
     return { success: false, error: "Invalid project data" };
   }
-  projectService.addRecentProject(parsed.data);
+  await projectService.addRecentProject(parsed.data);
   return { success: true, data: undefined };
 });
 
@@ -3975,20 +3975,20 @@ ipcMain.handle("project:removeRecent", async (_, id: unknown) => {
   if (typeof id !== "string") {
     return { success: false, error: "Invalid project id" };
   }
-  projectService.removeRecentProject(id);
+  await projectService.removeRecentProject(id);
   return { success: true, data: undefined };
 });
 
 ipcMain.handle("project:setPinned", async (_, request: unknown) => {
   const parsed = z.object({ id: z.string().min(1), pinned: z.boolean() }).safeParse(request);
   if (!parsed.success) return { success: false, error: "Invalid pin request" };
-  return { success: true, data: projectService.setProjectPinned(parsed.data.id, parsed.data.pinned) };
+  return { success: true, data: await projectService.setProjectPinned(parsed.data.id, parsed.data.pinned) };
 });
 
 ipcMain.handle("project:reorder", async (_, request: unknown) => {
   const parsed = z.object({ orderedIds: z.array(z.string()) }).safeParse(request);
   if (!parsed.success) return { success: false, error: "Invalid reorder request" };
-  return { success: true, data: projectService.reorderProjects(parsed.data.orderedIds) };
+  return { success: true, data: await projectService.reorderProjects(parsed.data.orderedIds) };
 });
 
 ipcMain.handle("longTasks:list", async (_, request: unknown) => {
@@ -4065,7 +4065,7 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     if (!fs.existsSync(project.path)) {
       return { success: false, error: "Project path does not exist" };
     }
-    projectService.addRecentProject({ ...project, lastOpenedAt: Date.now() });
+    await projectService.addRecentProject({ ...project, lastOpenedAt: Date.now() });
     const title = (parsed.data.title?.trim() || initialRequest.trim().split(/\r?\n/)[0] || "长程任务").slice(0, 80);
     const thinking = parsed.data.thinking ?? true;
     const yoloMode = parsed.data.yoloMode ?? false;

@@ -668,6 +668,7 @@ export function AppShell() {
       ? (currentIndex - 1 + sortedSessions.length) % sortedSessions.length
       : (currentIndex + 1) % sortedSessions.length;
     setCurrentSession(sortedSessions[nextIndex]);
+    setWorkspaceView("chat");
   };
 
   const handleCheckUpdates = async () => {

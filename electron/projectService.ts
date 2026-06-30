@@ -5,6 +5,14 @@ import { exec, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { GitGraphEntry, Project } from "./types/ipc";
 
+/** 串行 mutex — 确保并发读写不相互覆盖。 */
+let projectOpQueue: Promise<unknown> = Promise.resolve();
+function serialWrite<T>(fn: () => T): Promise<T> {
+  const next = projectOpQueue.then(fn, () => fn());
+  projectOpQueue = next.catch(() => {});
+  return next;
+}
+
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -84,52 +92,57 @@ export function getRecentProjects(): Project[] {
   return readProjects();
 }
 
-export function addRecentProject(project: Project): void {
-  const existing = readProjects();
-  const prior = existing.find((p) => p.path === project.path);
-  const filtered = existing.filter((p) => p.path !== project.path);
-  if (prior) {
-    // Re-opening a known project: keep its place, pin state and sort order — don't
-    // yank it to the top. Only refresh metadata (name, lastOpenedAt, gitBranch).
-    const merged = normalizeProject({
-      ...prior,
-      ...project,
-      pinned: prior.pinned,
-      sortOrder: prior.sortOrder,
-    });
-    writeProjects(sortProjects([...filtered, merged]).slice(0, 20));
-    return;
-  }
-  // Brand-new project: append after existing ones (new sortOrder at the end of its region).
-  const maxOrder = existing.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
-  const added = normalizeProject({ ...project, pinned: project.pinned === true, sortOrder: maxOrder + 1 });
-  writeProjects(sortProjects([...filtered, added]).slice(0, 20));
+export async function addRecentProject(project: Project): Promise<void> {
+  await serialWrite(() => {
+    const existing = readProjects();
+    const prior = existing.find((p) => p.path === project.path);
+    const filtered = existing.filter((p) => p.path !== project.path);
+    if (prior) {
+      const merged = normalizeProject({
+        ...prior,
+        ...project,
+        pinned: prior.pinned,
+        sortOrder: prior.sortOrder,
+      });
+      writeProjects(sortProjects([...filtered, merged]).slice(0, 20));
+      return;
+    }
+    const maxOrder = existing.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
+    const added = normalizeProject({ ...project, pinned: project.pinned === true, sortOrder: maxOrder + 1 });
+    writeProjects(sortProjects([...filtered, added]).slice(0, 20));
+  });
 }
 
-export function removeRecentProject(id: string): void {
-  const existing = readProjects();
-  writeProjects(existing.filter((p) => p.id !== id));
+export async function removeRecentProject(id: string): Promise<void> {
+  await serialWrite(() => {
+    const existing = readProjects();
+    writeProjects(existing.filter((p) => p.id !== id));
+  });
 }
 
-export function setProjectPinned(id: string, pinned: boolean): Project[] {
-  const existing = readProjects();
-  const updated = existing.map((p) => (p.id === id ? { ...p, pinned } : p));
-  const sorted = sortProjects(updated);
-  writeProjects(sorted);
-  return sorted;
+export async function setProjectPinned(id: string, pinned: boolean): Promise<Project[]> {
+  return serialWrite(() => {
+    const existing = readProjects();
+    const updated = existing.map((p) => (p.id === id ? { ...p, pinned } : p));
+    const sorted = sortProjects(updated);
+    writeProjects(sorted);
+    return sorted;
+  });
 }
 
 /** Persist an explicit ordering by assigning sortOrder from the given id sequence. */
-export function reorderProjects(orderedIds: string[]): Project[] {
-  const existing = readProjects();
-  const orderIndex = new Map(orderedIds.map((id, index) => [id, index]));
-  const updated = existing.map((p) => {
-    const idx = orderIndex.get(p.id);
-    return idx === undefined ? p : { ...p, sortOrder: idx };
+export async function reorderProjects(orderedIds: string[]): Promise<Project[]> {
+  return serialWrite(() => {
+    const existing = readProjects();
+    const orderIndex = new Map(orderedIds.map((id, index) => [id, index]));
+    const updated = existing.map((p) => {
+      const idx = orderIndex.get(p.id);
+      return idx === undefined ? p : { ...p, sortOrder: idx };
+    });
+    const sorted = sortProjects(updated);
+    writeProjects(sorted);
+    return sorted;
   });
-  const sorted = sortProjects(updated);
-  writeProjects(sorted);
-  return sorted;
 }
 
 export async function getGitBranch(projectPath: string): Promise<string | undefined> {

@@ -1066,7 +1066,7 @@ export function LongTaskInspectorPanel({
                 {rightCardDragHandle("longTaskStatus", "当前状态")}
               </div>
               <div className="mt-2 text-[14px] leading-6 text-text-primary">
-                长程任务 · {longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage}
+                长程任务 · {longTaskMeta.stage === "reviewing" ? "审查中" : longTaskMeta.stage}
               </div>
               <div className="mt-1 text-[13px] leading-5 text-text-muted">
                 步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}

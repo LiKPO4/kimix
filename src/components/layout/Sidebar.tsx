@@ -57,6 +57,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
@@ -750,6 +751,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                             }
                                             if (currentSession?.id === s.id) {
                                               setCurrentSession(null);
+                                            }
+                                            // 归档运行中会话时清理 runningSessionId
+                                            if (runningSessionId === s.id || runningSessionId === s.runtimeSessionId) {
+                                              setRunningSessionId(null);
                                             }
                                             toast("已归档对话");
                                           });
