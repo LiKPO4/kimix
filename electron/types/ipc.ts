@@ -1136,6 +1136,20 @@ export type PrepareKimiSkillResponse = {
   error: string;
 };
 
+export type KimiThemeSourceDeleteRequest = {
+  path: string;
+}
+
+export type KimiThemeSourceDeleteResponse = {
+  success: true;
+  data: {
+    path: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type SyncKimiAgentSkillsResponse = {
   success: true;
   data: {

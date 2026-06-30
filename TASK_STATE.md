@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-30 v2.12.12 主题删除双动作
+- 当前目标：将主题删除拆为“仅从 Kimix 移除”和“同步删除 Kimi Code 主题源文件”。
+- 已完成：主题卡片操作列新增断开与垃圾桶两个图标；仅移除会保留源文件并提示再次扫描会恢复；源文件删除先显示名称、绝对路径和不可逆确认，成功后同步移除 Kimix 记录。
+- 安全边界：新增受限 IPC，只允许删除当前 `KIMI_CODE_HOME/themes` 目录的直接 `.json` 子文件；拒绝目录外路径、嵌套路径、非 JSON 和非文件目标；删除后清空旧主题预览缓存。
+- 关键文件：`electron/kimiThemeFiles.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/components/settings/SettingsPanel.tsx`、`src/index.css`。
+- 验收：主题删除/同步局部测试 5/5 通过；全量测试 35 文件、267/267 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过；`git diff --check` 通过（仅 CRLF 提示）。`pnpm exec tsc --noEmit` 仍被项目既有类型基线错误阻塞，本轮新增文件未出现在报错列表。
+- 下一步：窄范围提交，由用户验收 v2.12.12 两种删除动作。
+
 ## 2026-06-30 v2.12.11 主题扫描清理失效记录
 - 当前目标：修复 Agent 删除主题 JSON 后，Kimix 再扫描仍显示对应主题的问题。
 - 根因：`scanOfficialKimiThemes()` 只用 `upsertKimiThemePresets()` 追加/更新扫描结果，不会移除 `~/.kimix/settings.json` 中已经失去源文件的旧主题记录；不是官方重新下载主题。

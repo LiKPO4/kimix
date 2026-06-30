@@ -11,6 +11,7 @@ import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
+import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
@@ -6090,6 +6091,20 @@ ipcMain.handle("kimi-code:openWebServer", async (_, request: unknown) => {
       await shell.openExternal(`${baseUrl}#token=${encodeURIComponent(token)}`);
     }
     return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:deleteThemeSource", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { path?: unknown } : {};
+    const requestedPath = typeof req.path === "string" ? req.path.trim() : "";
+    if (!requestedPath) return { success: false, error: "Missing theme source path" };
+    const themesDir = path.join(resolveKimiShareDir(), "themes");
+    const deletedPath = deleteKimiThemeSourceFile(themesDir, requestedPath);
+    kimiThemeImportPreviewCache.clear();
+    return { success: true, data: { path: deletedPath } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

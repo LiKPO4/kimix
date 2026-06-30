@@ -1393,21 +1393,43 @@ button.bg-accent-primary:disabled:hover,
   min-width: 0;
 }
 
-.kimix-settings-palette-delete {
+.kimix-settings-palette-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 34px;
+  min-height: 64px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.kimix-settings-palette-action {
   display: flex;
   width: 34px;
   min-height: 64px;
   align-items: center;
   justify-content: center;
-  border-left: 1px solid var(--border-subtle);
+  border: 0;
+  background: transparent;
   color: var(--text-muted);
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover);
 }
 
-.kimix-settings-palette-delete:hover {
+.kimix-settings-palette-action + .kimix-settings-palette-action {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.kimix-settings-palette-action:hover {
   background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.kimix-settings-palette-action.is-danger:hover {
   color: var(--accent-danger);
+}
+
+.kimix-settings-palette-action:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .kimix-settings-palette-copy {

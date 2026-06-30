@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.12.11";
+const KIMIX_VERSION = "2.12.12";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -459,6 +459,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
   const [themeScanLoading, setThemeScanLoading] = useState(false);
   const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
+  const [themeDeleteBusyId, setThemeDeleteBusyId] = useState<string | null>(null);
   const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(settingsStatusCache.modelConfig);
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
@@ -1054,6 +1055,36 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     ].filter(Boolean).join(" "));
   };
 
+  const removeThemeFromKimix = (id: string, label: string) => {
+    removeKimiThemePalette(id);
+    setThemeScanMessage(`已从 Kimix 移除 ${label}。主题源文件仍保留，再次扫描会重新出现。`);
+  };
+
+  const deleteThemeSource = async (id: string, label: string, sourcePath: string) => {
+    const confirmed = window.confirm([
+      `永久删除主题源文件「${label}」？`,
+      "",
+      sourcePath,
+      "",
+      "删除后 Kimi Code 与 Kimix 都无法再次扫描到该主题。此操作不可撤销。",
+    ].join("\n"));
+    if (!confirmed) return;
+    setThemeDeleteBusyId(id);
+    try {
+      const result = await window.api.deleteKimiThemeSource({ path: sourcePath });
+      if (!result.success) {
+        setThemeScanMessage(`删除主题源文件失败：${result.error}`);
+        return;
+      }
+      removeKimiThemePalette(id);
+      setThemeScanMessage(`已删除主题源文件并从 Kimix 移除 ${label}。`);
+    } catch (error) {
+      setThemeScanMessage(`删除主题源文件失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setThemeDeleteBusyId(null);
+    }
+  };
+
   const activeKimiTheme = themePalette.startsWith("kimi:")
     ? kimiThemePalettes.find((preset) => kimiThemePaletteId(preset.id) === themePalette)
     : null;
@@ -1235,7 +1266,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "dark", label: "深色", icon: Moon },
     { value: "system", label: "跟随系统", icon: Monitor },
   ];
-  const paletteOptions: { value: ThemePaletteId; label: string; description: string; colors: ThemePaletteColors; kimiId?: string }[] = [
+  const paletteOptions: { value: ThemePaletteId; label: string; description: string; colors: ThemePaletteColors; kimiId?: string; sourcePath?: string }[] = [
     ...THEME_PALETTES.map((palette) => ({
       value: palette.id,
       label: palette.label,
@@ -1258,6 +1289,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         accent: preset.palette.accent,
       },
       kimiId: preset.id,
+      sourcePath: preset.path,
     })),
   ];
 
@@ -1373,19 +1405,38 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         </span>
                       </button>
                       {palette.kimiId && (
-                        <button
-                          type="button"
-                          className="kimix-settings-palette-delete"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            removeKimiThemePalette(palette.kimiId!);
-                            setThemeScanMessage(`已从 Kimix 移除 ${palette.label}。官方主题文件仍保留。`);
-                          }}
-                          title={`从 Kimix 移除 ${palette.label}`}
-                          aria-label={`从 Kimix 移除 ${palette.label}`}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="kimix-settings-palette-actions">
+                          <button
+                            type="button"
+                            className="kimix-settings-palette-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              removeThemeFromKimix(palette.kimiId!, palette.label);
+                            }}
+                            disabled={themeDeleteBusyId === palette.kimiId}
+                            title={`仅从 Kimix 移除 ${palette.label}`}
+                            aria-label={`仅从 Kimix 移除 ${palette.label}`}
+                          >
+                            <Unlink size={14} />
+                          </button>
+                          {palette.sourcePath && (
+                            <button
+                              type="button"
+                              className="kimix-settings-palette-action is-danger"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void deleteThemeSource(palette.kimiId!, palette.label, palette.sourcePath!);
+                              }}
+                              disabled={themeDeleteBusyId === palette.kimiId}
+                              title={`删除源文件 ${palette.label}`}
+                              aria-label={`删除主题源文件 ${palette.label}`}
+                            >
+                              {themeDeleteBusyId === palette.kimiId
+                                ? <RefreshCw size={14} className="animate-spin" />
+                                : <Trash2 size={14} />}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}

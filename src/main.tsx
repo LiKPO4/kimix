@@ -406,6 +406,7 @@ function installBrowserPreviewApi() {
     }),
     updateKimiCli: (): Promise<UpdateKimiCliResponse> => fail("更新 Kimi Code"),
     listKimiCodeSlashCommands: (): Promise<ListSlashCommandsResponse> => Promise.resolve({ success: true, data: [] }),
+    deleteKimiThemeSource: () => fail("删除 Kimi 主题源文件"),
     listKimiCodeHistorySessions: (): Promise<ListSessionsResponse> => Promise.resolve({ success: true, data: [] }),
     exportKimiCodeSession: (): Promise<ExportSessionResponse> => fail("导出 Kimi Debug ZIP"),
     exportSessionBackup: (): Promise<ExportSessionBackupResponse> => fail("导出 Kimix 会话快照"),

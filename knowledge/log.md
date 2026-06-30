@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-30
+* **Safe bidirectional theme deletion**: Split local preset removal from destructive source deletion and documented the confirmation plus main-process path guard required before deleting a Kimi theme JSON.
 * **Theme scan reconciliation**: Documented that imported Kimi theme presets mirror their source directory and must remove stale cached records when source JSON files are deleted, without deleting presets from other sources.
 * **Visible slash command invariant**: Slash commands handled outside the generic prompt path now append the original command as an optimistic user message before dispatch; matching official Skill echoes are deduplicated so commands remain visible without duplicate bubbles.
 * **Official slash routing**: Confirmed Kimi Code 0.20.2 exposes `custom-theme`, `import-from-cc-codex`, and `mcp-config` as built-in user-only Skills and documented that Kimix must activate Skills and dispatch Server-supported session commands through official APIs before generic prompt submission; Goal, Swarm, and reload remain SDK-only compatibility boundaries.
