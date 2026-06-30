@@ -2492,6 +2492,8 @@ function App() {
       const uiSessionId = resolveUiSessionId(payload.sessionId);
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
+      // longTask 会话由专属监听器 (unsubscribeLongTaskStatus) 单独处理，通用监听器跳过避免重复执行
+      if (targetSession?.longTask) return;
 
       if (payload.status === "running") {
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
