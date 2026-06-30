@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Palette, X } from "lucide-react";
+import { Copy, Palette, X } from "lucide-react";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 
 export type PreviewImage = {
@@ -17,12 +17,31 @@ type ImagePreviewOverlayProps = {
 
 export function ImagePreviewOverlay({ image, onClose, onSaveDrawing }: ImagePreviewOverlayProps) {
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ left: number; top: number } | null>(null);
+
+  const handleCopyImage = async () => {
+    setContextMenu(null);
+    const result = await window.api.copyImage({ dataUrl: image.dataUrl });
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: result.success ? "图片已复制" : `复制图片失败：${result.error}`,
+    }));
+  };
 
   return createPortal(
     <>
       <div
         className="kimix-preview-overlay fixed inset-0 z-[80] flex items-center justify-center"
-        onClick={onClose}
+        onClick={() => {
+          if (contextMenu) {
+            setContextMenu(null);
+            return;
+          }
+          onClose();
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setContextMenu(null);
+        }}
         role="dialog"
         aria-modal="true"
         aria-label="图片预览"
@@ -38,11 +57,28 @@ export function ImagePreviewOverlay({ image, onClose, onSaveDrawing }: ImagePrev
             <X size={20} />
           </button>
         </div>
-        <div className="flex max-h-[88vh] max-w-[88vw] flex-col items-center" style={{ gap: 14 }} onClick={(event) => event.stopPropagation()}>
+        <div
+          className="flex max-h-[88vh] max-w-[88vw] flex-col items-center"
+          style={{ gap: 14 }}
+          onClick={(event) => {
+            event.stopPropagation();
+            setContextMenu(null);
+          }}
+        >
           <img
             src={image.dataUrl}
             alt={image.name}
             className="kimix-preview-image max-h-[76vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const menuWidth = 164;
+              const menuHeight = 50;
+              setContextMenu({
+                left: Math.max(12, Math.min(event.clientX, window.innerWidth - menuWidth - 12)),
+                top: Math.max(12, Math.min(event.clientY, window.innerHeight - menuHeight - 12)),
+              });
+            }}
           />
           <button
             type="button"
@@ -63,6 +99,33 @@ export function ImagePreviewOverlay({ image, onClose, onSaveDrawing }: ImagePrev
             <span>画板</span>
           </button>
         </div>
+        {contextMenu && (
+          <div
+            role="menu"
+            aria-label="图片操作"
+            className="fixed z-[90] rounded-lg border border-border bg-surface-elevated shadow-elevated-token"
+            style={{
+              left: contextMenu.left,
+              top: contextMenu.top,
+              width: 164,
+              padding: 7,
+            }}
+            onClick={(event) => event.stopPropagation()}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              autoFocus
+              onClick={() => void handleCopyImage()}
+              className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+              style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
+            >
+              <Copy size={15} />
+              <span>复制图片</span>
+            </button>
+          </div>
+        )}
       </div>
       {drawingBoardRequest && (
         <DrawingBoard
