@@ -1318,32 +1318,7 @@ export function ChatThread() {
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
 
-  useEffect(() => {
-    const data = {
-      sessionId: session?.id,
-      primedSessionId,
-      isSessionScrollPrimed,
-      hasVisibleContent,
-      hasActiveTurn,
-      eventsLength: session?.events.length ?? 0,
-      renderItemsLength: renderItems.length,
-    };
-    console.log("[ChatThread] render state", data);
-    window.api.writeDiag?.({ message: "[ChatThread] render state", data }).catch(() => {});
-    if (session?.id && !isSessionScrollPrimed) {
-      const node = scrollRef.current;
-      const visibilityData = {
-        sessionId: session?.id,
-        domVisibility: node ? getComputedStyle(node).visibility : "no-node",
-        domScrollHeight: node?.scrollHeight,
-        domClientHeight: node?.clientHeight,
-      };
-      console.log("[ChatThread] visibility check", visibilityData);
-      window.api.writeDiag?.({ message: "[ChatThread] visibility check", data: visibilityData }).catch(() => {});
-    }
-  });
-
-  useEffect(() => {
+	  useEffect(() => {
     const pending = pendingFocusEventRef.current;
     if (!pending || !session || pending.sessionId !== session.id) return;
     window.requestAnimationFrame(() => {
