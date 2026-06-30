@@ -1154,6 +1154,8 @@ type SavedOpenAiProviderConfig = z.infer<typeof SaveOpenAiProviderConfigSchema> 
 
 function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
   const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
+  // DeepSeek V4 系列上下文为 1M；V3/chat/coder 等旧系列为 64K。
+  if (/deepseek-v4/.test(signature)) return 1000000;
   if (signature.includes("deepseek")) return 65536;
   return 1048576;
 }

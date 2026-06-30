@@ -1768,7 +1768,10 @@ function normalizeCatalogMaxContextSize(providerId: string, baseUrl: string | nu
   const fallback = 262144;
   const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
   const signature = `${providerId} ${baseUrl ?? ""} ${modelId}`.toLowerCase();
-  const limit = signature.includes("deepseek") ? 65536 : 1048576;
+  // DeepSeek V4 系列上下文为 1M；V3/chat/coder 等旧系列为 64K。
+  let limit = 1048576;
+  if (/deepseek-v4/.test(signature)) limit = 1000000;
+  else if (signature.includes("deepseek")) limit = 65536;
   return Math.max(1, Math.min(limit, input));
 }
 

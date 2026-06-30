@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.12.21";
+const KIMIX_VERSION = "2.12.22";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -159,6 +159,8 @@ const settingsStatusCache: {
 
 function getOpenAiProviderContextLimit(providerName: string, baseUrl: string, model: string) {
   const signature = `${providerName} ${baseUrl} ${model}`.toLowerCase();
+  // DeepSeek V4 系列上下文为 1M；V3/chat/coder 等旧系列为 64K。
+  if (/deepseek-v4/.test(signature)) return 1000000;
   if (signature.includes("deepseek")) return 65536;
   return 1048576;
 }
@@ -482,7 +484,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     baseUrl: "https://api.deepseek.com",
     apiKey: "",
     model: "deepseek-v4-flash",
-    maxContextSize: "65536",
+    maxContextSize: "1000000",
   });
   const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | "remove" | null>(null);
   const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
