@@ -17,6 +17,7 @@ import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgument
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
+import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -227,7 +228,7 @@ function isInterruptedStatus(event: Extract<TimelineEvent, { type: "status_updat
 }
 
 function buildAssistantFullCopyText(event: Extract<TimelineEvent, { type: "assistant_message" }>) {
-  const thinkingText = getThinkingBlocks(event).map((block) => block.text.trim()).filter(Boolean).join("\n\n");
+  const thinkingText = buildThinkingBlocks(event).map((block) => block.text.trim()).filter(Boolean).join("\n\n");
   const content = event.content.trim();
   return [
     thinkingText ? `## 思考\n\n${thinkingText}` : "",
@@ -482,24 +483,11 @@ type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
 type ApprovalEvent = Extract<TimelineEvent, { type: "approval_request" }>;
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 
-type ThinkingBlock = {
-  id: string;
-  timestamp: number;
-  text: string;
-};
-
 type ProcessItem =
   | { type: "thinking"; block: ThinkingBlock }
   | { type: "tool"; tool: ToolEvent }
   | { type: "subagent"; subagent: SubagentEvent }
   | { type: "approval"; approval: ApprovalEvent };
-
-function firstThinkingSentence(text: string) {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  const match = normalized.match(/^(.{1,160}?[。！？?!])(?:\s|$)/);
-  const first = match?.[1] ?? normalized.slice(0, 120);
-  return normalized.length > first.length ? `${first}...` : first || "思考内容";
-}
 
 function normalizeThinkingMarkdown(text: string) {
   return text
@@ -509,79 +497,6 @@ function normalizeThinkingMarkdown(text: string) {
 
 function describeTool(tool: ToolEvent) {
   return toolArgumentPreview(tool) || tool.toolName || "工具调用";
-}
-
-function splitLegacyThinking(text: string, timestamp: number): ThinkingBlock[] {
-  if (isKimixSyntheticThinking(text)) return [];
-  const paragraphs = text
-    .split(/\n\s*\n+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const source = paragraphs.length > 1 ? paragraphs : text.match(/[^。！？?!]+[。！？?!]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [text.trim()];
-  const blocks: ThinkingBlock[] = [];
-  let buffer = "";
-  source.forEach((part) => {
-    const next = buffer ? `${buffer}\n\n${part}` : part;
-    if (next.length < 520) {
-      buffer = next;
-      return;
-    }
-    if (buffer) blocks.push({ id: `thinking-${timestamp}-${blocks.length}`, timestamp: timestamp + blocks.length, text: buffer });
-    buffer = part;
-  });
-  if (buffer) blocks.push({ id: `thinking-${timestamp}-${blocks.length}`, timestamp: timestamp + blocks.length, text: buffer });
-  return blocks;
-}
-
-function findThinkingSplitIndex(text: string, minIndex: number) {
-  const candidates = [
-    ...Array.from(text.matchAll(/[。！？?!]\s+/g)).map((match) => (match.index ?? -1) + match[0].length),
-    ...Array.from(text.matchAll(/\n\s*\n+/g)).map((match) => (match.index ?? -1) + match[0].length),
-    ...Array.from(text.matchAll(/\n\s*[-*•]\s+/g)).map((match) => match.index ?? -1),
-  ].filter((index) => index >= minIndex);
-  return candidates.length > 0 ? Math.max(...candidates) : -1;
-}
-
-function getThinkingBlocks(event: AssistantEvent): ThinkingBlock[] {
-  const parts = event.thinkingParts?.filter((part) => {
-    const text = part.text.trim();
-    return text && !isKimixSyntheticThinking(text);
-  }) ?? [];
-  if (parts.length === 0) return event.thinking && !isKimixSyntheticThinking(event.thinking) ? splitLegacyThinking(event.thinking, event.timestamp) : [];
-
-  const blocks: ThinkingBlock[] = [];
-  let current = "";
-  let currentTimestamp = parts[0]?.timestamp ?? event.timestamp;
-  parts.forEach((part) => {
-    if (!current) currentTimestamp = part.timestamp;
-    current += part.text;
-    if (current.length > 120 && /[。！？?!]\s*$/.test(current)) {
-      blocks.push({ id: `thinking-${part.id}`, timestamp: currentTimestamp, text: current.trim() });
-      current = "";
-      return;
-    }
-    if (current.length > 900) {
-      const splitIndex = findThinkingSplitIndex(current, 520);
-      if (splitIndex > 0) {
-        const head = current.slice(0, splitIndex).trim();
-        const tail = current.slice(splitIndex);
-        if (head) blocks.push({ id: `thinking-${part.id}`, timestamp: currentTimestamp, text: head });
-        current = tail;
-        currentTimestamp = part.timestamp;
-      }
-    }
-  });
-  if (current.trim()) {
-    blocks.push({ id: `thinking-tail-${blocks.length}`, timestamp: currentTimestamp, text: current.trim() });
-  }
-  return blocks;
-}
-
-function isKimixSyntheticThinking(text: string) {
-  const trimmed = text.trim();
-  return trimmed.startsWith("【实时状态】") ||
-    trimmed.includes("当前 prompt-mode 尚未实时写出思考正文") ||
-    trimmed.includes("Kimix 会继续回放");
 }
 
 function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
@@ -599,7 +514,7 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Brain size={15} />
         </span>
-        <span className="min-w-0 flex-1 truncate leading-5">{firstThinkingSentence(block.text)}</span>
+        <span className="min-w-0 flex-1 truncate leading-5">{block.summary}</span>
         {canExpand && (
           <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -872,6 +787,15 @@ function processItemTimestamp(item: ProcessItem) {
   }
 }
 
+function processItemPriority(item: ProcessItem) {
+  switch (item.type) {
+    case "thinking": return 0;
+    case "tool": return 1;
+    case "subagent": return 2;
+    case "approval": return 3;
+  }
+}
+
 function AssistantProcessSummary({ event, tools, subagents, approvals, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
@@ -881,13 +805,18 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
     viewportTop: number;
     anchor: "summary" | "content";
   } | null>(null);
-  const thinkingBlocks = useMemo(() => getThinkingBlocks(event), [event.thinking, event.thinkingParts, event.timestamp]);
+  const thinkingBlocks = useMemo(() => buildThinkingBlocks({
+    ...event,
+    boundaryTimestamps: tools.map((tool) => tool.timestamp),
+  }), [event.thinking, event.thinkingParts, event.timestamp, tools]);
   const items: ProcessItem[] = useMemo(() => [
     ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
     ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
     ...subagents.map((subagent): ProcessItem => ({ type: "subagent", subagent })),
     ...approvals.map((approval): ProcessItem => ({ type: "approval", approval })),
-  ].sort((a, b) => processItemTimestamp(a) - processItemTimestamp(b)), [thinkingBlocks, tools, subagents, approvals]);
+  ].sort((a, b) => (
+    processItemTimestamp(a) - processItemTimestamp(b) || processItemPriority(a) - processItemPriority(b)
+  )), [thinkingBlocks, tools, subagents, approvals]);
   const hasDetails = items.length > 0;
   const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = useMemo(() => joinSummaryParts([

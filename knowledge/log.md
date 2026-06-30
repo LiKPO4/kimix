@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-30
+* **Assistant process timeline**: Documented that thinking phases must retain tool-call boundaries, including the official equal-timestamp think-before-tool convention, and use each phase's final natural paragraph as its collapsed summary.
 * **Safe bidirectional theme deletion**: Split local preset removal from destructive source deletion and documented the confirmation plus main-process path guard required before deleting a Kimi theme JSON.
 * **Theme scan reconciliation**: Documented that imported Kimi theme presets mirror their source directory and must remove stale cached records when source JSON files are deleted, without deleting presets from other sources.
 * **Visible slash command invariant**: Slash commands handled outside the generic prompt path now append the original command as an optimistic user message before dispatch; matching official Skill echoes are deduplicated so commands remain visible without duplicate bubbles.
