@@ -26,6 +26,18 @@ Kimix release artifacts are produced by GitHub Actions, not by manual local pack
 4. Confirm the release job selected `docs/release-notes/vX.Y.Z.md` instead of the root fallback.
 5. Confirm all platform jobs and the final published release succeeded.
 
+# Development Guidelines
+
+## Error reporting
+
+Background operation failures (persistence, cleanup, polling) must not interrupt the user but must leave a trace for debugging. Use the `reportError` utility (`src/utils/reportError.ts`) instead of `.catch(() => {})`:
+
+- `reportError(error, { context })` — writes to `console.warn` and the diag log.
+- `reportError(error, { context, userVisible: true })` — also dispatches a toast.
+- The `logError(context)` shorthand can be passed directly to `.catch()`.
+
+Best-effort cleanup operations (`cancelKimiCodeTurn`, `closeKimiCodeSession`) may remain silent, but all other previously silent catches should be converted.
+
 # Prohibitions
 
 * Do not run a local distribution build and upload its artifacts over CI output.

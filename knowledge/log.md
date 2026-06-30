@@ -1,6 +1,25 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-30
+
+* **Mid-turn fallback prohibition**: Added invariant #36 that Server→SDK fallback is only permitted between turns; mid-turn Server prompt failure propagates as an error and the next turn uses the existing SDK session.
+* **Error reporting convention**: Documented `reportError` utility in release-process.md; background operation failures must use reportError or logError instead of silent .catch(() => {}).
+* **Long-task status deduplication**: Generic kimi-code status listener now skips longTask sessions; the dedicated longTask listener is the sole handler.
+* **Long-task thinking**: `longTasks:create` now forwards the user's defaultThinking setting to the executor session via createSession.
+* **Long-task pause targeting**: Pause now cancels the active agent's runtime (reviewer or executor) instead of always targeting executorSessionId.
+* **Recovery draft fallback**: `applyTargetStep` falls back to persisted `longTask.targetStep` when draft is empty for recovery continuation.
+* **Structured session-missing detection**: Both renderer and main-process `isKimiCodeSessionMissingError` now check `error.statusCode` before regex fallback; HTTP/Api errors in `kimiCodeServerClient.request` carry statusCode.
+* **Per-runtime ref cleanup**: Added `cleanupRuntimeRefs` to trim `notifiedQuestionRequestRef`, `hiddenLongTaskEventsRef`, and `longTaskReviewDispatchRef` when runtime sessions end.
+* **History loading cap**: `parseKimiCodeWireEvents` truncates to the most recent 2000 events to prevent OOM on very long sessions.
+* **Bootstrap setters stability**: `useBootstrap` now receives a `useMemo`-stabilized setters object so `listRecentProjects()` does not fire on every render.
+* **ChatThread debug effect removed**: The no-dependency `useEffect` that logged render state and visibility to console and writeDiag on every frame has been removed.
+* **Sidebar sync dep narrowed**: Sidebar session-sync effect now depends only on `currentSessionId`, `updatedAt`, and `eventsLength` instead of the whole session object.
+* **Reviewing stage label**: LongTaskInspectorPanel now displays "审查中" instead of "paused" when the long task stage is reviewing.
+* **Archive runningSessionId cleanup**: Archiving a running session now clears `runningSessionId` in the app store.
+* **moveChat view switching**: `moveChat` now sets workspace view to "chat" when switching sessions.
+* **Project service concurrency**: Added `serialWrite` mutex to serialize read-modify-write operations in projectService.
+
+## 2026-06-30
 * **History cache migration**: Added the invariant that persisted Kimi timelines carry a mapping version and stale caches reload once from official history, with richer canonical process events replacing incomplete local mirrors.
 * **Local history tool boundaries**: Recorded that Kimi wire history nests `tool.call` and `tool.result` inside loop events and these records must survive parsing for thought/tool interleaving to remain reconstructable.
 * **Assistant process timeline**: Documented that thinking phases must retain tool-call boundaries, including the official equal-timestamp think-before-tool convention, and use each phase's final natural paragraph as its collapsed summary.
