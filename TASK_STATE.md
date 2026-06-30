@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-06-30 v2.12.9 官方内置命令路由审计
+- 当前目标：审计仍由 Kimix 本地模拟或兼容处理的 slash 命令，优先切换到 Kimi Code 0.20.2 官方能力。
+- 现场证据：本机和 npm latest 均为 Kimi Code 0.20.2；隔离 Server 会话的官方 Skill 清单共 25 项，其中 `custom-theme`、`import-from-cc-codex`、`mcp-config` 均为 `source=builtin` 且 `disable_model_invocation=true`；官方 Server 提供 session-scoped Skill activation REST 路由。
+- 已完成：`/custom-theme` 与 `/import-from-cc-codex` 改为官方 built-in Skill 激活优先，旧 Kimix 实现仅在官方不可用时兜底；新增 `/mcp-config` 官方 Skill 入口；`/theme` 继续打开 Kimix 主题设置；兼容 custom-theme 提示同步官方确认流程、`KIMI_CODE_HOME` 路径和 `shellMode` token；版本号同步到 v2.12.9。
+- 路由修正：官方 Skill 激活不再随后重复发送普通 prompt；`compact`、`plan`、`btw`、`undo`、`status`、`usage` 在普通 prompt 前直接分流到 Kimi Code 0.20.2 Server API；`goal`、`swarm`、`reload` 也先进入已有命令处理，以便 SDK 兼容会话执行或在 Server 会话明确提示不支持。
+- 边界：Kimi Code 0.20.2 Server 尚未公开 Goal、Swarm、reload 路由；`/theme` 是 Kimix 本地 UI 命令；`custom-theme` 与 `import-from-cc-codex` 的旧桌面实现仅作兼容兜底；未知 slash 仍透传给会话，不擅自模拟未知命令。
+- 关键文件：`src/utils/slashRouting.ts`、`src/components/chat/Composer.tsx`、`electron/kimiCodeSlashCommands.ts`、`knowledge/architecture/runtime-routing.md`、版本号三处。
+- 验收：slash/event 局部测试 81/81 通过；全量测试 33 文件、261/261 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过；`git diff --check` 通过（仅 CRLF 提示）。
+- 下一步：窄范围提交；由用户在 v2.12.9 中复验三个 built-in Skill 命令及 `/compact`、`/status` 等直接命令。
+
 ## 2026-06-29 v2.12.8 前端规整第三轮
 - 当前目标：完成前端 TodoList 第三轮动效与表面细节治理，收束本轮不改变风格的前端统一工作。
 - 已完成：新增通用 `usePresence` 延迟卸载机制；Toast、设置、启动命令、帮助、引导和关机弹窗获得克制的进出场；移除未使用的旧入场动画；新增全局 reduced-motion 兜底；大图预览增加纯黑/纯白 10% 内描边；模态浮层改用带中性 ring 的统一阴影，移除重复硬边框；版本号同步到 v2.12.8。

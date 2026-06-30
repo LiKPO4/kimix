@@ -18,6 +18,16 @@ export function parseKimiSkillActivation(content: string): { name: string; args:
   };
 }
 
+const BUILTIN_SKILL_COMMAND_NAMES = new Set(["custom-theme", "import-from-cc-codex", "mcp-config"]);
+
+export function formatKimiSkillActivationCommand(name: string, args = "") {
+  const normalizedName = name.trim();
+  const command = BUILTIN_SKILL_COMMAND_NAMES.has(normalizedName.toLowerCase())
+    ? `/${normalizedName}`
+    : `/skill:${normalizedName}`;
+  return `${command}${args.trim() ? ` ${args.trim()}` : ""}`;
+}
+
 export function sanitizeKimiSkillActivationTitle(title: string) {
   const match = title.match(/^User activated the skill\s+["“]([^"”]+)["”]/i);
   return match ? `使用 ${match[1]}` : title;
@@ -62,7 +72,7 @@ export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[
     }
     return [{
       ...event,
-      content: `/skill:${activation.name}${activation.args ? ` ${activation.args}` : ""}`,
+      content: formatKimiSkillActivationCommand(activation.name, activation.args),
     }];
   });
 }

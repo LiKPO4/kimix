@@ -130,19 +130,18 @@ function buildGoalKickoffPrompt(objective: string) {
 function buildCustomThemeKickoffPrompt(request: string) {
   const themeRequest = request.trim() || "生成一套适合日常编码使用的 Kimi Code 主题";
   return [
-    "【Kimix 官方 /custom-theme 兼容执行】",
+    "【Kimix /custom-theme 兼容兜底】",
     "",
-    "当前 Kimix 通过兼容链路发送主题生成请求，不会触发官方终端界面的 slash 分发器；因此请你直接完成官方 /custom-theme 本该做的工作。",
+    "官方内置 custom-theme Skill 当前不可用，请按官方工作流完成等价操作。",
     "",
     `用户主题需求：${themeRequest}`,
     "",
-    "请直接在本机写入一个 Kimi Code 自定义主题 JSON，不要只给建议，不要询问是否打开预览或本地 URL。",
+    "如果用户尚未明确亮色/暗色、风格、指定颜色或文件名，请先提问并等待答复；信息完整后再写主题 JSON。",
     "",
     "写入位置必须严格按下面步骤解析，不能猜测用户目录：",
-    "- Windows PowerShell 先执行：`$profile = [Environment]::GetFolderPath('UserProfile')`",
-    "- 然后目标目录必须是：`Join-Path $profile '.kimi-code\\themes'`",
-    "- 目标文件必须是：`Join-Path (Join-Path $profile '.kimi-code\\themes') '<theme-name>.json'`",
-    "- 其他系统先用 `$HOME`，目标目录为：`$HOME/.kimi-code/themes`",
+    "- 先读取 `KIMI_CODE_HOME`；非空时使用 `$KIMI_CODE_HOME/themes`。",
+    "- `KIMI_CODE_HOME` 为空时才使用真实用户主目录下的 `.kimi-code/themes`。",
+    "- Windows 必须通过环境变量解析真实目录，其他系统使用 `$HOME`。",
     "- 禁止写入项目目录、当前工作目录、`~/.kimi-code/themes` 的字面量目录、或任何其他用户目录。",
     "- 如果当前真实用户目录不是 `C:\\Users\\lijialin08`，禁止写入 `C:\\Users\\lijialin08\\.kimi-code\\themes`。",
     "",
@@ -170,13 +169,14 @@ function buildCustomThemeKickoffPrompt(request: string) {
     "    \"diffRemovedStrong\": \"#B91C1C\",",
     "    \"diffGutter\": \"#737373\",",
     "    \"diffMeta\": \"#5F5F5F\",",
-    "    \"roleUser\": \"#9A4A00\"",
+    "    \"roleUser\": \"#9A4A00\",",
+    "    \"shellMode\": \"#00838F\"",
     "  }",
     "}",
     "```",
     "",
     "主题质量要求（必须先按这些规则设计，再写 JSON）：",
-    "- 这 18 个 token 不是三色主题映射，必须按语义分别设计，不能只改 primary/accent/text 后复制默认值。",
+    "- 这 19 个 token 不是三色主题映射，必须按语义分别设计，不能只改 primary/accent/text 后复制默认值。",
     "- `diffAdded` / `diffRemoved` 是 diff 背景/普通提示语义，必须与 `success` / `error` 有明确色相或明度差异；不能直接等于 success/error。",
     "- `diffAddedStrong` / `diffRemovedStrong` 必须比对应普通 diff 更强、更醒目，不能等于 diffAdded/diffRemoved，也不能等于 success/error。",
     "- `diffGutter` / `diffMeta` 是 diff 辅助信息，应该低饱和、低对比，但仍能读清；不要复用 textMuted 以外的强强调色。",
@@ -336,9 +336,10 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-swarm-on", label: "/swarm on", detail: "开启 Swarm 模式", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
   { id: "slash-swarm-off", label: "/swarm off", detail: "关闭 Swarm 模式", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
   { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方终端主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
-  { id: "slash-custom-theme", label: "/custom-theme", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
-  { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "Kimix 兼容生成官方主题 JSON", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
-  { id: "slash-import-from-cc-codex", label: "/import-from-cc-codex", detail: "预览并导入 Claude Code / Codex 配置", insertText: "/import-from-cc-codex", commandName: "import-from-cc-codex", kind: "slash" },
+  { id: "slash-custom-theme", label: "/custom-theme", detail: "调用官方内置 Skill 创建或修改主题", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
+  { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "调用官方内置 Skill 设计主题", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
+  { id: "slash-import-from-cc-codex", label: "/import-from-cc-codex", detail: "调用官方内置 Skill 导入 Claude Code / Codex 配置", insertText: "/import-from-cc-codex", commandName: "import-from-cc-codex", kind: "slash" },
+  { id: "slash-mcp-config", label: "/mcp-config", detail: "调用官方内置 Skill 配置 MCP", insertText: "/mcp-config ", commandName: "mcp-config", kind: "slash" },
   { id: "slash-compact", label: "/compact", detail: "静默压缩当前上下文，可附带保留指令，如：保留本轮测试结果和待办", insertText: "/compact ", commandName: "compact", kind: "slash" },
   { id: "slash-compact-template", label: "/compact 保留本轮测试结果和待办", detail: "带保留指令模板：压缩当前上下文", insertText: "/compact 保留本轮测试结果和待办", commandName: "compact", kind: "slash" },
   { id: "slash-plan", label: "/plan", detail: "切换 Plan 模式", insertText: "/plan ", commandName: "plan", kind: "slash" },
@@ -778,7 +779,7 @@ export function Composer() {
     return session;
   };
 
-  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string; beforePrompt?: () => Promise<boolean> }) => {
+  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
@@ -958,10 +959,6 @@ export function Composer() {
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
         updateLinkStatus("消息发送中", "info");
-        if (options?.beforePrompt) {
-          const ready = await options.beforePrompt();
-          if (!ready) throw new Error("Skill 准备失败，消息未发送。");
-        }
         markPromptDispatchStarted();
         let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
@@ -1238,7 +1235,7 @@ export function Composer() {
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
     const routing = classifySlashCommand(name);
-    if (routing !== "local") return false;
+    if (routing !== "local" && routing !== "official-skill-first") return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name === "theme") {
       await appendSlashNotice(commandNotice);
@@ -1250,7 +1247,7 @@ export function Composer() {
       await sendPromptContent(content.trim(), {
         outboundContent: buildCustomThemeKickoffPrompt(args),
         skipClarification: true,
-        postUserStatusMessage: `已接收本地指令：${commandNotice}`,
+        postUserStatusMessage: `官方 Skill 不可用，已使用兼容兜底：${commandNotice}`,
       });
       return true;
     }
@@ -1298,12 +1295,12 @@ export function Composer() {
     return false;
   };
 
-  const handleFallbackSlashCommand = async (content: string, images: ImageAttachment[] = []) => {
+  const handleDirectSlashCommand = async (content: string) => {
     const match = content.trim().match(slashCommandPattern);
     if (!match) return false;
     const name = match[1].toLowerCase();
     const args = (match[2] ?? "").trim();
-    if (classifySlashCommand(name) !== "official-first") return false;
+    if (classifySlashCommand(name) !== "direct") return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name.startsWith("skill:")) {
       const skillName = name.slice("skill:".length);
@@ -1462,8 +1459,14 @@ export function Composer() {
     return false;
   };
 
-  const applySkillCommand = async (skillName: string, args?: string) => {
-    if (!(await refreshInstalledAgentSkillsBeforePrompt())) return false;
+  const applySkillCommand = async (
+    skillName: string,
+    args?: string,
+    options: { allowMigration?: boolean; refreshRegistry?: boolean; reportFailure?: boolean } = {},
+  ) => {
+    const allowMigration = options.allowMigration ?? true;
+    const reportFailure = options.reportFailure ?? true;
+    if (options.refreshRegistry !== false && !(await refreshInstalledAgentSkillsBeforePrompt())) return false;
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
     let runtimeSessionId = runtime.runtimeSessionId;
@@ -1477,7 +1480,7 @@ export function Composer() {
 
     let officialSkill = await findOfficialSkill();
     let migrated = false;
-    if (!officialSkill) {
+    if (!officialSkill && allowMigration) {
       const prepareRes = await window.api.prepareKimiSkill({ name: skillName });
       if (!prepareRes.success) {
         await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `调用 Skill 失败：${prepareRes.error}`, source: "ui" });
@@ -1494,7 +1497,9 @@ export function Composer() {
       officialSkill = await findOfficialSkill();
     }
     if (!officialSkill) {
-      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Server 未识别 Skill：${skillName}。请新建会话后重试。`, source: "ui" });
+      if (reportFailure) {
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Server 未识别 Skill：${skillName}。请新建会话后重试。`, source: "ui" });
+      }
       return false;
     }
 
@@ -1513,15 +1518,17 @@ export function Composer() {
         await window.api.renameKimiCodeSession({ sessionId: runtimeSessionId, title: nextTitle }).catch(() => undefined);
       }
     }
-    await appendLocalEvent({
-      id: genId(),
-      type: activateRes.success ? "status_update" : "error",
-      timestamp: Date.now(),
-      message: activateRes.success
-        ? `${migrated ? "已迁移并" : "已"}调用 Skill：${officialSkill.name}`
-        : `调用 Skill 失败：${activateRes.error}`,
-      source: "ui",
-    });
+    if (activateRes.success || reportFailure) {
+      await appendLocalEvent({
+        id: genId(),
+        type: activateRes.success ? "status_update" : "error",
+        timestamp: Date.now(),
+        message: activateRes.success
+          ? `${migrated ? "已迁移并" : "已"}调用官方 Skill：${officialSkill.name}`
+          : `调用 Skill 失败：${activateRes.error}`,
+        source: "ui",
+      });
+    }
     return activateRes.success;
   };
 
@@ -1598,10 +1605,16 @@ export function Composer() {
       return;
     }
     const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
+    const slashArgs = trimmed.match(slashCommandPattern)?.[2]?.trim() || undefined;
+    const slashRouting = classifySlashCommand(slashName);
     if (shouldActivateSkillBeforePrompt(slashName)) {
       const match = trimmed.match(slashCommandPattern);
       const skillName = match?.[1]?.slice("skill:".length) ?? "";
       const skillArgs = (match?.[2] ?? "").trim();
+      if (imagesToSend.length > 0) {
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        return;
+      }
       setInput("");
       setImageAttachments([]);
       setEditingPendingId(null);
@@ -1609,11 +1622,54 @@ export function Composer() {
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
       }
-      await sendPromptContent(trimmed, {
-        images: imagesToSend,
-        skipClarification: true,
-        beforePrompt: () => applySkillCommand(skillName, skillArgs || undefined),
+      await applySkillCommand(skillName, skillArgs || undefined);
+      return;
+    }
+    if (slashRouting === "official-skill-first") {
+      if (imagesToSend.length > 0) {
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        return;
+      }
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      if (!hasActiveAssistantTurn && activeSession) {
+        settlePendingClarifications(activeSession.id);
+      }
+      const activated = await applySkillCommand(slashName, slashArgs, {
+        allowMigration: false,
+        refreshRegistry: false,
+        reportFailure: false,
       });
+      if (!activated) {
+        await appendStatusMessage(`官方 /${slashName} Skill 当前不可用，正在尝试 Kimix 兼容兜底。`);
+        const fallbackHandled = await handleSdkSlashCommand(trimmed);
+        if (!fallbackHandled) {
+          await appendLocalEvent({
+            id: genId(),
+            type: "error",
+            timestamp: Date.now(),
+            message: `官方 /${slashName} Skill 激活失败，当前没有可用的兼容处理。`,
+            source: "ui",
+          });
+        }
+      }
+      return;
+    }
+    if (slashRouting === "direct") {
+      if (imagesToSend.length > 0) {
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        return;
+      }
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      if (!hasActiveAssistantTurn && activeSession) {
+        settlePendingClarifications(activeSession.id);
+      }
+      await handleDirectSlashCommand(trimmed);
       return;
     }
     const slashHandled = trimmed.startsWith("/")
@@ -1636,10 +1692,7 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    const sent = await sendPromptContent(trimmed, { images: imagesToSend, skipClarification: trimmed.startsWith("/") });
-    if (!sent && trimmed.startsWith("/")) {
-      await handleFallbackSlashCommand(trimmed, imagesToSend);
-    }
+    await sendPromptContent(trimmed, { images: imagesToSend, skipClarification: trimmed.startsWith("/") });
   };
 
   const handleApplyThemeImport = async (themeId: string) => {

@@ -1,5 +1,5 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
-import { isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
+import { formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -656,7 +656,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         type: "user_message",
         timestamp: eventTimestamp,
         content: skillActivation
-          ? `/skill:${skillActivation.name}${skillActivation.args ? ` ${skillActivation.args}` : ""}`
+          ? formatKimiSkillActivationCommand(skillActivation.name, skillActivation.args)
           : userMessage.content,
         images: userMessage.images,
       };

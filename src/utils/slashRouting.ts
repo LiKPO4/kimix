@@ -1,10 +1,14 @@
 export const KIMIX_LOCAL_SLASH_COMMANDS = new Set([
   "theme",
-  "custom-theme",
-  "import-from-cc-codex",
 ]);
 
-export const KIMIX_FALLBACK_SLASH_COMMANDS = new Set([
+export const KIMI_BUILTIN_SKILL_SLASH_COMMANDS = new Set([
+  "custom-theme",
+  "import-from-cc-codex",
+  "mcp-config",
+]);
+
+export const KIMI_DIRECT_SLASH_COMMANDS = new Set([
   "goal",
   "compact",
   "plan",
@@ -16,7 +20,7 @@ export const KIMIX_FALLBACK_SLASH_COMMANDS = new Set([
   "usage",
 ]);
 
-export type SlashRoutingDecision = "local" | "official-first" | "passthrough";
+export type SlashRoutingDecision = "local" | "official-skill-first" | "direct" | "passthrough";
 
 export function shouldActivateSkillBeforePrompt(name: string): boolean {
   return name.trim().toLowerCase().startsWith("skill:");
@@ -26,7 +30,8 @@ export function classifySlashCommand(name: string): SlashRoutingDecision {
   const normalized = name.trim().toLowerCase();
   if (!normalized) return "passthrough";
   if (KIMIX_LOCAL_SLASH_COMMANDS.has(normalized)) return "local";
-  if (shouldActivateSkillBeforePrompt(normalized)) return "official-first";
-  if (KIMIX_FALLBACK_SLASH_COMMANDS.has(normalized)) return "official-first";
+  if (KIMI_BUILTIN_SKILL_SLASH_COMMANDS.has(normalized)) return "official-skill-first";
+  if (shouldActivateSkillBeforePrompt(normalized)) return "direct";
+  if (KIMI_DIRECT_SLASH_COMMANDS.has(normalized)) return "direct";
   return "passthrough";
 }

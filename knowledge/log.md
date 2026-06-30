@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+## 2026-06-30
+* **Official slash routing**: Confirmed Kimi Code 0.20.2 exposes `custom-theme`, `import-from-cc-codex`, and `mcp-config` as built-in user-only Skills and documented that Kimix must activate Skills and dispatch Server-supported session commands through official APIs before generic prompt submission; Goal, Swarm, and reload remain SDK-only compatibility boundaries.
+
 ## 2026-06-29
 * **Kimi Web readiness**: Documented that browser session deep links must wait for the official health endpoint because a successful launcher exit can precede daemon port and WebSocket readiness, especially while replacing a stale lock.
 

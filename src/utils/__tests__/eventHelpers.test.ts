@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { hasMalformedAssistantMarkdown, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasMalformedAssistantMarkdown, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -55,6 +55,13 @@ describe("sanitizePersistedEvents", () => {
   it("sanitizes cached official Skill activation titles", () => {
     expect(sanitizeKimiSkillActivationTitle('User activated the skill "find-skills".'))
       .toBe("使用 find-skills");
+  });
+
+  it("preserves built-in Skill command names while keeping external Skills namespaced", () => {
+    expect(formatKimiSkillActivationCommand("custom-theme", "做一套暗色主题"))
+      .toBe("/custom-theme 做一套暗色主题");
+    expect(formatKimiSkillActivationCommand("find-skills", "查找主题 Skill"))
+      .toBe("/skill:find-skills 查找主题 Skill");
   });
 });
 

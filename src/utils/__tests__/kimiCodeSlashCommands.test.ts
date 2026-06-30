@@ -29,6 +29,9 @@ describe("listKimiCodeSlashCommands", () => {
       expect(names.has("undo")).toBe(true);
       expect(names.has("skill:")).toBe(true);
       expect(names.has("theme")).toBe(true);
+      expect(names.has("custom-theme")).toBe(true);
+      expect(names.has("import-from-cc-codex")).toBe(true);
+      expect(names.has("mcp-config")).toBe(true);
     }
   });
 });

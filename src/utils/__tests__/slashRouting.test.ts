@@ -4,19 +4,23 @@ import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "../slashR
 describe("classifySlashCommand", () => {
   it("keeps Kimix-only slash commands local", () => {
     expect(classifySlashCommand("theme")).toBe("local");
-    expect(classifySlashCommand("custom-theme")).toBe("local");
-    expect(classifySlashCommand("import-from-cc-codex")).toBe("local");
   });
 
-  it("lets official slash commands reach the Kimi route before local fallback", () => {
-    expect(classifySlashCommand("goal")).toBe("official-first");
-    expect(classifySlashCommand("swarm")).toBe("official-first");
-    expect(classifySlashCommand("compact")).toBe("official-first");
-    expect(classifySlashCommand("undo")).toBe("official-first");
+  it("routes official built-in Skill commands through Skill activation first", () => {
+    expect(classifySlashCommand("custom-theme")).toBe("official-skill-first");
+    expect(classifySlashCommand("import-from-cc-codex")).toBe("official-skill-first");
+    expect(classifySlashCommand("mcp-config")).toBe("official-skill-first");
+  });
+
+  it("routes supported and compatibility commands before generic prompt submission", () => {
+    expect(classifySlashCommand("goal")).toBe("direct");
+    expect(classifySlashCommand("swarm")).toBe("direct");
+    expect(classifySlashCommand("compact")).toBe("direct");
+    expect(classifySlashCommand("undo")).toBe("direct");
   });
 
   it("lets skill slash commands reach the official route before local fallback", () => {
-    expect(classifySlashCommand("skill:deploy-okf-knowledge")).toBe("official-first");
+    expect(classifySlashCommand("skill:deploy-okf-knowledge")).toBe("direct");
   });
 
   it("activates skill slash commands before sending them as prompts", () => {

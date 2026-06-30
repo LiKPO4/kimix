@@ -4,9 +4,10 @@ export type KimiCodeSlashRuntime = "server" | "sdk";
 
 const COMMON_SLASH_COMMANDS: SlashCommandInfo[] = [
   { name: "theme", description: "打开 Kimix 主题设置；官方终端主题仅供参考", aliases: [] },
-  { name: "custom-theme", description: "Kimix 兼容生成官方主题 JSON；生成后可在设置里导入", aliases: [] },
-  { name: "custom-theme 做一套低饱和绿色主题", description: "Kimix 兼容生成官方主题 JSON", aliases: [] },
-  { name: "import-from-cc-codex", description: "预览并导入 Claude Code / Codex 配置", aliases: [] },
+  { name: "custom-theme", description: "调用官方内置 Skill 创建或修改自定义主题", aliases: [] },
+  { name: "custom-theme 做一套低饱和绿色主题", description: "调用官方内置 Skill 设计自定义主题", aliases: [] },
+  { name: "import-from-cc-codex", description: "调用官方内置 Skill 导入 Claude Code / Codex 配置", aliases: [] },
+  { name: "mcp-config", description: "调用官方内置 Skill 配置 MCP", aliases: [] },
   { name: "compact", description: "静默压缩当前上下文，可附带保留指令", aliases: [] },
   { name: "compact 保留本轮测试结果和待办", description: "带保留指令模板：压缩当前上下文", aliases: [] },
   { name: "plan", description: "切换 Plan 模式", aliases: [] },
