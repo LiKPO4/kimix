@@ -46,6 +46,7 @@ import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { reportError } from "@/utils/reportError";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -557,11 +558,11 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
         currentStep: latest.longTask.currentStep,
         targetStep: latest.longTask.targetStep,
         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
-      },
-    }).catch(() => {});
-  }
+	      },
+	    }).catch(logError("persistLongTaskMeta"));
+	  }
 
-  const active = useAppStore.getState().currentSession;
+	  const active = useAppStore.getState().currentSession;
   if (active?.id === uiSessionId) {
     if (latest) useAppStore.getState().setCurrentSession(latest);
   }
@@ -799,8 +800,8 @@ function applyLongTaskProgressFromLatestOutput(uiSessionId: string, runtimeSessi
         targetStep: latest.longTask.targetStep,
         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
       },
-    }).catch(() => {});
-    const active = useAppStore.getState().currentSession;
+      }).catch(logError("persistLongTaskMeta"));
+	    const active = useAppStore.getState().currentSession;
     if (active?.id === uiSessionId) useAppStore.getState().setCurrentSession(latest);
   }
   return latest ?? current;
@@ -1124,11 +1125,11 @@ function App() {
       useSessionStore.setState((state) => ({
         sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath, { source: res.source }),
       }));
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [currentProject?.path]);
+	    }).catch(logError("listKimiCodeSessions"));
+	    return () => {
+	      cancelled = true;
+	    };
+	  }, [currentProject?.path]);
 
   const syncCurrentSessionFromStore = (uiSessionId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -1288,7 +1289,7 @@ function App() {
         executorSessionId: session.longTask.executorSessionId,
         reviewerSessionId: session.longTask.reviewerSessionId,
       },
-    }).catch(() => {});
+    }).catch(logError("persistLongTaskMeta"));
   };
 
   const isMissingRuntimeSessionError = (err: unknown) => {
@@ -1492,7 +1493,7 @@ function App() {
       projectPath: session.projectPath,
       taskId: session.longTask.taskId,
       ...payload,
-    }).catch(() => {});
+    }).catch(logError("appendLongTaskRound"));
   };
 
   const mergeHiddenLongTaskEvent = (runtimeSessionId: string, event: TimelineEvent) => {
@@ -1655,11 +1656,11 @@ function App() {
           currentStep: latestForPrompt.longTask.currentStep,
           targetStep: latestForPrompt.longTask.targetStep,
           reviewedReviewItems: latestForPrompt.longTask.reviewedReviewItems ?? [],
-        },
-      }).catch(() => {});
-    }
-    setRunningSessionId(uiSessionId);
-    void window.api.sendKimiCodePrompt({
+	        },
+	      }).catch(logError("updateLongTaskState"));
+	    }
+	    setRunningSessionId(uiSessionId);
+	    void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.reviewerSessionId,
       content: buildLongTaskReviewPrompt(latestForPrompt),
       thinking: defaultThinking,
@@ -1716,7 +1717,7 @@ function App() {
             targetStep: failedSession.longTask.targetStep,
             reviewedReviewItems: failedSession.longTask.reviewedReviewItems ?? [],
           },
-        }).catch(() => {});
+        }).catch(logError("updateLongTaskState"));
       }
       setRunningSessionId(null);
     });
@@ -2218,7 +2219,7 @@ function App() {
             }
           })();
         }, 1_200);
-      }).catch(() => {});
+      }).catch(logError("loadKimiCodeSession"));
     });
 
     const storedSessions = localStorage.getItem(LOCAL_SESSIONS_KEY);
