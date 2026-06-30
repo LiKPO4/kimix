@@ -12,6 +12,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -67,6 +68,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
+  const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const permissionMode = useAppStore((s) => s.permissionMode);
+  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const recentProjects = useSessionStore((s) => s.recentProjects);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const addSession = useSessionStore((s) => s.addSession);
@@ -167,19 +172,25 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     if (useAppStore.getState().creatingSessionProjectPath) return;
     setCreatingSessionProjectPath(project.path);
     try {
-      let model = "kimi-for-coding";
-      try {
-        const modelRes = await window.api.getKimiModelConfig();
-        if (modelRes.success) model = modelRes.data.defaultModel?.trim() || model;
-      } catch {
-        // Keep the official built-in default.
-      }
-      const session = {
-        id: crypto.randomUUID(),
+      // 先在后端创建 runtime 会话，拿到真实 sessionId
+      const runtimeRes = await window.api.startKimiCodeRuntime({
+        workDir: project.path,
+        thinking: defaultThinking,
+        yoloMode: permissionMode === "yolo",
+        autoMode: permissionMode === "auto",
+        planMode: defaultPlanMode,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+      });
+      if (!runtimeRes.success) throw new Error(runtimeRes.error);
+
+      const session: Session = {
+        id: runtimeRes.data.sessionId,
         engine: "kimi-code" as const,
-        model,
+        model: runtimeRes.data.model ?? "kimi-for-coding",
         title: "新会话",
         projectPath: project.path,
+        runtimeSessionId: runtimeRes.data.sessionId,
+        officialSessionId: runtimeRes.data.sessionId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         events: [],
@@ -190,6 +201,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setWorkspaceView("chat");
       setCurrentSession(session);
       setExpandedProjectIds((current) => new Set([...current, project.id]));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `创建新会话失败：${message}` }));
     } finally {
       setCreatingSessionProjectPath(null);
     }
