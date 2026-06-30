@@ -3,12 +3,30 @@ type MessageEventLike = {
   message?: string;
 };
 
+/** HTTP 状态码或协议级别的 "not found" 错误识别。
+ *  优先检查 error 上的数字状态码（statusCode），正则作向后兼容兜底。 */
+const SESSION_NOT_FOUND_CODES = [404, 410, 409];
+const SESSION_NOT_FOUND_RE = /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i;
+
+function getErrorStatusCode(error: unknown): number | undefined {
+  const err = error as Record<string, unknown>;
+  return typeof err.statusCode === "number" ? err.statusCode
+    : typeof err.code === "number" ? err.code
+    : err.cause && typeof (err.cause as Record<string, unknown>).statusCode === "number"
+      ? (err.cause as Record<string, unknown>).statusCode as number
+      : undefined;
+}
+
 export function isKimiCodeSessionMissingError(error: unknown) {
+  const statusCode = getErrorStatusCode(error);
+  if (statusCode !== undefined) return SESSION_NOT_FOUND_CODES.includes(statusCode);
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i.test(message);
+  return SESSION_NOT_FOUND_RE.test(message);
 }
 
 export function isKimiCodeSessionInactiveError(error: unknown) {
+  const statusCode = getErrorStatusCode(error);
+  if (statusCode !== undefined) return statusCode === 400 || statusCode === 409;
   const message = error instanceof Error ? error.message : String(error);
   return /Kimi (?:Code|Server) session is not active/i.test(message);
 }

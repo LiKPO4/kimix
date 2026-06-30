@@ -217,9 +217,25 @@ export function isKimiCodeServerSessionRoutingEnabled(
   return settings?.experimentalKimiServerSessions !== false;
 }
 
+/** HTTP 状态码或协议级别的 "not found" 错误识别。
+ *  优先检查 error 上的数字状态码，正则作向后兼容兜底。 */
+const SESSION_NOT_FOUND_CODES = [404, 410, 409];
+const SESSION_NOT_FOUND_RE = /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i;
+
+function getErrorStatusCode(error: unknown): number | undefined {
+  const err = error as Record<string, unknown>;
+  return typeof err.statusCode === "number" ? err.statusCode
+    : typeof err.code === "number" ? err.code
+    : err.cause && typeof (err.cause as Record<string, unknown>).statusCode === "number"
+      ? (err.cause as Record<string, unknown>).statusCode as number
+      : undefined;
+}
+
 export function isKimiCodeSessionMissingError(error: unknown) {
+  const statusCode = getErrorStatusCode(error);
+  if (statusCode !== undefined) return SESSION_NOT_FOUND_CODES.includes(statusCode);
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i.test(message);
+  return SESSION_NOT_FOUND_RE.test(message);
 }
 
 export function getKimiCodeSessionAlreadyExistsId(error: unknown): string | null {
@@ -976,9 +992,17 @@ export class KimiCodeServerClient {
       signal,
       headers: { accept: "application/json", ...(hasJsonBody ? { "content-type": "application/json" } : {}) },
     });
-    if (!response.ok) throw new Error(`${pathname}: HTTP ${response.status}`);
-    const envelope = await response.json() as ServerEnvelope<T>;
-    if (envelope.code !== 0) throw new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
+    if (!response.ok) {
+	      const err = new Error(`${pathname}: HTTP ${response.status}`);
+	      (err as Record<string, unknown>).statusCode = response.status;
+	      throw err;
+	    }
+	    const envelope = await response.json() as ServerEnvelope<T>;
+	    if (envelope.code !== 0) {
+	      const err = new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
+	      (err as Record<string, unknown>).statusCode = envelope.code;
+	      throw err;
+	    }
     return envelope.data;
   }
 }
