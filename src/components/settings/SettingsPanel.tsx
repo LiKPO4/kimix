@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.12.20";
+const KIMIX_VERSION = "2.12.21";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -464,6 +464,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
+  const [modelAliasesExpanded, setModelAliasesExpanded] = useState(false);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
   const [experimentalKimiServer, setExperimentalKimiServer] = useState(true);
@@ -2059,7 +2060,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>{modelConfigMessage}</div>
                         )}
                         <div className="flex flex-col" style={{ gap: 8, marginTop: 2 }}>
-                          {modelConfig.models.slice(0, 3).map((model) => {
+                          {(modelAliasesExpanded ? modelConfig.models : modelConfig.models.slice(0, 3)).map((model) => {
                             const selected = selectedModelAlias === model.alias || (!selectedModelAlias && model.isDefault);
                             const provider = modelConfig.providers.find((item) => item.name === model.provider);
                             const externalOpenAiProvider = provider?.type === "openai";
@@ -2138,7 +2139,19 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           })}
                         </div>
                         {modelConfig.models.length > 3 && (
-                          <div className="kimix-settings-permission-desc">另有 {modelConfig.models.length - 3} 个模型别名未展示。</div>
+                          <button
+                            type="button"
+                            onClick={() => setModelAliasesExpanded(!modelAliasesExpanded)}
+                            className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+                            style={{ marginTop: 10 }}
+                          >
+                            {modelAliasesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <span>
+                              {modelAliasesExpanded
+                                ? `点击折叠 ${modelConfig.models.length - 3} 个模型`
+                                : `已折叠 ${modelConfig.models.length - 3} 个模型，点击展开`}
+                            </span>
+                          </button>
                         )}
                       </>
                     ) : (
