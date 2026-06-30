@@ -428,6 +428,9 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
   return null;
 }
 
+/** 单次会话历史加载上限；超过时丢弃最早的事件以控制内存。 */
+const MAX_HISTORY_EVENTS = 2_000;
+
 async function parseKimiCodeWireEvents(wireFile: string): Promise<SessionHistoryEvent[]> {
   if (!fs.existsSync(wireFile)) return [];
   const events: SessionHistoryEvent[] = [];
@@ -442,6 +445,9 @@ async function parseKimiCodeWireEvents(wireFile: string): Promise<SessionHistory
     } catch {
       continue;
     }
+  }
+  if (events.length > MAX_HISTORY_EVENTS) {
+    events.splice(0, events.length - MAX_HISTORY_EVENTS);
   }
   return events;
 }
