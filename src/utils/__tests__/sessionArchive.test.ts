@@ -58,4 +58,16 @@ describe("official-first session archive", () => {
     expect(result).toEqual({ success: true });
     expect(archiveLocal).toHaveBeenCalledWith("local-1");
   });
+
+  it("SDK-only 会话在 Server 不可用时回退到本地归档", async () => {
+    const archiveLocal = vi.fn();
+    const result = await archiveSessionOfficialFirst(
+      session({ id: "sdk-session", runtimeSessionId: "sdk-session" }),
+      async () => { throw new Error("Session not found on Kimi Server"); },
+      archiveLocal,
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(archiveLocal).toHaveBeenCalledWith("sdk-session");
+  });
 });
