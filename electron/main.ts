@@ -1525,35 +1525,47 @@ function removeKimiModelConfig(input: unknown) {
 async function testOpenAiProviderConfig(input: unknown) {
   const config = TestOpenAiProviderConfigSchema.parse(input);
   const kimiPath = await requireKimiExecutable();
-  const env = {
-    ...process.env,
-    KIMI_MODEL_PROVIDER_TYPE: "openai",
-    KIMI_MODEL_NAME: config.model,
-    KIMI_MODEL_BASE_URL: config.baseUrl,
-    KIMI_MODEL_API_KEY: config.apiKey,
-    KIMI_MODEL_MAX_CONTEXT_SIZE: String(normalizeOpenAiProviderContextSize(config)),
-    KIMI_MODEL_DISPLAY_NAME: config.modelAlias,
-  };
-  const output = await new Promise<string>((resolve, reject) => {
-    const child = execFile(kimiPath, ["--output-format", "stream-json", "-p", "只回复 OK，不要输出其它内容。"], {
-      windowsHide: true,
-      timeout: 60000,
-      maxBuffer: 8 * 1024 * 1024,
-      env,
-    }, (error, stdout, stderr) => {
-      const text = [stdout, stderr].filter(Boolean).join("\n").trim();
-      if (error) {
-        reject(new Error(normalizeModelConfigError(text || error.message)));
-        return;
-      }
-      resolve(text);
+  // 把测试会话隔离到临时 KIMI_CODE_HOME，避免污染用户真实会话历史和当前项目侧栏。
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-provider-test-"));
+  try {
+    const env = {
+      ...process.env,
+      KIMI_CODE_HOME: tmpDir,
+      KIMI_MODEL_PROVIDER_TYPE: "openai",
+      KIMI_MODEL_NAME: config.model,
+      KIMI_MODEL_BASE_URL: config.baseUrl,
+      KIMI_MODEL_API_KEY: config.apiKey,
+      KIMI_MODEL_MAX_CONTEXT_SIZE: String(normalizeOpenAiProviderContextSize(config)),
+      KIMI_MODEL_DISPLAY_NAME: config.modelAlias,
+    };
+    const output = await new Promise<string>((resolve, reject) => {
+      const child = execFile(kimiPath, ["--output-format", "stream-json", "-p", "只回复 OK，不要输出其它内容。"], {
+        windowsHide: true,
+        timeout: 60000,
+        maxBuffer: 8 * 1024 * 1024,
+        cwd: tmpDir,
+        env,
+      }, (error, stdout, stderr) => {
+        const text = [stdout, stderr].filter(Boolean).join("\n").trim();
+        if (error) {
+          reject(new Error(normalizeModelConfigError(text || error.message)));
+          return;
+        }
+        resolve(text);
+      });
+      child.on("error", (err) => reject(new Error(normalizeModelConfigError(err.message))));
     });
-    child.on("error", (err) => reject(new Error(normalizeModelConfigError(err.message))));
-  });
-  return {
-    message: "连接测试通过",
-    output: summarizeKimiPromptOutput(output),
-  };
+    return {
+      message: "连接测试通过",
+      output: summarizeKimiPromptOutput(output),
+    };
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // 临时目录清理失败不影响测试结果
+    }
+  }
 }
 
 function summarizeKimiPromptOutput(output: string) {
