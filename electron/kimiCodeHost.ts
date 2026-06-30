@@ -807,19 +807,14 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
       await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
       return { route: "server" };
     } catch (error) {
-      console.warn("[KimiCodeServerHost] prompt failed; falling back to SDK:", error);
-      const fallback = await fallbackServerSessionToSdk(sessionId, serverManaged, error);
-      try {
-        await fallback.session.prompt(input);
-      } catch (sdkError) {
-        setStatus(sessionId, "error");
-        throw sdkError;
-      }
-      return {
-        route: "sdk-fallback",
-        fallbackReason: error instanceof Error ? error.message : String(error),
-      };
-    }
+	      console.warn("[KimiCodeServerHost] prompt failed mid-turn; error will propagate to caller without fallback:", error);
+	      // Don't fallback mid-turn: mark server runtime failure, delete server session,
+	      // next turn will naturally switch to the SDK session (still in sessions map).
+	      markServerRuntimeFailure(error);
+	      serverSessions.delete(sessionId);
+	      setStatus(sessionId, "error");
+	      throw error;
+	    }
   }
   const managed = getManagedSession(sessionId);
   scheduleServerRecovery();
