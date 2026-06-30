@@ -4075,6 +4075,7 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
     const executor = await kimiCodeHost.createSession({
       workDir: project.path,
       permission,
+      thinking: thinking ? "on" : "off",
     });
     executorSessionId = executor.sessionId;
 
