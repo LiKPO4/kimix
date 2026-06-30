@@ -98,6 +98,8 @@ export interface Session {
   officialSessionId?: string;
   /** 当前官方 runtime 已加载到的本地 Agent Skill 最新修改时间。 */
   skillRegistrySyncedAt?: number;
+  /** Kimix 官方历史映射格式版本，用于一次性刷新旧的本地事件缓存。 */
+  kimiHistoryCacheVersion?: number;
   titleLocked?: boolean;
   model?: string | null;
   longTask?: LongTaskSessionMeta;

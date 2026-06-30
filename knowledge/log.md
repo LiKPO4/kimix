@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-30
+* **History cache migration**: Added the invariant that persisted Kimi timelines carry a mapping version and stale caches reload once from official history, with richer canonical process events replacing incomplete local mirrors.
 * **Local history tool boundaries**: Recorded that Kimi wire history nests `tool.call` and `tool.result` inside loop events and these records must survive parsing for thought/tool interleaving to remain reconstructable.
 * **Assistant process timeline**: Documented that thinking phases must retain tool-call boundaries, including the official equal-timestamp think-before-tool convention, and use each phase's final natural paragraph as its collapsed summary.
 * **Safe bidirectional theme deletion**: Split local preset removal from destructive source deletion and documented the confirmation plus main-process path guard required before deleting a Kimi theme JSON.

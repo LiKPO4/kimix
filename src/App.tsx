@@ -45,6 +45,7 @@ import { useSettingsSync } from "@/hooks/useSettingsSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
+import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -176,6 +177,7 @@ function needsKimiCodeHistoryRepair(session: Session) {
     !session.archivedAt &&
     Boolean(session.projectPath) &&
     (
+      session.kimiHistoryCacheVersion !== KIMI_HISTORY_CACHE_VERSION ||
       session.events.some((event) => (
         event.type === "assistant_message" &&
         (event.content.trim().length > 0 || (event.isComplete && event.content.trim().length === 0))
@@ -202,7 +204,11 @@ function extractOfficialSessionTitle(event: unknown): string | null {
 }
 
 async function repairKimiCodeHistoryBodies(sessions: Session[]) {
-  const candidates = sessions.filter(needsKimiCodeHistoryRepair).slice(0, 12);
+  const activeSessionId = readLocalActiveContext()?.sessionId;
+  const candidates = sessions
+    .filter(needsKimiCodeHistoryRepair)
+    .sort((a, b) => Number(b.id === activeSessionId) - Number(a.id === activeSessionId))
+    .slice(0, 12);
   for (const session of candidates) {
     const sessionIds = getKimiHistorySessionIds(session);
     if (sessionIds.length === 0 || !session.projectPath) continue;
@@ -219,13 +225,15 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       const repairsMalformedMarkdown = hasMalformedAssistantMarkdown(session.events) && !hasMalformedAssistantMarkdown(historyEvents);
       const canonicalAssistantBody = assistantBodyText(historyEvents);
       const repairsStreamAssembly = Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(session.events);
-      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown && !repairsStreamAssembly) continue;
+      const hasMoreProcessDetails = hasRicherKimiProcessHistory(session.events, historyEvents);
+      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown && !repairsStreamAssembly && !hasMoreProcessDetails) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
         sessions: state.sessions.map((item) => item.id === session.id
           ? {
               ...item,
               events: historyEvents,
+              kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
               title: item.titleLocked ? item.title : deriveSessionTitle(historyEvents, item.title),
               isLoading: false,
               updatedAt,
@@ -239,6 +247,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           currentSession: {
             ...current,
             events: historyEvents,
+            kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
             title: current.titleLocked ? current.title : deriveSessionTitle(historyEvents, current.title),
             isLoading: false,
             updatedAt,
@@ -2151,7 +2160,10 @@ function App() {
                   runtimeSessionId: startRes.data.sessionId,
                   officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
                   model: runtimeOwner.model ?? startRes.data.model ?? null,
-                events: runtimeOwner.events.length > 0 ? settleInactiveEvents(runtimeOwner.events) : events,
+                events: runtimeOwner.events.length > 0 && !hasRicherKimiProcessHistory(runtimeOwner.events, events)
+                  ? settleInactiveEvents(runtimeOwner.events)
+                  : events,
+                kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
                 isLoading: false,
               });
               useSessionStore.setState((state) => ({

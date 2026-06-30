@@ -11,6 +11,7 @@ import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
+import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -432,7 +433,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     if (!session) return;
     syncProjectForSession(session);
     setCurrentSession(session);
-    if (session.events.some((event) => event.type === "user_message" || event.type === "assistant_message")) return;
+    const hasConversation = session.events.some((event) => event.type === "user_message" || event.type === "assistant_message");
+    if (hasConversation && session.kimiHistoryCacheVersion === KIMI_HISTORY_CACHE_VERSION) return;
 
     const loaded = await window.api.loadKimiCodeSession({
       workDir: session.projectPath,
@@ -449,8 +451,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     }
     updateSession(session.id, (current) => ({
       ...current,
-      events,
-      title: current.titleLocked ? current.title : deriveSessionTitle(events, current.title),
+      events: !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events,
+      kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+      title: current.titleLocked ? current.title : deriveSessionTitle(
+        !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events,
+        current.title,
+      ),
       isLoading: false,
       updatedAt: Date.now(),
     }));
@@ -778,7 +784,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.14</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.15</span>
         </button>
       </div>
     </aside>

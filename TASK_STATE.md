@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-30 v2.12.15 历史事件缓存迁移
+- 当前目标：修复 v2.12.14 已能解析官方工具事件，但 UI 仍继续显示旧缓存中“1 段巨大思考”的问题。
+- 根因：侧栏选择已有消息的会话会直接返回，不再加载官方历史；启动修复只比较正文、Markdown 和图片，不比较工具/过程事件，因此 v2.12.14 的完整 timeline 没有替换 115 条旧缓存。
+- 已完成：新增历史缓存格式版本；启动优先迁移上次查看会话；侧栏选择旧版本缓存时补做一次迁移；官方历史过程事件更丰富时替换旧缓存；版本号同步到 v2.12.15。
+- 关键文件：`src/utils/kimiHistoryCache.ts`、`src/App.tsx`、`src/components/layout/Sidebar.tsx`、`src/types/ui.ts`。
+- 验收：缓存迁移/历史/思考局部测试 6/6 通过；全量测试 38 文件、273/273 通过；`pnpm knowledge:validate`、`git diff --check` 和 `pnpm build` 通过。
+- 下一步：窄范围提交，由用户重启 v2.12.15 后直接验收同一会话。
+
 ## 2026-06-30 v2.12.14 本地历史工具边界恢复
 - 当前目标：修复 v2.12.13 重新打开旧会话后仍将全部思考合成一个巨大卡片的问题。
 - 根因：目标会话由本地 `wire.jsonl` 回放；`sessionHistory.ts` 对 `context.append_loop_event` 只放行 `content.part` 和 `step.end`，把夹在思考之间的 `tool.call` / `tool.result` 全部丢弃，导致展示层收到的工具边界为空。
