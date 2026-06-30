@@ -110,6 +110,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     }
   }, [currentProject?.id]);
 
+  const currentSessionId = currentSession?.id;
+  const currentSessionUpdatedAt = currentSession?.updatedAt;
+  const currentSessionEventsLength = currentSession?.events.length;
   useEffect(() => {
     if (!currentSession || currentSession.archivedAt || isHiddenInternalSession(currentSession)) return;
     const existing = sessions.find((session) => session.id === currentSession.id);
@@ -156,7 +159,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     ) return;
 
     updateSession(currentSession.id, () => nextSession);
-  }, [addSession, currentSession, sessions, updateSession]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addSession, currentSessionId, currentSessionUpdatedAt, currentSessionEventsLength, sessions, updateSession]);
 
   const createSessionForProject = async (project: Project) => {
     if (useAppStore.getState().creatingSessionProjectPath) return;
