@@ -1190,7 +1190,11 @@ ${isFinalStep
 
   const applyTargetStep = async (startNow: boolean) => {
     if (!liveCurrentSession?.longTask || targetStepBusy) return;
-    const target = Number(targetStepDraft);
+    const draftNumber = Number(targetStepDraft);
+    // 恢复场景（startNow === true）下 draft 为空时回退到持久化的 targetStep
+    const target = (Number.isInteger(draftNumber) && draftNumber >= 1)
+      ? draftNumber
+      : (startNow ? liveCurrentSession.longTask.targetStep : 0);
     if (!Number.isInteger(target) || target < 1) {
       showToast("请输入有效步骤");
       return;
