@@ -5,7 +5,8 @@ type MessageEventLike = {
 
 /** HTTP 状态码或协议级别的 "not found" 错误识别。
  *  优先检查 error 上的数字状态码（statusCode），正则作向后兼容兜底。 */
-const SESSION_NOT_FOUND_CODES = [404, 410, 409];
+// 404=不存在 410=已归档；409 是 Conflict（非 missing），归 inactive 检查
+const SESSION_NOT_FOUND_CODES = [404, 410];
 const SESSION_NOT_FOUND_RE = /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i;
 
 function getErrorStatusCode(error: unknown): number | undefined {

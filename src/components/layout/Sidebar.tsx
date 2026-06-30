@@ -13,6 +13,7 @@ import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { reportError } from "@/utils/reportError";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -201,10 +202,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setWorkspaceView("chat");
       setCurrentSession(session);
       setExpandedProjectIds((current) => new Set([...current, project.id]));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `创建新会话失败：${message}` }));
-    } finally {
+	    } catch (err) {
+	      reportError(err, { context: "createSessionForProject", userVisible: true });
+	    } finally {
       setCreatingSessionProjectPath(null);
     }
   };
@@ -287,9 +287,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     const targets = sessions.filter((session) => isSameProjectPath(session.projectPath, project.path) && !session.archivedAt && !isHiddenInternalSession(session));
     const results = await Promise.all(targets.map((session) => archiveSession(session.id)));
     const archivedIds = new Set(targets.filter((_, index) => results[index].success).map((session) => session.id));
+    const archivedRuntimeIds = new Set(targets.filter((t) => archivedIds.has(t.id)).map((t) => t.runtimeSessionId).filter(Boolean));
     const failedCount = results.length - archivedIds.size;
     if (currentSession && archivedIds.has(currentSession.id)) {
       setCurrentSession(null);
+    }
+    // 批量归档运行中会话时清理 runningSessionId
+    if (runningSessionId && (archivedIds.has(runningSessionId) || archivedRuntimeIds.has(runningSessionId))) {
+      setRunningSessionId(null);
     }
     setOpenProjectMenu(null);
     if (targets.length === 0) toast("没有可归档的对话");

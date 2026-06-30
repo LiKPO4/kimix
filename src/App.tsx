@@ -590,25 +590,28 @@ function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "an
 }
 
 /**
- * 在 runtime 会话结束时清理不再需要的 per-runtime ref 条目。
- * 这些 ref 只有 add 没有 delete，长期运行会累积无引用条目。
+ * 在 runtime 会话终止时清理不用的 per-runtime ref 条目。
+ * notifiedQuestionRequestRef 仅在 error/interrupted 时清理，
+ * 以免同一 runtime 在新轮中丢掉 question 去重。
  */
 function cleanupRuntimeRefs(
   runtimeSessionId: string,
+  terminalStatus: "completed" | "error" | "interrupted",
   refs: {
     notifiedQuestionRequest: Set<string>;
     hiddenLongTaskEvents: Map<string, TimelineEvent[]>;
     longTaskReviewDispatch: Set<string>;
   },
 ) {
-  // notifiedQuestionRequestRef 键为 `${runtimeSessionId}:${requestId}`
-  for (const key of refs.notifiedQuestionRequest) {
-    if (key.startsWith(`${runtimeSessionId}:`)) {
-      refs.notifiedQuestionRequest.delete(key);
+  // 仅 error/interrupted 清理 question 去重记录；completed 保留以保护新轮去重
+  if (terminalStatus !== "completed") {
+    for (const key of refs.notifiedQuestionRequest) {
+      if (key.startsWith(`${runtimeSessionId}:`)) {
+        refs.notifiedQuestionRequest.delete(key);
+      }
     }
   }
   refs.hiddenLongTaskEvents.delete(runtimeSessionId);
-  // longTaskReviewDispatchRef 键为 `${uiSessionId}:${runtimeSessionId}:${eventsLength}`
   for (const key of refs.longTaskReviewDispatch) {
     if (key.includes(`:${runtimeSessionId}:`)) {
       refs.longTaskReviewDispatch.delete(key);
@@ -2545,7 +2548,7 @@ function App() {
 
       if (!["completed", "error", "interrupted"].includes(payload.status)) return;
 
-      cleanupRuntimeRefs(payload.sessionId, {
+      cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
         notifiedQuestionRequest: notifiedQuestionRequestRef.current,
         hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
         longTaskReviewDispatch: longTaskReviewDispatchRef.current,
@@ -2634,7 +2637,7 @@ function App() {
         return;
       }
 
-      cleanupRuntimeRefs(payload.sessionId, {
+      cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
         notifiedQuestionRequest: notifiedQuestionRequestRef.current,
         hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
         longTaskReviewDispatch: longTaskReviewDispatchRef.current,
