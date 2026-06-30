@@ -44,6 +44,7 @@ import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { logError } from "@/utils/reportError";
 
 function isBackgroundTaskTerminalStatus(status: string) {
   return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
@@ -1068,7 +1069,7 @@ export function AppShell() {
           targetStep: latestSession.longTask.targetStep,
           reviewedReviewItems: latestSession.longTask.reviewedReviewItems ?? [],
         },
-      }).catch(() => {});
+      }).catch(logError("updateLongTaskState"));
     }
   };
 

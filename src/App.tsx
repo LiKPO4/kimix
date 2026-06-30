@@ -1107,7 +1107,7 @@ function App() {
       setRunningSessionId(null);
       const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId || item.runtimeSessionId === sessionId);
       const runtimeSessionId = resolveRuntimeSessionId(sessionId);
-      window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => {});
+      window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(logError("cancelKimiCodeTurn"));
     }
   }, [setRunningSessionId]);
 
@@ -2314,7 +2314,7 @@ function App() {
     const finishHandoffJob = async (job: HandoffJob, status: "completed" | "error" | "interrupted") => {
       handoffJobRef.current = null;
       window.clearTimeout(job.timeoutId);
-      void window.api.closeKimiCodeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
+      void window.api.closeKimiCodeSession({ sessionId: job.runtimeSessionId }).catch(logError("closeKimiCodeSession"));
       if (status !== "completed") {
         setHandoffSessionId(null);
         setRunningSessionId(null);
@@ -2392,7 +2392,7 @@ function App() {
         if (job?.timeoutId) window.clearTimeout(job.timeoutId);
         setHandoffSessionId(null);
         setRunningSessionId(null);
-        if (job?.runtimeSessionId) void window.api.closeKimiCodeSession({ sessionId: job.runtimeSessionId }).catch(() => {});
+        if (job?.runtimeSessionId) void window.api.closeKimiCodeSession({ sessionId: job.runtimeSessionId }).catch(logError("closeKimiCodeSession"));
         updateRecommendationEvent(detail.sourceSessionId, detail.recommendationEventId, {
           handoffStatus: "error",
           handoffError: err instanceof Error ? err.message : String(err),

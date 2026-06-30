@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -18,6 +18,7 @@ import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { logError } from "@/utils/reportError";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -907,7 +908,7 @@ export function Composer() {
             targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
             // Re-apply the current UI permission mode so a resumed session honours
             // full-access (yolo) instead of keeping its persisted permission.
-            await window.api.setKimiCodePermission({ sessionId: resumeRes.data.sessionId, mode: permissionMode }).catch(() => {});
+            await window.api.setKimiCodePermission({ sessionId: resumeRes.data.sessionId, mode: permissionMode }).catch(logError("setKimiCodePermission"));
             updateLinkStatus("消息发送中", "info");
             return resumeRes.data.sessionId;
           }

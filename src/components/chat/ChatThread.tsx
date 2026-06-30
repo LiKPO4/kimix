@@ -18,6 +18,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { logError } from "@/utils/reportError";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
@@ -1077,7 +1078,7 @@ export function ChatThread() {
           currentSessionId: session?.id,
           matches: session?.id === primingSessionId,
         });
-        window.api.writeDiag?.({ message: "[ChatThread] rAF setPrimedSessionId", data: { primingSessionId, currentSessionId: session?.id, matches: session?.id === primingSessionId } }).catch(() => {});
+        window.api.writeDiag?.({ message: "[ChatThread] rAF setPrimedSessionId", data: { primingSessionId, currentSessionId: session?.id, matches: session?.id === primingSessionId } }).catch(logError("writeDiag"));
         setPrimedSessionId(primingSessionId);
         window.requestAnimationFrame(settleSessionAtBottom);
       });
