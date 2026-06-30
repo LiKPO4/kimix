@@ -1066,11 +1066,10 @@ export async function archiveSession(sessionId: string): Promise<void> {
     return;
   }
   if (!shouldRouteNewSessionToServer()) {
-    if (sessions.has(sessionId)) {
-      // SDK-only session: there is no official archive state, so let the renderer hide the local mirror.
-      throw new Error("Session not found on Kimi Server");
-    }
-    throw new Error("当前兼容链路未公开归档接口，请启用 Kimi Server 后重试。");
+    // Server routing is unavailable and this session is not actively managed by the Server.
+    // Signal a missing-session error so the renderer can hide the local mirror. The archived
+    // tombstone will prevent the session from being resurrected on the next reconciliation.
+    throw new Error("Session not found on Kimi Server");
   }
   await getServerClient().archiveSession(sessionId);
 }
