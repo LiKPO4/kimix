@@ -1052,15 +1052,25 @@ export function Composer() {
     });
   };
 
-  const appendSlashNotice = async (command: string) => {
+  const appendSlashUserMessage = async (command: string) => {
+    const targetSession = await ensureSession();
+    if (!targetSession) return;
+    const timestamp = Date.now();
+    const latestMatchingCommand = targetSession.events.findLast((event) => (
+      event.type === "user_message" &&
+      event.content.trim() === command.trim() &&
+      Math.abs(timestamp - event.timestamp) <= 10_000
+    ));
+    if (latestMatchingCommand) return;
     await appendLocalEvent({
       id: genId(),
-      type: "status_update",
-      timestamp: Date.now(),
-      message: `已接收本地指令：${command}`,
-      source: "slash",
-      tone: "info",
+      type: "user_message",
+      timestamp,
+      content: command,
     });
+    window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
+      detail: { sessionId: targetSession.id },
+    }));
   };
 
   const appendAssistantNotice = async (content: string) => {
@@ -1223,6 +1233,8 @@ export function Composer() {
     }
     syncOfficialGoal(runtime.uiSessionId, res.data.goal);
     await sendPromptContent(rawCommand, {
+      addUserEvent: false,
+      manualSubmitAutoScroll: false,
       outboundContent: buildGoalKickoffPrompt(objective),
       skipClarification: true,
     });
@@ -1238,13 +1250,15 @@ export function Composer() {
     if (routing !== "local" && routing !== "official-skill-first") return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name === "theme") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       setWorkspaceView("settings");
       await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的主题选择器，Kimix 使用独立的全局主题色板。");
       return true;
     }
     if (name === "custom-theme") {
       await sendPromptContent(content.trim(), {
+        addUserEvent: false,
+        manualSubmitAutoScroll: false,
         outboundContent: buildCustomThemeKickoffPrompt(args),
         skipClarification: true,
         postUserStatusMessage: `官方 Skill 不可用，已使用兼容兜底：${commandNotice}`,
@@ -1252,7 +1266,7 @@ export function Composer() {
       return true;
     }
     if (name === "import-from-cc-codex") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const [subcommand, previewId] = args.split(/\s+/);
       if (subcommand === "apply") {
         if (!previewId) {
@@ -1308,7 +1322,7 @@ export function Composer() {
       return true;
     }
     if (name === "goal") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       return handleGoalSlashCommand(content.trim(), args);
     }
     if (name === "swarm") {
@@ -1316,12 +1330,12 @@ export function Composer() {
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       if (!args) {
-        await appendSlashNotice(commandNotice);
+        await appendSlashUserMessage(commandNotice);
         await appendStatusMessage("请输入 Swarm 任务，例如：/swarm 并行检查最近改动并给出修复建议；也可使用 /swarm on 或 /swarm off 切换模式。");
         return true;
       }
       if (normalized === "on" || normalized === "off") {
-        await appendSlashNotice(commandNotice);
+        await appendSlashUserMessage(commandNotice);
         const enabled = normalized === "on";
         const res = await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, enabled, trigger: "manual" });
         await appendStatusMessage(res.success ? (enabled ? "Swarm 模式已开启。" : "Swarm 模式已关闭。") : `Swarm 模式切换失败：${res.error}`);
@@ -1371,7 +1385,7 @@ export function Composer() {
       return true;
     }
     if (name === "compact") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const res = await window.api.compactKimiCodeSession({ sessionId: runtime.runtimeSessionId, instruction: args || undefined });
@@ -1379,7 +1393,7 @@ export function Composer() {
       return true;
     }
     if (name === "plan") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const normalized = args.toLowerCase();
       const next = normalized === "on" || normalized === "true" || normalized === "1"
         ? true
@@ -1398,7 +1412,7 @@ export function Composer() {
       return true;
     }
     if (name === "reload") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const res = await window.api.reloadKimiCodeSession({ sessionId: runtime.runtimeSessionId });
@@ -1406,7 +1420,7 @@ export function Composer() {
       return true;
     }
     if (name === "status") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const res = await window.api.getKimiCodeStatus({ sessionId: runtime.runtimeSessionId });
@@ -1414,7 +1428,7 @@ export function Composer() {
       return true;
     }
     if (name === "usage") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const res = await window.api.getKimiCodeUsage({ sessionId: runtime.runtimeSessionId });
@@ -1422,7 +1436,7 @@ export function Composer() {
       return true;
     }
     if (name === "btw") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       if (!args) {
         await appendStatusMessage("请输入侧问内容，例如：/btw 这个函数是谁调用的？");
         return true;
@@ -1447,7 +1461,7 @@ export function Composer() {
       return true;
     }
     if (name === "undo") {
-      await appendSlashNotice(commandNotice);
+      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const rawCount = Number(args || "1");
@@ -1622,6 +1636,7 @@ export function Composer() {
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
       }
+      await appendSlashUserMessage(trimmed);
       await applySkillCommand(skillName, skillArgs || undefined);
       return;
     }
@@ -1637,6 +1652,7 @@ export function Composer() {
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
       }
+      await appendSlashUserMessage(trimmed);
       const activated = await applySkillCommand(slashName, slashArgs, {
         allowMigration: false,
         refreshRegistry: false,

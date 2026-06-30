@@ -448,6 +448,22 @@ describe("mergeEvents", () => {
     expect(result).toHaveLength(2);
   });
 
+  it("deduplicates an optimistic built-in Skill command against the official echo", () => {
+    const existing: TimelineEvent[] = [
+      { id: "local-skill", type: "user_message", timestamp: 1_000, content: "/custom-theme 做一套蓝色海盐风格主题" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "official-skill",
+      type: "user_message",
+      timestamp: 2_000,
+      content: "/custom-theme 做一套蓝色海盐风格主题",
+    };
+
+    const result = mergeEvents(existing, incoming);
+
+    expect(result).toEqual(existing);
+  });
+
   it("updates steer_message status on duplicate", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "steer_message", timestamp: 1, content: "Fix it", status: "sending" },

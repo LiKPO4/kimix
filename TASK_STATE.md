@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-06-30 v2.12.10 slash 命令用户消息可见性
+- 当前目标：修复 v2.12.9 官方 Skill/直接命令发送后只有状态气泡、缺少原始用户消息的问题。
+- 原因：Skill 激活切换到官方 activation API 后不再经过普通 prompt，原先由 prompt 发送链自动创建的 `user_message` 随之消失；官方实时事件在截图场景只产生 Skill 状态，没有稳定补回用户消息。
+- 已完成：统一新增 slash 用户消息写入；官方 built-in Skill、`/skill:*`、Kimix 本地命令和直接 API 命令都会先显示原始命令；custom-theme 兼容兜底和 Goal 后续 prompt 禁止重复添加用户消息；复用 10 秒用户消息去重窗口吸收官方回放。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/utils/__tests__/eventMapper.test.ts`、版本号三处、`knowledge/architecture/runtime-routing.md`。
+- 验收：`eventMapper.test.ts` 67/67 通过；全量测试 33 文件、262/262 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过；`git diff --check` 通过（仅 CRLF 提示）。
+- 下一步：窄范围提交，由用户截图验收 v2.12.10。
+
 ## 2026-06-30 v2.12.9 官方内置命令路由审计
 - 当前目标：审计仍由 Kimix 本地模拟或兼容处理的 slash 命令，优先切换到 Kimi Code 0.20.2 官方能力。
 - 现场证据：本机和 npm latest 均为 Kimi Code 0.20.2；隔离 Server 会话的官方 Skill 清单共 25 项，其中 `custom-theme`、`import-from-cc-codex`、`mcp-config` 均为 `source=builtin` 且 `disable_model_invocation=true`；官方 Server 提供 session-scoped Skill activation REST 路由。

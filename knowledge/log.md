@@ -1,6 +1,7 @@
 # Kimix Knowledge Update Log
 
 ## 2026-06-30
+* **Visible slash command invariant**: Slash commands handled outside the generic prompt path now append the original command as an optimistic user message before dispatch; matching official Skill echoes are deduplicated so commands remain visible without duplicate bubbles.
 * **Official slash routing**: Confirmed Kimi Code 0.20.2 exposes `custom-theme`, `import-from-cc-codex`, and `mcp-config` as built-in user-only Skills and documented that Kimix must activate Skills and dispatch Server-supported session commands through official APIs before generic prompt submission; Goal, Swarm, and reload remain SDK-only compatibility boundaries.
 
 ## 2026-06-29
