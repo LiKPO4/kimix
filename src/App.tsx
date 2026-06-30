@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useCallback } from "react";
+﻿import { useEffect, useRef, useCallback, useMemo } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
@@ -1089,26 +1089,34 @@ function App() {
     }
   }, [setRunningSessionId]);
 
-  useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
-  useBootstrap({
-    setTheme,
-    setThemePalette,
-    setCustomThemePalette,
-    setKimiThemePalettes,
-    setPermissionMode,
-    setDefaultThinking,
-    setDefaultPlanMode,
-    setAdditionalWorkDirs,
-    setDetailedContext,
-    setStatusUpdateDisplay,
-    setSessionRecommendationEnabled,
-    setSessionRecommendationTurnLimit,
-    setVoiceShortcut,
-    setNotificationMode,
-    setClarificationToolMode,
-    setFilePreviewExtensions,
-    setRecentProjects,
-  });
+	  useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
+	  const bootstrapSetters = useMemo(() => ({
+	    setTheme,
+	    setThemePalette,
+	    setCustomThemePalette,
+	    setKimiThemePalettes,
+	    setPermissionMode,
+	    setDefaultThinking,
+	    setDefaultPlanMode,
+	    setAdditionalWorkDirs,
+	    setDetailedContext,
+	    setStatusUpdateDisplay,
+	    setSessionRecommendationEnabled,
+	    setSessionRecommendationTurnLimit,
+	    setVoiceShortcut,
+	    setNotificationMode,
+	    setClarificationToolMode,
+	    setFilePreviewExtensions,
+	    setRecentProjects,
+	  }), [
+	    setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
+	    setPermissionMode, setDefaultThinking, setDefaultPlanMode,
+	    setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
+	    setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
+	    setVoiceShortcut, setNotificationMode, setClarificationToolMode,
+	    setFilePreviewExtensions, setRecentProjects,
+	  ]);
+	  useBootstrap(bootstrapSetters);
 
   useEffect(() => {
     const projectPath = currentProject?.path;
