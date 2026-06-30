@@ -578,6 +578,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         isComplete: true,
       };
 
+    case "tool.call":
     case "tool.call.started": {
       const args = payloadValue(payload, source, "args");
       return {

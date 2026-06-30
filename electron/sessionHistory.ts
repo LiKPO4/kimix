@@ -367,7 +367,7 @@ function parseEventPayload(
   return { ok: true, value: { type, payload } };
 }
 
-function parseKimiCodeRecord(record: Record<string, unknown>): SessionHistoryEvent | null {
+export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHistoryEvent | null {
   // New-format: { message: { type, payload } } (same as old wire format after passthrough).
   if (record.message && typeof record.message === "object") {
     const message = record.message as { type?: unknown; payload?: unknown };
@@ -416,6 +416,9 @@ function parseKimiCodeRecord(record: Record<string, unknown>): SessionHistoryEve
     const event = record.event as { type?: unknown; part?: unknown; time?: unknown };
     if (event.type === "content.part" && event.part && typeof event.part === "object") {
       return { type: "ContentPart", payload: event.part, time: event.time ?? record.time };
+    }
+    if (event.type === "tool.call" || event.type === "tool.result") {
+      return { type: event.type, payload: event, time: event.time ?? record.time };
     }
     if (event.type === "step.end") {
       return { type: "TurnEnd", payload: {}, time: event.time ?? record.time };

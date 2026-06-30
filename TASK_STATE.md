@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-06-30 v2.12.14 本地历史工具边界恢复
+- 当前目标：修复 v2.12.13 重新打开旧会话后仍将全部思考合成一个巨大卡片的问题。
+- 根因：目标会话由本地 `wire.jsonl` 回放；`sessionHistory.ts` 对 `context.append_loop_event` 只放行 `content.part` 和 `step.end`，把夹在思考之间的 `tool.call` / `tool.result` 全部丢弃，导致展示层收到的工具边界为空。
+- 已完成：历史解析器保留 loop 内工具调用和结果；事件映射器兼容官方 `tool.call` 名称；新增真实 wire 结构回归测试；版本号同步到 v2.12.14。
+- 关键文件：`electron/sessionHistory.ts`、`src/utils/eventMapper.ts`、`src/utils/__tests__/sessionHistory.test.ts`。
+- 现场证据：目标 turn 的官方 wire 含 29 段 `think` 和 30 次 `tool.call`，v2.12.13 显示为 1 段思考确认是历史工具边界丢失。
+- 验收：思考/历史局部测试 4/4 通过；全量测试 37 文件、271/271 通过；`pnpm knowledge:validate`、`git diff --check` 和 `pnpm build` 通过。
+- 下一步：窄范围提交，由用户重新打开同一历史会话截图验收 v2.12.14。
+
 ## 2026-06-30 v2.12.13 思考与工具时间线恢复
 - 当前目标：修复 turn 级合并将多段思考挤在一起、工具调用无法夹回原位置，以及折叠标题未使用官方阶段总结的问题。
 - 根因：Kimix 合并 Assistant 过程事件后按文本长度拆分思考，没有使用仍保留在 `thinkingParts` 和工具事件上的时间戳边界；官方历史中每个 step 的最终 `think` 与随后 `tool.call` 共用时间戳。
