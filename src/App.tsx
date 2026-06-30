@@ -589,6 +589,33 @@ function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "an
   ));
 }
 
+/**
+ * 在 runtime 会话结束时清理不再需要的 per-runtime ref 条目。
+ * 这些 ref 只有 add 没有 delete，长期运行会累积无引用条目。
+ */
+function cleanupRuntimeRefs(
+  runtimeSessionId: string,
+  refs: {
+    notifiedQuestionRequest: Set<string>;
+    hiddenLongTaskEvents: Map<string, TimelineEvent[]>;
+    longTaskReviewDispatch: Set<string>;
+  },
+) {
+  // notifiedQuestionRequestRef 键为 `${runtimeSessionId}:${requestId}`
+  for (const key of refs.notifiedQuestionRequest) {
+    if (key.startsWith(`${runtimeSessionId}:`)) {
+      refs.notifiedQuestionRequest.delete(key);
+    }
+  }
+  refs.hiddenLongTaskEvents.delete(runtimeSessionId);
+  // longTaskReviewDispatchRef 键为 `${uiSessionId}:${runtimeSessionId}:${eventsLength}`
+  for (const key of refs.longTaskReviewDispatch) {
+    if (key.includes(`:${runtimeSessionId}:`)) {
+      refs.longTaskReviewDispatch.delete(key);
+    }
+  }
+}
+
 function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSessionId: string) {
   return Boolean(
     session?.longTask &&
@@ -2518,6 +2545,12 @@ function App() {
 
       if (!["completed", "error", "interrupted"].includes(payload.status)) return;
 
+      cleanupRuntimeRefs(payload.sessionId, {
+        notifiedQuestionRequest: notifiedQuestionRequestRef.current,
+        hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
+        longTaskReviewDispatch: longTaskReviewDispatchRef.current,
+      });
+
       flushStreamEvents();
       void refreshOfficialGoalState(uiSessionId, payload.sessionId);
       goalLastRefreshRef.current.set(`${uiSessionId}:${payload.sessionId}`, Date.now());
@@ -2600,6 +2633,12 @@ function App() {
       if (!["completed", "error", "interrupted"].includes(payload.status)) {
         return;
       }
+
+      cleanupRuntimeRefs(payload.sessionId, {
+        notifiedQuestionRequest: notifiedQuestionRequestRef.current,
+        hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
+        longTaskReviewDispatch: longTaskReviewDispatchRef.current,
+      });
 
       const uiSessionId = statusUiSessionId;
       const terminalStatus = payload.status as "completed" | "error" | "interrupted";
