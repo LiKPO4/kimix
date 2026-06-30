@@ -5,7 +5,7 @@ import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, R
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
-import { kimiThemePaletteId, THEME_PALETTES, upsertKimiThemePresets } from "@/utils/themePalettes";
+import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
 import {
   applySessionBackupImportPlan,
   buildSessionBackupSnapshot,
@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.12.10";
+const KIMIX_VERSION = "2.12.11";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -1021,10 +1021,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       setThemeScanMessage(`扫描失败：${preview.error}`);
       return;
     }
-    if (preview.data.items.length === 0) {
-      setThemeScanMessage("未发现官方主题 JSON。可先发送 /custom-theme 让官方 Skill 生成主题。");
-      return;
-    }
     const presets: KimiThemePreset[] = preview.data.items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -1034,11 +1030,28 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       palette: item.kimiColors,
       colors: item.colors,
     }));
-    const next = upsertKimiThemePresets(kimiThemePalettes, presets);
-    setKimiThemePalettes(next);
+    const reconciled = reconcileKimiThemePresetsFromDirectory(
+      kimiThemePalettes,
+      presets,
+      preview.data.themesDir,
+    );
+    setKimiThemePalettes(reconciled.presets);
     const firstNew = presets[0];
+    const activeThemeStillExists = reconciled.presets.some((preset) => (
+      kimiThemePaletteId(preset.id) === themePalette
+    ));
     if (firstNew) setThemePalette(kimiThemePaletteId(firstNew.id));
-    setThemeScanMessage(`已登记/更新 ${presets.length} 套官方 KIMI 主题。`);
+    else if (themePalette.startsWith("kimi:") && !activeThemeStillExists) setThemePalette(DEFAULT_THEME_PALETTE_ID);
+    if (presets.length === 0) {
+      setThemeScanMessage(reconciled.removed > 0
+        ? `未发现官方主题 JSON，已移除 ${reconciled.removed} 条失效主题记录。`
+        : "未发现官方主题 JSON。可先发送 /custom-theme 让官方 Skill 生成主题。");
+      return;
+    }
+    setThemeScanMessage([
+      `已登记/更新 ${presets.length} 套官方 KIMI 主题。`,
+      reconciled.removed > 0 ? `已移除 ${reconciled.removed} 条失效记录。` : "",
+    ].filter(Boolean).join(" "));
   };
 
   const activeKimiTheme = themePalette.startsWith("kimi:")

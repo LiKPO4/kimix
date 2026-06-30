@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-06-30 v2.12.11 主题扫描清理失效记录
+- 当前目标：修复 Agent 删除主题 JSON 后，Kimix 再扫描仍显示对应主题的问题。
+- 根因：`scanOfficialKimiThemes()` 只用 `upsertKimiThemePresets()` 追加/更新扫描结果，不会移除 `~/.kimix/settings.json` 中已经失去源文件的旧主题记录；不是官方重新下载主题。
+- 现场证据：`C:\Users\Administrator\.kimi-code\themes` 已不存在用户所述新主题文件；主题扫描读取该目录，而 Kimix 设置会独立持久化已导入的主题列表。
+- 已完成：新增按扫描目录双向对账；移除同目录下源文件已消失的记录，保留其他目录及无来源路径记录；空目录也会清理旧记录；失效的当前 KIMI 主题回退默认方案；版本号同步到 v2.12.11。
+- 关键文件：`src/utils/themePalettes.ts`、`src/components/settings/SettingsPanel.tsx`、`src/utils/__tests__/themePalettes.test.ts`、版本号三处。
+- 验收：`themePalettes.test.ts` 2/2 通过；全量测试 34 文件、264/264 通过；`pnpm knowledge:validate` 通过；`pnpm build` 通过；`git diff --check` 通过（仅 CRLF 提示）。
+- 下一步：窄范围提交，由用户扫描并截图验收 v2.12.11。
+
 ## 2026-06-30 v2.12.10 slash 命令用户消息可见性
 - 当前目标：修复 v2.12.9 官方 Skill/直接命令发送后只有状态气泡、缺少原始用户消息的问题。
 - 原因：Skill 激活切换到官方 activation API 后不再经过普通 prompt，原先由 prompt 发送链自动创建的 `user_message` 随之消失；官方实时事件在截图场景只产生 Skill 状态，没有稳定补回用户消息。

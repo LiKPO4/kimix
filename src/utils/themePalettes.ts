@@ -183,6 +183,46 @@ export function upsertKimiThemePresets(current: KimiThemePreset[], incoming: Kim
   return list;
 }
 
+function normalizeThemeSourcePath(value: string) {
+  return value.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function themeSourceDirectory(filePath: string) {
+  const normalized = normalizeThemeSourcePath(filePath);
+  const separatorIndex = normalized.lastIndexOf("/");
+  return separatorIndex >= 0 ? normalized.slice(0, separatorIndex) : "";
+}
+
+export function reconcileKimiThemePresetsFromDirectory(
+  current: KimiThemePreset[],
+  incoming: KimiThemePreset[],
+  themesDir: string,
+) {
+  const normalizedDir = normalizeThemeSourcePath(themesDir);
+  const normalizedIncoming = incoming
+    .map(normalizeKimiThemePreset)
+    .filter((item): item is KimiThemePreset => Boolean(item));
+  const incomingPaths = new Set(
+    normalizedIncoming
+      .map((item) => item.path ? normalizeThemeSourcePath(item.path) : "")
+      .filter(Boolean),
+  );
+  const managedCurrent = current.filter((item) => (
+    item.path && themeSourceDirectory(item.path) === normalizedDir
+  ));
+  const retained = current.filter((item) => (
+    !item.path || themeSourceDirectory(item.path) !== normalizedDir
+  ));
+  const removed = managedCurrent.filter((item) => (
+    item.path && !incomingPaths.has(normalizeThemeSourcePath(item.path))
+  )).length;
+
+  return {
+    presets: upsertKimiThemePresets(retained, normalizedIncoming),
+    removed,
+  };
+}
+
 export function getThemePaletteColors(id: ThemePaletteId, custom: ThemePaletteColors): ThemePaletteColors {
   if (id === "custom") return normalizeThemePaletteColors(custom);
   if (isKimiThemePaletteId(id)) return DEFAULT_CUSTOM_THEME_PALETTE;
