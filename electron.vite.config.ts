@@ -59,15 +59,5 @@ export default defineConfig({
         'lucide-react',
       ],
     },
-    server: {
-      warmup: {
-        clientFiles: [
-          './index.html',
-          './src/main.tsx',
-          './src/App.tsx',
-          './src/index.css',
-        ],
-      },
-    },
   },
 })
