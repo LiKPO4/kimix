@@ -1119,15 +1119,14 @@ export function ChatThread() {
    */
   useEffect(() => {
     if (!session?.id) return;
-    const sessionId = session.id;
     const start = Date.now();
     const id = window.setInterval(() => {
-      if (Date.now() - start > 3000) {
+      if (Date.now() - start > 3000 || userScrollRef.current) {
         window.clearInterval(id);
         return;
       }
-      const latest = useLiveSession(sessionId);
-      if (!latest || userScrollRef.current) {
+      const node = scrollRef.current;
+      if (!node) {
         window.clearInterval(id);
         return;
       }
