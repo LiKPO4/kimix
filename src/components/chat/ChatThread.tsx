@@ -1098,6 +1098,13 @@ export function ChatThread() {
     };
   }, [session?.id]);
 
+  /** Scroll to bottom when the container becomes visible (primedSessionId set). */
+  useLayoutEffect(() => {
+    if (primedSessionId) {
+      settleSessionAtBottom();
+    }
+  }, [primedSessionId]);
+
   useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
