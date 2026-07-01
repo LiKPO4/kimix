@@ -917,6 +917,7 @@ export function ChatThread() {
     const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
     const delta = nextOffsetTop - anchor.offsetTop;
     if (Math.abs(delta) > 0.5) {
+      window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor APPLY", data: { anchorKey: anchor.key, prevOffset: anchor.offsetTop, newOffset: nextOffsetTop, delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight } }).catch(() => {});
       node.scrollTop += delta;
     }
     return true;
@@ -1332,6 +1333,9 @@ export function ChatThread() {
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
     const isScrollingUp = previousScrollTop !== null && node.scrollTop < previousScrollTop - 0.5;
+    if (isScrollingUp || (previousScrollTop !== null && Math.abs(node.scrollTop - previousScrollTop) > 5)) {
+      window.api.writeDiag?.({ message: "[ChatThread] handleScroll change", data: { scrollTop: node.scrollTop, previousScrollTop, isScrollingUp, delta: node.scrollTop - (previousScrollTop ?? node.scrollTop), distance: node.scrollHeight - node.scrollTop - node.clientHeight, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current } }).catch(() => {});
+    }
     lastScrollTopRef.current = node.scrollTop;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
