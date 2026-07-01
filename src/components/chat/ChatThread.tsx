@@ -1098,11 +1098,18 @@ export function ChatThread() {
     };
   }, [session?.id]);
 
-  /** Scroll to bottom when the container becomes visible (primedSessionId set). */
+  /** Scroll to bottom when the container becomes visible (primedSessionId set).
+   *  Must use direct scrollToBottom rather than settleSessionAtBottom because
+   *  the latter can bail when autoFollowRef or userScrollRef are stale, and the
+   *  settle-timer loop is too indirect for the first-visibility paint window. */
   useLayoutEffect(() => {
-    if (primedSessionId) {
-      settleSessionAtBottom();
-    }
+    if (!primedSessionId) return;
+    scrollToBottom("auto");
+    // Belt-and-suspenders: a second pass after the browser has laid out all
+    // children (covers async images, font load, etc.).
+    window.requestAnimationFrame(() => {
+      scrollToBottom("auto");
+    });
   }, [primedSessionId]);
 
   useLayoutEffect(() => {
