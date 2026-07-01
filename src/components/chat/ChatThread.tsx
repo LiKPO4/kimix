@@ -19,6 +19,7 @@ import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { logError } from "@/utils/reportError";
+import { shouldPauseAutoFollowForScroll, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
@@ -726,6 +727,7 @@ export function ChatThread() {
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const userScrollResizeRestoreUntilRef = useRef(0);
+  const userScrollIntentUntilRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
@@ -887,6 +889,15 @@ export function ChatThread() {
       autoFollowRef.current = false;
       updateAutoFollow(false);
     }
+  };
+
+  const markUserScrollIntent = () => {
+    userScrollIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
+  };
+
+  const markPointerScrollIntent = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (event.button === 1 || event.clientX >= rect.right - 20) markUserScrollIntent();
   };
 
   const captureResizeScrollAnchor = () => {
@@ -1072,6 +1083,7 @@ export function ChatThread() {
     lastScrollSizeRef.current = null;
     lastScrollTopRef.current = null;
     userScrollResizeRestoreUntilRef.current = 0;
+    userScrollIntentUntilRef.current = 0;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
@@ -1300,18 +1312,23 @@ export function ChatThread() {
     const node = scrollRef.current;
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
-    const isScrollingUp = previousScrollTop !== null && node.scrollTop < previousScrollTop - 0.5;
     lastScrollTopRef.current = node.scrollTop;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
-    // Middle-mouse autoscroll does not dispatch wheel events, so an upward
-    // scroll is a reliable signal that the user is taking manual control even
-    // inside the ignore window that follows programmatic bottom-scrolls.
-    if (isScrollingUp && autoFollowRef.current) {
+    // Browser clamping after content shrink can also move scrollTop upward.
+    // Only explicit, recent input is allowed to hand control to the user.
+    const now = Date.now();
+    if (shouldPauseAutoFollowForScroll({
+      previousScrollTop,
+      currentScrollTop: node.scrollTop,
+      autoFollow: autoFollowRef.current,
+      intentUntil: userScrollIntentUntilRef.current,
+      now,
+    })) {
+      userScrollIntentUntilRef.current = 0;
       pauseAutoFollowForUser();
     }
-    const now = Date.now();
     if (now < ignoreScrollUntilRef.current) return;
     if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
       userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
@@ -1392,9 +1409,9 @@ export function ChatThread() {
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
         style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
         onScroll={handleScroll}
-        onPointerDown={pauseAutoFollowForUser}
-        onWheel={pauseAutoFollowForUser}
-        onTouchStart={pauseAutoFollowForUser}
+        onPointerDown={markPointerScrollIntent}
+        onWheel={markUserScrollIntent}
+        onTouchStart={markUserScrollIntent}
       >
         <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
           {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}

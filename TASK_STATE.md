@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-01 v2.12.52 首次会话自动置底
+- 当前目标：修复软件启动后第一次打开会话先到底、随后因内容收缩跳回中段的问题。
+- 根因：浏览器在异步历史修复/布局 settle 后会 clamp `scrollTop`；旧 `handleScroll` 仅凭向上位移就判定用户接管，调用 `pauseAutoFollowForUser()` 清空仍应有效的自动置底窗口。
+- 已完成：新增短时用户滚动意图判定；只有滚轮、触摸、中键自动滚动或滚动条拖动后的真实向上滚动才暂停 auto-follow，内容 shrink/clamp 不再误杀；版本号同步到 v2.12.52。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/utils/scrollIntent.ts`。
+- 验收：局部测试 3/3、全量测试 40 文件 288/288、知识库校验、`git diff --check` 与生产构建通过；启动后的首次会话实机滚动待用户验收。
+- 下一步：用户完全退出并启动 v2.12.52，第一次打开长会话观察 3-5 秒；若仍跳动，继续记录异步 history repair 前后的 render item 数量和末项 DOM 位置。
+
 ## 2026-07-01 v2.12.28 会话模型弹窗与切换
 - 当前目标：在会话底栏提供常用 Agent 软件式的模型弹窗和当前会话切模能力。
 - 已确认：Kimi Code Host 已有官方会话级 `setModel()`；Server 走 session profile，SDK 走 `session.setModel()`。Kimix 原底栏入口只打开设置页，且默认模型显示优先级高于会话模型。
