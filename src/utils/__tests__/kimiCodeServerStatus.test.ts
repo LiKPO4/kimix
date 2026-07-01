@@ -1,7 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { serverStatusToAgentEvent } from "../../../electron/kimiCodeHost";
+import { missingOpenAiModelOutputLimitPatch, serverStatusToAgentEvent } from "../../../electron/kimiCodeHost";
 
 describe("Kimi Server session status adapter", () => {
+  it("adds a conservative output limit lazily for an OpenAI-compatible alias", () => {
+    expect(missingOpenAiModelOutputLimitPatch({
+      providers: { gateway: { type: "openai" } },
+      models: { "gateway/deepseek": { provider: "gateway", model: "deepseek", maxContextSize: 1_000_000 } },
+    }, "gateway/deepseek")).toEqual({
+      models: {
+        "gateway/deepseek": {
+          provider: "gateway",
+          model: "deepseek",
+          maxContextSize: 1_000_000,
+          maxOutputSize: 65536,
+        },
+      },
+    });
+  });
+
+  it("keeps managed and already bounded models unchanged", () => {
+    expect(missingOpenAiModelOutputLimitPatch({
+      providers: { kimi: { type: "kimi" }, gateway: { type: "openai" } },
+      models: {
+        kimi: { provider: "kimi", model: "kimi-for-coding", maxContextSize: 262144 },
+        bounded: { provider: "gateway", model: "bounded", maxContextSize: 100000, maxOutputSize: 8192 },
+      },
+    }, "kimi")).toBeNull();
+    expect(missingOpenAiModelOutputLimitPatch({
+      providers: { gateway: { type: "openai" } },
+      models: { bounded: { provider: "gateway", model: "bounded", maxOutputSize: 8192 } },
+    }, "bounded")).toBeNull();
+  });
+
   it("maps official context fields to the existing SDK status event", () => {
     expect(serverStatusToAgentEvent({
       status: "idle",

@@ -1208,7 +1208,6 @@ function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
     `provider = "${escapeTomlString(config.providerName)}"`,
     `model = "${escapeTomlString(config.model)}"`,
     `max_context_size = ${maxContextSize}`,
-    `max_output_size = ${Math.min(65536, maxContextSize)}`,
     `display_name = "${escapeTomlString(config.modelAlias)}"`,
     ...(disableAdaptiveThinking ? ["adaptive_thinking = false"] : []),
     KIMIX_MODEL_CONFIG_END,
@@ -1386,7 +1385,6 @@ async function saveOpenAiProviderConfigWithSdk(input: unknown) {
           provider: config.providerName,
           model: config.model,
           maxContextSize: normalizeOpenAiProviderContextSize(config),
-          maxOutputSize: Math.min(65536, normalizeOpenAiProviderContextSize(config)),
           displayName: config.modelAlias,
           adaptiveThinking: `${config.providerName} ${config.baseUrl} ${config.model}`.toLowerCase().includes("deepseek") ? false : undefined,
         },
@@ -5244,23 +5242,6 @@ ipcMain.handle("kimi-code:setModel", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
     const model = typeof req.model === "string" ? req.model.trim() : "";
     if (!sessionId || !model) return { success: false, error: "Missing sessionId or model" };
-    const config = await kimiCodeHost.getConfig({ reload: true });
-    const aliasConfig = config.models?.[model];
-    const providerConfig = aliasConfig?.provider ? config.providers?.[aliasConfig.provider] : undefined;
-    if (
-      aliasConfig &&
-      providerConfig?.type === "openai" &&
-      !(typeof aliasConfig.maxOutputSize === "number" && aliasConfig.maxOutputSize > 0)
-    ) {
-      await kimiCodeHost.setConfig({
-        models: {
-          [model]: {
-            ...aliasConfig,
-            maxOutputSize: Math.min(65536, aliasConfig.maxContextSize ?? 65536),
-          },
-        },
-      });
-    }
     await kimiCodeHost.setModel(sessionId, model);
     return { success: true, data: undefined };
   } catch (err) {

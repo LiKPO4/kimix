@@ -835,6 +835,43 @@ export type KimiCodePromptRouteResult = {
   fallbackReason?: string;
 };
 
+const normalizedModelOutputLimits = new Set<string>();
+
+export function missingOpenAiModelOutputLimitPatch(
+  config: KimiCodeConfig,
+  model: string | undefined,
+): KimiCodeConfigPatch | null {
+  if (!model) return null;
+  const aliasConfig = config.models?.[model];
+  const providerConfig = aliasConfig?.provider ? config.providers?.[aliasConfig.provider] : undefined;
+  if (
+    !aliasConfig ||
+    providerConfig?.type !== "openai" ||
+    (typeof aliasConfig.maxOutputSize === "number" && aliasConfig.maxOutputSize > 0)
+  ) {
+    return null;
+  }
+  return {
+    models: {
+      [model]: {
+        ...aliasConfig,
+        maxOutputSize: Math.min(65536, aliasConfig.maxContextSize ?? 65536),
+      },
+    },
+  };
+}
+
+async function ensureModelOutputLimitBeforePrompt(model: string | undefined): Promise<void> {
+  if (!model || normalizedModelOutputLimits.has(model)) return;
+  try {
+    const patch = missingOpenAiModelOutputLimitPatch(await getConfig({ reload: true }), model);
+    if (patch) await setConfig(patch);
+    normalizedModelOutputLimits.add(model);
+  } catch (error) {
+    console.warn(`[KimiCodeHost] lazy model output-limit normalization failed for ${model}:`, error);
+  }
+}
+
 export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<KimiCodePromptRouteResult> {
   sessionId = resolveMigratedSessionId(sessionId);
   let serverManaged = serverSessions.get(sessionId);
@@ -842,6 +879,7 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
     await resumeSession(sessionId);
     serverManaged = serverSessions.get(sessionId);
   }
+  await ensureModelOutputLimitBeforePrompt(serverManaged?.model ?? sessions.get(sessionId)?.model);
   serverManaged ??= await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
