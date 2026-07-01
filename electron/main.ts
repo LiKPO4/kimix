@@ -5024,12 +5024,22 @@ function toKimiCodePromptInput(content: string, images: { name: string; dataUrl:
   ];
 }
 
+// 在会话生命周期内被自动判定为不接受图片输入的模型集合。
+const nonVisionModels = new Set<string>();
+
+function markModelAsNonVision(model: string | null | undefined): void {
+  if (model) nonVisionModels.add(model);
+}
+
 function modelSupportsImages(model: string | null | undefined): boolean {
   if (!model) return true;
-  const lower = model.toLowerCase();
-  // DeepSeek API 目前不接受 image_url 消息；后续可按 catalog 能力扩展。
-  if (lower.includes("deepseek")) return false;
+  if (nonVisionModels.has(model)) return false;
   return true;
+}
+
+function isImageUnsupportedError(error: unknown): boolean {
+  const text = typeof error === "string" ? error : error instanceof Error ? error.message : String(error);
+  return /unknown variant [`'"]image_url[`'"]|expected [`'"]text[`'"]|image_url.*not supported|does not support images/i.test(text);
 }
 
 function adaptPromptForModel(
@@ -5164,12 +5174,25 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const images = parseKimiCodeImages(req.images);
     if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const model = kimiCodeHost.getSessionModel(sessionId);
+    const trySend = async (promptContent: string, promptImages: { name: string; dataUrl: string }[]) => {
+      const input = toKimiCodePromptInput(promptContent, promptImages);
+      const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
+      const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
+      return kimiCodeHost.sendPrompt(sessionId, finalInput);
+    };
     const adapted = adaptPromptForModel(content, images, model);
-    const input = toKimiCodePromptInput(adapted.content, adapted.images);
-    const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
-    const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-    const data = await kimiCodeHost.sendPrompt(sessionId, finalInput);
-    return { success: true, data };
+    try {
+      const data = await trySend(adapted.content, adapted.images);
+      return { success: true, data };
+    } catch (err) {
+      if (adapted.images.length > 0 && isImageUnsupportedError(err)) {
+        markModelAsNonVision(model);
+        const fallback = adaptPromptForModel(content, images, model);
+        const data = await trySend(fallback.content, fallback.images);
+        return { success: true, data };
+      }
+      throw err;
+    }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -5220,8 +5243,18 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
     if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const steerModel = kimiCodeHost.getSessionModel(sessionId);
     const steerAdapted = adaptPromptForModel(content, images, steerModel);
-    await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images));
-    return { success: true, data: undefined };
+    try {
+      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images));
+      return { success: true, data: undefined };
+    } catch (err) {
+      if (steerAdapted.images.length > 0 && isImageUnsupportedError(err)) {
+        markModelAsNonVision(steerModel);
+        const fallback = adaptPromptForModel(content, images, steerModel);
+        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images));
+        return { success: true, data: undefined };
+      }
+      throw err;
+    }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
