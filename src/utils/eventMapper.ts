@@ -1259,7 +1259,12 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       return appendAfterConfirmedSteer(existing, [incoming], { closeOpenAssistant: false });
     }
     if (last?.type === "status_update") {
-      return [...existing.slice(0, -1), incoming];
+      const merged: typeof last = {
+        ...last,
+        ...incoming,
+        message: incoming.message ?? last.message,
+      };
+      return [...existing.slice(0, -1), merged];
     }
     return appendAroundTrailingSteer(existing, [incoming]);
   }
