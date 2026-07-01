@@ -330,29 +330,74 @@ function firstStringValue(record: Record<string, unknown>, keys: string[]): stri
   return undefined;
 }
 
+function isShellLikeTool(toolName: string): boolean {
+  return ["shell", "bash", "cmd", "powershell", "pwsh"].some((name) => toolName.includes(name));
+}
+
+function parseShellDeletionPaths(command: string): string[] {
+  const trimmed = command.trim();
+  if (!/^\s*(rm|del|rmdir|Remove-Item|unlink)\b/i.test(trimmed)) return [];
+  const tokens = trimmed.split(/\s+/);
+  const paths: string[] = [];
+  for (let i = 1; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (!token) continue;
+    if (token.startsWith("-") || token.startsWith("/")) continue;
+    paths.push(token);
+  }
+  return paths;
+}
+
+function extractDeletedPaths(toolName: string, args: Record<string, unknown>): string[] {
+  if (["delete", "remove", "deletefile", "delete_file"].some((name) => toolName.includes(name))) {
+    const path = firstStringValue(args, ["path", "filePath", "file_path", "target", "file"]);
+    return path ? [path] : [];
+  }
+  if (isShellLikeTool(toolName)) {
+    const command = firstStringValue(args, ["command", "cmd", "script"]);
+    if (command) return parseShellDeletionPaths(command);
+  }
+  return [];
+}
+
 function createChangeSummaryFromToolCall(
   call: Extract<TimelineEvent, { type: "tool_call" }>,
   timestamp: number,
 ): TimelineEvent | null {
   const toolName = call.toolName.toLowerCase();
-  if (!["write", "edit", "multiedit"].some((name) => toolName.includes(name))) return null;
-
   const args = call.arguments ?? {};
-  const path = firstStringValue(args, ["path", "filePath", "file_path"]);
-  if (!path) return null;
-  const newText = firstStringValue(args, ["content", "newString", "new_string", "replacement", "text"]);
-  const oldText = firstStringValue(args, ["oldString", "old_string", "oldText", "old_text"]) ?? "";
-  const additions = newText !== undefined ? Math.max(0, countTextLines(newText) - countTextLines(oldText)) : 0;
-  const deletions = oldText ? Math.max(0, countTextLines(oldText) - countTextLines(newText ?? "")) : 0;
 
-  return {
-    id: generateId(),
-    type: "change_summary",
-    timestamp,
-    files: [{ path, additions, deletions }],
-    additions,
-    deletions,
-  };
+  if (["write", "edit", "multiedit"].some((name) => toolName.includes(name))) {
+    const path = firstStringValue(args, ["path", "filePath", "file_path"]);
+    if (!path) return null;
+    const newText = firstStringValue(args, ["content", "newString", "new_string", "replacement", "text"]);
+    const oldText = firstStringValue(args, ["oldString", "old_string", "oldText", "old_text"]) ?? "";
+    const additions = newText !== undefined ? Math.max(0, countTextLines(newText) - countTextLines(oldText)) : 0;
+    const deletions = oldText ? Math.max(0, countTextLines(oldText) - countTextLines(newText ?? "")) : 0;
+
+    return {
+      id: generateId(),
+      type: "change_summary",
+      timestamp,
+      files: [{ path, additions, deletions }],
+      additions,
+      deletions,
+    };
+  }
+
+  const deletedPaths = extractDeletedPaths(toolName, args);
+  if (deletedPaths.length > 0) {
+    return {
+      id: generateId(),
+      type: "change_summary",
+      timestamp,
+      files: deletedPaths.map((path) => ({ path, additions: 0, deletions: 1 })),
+      additions: 0,
+      deletions: deletedPaths.length,
+    };
+  }
+
+  return null;
 }
 
 function appendAroundTrailingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
