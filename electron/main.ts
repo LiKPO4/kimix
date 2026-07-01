@@ -5075,12 +5075,22 @@ function parseKimiCodeImages(value: unknown) {
 async function convertSessionImageHistoryToTextForModel(sessionId: string): Promise<boolean> {
   try {
     const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
-    if (!workDir) return false;
-    const shareDir = sessionHistory.resolveKimiShareDir();
-    const sessionDir = await sessionHistory.findKimiCodeSessionDir(shareDir, workDir, sessionId);
-    if (!sessionDir) return false;
-    return sessionHistory.convertSessionImageHistoryToText(sessionDir);
-  } catch {
+    if (!workDir) {
+      console.log(`[image-history-fallback] no workDir for session ${sessionId}`);
+      return false;
+    }
+    for (const shareDir of sessionHistory.candidateKimiShareDirs()) {
+      const sessionDir = await sessionHistory.findKimiCodeSessionDir(shareDir, workDir, sessionId);
+      if (sessionDir) {
+        const converted = sessionHistory.convertSessionImageHistoryToText(sessionDir);
+        console.log(`[image-history-fallback] converted=${converted} shareDir=${shareDir} sessionDir=${sessionDir}`);
+        return converted;
+      }
+    }
+    console.log(`[image-history-fallback] session dir not found for ${sessionId} workDir=${workDir}`);
+    return false;
+  } catch (err) {
+    console.error(`[image-history-fallback] failed for ${sessionId}:`, err);
     return false;
   }
 }
@@ -5202,7 +5212,12 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
         markModelAsNonVision(model);
         const converted = await convertSessionImageHistoryToTextForModel(sessionId);
         if (converted) {
-          await kimiCodeHost.reloadSession(sessionId).catch(() => {});
+          try {
+            await kimiCodeHost.reloadSession(sessionId);
+            console.log(`[image-history-fallback] reloadSession succeeded for ${sessionId}`);
+          } catch (reloadErr) {
+            console.error(`[image-history-fallback] reloadSession failed for ${sessionId}:`, reloadErr);
+          }
         }
         const fallback = adaptPromptForModel(content, images, model);
         const data = await trySend(fallback.content, fallback.images);
@@ -5268,7 +5283,12 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
         markModelAsNonVision(steerModel);
         const converted = await convertSessionImageHistoryToTextForModel(sessionId);
         if (converted) {
-          await kimiCodeHost.reloadSession(sessionId).catch(() => {});
+          try {
+            await kimiCodeHost.reloadSession(sessionId);
+            console.log(`[image-history-fallback] reloadSession succeeded for ${sessionId}`);
+          } catch (reloadErr) {
+            console.error(`[image-history-fallback] reloadSession failed for ${sessionId}:`, reloadErr);
+          }
         }
         const fallback = adaptPromptForModel(content, images, steerModel);
         await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images));

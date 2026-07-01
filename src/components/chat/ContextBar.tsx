@@ -292,21 +292,24 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
       return;
     }
     setSwitchingModel(model);
+    const switchedAt = Date.now();
+    updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: switchedAt, updatedAt: switchedAt }));
     let result;
     try {
       result = await window.api.setKimiCodeModel({ sessionId: runtimeSessionId, model });
     } catch (error) {
       setSwitchingModel(null);
+      updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: undefined, updatedAt: Date.now() }));
       showToast(`切换模型失败：${error instanceof Error ? error.message : String(error)}`);
       return;
     }
     setSwitchingModel(null);
     if (!result.success) {
+      updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: undefined, updatedAt: Date.now() }));
       showToast(`切换模型失败：${result.error}`);
       return;
     }
-    const switchedAt = Date.now();
-    updateSession(activeSession.id, (current) => ({ ...current, model, modelSwitchedAt: switchedAt, updatedAt: switchedAt }));
+    updateSession(activeSession.id, (current) => ({ ...current, model, updatedAt: switchedAt }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
     if (updated && currentSession?.id === updated.id) setCurrentSession(updated);
     setModelMenuOpen(false);

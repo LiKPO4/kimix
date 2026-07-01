@@ -2444,10 +2444,12 @@ function App() {
         mappedWithRole.type === "status_update" &&
         mappedWithRole.message?.startsWith("模型：") &&
         targetSession?.modelSwitchedAt &&
-        !targetSession.events.some((event) => event.type === "user_message" && event.timestamp > targetSession.modelSwitchedAt)
+        mappedWithRole.timestamp > targetSession.modelSwitchedAt &&
+        !targetSession.events.some((event) => event.type === "assistant_message" && event.timestamp > targetSession.modelSwitchedAt)
       ) {
         return;
       }
+
       markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
       if (mappedWithRole.type === "question_request" && mappedWithRole.status === "pending") {
         const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedWithRole)}`;
