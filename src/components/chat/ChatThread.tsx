@@ -786,12 +786,20 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
+    // 锚定最后一条事件：而不是 scrollHeight - clientHeight。
+    // 当内容 settle 后总高变化时，scrollHeight 变了会让 scrollTop 跳一大截；
+    // 锚定到具体的最后一条 DOM 元素（用 offsetTop+offsetHeight）则视觉上
+    // "同一条消息一直在视口底部"，不会让人觉得内容被截走。
+    const lastItem = node.querySelector<HTMLElement>("[data-kimix-render-key]:last-of-type");
+    let bottom: number;
+    if (lastItem) {
+      bottom = Math.max(0, lastItem.offsetTop + lastItem.offsetHeight - node.clientHeight);
+    } else {
+      bottom = Math.max(0, node.scrollHeight - node.clientHeight);
+    }
     if (behavior === "auto") {
-      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTop = bottom", data: { bottom, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTop = bottom;
     } else {
-      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTo bottom", data: { bottom, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTo({ top: bottom, behavior });
     }
     window.setTimeout(() => {
@@ -912,21 +920,17 @@ export function ChatThread() {
     const node = scrollRef.current;
     const anchor = resizeScrollAnchorRef.current;
     if (!node || !anchor?.key) {
-      window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor SKIP no anchor", data: { hasNode: !!node, hasKey: !!anchor?.key } }).catch(() => {});
       return false;
     }
     const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
     const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
     if (!target) {
-      window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor SKIP no target", data: { anchorKey: anchor.key } }).catch(() => {});
       return false;
     }
     const containerRect = node.getBoundingClientRect();
     const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
     const delta = nextOffsetTop - anchor.offsetTop;
-    window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor CALLED", data: { anchorKey: anchor.key, prevOffset: anchor.offsetTop, newOffset: nextOffsetTop, delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight } }).catch(() => {});
     if (Math.abs(delta) > 0.5) {
-      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTop += delta", data: { delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTop += delta;
     }
     return true;
@@ -994,10 +998,8 @@ export function ChatThread() {
     if (node && rect.height > 0) {
       const containerRect = node.getBoundingClientRect();
       const targetTop = node.scrollTop + rect.top - containerRect.top - Math.max(80, node.clientHeight * 0.28);
-      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTo targetTop (focusTimelineEvent)", data: { targetTop, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
     } else {
-      window.api.writeDiag?.({ message: "[ChatThread] scrollIntoView (focusTimelineEvent)", data: { stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       target.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     return true;
@@ -1005,12 +1007,9 @@ export function ChatThread() {
 
   const focusTimelineEvent = (eventId: string, searchText?: string): boolean => {
     cancelSessionAutoBottom();
-    window.api.writeDiag?.({ message: "[ChatThread] focusTimelineEvent CALL", data: { eventId, sessionId: session?.id, showOlderItems, hasPending: !!pendingFocusEventRef.current } }).catch(() => {});
     const target = findRenderedEventNode(eventId);
     if (!target) {
-      window.api.writeDiag?.({ message: "[ChatThread] focusTimelineEvent TARGET MISSING", data: { eventId, showOlderItems } }).catch(() => {});
       if (!showOlderItems) {
-        window.api.writeDiag?.({ message: "[ChatThread] focusTimelineEvent -> setShowOlderItems(true)", data: { eventId } }).catch(() => {});
         setShowOlderItems(true);
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText));
@@ -1190,17 +1189,6 @@ export function ChatThread() {
         settleSessionAtBottom();
         return;
       }
-      window.api.writeDiag?.({ message: "[ChatThread] processResize FELL THROUGH", data: {
-        remainingSessionAutoBottom: sessionAutoBottomUntilRef.current - Date.now(),
-        userScroll: userScrollRef.current,
-        autoFollow: autoFollowRef.current,
-        remainingUserScrollResizeRestore: userScrollResizeRestoreUntilRef.current - Date.now(),
-        remainingIntentionalResizeRestore: intentionalResizeRestoreUntilRef.current - Date.now(),
-        scrollTop: current.scrollTop,
-        scrollHeight: current.scrollHeight,
-        hasAnchor: !!resizeScrollAnchorRef.current,
-        anchorKey: resizeScrollAnchorRef.current?.key,
-      } }).catch(() => {});
       if (autoFollowRef.current && !userScrollRef.current) {
         scrollToBottom("auto");
         return;
@@ -1358,9 +1346,6 @@ export function ChatThread() {
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
     const isScrollingUp = previousScrollTop !== null && node.scrollTop < previousScrollTop - 0.5;
-    if (isScrollingUp || (previousScrollTop !== null && Math.abs(node.scrollTop - previousScrollTop) > 5)) {
-      window.api.writeDiag?.({ message: "[ChatThread] handleScroll change", data: { scrollTop: node.scrollTop, previousScrollTop, isScrollingUp, delta: node.scrollTop - (previousScrollTop ?? node.scrollTop), distance: node.scrollHeight - node.scrollTop - node.clientHeight, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current } }).catch(() => {});
-    }
     lastScrollTopRef.current = node.scrollTop;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
@@ -1401,9 +1386,7 @@ export function ChatThread() {
 
     useEffect(() => {
     const pending = pendingFocusEventRef.current;
-    window.api.writeDiag?.({ message: "[ChatThread] pendingFocusEvent useEffect", data: { hasPending: !!pending, pendingSession: pending?.sessionId, currentSession: session?.id, matches: pending?.sessionId === session?.id, showOlderItems, visibleItems: visibleRenderItems.length } }).catch(() => {});
     if (!pending || !session || pending.sessionId !== session.id) return;
-    window.api.writeDiag?.({ message: "[ChatThread] pendingFocusEvent -> focusTimelineEvent", data: { eventId: pending.eventId, searchText: pending.searchText } }).catch(() => {});
     window.requestAnimationFrame(() => {
       if (focusTimelineEvent(pending.eventId, pending.searchText)) {
         pendingFocusEventRef.current = null;
@@ -1412,13 +1395,11 @@ export function ChatThread() {
   }, [session?.id, visibleRenderItems.length]);
 
   useLayoutEffect(() => {
-    window.api.writeDiag?.({ message: "[ChatThread] showOlderItems effect", data: { showOlderItems, hasAnchor: !!pendingOlderItemsScrollAnchorRef.current, anchorScrollTop: pendingOlderItemsScrollAnchorRef.current?.scrollTop, anchorScrollHeight: pendingOlderItemsScrollAnchorRef.current?.scrollHeight, hasNode: !!scrollRef.current, visibleItems: visibleRenderItems.length } }).catch(() => {});
     const anchor = pendingOlderItemsScrollAnchorRef.current;
     const node = scrollRef.current;
     if (!anchor || !node || !showOlderItems) return;
     pendingOlderItemsScrollAnchorRef.current = null;
     const delta = node.scrollHeight - anchor.scrollHeight;
-    window.api.writeDiag?.({ message: "[ChatThread] showOlderItems effect APPLY", data: { anchorScrollTop: anchor.scrollTop, anchorScrollHeight: anchor.scrollHeight, currentScrollHeight: node.scrollHeight, delta, scrollTopBefore: node.scrollTop, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
     node.scrollTop = anchor.scrollTop + Math.max(0, delta);
     autoFollowRef.current = false;
     userScrollRef.current = true;
@@ -1440,7 +1421,6 @@ export function ChatThread() {
       };
       scrollTokenRef.current += 1;
     }
-    window.api.writeDiag?.({ message: "[ChatThread] expandOlderItems -> setShowOlderItems(true)", data: { anchorScrollTop: node?.scrollTop, anchorScrollHeight: node?.scrollHeight } }).catch(() => {});
     setShowOlderItems(true);
   };
 
