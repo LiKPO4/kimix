@@ -1,9 +1,50 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseKimiCodeRecord } from "../../../electron/sessionHistory";
+import { parseKimiCodeRecord, readKimiCodeSessionModelFromWire } from "../../../electron/sessionHistory";
 import { mapHistoryEvents } from "../eventMapper";
 import { buildThinkingBlocks } from "../thinkingBlocks";
 
 describe("Kimi Code wire history", () => {
+  it("uses the latest model record as the current session model", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-model-wire-"));
+    const wire = path.join(dir, "wire.jsonl");
+    fs.writeFileSync(wire, [
+      JSON.stringify({ type: "config.update", modelAlias: "kimi-code/kimi-for-coding" }),
+      JSON.stringify({ type: "config.update", modelAlias: "opencode-go/deepseek-v4-flash" }),
+      JSON.stringify({ type: "usage.record", model: "kimi-code/kimi-for-coding" }),
+    ].join("\n"));
+    try {
+      expect(readKimiCodeSessionModelFromWire(wire)).toBe("kimi-code/kimi-for-coding");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("maps turn usage to the model actually used by that response", () => {
+    const parsed = parseKimiCodeRecord({
+      type: "usage.record",
+      model: "kimi-code/kimi-for-coding",
+      usageScope: "turn",
+      usage: { inputOther: 10, inputCacheRead: 20, inputCacheCreation: 5, output: 46 },
+      time: 123,
+    });
+    expect(parsed).toMatchObject({
+      type: "StatusUpdate",
+      payload: {
+        model: "kimi-code/kimi-for-coding",
+        token_usage: { output: 46 },
+      },
+    });
+    expect(mapHistoryEvents(parsed ? [parsed] : [])).toMatchObject([{
+      type: "status_update",
+      message: "模型：kimi-code/kimi-for-coding",
+      tokenCount: 46,
+      inputTokenCount: 35,
+    }]);
+  });
+
   it("preserves tool calls nested between thinking loop events", () => {
     const time = 1_782_047_978_947;
     const records = [

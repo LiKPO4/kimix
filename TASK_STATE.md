@@ -1,11 +1,11 @@
 # Kimix 长程任务状态
 
-## 2026-07-01 v2.12.27 会话模型弹窗与切换
+## 2026-07-01 v2.12.28 会话模型弹窗与切换
 - 当前目标：在会话底栏提供常用 Agent 软件式的模型弹窗和当前会话切模能力。
 - 已确认：Kimi Code Host 已有官方会话级 `setModel()`；Server 走 session profile，SDK 走 `session.setModel()`。Kimix 原底栏入口只打开设置页，且默认模型显示优先级高于会话模型。
-- 已完成：新增会话切模 IPC；已配置别名与 Server 目录归一化并按 Provider 分组；底栏弹窗支持搜索、当前项、加载/空态/失败态和管理模型入口；运行中禁用切换；会话模型优先显示；切模空闲状态不再污染上一轮消息；第三方 OpenAI 模型缺少 `max_output_size` 时，在第一次真正发送请求前经官方配置接口静默补为 65536；版本号同步到 v2.12.27。
+- 已完成：新增会话切模 IPC 与弹窗；第三方 OpenAI 模型在首次请求前静默补输出上限；逐轮气泡模型改用官方 `usage.record`；空闲 `agent.status.updated` 不再携带模型标签；wire 当前模型改取最后一条有效记录；runtime 迁移后刷新官方状态同步底栏；版本号同步到 v2.12.28。
 - 关键文件：`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`src/components/chat/ContextBar.tsx`、`src/utils/sessionModelCatalog.ts`。
-- 验收：v2.12.27 局部测试 5/5、全量测试 278/278、知识库校验、`git diff --check` 与生产构建均通过；首次真实 Provider 请求仍待用户实机验收。
+- 验收：模型归属局部测试 98/98、全量测试 280/280、知识库校验、`git diff --check` 与生产构建均通过；已用用户实际 wire 核实截图中两轮均由 Kimi 产生，修复待 v2.12.28 实机验收。
 - 下一步：用户验收模型弹窗的空闲态、运行态与实际切换；若有视觉或 Server/SDK 切换差异，再按截图和日志窄范围调整。
 
 ## 2026-06-30 v2.12.16 图片预览右键复制

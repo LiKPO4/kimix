@@ -282,6 +282,7 @@ export function readKimiCodeSessionMetadata(
 
 export function readKimiCodeSessionModelFromWire(wireFile: string): string | null {
   if (!fs.existsSync(wireFile)) return null;
+  let latestModel: string | null = null;
   try {
     const lines = fs.readFileSync(wireFile, "utf-8").split(/\r?\n/);
     for (const line of lines) {
@@ -296,20 +297,20 @@ export function readKimiCodeSessionModelFromWire(wireFile: string): string | nul
         typeof record.modelAlias === "string" &&
         record.modelAlias.trim()
       ) {
-        return record.modelAlias.trim();
+        latestModel = record.modelAlias.trim();
       }
       if (
         record.type === "usage.record" &&
         typeof record.model === "string" &&
         record.model.trim()
       ) {
-        return record.model.trim();
+        latestModel = record.model.trim();
       }
     }
   } catch {
     return null;
   }
-  return null;
+  return latestModel;
 }
 
 export async function resolveSessionModel(
@@ -381,6 +382,27 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
     return {
       type: "TurnBegin",
       payload: { user_input: record.input },
+      time: record.time,
+    };
+  }
+
+  // A turn-scoped usage record is the authoritative model actually used for
+  // that response. Config updates only describe selection changes.
+  if (record.type === "usage.record" && record.usageScope === "turn") {
+    const usage = record.usage && typeof record.usage === "object"
+      ? record.usage as Record<string, unknown>
+      : {};
+    return {
+      type: "StatusUpdate",
+      payload: {
+        token_usage: {
+          input_other: usage.inputOther,
+          input_cache_read: usage.inputCacheRead,
+          input_cache_creation: usage.inputCacheCreation,
+          output: usage.output,
+        },
+        model: record.model,
+      },
       time: record.time,
     };
   }

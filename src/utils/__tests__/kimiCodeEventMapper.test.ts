@@ -151,6 +151,20 @@ describe("mapKimiCodeEvent", () => {
     expect(status?.type).toBe("status_update");
     expect((status as Extract<TimelineEvent, { type: "status_update" }>).inputTokenCount).toBe(15);
     expect((status as Extract<TimelineEvent, { type: "status_update" }>).tokenCount).toBe(20);
+    const idleStatus = mapKimiCodeEvent({
+      type: "agent.status.updated",
+      model: "deepseek-v4-flash",
+      contextTokens: 120,
+      maxContextTokens: 1000,
+    }, options) as Extract<TimelineEvent, { type: "status_update" }>;
+    const usageRecord = mapKimiCodeEvent({
+      type: "usage.record",
+      model: "kimi-code/kimi-for-coding",
+      usage: { inputOther: 10, inputCacheRead: 2, inputCacheCreation: 3, output: 20 },
+    }, options) as Extract<TimelineEvent, { type: "status_update" }>;
+    expect(idleStatus.message).toBeUndefined();
+    expect(usageRecord.message).toBe("模型：kimi-code/kimi-for-coding");
+    expect(usageRecord.tokenCount).toBe(20);
     expect(stepStarted).toBeNull();
     expect(stepCompleted).toBeNull();
     expect(interrupted?.type).toBe("status_update");

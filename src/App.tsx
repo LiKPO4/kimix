@@ -2518,6 +2518,15 @@ function App() {
           const latest = useSessionStore.getState().sessions.find((s) => s.id === uiSessionId);
           if (latest) useAppStore.getState().setCurrentSession(latest);
         }
+        void window.api.getKimiCodeStatus({ sessionId: payload.migratedTo }).then((response) => {
+          if (!response.success || !response.data.model) return;
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            model: response.data.model,
+            updatedAt: Date.now(),
+          }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }).catch(logError("refreshMigratedSessionModel"));
       }
 
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);

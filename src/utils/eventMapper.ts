@@ -841,7 +841,11 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         contextSize,
         contextLimit: 256000,
         planMode: typeof payload.plan_mode === "boolean" ? payload.plan_mode : undefined,
-        message: isNumber(payload.message_id) || isString(payload.message_id) ? `消息 ${payload.message_id}` : undefined,
+        message: isString(payload.model)
+          ? `模型：${payload.model}`
+          : isNumber(payload.message_id) || isString(payload.message_id)
+            ? `消息 ${payload.message_id}`
+            : undefined,
       };
     }
 

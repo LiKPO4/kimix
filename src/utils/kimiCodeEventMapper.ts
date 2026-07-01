@@ -419,6 +419,18 @@ export function mapKimiCodeEvent(
         contextSize: isNumber(event.contextTokens) ? event.contextTokens : undefined,
         contextLimit: isNumber(event.maxContextTokens) ? event.maxContextTokens : undefined,
         planMode: typeof event.planMode === "boolean" ? event.planMode : undefined,
+        message: currentTurnUsage && isString(event.model) ? `模型：${event.model}` : undefined,
+      };
+    }
+
+    case "usage.record": {
+      const usage = isRecord(event.usage) ? event.usage : {};
+      return {
+        id: getId(options),
+        type: "status_update",
+        timestamp,
+        tokenCount: usageOutput(usage),
+        inputTokenCount: usageInput(usage),
         message: isString(event.model) ? `模型：${event.model}` : undefined,
       };
     }

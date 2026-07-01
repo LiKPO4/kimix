@@ -2,6 +2,7 @@
 
 ## 2026-07-01
 
+* **Per-turn model attribution**: Historical response badges now use official turn-scoped usage records, while the footer follows the latest active runtime and is refreshed after Server-to-SDK migration.
 * **Lazy model compatibility correction**: Moved missing OpenAI-compatible `max_output_size` normalization from model selection to the first real prompt; provider resolution comes from the active configured alias and each model is checked once per process.
 * **Model-switch compatibility**: Restricted switching to configured aliases, added the missing third-party OpenAI output cap through the official config API, and prevented idle model status from rewriting the preceding turn metadata.
 * **Session-scoped model switching**: Documented that the chat footer uses official Server/SDK session model APIs, never rewrites the global default, and only updates local display state after official success while the turn is idle.
