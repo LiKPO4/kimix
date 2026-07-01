@@ -2444,10 +2444,17 @@ function App() {
         mappedWithRole.type === "status_update" &&
         mappedWithRole.message?.startsWith("模型：") &&
         targetSession?.modelSwitchedAt &&
-        mappedWithRole.timestamp > targetSession.modelSwitchedAt &&
         !targetSession.events.some((event) => event.type === "assistant_message" && event.timestamp > targetSession.modelSwitchedAt)
       ) {
-        return;
+        const modelInMessage = mappedWithRole.message.slice(3).trim();
+        const targetModel = targetSession.switchedToModel ?? targetSession.model ?? "";
+        const normalizeModel = (value: string) => value.trim().toLowerCase();
+        const matchesTarget =
+          targetModel &&
+          (normalizeModel(modelInMessage) === normalizeModel(targetModel) ||
+            normalizeModel(targetModel).endsWith(`/${normalizeModel(modelInMessage)}`) ||
+            normalizeModel(modelInMessage).endsWith(`/${normalizeModel(targetModel)}`));
+        if (matchesTarget) return;
       }
 
       markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);

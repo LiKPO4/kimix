@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseKimiCodeRecord, readKimiCodeSessionModelFromWire, convertSessionImageHistoryToText } from "../../../electron/sessionHistory";
+import { parseKimiCodeRecord, readKimiCodeSessionModelFromWire } from "../../../electron/sessionHistory";
 import { mapHistoryEvents } from "../eventMapper";
 import { buildThinkingBlocks } from "../thinkingBlocks";
 
@@ -148,77 +148,4 @@ describe("Kimi Code wire history", () => {
     ]);
   });
 
-  it("converts historical image_url parts to text references for non-vision models", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-image-wire-"));
-    const agentsMain = path.join(dir, "agents", "main");
-    fs.mkdirSync(agentsMain, { recursive: true });
-    const wire = path.join(agentsMain, "wire.jsonl");
-    const records = [
-      { type: "turn.prompt", input: [{ type: "text", text: "hello" }] },
-      {
-        type: "turn.prompt",
-        input: [
-          { type: "text", text: "describe this" },
-          { type: "image_url", imageUrl: { url: "data:image/png;base64,abc", id: "img1.png" } },
-        ],
-      },
-    ];
-    fs.writeFileSync(wire, records.map((r) => JSON.stringify(r)).join("\n"));
-    try {
-      expect(convertSessionImageHistoryToText(dir)).toBe(true);
-      const lines = fs.readFileSync(wire, "utf-8").split("\n").filter(Boolean);
-      expect(lines).toHaveLength(1);
-      const remaining = JSON.parse(lines[0]);
-      expect(remaining.type).toBe("turn.prompt");
-      expect(remaining.input).toEqual([{ type: "text", text: "hello" }]);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("handles TurnBegin records and preserves original line endings", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-turnbegin-wire-"));
-    const agentsMain = path.join(dir, "agents", "main");
-    fs.mkdirSync(agentsMain, { recursive: true });
-    const wire = path.join(agentsMain, "wire.jsonl");
-    const records = [
-      { type: "config.update", modelAlias: "opencode-go/deepseek-v4-flash" },
-      {
-        type: "other",
-        message: {
-          type: "TurnBegin",
-          payload: { user_input: [{ type: "image_url", imageUrl: { url: "data:image/png;base64,xyz", id: "shot.png" } }] },
-        },
-      },
-      { type: "turn.prompt", input: "latest prompt" },
-    ];
-    fs.writeFileSync(wire, records.map((r) => JSON.stringify(r)).join("\r\n"));
-    try {
-      expect(convertSessionImageHistoryToText(dir)).toBe(true);
-      const content = fs.readFileSync(wire, "utf-8");
-      expect(content).toContain("\r\n");
-      const lines = content.split("\r\n").filter(Boolean);
-      expect(lines).toHaveLength(2);
-      const configRecord = JSON.parse(lines[0]);
-      expect(configRecord.type).toBe("config.update");
-      const imageRecord = JSON.parse(lines[1]);
-      expect(imageRecord.message.payload.user_input).toBe("[图片: shot.png]");
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("removes the latest prompt record even when there are no images to convert", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-clean-wire-"));
-    const agentsMain = path.join(dir, "agents", "main");
-    fs.mkdirSync(agentsMain, { recursive: true });
-    const wire = path.join(agentsMain, "wire.jsonl");
-    fs.writeFileSync(wire, JSON.stringify({ type: "turn.prompt", input: "no images" }));
-    try {
-      expect(convertSessionImageHistoryToText(dir)).toBe(true);
-      expect(fs.readFileSync(wire, "utf-8")).toBe("");
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
 });

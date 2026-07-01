@@ -104,6 +104,8 @@ export interface Session {
   model?: string | null;
   /** 最近一次会话模型切换时间，用于阻止空闲状态污染上一轮消息元信息。 */
   modelSwitchedAt?: number;
+  /** 正在切换到的目标模型（API 返回前即写入），用于早于 store 更新的 SDK 事件判断。 */
+  switchedToModel?: string;
   longTask?: LongTaskSessionMeta;
   title: string;
   projectPath: string;
