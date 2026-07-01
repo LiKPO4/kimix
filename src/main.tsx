@@ -588,6 +588,13 @@ window.addEventListener("unhandledrejection", (event) => {
   showCenteredError(reason);
 });
 
+window.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r" && !event.shiftKey) {
+    event.preventDefault();
+    reloadKimixWindow();
+  }
+});
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element not found");
 const reportStartup = (label: string) => {
