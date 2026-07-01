@@ -1118,6 +1118,14 @@ export function ChatThread() {
   }, [primedSessionId]);
 
   useLayoutEffect(() => {
+    if (!session?.id || session.isLoading || primedSessionId !== session.id) return;
+    autoFollowRef.current = true;
+    userScrollRef.current = false;
+    scrollToBottom("auto");
+    window.requestAnimationFrame(settleSessionAtBottom);
+  }, [session?.id, session?.isLoading, primedSessionId]);
+
+  useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
     let resizeFrame = 0;
@@ -1353,7 +1361,7 @@ export function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
-  const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
+  const isSessionScrollPrimed = !session?.id || (primedSessionId === session.id && !session.isLoading);
 
     useEffect(() => {
     const pending = pendingFocusEventRef.current;

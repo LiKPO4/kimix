@@ -2,6 +2,7 @@
 
 ## 2026-07-01
 
+* **Startup chat reveal gate**: The cached active session can populate navigation immediately, but the chat stream is revealed only after official history hydration settles and layout-phase bottom alignment runs. See [/project/kimix.md](/project/kimix.md).
 * **Scroll intent boundary**: Documented that browser clamping after asynchronous content shrink is not user scrolling and must not cancel the session-open auto-follow window. See [/project/kimix.md](/project/kimix.md).
 * **Per-turn model attribution**: Historical response badges now use official turn-scoped usage records, while the footer follows the latest active runtime and is refreshed after Server-to-SDK migration.
 * **Lazy model compatibility correction**: Moved missing OpenAI-compatible `max_output_size` normalization from model selection to the first real prompt; provider resolution comes from the active configured alias and each model is checked once per process.

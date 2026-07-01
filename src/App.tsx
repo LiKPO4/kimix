@@ -2059,9 +2059,19 @@ function App() {
           : activeContext?.project
             ? recentProjects.find((project) => isSameLocalProjectPath(project.path, activeContext.project?.path)) ?? activeContext.project
             : payload.project;
+        const startupActiveSession = activeLocalSession
+          ? { ...activeLocalSession, isLoading: true }
+          : null;
+        if (startupActiveSession) {
+          useSessionStore.setState((state) => ({
+            sessions: state.sessions.map((session) => (
+              session.id === startupActiveSession.id ? startupActiveSession : session
+            )),
+          }));
+        }
         useAppStore.setState({
           currentProject: activeProject,
-          currentSession: activeLocalSession ?? useAppStore.getState().currentSession,
+          currentSession: startupActiveSession ?? useAppStore.getState().currentSession,
         });
 
         window.setTimeout(() => {
@@ -2237,6 +2247,21 @@ function App() {
               setRunningSessionId(null);
             } catch {
               setRunningSessionId(null);
+            } finally {
+              if (activeLocalSession) {
+                useSessionStore.setState((state) => ({
+                  sessions: state.sessions.map((session) => (
+                    session.id === activeLocalSession.id && session.isLoading
+                      ? { ...session, isLoading: false }
+                      : session
+                  )),
+                }));
+                const current = useAppStore.getState().currentSession;
+                if (current?.id === activeLocalSession.id && current.isLoading) {
+                  const settled = useSessionStore.getState().sessions.find((session) => session.id === activeLocalSession.id);
+                  if (settled) useAppStore.setState({ currentSession: settled });
+                }
+              }
             }
           })();
         }, 1_200);
