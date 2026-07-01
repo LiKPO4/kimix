@@ -115,6 +115,21 @@ function rewriteOpenAIBodyForNonVision(body: Record<string, unknown>): Record<st
   return { ...body, messages };
 }
 
+function isImageUnsupportedResponseText(text: string): boolean {
+  return /unknown variant [`'"]image_url[`'"]|expected [`'"]text[`'"]|image_url.*not supported|does not support images/i.test(text);
+}
+
+function buildRewrittenRequestBody(originalBody: string): { body: string; parsed: Record<string, unknown> } | null {
+  try {
+    const parsed = JSON.parse(originalBody) as Record<string, unknown>;
+    const rewritten = rewriteOpenAIBodyForNonVision(parsed);
+    const rewrittenBody = JSON.stringify(rewritten);
+    return { body: rewrittenBody, parsed };
+  } catch {
+    return null;
+  }
+}
+
 const NON_VISION_WRAPPED = Symbol.for("kimix.nonVisionFetchWrapped");
 
 export function installNonVisionFetchInterceptor() {
@@ -141,24 +156,41 @@ export function installNonVisionFetchInterceptor() {
       }
 
       const parsed = JSON.parse(body) as Record<string, unknown>;
-      const isNonVision = requestModelIsNonVision(parsed.model);
-      interceptorLog("info", "fetch interceptor: chat/completions request", {
-        url: urlString,
-        model: parsed.model,
-        isNonVision,
-        nonVisionModelsCount: nonVisionModels.size,
-      });
-      if (!isNonVision) {
-        return originalFetch(input, init);
+      const model = parsed.model;
+
+      if (requestModelIsNonVision(model)) {
+        interceptorLog("info", "fetch interceptor: known non-vision model, rewriting proactively", {
+          url: urlString,
+          model,
+          nonVisionModelsCount: nonVisionModels.size,
+        });
+        const rewritten = rewriteOpenAIBodyForNonVision(parsed);
+        return originalFetch(input, { ...init, body: JSON.stringify(rewritten) });
       }
 
-      const rewritten = rewriteOpenAIBodyForNonVision(parsed);
-      const rewrittenBody = JSON.stringify(rewritten);
-      interceptorLog("info", "fetch interceptor: rewrote request body for non-vision model", {
-        originalLength: body.length,
-        rewrittenLength: rewrittenBody.length,
+      // For unknown models, try the original request first.
+      interceptorLog("info", "fetch interceptor: chat/completions request", {
+        url: urlString,
+        model,
+        nonVisionModelsCount: nonVisionModels.size,
       });
-      return originalFetch(input, { ...init, body: rewrittenBody });
+      const response = await originalFetch(input, init);
+      if (!response.ok) {
+        const cloned = response.clone();
+        const text = await cloned.text().catch(() => "");
+        if (isImageUnsupportedResponseText(text)) {
+          markModelAsNonVision(model);
+          const rewritten = buildRewrittenRequestBody(body);
+          if (rewritten) {
+            interceptorLog("info", "fetch interceptor: provider rejected images, retrying with text fallback", {
+              url: urlString,
+              model,
+            });
+            return originalFetch(input, { ...init, body: rewritten.body });
+          }
+        }
+      }
+      return response;
     } catch (err) {
       interceptorLog("error", "fetch interceptor: failed to process request", {
         error: err instanceof Error ? err.message : String(err),

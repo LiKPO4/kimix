@@ -5176,21 +5176,14 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
       return kimiCodeHost.sendPrompt(sessionId, finalInput);
     };
     const adapted = adaptPromptForModel(content, images, model);
-    interceptorLog("info", "sendPrompt start", { sessionId, model, contentLength: content.length, imageCount: images.length, adaptedImageCount: adapted.images.length });
     try {
       const data = await trySend(adapted.content, adapted.images);
-      interceptorLog("info", "sendPrompt success", { sessionId, model });
       return { success: true, data };
     } catch (err) {
-      const errText = err instanceof Error ? err.message : String(err);
-      const isImageErr = isImageUnsupportedError(err);
-      interceptorLog("info", "sendPrompt caught error", { sessionId, model, isImageErr, error: errText });
-      if (isImageErr) {
+      if (isImageUnsupportedError(err)) {
         markModelAsNonVision(model);
         const fallback = adaptPromptForModel(content, images, model);
-        interceptorLog("info", "sendPrompt retrying with fallback", { sessionId, model, fallbackImageCount: fallback.images.length });
         const data = await trySend(fallback.content, fallback.images);
-        interceptorLog("info", "sendPrompt retry success", { sessionId, model });
         return { success: true, data };
       }
       throw err;
