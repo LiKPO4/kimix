@@ -295,7 +295,7 @@ function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () 
   );
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void> }) {
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError, eagerMarkdown }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; eagerMarkdown?: boolean }) {
   switch (event.type) {
     case "user_message":
       return (
@@ -307,7 +307,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
     case "steer_message":
       return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />;
     case "assistant_message":
-      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} eagerMarkdown={eagerMarkdown} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -1362,6 +1362,11 @@ export function ChatThread() {
   const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isSessionScrollPrimed = !session?.id || (primedSessionId === session.id && !session.isLoading);
+  const eagerInitialMarkdown = Boolean(session?.id && (
+    !isSessionScrollPrimed ||
+    session.isLoading ||
+    Date.now() < sessionAutoBottomUntilRef.current
+  ));
 
     useEffect(() => {
     const pending = pendingFocusEventRef.current;
@@ -1446,7 +1451,7 @@ export function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} />
+                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} eagerMarkdown={eagerInitialMarkdown} />
               }
             </div>
           ))}

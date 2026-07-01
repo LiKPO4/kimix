@@ -34,6 +34,7 @@ interface MessageBubbleProps {
   changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>;
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
+  eagerMarkdown?: boolean;
 }
 
 function timelineEventMemoKey(event: TimelineEvent) {
@@ -159,6 +160,7 @@ function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubblePr
     prev.runtimeSessionId === next.runtimeSessionId &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.hideProcessSummary === next.hideProcessSummary &&
+    prev.eagerMarkdown === next.eagerMarkdown &&
     eventArrayMemoEqual(prev.leadingTools, next.leadingTools) &&
     eventArrayMemoEqual(prev.leadingSubagents, next.leadingSubagents) &&
     eventArrayMemoEqual(prev.leadingHooks, next.leadingHooks) &&
@@ -998,7 +1000,7 @@ function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "ass
   return event.isComplete ? "已完成" : "消息处理中";
 }
 
-function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; turnStartedAt?: number; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; turnStartedAt?: number; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; eagerMarkdown?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -1063,7 +1065,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             {hasContent && (
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-                  <MarkdownRenderer content={displayContent} deferOffscreen={!isActiveAssistant && event.isComplete && displayContent.length > 1200} />
+                  <MarkdownRenderer content={displayContent} deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && displayContent.length > 1200} />
                 </div>
                 {mdArtifacts.length > 0 && (
                   <div className="flex flex-col" style={{ gap: 12 }}>
@@ -1096,12 +1098,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, eagerMarkdown }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} eagerMarkdown={eagerMarkdown} />;
 }, messageBubblePropsEqual);
