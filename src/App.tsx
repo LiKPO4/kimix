@@ -8,6 +8,7 @@ import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
+import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { reconcileOfficialSessionCatalog } from "@/utils/sessionCatalog";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -236,6 +237,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               events: historyEvents,
               kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
               title: item.titleLocked ? item.title : deriveSessionTitle(historyEvents, item.title),
+              model: getLastUsedModelFromEvents(historyEvents) ?? item.model,
               isLoading: false,
               updatedAt,
             }
@@ -250,9 +252,9 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
             events: historyEvents,
             kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
             title: current.titleLocked ? current.title : deriveSessionTitle(historyEvents, current.title),
+            model: getLastUsedModelFromEvents(historyEvents) ?? current.model,
             isLoading: false,
-            updatedAt,
-          },
+            updatedAt,          },
         });
       }
       persistLocalConversationState();

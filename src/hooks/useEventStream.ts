@@ -2,6 +2,7 @@ import { useRef, useCallback } from "react";
 import { useSessionStore } from "@/stores/sessionStore";
 import { mergeEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import type { TimelineEvent } from "@/types/ui";
 
 const STREAM_EVENT_FLUSH_MS = 80;
@@ -23,7 +24,14 @@ export function useEventStream() {
           events = mergeEvents(events, item);
         }
         const title = session.titleLocked ? session.title : deriveSessionTitle(events, session.title);
-        return { ...session, events, title, updatedAt: Date.now() };
+        const lastUsedModel = getLastUsedModelFromEvents(events);
+        return {
+          ...session,
+          events,
+          title,
+          updatedAt: Date.now(),
+          ...(lastUsedModel ? { model: lastUsedModel } : {}),
+        };
       });
     });
   }, [updateSession]);
