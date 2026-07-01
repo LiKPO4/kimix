@@ -156,6 +156,7 @@ import type {
   KimiCodeSetPluginMcpServerEnabledRequest,
   KimiCodeSetPermissionRequest,
   KimiCodeSetPlanModeRequest,
+  KimiCodeSetModelRequest,
   KimiCodeStatusPayload,
   KimiCodeStatusResponse,
   KimiCodeUsageResponse,
@@ -349,6 +350,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:cancel", req),
   setKimiCodePlanMode: (req: KimiCodeSetPlanModeRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:setPlanMode", req),
+  setKimiCodeModel: (req: KimiCodeSetModelRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:setModel", req),
   setKimiCodePermission: (req: KimiCodeSetPermissionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:setPermission", req),
   compactKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>

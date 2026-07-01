@@ -1,5 +1,10 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-01
+
+* **Model-switch compatibility**: Restricted switching to configured aliases, added the missing third-party OpenAI output cap through the official config API, and prevented idle model status from rewriting the preceding turn metadata.
+* **Session-scoped model switching**: Documented that the chat footer uses official Server/SDK session model APIs, never rewrites the global default, and only updates local display state after official success while the turn is idle.
+
 ## 2026-06-30
 
 * **Mid-turn fallback prohibition**: Added invariant #36 that Server→SDK fallback is only permitted between turns; mid-turn Server prompt failure propagates as an error and the next turn uses the existing SDK session.

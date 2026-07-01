@@ -1703,6 +1703,11 @@ export type KimiCodeSetPlanModeRequest = {
   enabled: boolean;
 };
 
+export type KimiCodeSetModelRequest = {
+  sessionId: string;
+  model: string;
+};
+
 export type KimiCodeSetPermissionRequest = {
   sessionId: string;
   mode: KimiCodePermissionMode;

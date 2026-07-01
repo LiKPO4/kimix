@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-06-30T15:10:00+08:00"
+timestamp: "2026-07-01T10:10:00+08:00"
 ---
 
 # Runtime Routing
@@ -49,6 +49,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 34. Kimix-managed foreground Server processes must not remain logically ready after the child exits. Host state returns to SDK routing when the managed process closes, and repeated WebSocket reconnect failures notify the same runtime-failure path so bounded background recovery can restart or reattach instead of leaving the renderer on a dead connection.
 	35. Opening the official Kimi Web UI is gated by `/api/v1/healthz`, not by a fixed delay or the `kimi web` launcher exit code. The launcher may exit successfully before its daemon has replaced a stale lock and bound the REST/WebSocket port. Kimix opens the authenticated session deep link only after the health envelope reports `code=0` and `data.ok=true`; timeout leaves the browser closed and reports an explicit startup error.
 	36. Server → SDK fallback is only permitted between turns, never during an active turn. A mid-turn Server prompt failure must set the session status to "error", mark the Server runtime as failed, delete the server session, and propagate the error. The next user turn discovers the existing SDK session without re-promotion, because the Server is in fallback state.
+	37. Model selection in the chat footer is session-scoped. Server sessions update the official session profile and SDK sessions call the official session `setModel`; the action must not mutate the global default model. Kimix disables switching while a turn is active and updates the visible session model only after official success. Only configured aliases are switchable and the Server catalog supplies display metadata. Before selecting a third-party OpenAI-compatible alias without `max_output_size`, Kimix applies a conservative output cap through the official config API so a large context limit cannot become an invalid `max_tokens` request.
 
 # Main Components
 

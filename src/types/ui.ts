@@ -102,6 +102,8 @@ export interface Session {
   kimiHistoryCacheVersion?: number;
   titleLocked?: boolean;
   model?: string | null;
+  /** 最近一次会话模型切换时间，用于阻止空闲状态污染上一轮消息元信息。 */
+  modelSwitchedAt?: number;
   longTask?: LongTaskSessionMeta;
   title: string;
   projectPath: string;

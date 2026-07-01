@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, CheckCircle2, Download, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, Search, Settings2, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
+import type { KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 import { compactModelDisplayName } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sessionModelCatalog";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -73,6 +76,8 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const updateSession = useSessionStore((s) => s.updateSession);
   const session = useLiveSession(currentSession?.id);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   const [workDirsOpen, setWorkDirsOpen] = useState(false);
@@ -82,18 +87,39 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const [usageLoginState, setUsageLoginState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [now, setNow] = useState(Date.now());
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [modelCatalogLoading, setModelCatalogLoading] = useState(false);
+  const [modelCatalogError, setModelCatalogError] = useState("");
+  const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(null);
+  const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
+  const [modelSearch, setModelSearch] = useState("");
+  const [switchingModel, setSwitchingModel] = useState<string | null>(null);
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const usageRequestIdRef = useRef(0);
   const workDirsRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const activeSession = session ?? currentSession;
   const projectDisplayName = displayProjectName(project);
-  const sessionHasStarted = Boolean(activeSession && activeSession.events.length > 0);
-  const sessionModel = sessionHasStarted && activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
-  const displayModel = defaultModel ?? sessionModel ?? FALLBACK_KIMI_MODEL;
+  const sessionModel = activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
+  const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
   const compactDisplayModel = compactModelDisplayName(displayModel);
-  const modelTitle = sessionModel && sessionModel === displayModel
+  const modelTitle = sessionModel
     ? `当前对话模型：${displayModel}`
     : `当前默认模型：${displayModel}`;
+  const modelOptions = useMemo(
+    () => buildSessionModelOptions(modelConfig, serverModelCatalog),
+    [modelConfig, serverModelCatalog],
+  );
+  const filteredModelOptions = useMemo(() => {
+    const query = modelSearch.trim().toLocaleLowerCase();
+    if (!query) return modelOptions;
+    return modelOptions.filter((option) => (
+      option.label.toLocaleLowerCase().includes(query) ||
+      option.id.toLocaleLowerCase().includes(query) ||
+      option.providerLabel.toLocaleLowerCase().includes(query)
+    ));
+  }, [modelOptions, modelSearch]);
+  const modelGroups = useMemo(() => groupSessionModelOptions(filteredModelOptions), [filteredModelOptions]);
   const pendingApprovalCount = activeSession?.events.filter((event) => event.type === "approval_request" && event.status === "pending").length ?? 0;
   const pendingQuestionCount = activeSession?.events.filter((event) => event.type === "question_request" && event.status === "pending").length ?? 0;
   const firstPendingApproval = activeSession?.events.find((event) => event.type === "approval_request" && event.status === "pending");
@@ -209,10 +235,82 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   };
   const toggleUsage = () => {
     const next = !usageOpen;
+    setModelMenuOpen(false);
     setUsageOpen(next);
     if (next) {
       void loadUsage();
     }
+  };
+
+  const loadModelCatalog = async () => {
+    setModelCatalogLoading(true);
+    setModelCatalogError("");
+    try {
+      const [configResult, serverResult] = await Promise.all([
+        window.api.getKimiModelConfig(),
+        window.api.getKimiCodeServerModelCatalog(),
+      ]);
+      setModelConfig(configResult.success ? configResult.data : null);
+      setServerModelCatalog(serverResult.success ? serverResult.data : null);
+      if (configResult.success) {
+        setDefaultModel(configResult.data.defaultModel?.trim() || FALLBACK_KIMI_MODEL);
+      }
+      if (!configResult.success && !serverResult.success) {
+        setModelCatalogError("暂时无法读取模型列表");
+      }
+    } catch {
+      setModelCatalogError("暂时无法读取模型列表");
+    } finally {
+      setModelCatalogLoading(false);
+    }
+  };
+
+  const toggleModelMenu = () => {
+    const next = !modelMenuOpen;
+    setUsageOpen(false);
+    setWorkDirsOpen(false);
+    setModelMenuOpen(next);
+    if (next) {
+      setModelSearch("");
+      void loadModelCatalog();
+    }
+  };
+
+  const handleSelectModel = async (model: string) => {
+    if (!activeSession || activeSession.isLoading || switchingModel) return;
+    if (isSessionRunning) {
+      showToast("本轮结束后可切换模型");
+      return;
+    }
+    if (model === sessionModel) {
+      setModelMenuOpen(false);
+      return;
+    }
+    const runtimeSessionId = getRuntimeSessionId(activeSession);
+    if (!runtimeSessionId) {
+      showToast("当前会话尚未就绪");
+      return;
+    }
+    setSwitchingModel(model);
+    let result;
+    try {
+      result = await window.api.setKimiCodeModel({ sessionId: runtimeSessionId, model });
+    } catch (error) {
+      setSwitchingModel(null);
+      showToast(`切换模型失败：${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    setSwitchingModel(null);
+    if (!result.success) {
+      showToast(`切换模型失败：${result.error}`);
+      return;
+    }
+    const switchedAt = Date.now();
+    updateSession(activeSession.id, (current) => ({ ...current, model, modelSwitchedAt: switchedAt, updatedAt: switchedAt }));
+    const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
+    if (updated && currentSession?.id === updated.id) setCurrentSession(updated);
+    setModelMenuOpen(false);
+    showToast(`已切换为 ${compactModelDisplayName(model)}`);
   };
 
   const openModelSettings = async () => {
@@ -302,7 +400,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   }, []);
 
   useEffect(() => {
-    if (!usageOpen && !workDirsOpen) return;
+    if (!usageOpen && !workDirsOpen && !modelMenuOpen) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     const handlePointerDown = (event: PointerEvent) => {
@@ -312,13 +410,21 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
       if (!workDirsRef.current?.contains(event.target as Node)) {
         setWorkDirsOpen(false);
       }
+      if (!modelMenuRef.current?.contains(event.target as Node)) {
+        setModelMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setModelMenuOpen(false);
     };
     document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [usageOpen, workDirsOpen]);
+  }, [usageOpen, workDirsOpen, modelMenuOpen]);
 
   return (
     <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ height: 36, lineHeight: "20px" }}>
@@ -456,18 +562,127 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => void openModelSettings()}
-          className="kimix-contextbar-action kimix-muted-action hidden min-w-0 items-center rounded-lg lg:flex"
-          style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
-          title={modelTitle}
-          aria-label={`${modelTitle}，打开模型设置`}
-        >
-          <Bot size={16} className="shrink-0" />
-          <span className="shrink-0" style={{ lineHeight: "20px", paddingBottom: 1 }}>模型</span>
-          <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1 }}>{compactDisplayModel}</span>
-        </button>
+        <div ref={modelMenuRef} className="relative hidden min-w-0 lg:block">
+          <button
+            type="button"
+            onClick={toggleModelMenu}
+            className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
+            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
+            title={modelTitle}
+            aria-label={`${modelTitle}，选择会话模型`}
+            aria-haspopup="menu"
+            aria-expanded={modelMenuOpen}
+          >
+            <Bot size={16} className="shrink-0" />
+            <span className="shrink-0" style={{ lineHeight: "20px", paddingBottom: 1 }}>模型</span>
+            <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1 }}>{compactDisplayModel}</span>
+            <ChevronDown size={14} className={`shrink-0 transition-transform duration-150 ${modelMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+          {modelMenuOpen && (
+            <div
+              role="menu"
+              aria-label="选择会话模型"
+              className="kimix-floating-panel absolute bottom-10 right-0 z-50 w-[330px] overflow-hidden rounded-xl"
+              style={{ padding: 12 }}
+            >
+              <div className="grid items-center" style={{ columnGap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 4, paddingRight: 4 }}>
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold leading-5 text-[var(--kimix-panel-text)]">会话模型</div>
+                  <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" title={displayModel} style={{ marginTop: 2 }}>
+                    当前：{compactDisplayModel}
+                  </div>
+                </div>
+                {isSessionRunning && (
+                  <span className="shrink-0 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">本轮结束后可切换</span>
+                )}
+              </div>
+
+              {modelOptions.length > 8 && (
+                <label className="relative block" style={{ marginTop: 12 }}>
+                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--kimix-panel-text-muted)]" />
+                  <input
+                    value={modelSearch}
+                    onChange={(event) => setModelSearch(event.target.value)}
+                    placeholder="搜索模型"
+                    className="h-9 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[13px] text-[var(--kimix-panel-text)] outline-none transition-colors focus:border-[var(--border-strong)]"
+                    style={{ paddingLeft: 34, paddingRight: 12 }}
+                    autoFocus
+                  />
+                </label>
+              )}
+
+              <div className="overflow-y-auto" style={{ maxHeight: 340, marginTop: 12, paddingRight: 2 }}>
+                {modelCatalogLoading ? (
+                  <div className="flex h-20 items-center justify-center text-[13px] text-[var(--kimix-panel-text-muted)]" style={{ gap: 8 }}>
+                    <Loader2 size={15} className="animate-spin" />
+                    正在读取模型
+                  </div>
+                ) : modelGroups.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--kimix-panel-border-soft)] text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
+                    {modelCatalogError || (modelSearch ? "没有匹配的模型" : "尚未配置可用模型")}
+                  </div>
+                ) : (
+                  <div className="flex flex-col" style={{ gap: modelGroups.length > 1 ? 14 : 4 }}>
+                    {modelGroups.map((group) => (
+                      <section key={group.provider}>
+                        {modelGroups.length > 1 && (
+                          <div className="truncate text-[11.5px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 12, paddingRight: 12, marginBottom: 4 }}>
+                            {group.label}
+                          </div>
+                        )}
+                        <div className="flex flex-col" style={{ gap: 3 }}>
+                          {group.models.map((option) => {
+                            const selected = option.id === sessionModel || (!sessionModel && option.id === defaultModel);
+                            const switching = switchingModel === option.id;
+                            return (
+                              <button
+                                key={option.id}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={selected}
+                                disabled={isSessionRunning || Boolean(switchingModel) || activeSession?.isLoading}
+                                onClick={() => void handleSelectModel(option.id)}
+                                className="grid w-full items-center rounded-lg text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                style={{
+                                  gridTemplateColumns: "minmax(0, 1fr) 22px",
+                                  columnGap: 8,
+                                  minHeight: 40,
+                                  paddingLeft: 12,
+                                  paddingRight: 10,
+                                }}
+                                title={option.id}
+                              >
+                                <span className="min-w-0 truncate font-medium">{option.label}</span>
+                                <span className="flex h-[22px] w-[22px] items-center justify-center text-accent-primary">
+                                  {switching ? <Loader2 size={14} className="animate-spin" /> : selected ? <Check size={15} /> : null}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 12, paddingTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModelMenuOpen(false);
+                    void openModelSettings();
+                  }}
+                  className="kimix-icon-text-button kimix-muted-action w-full justify-start rounded-lg"
+                  style={{ minHeight: 36, paddingLeft: 12, paddingRight: 12 }}
+                >
+                  <Settings2 size={15} />
+                  <span>管理模型</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => void handleKimiStatusClick()}

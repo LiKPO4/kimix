@@ -441,6 +441,7 @@ function installBrowserPreviewApi() {
     undoKimiCodeHistory: (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined }),
     cancelKimiCodeTurn: (): Promise<VoidResponse> => fail("停止 Kimi Code"),
     setKimiCodePlanMode: (): Promise<VoidResponse> => fail("切换 Kimi Code Plan 模式"),
+    setKimiCodeModel: (): Promise<VoidResponse> => fail("切换 Kimi Code 会话模型"),
     setKimiCodePermission: (): Promise<VoidResponse> => fail("切换 Kimi Code 权限"),
     archiveKimiCodeSession: (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined }),
     respondKimiCodeApproval: (): Promise<VoidResponse> => fail("响应 Kimi Code 审批"),
