@@ -51,7 +51,7 @@ function useAnimatedDots(active: boolean) {
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
-const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 20_000;
+const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 60_000;
 const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
 const SESSION_LAYOUT_STABLE_MS = 320;
 const SESSION_LAYOUT_STABLE_PASSES = 3;
@@ -1135,7 +1135,7 @@ export function ChatThread() {
     if (!session?.id) return;
     const start = Date.now();
     const id = window.setInterval(() => {
-      if (Date.now() - start > 3000 || userScrollRef.current) {
+      if (Date.now() - start > 30000 || userScrollRef.current) {
         window.clearInterval(id);
         return;
       }
@@ -1227,7 +1227,8 @@ export function ChatThread() {
   }, [session?.id, showOlderItems]);
 
   useLayoutEffect(() => {
-    const isSettlingOpenedSession = Date.now() < sessionAutoBottomUntilRef.current && !userScrollRef.current;
+    if (!session) return;
+    const isSettlingOpenedSession = Date.now() < sessionAutoBottomUntilRef.current;
     if (isSettlingOpenedSession) {
       autoFollowRef.current = true;
       updateAutoFollow(true);
