@@ -786,25 +786,7 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    // 锚定最后一条事件：而不是 scrollHeight - clientHeight。
-    // 当内容 settle 后总高变化时，scrollHeight 变了会让 scrollTop 跳一大截；
-    // 锚定到具体的最后一条 DOM 元素（用 getBoundingClientRect 算相对位置）
-    // 则视觉上"同一条消息一直在视口底部"，不会让人觉得内容被截走。
-    //
-    // 注意：不能用 offsetTop，因为事件 DOM 嵌在 streamContentRef 里，
-    // offsetTop 是相对 offsetParent 的，不是相对 scroll 容器。
-    const lastItem = node.querySelector<HTMLElement>("[data-kimix-render-key]:last-of-type");
-    let bottom: number;
-    if (lastItem) {
-      const itemRect = lastItem.getBoundingClientRect();
-      const containerRect = node.getBoundingClientRect();
-      // item 在 scroll 容器内容里的 top/bottom（已加 scrollTop 转成容器坐标系）
-      const itemTopInContainer = itemRect.top - containerRect.top + node.scrollTop;
-      const itemBottomInContainer = itemTopInContainer + lastItem.offsetHeight;
-      bottom = Math.max(0, itemBottomInContainer - node.clientHeight);
-    } else {
-      bottom = Math.max(0, node.scrollHeight - node.clientHeight);
-    }
+    const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
     if (behavior === "auto") {
       node.scrollTop = bottom;
     } else {
@@ -1358,14 +1340,16 @@ export function ChatThread() {
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
-    // Middle-mouse autoscroll does not dispatch wheel events, so an upward
-    // scroll is a reliable signal that the user is taking manual control even
-    // inside the ignore window that follows programmatic bottom-scrolls.
-    if (isScrollingUp && autoFollowRef.current) {
-      pauseAutoFollowForUser();
-    }
     const now = Date.now();
     const ignoreWindow = now < ignoreScrollUntilRef.current;
+    // Middle-mouse autoscroll does not dispatch wheel events, so an upward
+    // scroll is a reliable signal that the user is taking manual control.
+    // MUST be after the ignore check - otherwise programmatic scrollTop
+    // changes (browser clamp when content shrinks) would be mistaken for
+    // user scrolling and permanently kill the auto-follow settle process.
+    if (isScrollingUp && autoFollowRef.current && !ignoreWindow) {
+      pauseAutoFollowForUser();
+    }
     if (ignoreWindow) return;
     if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
       userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
@@ -1451,7 +1435,7 @@ export function ChatThread() {
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col justify-end" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
+        <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
           {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
           {visibleRenderItems.map((item) => (
             <div
