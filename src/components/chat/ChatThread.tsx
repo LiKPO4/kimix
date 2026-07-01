@@ -909,15 +909,21 @@ export function ChatThread() {
   const restoreResizeScrollAnchor = () => {
     const node = scrollRef.current;
     const anchor = resizeScrollAnchorRef.current;
-    if (!node || !anchor?.key) return false;
+    if (!node || !anchor?.key) {
+      window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor SKIP no anchor", data: { hasNode: !!node, hasKey: !!anchor?.key } }).catch(() => {});
+      return false;
+    }
     const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
     const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
-    if (!target) return false;
+    if (!target) {
+      window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor SKIP no target", data: { anchorKey: anchor.key } }).catch(() => {});
+      return false;
+    }
     const containerRect = node.getBoundingClientRect();
     const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
     const delta = nextOffsetTop - anchor.offsetTop;
+    window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor CALLED", data: { anchorKey: anchor.key, prevOffset: anchor.offsetTop, newOffset: nextOffsetTop, delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight } }).catch(() => {});
     if (Math.abs(delta) > 0.5) {
-      window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor APPLY", data: { anchorKey: anchor.key, prevOffset: anchor.offsetTop, newOffset: nextOffsetTop, delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight } }).catch(() => {});
       node.scrollTop += delta;
     }
     return true;
@@ -1176,6 +1182,17 @@ export function ChatThread() {
         settleSessionAtBottom();
         return;
       }
+      window.api.writeDiag?.({ message: "[ChatThread] processResize FELL THROUGH", data: {
+        remainingSessionAutoBottom: sessionAutoBottomUntilRef.current - Date.now(),
+        userScroll: userScrollRef.current,
+        autoFollow: autoFollowRef.current,
+        remainingUserScrollResizeRestore: userScrollResizeRestoreUntilRef.current - Date.now(),
+        remainingIntentionalResizeRestore: intentionalResizeRestoreUntilRef.current - Date.now(),
+        scrollTop: current.scrollTop,
+        scrollHeight: current.scrollHeight,
+        hasAnchor: !!resizeScrollAnchorRef.current,
+        anchorKey: resizeScrollAnchorRef.current?.key,
+      } }).catch(() => {});
       if (autoFollowRef.current && !userScrollRef.current) {
         scrollToBottom("auto");
         return;
