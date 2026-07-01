@@ -19,7 +19,8 @@ if "%~1"=="--clean" (
 ) else if "%~1"=="--dev" (
   echo Starting Kimix in hot-reload dev mode.
 ) else (
-  echo Starting built Kimix quickly (use --dev for hot reload, --clean for full rebuild).
+  echo Starting Kimix quickly. Auto-switches to dev mode if uncommitted changes exist.
+  echo Use --dev to force hot reload, --clean for full rebuild.
 )
 echo.
 

@@ -21,6 +21,15 @@ function Test-ContainsIgnoreCase {
   return $Text.IndexOf($Needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
+function Test-GitWorkspaceDirty {
+  try {
+    $status = & git -C $workspace status --porcelain 2>$null
+    return $status -ne $null -and $status.Length -gt 0
+  } catch {
+    return $false
+  }
+}
+
 function Stop-KimixProcessTree {
   $all = Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe", "electron.exe", "node.exe", "esbuild.exe") }
   $targetIds = New-Object "System.Collections.Generic.HashSet[int]"
@@ -117,6 +126,9 @@ if ($fullClean) {
     if (-not (Test-Path -LiteralPath $outMarker)) {
       Write-Host "No built output found; falling back to dev mode."
       $hotReloadDev = $true
+    } elseif (Test-GitWorkspaceDirty) {
+      Write-Host "Uncommitted source changes detected; starting dev mode for hot reload."
+      $hotReloadDev = $true
     }
   }
 }
@@ -130,5 +142,5 @@ if ($hotReloadDev) {
   if (-not (Test-Path -LiteralPath $mainBundle) -or -not (Test-Path -LiteralPath $rendererIndex)) {
     pnpm build
   }
-  & $electronBin .
+  Start-Process -FilePath $electronBin -ArgumentList "." -WorkingDirectory $workspace
 }
