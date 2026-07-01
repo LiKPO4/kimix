@@ -50,5 +50,24 @@ export default defineConfig({
         '@': path.resolve(__dirname, 'src'),
       },
     },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom/client',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+        'lucide-react',
+      ],
+    },
+    server: {
+      warmup: {
+        clientFiles: [
+          './index.html',
+          './src/main.tsx',
+          './src/App.tsx',
+          './src/index.css',
+        ],
+      },
+    },
   },
 })
