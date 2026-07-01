@@ -825,8 +825,17 @@ export function ChatThread() {
     };
     sessionAutoBottomStableRef.current = nextStable;
     if (nextStable.count >= SESSION_LAYOUT_STABLE_PASSES) {
-      clearSessionAutoBottomTimer();
-      return;
+      const node = scrollRef.current;
+      const distance = node ? node.scrollHeight - node.scrollTop - node.clientHeight : 0;
+      if (
+        distance <= 80 ||
+        !autoFollowRef.current ||
+        userScrollRef.current ||
+        Date.now() >= sessionAutoBottomUntilRef.current
+      ) {
+        clearSessionAutoBottomTimer();
+        return;
+      }
     }
     clearSessionAutoBottomTimer();
     sessionAutoBottomTimerRef.current = window.setTimeout(() => {
