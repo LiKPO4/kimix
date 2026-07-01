@@ -597,3 +597,122 @@ export async function getSessionHistoryById(
   }
   return [];
 }
+
+
+// ---------------------------------------------------------------------------
+// Non-vision model fallback: convert image parts in wire history to text.
+// ---------------------------------------------------------------------------
+
+function convertWireRecordImageParts(record: unknown): unknown {
+  if (!record || typeof record !== "object") return record;
+  const rec = record as Record<string, unknown>;
+
+  if (rec.type === "turn.prompt" && rec.input !== undefined) {
+    const converted = convertPromptInputToText(rec.input);
+    if (converted !== rec.input) return { ...rec, input: converted };
+  }
+
+  if (rec.message && typeof rec.message === "object") {
+    const msg = rec.message as Record<string, unknown>;
+    if (msg.type === "TurnBegin" && msg.payload && typeof msg.payload === "object") {
+      const payload = msg.payload as Record<string, unknown>;
+      if (payload.user_input !== undefined) {
+        const converted = convertPromptInputToText(payload.user_input);
+        if (converted !== payload.user_input) {
+          return {
+            ...rec,
+            message: { ...msg, payload: { ...payload, user_input: converted } },
+          };
+        }
+      }
+    }
+  }
+
+  return record;
+}
+
+function convertPromptInputToText(input: unknown): unknown {
+  if (typeof input === "string") return input;
+  if (!Array.isArray(input)) return input;
+
+  const textParts: string[] = [];
+  const imageRefs: string[] = [];
+  let hasImage = false;
+
+  for (const part of input) {
+    if (!part || typeof part !== "object") continue;
+    const p = part as Record<string, unknown>;
+    if (p.type === "text" && typeof p.text === "string") {
+      textParts.push(p.text);
+    } else if (p.type === "image_url") {
+      hasImage = true;
+      const imageUrl = p.imageUrl as Record<string, unknown> | undefined;
+      const id = imageUrl?.id;
+      const name = typeof id === "string" && id.trim() ? id : "[图片]";
+      imageRefs.push(`[图片: ${name}]`);
+    }
+  }
+
+  if (!hasImage) return input;
+
+  const combined = [...textParts, ...imageRefs].join("\n");
+  return combined || "";
+}
+
+/**
+ * Converts historical image_url parts in a session's wire.jsonl to text references.
+ * Removes the most recent user prompt record (turn.prompt / TurnBegin) so that the
+ * caller can retry the same prompt without duplicating the turn.
+ * Returns true if the wire file was modified.
+ */
+export function convertSessionImageHistoryToText(sessionDir: string): boolean {
+  const wireFile = getNewKimiWireFile(sessionDir);
+  if (!fs.existsSync(wireFile)) return false;
+
+  const content = fs.readFileSync(wireFile, "utf-8");
+  const lineEnding = content.includes("\r\n") ? "\r\n" : "\n";
+  const lines = content.split(lineEnding);
+
+  // Remove the most recent user prompt record so the caller can retry cleanly.
+  let lastPromptIndex = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    try {
+      const record = JSON.parse(line) as { type?: string; message?: { type?: string } };
+      if (record.type === "turn.prompt" || record.message?.type === "TurnBegin") {
+        lastPromptIndex = i;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+  if (lastPromptIndex >= 0) {
+    lines.splice(lastPromptIndex, 1);
+  }
+
+  let modified = lastPromptIndex >= 0;
+  const newLines = lines.map((line) => {
+    if (!line.trim()) return line;
+    try {
+      const record = JSON.parse(line);
+      const converted = convertWireRecordImageParts(record);
+      if (converted !== record) modified = true;
+      return JSON.stringify(converted);
+    } catch {
+      return line;
+    }
+  });
+
+  if (!modified) return false;
+
+  const backupFile = `${wireFile}.kimix-text-backup`;
+  try {
+    fs.copyFileSync(wireFile, backupFile);
+  } catch {
+    // Continue without backup if it fails.
+  }
+  fs.writeFileSync(wireFile, newLines.join(lineEnding), "utf-8");
+  return true;
+}

@@ -5072,6 +5072,19 @@ function parseKimiCodeImages(value: unknown) {
     : [];
 }
 
+async function convertSessionImageHistoryToTextForModel(sessionId: string): Promise<boolean> {
+  try {
+    const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
+    if (!workDir) return false;
+    const shareDir = sessionHistory.resolveKimiShareDir();
+    const sessionDir = await sessionHistory.findKimiCodeSessionDir(shareDir, workDir, sessionId);
+    if (!sessionDir) return false;
+    return sessionHistory.convertSessionImageHistoryToText(sessionDir);
+  } catch {
+    return false;
+  }
+}
+
 function normalizeAdditionalDirs(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -5185,8 +5198,12 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
       const data = await trySend(adapted.content, adapted.images);
       return { success: true, data };
     } catch (err) {
-      if (adapted.images.length > 0 && isImageUnsupportedError(err)) {
+      if (isImageUnsupportedError(err)) {
         markModelAsNonVision(model);
+        const converted = await convertSessionImageHistoryToTextForModel(sessionId);
+        if (converted) {
+          await kimiCodeHost.reloadSession(sessionId).catch(() => {});
+        }
         const fallback = adaptPromptForModel(content, images, model);
         const data = await trySend(fallback.content, fallback.images);
         return { success: true, data };
@@ -5247,8 +5264,12 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
       await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images));
       return { success: true, data: undefined };
     } catch (err) {
-      if (steerAdapted.images.length > 0 && isImageUnsupportedError(err)) {
+      if (isImageUnsupportedError(err)) {
         markModelAsNonVision(steerModel);
+        const converted = await convertSessionImageHistoryToTextForModel(sessionId);
+        if (converted) {
+          await kimiCodeHost.reloadSession(sessionId).catch(() => {});
+        }
         const fallback = adaptPromptForModel(content, images, steerModel);
         await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images));
         return { success: true, data: undefined };
