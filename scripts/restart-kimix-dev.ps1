@@ -6,6 +6,7 @@ $pnpmPath = "C:\Users\lijialin08\AppData\Roaming\npm"
 $env:Path = "$nodePath;$pnpmPath;$env:Path"
 $fullClean = $args -contains "--clean"
 $hotReloadDev = $args -contains "--dev"
+$fastLaunch = $args -contains "--fast"
 
 function Test-InWorkspace {
   param([string]$Path)
@@ -96,7 +97,25 @@ function Stop-KimixProcessTree {
   }
 }
 
+Set-Location $workspace
 Stop-KimixProcessTree
+
+function Test-BuildOutputComplete {
+  $mainBundle = Join-Path $workspace "out\main\index.cjs"
+  $rendererIndex = Join-Path $workspace "out\renderer\index.html"
+  return (Test-Path -LiteralPath $mainBundle) -and (Test-Path -LiteralPath $rendererIndex)
+}
+
+function Start-KimixBuiltApp {
+  $electronBin = Join-Path $workspace "node_modules\.bin\electron.cmd"
+  Start-Process -FilePath $electronBin -ArgumentList "." -WorkingDirectory $workspace
+}
+
+if ($hotReloadDev) {
+  Write-Host "Starting dev server with hot reload..."
+  pnpm dev
+  return
+}
 
 if ($fullClean) {
   $cleanTargets = @(
@@ -117,30 +136,27 @@ if ($fullClean) {
     }
   }
 
-  Set-Location $workspace
+  Write-Host "Clean rebuild..."
   pnpm build
-} else {
-  Set-Location $workspace
-  if (-not $hotReloadDev) {
-    $outMarker = Join-Path $workspace "out\renderer\index.html"
-    if (-not (Test-Path -LiteralPath $outMarker)) {
-      Write-Host "No built output found; falling back to dev mode."
-      $hotReloadDev = $true
-    } elseif (Test-GitWorkspaceDirty) {
-      Write-Host "Uncommitted source changes detected; starting dev mode for hot reload."
-      $hotReloadDev = $true
-    }
-  }
+  Start-KimixBuiltApp
+  return
 }
 
-if ($hotReloadDev) {
-  pnpm dev
+$needsBuild = $false
+if ($fastLaunch) {
+  Write-Host "Fast launch: using existing built output."
+} elseif (-not (Test-BuildOutputComplete)) {
+  Write-Host "No built output found; building..."
+  $needsBuild = $true
+} elseif (Test-GitWorkspaceDirty) {
+  Write-Host "Uncommitted source changes detected; rebuilding..."
+  $needsBuild = $true
 } else {
-  $mainBundle = Join-Path $workspace "out\main\index.cjs"
-  $rendererIndex = Join-Path $workspace "out\renderer\index.html"
-  $electronBin = Join-Path $workspace "node_modules\.bin\electron.cmd"
-  if (-not (Test-Path -LiteralPath $mainBundle) -or -not (Test-Path -LiteralPath $rendererIndex)) {
-    pnpm build
-  }
-  Start-Process -FilePath $electronBin -ArgumentList "." -WorkingDirectory $workspace
+  Write-Host "Source is clean and built output exists; launching directly."
 }
+
+if ($needsBuild) {
+  pnpm build
+}
+
+Start-KimixBuiltApp

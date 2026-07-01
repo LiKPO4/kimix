@@ -15,12 +15,14 @@ if "%~1"=="--check" (
 echo Starting Kimix from %CD%
 echo.
 if "%~1"=="--clean" (
-  echo Cleaning old Kimix processes, cache, rebuilding, and starting built app.
+  echo Cleaning cache and doing a full rebuild.
 ) else if "%~1"=="--dev" (
   echo Starting Kimix in hot-reload dev mode.
+) else if "%~1"=="--fast" (
+  echo Launching existing built output without checking for source changes.
 ) else (
-  echo Starting Kimix quickly. Auto-switches to dev mode if uncommitted changes exist.
-  echo Use --dev to force hot reload, --clean for full rebuild.
+  echo Auto mode: rebuilds if source changed/out missing, otherwise launches directly.
+  echo Use --dev for hot reload, --clean for full rebuild, --fast to skip rebuild.
 )
 echo.
 
