@@ -1000,9 +1000,12 @@ export function ChatThread() {
 
   const focusTimelineEvent = (eventId: string, searchText?: string): boolean => {
     cancelSessionAutoBottom();
+    window.api.writeDiag?.({ message: "[ChatThread] focusTimelineEvent CALL", data: { eventId, sessionId: session?.id, showOlderItems, hasPending: !!pendingFocusEventRef.current } }).catch(() => {});
     const target = findRenderedEventNode(eventId);
     if (!target) {
+      window.api.writeDiag?.({ message: "[ChatThread] focusTimelineEvent TARGET MISSING", data: { eventId, showOlderItems } }).catch(() => {});
       if (!showOlderItems) {
+        window.api.writeDiag?.({ message: "[ChatThread] focusTimelineEvent -> setShowOlderItems(true)", data: { eventId } }).catch(() => {});
         setShowOlderItems(true);
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText));
@@ -1393,7 +1396,9 @@ export function ChatThread() {
 
     useEffect(() => {
     const pending = pendingFocusEventRef.current;
+    window.api.writeDiag?.({ message: "[ChatThread] pendingFocusEvent useEffect", data: { hasPending: !!pending, pendingSession: pending?.sessionId, currentSession: session?.id, matches: pending?.sessionId === session?.id, showOlderItems, visibleItems: visibleRenderItems.length } }).catch(() => {});
     if (!pending || !session || pending.sessionId !== session.id) return;
+    window.api.writeDiag?.({ message: "[ChatThread] pendingFocusEvent -> focusTimelineEvent", data: { eventId: pending.eventId, searchText: pending.searchText } }).catch(() => {});
     window.requestAnimationFrame(() => {
       if (focusTimelineEvent(pending.eventId, pending.searchText)) {
         pendingFocusEventRef.current = null;
@@ -1402,11 +1407,13 @@ export function ChatThread() {
   }, [session?.id, visibleRenderItems.length]);
 
   useLayoutEffect(() => {
+    window.api.writeDiag?.({ message: "[ChatThread] showOlderItems effect", data: { showOlderItems, hasAnchor: !!pendingOlderItemsScrollAnchorRef.current, anchorScrollTop: pendingOlderItemsScrollAnchorRef.current?.scrollTop, anchorScrollHeight: pendingOlderItemsScrollAnchorRef.current?.scrollHeight, hasNode: !!scrollRef.current, visibleItems: visibleRenderItems.length } }).catch(() => {});
     const anchor = pendingOlderItemsScrollAnchorRef.current;
     const node = scrollRef.current;
     if (!anchor || !node || !showOlderItems) return;
     pendingOlderItemsScrollAnchorRef.current = null;
     const delta = node.scrollHeight - anchor.scrollHeight;
+    window.api.writeDiag?.({ message: "[ChatThread] showOlderItems effect APPLY", data: { anchorScrollTop: anchor.scrollTop, anchorScrollHeight: anchor.scrollHeight, currentScrollHeight: node.scrollHeight, delta, scrollTopBefore: node.scrollTop } }).catch(() => {});
     node.scrollTop = anchor.scrollTop + Math.max(0, delta);
     autoFollowRef.current = false;
     userScrollRef.current = true;
@@ -1428,6 +1435,7 @@ export function ChatThread() {
       };
       scrollTokenRef.current += 1;
     }
+    window.api.writeDiag?.({ message: "[ChatThread] expandOlderItems -> setShowOlderItems(true)", data: { anchorScrollTop: node?.scrollTop, anchorScrollHeight: node?.scrollHeight } }).catch(() => {});
     setShowOlderItems(true);
   };
 
