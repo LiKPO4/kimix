@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
+import type { Session } from "@/types/ui";
 import { compactModelDisplayName, getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
@@ -45,6 +46,13 @@ function formatRefreshTime(value: number | undefined, now: number) {
   const remaining = value - now;
   if (remaining <= 0) return "即将刷新";
   return `将于 ${formatDuration(remaining)}后刷新`;
+}
+
+function getDisplaySessionId(session: Session | null | undefined): string | null {
+  if (!session) return null;
+  const candidates = [session.runtimeSessionId, session.officialSessionId, session.id].filter((id): id is string => Boolean(id));
+  const nonSkill = candidates.find((id) => !id.startsWith("skill-"));
+  return nonSkill ?? candidates[0] ?? null;
 }
 
 function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
@@ -137,7 +145,11 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         : latestError
           ? { label: "有错误", tone: "danger" as const, icon: AlertCircle, detail: latestError.message }
           : activeSession?.engine === "kimi-code" || activeSession?.runtimeSessionId
-            ? { label: "已连接", tone: "success" as const, icon: CheckCircle2, detail: `runtime: ${activeSession.runtimeSessionId ?? activeSession.id}` }
+            ? (() => {
+                const displayId = getDisplaySessionId(activeSession);
+                const isRuntimeId = displayId === activeSession?.runtimeSessionId;
+                return { label: "已连接", tone: "success" as const, icon: CheckCircle2, detail: `${isRuntimeId ? "runtime" : "会话"}: ${displayId ?? activeSession?.id}` };
+              })()
             : { label: "未连接", tone: "muted" as const, icon: Radio, detail: "当前没有 Kimi Code 运行会话" };
   const KimiStatusIcon = kimiStatus.icon;
 
@@ -362,9 +374,11 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
       showToast("当前轮次正在运行");
       return;
     }
-    if (activeSession?.runtimeSessionId) {
-      await navigator.clipboard?.writeText(activeSession.runtimeSessionId);
-      showToast("已复制 runtime session id");
+    const displayId = getDisplaySessionId(activeSession);
+    if (displayId) {
+      await navigator.clipboard?.writeText(displayId);
+      const isRuntimeId = displayId === activeSession?.runtimeSessionId;
+      showToast(isRuntimeId ? "已复制 runtime session id" : "已复制会话 ID");
       return;
     }
     showToast("当前没有 Kimi Code 运行会话");
