@@ -1284,10 +1284,17 @@ export function ChatThread() {
     const node = scrollRef.current;
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
+    const isScrollingUp = previousScrollTop !== null && node.scrollTop < previousScrollTop - 0.5;
     lastScrollTopRef.current = node.scrollTop;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
+    // Middle-mouse autoscroll does not dispatch wheel events, so an upward
+    // scroll is a reliable signal that the user is taking manual control even
+    // inside the ignore window that follows programmatic bottom-scrolls.
+    if (isScrollingUp && autoFollowRef.current) {
+      pauseAutoFollowForUser();
+    }
     const now = Date.now();
     if (now < ignoreScrollUntilRef.current) return;
     if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
@@ -1369,9 +1376,7 @@ export function ChatThread() {
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
         style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
         onScroll={handleScroll}
-        onPointerDown={(event) => {
-          if (event.button === 0) pauseAutoFollowForUser();
-        }}
+        onPointerDown={pauseAutoFollowForUser}
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
