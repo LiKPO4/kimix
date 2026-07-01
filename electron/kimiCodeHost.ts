@@ -1958,6 +1958,10 @@ export function getSessionWorkDir(sessionId: string): string | undefined {
   return sessions.get(sessionId)?.session.workDir ?? serverSessions.get(sessionId)?.workDir;
 }
 
+export function getSessionModel(sessionId: string): string | undefined {
+  return serverSessions.get(sessionId)?.model ?? sessions.get(sessionId)?.model;
+}
+
 export function getActiveSessionIds(): string[] {
   return [...sessions.keys(), ...serverSessions.keys()];
 }

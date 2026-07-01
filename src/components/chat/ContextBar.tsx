@@ -344,10 +344,13 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
       return;
     }
     if (latestError) {
-      setWorkspaceView("settings");
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings"));
-      }, 80);
+      const message = latestError.message || String(latestError);
+      try {
+        await navigator.clipboard.writeText(message);
+        showToast("错误信息已复制到剪贴板");
+      } catch {
+        showToast(`错误：${message}`);
+      }
       return;
     }
     if (isSessionRunning) {

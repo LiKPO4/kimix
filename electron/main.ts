@@ -5024,6 +5024,32 @@ function toKimiCodePromptInput(content: string, images: { name: string; dataUrl:
   ];
 }
 
+function modelSupportsImages(model: string | null | undefined): boolean {
+  if (!model) return true;
+  const lower = model.toLowerCase();
+  // DeepSeek API 目前不接受 image_url 消息；后续可按 catalog 能力扩展。
+  if (lower.includes("deepseek")) return false;
+  return true;
+}
+
+function adaptPromptForModel(
+  content: string,
+  images: { name: string; dataUrl: string }[],
+  model: string | undefined,
+) {
+  if (images.length === 0 || modelSupportsImages(model)) {
+    return { content, images };
+  }
+  const imageLines = images.map((image, index) => `${index + 1}. [图片: ${image.name}]`);
+  const nextContent = [
+    content.trim(),
+    "图片：",
+    ...imageLines,
+    "",
+  ].filter(Boolean).join("\n");
+  return { content: nextContent, images: [] };
+}
+
 function parseKimiCodeImages(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is { name: string; dataUrl: string } =>
@@ -5137,7 +5163,9 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
     if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
-    const input = toKimiCodePromptInput(content, images);
+    const model = kimiCodeHost.getSessionModel(sessionId);
+    const adapted = adaptPromptForModel(content, images, model);
+    const input = toKimiCodePromptInput(adapted.content, adapted.images);
     const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
     const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
     const data = await kimiCodeHost.sendPrompt(sessionId, finalInput);
@@ -5190,7 +5218,9 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
     if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
-    await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(content, images));
+    const steerModel = kimiCodeHost.getSessionModel(sessionId);
+    const steerAdapted = adaptPromptForModel(content, images, steerModel);
+    await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images));
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
