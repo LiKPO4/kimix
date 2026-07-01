@@ -2,6 +2,7 @@
 
 ## 2026-07-01
 
+* **Demand-loaded older chat**: Background hydration no longer auto-expands the bottom-first tail; older messages prepend only on explicit upward browsing with scroll-height delta compensation. See [/project/kimix.md](/project/kimix.md).
 * **Bottom-first session rendering**: Replaced whole-chat startup hiding with an eager four-item tail; canonical history expands upward in a layout commit while preserving the bottom position. See [/project/kimix.md](/project/kimix.md).
 * **Startup Markdown settlement**: Extended the startup reveal gate through eager visible-range Markdown rendering so bottom alignment uses real DOM height rather than deferred placeholder estimates. See [/project/kimix.md](/project/kimix.md).
 * **Startup chat reveal gate**: The cached active session can populate navigation immediately, but the chat stream is revealed only after official history hydration settles and layout-phase bottom alignment runs. See [/project/kimix.md](/project/kimix.md).

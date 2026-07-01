@@ -722,6 +722,7 @@ export function ChatThread() {
   const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
   const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const pendingInitialTailScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
@@ -1119,23 +1120,6 @@ export function ChatThread() {
   }, [primedSessionId]);
 
   useLayoutEffect(() => {
-    if (!session?.id || session.isLoading || primedSessionId !== session.id) return;
-    autoFollowRef.current = true;
-    userScrollRef.current = false;
-    scrollToBottom("auto");
-    const frame = window.requestAnimationFrame(() => {
-      setExpandedInitialTailSessionId(session.id);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [session?.id, session?.isLoading, primedSessionId]);
-
-  useLayoutEffect(() => {
-    if (!session?.id || expandedInitialTailSessionId !== session.id) return;
-    scrollToBottom("auto");
-    window.requestAnimationFrame(settleSessionAtBottom);
-  }, [session?.id, expandedInitialTailSessionId]);
-
-  useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
     let resizeFrame = 0;
@@ -1372,6 +1356,7 @@ export function ChatThread() {
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id);
   const visibleRenderItems = isInitialTailOnly ? fullVisibleRenderItems.slice(-4) : fullVisibleRenderItems;
+  const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
   const eagerInitialMarkdown = Boolean(session?.id && (
@@ -1388,6 +1373,18 @@ export function ChatThread() {
       }
     });
   }, [session?.id, visibleRenderItems.length]);
+
+  useLayoutEffect(() => {
+    const anchor = pendingInitialTailScrollAnchorRef.current;
+    const node = scrollRef.current;
+    if (!anchor || !node || isInitialTailOnly) return;
+    pendingInitialTailScrollAnchorRef.current = null;
+    const delta = node.scrollHeight - anchor.scrollHeight;
+    node.scrollTop = anchor.scrollTop + Math.max(0, delta);
+    autoFollowRef.current = false;
+    userScrollRef.current = true;
+    updateAutoFollow(false);
+  }, [isInitialTailOnly, visibleRenderItems.length]);
 
   useLayoutEffect(() => {
     const anchor = pendingOlderItemsScrollAnchorRef.current;
@@ -1419,6 +1416,24 @@ export function ChatThread() {
     setShowOlderItems(true);
   };
 
+  const expandInitialTail = () => {
+    if (!session?.id || !isInitialTailOnly) return;
+    const node = scrollRef.current;
+    if (node) {
+      pendingInitialTailScrollAnchorRef.current = {
+        scrollHeight: node.scrollHeight,
+        scrollTop: node.scrollTop,
+      };
+    }
+    userScrollIntentUntilRef.current = 0;
+    setExpandedInitialTailSessionId(session.id);
+  };
+
+  const handleInitialTailWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    markUserScrollIntent();
+    if (event.deltaY < 0 && isInitialTailOnly) expandInitialTail();
+  };
+
   return (
     <div className="relative h-full">
       {session.longTask && (
@@ -1434,7 +1449,7 @@ export function ChatThread() {
         style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
         onScroll={handleScroll}
         onPointerDown={markPointerScrollIntent}
-        onWheel={markUserScrollIntent}
+        onWheel={handleInitialTailWheel}
         onTouchStart={markUserScrollIntent}
       >
         <div
@@ -1442,6 +1457,7 @@ export function ChatThread() {
           className="kimix-chat-stream-column flex min-h-full w-full flex-col"
           style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT, justifyContent: isInitialTailOnly ? "flex-end" : undefined }}
         >
+          {isInitialTailOnly && initialTailHiddenCount > 0 && <FoldedHistoryNotice count={initialTailHiddenCount} onExpand={expandInitialTail} />}
           {!isInitialTailOnly && foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
           {visibleRenderItems.map((item) => (
             <div
