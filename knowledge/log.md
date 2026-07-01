@@ -2,6 +2,7 @@
 
 ## 2026-07-01
 
+* **Bottom-first session rendering**: Replaced whole-chat startup hiding with an eager four-item tail; canonical history expands upward in a layout commit while preserving the bottom position. See [/project/kimix.md](/project/kimix.md).
 * **Startup Markdown settlement**: Extended the startup reveal gate through eager visible-range Markdown rendering so bottom alignment uses real DOM height rather than deferred placeholder estimates. See [/project/kimix.md](/project/kimix.md).
 * **Startup chat reveal gate**: The cached active session can populate navigation immediately, but the chat stream is revealed only after official history hydration settles and layout-phase bottom alignment runs. See [/project/kimix.md](/project/kimix.md).
 * **Scroll intent boundary**: Documented that browser clamping after asynchronous content shrink is not user scrolling and must not cancel the session-open auto-follow window. See [/project/kimix.md](/project/kimix.md).

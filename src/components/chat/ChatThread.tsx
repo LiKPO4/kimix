@@ -732,6 +732,7 @@ export function ChatThread() {
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
+  const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
     [session?.events]
@@ -1122,8 +1123,17 @@ export function ChatThread() {
     autoFollowRef.current = true;
     userScrollRef.current = false;
     scrollToBottom("auto");
-    window.requestAnimationFrame(settleSessionAtBottom);
+    const frame = window.requestAnimationFrame(() => {
+      setExpandedInitialTailSessionId(session.id);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [session?.id, session?.isLoading, primedSessionId]);
+
+  useLayoutEffect(() => {
+    if (!session?.id || expandedInitialTailSessionId !== session.id) return;
+    scrollToBottom("auto");
+    window.requestAnimationFrame(settleSessionAtBottom);
+  }, [session?.id, expandedInitialTailSessionId]);
 
   useLayoutEffect(() => {
     const node = scrollRef.current;
@@ -1359,12 +1369,13 @@ export function ChatThread() {
   ));
   const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
-  const visibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
+  const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
+  const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id);
+  const visibleRenderItems = isInitialTailOnly ? fullVisibleRenderItems.slice(-4) : fullVisibleRenderItems;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
-  const isSessionScrollPrimed = !session?.id || (primedSessionId === session.id && !session.isLoading);
+  const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
   const eagerInitialMarkdown = Boolean(session?.id && (
-    !isSessionScrollPrimed ||
-    session.isLoading ||
+    isInitialTailOnly ||
     Date.now() < sessionAutoBottomUntilRef.current
   ));
 
@@ -1426,8 +1437,12 @@ export function ChatThread() {
         onWheel={markUserScrollIntent}
         onTouchStart={markUserScrollIntent}
       >
-        <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
-          {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
+        <div
+          ref={streamContentRef}
+          className="kimix-chat-stream-column flex min-h-full w-full flex-col"
+          style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT, justifyContent: isInitialTailOnly ? "flex-end" : undefined }}
+        >
+          {!isInitialTailOnly && foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
           {visibleRenderItems.map((item) => (
             <div
               key={renderItemKey(item)}
