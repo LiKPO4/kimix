@@ -1451,7 +1451,7 @@ export function ChatThread() {
         onWheel={pauseAutoFollowForUser}
         onTouchStart={pauseAutoFollowForUser}
       >
-        <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
+        <div ref={streamContentRef} className="kimix-chat-stream-column flex min-h-full w-full flex-col justify-end" style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT }}>
           {foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
           {visibleRenderItems.map((item) => (
             <div
