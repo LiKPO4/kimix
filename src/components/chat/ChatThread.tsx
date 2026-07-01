@@ -1112,6 +1112,31 @@ export function ChatThread() {
     });
   }, [primedSessionId]);
 
+  /**
+   * 兜底：会话切换后 3 秒内，每 200ms 强制 scrollToBottom 一次。
+   * 解决"settle 循环停了但内容还在陆续到"导致停在中间位置的场景。
+   * 用户手动滚到底/上后通过 userScrollRef 停止兜底。
+   */
+  useEffect(() => {
+    if (!session?.id) return;
+    const sessionId = session.id;
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      if (Date.now() - start > 3000) {
+        window.clearInterval(id);
+        return;
+      }
+      const latest = useLiveSession(sessionId);
+      if (!latest || userScrollRef.current) {
+        window.clearInterval(id);
+        return;
+      }
+      autoFollowRef.current = true;
+      scrollToBottom("auto");
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [session?.id]);
+
   useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
