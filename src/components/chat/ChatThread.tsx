@@ -788,8 +788,10 @@ export function ChatThread() {
     ignoreScrollUntilRef.current = Date.now() + 420;
     const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
     if (behavior === "auto") {
+      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTop = bottom", data: { bottom, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTop = bottom;
     } else {
+      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTo bottom", data: { bottom, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTo({ top: bottom, behavior });
     }
     window.setTimeout(() => {
@@ -924,6 +926,7 @@ export function ChatThread() {
     const delta = nextOffsetTop - anchor.offsetTop;
     window.api.writeDiag?.({ message: "[ChatThread] restoreResizeScrollAnchor CALLED", data: { anchorKey: anchor.key, prevOffset: anchor.offsetTop, newOffset: nextOffsetTop, delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight } }).catch(() => {});
     if (Math.abs(delta) > 0.5) {
+      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTop += delta", data: { delta, scrollTopBefore: node.scrollTop, scrollHeight: node.scrollHeight, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTop += delta;
     }
     return true;
@@ -991,8 +994,10 @@ export function ChatThread() {
     if (node && rect.height > 0) {
       const containerRect = node.getBoundingClientRect();
       const targetTop = node.scrollTop + rect.top - containerRect.top - Math.max(80, node.clientHeight * 0.28);
+      window.api.writeDiag?.({ message: "[ChatThread] SET scrollTo targetTop (focusTimelineEvent)", data: { targetTop, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       node.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
     } else {
+      window.api.writeDiag?.({ message: "[ChatThread] scrollIntoView (focusTimelineEvent)", data: { stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
       target.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     return true;
@@ -1413,7 +1418,7 @@ export function ChatThread() {
     if (!anchor || !node || !showOlderItems) return;
     pendingOlderItemsScrollAnchorRef.current = null;
     const delta = node.scrollHeight - anchor.scrollHeight;
-    window.api.writeDiag?.({ message: "[ChatThread] showOlderItems effect APPLY", data: { anchorScrollTop: anchor.scrollTop, anchorScrollHeight: anchor.scrollHeight, currentScrollHeight: node.scrollHeight, delta, scrollTopBefore: node.scrollTop } }).catch(() => {});
+    window.api.writeDiag?.({ message: "[ChatThread] showOlderItems effect APPLY", data: { anchorScrollTop: anchor.scrollTop, anchorScrollHeight: anchor.scrollHeight, currentScrollHeight: node.scrollHeight, delta, scrollTopBefore: node.scrollTop, stack: new Error().stack?.split("\n").slice(2,5).join("|") } }).catch(() => {});
     node.scrollTop = anchor.scrollTop + Math.max(0, delta);
     autoFollowRef.current = false;
     userScrollRef.current = true;
