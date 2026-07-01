@@ -16,7 +16,23 @@ function isTodoToolName(toolName: string) {
 }
 
 function isEmptyTodoResult(result: unknown) {
-  if (typeof result === "string") return /todo\s+list\s+is\s+empty|todos?\s*(?:are|is)?\s*empty|空/.test(result.toLowerCase());
+  if (typeof result === "string") {
+    const lower = result.toLowerCase();
+    if (/todo\s+list\s+is\s+empty|todos?\s*(?:are|is)?\s*empty|空|cleared|clear\s*(?:ed|success)|已清|没有待办|无待办/.test(lower)) return true;
+    try {
+      const parsed = JSON.parse(result);
+      if (Array.isArray(parsed)) return parsed.length === 0;
+      if (parsed && typeof parsed === "object") {
+        return (
+          (Array.isArray(parsed.todos) && parsed.todos.length === 0) ||
+          (Array.isArray(parsed.items) && parsed.items.length === 0)
+        );
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return false;
+  }
   if (Array.isArray(result)) return result.length === 0;
   if (!result || typeof result !== "object") return false;
   const record = result as Record<string, unknown>;
@@ -26,13 +42,13 @@ function isEmptyTodoResult(result: unknown) {
   );
 }
 
-function todoItemsFromTool(event: Extract<TimelineEvent, { type: "tool_call" }>): TodoItem[] {
-  if (!isTodoToolName(event.toolName)) return [];
+function extractTodoItemsFromTool(event: Extract<TimelineEvent, { type: "tool_call" }>): TodoItem[] | null {
+  if (!isTodoToolName(event.toolName)) return null;
+  const hasTodoArgs = Array.isArray(event.arguments.todos) || Array.isArray(event.arguments.items);
+  if (!hasTodoArgs) return null;
   const rawItems = Array.isArray(event.arguments.todos)
     ? event.arguments.todos
-    : Array.isArray(event.arguments.items)
-      ? event.arguments.items
-      : [];
+    : event.arguments.items;
 
   return rawItems.flatMap((item, index) => {
     if (!item || typeof item !== "object") return [];
@@ -55,10 +71,10 @@ export function getLatestTodos(events: TimelineEvent[]): TodoItem[] {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
     if (event.type === "todo") return event.items;
-    if (event.type === "tool_call") {
-      const items = todoItemsFromTool(event);
-      if (items.length > 0) return items;
-      if (isTodoToolName(event.toolName) && event.status === "success" && isEmptyTodoResult(event.result)) return [];
+    if (event.type === "tool_call" && isTodoToolName(event.toolName) && event.status === "success") {
+      const items = extractTodoItemsFromTool(event);
+      if (items !== null) return items;
+      if (isEmptyTodoResult(event.result)) return [];
     }
   }
   return [];
