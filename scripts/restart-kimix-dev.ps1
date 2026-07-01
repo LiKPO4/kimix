@@ -22,13 +22,47 @@ function Test-ContainsIgnoreCase {
   return $Text.IndexOf($Needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
-function Test-GitWorkspaceDirty {
-  try {
-    $status = & git -C $workspace status --porcelain 2>$null
-    return $status -ne $null -and $status.Length -gt 0
-  } catch {
-    return $false
+$script:relevantSourcePrefixes = @("src/", "electron/")
+$script:relevantRootFiles = @(
+  "index.html",
+  "package.json",
+  "electron.vite.config.ts",
+  "tailwind.config.ts",
+  "tsconfig.json",
+  "tsconfig.node.json",
+  "electron-builder.yml"
+)
+
+function Test-IsRelevantSourceFile {
+  param([string]$RelativePath)
+  foreach ($prefix in $script:relevantSourcePrefixes) {
+    if ($RelativePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
   }
+  foreach ($file in $script:relevantRootFiles) {
+    if ($RelativePath -eq $file) { return $true }
+  }
+  return $false
+}
+
+function Test-BuildOutputStale {
+  param([string]$OutMarker)
+  if (-not (Test-Path -LiteralPath $OutMarker)) { return $true }
+  $outTime = (Get-Item -LiteralPath $OutMarker).LastWriteTime
+  $porcelain = & git -C $workspace status --porcelain 2>$null
+  if (-not $porcelain) { return $false }
+  foreach ($line in $porcelain) {
+    if ($line.Length -lt 4) { continue }
+    $relativePath = $line.Substring(3).Trim()
+    if (-not (Test-IsRelevantSourceFile $relativePath)) { continue }
+    $fullPath = Join-Path $workspace $relativePath
+    if (-not (Test-Path -LiteralPath $fullPath)) {
+      # File was deleted; output is stale.
+      return $true
+    }
+    $fileTime = (Get-Item -LiteralPath $fullPath).LastWriteTime
+    if ($fileTime -gt $outTime) { return $true }
+  }
+  return $false
 }
 
 function Stop-KimixProcessTree {
@@ -107,7 +141,11 @@ function Test-BuildOutputComplete {
 }
 
 function Start-KimixBuiltApp {
-  $electronBin = Join-Path $workspace "node_modules\.bin\electron.cmd"
+  $electronBin = Join-Path $workspace "node_modules\electron\dist\electron.exe"
+  if (-not (Test-Path -LiteralPath $electronBin)) {
+    # Fallback to the npm wrapper if the direct binary is missing.
+    $electronBin = Join-Path $workspace "node_modules\.bin\electron.cmd"
+  }
   Start-Process -FilePath $electronBin -ArgumentList "." -WorkingDirectory $workspace
 }
 
@@ -143,16 +181,17 @@ if ($fullClean) {
 }
 
 $needsBuild = $false
+$outMarker = Join-Path $workspace "out\renderer\index.html"
 if ($fastLaunch) {
   Write-Host "Fast launch: using existing built output."
 } elseif (-not (Test-BuildOutputComplete)) {
   Write-Host "No built output found; building..."
   $needsBuild = $true
-} elseif (Test-GitWorkspaceDirty) {
-  Write-Host "Uncommitted source changes detected; rebuilding..."
+} elseif (Test-BuildOutputStale $outMarker) {
+  Write-Host "Source changes newer than built output; rebuilding..."
   $needsBuild = $true
 } else {
-  Write-Host "Source is clean and built output exists; launching directly."
+  Write-Host "Built output is up to date; launching directly."
 }
 
 if ($needsBuild) {
