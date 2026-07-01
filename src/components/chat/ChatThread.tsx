@@ -783,10 +783,14 @@ export function ChatThread() {
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     const node = scrollRef.current;
-    if (!node) return;
+    if (!node) {
+      window.api.writeDiag?.({ message: "[ChatThread] scrollToBottom node null", data: { behavior, stack: new Error().stack?.split("\n").slice(1,6).join("|") } }).catch(() => {});
+      return;
+    }
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
     const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
+    window.api.writeDiag?.({ message: "[ChatThread] scrollToBottom", data: { behavior, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, bottom, visibility: node.style.visibility, scrollTopBefore: node.scrollTop } }).catch(() => {});
     if (behavior === "auto") {
       node.scrollTop = bottom;
     } else {
@@ -804,9 +808,11 @@ export function ChatThread() {
   const settleSessionAtBottom = () => {
     const node = scrollRef.current;
     if (!node || !autoFollowRef.current || userScrollRef.current) {
+      window.api.writeDiag?.({ message: "[ChatThread] settleSessionAtBottom bail", data: { node: !!node, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current, remaining: sessionAutoBottomUntilRef.current - Date.now() } }).catch(() => {});
       cancelSessionAutoBottom();
       return;
     }
+    window.api.writeDiag?.({ message: "[ChatThread] settleSessionAtBottom", data: { scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, scrollTop: node.scrollTop, visibility: node.style.visibility, remaining: sessionAutoBottomUntilRef.current - Date.now() } }).catch(() => {});
     scrollToBottom("auto");
     const remaining = sessionAutoBottomUntilRef.current - Date.now();
     if (remaining <= 0) {
@@ -1062,6 +1068,7 @@ export function ChatThread() {
   }, [session?.id]);
 
   useLayoutEffect(() => {
+    window.api.writeDiag?.({ message: "[ChatThread] sessionId effect", data: { sessionIdType: typeof session?.id, sessionId: session?.id ?? null, hasScrollRef: !!scrollRef.current, primedSessionId, hasSession: !!session, sessionKeys: session ? Object.keys(session).slice(0,10) : null } }).catch(() => {});
     setPrimedSessionId(null);
     cancelSessionAutoBottom();
     autoFollowRef.current = true;
@@ -1103,7 +1110,21 @@ export function ChatThread() {
    *  the latter can bail when autoFollowRef or userScrollRef are stale, and the
    *  settle-timer loop is too indirect for the first-visibility paint window. */
   useLayoutEffect(() => {
-    if (!primedSessionId) return;
+    if (!primedSessionId) {
+      window.api.writeDiag?.({ message: "[ChatThread] primedLayoutEffect skip null", data: { primedSessionId } }).catch(() => {});
+      return;
+    }
+    const node = scrollRef.current;
+    window.api.writeDiag?.({ message: "[ChatThread] primedLayoutEffect fire", data: {
+      primedSessionId,
+      sessionId: session?.id,
+      hasNode: !!node,
+      scrollHeight: node?.scrollHeight ?? null,
+      clientHeight: node?.clientHeight ?? null,
+      visibility: node?.style?.visibility ?? null,
+      autoFollow: autoFollowRef.current,
+      userScroll: userScrollRef.current,
+    } }).catch(() => {});
     scrollToBottom("auto");
     // Belt-and-suspenders: a second pass after the browser has laid out all
     // children (covers async images, font load, etc.).
@@ -1319,7 +1340,11 @@ export function ChatThread() {
       pauseAutoFollowForUser();
     }
     const now = Date.now();
-    if (now < ignoreScrollUntilRef.current) return;
+    const ignoreWindow = now < ignoreScrollUntilRef.current;
+    if (!ignoreWindow && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 20)) {
+      window.api.writeDiag?.({ message: "[ChatThread] handleScroll", data: { scrollTop: node.scrollTop, previousScrollTop, distance, awayFromBottom, isScrollingUp, ignoreWindow, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current, visibility: node.style.visibility } }).catch(() => {});
+    }
+    if (ignoreWindow) return;
     if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
       userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
       scheduleIdleAnchorCapture();
@@ -1387,7 +1412,7 @@ export function ChatThread() {
 
   return (
     <div className="relative h-full">
-      {session.longTask && (
+      {session?.longTask && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
           <div className="kimix-chat-stream-column pointer-events-auto">
             <LongTaskBanner meta={session.longTask} projectPath={session.projectPath} />
@@ -1397,7 +1422,7 @@ export function ChatThread() {
       <div
         ref={scrollRef}
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
-        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
+        style={{ paddingTop: session?.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
         onScroll={handleScroll}
         onPointerDown={pauseAutoFollowForUser}
         onWheel={pauseAutoFollowForUser}

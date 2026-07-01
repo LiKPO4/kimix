@@ -1,0 +1,1110 @@
+diff --git a/electron/kimiCodeHost.ts b/electron/kimiCodeHost.ts
+index 0dac9597..30981ffe 100644
+--- a/electron/kimiCodeHost.ts
++++ b/electron/kimiCodeHost.ts
+@@ -807,19 +807,14 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
+       await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
+       return { route: "server" };
+     } catch (error) {
+-      console.warn("[KimiCodeServerHost] prompt failed; falling back to SDK:", error);
+-      const fallback = await fallbackServerSessionToSdk(sessionId, serverManaged, error);
+-      try {
+-        await fallback.session.prompt(input);
+-      } catch (sdkError) {
+-        setStatus(sessionId, "error");
+-        throw sdkError;
+-      }
+-      return {
+-        route: "sdk-fallback",
+-        fallbackReason: error instanceof Error ? error.message : String(error),
+-      };
+-    }
++	      console.warn("[KimiCodeServerHost] prompt failed mid-turn; error will propagate to caller without fallback:", error);
++	      // Don't fallback mid-turn: mark server runtime failure, delete server session,
++	      // next turn will naturally switch to the SDK session (still in sessions map).
++	      markServerRuntimeFailure(error);
++	      serverSessions.delete(sessionId);
++	      setStatus(sessionId, "error");
++	      throw error;
++	    }
+   }
+   const managed = getManagedSession(sessionId);
+   scheduleServerRecovery();
+@@ -1066,7 +1061,10 @@ export async function archiveSession(sessionId: string): Promise<void> {
+     return;
+   }
+   if (!shouldRouteNewSessionToServer()) {
+-    throw new Error("当前兼容链路未公开归档接口，请启用 Kimi Server 后重试。");
++    // Server routing is unavailable and this session is not actively managed by the Server.
++    // Signal a missing-session error so the renderer can hide the local mirror. The archived
++    // tombstone will prevent the session from being resurrected on the next reconciliation.
++    throw new Error("Session not found on Kimi Server");
+   }
+   await getServerClient().archiveSession(sessionId);
+ }
+@@ -2073,9 +2071,10 @@ async function fallbackServerSessionToSdk(
+ function getServerClient() {
+   if (serverClient) return serverClient;
+   if (!kimiCodeServerHost.isReady()) throw new Error("Kimi Server 尚未就绪，已保留兼容链路。");
+-  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint, {
+-    onRuntimeFailure: markServerRuntimeFailure,
+-  });
++	  serverClient = new KimiCodeServerClient(kimiCodeServerHost.getStatus().endpoint, {
++	    onReconnecting: () => kimiCodeServerHost.markReconnecting(),
++	    onRuntimeFailure: markServerRuntimeFailure,
++	  });
+   unsubscribeServerFrames = serverClient.onFrame(handleServerFrame);
+   return serverClient;
+ }
+diff --git a/electron/kimiCodeServerClient.ts b/electron/kimiCodeServerClient.ts
+index 1deaedad..885006ea 100644
+--- a/electron/kimiCodeServerClient.ts
++++ b/electron/kimiCodeServerClient.ts
+@@ -4,6 +4,7 @@ export type ServerPromptPart =
+ 
+ type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
+ type ServerClientOptions = {
++  onReconnecting?: () => void;
+   onRuntimeFailure?: (error: Error) => void;
+   reconnectFailureThreshold?: number;
+ };
+@@ -206,7 +207,9 @@ export type ServerSnapshot = {
+   pending_questions?: unknown[];
+ };
+ 
+-const CONTROL_TIMEOUT_MS = 5_000;
++	const CONTROL_TIMEOUT_MS = 5_000;
++	const PROMPT_TIMEOUT_MS = 120_000;
++	const UPLOAD_TIMEOUT_MS = 300_000;
+ 
+ export function isKimiCodeServerSessionRoutingEnabled(
+   env: NodeJS.ProcessEnv = process.env,
+@@ -217,9 +220,26 @@ export function isKimiCodeServerSessionRoutingEnabled(
+   return settings?.experimentalKimiServerSessions !== false;
+ }
+ 
++/** HTTP 状态码或协议级别的 "not found" 错误识别。
++ *  优先检查 error 上的数字状态码，正则作向后兼容兜底。 */
++// 404=不存在 410=已归档；409 是 Conflict（非 missing），归 inactive 检查
++const SESSION_NOT_FOUND_CODES = [404, 410];
++const SESSION_NOT_FOUND_RE = /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i;
++
++function getErrorStatusCode(error: unknown): number | undefined {
++  const err = error as Record<string, unknown>;
++  return typeof err.statusCode === "number" ? err.statusCode
++    : typeof err.code === "number" ? err.code
++    : err.cause && typeof (err.cause as Record<string, unknown>).statusCode === "number"
++      ? (err.cause as Record<string, unknown>).statusCode as number
++      : undefined;
++}
++
+ export function isKimiCodeSessionMissingError(error: unknown) {
++  const statusCode = getErrorStatusCode(error);
++  if (statusCode !== undefined) return SESSION_NOT_FOUND_CODES.includes(statusCode);
+   const message = error instanceof Error ? error.message : String(error);
+-  return /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i.test(message);
++  return SESSION_NOT_FOUND_RE.test(message);
+ }
+ 
+ export function getKimiCodeSessionAlreadyExistsId(error: unknown): string | null {
+@@ -463,7 +483,7 @@ export class KimiCodeServerClient {
+     const form = new FormData();
+     form.append("name", input.name);
+     form.append("file", new Blob([Buffer.from(input.data, "base64")], { type: input.mediaType }), input.name);
+-    return this.request("/api/v1/files", { method: "POST", body: form });
++    return this.request("/api/v1/files", { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
+   }
+ 
+   async listSkills(sessionId: string): Promise<ServerSkill[]> {
+@@ -627,6 +647,7 @@ export class KimiCodeServerClient {
+     const result = await this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
+       method: "POST",
+       body: JSON.stringify({ content, ...controls }),
++      timeoutMs: PROMPT_TIMEOUT_MS,
+     });
+     await this.waitFor((frame) => {
+       if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
+@@ -644,10 +665,12 @@ export class KimiCodeServerClient {
+     const queued = await this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
+       method: "POST",
+       body: JSON.stringify({ content, ...controls }),
++      timeoutMs: PROMPT_TIMEOUT_MS,
+     });
+     await this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
+       method: "POST",
+       body: JSON.stringify({ prompt_ids: [queued.prompt_id] }),
++      timeoutMs: PROMPT_TIMEOUT_MS,
+     });
+     return queued;
+   }
+@@ -877,7 +900,11 @@ export class KimiCodeServerClient {
+       return;
+     }
+     this.queued.push(frame);
+-    if (this.queued.length > 2_000) this.queued.splice(0, this.queued.length - 2_000);
++    if (this.queued.length > 2_000) {
++      const dropped = this.queued.length - 2_000;
++      this.queued.splice(0, dropped);
++      console.warn(`[KimiCodeServerClient] frame queue overflow: dropped ${dropped} oldest frames`);
++    }
+   }
+ 
+   private handleSocketClose(socket: WebSocket) {
+@@ -885,6 +912,10 @@ export class KimiCodeServerClient {
+     this.socket = null;
+     this.connected = null;
+     if (this.closing || this.subscribed.size === 0) return;
++    // 首次重连立即通知前端，不等 3 次失败后再报
++    if (this.reconnectAttempt === 0) {
++      this.options.onReconnecting?.();
++    }
+     this.scheduleReconnect();
+   }
+ 
+@@ -968,17 +999,27 @@ export class KimiCodeServerClient {
+     });
+   }
+ 
+-  private async request<T>(pathname: string, options?: RequestInit): Promise<T> {
+-    const signal = options?.signal ?? AbortSignal.timeout(CONTROL_TIMEOUT_MS);
+-    const hasJsonBody = Boolean(options?.body) && !(options?.body instanceof FormData);
++  private async request<T>(pathname: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
++    const { timeoutMs, ...fetchOptions } = options ?? {};
++    const timeout = timeoutMs ?? CONTROL_TIMEOUT_MS;
++    const signal = fetchOptions.signal ?? AbortSignal.timeout(timeout);
++    const hasJsonBody = Boolean(fetchOptions.body) && !(fetchOptions.body instanceof FormData);
+     const response = await fetch(`${this.endpoint}${pathname}`, {
+-      ...options,
++      ...fetchOptions,
+       signal,
+       headers: { accept: "application/json", ...(hasJsonBody ? { "content-type": "application/json" } : {}) },
+     });
+-    if (!response.ok) throw new Error(`${pathname}: HTTP ${response.status}`);
+-    const envelope = await response.json() as ServerEnvelope<T>;
+-    if (envelope.code !== 0) throw new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
++    if (!response.ok) {
++	      const err = new Error(`${pathname}: HTTP ${response.status}`);
++	      (err as Record<string, unknown>).statusCode = response.status;
++	      throw err;
++	    }
++	    const envelope = await response.json() as ServerEnvelope<T>;
++	    if (envelope.code !== 0) {
++	      const err = new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
++	      (err as Record<string, unknown>).statusCode = envelope.code;
++	      throw err;
++	    }
+     return envelope.data;
+   }
+ }
+diff --git a/electron/kimiCodeServerHost.ts b/electron/kimiCodeServerHost.ts
+index db117f9e..86a11433 100644
+--- a/electron/kimiCodeServerHost.ts
++++ b/electron/kimiCodeServerHost.ts
+@@ -115,6 +115,15 @@ export class KimiCodeServerHost {
+     this.status = { ...this.status, routing };
+   }
+ 
++  /** 标记 WebSocket 连接断开正在重连，不清除 server sessions。 */
++  markReconnecting() {
++    this.status = {
++      ...this.status,
++      state: "starting",
++      error: "Kimi Server 连接断开，正在重连…",
++    };
++  }
++
+   markFallback(error: unknown) {
+     this.child?.kill();
+     this.child = null;
+diff --git a/electron/main.ts b/electron/main.ts
+index 753263d7..35a36f16 100644
+--- a/electron/main.ts
++++ b/electron/main.ts
+@@ -3847,7 +3847,7 @@ async function restoreLastContext() {
+       }
+     : recentProject ?? defaultProject;
+ 
+-  projectService.addRecentProject(project);
++  await projectService.addRecentProject(project);
+ 
+   if (!mainWindow || mainWindow.isDestroyed()) return;
+   mainWindow.webContents.send("kimix:bootstrap", { project });
+@@ -3875,12 +3875,12 @@ ipcMain.handle("project:open", async (_, request?: { defaultPath?: string }) =>
+     lastOpenedAt: Date.now(),
+     gitBranch: await projectService.getGitBranch(p),
+   };
+-  projectService.addRecentProject(project);
+-  return {
+-    success: true,
+-    data: project,
+-  };
+-});
++	  await projectService.addRecentProject(project);
++	  return {
++	    success: true,
++	    data: project,
++	  };
++	});
+ 
+ ipcMain.handle("project:chooseDirectory", async (_, request?: { defaultPath?: string }) => {
+   try {
+@@ -3906,8 +3906,8 @@ ipcMain.handle("project:listRecent", async () => {
+   let projects = projectService.getRecentProjects();
+   if (projects.length === 0) {
+     const defaultProject = getDefaultProject();
+-    projectService.addRecentProject(defaultProject);
+-    projects = projectService.getRecentProjects();
++	    await projectService.addRecentProject(defaultProject);
++	    projects = projectService.getRecentProjects();
+   }
+   return { success: true, data: projects };
+ });
+@@ -3967,7 +3967,7 @@ ipcMain.handle("project:addRecent", async (_, project: unknown) => {
+   if (!parsed.success) {
+     return { success: false, error: "Invalid project data" };
+   }
+-  projectService.addRecentProject(parsed.data);
++  await projectService.addRecentProject(parsed.data);
+   return { success: true, data: undefined };
+ });
+ 
+@@ -3975,20 +3975,20 @@ ipcMain.handle("project:removeRecent", async (_, id: unknown) => {
+   if (typeof id !== "string") {
+     return { success: false, error: "Invalid project id" };
+   }
+-  projectService.removeRecentProject(id);
++  await projectService.removeRecentProject(id);
+   return { success: true, data: undefined };
+ });
+ 
+ ipcMain.handle("project:setPinned", async (_, request: unknown) => {
+   const parsed = z.object({ id: z.string().min(1), pinned: z.boolean() }).safeParse(request);
+   if (!parsed.success) return { success: false, error: "Invalid pin request" };
+-  return { success: true, data: projectService.setProjectPinned(parsed.data.id, parsed.data.pinned) };
++  return { success: true, data: await projectService.setProjectPinned(parsed.data.id, parsed.data.pinned) };
+ });
+ 
+ ipcMain.handle("project:reorder", async (_, request: unknown) => {
+   const parsed = z.object({ orderedIds: z.array(z.string()) }).safeParse(request);
+   if (!parsed.success) return { success: false, error: "Invalid reorder request" };
+-  return { success: true, data: projectService.reorderProjects(parsed.data.orderedIds) };
++  return { success: true, data: await projectService.reorderProjects(parsed.data.orderedIds) };
+ });
+ 
+ ipcMain.handle("longTasks:list", async (_, request: unknown) => {
+@@ -4065,7 +4065,7 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
+     if (!fs.existsSync(project.path)) {
+       return { success: false, error: "Project path does not exist" };
+     }
+-    projectService.addRecentProject({ ...project, lastOpenedAt: Date.now() });
++    await projectService.addRecentProject({ ...project, lastOpenedAt: Date.now() });
+     const title = (parsed.data.title?.trim() || initialRequest.trim().split(/\r?\n/)[0] || "长程任务").slice(0, 80);
+     const thinking = parsed.data.thinking ?? true;
+     const yoloMode = parsed.data.yoloMode ?? false;
+@@ -4075,6 +4075,7 @@ ipcMain.handle("longTasks:create", async (_, request: unknown) => {
+     const executor = await kimiCodeHost.createSession({
+       workDir: project.path,
+       permission,
++      thinking: thinking ? "on" : "off",
+     });
+     executorSessionId = executor.sessionId;
+ 
+diff --git a/electron/projectService.ts b/electron/projectService.ts
+index 2ceb942a..08a77b82 100644
+--- a/electron/projectService.ts
++++ b/electron/projectService.ts
+@@ -5,6 +5,14 @@ import { exec, execFile } from "node:child_process";
+ import { promisify } from "node:util";
+ import type { GitGraphEntry, Project } from "./types/ipc";
+ 
++/** 串行 mutex — 确保并发读写不相互覆盖。 */
++let projectOpQueue: Promise<unknown> = Promise.resolve();
++function serialWrite<T>(fn: () => T): Promise<T> {
++  const next = projectOpQueue.then(fn, () => fn());
++  projectOpQueue = next.catch(() => {});
++  return next;
++}
++
+ const execAsync = promisify(exec);
+ const execFileAsync = promisify(execFile);
+ 
+@@ -84,52 +92,57 @@ export function getRecentProjects(): Project[] {
+   return readProjects();
+ }
+ 
+-export function addRecentProject(project: Project): void {
+-  const existing = readProjects();
+-  const prior = existing.find((p) => p.path === project.path);
+-  const filtered = existing.filter((p) => p.path !== project.path);
+-  if (prior) {
+-    // Re-opening a known project: keep its place, pin state and sort order — don't
+-    // yank it to the top. Only refresh metadata (name, lastOpenedAt, gitBranch).
+-    const merged = normalizeProject({
+-      ...prior,
+-      ...project,
+-      pinned: prior.pinned,
+-      sortOrder: prior.sortOrder,
+-    });
+-    writeProjects(sortProjects([...filtered, merged]).slice(0, 20));
+-    return;
+-  }
+-  // Brand-new project: append after existing ones (new sortOrder at the end of its region).
+-  const maxOrder = existing.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
+-  const added = normalizeProject({ ...project, pinned: project.pinned === true, sortOrder: maxOrder + 1 });
+-  writeProjects(sortProjects([...filtered, added]).slice(0, 20));
++export async function addRecentProject(project: Project): Promise<void> {
++  await serialWrite(() => {
++    const existing = readProjects();
++    const prior = existing.find((p) => p.path === project.path);
++    const filtered = existing.filter((p) => p.path !== project.path);
++    if (prior) {
++      const merged = normalizeProject({
++        ...prior,
++        ...project,
++        pinned: prior.pinned,
++        sortOrder: prior.sortOrder,
++      });
++      writeProjects(sortProjects([...filtered, merged]).slice(0, 20));
++      return;
++    }
++    const maxOrder = existing.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
++    const added = normalizeProject({ ...project, pinned: project.pinned === true, sortOrder: maxOrder + 1 });
++    writeProjects(sortProjects([...filtered, added]).slice(0, 20));
++  });
+ }
+ 
+-export function removeRecentProject(id: string): void {
+-  const existing = readProjects();
+-  writeProjects(existing.filter((p) => p.id !== id));
++export async function removeRecentProject(id: string): Promise<void> {
++  await serialWrite(() => {
++    const existing = readProjects();
++    writeProjects(existing.filter((p) => p.id !== id));
++  });
+ }
+ 
+-export function setProjectPinned(id: string, pinned: boolean): Project[] {
+-  const existing = readProjects();
+-  const updated = existing.map((p) => (p.id === id ? { ...p, pinned } : p));
+-  const sorted = sortProjects(updated);
+-  writeProjects(sorted);
+-  return sorted;
++export async function setProjectPinned(id: string, pinned: boolean): Promise<Project[]> {
++  return serialWrite(() => {
++    const existing = readProjects();
++    const updated = existing.map((p) => (p.id === id ? { ...p, pinned } : p));
++    const sorted = sortProjects(updated);
++    writeProjects(sorted);
++    return sorted;
++  });
+ }
+ 
+ /** Persist an explicit ordering by assigning sortOrder from the given id sequence. */
+-export function reorderProjects(orderedIds: string[]): Project[] {
+-  const existing = readProjects();
+-  const orderIndex = new Map(orderedIds.map((id, index) => [id, index]));
+-  const updated = existing.map((p) => {
+-    const idx = orderIndex.get(p.id);
+-    return idx === undefined ? p : { ...p, sortOrder: idx };
++export async function reorderProjects(orderedIds: string[]): Promise<Project[]> {
++  return serialWrite(() => {
++    const existing = readProjects();
++    const orderIndex = new Map(orderedIds.map((id, index) => [id, index]));
++    const updated = existing.map((p) => {
++      const idx = orderIndex.get(p.id);
++      return idx === undefined ? p : { ...p, sortOrder: idx };
++    });
++    const sorted = sortProjects(updated);
++    writeProjects(sorted);
++    return sorted;
+   });
+-  const sorted = sortProjects(updated);
+-  writeProjects(sorted);
+-  return sorted;
+ }
+ 
+ export async function getGitBranch(projectPath: string): Promise<string | undefined> {
+diff --git a/electron/sessionHistory.ts b/electron/sessionHistory.ts
+index 163cc21f..37f4be47 100644
+--- a/electron/sessionHistory.ts
++++ b/electron/sessionHistory.ts
+@@ -428,6 +428,9 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
+   return null;
+ }
+ 
++/** 单次会话历史加载上限；超过时丢弃最早的事件以控制内存。 */
++const MAX_HISTORY_EVENTS = 2_000;
++
+ async function parseKimiCodeWireEvents(wireFile: string): Promise<SessionHistoryEvent[]> {
+   if (!fs.existsSync(wireFile)) return [];
+   const events: SessionHistoryEvent[] = [];
+@@ -443,6 +446,9 @@ async function parseKimiCodeWireEvents(wireFile: string): Promise<SessionHistory
+       continue;
+     }
+   }
++  if (events.length > MAX_HISTORY_EVENTS) {
++    events.splice(0, events.length - MAX_HISTORY_EVENTS);
++  }
+   return events;
+ }
+ 
+diff --git a/knowledge/architecture/runtime-routing.md b/knowledge/architecture/runtime-routing.md
+index 76617e10..b1567b49 100644
+--- a/knowledge/architecture/runtime-routing.md
++++ b/knowledge/architecture/runtime-routing.md
+@@ -47,7 +47,8 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
+ 32. Server image prompts should trust the actual image bytes over a browser-provided data URL MIME label. Kimix sniffs PNG, JPEG, GIF, and WebP magic bytes before base64 fallback or official `/files` upload, then sends the corrected media type through the official image content schema.
+ 33. Background task management is split by official surface. Server sessions use official `/tasks` list/get/cancel for already-backgrounded work. The SDK compatibility chain may call official `session.detachBackgroundTask(taskId)` to move a foreground task into background, but Server 0.19 has no equivalent detach REST route; Kimix must report that boundary instead of offering a Server UI action that cannot complete.
+ 34. Kimix-managed foreground Server processes must not remain logically ready after the child exits. Host state returns to SDK routing when the managed process closes, and repeated WebSocket reconnect failures notify the same runtime-failure path so bounded background recovery can restart or reattach instead of leaving the renderer on a dead connection.
+-35. Opening the official Kimi Web UI is gated by `/api/v1/healthz`, not by a fixed delay or the `kimi web` launcher exit code. The launcher may exit successfully before its daemon has replaced a stale lock and bound the REST/WebSocket port. Kimix opens the authenticated session deep link only after the health envelope reports `code=0` and `data.ok=true`; timeout leaves the browser closed and reports an explicit startup error.
++	35. Opening the official Kimi Web UI is gated by `/api/v1/healthz`, not by a fixed delay or the `kimi web` launcher exit code. The launcher may exit successfully before its daemon has replaced a stale lock and bound the REST/WebSocket port. Kimix opens the authenticated session deep link only after the health envelope reports `code=0` and `data.ok=true`; timeout leaves the browser closed and reports an explicit startup error.
++	36. Server → SDK fallback is only permitted between turns, never during an active turn. A mid-turn Server prompt failure must set the session status to "error", mark the Server runtime as failed, delete the server session, and propagate the error. The next user turn discovers the existing SDK session without re-promotion, because the Server is in fallback state.
+ 
+ # Main Components
+ 
+diff --git a/knowledge/log.md b/knowledge/log.md
+index 4b395dd4..bd726a5f 100644
+--- a/knowledge/log.md
++++ b/knowledge/log.md
+@@ -1,5 +1,24 @@
+ # Kimix Knowledge Update Log
+ 
++## 2026-06-30
++
++* **Mid-turn fallback prohibition**: Added invariant #36 that Server→SDK fallback is only permitted between turns; mid-turn Server prompt failure propagates as an error and the next turn uses the existing SDK session.
++* **Error reporting convention**: Documented `reportError` utility in release-process.md; background operation failures must use reportError or logError instead of silent .catch(() => {}).
++* **Long-task status deduplication**: Generic kimi-code status listener now skips longTask sessions; the dedicated longTask listener is the sole handler.
++* **Long-task thinking**: `longTasks:create` now forwards the user's defaultThinking setting to the executor session via createSession.
++* **Long-task pause targeting**: Pause now cancels the active agent's runtime (reviewer or executor) instead of always targeting executorSessionId.
++* **Recovery draft fallback**: `applyTargetStep` falls back to persisted `longTask.targetStep` when draft is empty for recovery continuation.
++* **Structured session-missing detection**: Both renderer and main-process `isKimiCodeSessionMissingError` now check `error.statusCode` before regex fallback; HTTP/Api errors in `kimiCodeServerClient.request` carry statusCode.
++* **Per-runtime ref cleanup**: Added `cleanupRuntimeRefs` to trim `notifiedQuestionRequestRef`, `hiddenLongTaskEventsRef`, and `longTaskReviewDispatchRef` when runtime sessions end.
++* **History loading cap**: `parseKimiCodeWireEvents` truncates to the most recent 2000 events to prevent OOM on very long sessions.
++* **Bootstrap setters stability**: `useBootstrap` now receives a `useMemo`-stabilized setters object so `listRecentProjects()` does not fire on every render.
++* **ChatThread debug effect removed**: The no-dependency `useEffect` that logged render state and visibility to console and writeDiag on every frame has been removed.
++* **Sidebar sync dep narrowed**: Sidebar session-sync effect now depends only on `currentSessionId`, `updatedAt`, and `eventsLength` instead of the whole session object.
++* **Reviewing stage label**: LongTaskInspectorPanel now displays "审查中" instead of "paused" when the long task stage is reviewing.
++* **Archive runningSessionId cleanup**: Archiving a running session now clears `runningSessionId` in the app store.
++* **moveChat view switching**: `moveChat` now sets workspace view to "chat" when switching sessions.
++* **Project service concurrency**: Added `serialWrite` mutex to serialize read-modify-write operations in projectService.
++
+ ## 2026-06-30
+ * **History cache migration**: Added the invariant that persisted Kimi timelines carry a mapping version and stale caches reload once from official history, with richer canonical process events replacing incomplete local mirrors.
+ * **Local history tool boundaries**: Recorded that Kimi wire history nests `tool.call` and `tool.result` inside loop events and these records must survive parsing for thought/tool interleaving to remain reconstructable.
+diff --git a/knowledge/operations/release-process.md b/knowledge/operations/release-process.md
+index 5275f401..6553ed99 100644
+--- a/knowledge/operations/release-process.md
++++ b/knowledge/operations/release-process.md
+@@ -26,6 +26,18 @@ Kimix release artifacts are produced by GitHub Actions, not by manual local pack
+ 4. Confirm the release job selected `docs/release-notes/vX.Y.Z.md` instead of the root fallback.
+ 5. Confirm all platform jobs and the final published release succeeded.
+ 
++# Development Guidelines
++
++## Error reporting
++
++Background operation failures (persistence, cleanup, polling) must not interrupt the user but must leave a trace for debugging. Use the `reportError` utility (`src/utils/reportError.ts`) instead of `.catch(() => {})`:
++
++- `reportError(error, { context })` — writes to `console.warn` and the diag log.
++- `reportError(error, { context, userVisible: true })` — also dispatches a toast.
++- The `logError(context)` shorthand can be passed directly to `.catch()`.
++
++Best-effort cleanup operations (`cancelKimiCodeTurn`, `closeKimiCodeSession`) may remain silent, but all other previously silent catches should be converted.
++
+ # Prohibitions
+ 
+ * Do not run a local distribution build and upload its artifacts over CI output.
+diff --git a/package.json b/package.json
+index 2968ae96..3eba62be 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "kimix",
+-  "version": "2.12.17",
++  "version": "2.12.19",
+   "packageManager": "pnpm@11.0.8",
+   "pnpm": {
+     "allowBuilds": {
+diff --git a/src/App.tsx b/src/App.tsx
+index 8ae99df9..0c680cfd 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,4 +1,4 @@
+-﻿import { useEffect, useRef, useCallback } from "react";
++﻿import { useEffect, useRef, useCallback, useMemo } from "react";
+ import { AppShell } from "@/components/layout/AppShell";
+ import { ThemeProvider } from "@/components/common/ThemeProvider";
+ import { useAppStore } from "@/stores/appStore";
+@@ -46,6 +46,7 @@ import { useStatePersistence } from "@/hooks/useStatePersistence";
+ import { useEventStream } from "@/hooks/useEventStream";
+ import { useBootstrap } from "@/hooks/useBootstrap";
+ import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
++import { reportError } from "@/utils/reportError";
+ 
+ function promptImages(attachments: UserMessageImage[] = []) {
+   return attachments
+@@ -557,11 +558,11 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
+         currentStep: latest.longTask.currentStep,
+         targetStep: latest.longTask.targetStep,
+         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
+-      },
+-    }).catch(() => {});
+-  }
++	      },
++	    }).catch(logError("persistLongTaskMeta"));
++	  }
+ 
+-  const active = useAppStore.getState().currentSession;
++	  const active = useAppStore.getState().currentSession;
+   if (active?.id === uiSessionId) {
+     if (latest) useAppStore.getState().setCurrentSession(latest);
+   }
+@@ -588,6 +589,36 @@ function settlePendingQuestions(events: TimelineEvent[], status: "skipped" | "an
+   ));
+ }
+ 
++/**
++ * 在 runtime 会话终止时清理不用的 per-runtime ref 条目。
++ * notifiedQuestionRequestRef 仅在 error/interrupted 时清理，
++ * 以免同一 runtime 在新轮中丢掉 question 去重。
++ */
++function cleanupRuntimeRefs(
++  runtimeSessionId: string,
++  terminalStatus: "completed" | "error" | "interrupted",
++  refs: {
++    notifiedQuestionRequest: Set<string>;
++    hiddenLongTaskEvents: Map<string, TimelineEvent[]>;
++    longTaskReviewDispatch: Set<string>;
++  },
++) {
++  // 仅 error/interrupted 清理 question 去重记录；completed 保留以保护新轮去重
++  if (terminalStatus !== "completed") {
++    for (const key of refs.notifiedQuestionRequest) {
++      if (key.startsWith(`${runtimeSessionId}:`)) {
++        refs.notifiedQuestionRequest.delete(key);
++      }
++    }
++  }
++  refs.hiddenLongTaskEvents.delete(runtimeSessionId);
++  for (const key of refs.longTaskReviewDispatch) {
++    if (key.includes(`:${runtimeSessionId}:`)) {
++      refs.longTaskReviewDispatch.delete(key);
++    }
++  }
++}
++
+ function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSessionId: string) {
+   return Boolean(
+     session?.longTask &&
+@@ -799,8 +830,8 @@ function applyLongTaskProgressFromLatestOutput(uiSessionId: string, runtimeSessi
+         targetStep: latest.longTask.targetStep,
+         reviewedReviewItems: latest.longTask.reviewedReviewItems ?? [],
+       },
+-    }).catch(() => {});
+-    const active = useAppStore.getState().currentSession;
++      }).catch(logError("persistLongTaskMeta"));
++	    const active = useAppStore.getState().currentSession;
+     if (active?.id === uiSessionId) useAppStore.getState().setCurrentSession(latest);
+   }
+   return latest ?? current;
+@@ -1088,26 +1119,34 @@ function App() {
+     }
+   }, [setRunningSessionId]);
+ 
+-  useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
+-  useBootstrap({
+-    setTheme,
+-    setThemePalette,
+-    setCustomThemePalette,
+-    setKimiThemePalettes,
+-    setPermissionMode,
+-    setDefaultThinking,
+-    setDefaultPlanMode,
+-    setAdditionalWorkDirs,
+-    setDetailedContext,
+-    setStatusUpdateDisplay,
+-    setSessionRecommendationEnabled,
+-    setSessionRecommendationTurnLimit,
+-    setVoiceShortcut,
+-    setNotificationMode,
+-    setClarificationToolMode,
+-    setFilePreviewExtensions,
+-    setRecentProjects,
+-  });
++	  useKeyboardShortcuts(toggleSidebar, triggerFocusInput, handleEscape);
++	  const bootstrapSetters = useMemo(() => ({
++	    setTheme,
++	    setThemePalette,
++	    setCustomThemePalette,
++	    setKimiThemePalettes,
++	    setPermissionMode,
++	    setDefaultThinking,
++	    setDefaultPlanMode,
++	    setAdditionalWorkDirs,
++	    setDetailedContext,
++	    setStatusUpdateDisplay,
++	    setSessionRecommendationEnabled,
++	    setSessionRecommendationTurnLimit,
++	    setVoiceShortcut,
++	    setNotificationMode,
++	    setClarificationToolMode,
++	    setFilePreviewExtensions,
++	    setRecentProjects,
++	  }), [
++	    setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
++	    setPermissionMode, setDefaultThinking, setDefaultPlanMode,
++	    setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
++	    setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
++	    setVoiceShortcut, setNotificationMode, setClarificationToolMode,
++	    setFilePreviewExtensions, setRecentProjects,
++	  ]);
++	  useBootstrap(bootstrapSetters);
+ 
+   useEffect(() => {
+     const projectPath = currentProject?.path;
+@@ -1124,11 +1163,11 @@ function App() {
+       useSessionStore.setState((state) => ({
+         sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath, { source: res.source }),
+       }));
+-    }).catch(() => {});
+-    return () => {
+-      cancelled = true;
+-    };
+-  }, [currentProject?.path]);
++	    }).catch(logError("listKimiCodeSessions"));
++	    return () => {
++	      cancelled = true;
++	    };
++	  }, [currentProject?.path]);
+ 
+   const syncCurrentSessionFromStore = (uiSessionId: string) => {
+     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+@@ -1288,7 +1327,7 @@ function App() {
+         executorSessionId: session.longTask.executorSessionId,
+         reviewerSessionId: session.longTask.reviewerSessionId,
+       },
+-    }).catch(() => {});
++    }).catch(logError("persistLongTaskMeta"));
+   };
+ 
+   const isMissingRuntimeSessionError = (err: unknown) => {
+@@ -1492,7 +1531,7 @@ function App() {
+       projectPath: session.projectPath,
+       taskId: session.longTask.taskId,
+       ...payload,
+-    }).catch(() => {});
++    }).catch(logError("appendLongTaskRound"));
+   };
+ 
+   const mergeHiddenLongTaskEvent = (runtimeSessionId: string, event: TimelineEvent) => {
+@@ -1655,11 +1694,11 @@ function App() {
+           currentStep: latestForPrompt.longTask.currentStep,
+           targetStep: latestForPrompt.longTask.targetStep,
+           reviewedReviewItems: latestForPrompt.longTask.reviewedReviewItems ?? [],
+-        },
+-      }).catch(() => {});
+-    }
+-    setRunningSessionId(uiSessionId);
+-    void window.api.sendKimiCodePrompt({
++	        },
++	      }).catch(logError("updateLongTaskState"));
++	    }
++	    setRunningSessionId(uiSessionId);
++	    void window.api.sendKimiCodePrompt({
+       sessionId: latestSession.longTask.reviewerSessionId,
+       content: buildLongTaskReviewPrompt(latestForPrompt),
+       thinking: defaultThinking,
+@@ -1716,7 +1755,7 @@ function App() {
+             targetStep: failedSession.longTask.targetStep,
+             reviewedReviewItems: failedSession.longTask.reviewedReviewItems ?? [],
+           },
+-        }).catch(() => {});
++        }).catch(logError("updateLongTaskState"));
+       }
+       setRunningSessionId(null);
+     });
+@@ -2218,7 +2257,7 @@ function App() {
+             }
+           })();
+         }, 1_200);
+-      }).catch(() => {});
++      }).catch(logError("loadKimiCodeSession"));
+     });
+ 
+     const storedSessions = localStorage.getItem(LOCAL_SESSIONS_KEY);
+@@ -2492,6 +2531,8 @@ function App() {
+       const uiSessionId = resolveUiSessionId(payload.sessionId);
+       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+       if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
++      // longTask 会话由专属监听器 (unsubscribeLongTaskStatus) 单独处理，通用监听器跳过避免重复执行
++      if (targetSession?.longTask) return;
+ 
+       if (payload.status === "running") {
+         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+@@ -2507,6 +2548,12 @@ function App() {
+ 
+       if (!["completed", "error", "interrupted"].includes(payload.status)) return;
+ 
++      cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
++        notifiedQuestionRequest: notifiedQuestionRequestRef.current,
++        hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
++        longTaskReviewDispatch: longTaskReviewDispatchRef.current,
++      });
++
+       flushStreamEvents();
+       void refreshOfficialGoalState(uiSessionId, payload.sessionId);
+       goalLastRefreshRef.current.set(`${uiSessionId}:${payload.sessionId}`, Date.now());
+@@ -2590,6 +2637,12 @@ function App() {
+         return;
+       }
+ 
++      cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
++        notifiedQuestionRequest: notifiedQuestionRequestRef.current,
++        hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
++        longTaskReviewDispatch: longTaskReviewDispatchRef.current,
++      });
++
+       const uiSessionId = statusUiSessionId;
+       const terminalStatus = payload.status as "completed" | "error" | "interrupted";
+       const terminalSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+diff --git a/src/components/chat/ChatThread.tsx b/src/components/chat/ChatThread.tsx
+index 52fd2bb2..4cb405c0 100644
+--- a/src/components/chat/ChatThread.tsx
++++ b/src/components/chat/ChatThread.tsx
+@@ -1318,32 +1318,7 @@ export function ChatThread() {
+   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
+   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
+ 
+-  useEffect(() => {
+-    const data = {
+-      sessionId: session?.id,
+-      primedSessionId,
+-      isSessionScrollPrimed,
+-      hasVisibleContent,
+-      hasActiveTurn,
+-      eventsLength: session?.events.length ?? 0,
+-      renderItemsLength: renderItems.length,
+-    };
+-    console.log("[ChatThread] render state", data);
+-    window.api.writeDiag?.({ message: "[ChatThread] render state", data }).catch(() => {});
+-    if (session?.id && !isSessionScrollPrimed) {
+-      const node = scrollRef.current;
+-      const visibilityData = {
+-        sessionId: session?.id,
+-        domVisibility: node ? getComputedStyle(node).visibility : "no-node",
+-        domScrollHeight: node?.scrollHeight,
+-        domClientHeight: node?.clientHeight,
+-      };
+-      console.log("[ChatThread] visibility check", visibilityData);
+-      window.api.writeDiag?.({ message: "[ChatThread] visibility check", data: visibilityData }).catch(() => {});
+-    }
+-  });
+-
+-  useEffect(() => {
++	  useEffect(() => {
+     const pending = pendingFocusEventRef.current;
+     if (!pending || !session || pending.sessionId !== session.id) return;
+     window.requestAnimationFrame(() => {
+diff --git a/src/components/layout/AppShell.tsx b/src/components/layout/AppShell.tsx
+index 0337b599..ebde58f7 100644
+--- a/src/components/layout/AppShell.tsx
++++ b/src/components/layout/AppShell.tsx
+@@ -668,6 +668,7 @@ export function AppShell() {
+       ? (currentIndex - 1 + sortedSessions.length) % sortedSessions.length
+       : (currentIndex + 1) % sortedSessions.length;
+     setCurrentSession(sortedSessions[nextIndex]);
++    setWorkspaceView("chat");
+   };
+ 
+   const handleCheckUpdates = async () => {
+@@ -1114,11 +1115,15 @@ export function AppShell() {
+     if (!liveCurrentSession?.longTask || longTaskControlBusy) return;
+     setLongTaskControlBusy(true);
+     let latestSession = liveCurrentSession;
+-    try {
+-      if (options?.stopRunning) {
+-        const runtimeSessionId = getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id;
+-        await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
+-      }
++	    try {
++	      if (options?.stopRunning) {
++	        // 长任务需按 activeAgent 选择正确的 runtime，而非总是 executor
++	        const longTask = liveCurrentSession.longTask;
++	        const runtimeSessionId = longTask && longTask.activeAgent === "reviewer" && longTask.reviewerSessionId !== longTask.executorSessionId
++	          ? longTask.reviewerSessionId
++	          : (getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id);
++	        await window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(() => ({ success: true as const, data: undefined }));
++	      }
+       updateSession(liveCurrentSession.id, (session) => {
+         if (!session.longTask) return session;
+         const nextMeta = {
+@@ -1186,7 +1191,11 @@ ${isFinalStep
+ 
+   const applyTargetStep = async (startNow: boolean) => {
+     if (!liveCurrentSession?.longTask || targetStepBusy) return;
+-    const target = Number(targetStepDraft);
++    const draftNumber = Number(targetStepDraft);
++    // 恢复场景（startNow === true）下 draft 为空时回退到持久化的 targetStep
++    const target = (Number.isInteger(draftNumber) && draftNumber >= 1)
++      ? draftNumber
++      : (startNow ? liveCurrentSession.longTask.targetStep : 0);
+     if (!Number.isInteger(target) || target < 1) {
+       showToast("请输入有效步骤");
+       return;
+diff --git a/src/components/layout/LongTaskInspectorPanel.tsx b/src/components/layout/LongTaskInspectorPanel.tsx
+index 12f76519..3a718223 100644
+--- a/src/components/layout/LongTaskInspectorPanel.tsx
++++ b/src/components/layout/LongTaskInspectorPanel.tsx
+@@ -1066,7 +1066,7 @@ export function LongTaskInspectorPanel({
+                 {rightCardDragHandle("longTaskStatus", "当前状态")}
+               </div>
+               <div className="mt-2 text-[14px] leading-6 text-text-primary">
+-                长程任务 · {longTaskMeta.stage === "reviewing" ? "paused" : longTaskMeta.stage}
++                长程任务 · {longTaskMeta.stage === "reviewing" ? "审查中" : longTaskMeta.stage}
+               </div>
+               <div className="mt-1 text-[13px] leading-5 text-text-muted">
+                 步骤 {longTaskMeta.currentStep}{longTaskMeta.targetStep ? ` / ${longTaskMeta.targetStep}` : " / 未设置"}
+diff --git a/src/components/layout/Sidebar.tsx b/src/components/layout/Sidebar.tsx
+index ba15bbea..5cdd8c8e 100644
+--- a/src/components/layout/Sidebar.tsx
++++ b/src/components/layout/Sidebar.tsx
+@@ -12,6 +12,8 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
+ import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+ import { useArchiveSession } from "@/hooks/useArchiveSession";
+ import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
++import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
++import { reportError } from "@/utils/reportError";
+ 
+ function formatRelativeTime(ts: number): string {
+   const diff = Date.now() - ts;
+@@ -57,6 +59,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+   const currentProject = useAppStore((s) => s.currentProject);
+   const currentSession = useAppStore((s) => s.currentSession);
+   const runningSessionId = useAppStore((s) => s.runningSessionId);
++  const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
+   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
+   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+@@ -66,6 +69,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
+   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
++  const defaultThinking = useAppStore((s) => s.defaultThinking);
++  const permissionMode = useAppStore((s) => s.permissionMode);
++  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
++  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
+   const recentProjects = useSessionStore((s) => s.recentProjects);
+   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
+   const addSession = useSessionStore((s) => s.addSession);
+@@ -110,6 +117,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+     }
+   }, [currentProject?.id]);
+ 
++  const currentSessionId = currentSession?.id;
++  const currentSessionUpdatedAt = currentSession?.updatedAt;
++  const currentSessionEventsLength = currentSession?.events.length;
+   useEffect(() => {
+     if (!currentSession || currentSession.archivedAt || isHiddenInternalSession(currentSession)) return;
+     const existing = sessions.find((session) => session.id === currentSession.id);
+@@ -156,25 +166,32 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+     ) return;
+ 
+     updateSession(currentSession.id, () => nextSession);
+-  }, [addSession, currentSession, sessions, updateSession]);
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [addSession, currentSessionId, currentSessionUpdatedAt, currentSessionEventsLength, sessions, updateSession]);
+ 
+   const createSessionForProject = async (project: Project) => {
+     if (useAppStore.getState().creatingSessionProjectPath) return;
+     setCreatingSessionProjectPath(project.path);
+     try {
+-      let model = "kimi-for-coding";
+-      try {
+-        const modelRes = await window.api.getKimiModelConfig();
+-        if (modelRes.success) model = modelRes.data.defaultModel?.trim() || model;
+-      } catch {
+-        // Keep the official built-in default.
+-      }
+-      const session = {
+-        id: crypto.randomUUID(),
++      // 先在后端创建 runtime 会话，拿到真实 sessionId
++      const runtimeRes = await window.api.startKimiCodeRuntime({
++        workDir: project.path,
++        thinking: defaultThinking,
++        yoloMode: permissionMode === "yolo",
++        autoMode: permissionMode === "auto",
++        planMode: defaultPlanMode,
++        additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
++      });
++      if (!runtimeRes.success) throw new Error(runtimeRes.error);
++
++      const session: Session = {
++        id: runtimeRes.data.sessionId,
+         engine: "kimi-code" as const,
+-        model,
++        model: runtimeRes.data.model ?? "kimi-for-coding",
+         title: "新会话",
+         projectPath: project.path,
++        runtimeSessionId: runtimeRes.data.sessionId,
++        officialSessionId: runtimeRes.data.sessionId,
+         createdAt: Date.now(),
+         updatedAt: Date.now(),
+         events: [],
+@@ -185,7 +202,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+       setWorkspaceView("chat");
+       setCurrentSession(session);
+       setExpandedProjectIds((current) => new Set([...current, project.id]));
+-    } finally {
++	    } catch (err) {
++	      reportError(err, { context: "createSessionForProject", userVisible: true });
++	    } finally {
+       setCreatingSessionProjectPath(null);
+     }
+   };
+@@ -268,10 +287,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+     const targets = sessions.filter((session) => isSameProjectPath(session.projectPath, project.path) && !session.archivedAt && !isHiddenInternalSession(session));
+     const results = await Promise.all(targets.map((session) => archiveSession(session.id)));
+     const archivedIds = new Set(targets.filter((_, index) => results[index].success).map((session) => session.id));
++    const archivedRuntimeIds = new Set(targets.filter((t) => archivedIds.has(t.id)).map((t) => t.runtimeSessionId).filter(Boolean));
+     const failedCount = results.length - archivedIds.size;
+     if (currentSession && archivedIds.has(currentSession.id)) {
+       setCurrentSession(null);
+     }
++    // 批量归档运行中会话时清理 runningSessionId
++    if (runningSessionId && (archivedIds.has(runningSessionId) || archivedRuntimeIds.has(runningSessionId))) {
++      setRunningSessionId(null);
++    }
+     setOpenProjectMenu(null);
+     if (targets.length === 0) toast("没有可归档的对话");
+     else if (failedCount > 0) toast(`已归档 ${archivedIds.size} 个对话，${failedCount} 个失败`);
+@@ -747,6 +771,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+                                             if (currentSession?.id === s.id) {
+                                               setCurrentSession(null);
+                                             }
++                                            // 归档运行中会话时清理 runningSessionId
++                                            if (runningSessionId === s.id || runningSessionId === s.runtimeSessionId) {
++                                              setRunningSessionId(null);
++                                            }
+                                             toast("已归档对话");
+                                           });
+                                         }}
+@@ -784,7 +812,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
+         >
+           <Settings size={18} className="text-text-secondary" />
+           <span>设置</span>
+-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.17</span>
++          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.19</span>
+         </button>
+       </div>
+     </aside>
+diff --git a/src/components/settings/SettingsPanel.tsx b/src/components/settings/SettingsPanel.tsx
+index 0c6914dd..dcf45bf8 100644
+--- a/src/components/settings/SettingsPanel.tsx
++++ b/src/components/settings/SettingsPanel.tsx
+@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
+ const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
+ const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
+ const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
+-const KIMIX_VERSION = "2.12.17";
++const KIMIX_VERSION = "2.12.19";
+ const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
+ 
+ type SettingsSectionId =
+diff --git a/src/utils/__tests__/sessionArchive.test.ts b/src/utils/__tests__/sessionArchive.test.ts
+index 926507ec..af4108dc 100644
+--- a/src/utils/__tests__/sessionArchive.test.ts
++++ b/src/utils/__tests__/sessionArchive.test.ts
+@@ -58,4 +58,16 @@ describe("official-first session archive", () => {
+     expect(result).toEqual({ success: true });
+     expect(archiveLocal).toHaveBeenCalledWith("local-1");
+   });
++
++  it("SDK-only 会话在 Server 不可用时回退到本地归档", async () => {
++    const archiveLocal = vi.fn();
++    const result = await archiveSessionOfficialFirst(
++      session({ id: "sdk-session", runtimeSessionId: "sdk-session" }),
++      async () => { throw new Error("Session not found on Kimi Server"); },
++      archiveLocal,
++    );
++
++    expect(result).toEqual({ success: true });
++    expect(archiveLocal).toHaveBeenCalledWith("sdk-session");
++  });
+ });
+diff --git a/src/utils/kimiCodeSessionRecovery.ts b/src/utils/kimiCodeSessionRecovery.ts
+index cb529d61..1c44196c 100644
+--- a/src/utils/kimiCodeSessionRecovery.ts
++++ b/src/utils/kimiCodeSessionRecovery.ts
+@@ -3,12 +3,31 @@ type MessageEventLike = {
+   message?: string;
+ };
+ 
++/** HTTP 状态码或协议级别的 "not found" 错误识别。
++ *  优先检查 error 上的数字状态码（statusCode），正则作向后兼容兜底。 */
++// 404=不存在 410=已归档；409 是 Conflict（非 missing），归 inactive 检查
++const SESSION_NOT_FOUND_CODES = [404, 410];
++const SESSION_NOT_FOUND_RE = /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i;
++
++function getErrorStatusCode(error: unknown): number | undefined {
++  const err = error as Record<string, unknown>;
++  return typeof err.statusCode === "number" ? err.statusCode
++    : typeof err.code === "number" ? err.code
++    : err.cause && typeof (err.cause as Record<string, unknown>).statusCode === "number"
++      ? (err.cause as Record<string, unknown>).statusCode as number
++      : undefined;
++}
++
+ export function isKimiCodeSessionMissingError(error: unknown) {
++  const statusCode = getErrorStatusCode(error);
++  if (statusCode !== undefined) return SESSION_NOT_FOUND_CODES.includes(statusCode);
+   const message = error instanceof Error ? error.message : String(error);
+-  return /(?:HTTP\s+404|session not found|was not found|unknown session|does not exist|会话不存在|session.*missing)/i.test(message);
++  return SESSION_NOT_FOUND_RE.test(message);
+ }
+ 
+ export function isKimiCodeSessionInactiveError(error: unknown) {
++  const statusCode = getErrorStatusCode(error);
++  if (statusCode !== undefined) return statusCode === 400 || statusCode === 409;
+   const message = error instanceof Error ? error.message : String(error);
+   return /Kimi (?:Code|Server) session is not active/i.test(message);
+ }
+diff --git a/src/utils/reportError.ts b/src/utils/reportError.ts
+new file mode 100644
+index 00000000..c9639014
+--- /dev/null
++++ b/src/utils/reportError.ts
+@@ -0,0 +1,33 @@
++/**
++ * reportError — 统一错误记录工具。
++ *
++ * - background: 后台操作失败（持久化/清理/轮询），仅 console.warn，不打扰用户。
++ * - userVisible: 用户操作失败，console.error + toast。
++ *
++ * 替换 `.catch(() => {})` 的静默吞错，让无用信息进入 diag 日志便于调试。
++ */
++
++type ReportOptions = {
++  context?: string;
++  userVisible?: boolean;
++};
++
++export function reportError(error: unknown, options: ReportOptions = {}): void {
++  const { context = "", userVisible = false } = options;
++  const message = error instanceof Error ? error.message : String(error);
++  const prefix = context ? `[${context}]` : "";
++
++  if (userVisible) {
++    console.error(`${prefix} ${message}`, error);
++    window.api.writeDiag?.({ message: `${prefix} user-visible error`, data: { message, stack: error instanceof Error ? error.stack : undefined } })
++      .catch(() => {});
++    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: message }));
++  } else {
++    console.warn(`${prefix} ${message}`);
++    window.api.writeDiag?.({ message: `${prefix} background error`, data: { message } })
++      .catch(() => {});
++  }
++}
++
++/** 用于替换 background 类 catch 的 shorthand */
++export const logError = (context: string) => (error: unknown) => reportError(error, { context });
