@@ -4,7 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
-import { compactModelDisplayName } from "@/utils/modelDisplay";
+import { compactModelDisplayName, getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
@@ -100,7 +100,9 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const activeSession = session ?? currentSession;
   const projectDisplayName = displayProjectName(project);
-  const sessionModel = activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null;
+  const lastUsedModel = getLastUsedModelFromEvents(activeSession?.events ?? []);
+  const sessionModel = (activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null)
+    ?? lastUsedModel;
   const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
   const compactDisplayModel = compactModelDisplayName(displayModel);
   const modelTitle = sessionModel
