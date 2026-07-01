@@ -1,5 +1,6 @@
 import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session } from "@/types/ui";
@@ -81,7 +82,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const updateSession = useSessionStore((s) => s.updateSession);
 
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
-  const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null);
+  const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; left: number } | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
 
@@ -103,7 +104,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   useEffect(() => {
     const close = () => setOpenProjectMenu(null);
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -636,7 +643,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setOpenProjectMenu((current) => current === project.id ? null : project.id);
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const menuWidth = 192;
+                                setOpenProjectMenu((current) =>
+                                  current?.projectId === project.id
+                                    ? null
+                                    : { projectId: project.id, top: rect.top, bottom: rect.bottom, left: Math.max(4, rect.right - menuWidth) }
+                                );
                               }}
                               className="kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
                               title="项目菜单"
@@ -659,36 +672,52 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               {creatingSessionProjectPath === project.path ? <Loader2 size={15} className="kimix-spin" /> : <SquarePen size={15} />}
                             </button>
                           </div>
-                          {openProjectMenu === project.id && (
-                            <div
-                              className="absolute right-1 top-8 z-40 w-48 rounded-xl border border-border-subtle bg-surface-elevated py-1.5 text-[13px] text-text-primary shadow-floating-token"
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                                <Pin size={14} className="text-text-secondary" />
-                                <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
-                              </button>
-                              <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                                <FolderSearch size={14} className="text-text-secondary" />
-                                <span>在资源管理器中打开</span>
-                              </button>
-                              <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                                <GitBranch size={14} className="text-text-secondary" />
-                                <span>创建永久工作树</span>
-                              </button>
-                              <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                                <SquarePen size={14} className="text-text-secondary" />
-                                <span>重命名项目</span>
-                              </button>
-                              <button onClick={() => void archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                                <Archive size={14} className="text-text-secondary" />
-                                <span>归档对话</span>
-                              </button>
-                              <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-accent-danger transition-colors hover:bg-accent-danger-light" style={{ paddingLeft: 18, paddingRight: 18 }}>
-                                <X size={14} />
-                                <span>移除</span>
-                              </button>
-                            </div>
+                          {openProjectMenu?.projectId === project.id && createPortal(
+                            (() => {
+                              const menuHeight = 246;
+                              const menuTop = openProjectMenu.bottom + 4 + menuHeight > window.innerHeight
+                                ? Math.max(4, openProjectMenu.top - menuHeight - 4)
+                                : openProjectMenu.bottom + 4;
+                              return (
+                                <div
+                                  className="w-48 rounded-xl border border-border-subtle bg-surface-elevated py-1.5 text-[13px] text-text-primary shadow-floating-token"
+                                  style={{
+                                    position: "fixed",
+                                    top: menuTop,
+                                    left: openProjectMenu.left,
+                                    width: 192,
+                                    zIndex: 100,
+                                  }}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                  <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                    <Pin size={14} className="text-text-secondary" />
+                                    <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
+                                  </button>
+                                  <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                    <FolderSearch size={14} className="text-text-secondary" />
+                                    <span>在资源管理器中打开</span>
+                                  </button>
+                                  <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                    <GitBranch size={14} className="text-text-secondary" />
+                                    <span>创建永久工作树</span>
+                                  </button>
+                                  <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                    <SquarePen size={14} className="text-text-secondary" />
+                                    <span>重命名项目</span>
+                                  </button>
+                                  <button onClick={() => void archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                    <Archive size={14} className="text-text-secondary" />
+                                    <span>归档对话</span>
+                                  </button>
+                                  <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-accent-danger transition-colors hover:bg-accent-danger-light" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                    <X size={14} />
+                                    <span>移除</span>
+                                  </button>
+                                </div>
+                              );
+                            })(),
+                            document.body
                           )}
                         </div>
 
@@ -812,7 +841,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.44</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.45</span>
         </button>
       </div>
     </aside>
