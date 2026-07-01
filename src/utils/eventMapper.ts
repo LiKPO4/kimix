@@ -592,6 +592,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         timestamp: eventTimestamp,
         agentId: payloadString(payload, source, "agentId"),
         content: delta,
+        model: payloadString(payload, source, "model")?.trim() || undefined,
         isThinking: false,
         isComplete: false,
       };
@@ -608,6 +609,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         content: "",
         thinking: delta,
         thinkingParts: [{ id: generateId(), timestamp: eventTimestamp, text: delta }],
+        model: payloadString(payload, source, "model")?.trim() || undefined,
         isThinking: true,
         isComplete: false,
       };
@@ -619,6 +621,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         type: "assistant_message",
         timestamp: eventTimestamp,
         content: "",
+        model: payloadString(payload, source, "model")?.trim() || undefined,
         isThinking: false,
         isComplete: true,
       };
@@ -718,6 +721,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           type: "assistant_message",
           timestamp: eventTimestamp,
           content: part.text,
+          model: payloadString(payload, source, "model")?.trim() || undefined,
           isThinking: false,
           isComplete: false,
         };
@@ -733,6 +737,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           content: "",
           thinking: part.think,
           thinkingParts: [{ id: generateId(), timestamp, text: part.think }],
+          model: payloadString(payload, source, "model")?.trim() || undefined,
           isThinking: true,
           isComplete: false,
         };
@@ -977,6 +982,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         type: "assistant_message",
         timestamp: eventTimestamp,
         content: "",
+        model: payloadString(payload, source, "model")?.trim() || undefined,
         isThinking: false,
         isComplete: true,
       };

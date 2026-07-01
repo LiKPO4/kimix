@@ -20,9 +20,12 @@ export function extractModelFromStatusMessage(message: string | undefined | null
   return model || null;
 }
 
-export function getLastUsedModelFromEvents(events: { type: string; message?: string | null }[]): string | null {
+export function getLastUsedModelFromEvents(events: { type: string; message?: string | null; model?: string | null }[]): string | null {
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
+    if (event.type === "assistant_message" && typeof event.model === "string" && event.model.trim()) {
+      return event.model.trim();
+    }
     if (event.type !== "status_update") continue;
     const model = extractModelFromStatusMessage(event.message);
     if (model) return model;

@@ -230,6 +230,7 @@ export function mapKimiCodeEvent(
         timestamp,
         agentId: getAgentId(event),
         content: delta,
+        model: isString(event.model) ? event.model : undefined,
         isThinking: false,
         isComplete: false,
       };
@@ -246,6 +247,7 @@ export function mapKimiCodeEvent(
           timestamp,
           agentId: getAgentId(event),
           content: text,
+          model: isString(event.model) ? event.model : undefined,
           isThinking: false,
           isComplete: false,
         };
@@ -261,6 +263,7 @@ export function mapKimiCodeEvent(
           content: "",
           thinking: think,
           thinkingParts: [{ id: getId(options), timestamp, text: think }],
+          model: isString(event.model) ? event.model : undefined,
           isThinking: true,
           isComplete: false,
         };
@@ -279,6 +282,7 @@ export function mapKimiCodeEvent(
         content: "",
         thinking: delta,
         thinkingParts: [{ id: getId(options), timestamp, text: delta }],
+        model: isString(event.model) ? event.model : undefined,
         isThinking: true,
         isComplete: false,
       };
@@ -326,6 +330,7 @@ export function mapKimiCodeEvent(
         timestamp,
         agentId: getAgentId(event),
         content: "",
+        model: isString(event.model) ? event.model : undefined,
         isThinking: false,
         isComplete: true,
       };
@@ -339,6 +344,7 @@ export function mapKimiCodeEvent(
         timestamp,
         agentId: getAgentId(event),
         content: "",
+        model: isString(event.model) ? event.model : undefined,
         isThinking: false,
         isComplete: true,
       };

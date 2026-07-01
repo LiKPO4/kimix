@@ -217,6 +217,7 @@ export interface AssistantMessageEvent {
   content: string;
   thinking?: string;
   thinkingParts?: ThinkingPart[];
+  model?: string;
   isThinking: boolean;
   isComplete: boolean;
   durationMs?: number;
