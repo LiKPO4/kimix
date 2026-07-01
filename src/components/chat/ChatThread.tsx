@@ -51,7 +51,7 @@ function useAnimatedDots(active: boolean) {
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
-const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 60_000;
+const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 20_000;
 const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
 const SESSION_LAYOUT_STABLE_MS = 320;
 const SESSION_LAYOUT_STABLE_PASSES = 3;
@@ -720,7 +720,6 @@ export function ChatThread() {
   const sessionAutoBottomUntilRef = useRef(0);
   const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
-  const prevScrollHeightRef = useRef(0);
   const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
@@ -787,14 +786,6 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    // Direction B：内容缩小时跳过本次 scrollToBottom。
-    // 浏览器会自动 clamp scrollTop 到新底，无需我们再设一次，
-    // 这样避免"旧底→clamp→新底"三步引起的闪烁。
-    if (node.scrollHeight < prevScrollHeightRef.current) {
-      prevScrollHeightRef.current = node.scrollHeight;
-      return;
-    }
-    prevScrollHeightRef.current = node.scrollHeight;
     const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
     if (behavior === "auto") {
       node.scrollTop = bottom;
@@ -918,14 +909,10 @@ export function ChatThread() {
   const restoreResizeScrollAnchor = () => {
     const node = scrollRef.current;
     const anchor = resizeScrollAnchorRef.current;
-    if (!node || !anchor?.key) {
-      return false;
-    }
+    if (!node || !anchor?.key) return false;
     const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
     const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
-    if (!target) {
-      return false;
-    }
+    if (!target) return false;
     const containerRect = node.getBoundingClientRect();
     const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
     const delta = nextOffsetTop - anchor.offsetTop;
@@ -1091,7 +1078,6 @@ export function ChatThread() {
     if (session?.id) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       sessionAutoBottomStableRef.current = null;
-      prevScrollHeightRef.current = 0;
       settleSessionAtBottom();
       const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
@@ -1112,43 +1098,12 @@ export function ChatThread() {
     };
   }, [session?.id]);
 
-  /** Scroll to bottom when the container becomes visible (primedSessionId set).
-   *  Must use direct scrollToBottom rather than settleSessionAtBottom because
-   *  the latter can bail when autoFollowRef or userScrollRef are stale, and the
-   *  settle-timer loop is too indirect for the first-visibility paint window. */
+  /** Scroll to bottom when the container becomes visible (primedSessionId set). */
   useLayoutEffect(() => {
-    if (!primedSessionId) return;
-    scrollToBottom("auto");
-    // Belt-and-suspenders: a second pass after the browser has laid out all
-    // children (covers async images, font load, etc.).
-    window.requestAnimationFrame(() => {
-      scrollToBottom("auto");
-    });
+    if (primedSessionId) {
+      settleSessionAtBottom();
+    }
   }, [primedSessionId]);
-
-  /**
-   * 兜底：会话切换后 3 秒内，每 200ms 强制 scrollToBottom 一次。
-   * 解决"settle 循环停了但内容还在陆续到"导致停在中间位置的场景。
-   * 用户手动滚到底/上后通过 userScrollRef 停止兜底。
-   */
-  useEffect(() => {
-    if (!session?.id) return;
-    const start = Date.now();
-    const id = window.setInterval(() => {
-      if (Date.now() - start > 30000 || userScrollRef.current) {
-        window.clearInterval(id);
-        return;
-      }
-      const node = scrollRef.current;
-      if (!node) {
-        window.clearInterval(id);
-        return;
-      }
-      autoFollowRef.current = true;
-      scrollToBottom("auto");
-    }, 200);
-    return () => window.clearInterval(id);
-  }, [session?.id]);
 
   useLayoutEffect(() => {
     const node = scrollRef.current;
@@ -1227,8 +1182,7 @@ export function ChatThread() {
   }, [session?.id, showOlderItems]);
 
   useLayoutEffect(() => {
-    if (!session) return;
-    const isSettlingOpenedSession = Date.now() < sessionAutoBottomUntilRef.current;
+    const isSettlingOpenedSession = Date.now() < sessionAutoBottomUntilRef.current && !userScrollRef.current;
     if (isSettlingOpenedSession) {
       autoFollowRef.current = true;
       updateAutoFollow(true);
@@ -1351,17 +1305,14 @@ export function ChatThread() {
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
-    const now = Date.now();
-    const ignoreWindow = now < ignoreScrollUntilRef.current;
     // Middle-mouse autoscroll does not dispatch wheel events, so an upward
-    // scroll is a reliable signal that the user is taking manual control.
-    // MUST be after the ignore check - otherwise programmatic scrollTop
-    // changes (browser clamp when content shrinks) would be mistaken for
-    // user scrolling and permanently kill the auto-follow settle process.
-    if (isScrollingUp && autoFollowRef.current && !ignoreWindow) {
+    // scroll is a reliable signal that the user is taking manual control even
+    // inside the ignore window that follows programmatic bottom-scrolls.
+    if (isScrollingUp && autoFollowRef.current) {
       pauseAutoFollowForUser();
     }
-    if (ignoreWindow) return;
+    const now = Date.now();
+    if (now < ignoreScrollUntilRef.current) return;
     if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
       userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
       scheduleIdleAnchorCapture();
@@ -1429,8 +1380,7 @@ export function ChatThread() {
 
   return (
     <div className="relative h-full">
-
-      {session?.longTask && (
+      {session.longTask && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
           <div className="kimix-chat-stream-column pointer-events-auto">
             <LongTaskBanner meta={session.longTask} projectPath={session.projectPath} />
@@ -1440,7 +1390,7 @@ export function ChatThread() {
       <div
         ref={scrollRef}
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
-        style={{ paddingTop: session?.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
+        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
         onScroll={handleScroll}
         onPointerDown={pauseAutoFollowForUser}
         onWheel={pauseAutoFollowForUser}
