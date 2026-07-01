@@ -720,6 +720,7 @@ export function ChatThread() {
   const sessionAutoBottomUntilRef = useRef(0);
   const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
+  const prevScrollHeightRef = useRef(0);
   const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
@@ -786,6 +787,14 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
+    // Direction B：内容缩小时跳过本次 scrollToBottom。
+    // 浏览器会自动 clamp scrollTop 到新底，无需我们再设一次，
+    // 这样避免"旧底→clamp→新底"三步引起的闪烁。
+    if (node.scrollHeight < prevScrollHeightRef.current) {
+      prevScrollHeightRef.current = node.scrollHeight;
+      return;
+    }
+    prevScrollHeightRef.current = node.scrollHeight;
     const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
     if (behavior === "auto") {
       node.scrollTop = bottom;
@@ -1082,6 +1091,7 @@ export function ChatThread() {
     if (session?.id) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       sessionAutoBottomStableRef.current = null;
+      prevScrollHeightRef.current = 0;
       settleSessionAtBottom();
       const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
