@@ -600,6 +600,12 @@ if (!rootEl) throw new Error("Root element not found");
 const reportStartup = (label: string) => {
   window.api?.reportRendererStartup?.({ label, elapsedMs: performance.now() });
 };
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => reportStartup("dom content loaded"));
+} else {
+  reportStartup("dom content loaded");
+}
+window.addEventListener("load", () => reportStartup("window load"));
 reportStartup("renderer entry");
 applyCachedThemeSnapshot();
 reportStartup("after theme snapshot");

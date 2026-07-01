@@ -3753,6 +3753,12 @@ function createWindow() {
   mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     console.error(`[RENDERER] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
   });
+  mainWindow.webContents.once("dom-ready", () => {
+    logMainStartup("dom-ready");
+  });
+  mainWindow.webContents.on("did-frame-finish-load", (_event, isMainFrame) => {
+    if (isMainFrame) logMainStartup("did-frame-finish-load");
+  });
   mainWindow.webContents.once("did-finish-load", () => {
     logMainStartup("did-finish-load");
     void restoreLastContext();
