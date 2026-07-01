@@ -49,8 +49,14 @@ export function markModelAsNonVision(model: string | null | undefined): void {
   }
 }
 
+function isKnownNonVisionModelName(model: string): boolean {
+  const normalized = normalizeModelName(model);
+  return normalized.includes("deepseek");
+}
+
 export function modelSupportsImages(model: string | null | undefined): boolean {
   if (!model) return true;
+  if (isKnownNonVisionModelName(model)) return false;
   return !nonVisionModels.has(model);
 }
 
@@ -61,6 +67,7 @@ function normalizeModelName(value: string): string {
 function requestModelIsNonVision(requestModel: unknown): boolean {
   if (typeof requestModel !== "string") return false;
   const normalized = normalizeModelName(requestModel);
+  if (isKnownNonVisionModelName(normalized)) return true;
   for (const known of nonVisionModels) {
     const knownNormalized = normalizeModelName(known);
     if (knownNormalized === normalized) return true;
