@@ -503,6 +503,12 @@ const api = {
     return () => ipcRenderer.off("window:maximized-change", handler);
   },
   closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
+
+  onMainLog: (callback: (payload: { level: string; message: string }) => void) => {
+    const handler = (_: unknown, payload: { level: string; message: string }) => callback(payload);
+    ipcRenderer.on("kimix:main-log", handler);
+    return () => ipcRenderer.off("kimix:main-log", handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("api", api);

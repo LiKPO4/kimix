@@ -1141,6 +1141,14 @@ function App() {
     useBootstrap(bootstrapSetters);
 
   useEffect(() => {
+    if (!window.api.onMainLog) return;
+    return window.api.onMainLog((payload) => {
+      const fn = (console[payload.level as keyof Console] as typeof console.log) ?? console.log;
+      fn(`[MAIN] ${payload.message}`);
+    });
+  }, []);
+
+  useEffect(() => {
     const projectPath = currentProject?.path;
     if (!projectPath) return;
     let cancelled = false;
@@ -2442,19 +2450,10 @@ function App() {
       const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
       if (
         mappedWithRole.type === "status_update" &&
-        mappedWithRole.message?.startsWith("模型：") &&
         targetSession?.modelSwitchedAt &&
         !targetSession.events.some((event) => event.type === "assistant_message" && event.timestamp > targetSession.modelSwitchedAt)
       ) {
-        const modelInMessage = mappedWithRole.message.slice(3).trim();
-        const targetModel = targetSession.switchedToModel ?? targetSession.model ?? "";
-        const normalizeModel = (value: string) => value.trim().toLowerCase();
-        const matchesTarget =
-          targetModel &&
-          (normalizeModel(modelInMessage) === normalizeModel(targetModel) ||
-            normalizeModel(targetModel).endsWith(`/${normalizeModel(modelInMessage)}`) ||
-            normalizeModel(modelInMessage).endsWith(`/${normalizeModel(targetModel)}`));
-        if (matchesTarget) return;
+        return;
       }
 
       markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);

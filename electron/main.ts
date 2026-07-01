@@ -13,6 +13,11 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
+import {
+  installNonVisionFetchInterceptor,
+  markModelAsNonVision,
+  modelSupportsImages,
+} from "./nonVisionFetchInterceptor";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
@@ -5025,93 +5030,9 @@ function toKimiCodePromptInput(content: string, images: { name: string; dataUrl:
 }
 
 // 在会话生命周期内被自动判定为不接受图片输入的模型集合。
-const nonVisionModels = new Set<string>();
-
-function markModelAsNonVision(model: string | null | undefined): void {
-  if (model) nonVisionModels.add(model);
-}
-
-function modelSupportsImages(model: string | null | undefined): boolean {
-  if (!model) return true;
-  if (nonVisionModels.has(model)) return false;
-  return true;
-}
-
 function isImageUnsupportedError(error: unknown): boolean {
   const text = typeof error === "string" ? error : error instanceof Error ? error.message : String(error);
   return /unknown variant [`'"]image_url[`'"]|expected [`'"]text[`'"]|image_url.*not supported|does not support images/i.test(text);
-}
-
-function normalizeModelName(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function requestModelIsNonVision(requestModel: unknown): boolean {
-  if (typeof requestModel !== "string") return false;
-  const normalized = normalizeModelName(requestModel);
-  for (const known of nonVisionModels) {
-    const knownNormalized = normalizeModelName(known);
-    if (knownNormalized === normalized) return true;
-    if (knownNormalized.endsWith(`/${normalized}`)) return true;
-    if (normalized.endsWith(`/${knownNormalized}`)) return true;
-  }
-  return false;
-}
-
-function rewriteOpenAIContentForNonVision(content: unknown): unknown {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return content;
-
-  const textParts: string[] = [];
-  const imageRefs: string[] = [];
-  let hasImage = false;
-
-  for (const part of content) {
-    if (!part || typeof part !== "object") continue;
-    const p = part as Record<string, unknown>;
-    if (p.type === "text" && typeof p.text === "string") {
-      textParts.push(p.text);
-    } else if (p.type === "image_url") {
-      hasImage = true;
-      const imageUrl = p.imageUrl as Record<string, unknown> | undefined;
-      const id = imageUrl?.id;
-      const name = typeof id === "string" && id.trim() ? id : "[图片]";
-      imageRefs.push(`[图片: ${name}]`);
-    }
-  }
-
-  if (!hasImage) return content;
-  const combined = [...textParts, ...imageRefs].join("\n");
-  return combined || "";
-}
-
-function rewriteOpenAIBodyForNonVision(body: Record<string, unknown>): Record<string, unknown> {
-  if (!Array.isArray(body.messages)) return body;
-  const messages = body.messages.map((msg: unknown) => {
-    if (!msg || typeof msg !== "object") return msg;
-    const m = msg as Record<string, unknown>;
-    if (m.role !== "user" || !Array.isArray(m.content)) return msg;
-    return { ...m, content: rewriteOpenAIContentForNonVision(m.content) };
-  });
-  return { ...body, messages };
-}
-
-function installNonVisionFetchInterceptor() {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    try {
-      const urlString = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      if (!/\/chat\/completions/i.test(urlString)) return originalFetch(input, init);
-      const body = init?.body;
-      if (typeof body !== "string") return originalFetch(input, init);
-      const parsed = JSON.parse(body) as Record<string, unknown>;
-      if (!requestModelIsNonVision(parsed.model)) return originalFetch(input, init);
-      const rewritten = rewriteOpenAIBodyForNonVision(parsed);
-      return originalFetch(input, { ...init, body: JSON.stringify(rewritten) });
-    } catch {
-      return originalFetch(input, init);
-    }
-  };
 }
 
 installNonVisionFetchInterceptor();
