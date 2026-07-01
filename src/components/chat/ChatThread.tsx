@@ -788,12 +788,20 @@ export function ChatThread() {
     ignoreScrollUntilRef.current = Date.now() + 420;
     // 锚定最后一条事件：而不是 scrollHeight - clientHeight。
     // 当内容 settle 后总高变化时，scrollHeight 变了会让 scrollTop 跳一大截；
-    // 锚定到具体的最后一条 DOM 元素（用 offsetTop+offsetHeight）则视觉上
-    // "同一条消息一直在视口底部"，不会让人觉得内容被截走。
+    // 锚定到具体的最后一条 DOM 元素（用 getBoundingClientRect 算相对位置）
+    // 则视觉上"同一条消息一直在视口底部"，不会让人觉得内容被截走。
+    //
+    // 注意：不能用 offsetTop，因为事件 DOM 嵌在 streamContentRef 里，
+    // offsetTop 是相对 offsetParent 的，不是相对 scroll 容器。
     const lastItem = node.querySelector<HTMLElement>("[data-kimix-render-key]:last-of-type");
     let bottom: number;
     if (lastItem) {
-      bottom = Math.max(0, lastItem.offsetTop + lastItem.offsetHeight - node.clientHeight);
+      const itemRect = lastItem.getBoundingClientRect();
+      const containerRect = node.getBoundingClientRect();
+      // item 在 scroll 容器内容里的 top/bottom（已加 scrollTop 转成容器坐标系）
+      const itemTopInContainer = itemRect.top - containerRect.top + node.scrollTop;
+      const itemBottomInContainer = itemTopInContainer + lastItem.offsetHeight;
+      bottom = Math.max(0, itemBottomInContainer - node.clientHeight);
     } else {
       bottom = Math.max(0, node.scrollHeight - node.clientHeight);
     }
