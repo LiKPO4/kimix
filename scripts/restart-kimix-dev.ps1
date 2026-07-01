@@ -113,9 +113,9 @@ if ($fullClean) {
 } else {
   Set-Location $workspace
   if (-not $hotReloadDev) {
-    $srcMarker = Join-Path $workspace "src\components\settings\SettingsPanel.tsx"
     $outMarker = Join-Path $workspace "out\renderer\index.html"
-    if (-not (Test-Path -LiteralPath $outMarker) -or (Get-Item -LiteralPath $srcMarker).LastWriteTime -gt (Get-Item -LiteralPath $outMarker).LastWriteTime) {
+    if (-not (Test-Path -LiteralPath $outMarker)) {
+      Write-Host "No built output found; falling back to dev mode."
       $hotReloadDev = $true
     }
   }
