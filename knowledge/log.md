@@ -2,6 +2,7 @@
 
 ## 2026-07-02
 
+* **Stable progressive startup tail**: The first history batch now fills upward while retaining bottom-origin coordinates; explicit older-history expansion preserves a rendered message anchor across the later coordinate switch. See [/project/kimix.md](/project/kimix.md).
 * **Conversation-aware startup tail**: The eager tail expands within a fixed cap to retain recent completed Assistant answers when trailing unanswered user turns would otherwise crowd them out. See [/project/kimix.md](/project/kimix.md).
 * **Single-writer startup history**: The active restored session is gated before entering the store, background repair excludes it, and SDK wrapped wire records retain their original timestamp. See [/project/kimix.md](/project/kimix.md).
 * **Canonical startup tail gate**: Persisted messages are no longer presented as the real bottom while an official session's first history synchronization is pending; startup history loading also begins without the former 1.2-second delay. See [/project/kimix.md](/project/kimix.md).

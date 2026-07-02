@@ -29,6 +29,8 @@ type RenderItem =
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
 
+type ViewportAnchor = { key: string; offsetTop: number };
+
 function renderItemKey(item: RenderItem) {
   return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
 }
@@ -52,20 +54,18 @@ function useAnimatedDots(active: boolean) {
 
 function SessionHistoryLoadingState() {
   return (
-    <div className="kimix-content-x h-full overflow-hidden">
+    <div
+      className="flex h-full w-full items-center justify-center overflow-hidden"
+      style={{ paddingLeft: 24, paddingRight: 24 }}
+    >
       <div
-        className="kimix-chat-stream-column flex min-h-full w-full flex-col justify-end"
-        style={{ paddingTop: 42, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT, gap: 14 }}
+        className="flex items-center justify-center text-text-muted"
+        style={{ minHeight: 40, gap: 10, paddingLeft: 16, paddingRight: 16 }}
+        role="status"
+        aria-live="polite"
       >
-        <div
-          className="flex items-center text-text-muted"
-          style={{ minHeight: 34, gap: 8, paddingLeft: 14, paddingRight: 14 }}
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 size={15} className="animate-spin" />
-          <span className="text-[13px]">正在同步最新会话</span>
-        </div>
+        <Loader2 size={17} className="animate-spin" />
+        <span style={{ fontSize: 15, lineHeight: "22px", fontWeight: 500, textWrap: "pretty" }}>正在同步最新会话</span>
       </div>
     </div>
   );
@@ -743,8 +743,7 @@ export function ChatThread() {
   const sessionAutoBottomUntilRef = useRef(0);
   const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
-  const pendingOlderItemsScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
-  const pendingInitialTailScrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const pendingOlderItemsScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
@@ -812,7 +811,7 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    const bottom = isInitialTailOnly ? 0 : Math.max(0, node.scrollHeight - node.clientHeight);
+    const bottom = isBottomOriginMode ? 0 : Math.max(0, node.scrollHeight - node.clientHeight);
     if (behavior === "auto") {
       node.scrollTop = bottom;
     } else {
@@ -822,7 +821,7 @@ export function ChatThread() {
       if (token !== scrollTokenRef.current || !autoFollowRef.current) return;
       const current = scrollRef.current;
       if (!current) return;
-      const distance = isInitialTailOnly
+      const distance = isBottomOriginMode
         ? Math.abs(current.scrollTop)
         : current.scrollHeight - current.scrollTop - current.clientHeight;
       updateShowScrollToBottom(distance > 80);
@@ -855,7 +854,7 @@ export function ChatThread() {
     if (nextStable.count >= SESSION_LAYOUT_STABLE_PASSES) {
       const node = scrollRef.current;
       const distance = node
-        ? isInitialTailOnly
+        ? isBottomOriginMode
           ? Math.abs(node.scrollTop)
           : node.scrollHeight - node.scrollTop - node.clientHeight
         : 0;
@@ -1175,7 +1174,7 @@ export function ChatThread() {
         scheduleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {
-          const distance = isInitialTailOnly
+          const distance = isBottomOriginMode
             ? Math.abs(activeNode.scrollTop)
             : activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
           updateShowScrollToBottom(distance > 80);
@@ -1196,7 +1195,7 @@ export function ChatThread() {
         scheduleIdleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {
-          const distance = isInitialTailOnly
+          const distance = isBottomOriginMode
             ? Math.abs(activeNode.scrollTop)
             : activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
           updateShowScrollToBottom(distance > 80);
@@ -1207,7 +1206,7 @@ export function ChatThread() {
       scheduleAnchorCapture();
       const nodeAfterRestore = scrollRef.current;
       if (!nodeAfterRestore) return;
-      const distance = isInitialTailOnly
+      const distance = isBottomOriginMode
         ? Math.abs(nodeAfterRestore.scrollTop)
         : nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
       updateShowScrollToBottom(distance > 80);
@@ -1243,7 +1242,7 @@ export function ChatThread() {
     }
     const node = scrollRef.current;
     if (!node) return;
-    const distance = isInitialTailOnly
+    const distance = isBottomOriginMode
       ? Math.abs(node.scrollTop)
       : node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
@@ -1351,7 +1350,7 @@ export function ChatThread() {
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
     lastScrollTopRef.current = node.scrollTop;
-    const distance = isInitialTailOnly
+    const distance = isBottomOriginMode
       ? Math.abs(node.scrollTop)
       : node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
@@ -1393,6 +1392,7 @@ export function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id);
+  const isBottomOriginMode = Boolean(session?.id && !showOlderItems);
   const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
     isCompletedAssistant: (item) => item.type === "event" &&
       item.event.type === "assistant_message" &&
@@ -1405,11 +1405,11 @@ export function ChatThread() {
   const isRestoringOfficialHistory = Boolean(session?.isLoading && session.events.length > 0);
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
   const eagerInitialMarkdown = Boolean(session?.id && (
-    isInitialTailOnly ||
+    isBottomOriginMode ||
     Date.now() < sessionAutoBottomUntilRef.current
   ));
 
-    useEffect(() => {
+  useEffect(() => {
     const pending = pendingFocusEventRef.current;
     if (!pending || !session || pending.sessionId !== session.id) return;
     window.requestAnimationFrame(() => {
@@ -1419,29 +1419,31 @@ export function ChatThread() {
     });
   }, [session?.id, visibleRenderItems.length]);
 
-  useLayoutEffect(() => {
-    const anchor = pendingInitialTailScrollAnchorRef.current;
-    const node = scrollRef.current;
-    if (!anchor || !node || isInitialTailOnly) return;
-    pendingInitialTailScrollAnchorRef.current = null;
-    const delta = node.scrollHeight - anchor.scrollHeight;
-    node.scrollTop = anchor.scrollTop + Math.max(0, delta);
-    autoFollowRef.current = false;
-    userScrollRef.current = true;
-    updateAutoFollow(false);
-  }, [isInitialTailOnly, visibleRenderItems.length]);
+  useEffect(() => {
+    if (!session?.id || !isInitialTailOnly || isRestoringOfficialHistory || initialTailHiddenCount === 0) return;
+    const sessionId = session.id;
+    const frame = window.requestAnimationFrame(() => {
+      setExpandedInitialTailSessionId(sessionId);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [session?.id, isInitialTailOnly, isRestoringOfficialHistory, initialTailHiddenCount]);
 
   useLayoutEffect(() => {
     const anchor = pendingOlderItemsScrollAnchorRef.current;
     const node = scrollRef.current;
     if (!anchor || !node || !showOlderItems) return;
     pendingOlderItemsScrollAnchorRef.current = null;
-    const delta = node.scrollHeight - anchor.scrollHeight;
-    node.scrollTop = anchor.scrollTop + Math.max(0, delta);
+    const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
+    const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
+    if (target) {
+      const containerRect = node.getBoundingClientRect();
+      const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
+      node.scrollTop += nextOffsetTop - anchor.offsetTop;
+    }
     autoFollowRef.current = false;
     userScrollRef.current = true;
     updateAutoFollow(false);
-    const distance = isInitialTailOnly
+    const distance = isBottomOriginMode
       ? Math.abs(node.scrollTop)
       : node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
@@ -1458,25 +1460,22 @@ export function ChatThread() {
   const expandOlderItems = () => {
     const node = scrollRef.current;
     if (node) {
-      pendingOlderItemsScrollAnchorRef.current = {
-        scrollHeight: node.scrollHeight,
-        scrollTop: node.scrollTop,
-      };
+      const containerRect = node.getBoundingClientRect();
+      const items = Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-render-key]"));
+      const anchor = items.find((item) => item.getBoundingClientRect().bottom >= containerRect.top + 1) ?? items[0];
+      pendingOlderItemsScrollAnchorRef.current = anchor ? {
+        key: anchor.dataset.kimixRenderKey ?? "",
+        offsetTop: anchor.getBoundingClientRect().top - containerRect.top,
+      } : null;
       scrollTokenRef.current += 1;
+      ignoreScrollUntilRef.current = Date.now() + 240;
+      intentionalResizeRestoreUntilRef.current = Date.now() + 240;
     }
     setShowOlderItems(true);
   };
 
   const expandInitialTail = () => {
     if (!session?.id || !isInitialTailOnly) return;
-    const node = scrollRef.current;
-    if (node) {
-      pendingInitialTailScrollAnchorRef.current = {
-        scrollHeight: node.scrollHeight,
-        scrollTop: node.scrollTop,
-      };
-    }
-    userScrollIntentUntilRef.current = 0;
     setExpandedInitialTailSessionId(session.id);
   };
 
@@ -1504,8 +1503,8 @@ export function ChatThread() {
           overflowAnchor: "none",
           overscrollBehavior: "contain",
           visibility: isSessionScrollPrimed ? "visible" : "hidden",
-          display: isInitialTailOnly ? "flex" : undefined,
-          flexDirection: isInitialTailOnly ? "column-reverse" : undefined,
+          display: isBottomOriginMode ? "flex" : undefined,
+          flexDirection: isBottomOriginMode ? "column-reverse" : undefined,
         }}
         onScroll={handleScroll}
         onPointerDown={markPointerScrollIntent}
@@ -1518,8 +1517,8 @@ export function ChatThread() {
           style={{
             gap: 22,
             paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT,
-            justifyContent: isInitialTailOnly ? "flex-end" : undefined,
-            flexShrink: isInitialTailOnly ? 0 : undefined,
+            justifyContent: isBottomOriginMode ? "flex-end" : undefined,
+            flexShrink: isBottomOriginMode ? 0 : undefined,
           }}
         >
           {isInitialTailOnly && initialTailHiddenCount > 0 && <FoldedHistoryNotice count={initialTailHiddenCount} onExpand={expandInitialTail} />}
