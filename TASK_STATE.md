@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.13.0 Kimi Code 0.22 跟进与全局会话搜索
+- 当前目标：跟进官方 Kimi Code 0.22 的模型覆盖、图片压缩和 Web 会话搜索能力，同时保持 Server 优先、SDK 兼容回退架构。
+- 已完成：Server 模型目录保留官方生效后的 `support_efforts/default_effort`；OpenAI 兼容模型的输出上限改写入 `models.<alias>.overrides`；vendored SDK 更新到官方 node-sdk 0.12.0，并兼容 `thinkingEffort`；`Ctrl/Cmd+K` 改为搜索标题、项目与最近提示词的会话面板。
+- 关键文件：`electron/kimiCodeHost.ts`、`electron/kimiCodeServerClient.ts`、`vendor/kimi-code-sdk/`、`src/components/layout/SessionSearchDialog.tsx`、`src/utils/sessionSearch.ts`。
+- 下一步：实机验收跨项目会话切换、输入框聚焦时快捷键、方向键/回车操作以及第三方模型首次请求后的 overrides 持久化。
+
 ## 2026-07-02 v2.12.70 滚动闪跳修复 + 用量条 + 文字右键菜单（本轮汇总）
 - 当前目标：一轮内处理多个独立需求：修复打开会话/上滚闪跳、用量面板时间条与静默刷新、文字选中右键菜单（含本地路径定位）。
 - 已完成（按提交倒序）：

@@ -8,6 +8,7 @@ import { getVisibleTodos } from "@/components/chat/TodoPanel";
 import { getVisibleSwarmAgents } from "@/components/chat/SwarmPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
+import { SessionSearchDialog } from "./SessionSearchDialog";
 import { SkillsPanel } from "./SkillsPanel";
 import { HooksPanel } from "./HooksPanel";
 import { LongTasksPanel } from "./LongTasksPanel";
@@ -270,6 +271,8 @@ export function AppShell() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const searchOpen = useAppStore((s) => s.searchOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+  const sessionSearchOpen = useAppStore((s) => s.sessionSearchOpen);
+  const setSessionSearchOpen = useAppStore((s) => s.setSessionSearchOpen);
   const workspaceView = useAppStore((s) => s.workspaceView);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const longTaskInspectorOpen = useAppStore((s) => s.longTaskInspectorOpen);
@@ -1921,6 +1924,7 @@ ${isFinalStep
       </div>
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SessionSearchDialog open={sessionSearchOpen} onClose={() => setSessionSearchOpen(false)} />
       <LongTasksPanel />
       <ToastSystem message={toastMessage} />
       <TextContextMenu />

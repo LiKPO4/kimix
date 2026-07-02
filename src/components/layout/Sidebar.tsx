@@ -841,7 +841,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.12.70</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.0</span>
         </button>
       </div>
     </aside>

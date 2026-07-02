@@ -2,6 +2,8 @@
 
 ## 2026-07-02
 
+* **Kimi Code 0.22 runtime alignment**: Updated the vendored fallback to Node SDK 0.12, normalized `thinkingEffort`, retained the bounded MCP startup timeout, and verified official image-compression exports. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Durable model overrides**: Effective effort metadata now crosses the Server catalog boundary, and lazy OpenAI-compatible output limits persist under official model overrides so provider refreshes do not erase them. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Normalize tall single-message sessions**: Initial-tail completion no longer requires hidden items; bottom-origin coordinates are replaced with normal scrolling before users browse very tall Markdown answers. See [/project/kimix.md](/project/kimix.md).
 * **Stable progressive startup tail**: The first history batch now fills upward while retaining bottom-origin coordinates; explicit older-history expansion preserves a rendered message anchor across the later coordinate switch. See [/project/kimix.md](/project/kimix.md).
 * **Conversation-aware startup tail**: The eager tail expands within a fixed cap to retain recent completed Assistant answers when trailing unanswered user turns would otherwise crowd them out. See [/project/kimix.md](/project/kimix.md).

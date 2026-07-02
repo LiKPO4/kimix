@@ -521,7 +521,7 @@ function HelpDialogPanel({
 
           {visibleDialog === "shortcuts" && (
             <div className="grid gap-2 text-[14px] text-text-secondary">
-              {["Ctrl+B 切换侧边栏", "Ctrl+K 聚焦输入框", "Ctrl+N 新对话", "Ctrl+O 打开项目", "Ctrl+R 重新载入页面", "Ctrl++ 放大", "Ctrl+- 缩小", "Ctrl+0 实际大小", "F11 切换全屏", "Esc 停止当前任务"].map((line) => (
+              {["Ctrl+B 切换侧边栏", "Ctrl+K 搜索会话", "Ctrl+N 新对话", "Ctrl+O 打开项目", "Ctrl+R 重新载入页面", "Ctrl++ 放大", "Ctrl+- 缩小", "Ctrl+0 实际大小", "F11 切换全屏", "Esc 停止当前任务"].map((line) => (
                 <div key={line} className="rounded-lg bg-surface-base" style={{ padding: "10px 14px" }}>{line}</div>
               ))}
             </div>
