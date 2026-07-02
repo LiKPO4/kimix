@@ -20,6 +20,7 @@ import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { logError } from "@/utils/reportError";
 import { shouldPauseAutoFollowForScroll, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
+import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
@@ -1392,7 +1393,13 @@ export function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id);
-  const visibleRenderItems = isInitialTailOnly ? fullVisibleRenderItems.slice(-4) : fullVisibleRenderItems;
+  const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
+    isCompletedAssistant: (item) => item.type === "event" &&
+      item.event.type === "assistant_message" &&
+      item.event.isComplete &&
+      item.event.content.trim().length > 0,
+  }), [fullVisibleRenderItems]);
+  const visibleRenderItems = isInitialTailOnly ? initialTailRenderItems : fullVisibleRenderItems;
   const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isRestoringOfficialHistory = Boolean(session?.isLoading && session.events.length > 0);
