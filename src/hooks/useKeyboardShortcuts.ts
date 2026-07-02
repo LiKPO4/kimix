@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 export function useKeyboardShortcuts(
   toggleSidebar: () => void,
-  openSessionSearch: () => void,
+  openSearch: () => void,
   onEscape: () => void,
 ) {
   useEffect(() => {
@@ -12,7 +12,7 @@ export function useKeyboardShortcuts(
       const isMod = e.metaKey || e.ctrlKey;
       if (isMod && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        openSessionSearch();
+        openSearch();
         return;
       }
 
@@ -33,5 +33,5 @@ export function useKeyboardShortcuts(
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [toggleSidebar, openSessionSearch, onEscape]);
+  }, [toggleSidebar, openSearch, onEscape]);
 }

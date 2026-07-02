@@ -1074,7 +1074,7 @@ function App() {
   const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
-  const setSessionSearchOpen = useAppStore((s) => s.setSessionSearchOpen);
+  const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const updateSession = useSessionStore((s) => s.updateSession);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const currentSession = useAppStore((s) => s.currentSession);
@@ -1112,7 +1112,7 @@ function App() {
     }
   }, [setRunningSessionId]);
 
-    useKeyboardShortcuts(toggleSidebar, () => setSessionSearchOpen(true), handleEscape);
+    useKeyboardShortcuts(toggleSidebar, () => setSearchOpen(true), handleEscape);
     const bootstrapSetters = useMemo(() => ({
       setTheme,
       setThemePalette,

@@ -67,9 +67,13 @@ function loadWithTimeout(session: Session, timeoutMs = 8000) {
 
 export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const currentProject = useAppStore((s) => s.currentProject);
+  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const sessions = useSessionStore((s) => s.sessions);
+  const recentProjects = useSessionStore((s) => s.recentProjects);
   const addSession = useSessionStore((s) => s.addSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const [query, setQuery] = useState("");
@@ -81,16 +85,22 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const [loadingGlobalSessions, setLoadingGlobalSessions] = useState(false);
   const [globalSessions, setGlobalSessions] = useState<KimiCodeSessionSummary[]>([]);
   const [copyMessage, setCopyMessage] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    setScope("project");
+    setScope("all");
     setCopyMessage("");
     setHistoryLoadMessage("");
+    setSelectedIndex(0);
     attemptedHistoryLoadIdsRef.current.clear();
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query, scope]);
 
   useEffect(() => {
     setSearchOnlySessions([]);
@@ -280,6 +290,53 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     window.setTimeout(() => setCopyMessage(""), 1800);
   };
 
+  const openGlobalSession = (summary: KimiCodeSessionSummary) => {
+    const existing = useSessionStore.getState().sessions.find((item) => (
+      item.id === summary.id || getRuntimeSessionId(item) === summary.id
+    ));
+    const session: Session = existing ?? {
+      id: summary.id,
+      engine: "kimi-code",
+      runtimeSessionId: summary.id,
+      officialSessionId: summary.id,
+      title: summary.title || summary.lastPrompt || "历史对话",
+      projectPath: summary.workDir,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      events: [],
+      isLoading: true,
+    };
+    if (!existing) addSession(session);
+    const project = recentProjects.find((item) => item.path.toLowerCase() === summary.workDir.toLowerCase()) ?? {
+      id: summary.workDir,
+      name: summary.workDir.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || summary.workDir,
+      path: summary.workDir,
+      lastOpenedAt: Date.now(),
+    };
+    setCurrentProject(project);
+    setWorkspaceView("chat");
+    setCurrentSession(session);
+    onClose();
+  };
+
+  const resultCount = scope === "all" ? globalMatches.length : matches.length;
+  const moveSelection = (delta: number) => {
+    if (resultCount === 0) return;
+    const next = (selectedIndex + delta + resultCount) % resultCount;
+    setSelectedIndex(next);
+    window.setTimeout(() => listRef.current?.querySelector<HTMLElement>(`[data-search-index="${next}"]`)?.scrollIntoView({ block: "nearest" }), 0);
+  };
+
+  const openSelected = () => {
+    if (scope === "all") {
+      const match = globalMatches[selectedIndex];
+      if (match) openGlobalSession(match.session);
+      return;
+    }
+    const match = matches[selectedIndex];
+    if (match) openSession(match.session, match.eventId, match.searchText);
+  };
+
   if (!open) return null;
 
   return (
@@ -292,19 +349,19 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") onClose();
-              if (event.key === "Enter" && scope === "project" && matches[0]) {
-                openSession(matches[0].session, matches[0].eventId, matches[0].searchText);
-              }
+              if (event.key === "Escape") { event.preventDefault(); onClose(); }
+              else if (event.key === "ArrowDown") { event.preventDefault(); moveSelection(1); }
+              else if (event.key === "ArrowUp") { event.preventDefault(); moveSelection(-1); }
+              else if (event.key === "Enter") { event.preventDefault(); openSelected(); }
             }}
             className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none placeholder:text-text-muted"
-            placeholder="搜索对话、回复、思考、工具和状态"
+            placeholder="搜索标题、项目、最近提示词或会话内容"
           />
           <button className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={onClose} aria-label="关闭搜索">
             <X size={16} />
           </button>
         </div>
-        <div className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
+        <div ref={listRef} className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
           <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
             <button
               className={`kimix-icon-text-button ${scope === "project" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
@@ -330,11 +387,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               : loadingHistory ? "正在补充加载最近历史..." : historyLoadMessage || (query.trim() ? `${matches.length} 条匹配` : "最近对话")}
           </div>
           {scope === "all" ? (
-            globalMatches.length > 0 ? globalMatches.map((match) => (
-              <div
+            globalMatches.length > 0 ? globalMatches.map((match, index) => (
+              <button
                 key={match.session.id}
-                className="grid min-h-14 w-full items-center rounded-xl text-left transition-colors hover:bg-surface-hover"
+                data-search-index={index}
+                className={`grid min-h-14 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
                 style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "10px 14px" }}
+                onClick={() => openGlobalSession(match.session)}
+                onMouseMove={() => setSelectedIndex(index)}
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[14.5px] text-text-primary">{match.session.title || match.session.lastPrompt || "历史对话"}</span>
@@ -343,13 +403,13 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 <button
                   className="kimix-icon-text-button text-text-muted hover:bg-surface-hover"
                   style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
-                  onClick={() => void copyResumeCommand(match.session)}
+                  onClick={(event) => { event.stopPropagation(); void copyResumeCommand(match.session); }}
                   title={formatResumeCommand(match.session)}
                 >
                   <ClipboardCopy size={14} />
                   复制命令
                 </button>
-              </div>
+              </button>
             )) : (
               <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
                 没有找到官方会话
@@ -358,10 +418,12 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           ) : matches.length > 0 ? matches.map((match, index) => (
             <button
               key={`${match.session.id}-${match.kind}-${match.timestamp}-${index}`}
+              data-search-index={index}
               onClick={() => {
                 openSession(match.session, match.eventId, match.searchText);
               }}
-              className="flex min-h-12 w-full items-center rounded-xl text-left transition-colors hover:bg-surface-hover"
+              onMouseMove={() => setSelectedIndex(index)}
+              className={`flex min-h-12 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
               style={{ gap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}
             >
               {match.kind === "最近对话" || match.kind === "标题" ? <MessageSquare size={16} className="shrink-0 text-text-muted" /> : <FileText size={16} className="shrink-0 text-text-muted" />}

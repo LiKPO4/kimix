@@ -76,8 +76,6 @@ export interface AppStore extends AppState {
   setSearchQuery: (q: string) => void;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
-  sessionSearchOpen: boolean;
-  setSessionSearchOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -114,7 +112,6 @@ export const useAppStore = create<AppStore>((set) => ({
   focusInputTrigger: 0,
   searchQuery: "",
   searchOpen: false,
-  sessionSearchOpen: false,
 
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
@@ -169,7 +166,6 @@ export const useAppStore = create<AppStore>((set) => ({
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchOpen: (open) => set({ searchOpen: open }),
-  setSessionSearchOpen: (open) => set({ sessionSearchOpen: open }),
   setTheme: (theme) => set({ theme }),
   setThemePalette: (palette) => set({ themePalette: normalizeThemePaletteId(palette) }),
   setCustomThemePalette: (colors) => set({ customThemePalette: normalizeThemePaletteColors(colors) }),
