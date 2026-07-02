@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.13.5 SDK 官方归档路由
+- 根因：Server 路由会调用官方 `POST /sessions/{id}:archive`，但 Server 启动超时转入 SDK fallback 后，Kimix 仍按旧能力矩阵只做本地归档，没有调用 0.22 SDK 已提供的 `archiveSession`。
+- 后果：官方 `state.json` 仍为未归档，只能依赖 localStorage tombstone 防止重启回流，任何恢复/镜像 ID 差异都可能让会话再次出现。
+- 修复：SDK fallback 直接调用官方 Harness `archiveSession({ sessionId })`，成功后再清理 Kimix 运行态；本地关联镜像和 tombstone 仍作为双保险。
+
 ## 2026-07-02 v2.13.4 自定义标题空会话过滤
 - 证据：`session_d75ff8ef-ab21-4d54-ba27-6681779fcca3` 是 `kimix-p3-probe-a` 创建的 `P3 Child`，官方记录 `message_count=0`、`turn_count=0`且 token 全为 0。
 - 根因：SDK 回退目录的遗留镜像清理错误依赖 `New Session/新会话` 标题，漏掉了 `P3 Child/P3 Fork` 等自定义标题空会话。

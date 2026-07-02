@@ -67,6 +67,7 @@ type KimiHarnessLike = {
   resumeSession(input: { id: string; additionalDirs?: readonly string[] }): Promise<KimiCodeSessionLike>;
   forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
   renameSession?(input: { id: string; title: string }): Promise<void>;
+  archiveSession?(input: { sessionId: string }): Promise<void>;
   listSessions(options?: { workDir?: string; sessionId?: string }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
@@ -1161,12 +1162,28 @@ export async function archiveSession(sessionId: string): Promise<void> {
     return;
   }
   if (!shouldRouteNewSessionToServer()) {
-    // Server routing is unavailable and this session is not actively managed by the Server.
-    // Signal a missing-session error so the renderer can hide the local mirror. The archived
-    // tombstone will prevent the session from being resurrected on the next reconciliation.
-    throw new Error("Session not found on Kimi Server");
+    const sdkHarness = await getHarness();
+    await archiveSdkSession(sdkHarness, sessionId);
+    sessions.delete(sessionId);
+    settlePendingForSession(sessionId, "cancelled");
+    for (const [serverSessionId, migratedSessionId] of serverSessionMigrations) {
+      if (serverSessionId === sessionId || migratedSessionId === sessionId) {
+        serverSessionMigrations.delete(serverSessionId);
+      }
+    }
+    return;
   }
   await getServerClient().archiveSession(sessionId);
+}
+
+export async function archiveSdkSession(
+  sdkHarness: { archiveSession?: (input: { sessionId: string }) => Promise<void> },
+  sessionId: string,
+): Promise<void> {
+  if (!sdkHarness.archiveSession) {
+    throw new Error("当前官方 SDK 不支持归档会话。");
+  }
+  await sdkHarness.archiveSession({ sessionId });
 }
 
 export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {
