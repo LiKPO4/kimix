@@ -1554,7 +1554,7 @@ export function ChatThread() {
       >
         <div
           ref={streamContentRef}
-          className="kimix-chat-stream-column flex min-h-full w-full flex-col"
+          className="kimix-chat-stream-column flex min-h-full w-full flex-col justify-end"
           style={{
             gap: 22,
             paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT,
