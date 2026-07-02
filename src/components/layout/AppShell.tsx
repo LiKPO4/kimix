@@ -36,6 +36,7 @@ import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
 import { clampWidth } from "@/utils/number";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { DialogSystem } from "./DialogSystem";
+import { TextContextMenu } from "@/components/chat/TextContextMenu";
 import { SessionToolbar } from "./SessionToolbar";
 import { DiffPanel } from "./DiffPanel";
 import { ToastSystem } from "./ToastSystem";
@@ -1922,6 +1923,7 @@ ${isFinalStep
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       <LongTasksPanel />
       <ToastSystem message={toastMessage} />
+      <TextContextMenu />
       <DialogSystem
         showKimiOnboarding={showKimiOnboarding}
         kimiOnboardingMessage={kimiOnboarding.message}
