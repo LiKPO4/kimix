@@ -275,6 +275,8 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
     displayName: "display_name",
     reasoningKey: "reasoning_key",
     adaptiveThinking: "adaptive_thinking",
+    supportEfforts: "support_efforts",
+    defaultEffort: "default_effort",
   };
   const rename = (value: unknown, keys: Record<string, string>) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return value;
@@ -285,7 +287,15 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
       return [key, Object.fromEntries(Object.entries(value).map(([id, provider]) => [id, rename(provider, providerKeys)]))];
     }
     if (key === "models" && value && typeof value === "object" && !Array.isArray(value)) {
-      return [key, Object.fromEntries(Object.entries(value).map(([id, model]) => [id, rename(model, modelKeys)]))];
+      return [key, Object.fromEntries(Object.entries(value).map(([id, model]) => {
+        const renamed = rename(model, modelKeys);
+        if (!renamed || typeof renamed !== "object" || Array.isArray(renamed)) return [id, renamed];
+        const record = renamed as Record<string, unknown>;
+        return [id, {
+          ...record,
+          ...(record.overrides === undefined ? {} : { overrides: rename(record.overrides, modelKeys) }),
+        }];
+      }))];
     }
     return [topLevelKeys[key] ?? key, value];
   }));

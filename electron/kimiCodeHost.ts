@@ -377,6 +377,9 @@ export type KimiCodeModelAlias = {
   displayName?: string;
   reasoningKey?: string;
   adaptiveThinking?: boolean;
+  supportEfforts?: string[];
+  defaultEffort?: string;
+  overrides?: Partial<Omit<KimiCodeModelAlias, "overrides">>;
 };
 
 export type KimiCodeConfigPatch = Partial<KimiCodeConfig>;
@@ -850,15 +853,21 @@ export function missingOpenAiModelOutputLimitPatch(
   if (
     !aliasConfig ||
     providerConfig?.type !== "openai" ||
-    (typeof aliasConfig.maxOutputSize === "number" && aliasConfig.maxOutputSize > 0)
+    (typeof (aliasConfig.overrides?.maxOutputSize ?? aliasConfig.maxOutputSize) === "number"
+      && (aliasConfig.overrides?.maxOutputSize ?? aliasConfig.maxOutputSize ?? 0) > 0)
   ) {
     return null;
   }
   return {
     models: {
       [model]: {
-        ...aliasConfig,
-        maxOutputSize: Math.min(65536, aliasConfig.maxContextSize ?? 65536),
+        overrides: {
+          ...aliasConfig.overrides,
+          maxOutputSize: Math.min(
+            65536,
+            aliasConfig.overrides?.maxContextSize ?? aliasConfig.maxContextSize ?? 65536,
+          ),
+        },
       },
     },
   };

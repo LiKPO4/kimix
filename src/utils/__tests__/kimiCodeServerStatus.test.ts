@@ -9,10 +9,7 @@ describe("Kimi Server session status adapter", () => {
     }, "gateway/deepseek")).toEqual({
       models: {
         "gateway/deepseek": {
-          provider: "gateway",
-          model: "deepseek",
-          maxContextSize: 1_000_000,
-          maxOutputSize: 65536,
+          overrides: { maxOutputSize: 65536 },
         },
       },
     });
@@ -29,6 +26,10 @@ describe("Kimi Server session status adapter", () => {
     expect(missingOpenAiModelOutputLimitPatch({
       providers: { gateway: { type: "openai" } },
       models: { bounded: { provider: "gateway", model: "bounded", maxOutputSize: 8192 } },
+    }, "bounded")).toBeNull();
+    expect(missingOpenAiModelOutputLimitPatch({
+      providers: { gateway: { type: "openai" } },
+      models: { bounded: { provider: "gateway", model: "bounded", overrides: { maxOutputSize: 16384 } } },
     }, "bounded")).toBeNull();
   });
 
