@@ -749,6 +749,7 @@ export function ChatThread() {
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
+  const lastScrollHeightRef = useRef<number | null>(null);
   const userScrollResizeRestoreUntilRef = useRef(0);
   const userScrollIntentUntilRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
@@ -813,11 +814,23 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
-    if (behavior === "auto") {
-      node.scrollTop = bottom;
+    const contentNode = streamContentRef.current;
+    const items = Array.from(contentNode?.querySelectorAll<HTMLElement>("[data-kimix-render-key]") ?? []);
+    const lastItem = items.at(-1) ?? null;
+    let targetTop: number;
+    if (lastItem && contentNode) {
+      // Anchor to the bottom of the last rendered message instead of scrollHeight.
+      // This stays correct when content settles and scrollHeight shrinks.
+      const lastItemBottom = lastItem.offsetTop + lastItem.offsetHeight;
+      targetTop = contentNode.offsetTop + lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - node.clientHeight;
+      targetTop = Math.max(0, targetTop);
     } else {
-      node.scrollTo({ top: bottom, behavior });
+      targetTop = Math.max(0, node.scrollHeight - node.clientHeight);
+    }
+    if (behavior === "auto") {
+      node.scrollTop = targetTop;
+    } else {
+      node.scrollTo({ top: targetTop, behavior });
     }
     window.setTimeout(() => {
       if (token !== scrollTokenRef.current || !autoFollowRef.current) return;
@@ -1108,6 +1121,7 @@ export function ChatThread() {
     resizeScrollAnchorRef.current = null;
     lastScrollSizeRef.current = null;
     lastScrollTopRef.current = null;
+    lastScrollHeightRef.current = null;
     userScrollResizeRestoreUntilRef.current = 0;
     userScrollIntentUntilRef.current = 0;
     cancelPendingAnchorCapture();
@@ -1343,16 +1357,34 @@ export function ChatThread() {
     const node = scrollRef.current;
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
-    lastScrollTopRef.current = node.scrollTop;
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const previousScrollHeight = lastScrollHeightRef.current;
+    const currentScrollTop = node.scrollTop;
+    const currentScrollHeight = node.scrollHeight;
+    lastScrollTopRef.current = currentScrollTop;
+    lastScrollHeightRef.current = currentScrollHeight;
+    const distance = currentScrollHeight - currentScrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
-    // Browser clamping after content shrink can also move scrollTop upward.
-    // Only explicit, recent input is allowed to hand control to the user.
     const now = Date.now();
+    // Ignore programmatic scrolls for a short window after we move the viewport.
+    if (now < ignoreScrollUntilRef.current) return;
+    // Browser clamping after content shrinks is not user scrolling.
+    if (
+      previousScrollHeight !== null &&
+      currentScrollHeight < previousScrollHeight &&
+      previousScrollTop !== null
+    ) {
+      const shrink = previousScrollHeight - currentScrollHeight;
+      const topDelta = previousScrollTop - currentScrollTop;
+      if (Math.abs(topDelta - shrink) <= 2 && distance <= 80) {
+        // The browser clamped scrollTop to the new bottom; keep following.
+        return;
+      }
+    }
+    // Only explicit, recent input is allowed to hand control to the user.
     if (shouldPauseAutoFollowForScroll({
       previousScrollTop,
-      currentScrollTop: node.scrollTop,
+      currentScrollTop,
       autoFollow: autoFollowRef.current,
       intentUntil: userScrollIntentUntilRef.current,
       now,
@@ -1360,8 +1392,7 @@ export function ChatThread() {
       userScrollIntentUntilRef.current = 0;
       pauseAutoFollowForUser();
     }
-    if (now < ignoreScrollUntilRef.current) return;
-    if (userScrollRef.current && (previousScrollTop === null || Math.abs(node.scrollTop - previousScrollTop) > 0.5)) {
+    if (userScrollRef.current && (previousScrollTop === null || Math.abs(currentScrollTop - previousScrollTop) > 0.5)) {
       userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
       scheduleIdleAnchorCapture();
     }
