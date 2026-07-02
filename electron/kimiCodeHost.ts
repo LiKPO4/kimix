@@ -246,6 +246,8 @@ export type KimiCodeServerModelCatalog = {
     displayName?: string;
     maxContextSize: number;
     capabilities: string[];
+    supportEfforts: string[];
+    defaultEffort?: string;
   }>;
   providers: Array<{
     id: string;
@@ -1425,6 +1427,8 @@ export async function getServerModelCatalog(): Promise<KimiCodeServerModelCatalo
       displayName: model.display_name,
       maxContextSize: model.max_context_size,
       capabilities: model.capabilities ?? [],
+      supportEfforts: model.support_efforts ?? [],
+      defaultEffort: model.default_effort,
     })),
     providers: providers.map((provider) => ({
       id: provider.id,

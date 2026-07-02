@@ -1499,6 +1499,8 @@ export type KimiCodeServerModelCatalog = {
     displayName?: string;
     maxContextSize: number;
     capabilities: string[];
+    supportEfforts: string[];
+    defaultEffort?: string;
   }>;
   providers: Array<{
     id: string;

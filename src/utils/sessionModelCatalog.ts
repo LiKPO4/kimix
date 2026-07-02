@@ -7,6 +7,8 @@ export type SessionModelOption = {
   provider: string;
   providerLabel: string;
   maxContextSize: number | null;
+  supportEfforts: string[];
+  defaultEffort: string | null;
 };
 
 function providerLabel(provider: string) {
@@ -36,6 +38,8 @@ export function buildSessionModelOptions(
       provider,
       providerLabel: providerLabel(provider),
       maxContextSize: model.maxContextSize ?? catalogModel?.maxContextSize ?? null,
+      supportEfforts: catalogModel?.supportEfforts ?? [],
+      defaultEffort: catalogModel?.defaultEffort ?? null,
     });
   }
   return Array.from(options.values()).sort((a, b) => (

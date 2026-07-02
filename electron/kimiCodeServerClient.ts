@@ -127,6 +127,8 @@ export type ServerModelCatalogItem = {
   display_name?: string;
   max_context_size: number;
   capabilities?: string[];
+  support_efforts?: string[];
+  default_effort?: string;
 };
 
 export type ServerProviderCatalogItem = {

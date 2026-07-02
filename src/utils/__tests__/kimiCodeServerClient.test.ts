@@ -485,7 +485,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
         : url.endsWith("/config")
           ? { default_provider: "kimi-code", providers: { "kimi-code": { type: "kimi", has_api_key: false } } }
           : url.endsWith("/models")
-            ? { items: [{ provider: "kimi-code", model: "kimi-for-coding", display_name: "K2.7 Code High Speed", max_context_size: 262144, capabilities: ["thinking", "tool_use"] }] }
+            ? { items: [{ provider: "kimi-code", model: "kimi-for-coding", display_name: "K2.7 Code High Speed", max_context_size: 262144, capabilities: ["thinking", "tool_use"], support_efforts: ["low", "medium", "high"], default_effort: "medium" }] }
             : { items: [{ id: "managed:kimi-code", type: "kimi", has_api_key: false, status: "connected", models: ["kimi-for-coding"] }] };
       return new Response(JSON.stringify({ code: 0, data }), {
         status: 200,
@@ -497,7 +497,12 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await expect(client.getAuthSummary()).resolves.toMatchObject({ ready: true, providers_count: 1 });
     await expect(client.getRedactedConfig()).resolves.toMatchObject({ default_provider: "kimi-code" });
     await expect(client.listModels()).resolves.toEqual([
-      expect.objectContaining({ model: "kimi-for-coding", max_context_size: 262144 }),
+      expect.objectContaining({
+        model: "kimi-for-coding",
+        max_context_size: 262144,
+        support_efforts: ["low", "medium", "high"],
+        default_effort: "medium",
+      }),
     ]);
     await expect(client.listProviders()).resolves.toEqual([
       expect.objectContaining({ id: "managed:kimi-code", status: "connected" }),

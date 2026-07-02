@@ -33,14 +33,18 @@ describe("session model catalog", () => {
       auth: { ready: true, providerCount: 1, defaultModel: null, managedProvider: null },
       config: {},
       models: [
-        { provider: "deepseek", model: "v4", displayName: "duplicate", maxContextSize: 100, capabilities: [] },
-        { provider: "deepseek", model: "flash", displayName: "Flash", maxContextSize: 200, capabilities: [] },
+        { provider: "deepseek", model: "v4", displayName: "duplicate", maxContextSize: 100, capabilities: ["thinking"], supportEfforts: ["low", "high"], defaultEffort: "high" },
+        { provider: "deepseek", model: "flash", displayName: "Flash", maxContextSize: 200, capabilities: [], supportEfforts: [] },
       ],
       providers: [],
     });
 
     expect(options).toHaveLength(1);
     expect(options.find((option) => option.id === "deepseek/v4")?.label).toBe("DeepSeek V4");
+    expect(options.find((option) => option.id === "deepseek/v4")).toMatchObject({
+      supportEfforts: ["low", "high"],
+      defaultEffort: "high",
+    });
     expect(options.map((option) => option.id)).not.toContain("deepseek/flash");
   });
 });
