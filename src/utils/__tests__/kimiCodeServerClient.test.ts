@@ -178,6 +178,22 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("asks the official Server to exclude empty sessions", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(url);
+      return new Response(JSON.stringify({ code: 0, data: { items: [], has_more: false } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.listSessions()).resolves.toEqual([]);
+    expect(calls).toEqual([
+      "http://127.0.0.1:58627/api/v1/sessions?page_size=100&exclude_empty=true",
+    ]);
+  });
+
   it("reads messages and prompt queue through official diagnostic routes", async () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {

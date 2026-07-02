@@ -97,6 +97,18 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].archivedAt).toBeUndefined();
   });
 
+  it("SDK 目录省略空会话时会归档遗留的 New Session 镜像", () => {
+    const empty = localSession({
+      id: "empty-1",
+      officialSessionId: "empty-1",
+      title: "New Session",
+      events: [],
+    });
+    const result = reconcileOfficialSessionCatalog([empty], [], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
   it("不因官方缺失隐藏本地-only、长程任务或其他项目会话", () => {
     const localOnly = localSession({ id: "local-abc", officialSessionId: undefined, runtimeSessionId: undefined });
     const longTask = localSession({

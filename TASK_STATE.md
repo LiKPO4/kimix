@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.13.3 空会话目录过滤
+- 证据：`session_c16c1ae6-66c3-4095-8840-90c1d6cc77c5` 只有 metadata/config/permission，`state.json` 无 `lastPrompt`，没有用户消息，属于真正空会话。
+- 根因：Kimix Server 列表漏传官方 `exclude_empty`，SDK 回退也未过滤无 `lastPrompt` 条目。
+- 修复：Server 请求增加 `exclude_empty=true`；SDK metadata 回填后过滤空项；遗留 `New Session/新会话` 空镜像在对账中归档隐藏，不删除官方物理目录。
+- 下一步：重启验收 Project06 侧栏中的历史空 New Session 是否全部消失。
+
 ## 2026-07-02 v2.13.2 迁移会话加载与归档回流修复
 - 根因：`session_30c60f3b-e2cc-4295-9540-fffcbbfe2c7c` 的 Server snapshot 为空，但本地 SDK `wire.jsonl` 约 286KB 且包含完整对话；全局搜索直达还只创建了 `isLoading` 占位，没有触发历史读取。
 - 修复：Server 历史读取增加 8 秒上限，并在失败、超时或空 snapshot 时回退本地 wire；全局搜索直达主动加载历史；侧栏加载失败会退出转圈并提示。

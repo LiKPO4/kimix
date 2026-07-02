@@ -43,6 +43,15 @@ function officialSessionIds(session: Session) {
   ].filter((id): id is string => Boolean(id));
 }
 
+function isAbandonedEmptyMirror(session: Session, projectPath: string) {
+  return session.engine === "kimi-code" &&
+    !session.longTask &&
+    !session.archivedAt &&
+    normalizeProjectPath(session.projectPath) === normalizeProjectPath(projectPath) &&
+    session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
+    /^(new session|新会话)$/i.test(session.title.trim());
+}
+
 /**
  * Reconcile the lightweight official session catalog into Kimix's local mirror.
  * Message bodies remain lazy-loaded when the user opens a discovered session.
@@ -96,11 +105,12 @@ export function reconcileOfficialSessionCatalog(
     changed = true;
   }
 
-  if (serverAuthoritative) {
+  if (serverAuthoritative || next.some((session) => isAbandonedEmptyMirror(session, projectPath))) {
     const archivedAt = Date.now();
     next.forEach((session, index) => {
       if (!isOfficialMirrorSession(session, projectPath)) return;
       if (officialSessionIds(session).some((id) => visibleOfficialIds.has(id))) return;
+      if (!serverAuthoritative && !isAbandonedEmptyMirror(session, projectPath)) return;
       if (next === sessions) next = [...sessions];
       next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };
       changed = true;

@@ -1767,7 +1767,7 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
       // ignore unreadable metadata
     }
   }
-  return sessions;
+  return sessions.filter((session) => Boolean(session.lastPrompt?.trim()));
 }
 
 export async function loadServerSessionHistory(sessionId: string): Promise<{ events: Array<{ type: string; payload: unknown; time?: unknown }>; source: "server" }> {

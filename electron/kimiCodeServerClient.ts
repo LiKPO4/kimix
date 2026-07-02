@@ -591,7 +591,7 @@ export class KimiCodeServerClient {
     const sessions: ServerSession[] = [];
     let afterId: string | undefined;
     for (let page = 0; page < 100; page += 1) {
-      const query = new URLSearchParams({ page_size: "100" });
+      const query = new URLSearchParams({ page_size: "100", exclude_empty: "true" });
       if (afterId) query.set("after_id", afterId);
       const result = await this.request<{ items: ServerSession[]; has_more: boolean }>(`/api/v1/sessions?${query}`);
       sessions.push(...result.items);
