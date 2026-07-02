@@ -73,10 +73,9 @@ function SessionHistoryLoadingState() {
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
-const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 2_000;
+const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 3_500;
 const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
-const SESSION_LAYOUT_STABLE_MS = 320;
-const SESSION_LAYOUT_STABLE_PASSES = 3;
+const SESSION_LAYOUT_STABLE_MS = 80;
 const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
 const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
 const MAX_RESIZE_ANCHOR_RESTORE_PX = 300;
@@ -752,11 +751,13 @@ export function ChatThread() {
   const touchStartYRef = useRef<number | null>(null);
   const userInputLockUntilRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
+  const bottomTrackerFrameRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
 
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
@@ -813,26 +814,42 @@ export function ChatThread() {
     const node = scrollRef.current;
     if (!node) return;
     const locked = Date.now() < userInputLockUntilRef.current;
-    window.api.writeDiag?.({
-      message: "[ChatThread] scrollToBottom",
-      data: { behavior, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current, locked },
-    }).catch(logError("writeDiag"));
-    if (locked) return;
-    const token = ++scrollTokenRef.current;
-    ignoreScrollUntilRef.current = Date.now() + 420;
+    const beforeScrollTop = node.scrollTop;
+    const beforeScrollHeight = node.scrollHeight;
     const contentNode = streamContentRef.current;
     const items = Array.from(contentNode?.querySelectorAll<HTMLElement>("[data-kimix-render-key]") ?? []);
     const lastItem = items.at(-1) ?? null;
     let targetTop: number;
     if (lastItem && contentNode) {
-      // Anchor to the bottom of the last rendered message instead of scrollHeight.
-      // This stays correct when content settles and scrollHeight shrinks.
-      const lastItemBottom = lastItem.offsetTop + lastItem.offsetHeight;
-      targetTop = contentNode.offsetTop + lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - node.clientHeight;
+      const nodeRect = node.getBoundingClientRect();
+      const contentRect = contentNode.getBoundingClientRect();
+      const lastItemRect = lastItem.getBoundingClientRect();
+      const contentTop = contentRect.top - nodeRect.top;
+      const lastItemBottom = lastItemRect.bottom - contentRect.top;
+      targetTop = contentTop + lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - node.clientHeight;
       targetTop = Math.max(0, targetTop);
     } else {
       targetTop = Math.max(0, node.scrollHeight - node.clientHeight);
     }
+    window.api.writeDiag?.({
+      message: "[ChatThread] scrollToBottom",
+      data: {
+        behavior,
+        autoFollow: autoFollowRef.current,
+        userScroll: userScrollRef.current,
+        locked,
+        beforeScrollTop,
+        beforeScrollHeight,
+        targetTop,
+        itemCount: items.length,
+        lastItemOffsetTop: lastItem?.offsetTop,
+        lastItemOffsetHeight: lastItem?.offsetHeight,
+        contentNodeOffsetTop: contentNode?.offsetTop,
+      },
+    }).catch(logError("writeDiag"));
+    if (locked) return;
+    const token = ++scrollTokenRef.current;
+    ignoreScrollUntilRef.current = Date.now() + 420;
     if (behavior === "auto") {
       node.scrollTop = targetTop;
     } else {
@@ -844,7 +861,18 @@ export function ChatThread() {
       if (!current) return;
       const distance = current.scrollHeight - current.scrollTop - current.clientHeight;
       updateShowScrollToBottom(distance > 80);
-    }, 460);
+      window.api.writeDiag?.({
+        message: "[ChatThread] scrollToBottomAfter",
+        data: {
+          token,
+          targetTop,
+          afterScrollTop: current.scrollTop,
+          afterScrollHeight: current.scrollHeight,
+          afterClientHeight: current.clientHeight,
+          distance,
+        },
+      }).catch(logError("writeDiag"));
+    }, 60);
   };
 
   const settleSessionAtBottom = () => {
@@ -855,33 +883,20 @@ export function ChatThread() {
     }
     scrollToBottom("auto");
     const remaining = sessionAutoBottomUntilRef.current - Date.now();
+    window.api.writeDiag?.({
+      message: "[ChatThread] settleSessionAtBottom",
+      data: {
+        remaining,
+        scrollHeight: node.scrollHeight,
+        scrollTop: node.scrollTop,
+        clientHeight: node.clientHeight,
+        autoFollow: autoFollowRef.current,
+        userScroll: userScrollRef.current,
+      },
+    }).catch(logError("writeDiag"));
     if (remaining <= 0) {
       cancelSessionAutoBottom();
       return;
-    }
-    const previousStable = sessionAutoBottomStableRef.current;
-    const nextStable = {
-      scrollHeight: node.scrollHeight,
-      clientHeight: node.clientHeight,
-      count: previousStable &&
-        previousStable.scrollHeight === node.scrollHeight &&
-        previousStable.clientHeight === node.clientHeight
-          ? previousStable.count + 1
-          : 1,
-    };
-    sessionAutoBottomStableRef.current = nextStable;
-    if (nextStable.count >= SESSION_LAYOUT_STABLE_PASSES) {
-      const node = scrollRef.current;
-      const distance = node ? node.scrollHeight - node.scrollTop - node.clientHeight : 0;
-      if (
-        distance <= 80 ||
-        !autoFollowRef.current ||
-        userScrollRef.current ||
-        Date.now() >= sessionAutoBottomUntilRef.current
-      ) {
-        clearSessionAutoBottomTimer();
-        return;
-      }
     }
     clearSessionAutoBottomTimer();
     sessionAutoBottomTimerRef.current = window.setTimeout(() => {
@@ -929,6 +944,9 @@ export function ChatThread() {
     cancelSessionAutoBottom();
     userScrollRef.current = true;
     scrollTokenRef.current += 1;
+    if (!userHasScrolled) {
+      setUserHasScrolled(true);
+    }
     if (autoFollowRef.current) {
       autoFollowRef.current = false;
       updateAutoFollow(false);
@@ -1155,6 +1173,7 @@ export function ChatThread() {
     userScrollRef.current = false;
     setShowOlderItems(false);
     setExpandedInitialTailSessionId(null);
+    setUserHasScrolled(false);
     pendingOlderItemsScrollAnchorRef.current = null;
     resizeScrollAnchorRef.current = null;
     lastScrollSizeRef.current = null;
@@ -1165,6 +1184,7 @@ export function ChatThread() {
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
+    let mutationObserver: MutationObserver | null = null;
     if (session?.id) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       sessionAutoBottomStableRef.current = null;
@@ -1173,6 +1193,20 @@ export function ChatThread() {
         node.scrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
       }
       settleSessionAtBottom();
+      const contentNode = streamContentRef.current;
+      if (contentNode) {
+        mutationObserver = new MutationObserver(() => {
+          if (!autoFollowRef.current || userScrollRef.current) return;
+          if (Date.now() >= sessionAutoBottomUntilRef.current && !isAutoFollowRef.current) return;
+          if (bottomTrackerFrameRef.current) return;
+          bottomTrackerFrameRef.current = window.requestAnimationFrame(() => {
+            bottomTrackerFrameRef.current = 0;
+            if (!autoFollowRef.current || userScrollRef.current) return;
+            scrollToBottom("auto");
+          });
+        });
+        mutationObserver.observe(contentNode, { childList: true, subtree: true });
+      }
       const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
         settleSessionAtBottom();
@@ -1189,6 +1223,11 @@ export function ChatThread() {
     return () => {
       cancelSessionAutoBottom();
       cancelPendingAnchorCapture();
+      if (bottomTrackerFrameRef.current) {
+        window.cancelAnimationFrame(bottomTrackerFrameRef.current);
+        bottomTrackerFrameRef.current = 0;
+      }
+      mutationObserver?.disconnect();
     };
   }, [session?.id]);
 
@@ -1249,7 +1288,7 @@ export function ChatThread() {
       if (Date.now() < sessionAutoBottomUntilRef.current) {
         autoFollowRef.current = true;
         updateAutoFollow(true);
-        settleSessionAtBottom();
+        scrollToBottom("auto");
         return;
       }
       if (autoFollowRef.current) {
@@ -1281,15 +1320,16 @@ export function ChatThread() {
   }, [session?.id, showOlderItems]);
 
   useLayoutEffect(() => {
-    const isSettlingOpenedSession = Date.now() < sessionAutoBottomUntilRef.current && !userScrollRef.current;
+    const remaining = sessionAutoBottomUntilRef.current - Date.now();
+    const isSettlingOpenedSession = remaining > 0 && !userScrollRef.current;
     window.api.writeDiag?.({
       message: "[ChatThread] contentVersion effect",
-      data: { isSettlingOpenedSession, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
+      data: { isSettlingOpenedSession, remaining, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
     }).catch(logError("writeDiag"));
     if (isSettlingOpenedSession) {
       autoFollowRef.current = true;
       updateAutoFollow(true);
-      settleSessionAtBottom();
+      scrollToBottom("auto");
       return;
     }
     if (isAutoFollowRef.current) {
@@ -1431,7 +1471,7 @@ export function ChatThread() {
   const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
-  const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id);
+  const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id && !userHasScrolled);
   const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
     isCompletedAssistant: (item) => item.type === "event" &&
       item.event.type === "assistant_message" &&
@@ -1443,8 +1483,8 @@ export function ChatThread() {
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
   const isRestoringOfficialHistory = Boolean(session?.isLoading && session.events.length > 0);
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
-  const eagerInitialMarkdown = Boolean(session?.id && (
-    Date.now() < sessionAutoBottomUntilRef.current
+  const eagerMarkdown = Boolean(session?.id && (
+    Date.now() < sessionAutoBottomUntilRef.current || userHasScrolled
   ));
 
   useEffect(() => {
@@ -1585,7 +1625,7 @@ export function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} eagerMarkdown={eagerInitialMarkdown} />
+                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} eagerMarkdown={eagerMarkdown} />
               }
             </div>
           ))}
