@@ -4205,6 +4205,30 @@ ipcMain.handle("project:openPath", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:revealPath", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const target = (request as { path?: unknown }).path;
+    if (typeof target !== "string" || !target) {
+      return { success: false, error: "Invalid path" };
+    }
+    if (!fs.existsSync(target)) {
+      return { success: false, error: "Path does not exist" };
+    }
+    // Directory: open it directly. File: reveal in folder and select it.
+    if (fs.statSync(target).isDirectory()) {
+      await shell.openPath(target);
+    } else {
+      shell.showItemInFolder(target);
+    }
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:openEditor", async (_, request: unknown) => {
   try {
     if (!request || typeof request !== "object") {

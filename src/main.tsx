@@ -161,6 +161,7 @@ function installBrowserPreviewApi() {
     pullGitChanges: (_req: GitPullRequest): Promise<GitActionResponse> => fail("Git 拉取"),
     pushGitChanges: (_req: GitPushRequest): Promise<GitActionResponse> => fail("Git 推送"),
     openProjectPath: () => fail<VoidResponse>("打开项目目录"),
+    revealPath: () => fail<VoidResponse>("在文件夹中显示"),
     readTextFile: (): Promise<ReadTextFileResponse> => fail("读取文本文件"),
     listPreviewFiles: () => Promise.resolve({ success: true, data: [] }),
     openFile: () => fail<VoidResponse>("打开文件"),

@@ -1,16 +1,34 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Copy, ExternalLink, TextSelect } from "lucide-react";
+import { Copy, ExternalLink, FolderOpen, TextSelect } from "lucide-react";
 
 type MenuState = {
   x: number;
   y: number;
   selectedText: string;
   linkUrl: string | null;
+  localPath: string | null;
   selectAllTarget: Element | null;
 };
 
 const URL_RE = /^https?:\/\/[^\s]{4,}$/;
+
+// Windows drive path (C:\… or C:/…), UNC (\\host\share\…), or POSIX absolute
+// path (/usr/…). Paths may contain spaces (e.g. "Android Project"), so we match
+// the whole trimmed selection rather than a single non-space token.
+const WINDOWS_PATH_RE = /^[a-zA-Z]:[\\/][^\r\n]+$/;
+const UNC_PATH_RE = /^\\\\[^\\\r\n]+\\[^\r\n]+$/;
+const POSIX_PATH_RE = /^\/[^\0\r\n]+$/;
+
+function detectLocalPath(text: string): string | null {
+  const value = text.trim();
+  if (!value || value.length > 1024) return null;
+  if (URL_RE.test(value)) return null;
+  if (WINDOWS_PATH_RE.test(value) || UNC_PATH_RE.test(value) || POSIX_PATH_RE.test(value)) {
+    return value;
+  }
+  return null;
+}
 
 /** Walk up from `el` and return the nearest meaningful text container. */
 function findSelectAllTarget(el: Element | null): Element | null {
@@ -52,20 +70,24 @@ export function TextContextMenu() {
       const linkUrl: string | null =
         href ?? (URL_RE.test(selectedText) ? selectedText : null);
 
+      // Local filesystem path in the selection (only when it isn't a web link).
+      const localPath = linkUrl ? null : detectLocalPath(selectedText);
+
       // Nothing to show — fall back to default browser behavior.
       if (!selectedText && !linkUrl) return;
 
       event.preventDefault();
 
-      const itemCount = (selectedText ? 1 : 0) + 1 + (linkUrl ? 1 : 0);
+      const itemCount = (selectedText ? 1 : 0) + 1 + (linkUrl ? 1 : 0) + (localPath ? 1 : 0);
       const menuH = itemCount * 34 + 14;  // 14px = 2 × 7px padding
-      const menuW = 164;
+      const menuW = 176;
 
       setMenu({
         x: Math.max(12, Math.min(event.clientX, window.innerWidth - menuW - 12)),
         y: Math.max(12, Math.min(event.clientY, window.innerHeight - menuH - 12)),
         selectedText,
         linkUrl,
+        localPath,
         selectAllTarget: findSelectAllTarget(target),
       });
     };
@@ -108,12 +130,24 @@ export function TextContextMenu() {
     if (menu.linkUrl) window.open(menu.linkUrl, "_blank", "noopener,noreferrer");
   };
 
+  const handleReveal = async () => {
+    const path = menu.localPath;
+    setMenu(null);
+    if (!path) return;
+    const result = await window.api.revealPath?.({ path });
+    if (result && !result.success) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `无法打开路径：${result.error}`,
+      }));
+    }
+  };
+
   return createPortal(
     <div
       role="menu"
       aria-label="文字操作"
       className="fixed z-[200] rounded-lg border border-border bg-surface-elevated shadow-elevated-token"
-      style={{ left: menu.x, top: menu.y, width: 164, padding: 7 }}
+      style={{ left: menu.x, top: menu.y, width: 176, padding: 7 }}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
@@ -150,6 +184,18 @@ export function TextContextMenu() {
         >
           <ExternalLink size={15} />
           <span>打开链接</span>
+        </button>
+      )}
+      {menu.localPath && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => void handleReveal()}
+          className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+          style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
+        >
+          <FolderOpen size={15} />
+          <span>在文件夹中显示</span>
         </button>
       )}
     </div>,

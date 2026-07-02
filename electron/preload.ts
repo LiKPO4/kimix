@@ -197,6 +197,8 @@ const api = {
     ipcRenderer.invoke("project:gitPush", req),
   openProjectPath: (req: OpenPathRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openPath", req),
+  revealPath: (req: OpenPathRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("project:revealPath", req),
   readTextFile: (req: ReadTextFileRequest): Promise<ReadTextFileResponse> =>
     ipcRenderer.invoke("project:readTextFile", req),
   listPreviewFiles: (req: ListPreviewFilesRequest): Promise<ListPreviewFilesResponse> =>
