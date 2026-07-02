@@ -64,10 +64,10 @@ function getPeriodWindowMs(label: string): number | null {
 function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
   const percent = Math.max(0, Math.min(100, period.percent ?? 0));
   const windowMs = getPeriodWindowMs(period.label);
-  // Remaining-time bar: remaining / total window. Only shown when both
-  // refreshAt and a known window duration are available.
+  // Elapsed-time bar: how much of the window has already passed.
+  // e.g. 5h window with 1h remaining → elapsed = 4h → 80% green.
   const timePercent = (period.refreshAt && windowMs)
-    ? Math.max(0, Math.min(100, (period.refreshAt - now) / windowMs * 100))
+    ? Math.max(0, Math.min(100, (1 - (period.refreshAt - now) / windowMs) * 100))
     : null;
   return (
     <div style={{ paddingTop: 2, paddingBottom: 3 }}>
@@ -75,17 +75,24 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
         <span className="font-medium text-[var(--kimix-panel-text-secondary)]">{period.label}</span>
         <span className="kimix-tabular-nums shrink-0 text-[var(--kimix-panel-text-muted)]">{period.available ? `已用 ${percent.toFixed(0)}%` : "0%"}</span>
       </div>
-      <div className="kimix-progress-track mt-2 h-2 overflow-hidden rounded-full">
+      {/* Usage bar — square corners override the CSS class border-radius */}
+      <div
+        className="kimix-progress-track mt-2 h-2 overflow-hidden"
+        style={{ borderRadius: 0 }}
+      >
         <div
-          className="kimix-progress-fill h-full rounded-full"
-          style={{ width: `${percent}%` }}
+          className="kimix-progress-fill h-full"
+          style={{ width: `${percent}%`, borderRadius: 0 }}
         />
       </div>
       {timePercent !== null && (
-        <div className="kimix-progress-track mt-1 h-1 overflow-hidden rounded-full">
+        <div
+          className="kimix-progress-track mt-1 h-1 overflow-hidden"
+          style={{ borderRadius: 0 }}
+        >
           <div
-            className="h-full rounded-full bg-accent-success"
-            style={{ width: `${timePercent}%` }}
+            className="h-full"
+            style={{ width: `${timePercent}%`, borderRadius: 0, background: "#34d399" }}
           />
         </div>
       )}
