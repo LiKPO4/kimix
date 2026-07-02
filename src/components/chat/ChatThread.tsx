@@ -49,6 +49,27 @@ function useAnimatedDots(active: boolean) {
   return ".".repeat(count);
 }
 
+function SessionHistoryLoadingState() {
+  return (
+    <div className="kimix-content-x h-full overflow-hidden">
+      <div
+        className="kimix-chat-stream-column flex min-h-full w-full flex-col justify-end"
+        style={{ paddingTop: 42, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT, gap: 14 }}
+      >
+        <div
+          className="flex items-center text-text-muted"
+          style={{ minHeight: 34, gap: 8, paddingLeft: 14, paddingRight: 14 }}
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 size={15} className="animate-spin" />
+          <span className="text-[13px]">正在同步最新会话</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
@@ -1374,6 +1395,7 @@ export function ChatThread() {
   const visibleRenderItems = isInitialTailOnly ? fullVisibleRenderItems.slice(-4) : fullVisibleRenderItems;
   const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
+  const isRestoringOfficialHistory = Boolean(session?.isLoading && session.events.length > 0);
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
   const eagerInitialMarkdown = Boolean(session?.id && (
     isInitialTailOnly ||
@@ -1417,6 +1439,10 @@ export function ChatThread() {
       : node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
   }, [showOlderItems, visibleRenderItems.length]);
+
+  if (isRestoringOfficialHistory) {
+    return <SessionHistoryLoadingState />;
+  }
 
   if (!session || (!hasActiveTurn && !hasPendingMessage && !hasVisibleContent)) {
     return <EmptyState />;

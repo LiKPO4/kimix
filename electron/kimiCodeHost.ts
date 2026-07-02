@@ -1762,7 +1762,7 @@ function serverReplayTimestamp(frame: ServerFrame): unknown {
     : {};
   const createdAt = payload.created_at ?? payload.createdAt;
   if (typeof createdAt === "string" || typeof createdAt === "number") return createdAt;
-  return typeof frame.seq === "number" ? frame.seq : undefined;
+  return undefined;
 }
 
 export async function exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult> {

@@ -1033,6 +1033,7 @@ function snapshotMessageToServerFrames(
 ): ServerFrame[] {
   if (!isRecord(message)) return [];
   const role = typeof message.role === "string" ? message.role : "";
+  const messageTimestamp = snapshotMessageTimestamp(message);
   if (role === "user") {
     const messageText = contentToText(message.content);
     if (replayMode === "history" && messageText) {
@@ -1041,7 +1042,7 @@ function snapshotMessageToServerFrames(
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ user_input: message.content }, replayMode, snapshotMessageId(message, role), messageText, role),
+        payload: snapshotReplayPayload({ user_input: message.content }, replayMode, snapshotMessageId(message, role), messageText, role, messageTimestamp),
       }];
     }
     return replayMode === "in_flight"
@@ -1051,14 +1052,14 @@ function snapshotMessageToServerFrames(
   const messageId = snapshotMessageId(message, role);
   if (role === "assistant") {
     const messageText = contentToText(message.content);
-    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageId, messageText);
+    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageId, messageText, messageTimestamp);
     if (frames.length > 0) {
       frames.push({
         type: "turn.ended",
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ type: "turn.ended" }, replayMode, messageId, messageText, role),
+        payload: snapshotReplayPayload({ type: "turn.ended" }, replayMode, messageId, messageText, role, messageTimestamp),
       });
     }
     return frames;
@@ -1075,7 +1076,7 @@ function snapshotMessageToServerFrames(
       session_id: sessionId,
       seq,
       epoch,
-      payload: snapshotReplayPayload({ type: "tool.result", toolCallId, output }, replayMode, messageId, output, role),
+      payload: snapshotReplayPayload({ type: "tool.result", toolCallId, output }, replayMode, messageId, output, role, messageTimestamp),
     }];
   }
   return [];
@@ -1089,6 +1090,7 @@ function contentPartsToFrames(
   replayMode: "history" | "in_flight",
   messageId: string,
   messageText: string,
+  messageTimestamp: unknown,
 ): ServerFrame[] {
   if (typeof content === "string") {
     return content ? [{
@@ -1096,7 +1098,7 @@ function contentPartsToFrames(
       session_id: sessionId,
       seq,
       epoch,
-      payload: snapshotReplayPayload({ delta: content }, replayMode, messageId, messageText, "assistant"),
+      payload: snapshotReplayPayload({ delta: content }, replayMode, messageId, messageText, "assistant", messageTimestamp),
     }] : [];
   }
   if (!Array.isArray(content)) return [];
@@ -1109,7 +1111,7 @@ function contentPartsToFrames(
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ part: { type: "text", text: part.text } }, replayMode, messageId, messageText, "assistant"),
+        payload: snapshotReplayPayload({ part: { type: "text", text: part.text } }, replayMode, messageId, messageText, "assistant", messageTimestamp),
       }];
     }
     if ((type === "think" || type === "thinking") && typeof (part.think ?? part.thinking ?? part.text) === "string") {
@@ -1119,7 +1121,7 @@ function contentPartsToFrames(
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ part: { type: "think", think } }, replayMode, messageId, messageText, "assistant"),
+        payload: snapshotReplayPayload({ part: { type: "think", think } }, replayMode, messageId, messageText, "assistant", messageTimestamp),
       }] : [];
     }
     return [];
@@ -1163,15 +1165,21 @@ function snapshotMessageId(message: Record<string, unknown>, role: string): stri
     `${role}:${contentToText(message.content).slice(0, 512)}`;
 }
 
+function snapshotMessageTimestamp(message: Record<string, unknown>): unknown {
+  return message.created_at ?? message.createdAt ?? message.timestamp ?? message.time;
+}
+
 function snapshotReplayPayload(
   payload: Record<string, unknown>,
   replayMode: "history" | "in_flight",
   messageId: string,
   messageText: string,
   role: string,
+  messageTimestamp: unknown,
 ): Record<string, unknown> {
   return {
     ...payload,
+    ...(messageTimestamp !== undefined && messageTimestamp !== null ? { created_at: messageTimestamp } : {}),
     snapshotReplay: replayMode,
     snapshotMessageId: messageId,
     snapshotMessageText: messageText,

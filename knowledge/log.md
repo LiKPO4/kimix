@@ -2,6 +2,8 @@
 
 ## 2026-07-02
 
+* **Canonical startup tail gate**: Persisted messages are no longer presented as the real bottom while an official session's first history synchronization is pending; startup history loading also begins without the former 1.2-second delay. See [/project/kimix.md](/project/kimix.md).
+* **Server replay timestamps**: Snapshot-derived history frames now retain each official message's `created_at`; protocol sequence numbers are no longer interpreted as message time. See [/project/kimix.md](/project/kimix.md).
 * **Bottom-origin startup tail**: The initial eager tail now uses reverse scroll coordinates so asynchronous body growth extends upward without temporarily moving the viewport away from the bottom. See [/project/kimix.md](/project/kimix.md).
 
 ## 2026-07-01

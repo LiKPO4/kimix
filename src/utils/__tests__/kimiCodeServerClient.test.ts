@@ -542,8 +542,8 @@ describe("KimiCodeServerClient protocol adapters", () => {
       session: { id: "session-1", status: "idle" },
       messages: {
         items: [
-          { id: "msg-user", role: "user", content: [{ type: "text", text: "用户历史问题" }] },
-          { id: "msg-history", role: "assistant", content: [{ type: "text", text: "历史消息可按需补偿" }] },
+          { id: "msg-user", role: "user", created_at: "2026-07-01T20:15:00+08:00", content: [{ type: "text", text: "用户历史问题" }] },
+          { id: "msg-history", role: "assistant", created_at: "2026-07-01T20:16:00+08:00", content: [{ type: "text", text: "历史消息可按需补偿" }] },
         ],
       },
       in_flight_turn: {
@@ -561,6 +561,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
         snapshotReplay: "history",
         snapshotMessageId: "msg-user",
         snapshotMessageText: "用户历史问题",
+        created_at: "2026-07-01T20:15:00+08:00",
         user_input: [{ type: "text", text: "用户历史问题" }],
       },
     });
@@ -570,6 +571,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
         snapshotReplay: "history",
         snapshotMessageId: "msg-history",
         snapshotMessageText: "历史消息可按需补偿",
+        created_at: "2026-07-01T20:16:00+08:00",
         part: { type: "text", text: "历史消息可按需补偿" },
       },
     });

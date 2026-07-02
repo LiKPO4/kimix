@@ -2264,7 +2264,7 @@ function App() {
               }
             }
           })();
-        }, 1_200);
+        }, 0);
       }).catch(logError("loadKimiCodeSession"));
     });
 
