@@ -55,8 +55,20 @@ function getDisplaySessionId(session: Session | null | undefined): string | null
   return nonSkill ?? candidates[0] ?? null;
 }
 
+function getPeriodWindowMs(label: string): number | null {
+  if (/5\s*小时/.test(label)) return 5 * 3600 * 1000;
+  if (/本周|每周|一周|\bweek\b/i.test(label)) return 7 * 24 * 3600 * 1000;
+  return null;
+}
+
 function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
   const percent = Math.max(0, Math.min(100, period.percent ?? 0));
+  const windowMs = getPeriodWindowMs(period.label);
+  // Remaining-time bar: remaining / total window. Only shown when both
+  // refreshAt and a known window duration are available.
+  const timePercent = (period.refreshAt && windowMs)
+    ? Math.max(0, Math.min(100, (period.refreshAt - now) / windowMs * 100))
+    : null;
   return (
     <div style={{ paddingTop: 2, paddingBottom: 3 }}>
       <div className="flex items-center justify-between gap-5 text-[14px] leading-5">
@@ -69,6 +81,14 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
           style={{ width: `${percent}%` }}
         />
       </div>
+      {timePercent !== null && (
+        <div className="kimix-progress-track mt-1 h-1 overflow-hidden rounded-full">
+          <div
+            className="h-full rounded-full bg-accent-success"
+            style={{ width: `${timePercent}%` }}
+          />
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between gap-3 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">
         <span className="kimix-tabular-nums shrink-0">{formatRefreshTime(period.refreshAt, now)}</span>
         <span className="kimix-tabular-nums min-w-0 truncate">{formatUsage(period)}</span>
