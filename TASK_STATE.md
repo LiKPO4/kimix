@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.13.2 迁移会话加载与归档回流修复
+- 根因：`session_30c60f3b-e2cc-4295-9540-fffcbbfe2c7c` 的 Server snapshot 为空，但本地 SDK `wire.jsonl` 约 286KB 且包含完整对话；全局搜索直达还只创建了 `isLoading` 占位，没有触发历史读取。
+- 修复：Server 历史读取增加 8 秒上限，并在失败、超时或空 snapshot 时回退本地 wire；全局搜索直达主动加载历史；侧栏加载失败会退出转圈并提示。
+- 归档：同一官方 runtime 的重复本地镜像一起归档并立即写 tombstone，保留上限从 500 提升到 5000。
+- 下一步：实机复验指定 session 能从本地 wire 恢复，并重启确认已归档会话不再回来。
+
 ## 2026-07-02 v2.13.0 Kimi Code 0.22 跟进与全局会话搜索
 - 当前目标：跟进官方 Kimi Code 0.22 的模型覆盖、图片压缩和 Web 会话搜索能力，同时保持 Server 优先、SDK 兼容回退架构。
 - 已完成：Server 模型目录保留官方生效后的 `support_efforts/default_effort`；OpenAI 兼容模型的输出上限改写入 `models.<alias>.overrides`；vendored SDK 更新到官方 node-sdk 0.12.0，并兼容 `thinkingEffort`；`Ctrl/Cmd+K` 改为搜索标题、项目与最近提示词的会话面板。

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Session } from "@/types/ui";
-import { archiveSessionOfficialFirst, getOfficialArchiveSessionId } from "../sessionArchive";
+import { archiveSessionOfficialFirst, getOfficialArchiveSessionId, getRelatedArchiveSessionIds } from "../sessionArchive";
 
 function session(overrides: Partial<Session> = {}): Session {
   return {
@@ -17,6 +17,13 @@ function session(overrides: Partial<Session> = {}): Session {
 }
 
 describe("official-first session archive", () => {
+  it("归档所有共享同一官方 runtime id 的本地镜像", () => {
+    const target = session({ id: "local-a", runtimeSessionId: "official-1" });
+    const duplicate = session({ id: "local-b", officialSessionId: "official-1" });
+    const unrelated = session({ id: "local-c", officialSessionId: "official-2" });
+    expect(getRelatedArchiveSessionIds([target, duplicate, unrelated], target)).toEqual(["local-a", "local-b"]);
+  });
+
   it("优先使用 runtime 或 official id", () => {
     expect(getOfficialArchiveSessionId(session({ runtimeSessionId: "runtime", officialSessionId: "official" }))).toBe("runtime");
     expect(getOfficialArchiveSessionId(session({ officialSessionId: "official" }))).toBe("official");

@@ -2,6 +2,8 @@
 
 ## 2026-07-02
 
+* **Migrated history fallback**: Empty, failed, or timed-out Server snapshots now fall back to the SDK wire mirror, and every loading entry point settles its placeholder. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Archive identity closure**: Archiving now covers every local mirror sharing an official runtime identity and writes tombstones immediately with a larger retention bound. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Kimi Code 0.22 runtime alignment**: Updated the vendored fallback to Node SDK 0.12, normalized `thinkingEffort`, retained the bounded MCP startup timeout, and verified official image-compression exports. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Durable model overrides**: Effective effort metadata now crosses the Server catalog boundary, and lazy OpenAI-compatible output limits persist under official model overrides so provider refreshes do not erase them. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Normalize tall single-message sessions**: Initial-tail completion no longer requires hidden items; bottom-origin coordinates are replaced with normal scrolling before users browse very tall Markdown answers. See [/project/kimix.md](/project/kimix.md).

@@ -8,6 +8,7 @@ import { mapHistoryEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 
 type SearchMatch = {
   session: Session;
@@ -290,7 +291,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     window.setTimeout(() => setCopyMessage(""), 1800);
   };
 
-  const openGlobalSession = (summary: KimiCodeSessionSummary) => {
+  const openGlobalSession = async (summary: KimiCodeSessionSummary) => {
     const existing = useSessionStore.getState().sessions.find((item) => (
       item.id === summary.id || getRuntimeSessionId(item) === summary.id
     ));
@@ -317,6 +318,30 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     setWorkspaceView("chat");
     setCurrentSession(session);
     onClose();
+    const loaded = await window.api.loadKimiCodeSession({ workDir: summary.workDir, sessionId: summary.id });
+    if (!loaded.success) {
+      updateSession(session.id, (current) => ({
+        ...current,
+        isLoading: false,
+        events: [...current.events, {
+          id: crypto.randomUUID(),
+          type: "error",
+          timestamp: Date.now(),
+          message: `读取会话历史失败：${loaded.error}`,
+        }],
+      }));
+    } else {
+      const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+      updateSession(session.id, (current) => ({
+        ...current,
+        events,
+        title: current.titleLocked ? current.title : deriveSessionTitle(events, current.title),
+        kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+        isLoading: false,
+      }));
+    }
+    const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+    if (updated && useAppStore.getState().currentSession?.id === session.id) setCurrentSession(updated);
   };
 
   const resultCount = scope === "all" ? globalMatches.length : matches.length;
@@ -330,7 +355,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const openSelected = () => {
     if (scope === "all") {
       const match = globalMatches[selectedIndex];
-      if (match) openGlobalSession(match.session);
+      if (match) void openGlobalSession(match.session);
       return;
     }
     const match = matches[selectedIndex];
@@ -393,7 +418,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 data-search-index={index}
                 className={`grid min-h-14 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
                 style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "10px 14px" }}
-                onClick={() => openGlobalSession(match.session)}
+                onClick={() => void openGlobalSession(match.session)}
                 onMouseMove={() => setSelectedIndex(index)}
               >
                 <span className="min-w-0">

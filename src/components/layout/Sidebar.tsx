@@ -471,7 +471,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       workDir: session.projectPath,
       sessionId: getRuntimeSessionId(session) ?? session.id,
     });
-    if (!loaded.success) return;
+    if (!loaded.success) {
+      updateSession(session.id, (current) => ({ ...current, isLoading: false }));
+      const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+      if (updated) setCurrentSession(updated);
+      toast(`读取会话失败：${loaded.error}`);
+      return;
+    }
     const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
     if (isHiddenInternalSession({ ...session, events })) {
       deleteSession(session.id);
@@ -841,7 +847,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.1</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.2</span>
         </button>
       </div>
     </aside>

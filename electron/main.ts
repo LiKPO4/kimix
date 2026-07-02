@@ -9,6 +9,7 @@ import AdmZip from "adm-zip";
 import { z } from "zod";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
+import { loadSessionHistoryWithFallback } from "./sessionHistoryFallback";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
@@ -5766,12 +5767,11 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!workDir || !sessionId) return { success: false, error: "Missing workDir or sessionId" };
     if (kimiCodeHost.isListingSessionsFromServer()) {
-      try {
-        const history = await kimiCodeHost.loadServerSessionHistory(sessionId);
-        return { success: true, data: { sessionId, events: history.events, source: history.source } };
-      } catch (error) {
-        console.warn("[KimiCodeServerHost] load official session history failed; falling back to local mirror:", error);
-      }
+      const history = await loadSessionHistoryWithFallback(
+        () => kimiCodeHost.loadServerSessionHistory(sessionId),
+        () => sessionHistory.getSessionHistory(workDir, sessionId),
+      );
+      return { success: true, data: { sessionId, events: history.events, source: history.source } };
     }
     const events = await sessionHistory.getSessionHistory(workDir, sessionId);
     return { success: true, data: { sessionId, events, source: "local" } };

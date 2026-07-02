@@ -8,6 +8,23 @@ export function getOfficialArchiveSessionId(session: Session) {
   return session.runtimeSessionId ?? session.officialSessionId ?? (session.id.startsWith("local-") ? null : session.id);
 }
 
+export function getRelatedArchiveSessionIds(sessions: Session[], target: Session): string[] {
+  const targetIds = new Set([
+    target.id,
+    target.runtimeSessionId,
+    target.officialSessionId,
+    target.longTask?.executorSessionId,
+    target.longTask?.reviewerSessionId,
+  ].filter((id): id is string => Boolean(id)));
+  return sessions.filter((session) => [
+    session.id,
+    session.runtimeSessionId,
+    session.officialSessionId,
+    session.longTask?.executorSessionId,
+    session.longTask?.reviewerSessionId,
+  ].some((id) => Boolean(id && targetIds.has(id)))).map((session) => session.id);
+}
+
 export async function archiveSessionOfficialFirst(
   session: Session,
   archiveOfficial: (sessionId: string) => Promise<OfficialArchiveResult>,

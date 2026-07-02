@@ -77,7 +77,7 @@ export function getArchivedSessionTombstones(): ArchivedSessionTombstone[] {
 }
 
 function writeArchivedSessionTombstones(tombstones: ArchivedSessionTombstone[]) {
-  localStorage.setItem(LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY, JSON.stringify(tombstones.slice(-500)));
+  localStorage.setItem(LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY, JSON.stringify(tombstones.slice(-5000)));
 }
 
 export function rememberArchivedSessionTombstone(session: Session) {
