@@ -67,7 +67,6 @@ type KimiHarnessLike = {
   resumeSession(input: { id: string; additionalDirs?: readonly string[] }): Promise<KimiCodeSessionLike>;
   forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
   renameSession?(input: { id: string; title: string }): Promise<void>;
-  archiveSession?(input: { sessionId: string }): Promise<void>;
   listSessions(options?: { workDir?: string; sessionId?: string }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
@@ -1163,9 +1162,7 @@ export async function archiveSession(sessionId: string): Promise<void> {
   }
   if (!shouldRouteNewSessionToServer()) {
     const sdkHarness = await getHarness();
-    await archiveSdkSession(sdkHarness, sessionId);
-    sessions.delete(sessionId);
-    settlePendingForSession(sessionId, "cancelled");
+    await archiveSdkSession(sdkHarness, sessionId, () => closeSession(sessionId));
     for (const [serverSessionId, migratedSessionId] of serverSessionMigrations) {
       if (serverSessionId === sessionId || migratedSessionId === sessionId) {
         serverSessionMigrations.delete(serverSessionId);
@@ -1177,13 +1174,32 @@ export async function archiveSession(sessionId: string): Promise<void> {
 }
 
 export async function archiveSdkSession(
-  sdkHarness: { archiveSession?: (input: { sessionId: string }) => Promise<void> },
+  sdkHarness: { listSessions: (input: { sessionId: string }) => Promise<KimiCodeSessionSummary[]> },
   sessionId: string,
+  closeManagedSession: () => Promise<void> = async () => {},
 ): Promise<void> {
-  if (!sdkHarness.archiveSession) {
-    throw new Error("当前官方 SDK 不支持归档会话。");
+  const summaries = await sdkHarness.listSessions({ sessionId });
+  const summary = summaries.find((item) => item.id === sessionId);
+  if (!summary?.sessionDir) {
+    throw new Error(`Session "${sessionId}" was not found`);
   }
-  await sdkHarness.archiveSession({ sessionId });
+  await closeManagedSession();
+  const statePath = path.join(summary.sessionDir, "state.json");
+  let state: unknown;
+  try {
+    state = JSON.parse(await fs.promises.readFile(statePath, "utf-8"));
+  } catch (error) {
+    throw new Error(`Session "${sessionId}" state.json was not found`, { cause: error });
+  }
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
+    throw new Error(`Session "${sessionId}" state.json is invalid`);
+  }
+  const next = {
+    ...state,
+    archived: true,
+    updatedAt: new Date().toISOString(),
+  };
+  await fs.promises.writeFile(statePath, `${JSON.stringify(next, null, 2)}\n`, "utf-8");
 }
 
 export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInput): Promise<KimiCodeGoalState> {

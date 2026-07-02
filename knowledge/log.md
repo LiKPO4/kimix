@@ -2,7 +2,7 @@
 
 ## 2026-07-02
 
-* **Official SDK archival**: SDK fallback now calls the official Harness archive operation before clearing Kimix runtime state; local tombstones remain reconciliation insurance rather than the primary archive. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **SDK SessionStore-compatible archival**: Runtime inspection proved the 0.22 public Harness omits its internal archive RPC; fallback archival now resolves the authoritative session directory and applies the official non-destructive state transition after closing the session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Title-independent empty-session cleanup**: Empty mirrors omitted by the SDK catalog are now identified by content and age instead of `New Session` titles, while a creation grace period protects fresh unsent sessions. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Empty-session catalog parity**: Server and SDK catalogs now follow official `exclude_empty` semantics, and abandoned empty local mirrors are hidden without deleting Kimi Code session files. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Migrated history fallback**: Empty, failed, or timed-out Server snapshots now fall back to the SDK wire mirror, and every loading entry point settles its placeholder. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

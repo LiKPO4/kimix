@@ -1,9 +1,14 @@
 # Kimix 长程任务状态
 
-## 2026-07-02 v2.13.5 SDK 官方归档路由
+## 2026-07-02 v2.13.6 SDK SessionStore 兼容归档
+- 实机证据：0.22 公开 Harness 没有 `archiveSession`；v2.13.5 误把 SDK 内部 Core RPC 方法当成公开 Harness 能力，导致归档报错。
+- 官方语义：SDK 内部 SessionStore 的归档不删除目录，只在 `state.json` 写入 `archived: true` 和新 `updatedAt`，默认列表随后会排除该会话。
+- 修复：先由 Harness `listSessions({ sessionId })` 确认官方 `sessionDir`，关闭活跃会话后按相同结构化语义标记归档；不删除任何历史文件。
+
+## 2026-07-02 v2.13.5 SDK 官方归档路由（已被 v2.13.6 纠正）
 - 根因：Server 路由会调用官方 `POST /sessions/{id}:archive`，但 Server 启动超时转入 SDK fallback 后，Kimix 仍按旧能力矩阵只做本地归档，没有调用 0.22 SDK 已提供的 `archiveSession`。
 - 后果：官方 `state.json` 仍为未归档，只能依赖 localStorage tombstone 防止重启回流，任何恢复/镜像 ID 差异都可能让会话再次出现。
-- 修复：SDK fallback 直接调用官方 Harness `archiveSession({ sessionId })`，成功后再清理 Kimix 运行态；本地关联镜像和 tombstone 仍作为双保险。
+- 原实现误判公开 Harness 能力，实机报错后由 v2.13.6 改为 SessionStore 兼容归档。
 
 ## 2026-07-02 v2.13.4 自定义标题空会话过滤
 - 证据：`session_d75ff8ef-ab21-4d54-ba27-6681779fcca3` 是 `kimix-p3-probe-a` 创建的 `P3 Child`，官方记录 `message_count=0`、`turn_count=0`且 token 全为 0。
