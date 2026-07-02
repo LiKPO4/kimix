@@ -87,12 +87,12 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
       </div>
       {timePercent !== null && (
         <div
-          className="kimix-progress-track mt-1 h-1 overflow-hidden"
+          className="kimix-progress-track mt-1 h-[3px] overflow-hidden"
           style={{ borderRadius: 0 }}
         >
           <div
             className="h-full"
-            style={{ width: `${timePercent}%`, borderRadius: 0, background: "#34d399" }}
+            style={{ width: `${timePercent}%`, borderRadius: 0, background: "#2ddd19" }}
           />
         </div>
       )}
@@ -223,10 +223,10 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     setAdditionalWorkDirs(additionalWorkDirs.filter((_, itemIndex) => itemIndex !== index));
   };
 
-  const loadUsage = async () => {
+  const loadUsage = async ({ background = false }: { background?: boolean } = {}) => {
     const requestId = usageRequestIdRef.current + 1;
     usageRequestIdRef.current = requestId;
-    setUsageLoading(true);
+    if (!background) setUsageLoading(true);
     setUsageLoginState("idle");
     try {
       const res = await window.api.getKimiCodeAccountUsage();
@@ -258,7 +258,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         ],
       });
     } finally {
-      if (usageRequestIdRef.current === requestId) setUsageLoading(false);
+      if (usageRequestIdRef.current === requestId && !background) setUsageLoading(false);
     }
   };
 
@@ -279,7 +279,10 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     setModelMenuOpen(false);
     setUsageOpen(next);
     if (next) {
-      void loadUsage();
+      // Refresh on open, but only spin when there is nothing to show yet.
+      // With cached data present, refresh silently in the background so the
+      // panel shows current numbers immediately without a loading spinner.
+      void loadUsage({ background: Boolean(usageData) });
     }
   };
 
@@ -566,7 +569,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={loadUsage}
+                    onClick={() => void loadUsage()}
                     className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
                   >
                     {usageLoading ? <Loader2 size={14} className="animate-spin" /> : "刷新"}
