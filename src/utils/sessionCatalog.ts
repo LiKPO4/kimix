@@ -1,6 +1,8 @@
 import type { Session } from "@/types/ui";
 import { truncateSessionTitle } from "@/utils/sessionTitle";
 
+const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
+
 export interface OfficialSessionCatalogItem {
   id: string;
   workDir: string;
@@ -49,7 +51,7 @@ function isAbandonedEmptyMirror(session: Session, projectPath: string) {
     !session.archivedAt &&
     normalizeProjectPath(session.projectPath) === normalizeProjectPath(projectPath) &&
     session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
-    /^(new session|新会话)$/i.test(session.title.trim());
+    Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
 }
 
 /**

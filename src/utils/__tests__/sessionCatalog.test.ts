@@ -90,23 +90,42 @@ describe("reconcileOfficialSessionCatalog", () => {
   });
 
   it("SDK 来源列表不隐藏缺失的本地镜像", () => {
-    const existing = localSession({ id: "official-1", officialSessionId: "official-1" });
+    const existing = localSession({
+      id: "official-1",
+      officialSessionId: "official-1",
+      events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "已有正文" }],
+    });
     const result = reconcileOfficialSessionCatalog([existing], [], "D:\\work\\demo", { source: "sdk" });
 
     expect(result[0]).toBe(existing);
     expect(result[0].archivedAt).toBeUndefined();
   });
 
-  it("SDK 目录省略空会话时会归档遗留的 New Session 镜像", () => {
+  it("SDK 目录省略空会话时会归档任意标题的遗留空镜像", () => {
     const empty = localSession({
       id: "empty-1",
       officialSessionId: "empty-1",
-      title: "New Session",
+      title: "P3 Child",
+      createdAt: Date.now() - 10 * 60 * 1000,
       events: [],
     });
     const result = reconcileOfficialSessionCatalog([empty], [], "D:\\work\\demo", { source: "sdk" });
 
     expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
+  it("保留刚创建且尚未输入的空会话", () => {
+    const recent = localSession({
+      id: "empty-recent",
+      officialSessionId: "empty-recent",
+      title: "New Session",
+      createdAt: Date.now(),
+      events: [],
+    });
+    const result = reconcileOfficialSessionCatalog([recent], [], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result[0]).toBe(recent);
+    expect(result[0].archivedAt).toBeUndefined();
   });
 
   it("不因官方缺失隐藏本地-only、长程任务或其他项目会话", () => {

@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.13.4 自定义标题空会话过滤
+- 证据：`session_d75ff8ef-ab21-4d54-ba27-6681779fcca3` 是 `kimix-p3-probe-a` 创建的 `P3 Child`，官方记录 `message_count=0`、`turn_count=0`且 token 全为 0。
+- 根因：SDK 回退目录的遗留镜像清理错误依赖 `New Session/新会话` 标题，漏掉了 `P3 Child/P3 Fork` 等自定义标题空会话。
+- 修复：改为基于官方目录缺失、本地无用户/引导消息和 5 分钟创建保护期判定，不再依赖标题。
+
 ## 2026-07-02 v2.13.3 空会话目录过滤
 - 证据：`session_c16c1ae6-66c3-4095-8840-90c1d6cc77c5` 只有 metadata/config/permission，`state.json` 无 `lastPrompt`，没有用户消息，属于真正空会话。
 - 根因：Kimix Server 列表漏传官方 `exclude_empty`，SDK 回退也未过滤无 `lastPrompt` 条目。
