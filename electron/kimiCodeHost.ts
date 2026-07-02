@@ -177,6 +177,7 @@ export type KimiCodeSessionStatus = {
   engineStatus?: KimiCodeEngineStatus;
   model?: string;
   thinkingLevel?: string;
+  thinkingEffort?: string;
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   contextTokens?: number;
@@ -351,6 +352,7 @@ export type KimiCodeConfig = {
   models?: Record<string, KimiCodeModelAlias>;
   thinking?: {
     mode?: "auto" | "on" | "off";
+    enabled?: boolean;
     effort?: string;
   };
   defaultThinking?: boolean;
@@ -658,7 +660,7 @@ export async function resumeSession(sessionId: string, options: { additionalDirs
   }
   return registerSession(session, "idle", {
     model: resumedStatus?.model,
-    thinking: resumedStatus?.thinkingLevel,
+    thinking: resumedStatus?.thinkingEffort ?? resumedStatus?.thinkingLevel,
     permission: resumedPermission,
     planMode: resumedStatus?.planMode,
   });
@@ -749,7 +751,7 @@ export async function forkSession(
   }
   return registerSession(session, "idle", {
     model: forkStatus?.model,
-    thinking: forkStatus?.thinkingLevel,
+    thinking: forkStatus?.thinkingEffort ?? forkStatus?.thinkingLevel,
     permission: forkPermission,
     planMode: forkStatus?.planMode,
   });
@@ -1212,7 +1214,19 @@ export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatu
     return serverStatusToKimiCodeStatus(await refreshServerSessionStatus(sessionId, false), serverManaged.session.usage);
   }
   const managed = getManagedSession(sessionId);
-  return { ...await managed.session.getStatus(), engineStatus: managed.status };
+  return normalizeSdkSessionStatus(await managed.session.getStatus(), managed.status);
+}
+
+export function normalizeSdkSessionStatus(
+  status: KimiCodeSessionStatus,
+  engineStatus?: KimiCodeEngineStatus,
+): KimiCodeSessionStatus {
+  const thinkingLevel = status.thinkingEffort ?? status.thinkingLevel;
+  return {
+    ...status,
+    ...(engineStatus === undefined ? {} : { engineStatus }),
+    ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
+  };
 }
 
 export async function getUsage(sessionId: string): Promise<KimiCodeSessionUsage> {

@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { missingOpenAiModelOutputLimitPatch, serverStatusToAgentEvent } from "../../../electron/kimiCodeHost";
+import { missingOpenAiModelOutputLimitPatch, normalizeSdkSessionStatus, serverStatusToAgentEvent } from "../../../electron/kimiCodeHost";
 
 describe("Kimi Server session status adapter", () => {
+  it("maps SDK 0.12 thinking effort onto the stable Kimix status field", () => {
+    expect(normalizeSdkSessionStatus({
+      model: "kimi-code/kimi-for-coding",
+      thinkingEffort: "high",
+      permission: "auto",
+      planMode: false,
+    }, "idle")).toMatchObject({
+      engineStatus: "idle",
+      thinkingLevel: "high",
+      thinkingEffort: "high",
+    });
+  });
+
   it("adds a conservative output limit lazily for an OpenAI-compatible alias", () => {
     expect(missingOpenAiModelOutputLimitPatch({
       providers: { gateway: { type: "openai" } },
