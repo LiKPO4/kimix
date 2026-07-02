@@ -755,6 +755,7 @@ export function ChatThread() {
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
+  const [normalizedScrollSessionId, setNormalizedScrollSessionId] = useState<string | null>(null);
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
     [session?.events]
@@ -1392,7 +1393,11 @@ export function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
   const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id);
-  const isBottomOriginMode = Boolean(session?.id && !showOlderItems);
+  const isBottomOriginMode = Boolean(
+    session?.id &&
+    normalizedScrollSessionId !== session.id &&
+    !showOlderItems
+  );
   const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
     isCompletedAssistant: (item) => item.type === "event" &&
       item.event.type === "assistant_message" &&
@@ -1420,13 +1425,44 @@ export function ChatThread() {
   }, [session?.id, visibleRenderItems.length]);
 
   useEffect(() => {
-    if (!session?.id || !isInitialTailOnly || isRestoringOfficialHistory || initialTailHiddenCount === 0) return;
+    if (!session?.id || !isInitialTailOnly || isRestoringOfficialHistory) return;
     const sessionId = session.id;
     const frame = window.requestAnimationFrame(() => {
       setExpandedInitialTailSessionId(sessionId);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [session?.id, isInitialTailOnly, isRestoringOfficialHistory, initialTailHiddenCount]);
+  }, [session?.id, isInitialTailOnly, isRestoringOfficialHistory]);
+
+  useEffect(() => {
+    if (
+      !session?.id ||
+      isInitialTailOnly ||
+      isRestoringOfficialHistory ||
+      normalizedScrollSessionId === session.id
+    ) return;
+    const sessionId = session.id;
+    const frame = window.requestAnimationFrame(() => {
+      setNormalizedScrollSessionId(sessionId);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [session?.id, isInitialTailOnly, isRestoringOfficialHistory, normalizedScrollSessionId]);
+
+  useLayoutEffect(() => {
+    const node = scrollRef.current;
+    if (!session?.id || normalizedScrollSessionId !== session.id || !node || showOlderItems) return;
+    const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
+    scrollTokenRef.current += 1;
+    ignoreScrollUntilRef.current = Date.now() + 240;
+    intentionalResizeRestoreUntilRef.current = Date.now() + 240;
+    resizeScrollAnchorRef.current = null;
+    node.scrollTop = bottom;
+    lastScrollTopRef.current = bottom;
+    autoFollowRef.current = true;
+    userScrollRef.current = false;
+    updateAutoFollow(true);
+    updateShowScrollToBottom(false);
+    window.requestAnimationFrame(scheduleAnchorCapture);
+  }, [session?.id, normalizedScrollSessionId, showOlderItems]);
 
   useLayoutEffect(() => {
     const anchor = pendingOlderItemsScrollAnchorRef.current;
