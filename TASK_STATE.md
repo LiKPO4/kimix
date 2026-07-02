@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.13.7 首屏会话目录确认
+- 现象：启动后仍短暂显示多个旧 `New Session`，点击某个会话附近其他项才一起消失。
+- 根因：本地 `kimix_sessions` 先同步渲染，SDK 首次列目录需初始化 Harness/Plugin/MCP，官方目录对账后到；点击只是时序重合，不是删除触发器。
+- 修复：会话镜像持久化最近官方目录确认时间；首屏暂时隐藏超过 5 分钟、无正文、尚未确认的官方占位，目录返回后真实会话会立即标记确认并显示。
+
 ## 2026-07-02 v2.13.6 SDK SessionStore 兼容归档
 - 实机证据：0.22 公开 Harness 没有 `archiveSession`；v2.13.5 误把 SDK 内部 Core RPC 方法当成公开 Harness 能力，导致归档报错。
 - 官方语义：SDK 内部 SessionStore 的归档不删除目录，只在 `state.json` 写入 `archived: true` 和新 `updatedAt`，默认列表随后会排除该会话。

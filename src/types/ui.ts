@@ -100,6 +100,8 @@ export interface Session {
   skillRegistrySyncedAt?: number;
   /** Kimix 官方历史映射格式版本，用于一次性刷新旧的本地事件缓存。 */
   kimiHistoryCacheVersion?: number;
+  /** 最近一次被官方 Server/SDK 会话目录确认可见的时间。 */
+  officialCatalogConfirmedAt?: number;
   titleLocked?: boolean;
   model?: string | null;
   /** 最近一次会话模型切换时间，用于阻止空闲状态污染上一轮消息元信息。 */

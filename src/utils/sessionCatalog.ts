@@ -54,6 +54,16 @@ function isAbandonedEmptyMirror(session: Session, projectPath: string) {
     Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
 }
 
+export function isUnconfirmedOfficialSessionPlaceholder(session: Session) {
+  return session.engine === "kimi-code" &&
+    !session.longTask &&
+    !session.archivedAt &&
+    !session.officialCatalogConfirmedAt &&
+    Boolean(session.officialSessionId || session.runtimeSessionId || !session.id.startsWith("local-")) &&
+    session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
+    Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
+}
+
 /**
  * Reconcile the lightweight official session catalog into Kimix's local mirror.
  * Message bodies remain lazy-loaded when the user opens a discovered session.
@@ -72,6 +82,7 @@ export function reconcileOfficialSessionCatalog(
       .map((official) => official.id)
       .filter(Boolean),
   );
+  const catalogConfirmedAt = Date.now();
   let changed = false;
   let next = sessions;
 
@@ -84,9 +95,14 @@ export function reconcileOfficialSessionCatalog(
       const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);
       const officialSessionId = existing.officialSessionId ?? official.id;
       const engine = existing.engine ?? "kimi-code";
-      if (updatedAt === existing.updatedAt && officialSessionId === existing.officialSessionId && engine === existing.engine) continue;
+      if (
+        updatedAt === existing.updatedAt &&
+        officialSessionId === existing.officialSessionId &&
+        engine === existing.engine &&
+        existing.officialCatalogConfirmedAt
+      ) continue;
       if (next === sessions) next = [...sessions];
-      next[existingIndex] = { ...existing, engine, officialSessionId, updatedAt };
+      next[existingIndex] = { ...existing, engine, officialSessionId, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
       changed = true;
       continue;
     }
@@ -96,6 +112,7 @@ export function reconcileOfficialSessionCatalog(
       id: official.id,
       engine: "kimi-code",
       officialSessionId: official.id,
+      officialCatalogConfirmedAt: catalogConfirmedAt,
       model: null,
       title: catalogTitle(official),
       projectPath,

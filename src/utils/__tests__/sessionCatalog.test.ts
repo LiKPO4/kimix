@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session } from "@/types/ui";
-import { reconcileOfficialSessionCatalog } from "../sessionCatalog";
+import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog } from "../sessionCatalog";
 
 function localSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -25,6 +25,39 @@ describe("reconcileOfficialSessionCatalog", () => {
 
     expect(result.map((session) => session.id)).toEqual(["official-1", "official-2"]);
     expect(result[0]).toMatchObject({ officialSessionId: "official-1", title: "第一条", events: [] });
+    expect(result[0].officialCatalogConfirmedAt).toBeTypeOf("number");
+  });
+
+  it("首屏隐藏尚未被官方目录确认的旧空占位", () => {
+    const stale = localSession({
+      id: "official-stale",
+      officialSessionId: "official-stale",
+      title: "New Session",
+      createdAt: Date.now() - 10 * 60 * 1000,
+      events: [],
+    });
+    const confirmed = { ...stale, officialCatalogConfirmedAt: Date.now() };
+
+    expect(isUnconfirmedOfficialSessionPlaceholder(stale)).toBe(true);
+    expect(isUnconfirmedOfficialSessionPlaceholder(confirmed)).toBe(false);
+  });
+
+  it("首屏不隐藏有正文或刚创建的会话", () => {
+    const withContent = localSession({
+      id: "official-content",
+      officialSessionId: "official-content",
+      createdAt: Date.now() - 10 * 60 * 1000,
+      events: [{ id: "user-1", type: "user_message", timestamp: 1, content: "正文" }],
+    });
+    const recent = localSession({
+      id: "official-recent",
+      officialSessionId: "official-recent",
+      createdAt: Date.now(),
+      events: [],
+    });
+
+    expect(isUnconfirmedOfficialSessionPlaceholder(withContent)).toBe(false);
+    expect(isUnconfirmedOfficialSessionPlaceholder(recent)).toBe(false);
   });
 
   it("官方 Server 目录项使用 title 或 lastPrompt 生成占位标题", () => {

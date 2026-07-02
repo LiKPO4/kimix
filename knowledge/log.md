@@ -2,6 +2,7 @@
 
 ## 2026-07-02
 
+* **First-paint catalog confirmation**: Old empty local placeholders remain hidden until the official catalog confirms them, preventing archived or empty sessions from flashing before slow SDK initialization completes. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **SDK SessionStore-compatible archival**: Runtime inspection proved the 0.22 public Harness omits its internal archive RPC; fallback archival now resolves the authoritative session directory and applies the official non-destructive state transition after closing the session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Title-independent empty-session cleanup**: Empty mirrors omitted by the SDK catalog are now identified by content and age instead of `New Session` titles, while a creation grace period protects fresh unsent sessions. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Empty-session catalog parity**: Server and SDK catalogs now follow official `exclude_empty` semantics, and abandoned empty local mirrors are hidden without deleting Kimi Code session files. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
