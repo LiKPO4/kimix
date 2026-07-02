@@ -750,6 +750,8 @@ export function ChatThread() {
   const lastScrollTopRef = useRef<number | null>(null);
   const lastScrollHeightRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+  const userInputLockUntilRef = useRef(0);
+  const lastScrollDiagRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
@@ -810,6 +812,12 @@ export function ChatThread() {
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     const node = scrollRef.current;
     if (!node) return;
+    const locked = Date.now() < userInputLockUntilRef.current;
+    window.api.writeDiag?.({
+      message: "[ChatThread] scrollToBottom",
+      data: { behavior, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current, locked },
+    }).catch(logError("writeDiag"));
+    if (locked) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
     const contentNode = streamContentRef.current;
@@ -927,15 +935,21 @@ export function ChatThread() {
     }
   };
 
+  const lockScrollForUserInput = () => {
+    userInputLockUntilRef.current = Date.now() + 200;
+  };
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.button === 1 || event.clientX >= rect.right - 20) {
+      lockScrollForUserInput();
       pauseAutoFollowForUser();
     }
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (event.deltaY < 0) {
+      lockScrollForUserInput();
       pauseAutoFollowForUser();
       if (isInitialTailOnly) expandInitialTail();
     }
@@ -950,12 +964,14 @@ export function ChatThread() {
     if (startY === null) return;
     const currentY = event.touches[0]?.clientY ?? startY;
     if (startY - currentY > 10) {
+      lockScrollForUserInput();
       pauseAutoFollowForUser();
     }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (["PageUp", "ArrowUp", "Home"].includes(event.key)) {
+      lockScrollForUserInput();
       pauseAutoFollowForUser();
     }
   };
@@ -1145,6 +1161,7 @@ export function ChatThread() {
     lastScrollTopRef.current = null;
     lastScrollHeightRef.current = null;
     touchStartYRef.current = null;
+    userInputLockUntilRef.current = 0;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
@@ -1206,6 +1223,10 @@ export function ChatThread() {
       ) {
         return;
       }
+      window.api.writeDiag?.({
+        message: "[ChatThread] processResize",
+        data: { previousSize, nextSize, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
+      }).catch(logError("writeDiag"));
       if (Date.now() < intentionalResizeRestoreUntilRef.current) {
         scheduleAnchorCapture();
         const activeNode = scrollRef.current;
@@ -1261,6 +1282,10 @@ export function ChatThread() {
 
   useLayoutEffect(() => {
     const isSettlingOpenedSession = Date.now() < sessionAutoBottomUntilRef.current && !userScrollRef.current;
+    window.api.writeDiag?.({
+      message: "[ChatThread] contentVersion effect",
+      data: { isSettlingOpenedSession, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
+    }).catch(logError("writeDiag"));
     if (isSettlingOpenedSession) {
       autoFollowRef.current = true;
       updateAutoFollow(true);
@@ -1381,6 +1406,21 @@ export function ChatThread() {
     lastScrollHeightRef.current = node.scrollHeight;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
+    const now = Date.now();
+    if (now - lastScrollDiagRef.current > 50) {
+      lastScrollDiagRef.current = now;
+      window.api.writeDiag?.({
+        message: "[ChatThread] handleScroll",
+        data: {
+          scrollTop: node.scrollTop,
+          scrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+          distance,
+          autoFollow: autoFollowRef.current,
+          userScroll: userScrollRef.current,
+        },
+      }).catch(logError("writeDiag"));
+    }
   };
 
   const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
