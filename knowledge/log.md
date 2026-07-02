@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-02
+
+* **Bottom-origin startup tail**: The initial eager tail now uses reverse scroll coordinates so asynchronous body growth extends upward without temporarily moving the viewport away from the bottom. See [/project/kimix.md](/project/kimix.md).
+
 ## 2026-07-01
 
 * **Demand-loaded older chat**: Background hydration no longer auto-expands the bottom-first tail; older messages prepend only on explicit upward browsing with scroll-height delta compensation. See [/project/kimix.md](/project/kimix.md).

@@ -790,7 +790,7 @@ export function ChatThread() {
     if (!node) return;
     const token = ++scrollTokenRef.current;
     ignoreScrollUntilRef.current = Date.now() + 420;
-    const bottom = Math.max(0, node.scrollHeight - node.clientHeight);
+    const bottom = isInitialTailOnly ? 0 : Math.max(0, node.scrollHeight - node.clientHeight);
     if (behavior === "auto") {
       node.scrollTop = bottom;
     } else {
@@ -800,7 +800,9 @@ export function ChatThread() {
       if (token !== scrollTokenRef.current || !autoFollowRef.current) return;
       const current = scrollRef.current;
       if (!current) return;
-      const distance = current.scrollHeight - current.scrollTop - current.clientHeight;
+      const distance = isInitialTailOnly
+        ? Math.abs(current.scrollTop)
+        : current.scrollHeight - current.scrollTop - current.clientHeight;
       updateShowScrollToBottom(distance > 80);
     }, 460);
   };
@@ -830,7 +832,11 @@ export function ChatThread() {
     sessionAutoBottomStableRef.current = nextStable;
     if (nextStable.count >= SESSION_LAYOUT_STABLE_PASSES) {
       const node = scrollRef.current;
-      const distance = node ? node.scrollHeight - node.scrollTop - node.clientHeight : 0;
+      const distance = node
+        ? isInitialTailOnly
+          ? Math.abs(node.scrollTop)
+          : node.scrollHeight - node.scrollTop - node.clientHeight
+        : 0;
       if (
         distance <= 80 ||
         !autoFollowRef.current ||
@@ -1147,7 +1153,9 @@ export function ChatThread() {
         scheduleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {
-          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          const distance = isInitialTailOnly
+            ? Math.abs(activeNode.scrollTop)
+            : activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
           updateShowScrollToBottom(distance > 80);
         }
         return;
@@ -1166,7 +1174,9 @@ export function ChatThread() {
         scheduleIdleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {
-          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          const distance = isInitialTailOnly
+            ? Math.abs(activeNode.scrollTop)
+            : activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
           updateShowScrollToBottom(distance > 80);
         }
         return;
@@ -1175,7 +1185,9 @@ export function ChatThread() {
       scheduleAnchorCapture();
       const nodeAfterRestore = scrollRef.current;
       if (!nodeAfterRestore) return;
-      const distance = nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
+      const distance = isInitialTailOnly
+        ? Math.abs(nodeAfterRestore.scrollTop)
+        : nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
       updateShowScrollToBottom(distance > 80);
     };
 
@@ -1209,7 +1221,9 @@ export function ChatThread() {
     }
     const node = scrollRef.current;
     if (!node) return;
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const distance = isInitialTailOnly
+      ? Math.abs(node.scrollTop)
+      : node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
   }, [contentVersion]);
 
@@ -1315,7 +1329,9 @@ export function ChatThread() {
     if (!node) return;
     const previousScrollTop = lastScrollTopRef.current;
     lastScrollTopRef.current = node.scrollTop;
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const distance = isInitialTailOnly
+      ? Math.abs(node.scrollTop)
+      : node.scrollHeight - node.scrollTop - node.clientHeight;
     const awayFromBottom = distance > 80;
     updateShowScrollToBottom(awayFromBottom);
     // Browser clamping after content shrink can also move scrollTop upward.
@@ -1396,7 +1412,9 @@ export function ChatThread() {
     autoFollowRef.current = false;
     userScrollRef.current = true;
     updateAutoFollow(false);
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const distance = isInitialTailOnly
+      ? Math.abs(node.scrollTop)
+      : node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
   }, [showOlderItems, visibleRenderItems.length]);
 
@@ -1446,7 +1464,16 @@ export function ChatThread() {
       <div
         ref={scrollRef}
         className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
-        style={{ paddingTop: session.longTask ? 124 : 42, paddingBottom: 0, scrollbarGutter: "stable", overflowAnchor: "none", overscrollBehavior: "contain", visibility: isSessionScrollPrimed ? "visible" : "hidden" }}
+        style={{
+          paddingTop: session.longTask ? 124 : 42,
+          paddingBottom: 0,
+          scrollbarGutter: "stable",
+          overflowAnchor: "none",
+          overscrollBehavior: "contain",
+          visibility: isSessionScrollPrimed ? "visible" : "hidden",
+          display: isInitialTailOnly ? "flex" : undefined,
+          flexDirection: isInitialTailOnly ? "column-reverse" : undefined,
+        }}
         onScroll={handleScroll}
         onPointerDown={markPointerScrollIntent}
         onWheel={handleInitialTailWheel}
@@ -1455,7 +1482,12 @@ export function ChatThread() {
         <div
           ref={streamContentRef}
           className="kimix-chat-stream-column flex min-h-full w-full flex-col"
-          style={{ gap: 22, paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT, justifyContent: isInitialTailOnly ? "flex-end" : undefined }}
+          style={{
+            gap: 22,
+            paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT,
+            justifyContent: isInitialTailOnly ? "flex-end" : undefined,
+            flexShrink: isInitialTailOnly ? 0 : undefined,
+          }}
         >
           {isInitialTailOnly && initialTailHiddenCount > 0 && <FoldedHistoryNotice count={initialTailHiddenCount} onExpand={expandInitialTail} />}
           {!isInitialTailOnly && foldedItemCount > 0 && <FoldedHistoryNotice count={foldedItemCount} onExpand={expandOlderItems} />}
