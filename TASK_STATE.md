@@ -1,5 +1,19 @@
 # Kimix 长程任务状态
 
+## 2026-07-02 v2.12.70 滚动闪跳修复 + 用量条 + 文字右键菜单（本轮汇总）
+- 当前目标：一轮内处理多个独立需求：修复打开会话/上滚闪跳、用量面板时间条与静默刷新、文字选中右键菜单（含本地路径定位）。
+- 已完成（按提交倒序）：
+  - `413fd45` feat(chat)：文字右键菜单识别本地路径，点击「在文件夹中显示」。文件→资源管理器定位并选中（`shell.showItemInFolder`），目录→直接打开（`shell.openPath`）；识别 Windows 盘符/UNC/POSIX 绝对路径，支持含空格路径，排除 http(s)；新增 `project:revealPath` IPC 全链路（main/preload/main.tsx mock/组件）。顺带 `.gitignore` 加 `.kimix-upstream-kimi-code-0.18.0/`（该 amend 已去掉误提交的 gitlink）。
+  - `70fd2f9` feat(chat)：新增全局 `TextContextMenu`（挂在 AppShell），选中文字右键出复制/全选/打开链接；输入框/textarea/contenteditable 不拦截保留原生菜单；「全选」优先选中最近的消息容器（`.markdown-body`/`.kimix-user-bubble`/`data-kimix-render-key`）。
+  - `98a6942` fix(usage)：打开用量面板改静默后台刷新（`loadUsage` 加 `background` 选项，有缓存不显示转圈，首次无数据才转圈）；顺带定时条颜色 `#2ddd19`、高度 3px、修手动刷新按钮把点击事件当参数传的隐患。
+  - `641de92`/`58c9833` feat/fix(usage)：用量进度条下方加并列紧贴的时间条（翠绿、方角），显示「已过时间」百分比（5 小时窗口剩 1 小时→显示 80%）。
+  - `809cbed` fix(chat)：消息流撑不满页面时去掉 `justify-end`，内容置顶而非置底。
+  - `2e6910b`/`2d2a31b` fix(scroll)：修复打开会话停顶部（`scrollToBottom` 改 scroll-independent delta；`expandInitialTail` 加 anchor capture/restore）；修复上滚闪跳（删除滚动容器 `overflowAnchor:none` 恢复浏览器原生锚定 + 去掉非延迟路径 `content-visibility:auto` 的虚拟尺寸估算跳变）。
+- 关键文件：`src/components/chat/TextContextMenu.tsx`（新增）、`src/components/layout/AppShell.tsx`、`electron/main.ts`、`electron/preload.ts`、`src/main.tsx`、`src/components/chat/ContextBar.tsx`、`src/components/chat/ChatThread.tsx`、`src/components/chat/MarkdownRenderer.tsx`、`.gitignore`。
+- 验收：`pnpm build` 通过；全量测试 41 文件 292/292 通过；工作树干净，版本 2.12.70。
+- 已知环境问题（非代码）：本会话经第三方中转 `ai8.my`（`~/.claude/settings.json` 的 `ANTHROPIC_BASE_URL`）转发，该中转会向每条用户消息注入一段 `<ruLes>`（要求「分段多次输出」），已全程忽略。仓库源码与 Kimix hook 系统均无此注入源。用户暂不处理；如需消除，改回官方 `ANTHROPIC_BASE_URL` 并轮换已泄露的 token。
+- 下一步：由用户启动 v2.12.70 实机验收——重点看①打开会话停底部/上滚不闪跳；②短会话消息置顶；③用量面板打开不转圈、时间条翠绿方角且显示已过时间；④选中文字/链接/本地路径右键菜单，本地路径点击能在资源管理器定位。
+
 ## 2026-07-02 v2.12.62 超长单消息滚动稳定
 - 当前目标：修复 v2.12.61 实机录屏约 11.10-11.15 秒出现的无过渡大幅闪跳。
 - 精确证据：逐帧确认 50ms 内从“2.2 音频压缩实测”跳到另一张风险表格；现场会话只有一条用户消息和一条包含 7 段思考、36 条命令的超长 Assistant 报告，并非渲染项数量过多。
