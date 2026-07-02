@@ -358,7 +358,6 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     <div
       ref={containerRef}
       className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
-      style={{ contentVisibility: "auto", containIntrinsicSize: measuredHeight ? `${Math.round(measuredHeight)}px` : undefined }}
     >
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
         {normalizedContent}

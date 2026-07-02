@@ -1615,7 +1615,6 @@ export function ChatThread() {
           paddingTop: session.longTask ? 124 : 42,
           paddingBottom: 0,
           scrollbarGutter: "stable",
-          overflowAnchor: "none",
           overscrollBehavior: "contain",
           visibility: isSessionScrollPrimed ? "visible" : "hidden",
         }}
