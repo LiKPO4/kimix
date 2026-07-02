@@ -7,6 +7,29 @@ import { mapHistoryEvents } from "../eventMapper";
 import { buildThinkingBlocks } from "../thinkingBlocks";
 
 describe("Kimi Code wire history", () => {
+  it("preserves timestamps from wrapped wire messages", () => {
+    expect(parseKimiCodeRecord({
+      time: "2026-07-01T20:03:27+08:00",
+      message: {
+        type: "ContentPart",
+        payload: { type: "text", text: "昨晚的回答" },
+      },
+    })).toEqual({
+      type: "ContentPart",
+      payload: { type: "text", text: "昨晚的回答" },
+      time: "2026-07-01T20:03:27+08:00",
+    });
+
+    expect(parseKimiCodeRecord({
+      time: "2026-07-02T09:59:52+08:00",
+      message: {
+        type: "ContentPart",
+        created_at: "2026-07-01T20:03:27+08:00",
+        payload: { type: "text", text: "消息时间优先" },
+      },
+    })?.time).toBe("2026-07-01T20:03:27+08:00");
+  });
+
   it("uses the latest model record as the current session model", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-model-wire-"));
     const wire = path.join(dir, "wire.jsonl");

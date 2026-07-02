@@ -208,8 +208,7 @@ function extractOfficialSessionTitle(event: unknown): string | null {
 async function repairKimiCodeHistoryBodies(sessions: Session[]) {
   const activeSessionId = readLocalActiveContext()?.sessionId;
   const candidates = sessions
-    .filter(needsKimiCodeHistoryRepair)
-    .sort((a, b) => Number(b.id === activeSessionId) - Number(a.id === activeSessionId))
+    .filter((session) => session.id !== activeSessionId && needsKimiCodeHistoryRepair(session))
     .slice(0, 12);
   for (const session of candidates) {
     const sessionIds = getKimiHistorySessionIds(session);
@@ -2273,6 +2272,7 @@ function App() {
       try {
         const parsed = JSON.parse(storedSessions);
         if (Array.isArray(parsed)) {
+          const restoringActiveSessionId = readLocalActiveContext()?.sessionId;
           const visibleSessions = parsed
             .filter((session) => !isHiddenInternalSession(session))
             .map((session) => ({
@@ -2291,7 +2291,7 @@ function App() {
               engine: knownEngine ? rawEngine : "kimi-code",
               runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
               events: removeStaleKimiCodeStartupErrors(resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []))),
-              isLoading: false,
+              isLoading: session.id === restoringActiveSessionId,
             });
           });
           useSessionStore.setState({ sessions: restoredSessions });

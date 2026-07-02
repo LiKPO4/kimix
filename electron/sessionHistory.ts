@@ -371,10 +371,21 @@ function parseEventPayload(
 export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHistoryEvent | null {
   // New-format: { message: { type, payload } } (same as old wire format after passthrough).
   if (record.message && typeof record.message === "object") {
-    const message = record.message as { type?: unknown; payload?: unknown };
+    const message = record.message as {
+      type?: unknown;
+      payload?: unknown;
+      time?: unknown;
+      created_at?: unknown;
+      createdAt?: unknown;
+      timestamp?: unknown;
+    };
     if (typeof message.type !== "string") return null;
     const result = parseEventPayload(message.type, message.payload);
-    return result.ok ? result.value : null;
+    if (!result.ok) return null;
+    return {
+      ...result.value,
+      time: message.time ?? message.created_at ?? message.createdAt ?? message.timestamp ?? record.time ?? record.created_at ?? record.createdAt ?? record.timestamp,
+    };
   }
 
   // Kimi-code turn prompt marker: emit as TurnBegin so history shows user messages.
@@ -597,6 +608,5 @@ export async function getSessionHistoryById(
   }
   return [];
 }
-
 
 
