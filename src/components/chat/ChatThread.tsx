@@ -743,6 +743,7 @@ export function ChatThread() {
   const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
   const pendingOlderItemsScrollAnchorRef = useRef<ViewportAnchor | null>(null);
+  const pendingTailExpandScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
@@ -820,14 +821,19 @@ export function ChatThread() {
     const items = Array.from(contentNode?.querySelectorAll<HTMLElement>("[data-kimix-render-key]") ?? []);
     const lastItem = items.at(-1) ?? null;
     let targetTop: number;
-    if (lastItem && contentNode) {
+    if (lastItem) {
+      // Compute a scroll-position-INDEPENDENT delta: how far the last item's
+      // bottom (plus the bottom spacer) currently sits below the viewport
+      // bottom, then add it to the current scrollTop. Using getBoundingClientRect
+      // values directly as an absolute scrollTop is wrong because they are
+      // measured relative to the current scroll offset — that produced the
+      // v2.12.69 "opens at top" regression (measurement ran after an initial
+      // jump-to-bottom, so the rect-derived target collapsed to ~0).
       const nodeRect = node.getBoundingClientRect();
-      const contentRect = contentNode.getBoundingClientRect();
-      const lastItemRect = lastItem.getBoundingClientRect();
-      const contentTop = contentRect.top - nodeRect.top;
-      const lastItemBottom = lastItemRect.bottom - contentRect.top;
-      targetTop = contentTop + lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - node.clientHeight;
-      targetTop = Math.max(0, targetTop);
+      const lastItemBottom = lastItem.getBoundingClientRect().bottom;
+      const viewportBottom = nodeRect.top + node.clientHeight;
+      const delta = lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - viewportBottom;
+      targetTop = Math.max(0, node.scrollTop + delta);
     } else {
       targetTop = Math.max(0, node.scrollHeight - node.clientHeight);
     }
@@ -1175,6 +1181,7 @@ export function ChatThread() {
     setExpandedInitialTailSessionId(null);
     setUserHasScrolled(false);
     pendingOlderItemsScrollAnchorRef.current = null;
+    pendingTailExpandScrollAnchorRef.current = null;
     resizeScrollAnchorRef.current = null;
     lastScrollSizeRef.current = null;
     lastScrollTopRef.current = null;
@@ -1509,6 +1516,23 @@ export function ChatThread() {
   useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || !session?.id) return;
+    const anchor = pendingTailExpandScrollAnchorRef.current;
+    if (anchor?.key) {
+      // The user scrolled up, which expanded the folded initial-tail history
+      // above the viewport. Pin the previously-visible anchor so the newly
+      // inserted (and now eagerly-rendered) content does not shove the view.
+      pendingTailExpandScrollAnchorRef.current = null;
+      const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
+      const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
+      if (target) {
+        const containerRect = node.getBoundingClientRect();
+        const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
+        node.scrollTop += nextOffsetTop - anchor.offsetTop;
+      }
+      const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+      updateShowScrollToBottom(distance > 80);
+      return;
+    }
     if (autoFollowRef.current && !userScrollRef.current) {
       scrollToBottom("auto");
     }
@@ -1560,6 +1584,16 @@ export function ChatThread() {
 
   const expandInitialTail = () => {
     if (!session?.id || !isInitialTailOnly) return;
+    const node = scrollRef.current;
+    if (node) {
+      const containerRect = node.getBoundingClientRect();
+      const items = Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-render-key]"));
+      const anchor = items.find((item) => item.getBoundingClientRect().bottom >= containerRect.top + 1) ?? items[0];
+      pendingTailExpandScrollAnchorRef.current = anchor ? {
+        key: anchor.dataset.kimixRenderKey ?? "",
+        offsetTop: anchor.getBoundingClientRect().top - containerRect.top,
+      } : null;
+    }
     setExpandedInitialTailSessionId(session.id);
   };
 
