@@ -19,7 +19,6 @@ import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { logError } from "@/utils/reportError";
-import { shouldPauseAutoFollowForScroll, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
@@ -750,8 +749,7 @@ export function ChatThread() {
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const lastScrollHeightRef = useRef<number | null>(null);
-  const userScrollResizeRestoreUntilRef = useRef(0);
-  const userScrollIntentUntilRef = useRef(0);
+  const touchStartYRef = useRef<number | null>(null);
   const intentionalResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
@@ -929,13 +927,37 @@ export function ChatThread() {
     }
   };
 
-  const markUserScrollIntent = () => {
-    userScrollIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (event.button === 1 || event.clientX >= rect.right - 20) {
+      pauseAutoFollowForUser();
+    }
   };
 
-  const markPointerScrollIntent = (event: React.PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (event.button === 1 || event.clientX >= rect.right - 20) markUserScrollIntent();
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.deltaY < 0) {
+      pauseAutoFollowForUser();
+      if (isInitialTailOnly) expandInitialTail();
+    }
+  };
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    touchStartYRef.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startY = touchStartYRef.current;
+    if (startY === null) return;
+    const currentY = event.touches[0]?.clientY ?? startY;
+    if (startY - currentY > 10) {
+      pauseAutoFollowForUser();
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (["PageUp", "ArrowUp", "Home"].includes(event.key)) {
+      pauseAutoFollowForUser();
+    }
   };
 
   const captureResizeScrollAnchor = () => {
@@ -1122,8 +1144,7 @@ export function ChatThread() {
     lastScrollSizeRef.current = null;
     lastScrollTopRef.current = null;
     lastScrollHeightRef.current = null;
-    userScrollResizeRestoreUntilRef.current = 0;
-    userScrollIntentUntilRef.current = 0;
+    touchStartYRef.current = null;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
@@ -1356,50 +1377,10 @@ export function ChatThread() {
   const handleScroll = () => {
     const node = scrollRef.current;
     if (!node) return;
-    const previousScrollTop = lastScrollTopRef.current;
-    const previousScrollHeight = lastScrollHeightRef.current;
-    const currentScrollTop = node.scrollTop;
-    const currentScrollHeight = node.scrollHeight;
-    lastScrollTopRef.current = currentScrollTop;
-    lastScrollHeightRef.current = currentScrollHeight;
-    const distance = currentScrollHeight - currentScrollTop - node.clientHeight;
-    const awayFromBottom = distance > 80;
-    updateShowScrollToBottom(awayFromBottom);
-    const now = Date.now();
-    // Ignore programmatic scrolls for a short window after we move the viewport.
-    if (now < ignoreScrollUntilRef.current) return;
-    // Browser clamping after content shrinks is not user scrolling.
-    if (
-      previousScrollHeight !== null &&
-      currentScrollHeight < previousScrollHeight &&
-      previousScrollTop !== null
-    ) {
-      const shrink = previousScrollHeight - currentScrollHeight;
-      const topDelta = previousScrollTop - currentScrollTop;
-      if (Math.abs(topDelta - shrink) <= 2 && distance <= 80) {
-        // The browser clamped scrollTop to the new bottom; keep following.
-        return;
-      }
-    }
-    // Only explicit, recent input is allowed to hand control to the user.
-    if (shouldPauseAutoFollowForScroll({
-      previousScrollTop,
-      currentScrollTop,
-      autoFollow: autoFollowRef.current,
-      intentUntil: userScrollIntentUntilRef.current,
-      now,
-    })) {
-      userScrollIntentUntilRef.current = 0;
-      pauseAutoFollowForUser();
-    }
-    if (userScrollRef.current && (previousScrollTop === null || Math.abs(currentScrollTop - previousScrollTop) > 0.5)) {
-      userScrollResizeRestoreUntilRef.current = now + USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
-      scheduleIdleAnchorCapture();
-    }
-    if (userScrollRef.current && awayFromBottom && autoFollowRef.current) {
-      autoFollowRef.current = false;
-      updateAutoFollow(false);
-    }
+    lastScrollTopRef.current = node.scrollTop;
+    lastScrollHeightRef.current = node.scrollHeight;
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    updateShowScrollToBottom(distance > 80);
   };
 
   const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
@@ -1502,13 +1483,7 @@ export function ChatThread() {
     setExpandedInitialTailSessionId(session.id);
   };
 
-  const handleInitialTailWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    markUserScrollIntent();
-    if (event.deltaY < 0 && isInitialTailOnly) {
-      pauseAutoFollowForUser();
-      expandInitialTail();
-    }
-  };
+
 
   return (
     <div className="relative h-full">
@@ -1531,9 +1506,11 @@ export function ChatThread() {
           visibility: isSessionScrollPrimed ? "visible" : "hidden",
         }}
         onScroll={handleScroll}
-        onPointerDown={markPointerScrollIntent}
-        onWheel={handleInitialTailWheel}
-        onTouchStart={markUserScrollIntent}
+        onPointerDown={handlePointerDown}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onKeyDown={handleKeyDown}
       >
         <div
           ref={streamContentRef}
