@@ -18,7 +18,7 @@ export function getSessionConversationActivityAt(session: Session): number {
   return session.updatedAt;
 }
 
-const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
+export const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
 
 export function isTerminalKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {
   return status === "completed" || status === "interrupted" || status === "error" || status === "idle";

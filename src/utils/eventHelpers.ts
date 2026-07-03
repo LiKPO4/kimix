@@ -1,5 +1,6 @@
 import type { TimelineEvent } from "@/types/ui";
 import { reliableAssistantDurationMs } from "./duration";
+import { STALE_TIMELINE_WORK_MS } from "./sessionActivity";
 
 export function isLegacyKimiWorkDirError(message: string) {
   return /unknown option\s+['"]?--work-dir['"]?/i.test(message);
@@ -95,11 +96,27 @@ export function latestAssistantVisibleOrThinkingContent(events: TimelineEvent[])
   return parts || assistant.thinking?.trim() || "";
 }
 
-export function settleInactiveEvents(events: TimelineEvent[]): TimelineEvent[] {
-  const settledAt = Date.now();
+function isStaleRunningEvent(event: TimelineEvent, settledAt: number) {
+  return settledAt - event.timestamp > STALE_TIMELINE_WORK_MS;
+}
+
+export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.now()): TimelineEvent[] {
   const settled = events.flatMap((event) => {
     if (event.type === "subagent") {
-      return event.status === "running" ? [{ ...event, status: "completed" as const }] : [event];
+      if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
+        return [{ ...event, status: "completed" as const }];
+      }
+      return [event];
+    }
+    if (event.type === "tool_call") {
+      if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
+        return [{
+          ...event,
+          status: "success" as const,
+          durationMs: reliableAssistantDurationMs(settledAt - event.timestamp),
+        }];
+      }
+      return [event];
     }
     if (event.type !== "assistant_message" || event.isComplete) return [event];
     const hasContent = event.content.trim().length > 0;

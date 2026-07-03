@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -37,7 +37,7 @@ const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; 
 
 const permissionMenuIcons = {
   manual: Hand,
-  auto: Brain,
+  auto: CircleCheck,
   yolo: ShieldAlert,
 };
 
@@ -2611,7 +2611,10 @@ export function Composer() {
 
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
               <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35">
-                <AlertTriangle size={14} className="shrink-0 text-accent-warning" />
+                {(() => {
+                  const PermissionIcon = permissionMenuIcons[permissionMode];
+                  return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
+                })()}
                 <span className="truncate">{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
