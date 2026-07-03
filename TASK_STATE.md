@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-03 v2.14.8 移除普通消息自动 fork
+- 现象：用户没有主动派生，但新对话首次发送、或本地 Skill 修改后继续旧对话时，官方 session 会自动增加。
+- 根因：每条普通消息发送前都同步全部 Agent Skills，并用所有 Skill 的最大 mtime 对比会话 `skillRegistrySyncedAt`；新会话初值为 0，因此只要本机存在 Agent Skills，首次普通消息必然 fork，任何 Skill 更新还会让所有旧会话在下次发送时 fork。
+- 修复：普通消息不再同步或 fork Skill 注册表；当前 runtime 已能识别的 Skill 直接激活。只有用户明确调用当前 runtime 不可见的 `/skill:...` 时，才允许准备目标 Skill 并执行一次受控迁移。
+
 ## 2026-07-03 v2.14.7 Skill fork 会话链折叠
 - 现象：侧栏持续增加多个同名对话，看起来像每轮都产生了分支。
 - 根因：为刷新官方 Skill 注册表，Kimix 会 fork 当前 runtime 并把原 UI 会话迁移到子 runtime；官方目录仍同时返回父、子、孙，目录对账只按单个 ID 匹配，遂把旧祖先重新补成独立侧栏项。

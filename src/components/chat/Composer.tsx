@@ -1494,11 +1494,10 @@ export function Composer() {
   const applySkillCommand = async (
     skillName: string,
     args?: string,
-    options: { allowMigration?: boolean; refreshRegistry?: boolean; reportFailure?: boolean } = {},
+    options: { allowMigration?: boolean; reportFailure?: boolean } = {},
   ) => {
     const allowMigration = options.allowMigration ?? true;
     const reportFailure = options.reportFailure ?? true;
-    if (options.refreshRegistry !== false && !(await refreshInstalledAgentSkillsBeforePrompt())) return false;
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
     let runtimeSessionId = runtime.runtimeSessionId;
@@ -1591,39 +1590,6 @@ export function Composer() {
     return nextRuntimeSessionId;
   };
 
-  const refreshInstalledAgentSkillsBeforePrompt = async () => {
-    const syncRes = await window.api.syncKimiAgentSkills();
-    if (!syncRes.success) {
-      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `刷新已安装 Skill 失败：${syncRes.error}`, source: "ui" });
-      return false;
-    }
-    if (syncRes.data.warnings.length > 0) {
-      console.warn("Some installed Agent Skills could not be synchronized:", syncRes.data.warnings);
-    }
-    if (syncRes.data.names.length === 0 || syncRes.data.latestModifiedAt <= 0) return true;
-
-    const targetSession = currentSession
-      ? useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession
-      : null;
-    if (!targetSession) return true;
-    if ((targetSession.skillRegistrySyncedAt ?? 0) >= syncRes.data.latestModifiedAt) return true;
-
-    const runtimeSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
-    if (!runtimeSessionId) {
-      updateSession(targetSession.id, (session) => ({
-        ...session,
-        skillRegistrySyncedAt: syncRes.data.latestModifiedAt,
-        updatedAt: Date.now(),
-      }));
-      return true;
-    }
-    return Boolean(await forkRuntimeForSkillRegistry(
-      targetSession.id,
-      runtimeSessionId,
-      syncRes.data.latestModifiedAt,
-    ));
-  };
-
   const handleSend = async () => {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
@@ -1673,7 +1639,6 @@ export function Composer() {
       await appendSlashUserMessage(trimmed);
       const activated = await applySkillCommand(slashName, slashArgs, {
         allowMigration: false,
-        refreshRegistry: false,
         reportFailure: false,
       });
       if (!activated) {
@@ -1716,7 +1681,6 @@ export function Composer() {
       inputRef.current?.reset();
       return;
     }
-    if (!trimmed.startsWith("/") && !(await refreshInstalledAgentSkillsBeforePrompt())) return;
     setInput("");
     setImageAttachments([]);
     setEditingPendingId(null);
