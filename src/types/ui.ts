@@ -63,6 +63,7 @@ export interface AppState {
   voiceShortcut: string;
   notificationMode: NotificationMode;
   clarificationToolMode: ClarificationToolMode;
+  processDisplayMode: ProcessDisplayMode;
   filePreviewExtensions: string[];
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
@@ -79,6 +80,7 @@ export interface AppState {
 }
 
 export type StatusUpdateDisplay = "each" | "turn_end" | "never";
+export type ProcessDisplayMode = "kimix" | "kimi-web";
 
 export interface Project {
   id: string;

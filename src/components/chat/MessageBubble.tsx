@@ -3,7 +3,7 @@ import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2,
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { TimelineEvent, UserMessageImage } from "@/types/ui";
+import type { TimelineEvent, UserMessageImage, ProcessDisplayMode } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { restoreAssistantProgressParagraphs } from "@/utils/assistantParagraphs";
 import { FileCard } from "./FileCard";
@@ -794,7 +794,7 @@ function processItemPriority(item: ProcessItem) {
   }
 }
 
-function AssistantProcessSummary({ event, tools, subagents, approvals, label }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode }) {
+function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix" }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode }) {
   const [expanded, setExpanded] = useState(false);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
@@ -859,19 +859,21 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
     return () => window.cancelAnimationFrame(frame);
   }, [expanded]);
 
+  const isKimiWeb = displayMode === "kimi-web";
+
   return (
-    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: expanded && hasDetails ? 8 : 12 }}>
+    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: (expanded || isKimiWeb) && hasDetails ? 8 : 12 }}>
       <button
         ref={summaryAnchorRef}
         type="button"
         onClick={() => {
-          if (!hasDetails) return;
+          if (!hasDetails || isKimiWeb) return;
           toggleWithStableAnchor(!expanded, "summary");
         }}
-        disabled={!hasDetails}
-        className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
+        disabled={!hasDetails || isKimiWeb}
+        className={`kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)] ${isKimiWeb ? "" : "hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"}`}
       >
-        {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
+        {hasDetails && !isKimiWeb ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
         <span className="kimix-tabular-nums shrink-0">{label}</span>
         {hasDetails && (
           <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
@@ -879,18 +881,20 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label }: 
           </span>
         )}
       </button>
-      {expanded && hasDetails && (
+      {(expanded || isKimiWeb) && hasDetails && (
         <div className="kimix-soft-card mt-3 flex flex-col rounded-xl" style={{ gap: 12, padding: "14px 14px" }}>
           <ProcessDetailList items={items} />
-          <button
-            type="button"
-            onClick={() => toggleWithStableAnchor(false, "content")}
-            className="kimix-icon-text-button kimix-muted-action is-compact self-end"
-            style={{ marginTop: 2, paddingLeft: 12, paddingRight: 12 }}
-          >
-            <ChevronUp size={14} />
-            <span>收起本轮内容</span>
-          </button>
+          {!isKimiWeb && (
+            <button
+              type="button"
+              onClick={() => toggleWithStableAnchor(false, "content")}
+              className="kimix-icon-text-button kimix-muted-action is-compact self-end"
+              style={{ marginTop: 2, paddingLeft: 12, paddingRight: 12 }}
+            >
+              <ChevronUp size={14} />
+              <span>收起本轮内容</span>
+            </button>
+          )}
         </div>
       )}
       <span ref={contentAnchorRef} aria-hidden="true" className="block h-0" />
@@ -1004,6 +1008,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const displayContent = restoreAssistantProgressParagraphs(event.content);
   const hasContent = displayContent.trim().length > 0;
   const changedSet = new Set(changedFiles.map((f) => f.toLowerCase()));
@@ -1050,6 +1055,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             tools={leadingTools}
             subagents={leadingSubagents}
             approvals={leadingApprovals}
+            displayMode={processDisplayMode}
             label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />}
           />
         )}

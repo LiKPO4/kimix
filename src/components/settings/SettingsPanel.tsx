@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset } from "@/types/ui";
+import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
 import {
   applySessionBackupImportPlan,
@@ -52,6 +52,7 @@ type SettingsSectionId =
   | "permission"
   | "context"
   | "message"
+  | "processDisplay"
   | "filePreview"
   | "newSession"
   | "notification"
@@ -69,6 +70,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "permission",
   "context",
   "message",
+  "processDisplay",
   "filePreview",
   "newSession",
   "notification",
@@ -412,6 +414,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const notificationMode = useAppStore((s) => s.notificationMode);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
+  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
+  const setProcessDisplayMode = useAppStore((s) => s.setProcessDisplayMode);
   const filePreviewExtensions = useAppStore((s) => s.filePreviewExtensions);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -1296,6 +1300,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "unfocused", label: "无焦点时", desc: "仅 Kimix 窗口没有焦点时提醒" },
     { value: "always", label: "任何时候", desc: "每轮完成都弹出系统通知；红点仍只在无焦点时显示" },
   ];
+  const processDisplayModes: { value: ProcessDisplayMode; label: string; desc: string }[] = [
+    { value: "kimix", label: "Kimix 模式", desc: "默认折叠本轮思考/命令过程，点击后再展开" },
+    { value: "kimi-web", label: "Kimi Web 模式", desc: "直接展示过程总结列表，点击单条展开详情" },
+  ];
   const archivedSessions = [...archivedSessionSummaries]
     .sort((a, b) => b.archivedAt - a.archivedAt);
   const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, SETTINGS_PREVIEW_ITEM_LIMIT);
@@ -1548,7 +1556,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("filePreview", 7)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("processDisplay", 7)}>
+                <div className="kimix-settings-section-title">
+                  <List size={16} className="text-text-muted" />
+                  <span>过程展示方式</span>
+                  {settingsDragHandle("processDisplay", "过程展示方式")}
+                </div>
+                <div className="kimix-settings-permissions">
+                  {processDisplayModes.map((mode) => (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      onClick={() => setProcessDisplayMode(mode.value)}
+                      className={`kimix-settings-permission ${processDisplayMode === mode.value ? "is-active" : ""}`}
+                    >
+                      <SelectionIndicator selected={processDisplayMode === mode.value} />
+                      <div className="kimix-settings-permission-copy">
+                        <div className="kimix-settings-permission-label">{mode.label}</div>
+                        <div className="kimix-settings-permission-desc">{mode.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("filePreview", 8)}>
                 <div className="kimix-settings-section-title">
                   <FileText size={16} className="text-text-muted" />
                   <span>文件预览</span>

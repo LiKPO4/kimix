@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_CUSTOM_THEME_PALETTE, DEFAULT_KIMI_THEME_PRESETS, DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
@@ -53,6 +53,7 @@ export interface AppStore extends AppState {
   setVoiceShortcut: (shortcut: string) => void;
   setNotificationMode: (mode: NotificationMode) => void;
   setClarificationToolMode: (mode: ClarificationToolMode) => void;
+  setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setFilePreviewExtensions: (extensions: string[]) => void;
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
@@ -95,6 +96,7 @@ export const useAppStore = create<AppStore>((set) => ({
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
+  processDisplayMode: "kimix",
   filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
   longTaskInspectorOpen: false,
@@ -129,6 +131,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
   setNotificationMode: (mode) => set({ notificationMode: mode }),
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
+  setProcessDisplayMode: (mode) => set({ processDisplayMode: mode }),
   setFilePreviewExtensions: (extensions) => set({
     filePreviewExtensions: Array.from(new Set(extensions
       .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
