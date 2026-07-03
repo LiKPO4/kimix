@@ -894,8 +894,9 @@ function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
   );
 }
 
-function KimiWebToolRow({ tool, index }: { tool: ToolEvent; index: number }) {
-  const argumentText = toolArgumentPreview(tool) || tool.toolName || "工具调用";
+function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const argumentPreview = toolArgumentPreview(tool) || tool.toolName || "工具调用";
   const command = typeof tool.arguments?.command === "string"
     ? tool.arguments.command
     : typeof tool.arguments?.cmd === "string"
@@ -906,25 +907,50 @@ function KimiWebToolRow({ tool, index }: { tool: ToolEvent; index: number }) {
     : typeof tool.arguments?.file_path === "string"
       ? tool.arguments.file_path
       : "";
-  const displayTarget = command || path || argumentText;
+  const displayTarget = command || path || argumentPreview;
   const lineCount = typeof tool.result === "string"
     ? tool.result.split(/\r?\n/).length
     : 0;
+  const argumentText = formatToolArgumentsForDisplay(tool).trim();
+  const resultText = formatToolResultForDisplay(tool.result);
+  const detailText = [
+    `工具：${tool.toolName || "未知工具"}`,
+    argumentText ? `参数：\n${argumentText}` : "",
+    resultText ? `结果：\n${resultText}` : "",
+  ].filter(Boolean).join("\n\n");
+  const hasDetail = detailText.trim().length > 0;
+
   return (
     <div
-      className="grid items-center text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]"
-      style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto", gap: 8, paddingTop: index > 0 ? 8 : 0, paddingBottom: 8, borderBottom: index > 0 ? "1px solid var(--kimix-panel-divider)" : "none" }}
+      className="flex flex-col"
+      style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
-      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
-        <SquareTerminal size={13} />
-      </span>
-      <span className="min-w-0 truncate">{displayTarget}</span>
-      <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
-        {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
-        {tool.status === "success" && <Check size={13} className="text-accent-success" />}
-        {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
-        {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
-      </span>
+      <button
+        type="button"
+        onClick={() => hasDetail && setExpanded((value) => !value)}
+        disabled={!hasDetail}
+        className="grid w-full items-center text-left text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto auto", gap: 8, paddingTop: 8, paddingBottom: 8 }}
+      >
+        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+          <SquareTerminal size={13} />
+        </span>
+        <span className="min-w-0 truncate">{displayTarget}</span>
+        <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
+          {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
+          {tool.status === "success" && <Check size={13} className="text-accent-success" />}
+          {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+          {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
+        </span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {hasDetail ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+        </span>
+      </button>
+      {expanded && (
+        <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 0 8px 26px" }}>
+          {detailText}
+        </pre>
+      )}
     </div>
   );
 }
@@ -955,7 +981,7 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
       </button>
       {expanded && (
         <div style={{ padding: "0 12px 10px" }}>
-          {tools.map((tool, index) => <KimiWebToolRow key={tool.id} tool={tool} index={index} />)}
+          {tools.map((tool, index) => <KimiWebToolRow key={tool.id} tool={tool} isLast={index === tools.length - 1} />)}
         </div>
       )}
     </div>
