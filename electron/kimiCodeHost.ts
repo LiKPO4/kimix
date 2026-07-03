@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { app } from "electron";
-import { candidateKimiShareDirs, findKimiCodeSessionDir, readKimiCodeSessionMetadata } from "./sessionHistory";
+import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as settingsService from "./settingsService";
@@ -164,6 +164,8 @@ export type KimiCodeSessionSummary = {
   id: string;
   title?: string;
   lastPrompt?: string;
+  brief?: string;
+  isCustomTitle?: boolean;
   workDir: string;
   sessionDir: string;
   createdAt: number;
@@ -1786,14 +1788,18 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   for (const session of sessions) {
     session.source = "sdk";
     session.title = sanitizeSkillActivationTitle(session.title);
-    if (session.title?.trim() && session.lastPrompt?.trim()) continue;
     try {
       const metadata = readKimiCodeSessionMetadata(session.sessionDir);
+      session.isCustomTitle = metadata?.isCustomTitle === true;
       if (!session.title?.trim() && metadata?.title?.trim()) {
         session.title = sanitizeSkillActivationTitle(metadata.title.trim());
       }
       if (!session.lastPrompt?.trim() && metadata?.lastPrompt?.trim()) {
         session.lastPrompt = metadata.lastPrompt.trim();
+      }
+      if (session.archived !== true && session.isCustomTitle !== true) {
+        const firstPrompt = await getFirstUserMessage(path.join(session.sessionDir, "agents", "main", "wire.jsonl"));
+        if (firstPrompt.trim()) session.brief = firstPrompt.trim();
       }
     } catch {
       // ignore unreadable metadata

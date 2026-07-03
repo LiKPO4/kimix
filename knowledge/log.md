@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+* **Catalog-time title parity**: SDK summaries now carry first-prompt briefs and custom-title metadata so unlocked sidebar titles match post-hydration titles before users open a session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Explicit SDK archive reconciliation**: SDK catalogs include archived summaries so official `archived: true` identities close local mirrors and any stale loading view without relying on absence inference. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-02

@@ -266,11 +266,11 @@ export async function getKimiCodeSessionDirs(
 
 export function readKimiCodeSessionMetadata(
   sessionDir: string,
-): { title?: string; updatedAt?: string; lastPrompt?: string } | null {
+): { title?: string; updatedAt?: string; lastPrompt?: string; isCustomTitle?: boolean } | null {
   try {
     return JSON.parse(
       fs.readFileSync(path.join(sessionDir, "state.json"), "utf-8"),
-    ) as { title?: string; updatedAt?: string; lastPrompt?: string };
+    ) as { title?: string; updatedAt?: string; lastPrompt?: string; isCustomTitle?: boolean };
   } catch {
     return null;
   }
@@ -608,5 +608,4 @@ export async function getSessionHistoryById(
   }
   return [];
 }
-
 

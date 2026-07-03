@@ -1580,6 +1580,8 @@ export type KimiCodeSessionSummary = {
   id: string;
   title?: string;
   lastPrompt?: string;
+  brief?: string;
+  isCustomTitle?: boolean;
   workDir: string;
   sessionDir: string;
   createdAt: number;

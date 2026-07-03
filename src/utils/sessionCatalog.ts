@@ -10,6 +10,7 @@ export interface OfficialSessionCatalogItem {
   brief?: string;
   title?: string;
   lastPrompt?: string;
+  isCustomTitle?: boolean;
   archived?: boolean;
   source?: "server" | "sdk";
 }
@@ -26,8 +27,11 @@ function belongsToOfficialSession(session: Session, officialId: string) {
     session.longTask?.reviewerSessionId === officialId;
 }
 
-function catalogTitle(item: OfficialSessionCatalogItem) {
-  return truncateSessionTitle(item.brief?.trim() || item.title?.trim() || item.lastPrompt?.trim() || "新会话") || "新会话";
+function catalogTitle(item: OfficialSessionCatalogItem): string | undefined {
+  const source = item.isCustomTitle === true
+    ? item.title?.trim()
+    : item.brief?.trim() || item.lastPrompt?.trim() || item.title?.trim();
+  return source ? truncateSessionTitle(source) || undefined : undefined;
 }
 
 function isOfficialMirrorSession(session: Session, projectPath: string) {
@@ -103,14 +107,16 @@ export function reconcileOfficialSessionCatalog(
       const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);
       const officialSessionId = existing.officialSessionId ?? official.id;
       const engine = existing.engine ?? "kimi-code";
+      const title = existing.titleLocked ? existing.title : catalogTitle(official) ?? existing.title;
       if (
         updatedAt === existing.updatedAt &&
         officialSessionId === existing.officialSessionId &&
         engine === existing.engine &&
+        title === existing.title &&
         existing.officialCatalogConfirmedAt
       ) continue;
       if (next === sessions) next = [...sessions];
-      next[existingIndex] = { ...existing, engine, officialSessionId, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
+      next[existingIndex] = { ...existing, engine, officialSessionId, title, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
       changed = true;
       continue;
     }
@@ -122,7 +128,7 @@ export function reconcileOfficialSessionCatalog(
       officialSessionId: official.id,
       officialCatalogConfirmedAt: catalogConfirmedAt,
       model: null,
-      title: catalogTitle(official),
+      title: catalogTitle(official) ?? "新会话",
       projectPath,
       createdAt: official.updatedAt || Date.now(),
       updatedAt: official.updatedAt || Date.now(),

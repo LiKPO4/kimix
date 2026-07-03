@@ -69,7 +69,62 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result.map((session) => session.title)).toEqual(["官方标题", "上一条用户消息"]);
   });
 
-  it("按官方 id 对账且保留本地正文和标题", () => {
+  it("目录确认时立即用第一条有效提示更新未锁定标题", () => {
+    const existing = localSession({
+      id: "official-brief",
+      officialSessionId: "official-brief",
+      title: "New Session",
+    });
+    const result = reconcileOfficialSessionCatalog([existing], [{
+      id: "official-brief",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      title: "你好呀",
+      lastPrompt: "最后一条消息",
+      brief: "暂时没有，你感觉怎么样",
+      source: "sdk",
+    }], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result[0].title).toBe("暂时没有，你感觉怎么样");
+  });
+
+  it("保留用户锁定标题和官方自定义标题", () => {
+    const locked = localSession({
+      id: "official-locked",
+      officialSessionId: "official-locked",
+      title: "我的标题",
+      titleLocked: true,
+    });
+    const custom = localSession({
+      id: "official-custom",
+      officialSessionId: "official-custom",
+      title: "New Session",
+    });
+    const result = reconcileOfficialSessionCatalog([locked, custom], [
+      {
+        id: "official-locked",
+        workDir: "D:\\work\\demo",
+        updatedAt: 200,
+        brief: "不应覆盖",
+        source: "sdk",
+      },
+      {
+        id: "official-custom",
+        workDir: "D:\\work\\demo",
+        updatedAt: 190,
+        title: "/skill:game-development 使用该skill",
+        lastPrompt: "你好",
+        brief: "其他提示",
+        isCustomTitle: true,
+        source: "sdk",
+      },
+    ], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result.find((session) => session.id === "official-locked")?.title).toBe("我的标题");
+    expect(result.find((session) => session.id === "official-custom")?.title).toBe("/skill:game-development 使用该ski...");
+  });
+
+  it("按官方 id 对账、保留本地正文并更新未锁定标题", () => {
     const existing = localSession({
       officialSessionId: "official-1",
       events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "正文" }],
@@ -79,7 +134,7 @@ describe("reconcileOfficialSessionCatalog", () => {
     ], "D:\\work\\demo");
 
     expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("本地标题");
+    expect(result[0].title).toBe("官方标题");
     expect(result[0].events).toEqual(existing.events);
     expect(result[0].updatedAt).toBe(200);
   });
