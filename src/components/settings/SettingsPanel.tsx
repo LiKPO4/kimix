@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.14.0";
+const KIMIX_VERSION = "2.15.0";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -1034,12 +1034,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       preview.data.themesDir,
     );
     setKimiThemePalettes(reconciled.presets);
-    const firstNew = presets[0];
     const activeThemeStillExists = reconciled.presets.some((preset) => (
       kimiThemePaletteId(preset.id) === themePalette
     ));
-    if (firstNew) setThemePalette(kimiThemePaletteId(firstNew.id));
-    else if (themePalette.startsWith("kimi:") && !activeThemeStillExists) setThemePalette(DEFAULT_THEME_PALETTE_ID);
+    if (themePalette.startsWith("kimi:") && !activeThemeStillExists) setThemePalette(DEFAULT_THEME_PALETTE_ID);
     if (presets.length === 0) {
       setThemeScanMessage(reconciled.removed > 0
         ? `未发现官方主题 JSON，已移除 ${reconciled.removed} 条失效主题记录。`

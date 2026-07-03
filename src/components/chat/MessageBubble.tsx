@@ -926,17 +926,17 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         type="button"
         onClick={() => hasDetail && setExpanded((value) => !value)}
         disabled={!hasDetail}
-        className="flex w-full items-center text-left text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        className="flex w-full items-center text-left text-[13px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
         style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={13} />
         </span>
-        <span className="flex min-w-0 flex-1 items-center">
+        <span className="flex h-5 min-w-0 flex-1 items-center">
           <span className="truncate">{displayTarget}</span>
         </span>
-        <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
-          {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
           {tool.status === "success" && <Check size={13} className="text-accent-success" />}
           {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
           {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
@@ -963,15 +963,17 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="grid w-full items-center text-left text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 9, padding: "8px 12px" }}
+        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ gap: 9, padding: "8px 12px" }}
       >
-        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={14} />
         </span>
-        <span className="min-w-0 truncate">{kimiWebGroupSummary({ type: "tool", tools })}</span>
-        <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
-          {statusText && <span className="text-[12px] text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
+        <span className="flex h-5 min-w-0 flex-1 items-center">
+          <span className="truncate">{kimiWebGroupSummary({ type: "tool", tools })}</span>
+        </span>
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          {statusText && <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
           {allDone && <Check size={13} className="text-accent-success" />}
         </span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -991,17 +993,17 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
   return (
     <div
-      className="flex items-center text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+      className="flex items-center text-[13px] leading-none text-[var(--kimix-panel-text-secondary)]"
       style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
       <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
         {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
       </span>
-      <span className="flex min-w-0 flex-1 items-center">
+      <span className="flex h-5 min-w-0 flex-1 items-center">
         <span className="truncate">{subagent.agentName || "子代理"}</span>
       </span>
-      <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
-        <span className="text-[12px] text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
+      <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+        <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
         {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
         {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
       </span>
@@ -1017,17 +1019,17 @@ function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] })
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
         style={{ gap: 9, padding: "8px 12px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <Bot size={14} />
         </span>
-        <span className="flex min-w-0 flex-1 items-center">
+        <span className="flex h-5 min-w-0 flex-1 items-center">
           <span className="truncate">{kimiWebGroupSummary({ type: "subagent", subagents })}</span>
         </span>
-        <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
-          {statusText && <span className="text-[12px] text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          {statusText && <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
         </span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -1046,16 +1048,16 @@ function KimiWebApprovalRow({ approval, isLast }: { approval: ApprovalEvent; isL
   const approved = approval.status === "approved";
   return (
     <div
-      className="flex items-center text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+      className="flex items-center text-[13px] leading-none text-[var(--kimix-panel-text-secondary)]"
       style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
       <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
         <ShieldCheck size={13} />
       </span>
-      <span className="flex min-w-0 flex-1 items-center">
+      <span className="flex h-5 min-w-0 flex-1 items-center">
         <span className="truncate">{approval.description || approval.toolName || "工具请求"}</span>
       </span>
-      <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
+      <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
         {approved && <Check size={13} className="text-accent-success" />}
         {approval.status === "rejected" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
         {approval.status === "pending" && <span className="h-1.5 w-1.5 rounded-full bg-accent-warning" />}
@@ -1072,17 +1074,17 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
         style={{ gap: 9, padding: "8px 12px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <ShieldCheck size={14} />
         </span>
-        <span className="flex min-w-0 flex-1 items-center">
+        <span className="flex h-5 min-w-0 flex-1 items-center">
           <span className="truncate">{kimiWebGroupSummary({ type: "approval", approvals })}</span>
         </span>
-        <span className="flex shrink-0 items-center" style={{ gap: 8 }}>
-          {statusText && <span className="text-[12px] text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          {statusText && <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
         </span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
