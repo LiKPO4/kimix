@@ -82,6 +82,7 @@ export function useStatePersistence() {
       isUnloadingRef.current = true;
       clearConversationPersistTimer();
       persistLocalConversationState();
+      persistLocalActiveContext();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
@@ -91,7 +92,6 @@ export function useStatePersistence() {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       clearConversationPersistTimer();
       if (!isUnloadingRef.current) flushLocalConversationState();
-      persistLocalActiveContext();
     };
   }, []);
 }

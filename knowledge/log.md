@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+* **Active-context lifecycle boundary**: Active project/session state now flushes on real unload and is never written from React effect cleanup, preventing Strict Mode/HMR from erasing startup restoration state. See [/project/kimix.md](/project/kimix.md).
 * **Bilingual default-title handling**: English and Chinese Kimi placeholder titles now share one fallback rule across catalog and live metadata paths. See [/project/kimix.md](/project/kimix.md).
 * **First-frame stale placeholder filtering**: Shell and sidebar now share the same rule for hiding expired empty official sessions before catalog reconciliation. See [/project/kimix.md](/project/kimix.md).
 * **Stable catalog titles and loading indicators**: Non-default official titles now win before prompt fallbacks, and inactive rows ignore stale view-loading flags. See [/project/kimix.md](/project/kimix.md).
