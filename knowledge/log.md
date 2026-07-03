@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-03
+
+* **Explicit SDK archive reconciliation**: SDK catalogs include archived summaries so official `archived: true` identities close local mirrors and any stale loading view without relying on absence inference. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-02
 
 * **First-paint catalog confirmation**: Old empty local placeholders remain hidden until the official catalog confirms them, preventing archived or empty sessions from flashing before slow SDK initialization completes. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

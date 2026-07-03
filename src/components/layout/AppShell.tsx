@@ -617,6 +617,12 @@ export function AppShell() {
     [sessions, currentProject],
   );
 
+  useEffect(() => {
+    if (!currentSession) return;
+    const stored = sessions.find((session) => session.id === currentSession.id);
+    if (!stored || stored.archivedAt) setCurrentSession(null);
+  }, [sessions, currentSession?.id, setCurrentSession]);
+
   const applyNavigationEntry = (entry: NavigationEntry) => {
     applyingNavigationRef.current = true;
     lastNavigationEntryRef.current = entry;

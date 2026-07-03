@@ -122,6 +122,35 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].archivedAt).toBeTypeOf("number");
   });
 
+  it("SDK 明确返回已归档时归档带正文的本地镜像", () => {
+    const local = localSession({
+      id: "official-archived",
+      officialSessionId: "official-archived",
+      events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "正文" }],
+    });
+    const result = reconcileOfficialSessionCatalog([local], [{
+      id: "official-archived",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      archived: true,
+      source: "sdk",
+    }], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
+  it("不为只存在于官方归档目录的会话创建新镜像", () => {
+    const result = reconcileOfficialSessionCatalog([], [{
+      id: "official-archived",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      archived: true,
+      source: "sdk",
+    }], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result).toEqual([]);
+  });
+
   it("SDK 来源列表不隐藏缺失的本地镜像", () => {
     const existing = localSession({
       id: "official-1",

@@ -10,6 +10,7 @@ export interface OfficialSessionCatalogItem {
   brief?: string;
   title?: string;
   lastPrompt?: string;
+  archived?: boolean;
   source?: "server" | "sdk";
 }
 
@@ -78,7 +79,13 @@ export function reconcileOfficialSessionCatalog(
   const serverAuthoritative = options.source === "server" || officialSessions.some((session) => session.source === "server");
   const visibleOfficialIds = new Set(
     officialSessions
-      .filter((official) => normalizeProjectPath(official.workDir || projectPath) === normalizedProjectPath)
+      .filter((official) => official.archived !== true && normalizeProjectPath(official.workDir || projectPath) === normalizedProjectPath)
+      .map((official) => official.id)
+      .filter(Boolean),
+  );
+  const archivedOfficialIds = new Set(
+    officialSessions
+      .filter((official) => official.archived === true && normalizeProjectPath(official.workDir || projectPath) === normalizedProjectPath)
       .map((official) => official.id)
       .filter(Boolean),
   );
@@ -88,6 +95,7 @@ export function reconcileOfficialSessionCatalog(
 
   for (const official of officialSessions) {
     if (!official.id || normalizeProjectPath(official.workDir || projectPath) !== normalizedProjectPath) continue;
+    if (official.archived === true) continue;
     const existingIndex = next.findIndex((session) => belongsToOfficialSession(session, official.id));
     if (existingIndex >= 0) {
       const existing = next[existingIndex];
@@ -124,12 +132,13 @@ export function reconcileOfficialSessionCatalog(
     changed = true;
   }
 
-  if (serverAuthoritative || next.some((session) => isAbandonedEmptyMirror(session, projectPath))) {
+  if (serverAuthoritative || archivedOfficialIds.size > 0 || next.some((session) => isAbandonedEmptyMirror(session, projectPath))) {
     const archivedAt = Date.now();
     next.forEach((session, index) => {
       if (!isOfficialMirrorSession(session, projectPath)) return;
       if (officialSessionIds(session).some((id) => visibleOfficialIds.has(id))) return;
-      if (!serverAuthoritative && !isAbandonedEmptyMirror(session, projectPath)) return;
+      const explicitlyArchived = officialSessionIds(session).some((id) => archivedOfficialIds.has(id));
+      if (!serverAuthoritative && !explicitlyArchived && !isAbandonedEmptyMirror(session, projectPath)) return;
       if (next === sessions) next = [...sessions];
       next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };
       changed = true;

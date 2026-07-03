@@ -1156,13 +1156,12 @@ function App() {
     void window.api.listKimiCodeSessions({ workDir: projectPath }).then((res) => {
       if (cancelled || !res.success) return;
       const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
-      const visibleOfficialSessions = res.data.filter((session) => (
+      const catalogSessions = res.data.filter((session) => (
         !hiddenHandoffSessionIds.has(session.id) &&
-        !isHiddenInternalSession(session) &&
-        !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, projectPath)
+        !isHiddenInternalSession(session)
       ));
       useSessionStore.setState((state) => ({
-        sessions: reconcileOfficialSessionCatalog(state.sessions, visibleOfficialSessions, projectPath, { source: res.source }),
+        sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSessions, projectPath, { source: res.source }),
       }));
       }).catch(logError("listKimiCodeSessions"));
       return () => {
@@ -2092,9 +2091,12 @@ function App() {
 
               const res = await window.api.listKimiCodeSessions({ workDir: activeProject.path });
               if (!res.success) return;
-              const activeSummaries = res.data.filter(isUsableHistorySession);
+              const catalogSummaries = res.data.filter((session) => (
+                !hiddenHandoffSessionIds.has(session.id) && !isHiddenInternalSession(session)
+              ));
+              const activeSummaries = catalogSummaries.filter((session) => session.archived !== true && isUsableHistorySession(session));
               useSessionStore.setState((state) => ({
-                sessions: reconcileOfficialSessionCatalog(state.sessions, activeSummaries, activeProject.path, { source: res.source }),
+                sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSummaries, activeProject.path, { source: res.source }),
               }));
               const latest = (activeRuntimeIds.size > 0
                 ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))

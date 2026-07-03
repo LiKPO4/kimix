@@ -67,7 +67,7 @@ type KimiHarnessLike = {
   resumeSession(input: { id: string; additionalDirs?: readonly string[] }): Promise<KimiCodeSessionLike>;
   forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
   renameSession?(input: { id: string; title: string }): Promise<void>;
-  listSessions(options?: { workDir?: string; sessionId?: string }): Promise<KimiCodeSessionSummary[]>;
+  listSessions(options?: { workDir?: string; sessionId?: string; includeArchive?: boolean }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
   getConfigDiagnostics?(): Promise<KimiCodeConfigDiagnostics>;
@@ -1775,14 +1775,13 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   if (shouldRouteNewSessionToServer()) {
     const normalizedWorkDir = workDir ? path.resolve(workDir).toLowerCase() : undefined;
     return (await getServerClient().listSessions())
-      .filter((session) => session.archived !== true)
       .filter((session) => !normalizedWorkDir || (
         typeof session.metadata?.cwd === "string" && path.resolve(session.metadata.cwd).toLowerCase() === normalizedWorkDir
       ))
       .map(serverSessionSummary);
   }
   const sdkHarness = await getHarness();
-  const sessions = [...await sdkHarness.listSessions(workDir ? { workDir } : {})];
+  const sessions = [...await sdkHarness.listSessions({ ...(workDir ? { workDir } : {}), includeArchive: true })];
   // SDK may return empty title/lastPrompt; backfill from state.json if available.
   for (const session of sessions) {
     session.source = "sdk";
@@ -1800,7 +1799,7 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
       // ignore unreadable metadata
     }
   }
-  return sessions.filter((session) => Boolean(session.lastPrompt?.trim()));
+  return sessions.filter((session) => session.archived === true || Boolean(session.lastPrompt?.trim()));
 }
 
 export async function loadServerSessionHistory(sessionId: string): Promise<{ events: Array<{ type: string; payload: unknown; time?: unknown }>; source: "server" }> {
