@@ -984,7 +984,7 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
         </span>
       </button>
       {expanded && (
-        <div style={{ padding: "0 12px 10px" }}>
+        <div style={{ padding: "5px 12px" }}>
           {tools.map((tool, index) => <KimiWebToolRow key={tool.id} tool={tool} isLast={index === tools.length - 1} />)}
         </div>
       )}
@@ -1044,7 +1044,7 @@ function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] })
         </span>
       </button>
       {expanded && (
-        <div style={{ padding: "0 12px 10px" }}>
+        <div style={{ padding: "5px 12px" }}>
           {subagents.map((subagent, index) => <KimiWebSubagentRow key={subagent.id} subagent={subagent} isLast={index === subagents.length - 1} />)}
         </div>
       )}
@@ -1104,7 +1104,7 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
         </span>
       </button>
       {expanded && (
-        <div style={{ padding: "0 12px 10px" }}>
+        <div style={{ padding: "5px 12px" }}>
           {approvals.map((approval, index) => <KimiWebApprovalRow key={approval.id} approval={approval} isLast={index === approvals.length - 1} />)}
         </div>
       )}
