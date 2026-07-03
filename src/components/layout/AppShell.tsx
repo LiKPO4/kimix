@@ -43,7 +43,7 @@ import { ToastSystem } from "./ToastSystem";
 import { LongTaskInspectorPanel, type BtwPanelState, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
-import { isUnconfirmedOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
+import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
@@ -611,7 +611,7 @@ export function AppShell() {
     () => sessions.filter((session) => (
       !session.archivedAt &&
       !isHiddenInternalSession(session) &&
-      !isUnconfirmedOfficialSessionPlaceholder(session) &&
+      !shouldHideOfficialSessionPlaceholder(session) &&
       (!currentProject || isSameProjectPath(session.projectPath, currentProject.path))
     )),
     [sessions, currentProject],

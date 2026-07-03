@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+* **First-frame stale placeholder filtering**: Shell and sidebar now share the same rule for hiding expired empty official sessions before catalog reconciliation. See [/project/kimix.md](/project/kimix.md).
 * **Stable catalog titles and loading indicators**: Non-default official titles now win before prompt fallbacks, and inactive rows ignore stale view-loading flags. See [/project/kimix.md](/project/kimix.md).
 * **Conversation-based sidebar recency**: Sidebar times now prefer the latest conversational event instead of generic session metadata updates. See [/project/kimix.md](/project/kimix.md).
 * **Markdown horizontal overflow containment**: Prose and inline code visually wrap long unbroken paths while fenced code, tables, and formulas keep local overflow ownership. See [/project/kimix.md](/project/kimix.md).

@@ -15,6 +15,7 @@ import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { reportError } from "@/utils/reportError";
+import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -358,7 +359,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       : sessions;
     const byProject = new Map<string, Session[]>();
     for (const session of visible) {
-      if (session.archivedAt || isHiddenInternalSession(session)) continue;
+      if (session.archivedAt || isHiddenInternalSession(session) || shouldHideOfficialSessionPlaceholder(session)) continue;
       const projectKey = normalizeProjectPath(session.projectPath);
       if (!projectKey) continue;
       const items = byProject.get(projectKey);
@@ -840,7 +841,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.12</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.13</span>
         </button>
       </div>
     </aside>

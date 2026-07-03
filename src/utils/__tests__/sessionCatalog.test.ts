@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session } from "@/types/ui";
-import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog } from "../sessionCatalog";
+import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "../sessionCatalog";
 
 function localSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -58,6 +58,25 @@ describe("reconcileOfficialSessionCatalog", () => {
 
     expect(isUnconfirmedOfficialSessionPlaceholder(withContent)).toBe(false);
     expect(isUnconfirmedOfficialSessionPlaceholder(recent)).toBe(false);
+  });
+
+  it("首屏隐藏曾确认但已经过期的默认标题空占位", () => {
+    const staleConfirmed = localSession({
+      id: "official-stale-confirmed",
+      officialSessionId: "official-stale-confirmed",
+      officialCatalogConfirmedAt: Date.now() - 60_000,
+      title: "New Session",
+      createdAt: Date.now() - 10 * 60 * 1000,
+      events: [],
+    });
+    const realConversation = {
+      ...staleConfirmed,
+      events: [{ id: "user-1", type: "user_message", timestamp: 1, content: "正文" }],
+    } satisfies Session;
+
+    expect(isUnconfirmedOfficialSessionPlaceholder(staleConfirmed)).toBe(false);
+    expect(shouldHideOfficialSessionPlaceholder(staleConfirmed)).toBe(true);
+    expect(shouldHideOfficialSessionPlaceholder(realConversation)).toBe(false);
   });
 
   it("官方 Server 目录项使用 title 或 lastPrompt 生成占位标题", () => {

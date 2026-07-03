@@ -69,6 +69,17 @@ export function isUnconfirmedOfficialSessionPlaceholder(session: Session) {
     Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
 }
 
+export function shouldHideOfficialSessionPlaceholder(session: Session) {
+  if (isUnconfirmedOfficialSessionPlaceholder(session)) return true;
+  const defaultTitle = session.title.trim().toLowerCase();
+  return session.engine === "kimi-code" &&
+    !session.longTask &&
+    !session.archivedAt &&
+    (defaultTitle === "new session" || defaultTitle === "新会话") &&
+    session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
+    Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
+}
+
 /**
  * Reconcile the lightweight official session catalog into Kimix's local mirror.
  * Message bodies remain lazy-loaded when the user opens a discovered session.
