@@ -108,17 +108,29 @@ describe("reconcileOfficialSessionCatalog", () => {
   });
 
   it("官方标题仍为默认值时回退到第一条有效提示", () => {
-    const result = reconcileOfficialSessionCatalog([], [{
-      id: "official-default-title",
-      workDir: "D:\\work\\demo",
-      updatedAt: 200,
-      title: "New Session",
-      lastPrompt: "最后一条消息",
-      brief: "第一条有效提示",
-      source: "sdk",
-    }], "D:\\work\\demo", { source: "sdk" });
+    const result = reconcileOfficialSessionCatalog([], [
+      {
+        id: "official-default-title",
+        workDir: "D:\\work\\demo",
+        updatedAt: 200,
+        title: "New Session",
+        lastPrompt: "最后一条消息",
+        brief: "第一条有效提示",
+        source: "sdk",
+      },
+      {
+        id: "skill-default-title",
+        workDir: "D:\\work\\demo",
+        updatedAt: 100,
+        title: "新会话",
+        lastPrompt: "介绍一下你有什么功能",
+        isCustomTitle: true,
+        source: "sdk",
+      },
+    ], "D:\\work\\demo", { source: "sdk" });
 
     expect(result[0].title).toBe("第一条有效提示");
+    expect(result[1].title).toBe("介绍一下你有什么功能");
   });
 
   it("保留用户锁定标题和官方自定义标题", () => {

@@ -3,6 +3,11 @@ import { isInternalPromptText } from "./internalSessions";
 
 const TITLE_LIMIT = 30;
 
+export function isDefaultSessionTitle(title: string | undefined | null): boolean {
+  const normalized = title?.trim().toLowerCase();
+  return normalized === "new session" || normalized === "新会话";
+}
+
 function cleanTitleText(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, " ")

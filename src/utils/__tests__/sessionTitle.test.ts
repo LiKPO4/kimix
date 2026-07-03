@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveSessionTitle, truncateSessionTitle } from "../sessionTitle";
+import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "../sessionTitle";
 import type { TimelineEvent } from "@/types/ui";
 
 describe("truncateSessionTitle", () => {
@@ -30,6 +30,14 @@ describe("truncateSessionTitle", () => {
 
   it("picks first meaningful line", () => {
     expect(truncateSessionTitle("\n\n  \nReal content here")).toBe("Real content here");
+  });
+});
+
+describe("isDefaultSessionTitle", () => {
+  it("recognizes English and Chinese placeholder titles", () => {
+    expect(isDefaultSessionTitle("New Session")).toBe(true);
+    expect(isDefaultSessionTitle("新会话")).toBe(true);
+    expect(isDefaultSessionTitle("介绍一下你有什么功能")).toBe(false);
   });
 });
 

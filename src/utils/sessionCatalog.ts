@@ -1,5 +1,5 @@
 import type { Session } from "@/types/ui";
-import { truncateSessionTitle } from "@/utils/sessionTitle";
+import { isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 
 const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
 
@@ -29,7 +29,7 @@ function belongsToOfficialSession(session: Session, officialId: string) {
 
 function catalogTitle(item: OfficialSessionCatalogItem): string | undefined {
   const officialTitle = item.title?.trim();
-  const usableOfficialTitle = officialTitle && officialTitle !== "New Session" ? officialTitle : undefined;
+  const usableOfficialTitle = officialTitle && !isDefaultSessionTitle(officialTitle) ? officialTitle : undefined;
   const source = usableOfficialTitle || item.brief?.trim() || item.lastPrompt?.trim();
   return source ? truncateSessionTitle(source) || undefined : undefined;
 }
@@ -71,11 +71,10 @@ export function isUnconfirmedOfficialSessionPlaceholder(session: Session) {
 
 export function shouldHideOfficialSessionPlaceholder(session: Session) {
   if (isUnconfirmedOfficialSessionPlaceholder(session)) return true;
-  const defaultTitle = session.title.trim().toLowerCase();
   return session.engine === "kimi-code" &&
     !session.longTask &&
     !session.archivedAt &&
-    (defaultTitle === "new session" || defaultTitle === "新会话") &&
+    isDefaultSessionTitle(session.title) &&
     session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
     Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
 }

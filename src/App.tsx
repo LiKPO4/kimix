@@ -7,7 +7,7 @@ import type { PendingMessage } from "@/stores/sessionStore";
 import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
-import { deriveSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
+import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { reconcileOfficialSessionCatalog } from "@/utils/sessionCatalog";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
@@ -202,7 +202,7 @@ function extractOfficialSessionTitle(event: unknown): string | null {
   const record = event as Record<string, unknown>;
   if (record.type !== "session.meta.updated" || typeof record.title !== "string") return null;
   const title = truncateSessionTitle(record.title);
-  return title && title !== "New Session" ? title : null;
+  return title && !isDefaultSessionTitle(title) ? title : null;
 }
 
 async function repairKimiCodeHistoryBodies(sessions: Session[]) {
