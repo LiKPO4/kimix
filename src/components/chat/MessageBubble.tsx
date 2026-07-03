@@ -859,17 +859,36 @@ function kimiWebGroupSummary(group: ProcessGroup) {
   return `${group.approvals.length} 个工具请求`;
 }
 
-function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
+function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
+  const [expanded, setExpanded] = useState(false);
+  const canExpand = block.text.trim().length > 0 && block.text.trim() !== block.summary.trim();
   return (
-    <div className="flex flex-col" style={{ gap: 10 }}>
-      {blocks.map((block) => (
+    <div className="flex flex-col" style={{ gap: expanded ? 8 : 0 }}>
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((value) => !value)}
+        disabled={!canExpand}
+        className="text-left text-[13px] leading-[1.6] text-[var(--kimix-panel-text-muted)] transition-colors hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:text-[var(--kimix-panel-text-muted)]"
+      >
+        {block.summary}
+      </button>
+      {expanded && (
         <div
-          key={block.id}
           className="text-[13px] leading-[1.65] text-[var(--kimix-panel-text-muted)]"
           style={{ whiteSpace: "pre-wrap" }}
         >
           {block.text}
         </div>
+      )}
+    </div>
+  );
+}
+
+function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
+  return (
+    <div className="flex flex-col" style={{ gap: 8 }}>
+      {blocks.map((block) => (
+        <KimiWebThinkingItem key={block.id} block={block} />
       ))}
     </div>
   );
@@ -1137,29 +1156,27 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
   const isKimiWeb = displayMode === "kimi-web";
 
   return (
-    <div className="w-full" style={{ paddingBottom: isKimiWeb ? 0 : (expanded && hasDetails ? 8 : 12) }}>
-      {!isKimiWeb && (
-        <button
-          ref={summaryAnchorRef}
-          type="button"
-          onClick={() => {
-            if (!hasDetails) return;
-            toggleWithStableAnchor(!expanded, "summary");
-          }}
-          disabled={!hasDetails}
-          className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
-        >
-          {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
-          <span className="kimix-tabular-nums shrink-0">{label}</span>
-          {hasDetails && (
-            <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
-              {summary}
-            </span>
-          )}
-        </button>
-      )}
+    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: (expanded || isKimiWeb) && hasDetails ? 8 : 12 }}>
+      <button
+        ref={summaryAnchorRef}
+        type="button"
+        onClick={() => {
+          if (!hasDetails || isKimiWeb) return;
+          toggleWithStableAnchor(!expanded, "summary");
+        }}
+        disabled={!hasDetails || isKimiWeb}
+        className={`kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)] ${isKimiWeb ? "" : "hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"}`}
+      >
+        {hasDetails && !isKimiWeb ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
+        <span className="kimix-tabular-nums shrink-0">{label}</span>
+        {hasDetails && !isKimiWeb && (
+          <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
+            {summary}
+          </span>
+        )}
+      </button>
       {(expanded || isKimiWeb) && hasDetails && (
-        <div className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 0 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
+        <div className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12 }}>
           {isKimiWeb ? <KimiWebProcessList items={items} /> : <ProcessDetailList items={items} />}
           {!isKimiWeb && (
             <button
