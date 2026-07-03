@@ -1089,7 +1089,7 @@ function KimiWebProcessList({ items }: { items: ProcessItem[] }) {
 }
 
 function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix" }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => displayMode === "kimi-web");
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
   const pendingToggleAnchorRef = useRef<{
@@ -1156,18 +1156,18 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
   const isKimiWeb = displayMode === "kimi-web";
 
   return (
-    <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: (expanded || isKimiWeb) && hasDetails ? 8 : 12 }}>
+    <div className={`w-full ${isKimiWeb ? "" : "border-b border-[var(--kimix-panel-divider)]"}`} style={{ paddingBottom: !isKimiWeb && expanded && hasDetails ? 8 : 12 }}>
       <button
         ref={summaryAnchorRef}
         type="button"
         onClick={() => {
-          if (!hasDetails || isKimiWeb) return;
+          if (!hasDetails) return;
           toggleWithStableAnchor(!expanded, "summary");
         }}
-        disabled={!hasDetails || isKimiWeb}
-        className={`kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)] ${isKimiWeb ? "" : "hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"}`}
+        disabled={!hasDetails}
+        className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
       >
-        {hasDetails && !isKimiWeb ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
+        {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
         <span className="kimix-tabular-nums shrink-0">{label}</span>
         {hasDetails && !isKimiWeb && (
           <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
@@ -1175,8 +1175,11 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
           </span>
         )}
       </button>
-      {(expanded || isKimiWeb) && hasDetails && (
-        <div className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12 }}>
+      {isKimiWeb && (
+        <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: 8 }} />
+      )}
+      {expanded && hasDetails && (
+        <div className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
           {isKimiWeb ? <KimiWebProcessList items={items} /> : <ProcessDetailList items={items} />}
           {!isKimiWeb && (
             <button
