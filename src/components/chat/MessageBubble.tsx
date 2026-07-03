@@ -929,22 +929,22 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         type="button"
         onClick={() => hasDetail && setExpanded((value) => !value)}
         disabled={!hasDetail}
-        className="flex w-full items-center text-left text-[13px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 8, minHeight: 42, paddingTop: 8, paddingBottom: 8 }}
+        className="grid w-full items-center text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
+        style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, height: 42 }}
       >
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={13} />
         </span>
-        <span className="flex h-5 min-w-0 flex-1 items-center">
-          <span className="truncate">{displayTarget}</span>
+        <span className="flex min-w-0 items-center overflow-hidden">
+          <span className="truncate leading-[20px]">{displayTarget}</span>
         </span>
-        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+        <span className="flex h-5 items-center" style={{ gap: 8 }}>
           {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
           {tool.status === "success" && <Check size={13} className="text-accent-success" />}
           {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
           {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
         </span>
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
           {hasDetail ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
         </span>
       </button>
@@ -996,20 +996,20 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
   return (
     <div
-      className="flex items-center text-[13px] leading-none text-[var(--kimix-panel-text-secondary)]"
+      className="text-[13px] text-[var(--kimix-panel-text-secondary)]"
       style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
       <div
-        className="flex w-full items-center text-[var(--kimix-panel-text-secondary)]"
-        style={{ gap: 8, minHeight: 42, paddingTop: 8, paddingBottom: 8 }}
+        className="grid w-full items-center"
+        style={{ gridTemplateColumns: "18px 1fr auto", gap: 8, height: 42 }}
       >
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
           {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
         </span>
-        <span className="flex h-5 min-w-0 flex-1 items-center">
-          <span className="truncate">{subagent.agentName || "子代理"}</span>
+        <span className="flex min-w-0 items-center overflow-hidden">
+          <span className="truncate leading-[20px]">{subagent.agentName || "子代理"}</span>
         </span>
-        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+        <span className="flex h-5 items-center" style={{ gap: 8 }}>
           <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
           {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
           {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
@@ -1056,20 +1056,20 @@ function KimiWebApprovalRow({ approval, isLast }: { approval: ApprovalEvent; isL
   const approved = approval.status === "approved";
   return (
     <div
-      className="flex items-center text-[13px] leading-none text-[var(--kimix-panel-text-secondary)]"
+      className="text-[13px] text-[var(--kimix-panel-text-secondary)]"
       style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
       <div
-        className="flex w-full items-center text-[var(--kimix-panel-text-secondary)]"
-        style={{ gap: 8, minHeight: 42, paddingTop: 8, paddingBottom: 8 }}
+        className="grid w-full items-center"
+        style={{ gridTemplateColumns: "18px 1fr auto", gap: 8, height: 42 }}
       >
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
           <ShieldCheck size={13} />
         </span>
-        <span className="flex h-5 min-w-0 flex-1 items-center">
-          <span className="truncate">{approval.description || approval.toolName || "工具请求"}</span>
+        <span className="flex min-w-0 items-center overflow-hidden">
+          <span className="truncate leading-[20px]">{approval.description || approval.toolName || "工具请求"}</span>
         </span>
-        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+        <span className="flex h-5 items-center" style={{ gap: 8 }}>
           {approved && <Check size={13} className="text-accent-success" />}
           {approval.status === "rejected" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
           {approval.status === "pending" && <span className="h-1.5 w-1.5 rounded-full bg-accent-warning" />}
