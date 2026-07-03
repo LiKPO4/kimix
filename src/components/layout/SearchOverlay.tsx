@@ -340,8 +340,11 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
         isLoading: false,
       }));
     }
-    const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-    if (updated && useAppStore.getState().currentSession?.id === session.id) setCurrentSession(updated);
+    useAppStore.setState((state) => {
+      if (state.currentSession?.id !== session.id) return {};
+      const updated = useSessionStore.getState().sessions.find((s) => s.id === session.id);
+      return updated ? { currentSession: updated } : {};
+    });
   };
 
   const resultCount = scope === "all" ? globalMatches.length : matches.length;
