@@ -5,6 +5,26 @@ import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
 const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
+const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
+
+function readProcessDisplayMode(): ProcessDisplayMode {
+  try {
+    if (typeof localStorage === "undefined") return "kimix";
+    const raw = localStorage.getItem(PROCESS_DISPLAY_MODE_KEY);
+    if (raw === "kimix" || raw === "kimi-web") return raw;
+    return "kimix";
+  } catch {
+    return "kimix";
+  }
+}
+
+function writeProcessDisplayMode(mode: ProcessDisplayMode) {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(PROCESS_DISPLAY_MODE_KEY, mode);
+  } catch {
+    // Ignore local persistence errors; the in-memory value still updates.
+  }
+}
 
 function readRightSidebarCardOrder(): RightSidebarCardId[] {
   try {
@@ -96,7 +116,7 @@ export const useAppStore = create<AppStore>((set) => ({
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   clarificationToolMode: "auto",
-  processDisplayMode: "kimix",
+  processDisplayMode: readProcessDisplayMode(),
   filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
   longTaskInspectorOpen: false,
@@ -131,7 +151,10 @@ export const useAppStore = create<AppStore>((set) => ({
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
   setNotificationMode: (mode) => set({ notificationMode: mode }),
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
-  setProcessDisplayMode: (mode) => set({ processDisplayMode: mode }),
+  setProcessDisplayMode: (mode) => {
+    writeProcessDisplayMode(mode);
+    set({ processDisplayMode: mode });
+  },
   setFilePreviewExtensions: (extensions) => set({
     filePreviewExtensions: Array.from(new Set(extensions
       .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
