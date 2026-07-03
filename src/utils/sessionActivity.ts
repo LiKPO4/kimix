@@ -55,3 +55,13 @@ export function isSessionRuntimeRunning(session: Session | undefined, runningSes
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId) ||
     hasActiveTimelineWork(session, now);
 }
+
+export function isSessionSidebarBusy(
+  session: Session,
+  runningSessionId: string | null,
+  currentSessionId?: string,
+  now = Date.now(),
+) {
+  return (session.isLoading && session.id === currentSessionId) ||
+    isSessionRuntimeRunning(session, runningSessionId, now);
+}

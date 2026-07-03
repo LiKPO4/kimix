@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { getSessionConversationActivityAt, hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { getSessionConversationActivityAt, hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -73,5 +73,13 @@ describe("sessionActivity", () => {
 
     expect(getSessionConversationActivityAt(active)).toBe(500);
     expect(getSessionConversationActivityAt({ ...active, events: [], updatedAt: 700 })).toBe(700);
+  });
+
+  it("shows transient loading only on the current session row", () => {
+    const loading = { ...session(), isLoading: true };
+
+    expect(isSessionSidebarBusy(loading, null, "other-session", 1)).toBe(false);
+    expect(isSessionSidebarBusy(loading, null, loading.id, 1)).toBe(true);
+    expect(isSessionSidebarBusy({ ...loading, isLoading: false }, loading.runtimeSessionId ?? null, "other-session", 1)).toBe(true);
   });
 });

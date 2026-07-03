@@ -69,7 +69,7 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result.map((session) => session.title)).toEqual(["官方标题", "上一条用户消息"]);
   });
 
-  it("目录确认时立即用第一条有效提示更新未锁定标题", () => {
+  it("目录确认时优先使用官方生成标题", () => {
     const existing = localSession({
       id: "official-brief",
       officialSessionId: "official-brief",
@@ -85,7 +85,21 @@ describe("reconcileOfficialSessionCatalog", () => {
       source: "sdk",
     }], "D:\\work\\demo", { source: "sdk" });
 
-    expect(result[0].title).toBe("暂时没有，你感觉怎么样");
+    expect(result[0].title).toBe("你好呀");
+  });
+
+  it("官方标题仍为默认值时回退到第一条有效提示", () => {
+    const result = reconcileOfficialSessionCatalog([], [{
+      id: "official-default-title",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      title: "New Session",
+      lastPrompt: "最后一条消息",
+      brief: "第一条有效提示",
+      source: "sdk",
+    }], "D:\\work\\demo", { source: "sdk" });
+
+    expect(result[0].title).toBe("第一条有效提示");
   });
 
   it("保留用户锁定标题和官方自定义标题", () => {

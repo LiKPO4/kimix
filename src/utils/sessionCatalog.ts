@@ -28,9 +28,9 @@ function belongsToOfficialSession(session: Session, officialId: string) {
 }
 
 function catalogTitle(item: OfficialSessionCatalogItem): string | undefined {
-  const source = item.isCustomTitle === true
-    ? item.title?.trim()
-    : item.brief?.trim() || item.lastPrompt?.trim() || item.title?.trim();
+  const officialTitle = item.title?.trim();
+  const usableOfficialTitle = officialTitle && officialTitle !== "New Session" ? officialTitle : undefined;
+  const source = usableOfficialTitle || item.brief?.trim() || item.lastPrompt?.trim();
   return source ? truncateSessionTitle(source) || undefined : undefined;
 }
 

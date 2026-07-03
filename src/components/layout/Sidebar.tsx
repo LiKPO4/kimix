@@ -10,7 +10,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { getSessionConversationActivityAt, isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -43,13 +43,6 @@ function isSameProjectPath(a: string | undefined, b: string | undefined) {
   const left = normalizeProjectPath(a);
   const right = normalizeProjectPath(b);
   return Boolean(left && right && left === right);
-}
-
-function isSidebarSessionBusy(session: Session, runningSessionId: string | null) {
-  return Boolean(
-    session.isLoading ||
-    isSessionRuntimeRunning(session, runningSessionId)
-  );
 }
 
 interface SidebarProps {
@@ -738,7 +731,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             }}
                           >
                             {pSessions.map((s) => {
-                              const isSessionBusy = isSidebarSessionBusy(s, runningSessionId);
+                              const isSessionBusy = isSessionSidebarBusy(s, runningSessionId, currentSession?.id);
                               const isLongTaskSession = Boolean(s.longTask);
 
                               return (
@@ -847,7 +840,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.11</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.12</span>
         </button>
       </div>
     </aside>
