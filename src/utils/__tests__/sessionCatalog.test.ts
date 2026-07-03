@@ -184,6 +184,71 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].updatedAt).toBe(200);
   });
 
+  it("把 Kimix Skill 注册表刷新产生的 fork 链折叠到同一个本地会话", () => {
+    const parent = localSession({
+      id: "local-conversation",
+      officialSessionId: "session-parent",
+      runtimeSessionId: "session-parent",
+      events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "原对话" }],
+    });
+    const duplicateParent = localSession({
+      id: "session-parent",
+      officialSessionId: "session-parent",
+      title: "重复父会话",
+      events: [{ id: "user-2", type: "user_message", timestamp: 11, content: "重复镜像" }],
+    });
+    const result = reconcileOfficialSessionCatalog([parent, duplicateParent], [
+      { id: "session-parent", workDir: "D:\\work\\demo", updatedAt: 100, title: "同一对话", source: "sdk" },
+      {
+        id: "skill-child",
+        workDir: "D:\\work\\demo",
+        updatedAt: 200,
+        title: "同一对话",
+        source: "sdk",
+        metadata: { source: "kimix-fork", forkedFrom: "session-parent" },
+      },
+      {
+        id: "skill-leaf",
+        workDir: "D:\\work\\demo",
+        updatedAt: 300,
+        title: "同一对话",
+        source: "sdk",
+        metadata: { source: "kimix-fork", forkedFrom: "skill-child" },
+      },
+    ], "D:\\work\\demo", { source: "sdk" });
+
+    const visible = result.filter((session) => !session.archivedAt);
+    expect(visible).toHaveLength(1);
+    expect(visible[0]).toMatchObject({
+      id: "local-conversation",
+      officialSessionId: "skill-leaf",
+      runtimeSessionId: "skill-leaf",
+    });
+    expect(visible[0].events).toEqual(parent.events);
+    expect(result.find((session) => session.id === "session-parent")?.archivedAt).toBeTypeOf("number");
+  });
+
+  it("不按标题合并真正独立的同名会话或用户手动分支", () => {
+    const result = reconcileOfficialSessionCatalog([], [
+      { id: "session-a", workDir: "D:\\work\\demo", updatedAt: 300, title: "同名", source: "server" },
+      { id: "session-b", workDir: "D:\\work\\demo", updatedAt: 200, title: "同名", source: "server" },
+      {
+        id: "fork-manual",
+        workDir: "D:\\work\\demo",
+        updatedAt: 100,
+        title: "同名",
+        source: "server",
+        metadata: { source: "kimix-fork", forkedFrom: "session-a" },
+      },
+    ], "D:\\work\\demo", { source: "server" });
+
+    expect(result.filter((session) => !session.archivedAt).map((session) => session.id)).toEqual([
+      "session-a",
+      "session-b",
+      "fork-manual",
+    ]);
+  });
+
   it("不复活已归档的本地会话", () => {
     const archived = localSession({ id: "official-1", archivedAt: 30 });
     const result = reconcileOfficialSessionCatalog([archived], [

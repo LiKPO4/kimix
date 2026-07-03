@@ -266,11 +266,25 @@ export async function getKimiCodeSessionDirs(
 
 export function readKimiCodeSessionMetadata(
   sessionDir: string,
-): { title?: string; updatedAt?: string; lastPrompt?: string; isCustomTitle?: boolean } | null {
+): {
+  title?: string;
+  updatedAt?: string;
+  lastPrompt?: string;
+  isCustomTitle?: boolean;
+  forkedFrom?: string;
+  custom?: Record<string, unknown>;
+} | null {
   try {
     return JSON.parse(
       fs.readFileSync(path.join(sessionDir, "state.json"), "utf-8"),
-    ) as { title?: string; updatedAt?: string; lastPrompt?: string; isCustomTitle?: boolean };
+    ) as {
+      title?: string;
+      updatedAt?: string;
+      lastPrompt?: string;
+      isCustomTitle?: boolean;
+      forkedFrom?: string;
+      custom?: Record<string, unknown>;
+    };
   } catch {
     return null;
   }
@@ -608,4 +622,3 @@ export async function getSessionHistoryById(
   }
   return [];
 }
-

@@ -1791,6 +1791,18 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
     try {
       const metadata = readKimiCodeSessionMetadata(session.sessionDir);
       session.isCustomTitle = metadata?.isCustomTitle === true;
+      if (metadata) {
+        const forkedFrom = typeof metadata.forkedFrom === "string"
+          ? metadata.forkedFrom
+          : typeof metadata.custom?.forkedFrom === "string"
+            ? metadata.custom.forkedFrom
+            : undefined;
+        session.metadata = {
+          ...session.metadata,
+          ...metadata.custom,
+          ...(forkedFrom ? { forkedFrom } : {}),
+        };
+      }
       if (!session.title?.trim() && metadata?.title?.trim()) {
         session.title = sanitizeSkillActivationTitle(metadata.title.trim());
       }

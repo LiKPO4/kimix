@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+* **Transparent Skill-fork lineage**: Registry-refresh `skill-*` forks now reconcile as one stable visible conversation bound to the newest runtime leaf; explicit branches and unrelated same-title sessions remain distinct. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Authoritative deferred-permission boundary**: Active-turn permission changes are bound to the current runtime and consumed only by its live `turn.ended`; renderer activity timeouts, status reconciliation, and snapshot replay cannot apply them early. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Turn-boundary permission changes**: Permission and Plan preferences no longer invalidate runtime prewarm; active-turn permission changes are deferred and applied to the existing runtime before the next prompt. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Active-context lifecycle boundary**: Active project/session state now flushes on real unload and is never written from React effect cleanup, preventing Strict Mode/HMR from erasing startup restoration state. See [/project/kimix.md](/project/kimix.md).

@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-03 v2.14.7 Skill fork 会话链折叠
+- 现象：侧栏持续增加多个同名对话，看起来像每轮都产生了分支。
+- 根因：为刷新官方 Skill 注册表，Kimix 会 fork 当前 runtime 并把原 UI 会话迁移到子 runtime；官方目录仍同时返回父、子、孙，目录对账只按单个 ID 匹配，遂把旧祖先重新补成独立侧栏项。
+- 修复：SDK 目录透传 `state.json` 中的 `source/forkedFrom`；目录对账只折叠 `skill-* + source=kimix-fork` 的透明迁移链，保留最新叶子 runtime、本地正文和 UI 会话 ID，并归档重复祖先镜像。独立同名会话和手动 `fork-*` 分支不按标题合并。
+
 ## 2026-07-03 v2.14.6 权限切换绑定真实轮次边界
 - 现象：超过两分钟的最后一个工具仍在运行时，延后的权限切换可能提前生效，随后没有 Assistant 正文。
 - 根因：Composer 以 `isCurrentSessionRunning` 下降沿代替官方轮次结束；该派生状态会受两分钟活动事件过期、`runningSessionId` 抖动和 status 对账影响，并不等价于 `turn.ended`。

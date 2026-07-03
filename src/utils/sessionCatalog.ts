@@ -13,6 +13,7 @@ export interface OfficialSessionCatalogItem {
   isCustomTitle?: boolean;
   archived?: boolean;
   source?: "server" | "sdk";
+  metadata?: Record<string, unknown>;
 }
 
 function normalizeProjectPath(projectPath: string | undefined) {
@@ -48,6 +49,37 @@ function officialSessionIds(session: Session) {
     session.officialSessionId,
     session.runtimeSessionId,
   ].filter((id): id is string => Boolean(id));
+}
+
+function transparentSkillForkParent(item: OfficialSessionCatalogItem): string | undefined {
+  if (!item.id.startsWith("skill-")) return undefined;
+  if (item.metadata?.source !== "kimix-fork") return undefined;
+  const forkedFrom = item.metadata.forkedFrom;
+  return typeof forkedFrom === "string" && forkedFrom.trim() ? forkedFrom : undefined;
+}
+
+function officialLineageIds(
+  item: OfficialSessionCatalogItem,
+  byId: Map<string, OfficialSessionCatalogItem>,
+): Set<string> {
+  const ids = new Set<string>();
+  let current: OfficialSessionCatalogItem | undefined = item;
+  while (current && !ids.has(current.id)) {
+    ids.add(current.id);
+    const parentId = transparentSkillForkParent(current);
+    if (!parentId) break;
+    const parent = byId.get(parentId);
+    if (!parent) {
+      ids.add(parentId);
+      break;
+    }
+    current = parent;
+  }
+  return ids;
+}
+
+function belongsToOfficialLineage(session: Session, lineageIds: Set<string>) {
+  return officialSessionIds(session).some((id) => lineageIds.has(id));
 }
 
 function isAbandonedEmptyMirror(session: Session, projectPath: string) {
@@ -91,8 +123,13 @@ export function reconcileOfficialSessionCatalog(
 ): Session[] {
   const normalizedProjectPath = normalizeProjectPath(projectPath);
   const serverAuthoritative = options.source === "server" || officialSessions.some((session) => session.source === "server");
+  const officialById = new Map(officialSessions.map((session) => [session.id, session]));
+  const supersededOfficialIds = new Set(
+    officialSessions.map(transparentSkillForkParent).filter((id): id is string => Boolean(id)),
+  );
+  const effectiveOfficialSessions = officialSessions.filter((official) => !supersededOfficialIds.has(official.id));
   const visibleOfficialIds = new Set(
-    officialSessions
+    effectiveOfficialSessions
       .filter((official) => official.archived !== true && normalizeProjectPath(official.workDir || projectPath) === normalizedProjectPath)
       .map((official) => official.id)
       .filter(Boolean),
@@ -106,27 +143,38 @@ export function reconcileOfficialSessionCatalog(
   const catalogConfirmedAt = Date.now();
   let changed = false;
   let next = sessions;
+  const claimedSessionIndexes = new Set<number>();
 
-  for (const official of officialSessions) {
+  for (const official of effectiveOfficialSessions) {
     if (!official.id || normalizeProjectPath(official.workDir || projectPath) !== normalizedProjectPath) continue;
     if (official.archived === true) continue;
-    const existingIndex = next.findIndex((session) => belongsToOfficialSession(session, official.id));
+    const lineageIds = officialLineageIds(official, officialById);
+    const hasArchivedExactMirror = next.some((session) => (
+      Boolean(session.archivedAt) && belongsToOfficialSession(session, official.id)
+    ));
+    if (hasArchivedExactMirror) continue;
+    const existingIndex = next.findIndex((session, index) => (
+      !session.archivedAt && !claimedSessionIndexes.has(index) && belongsToOfficialLineage(session, lineageIds)
+    ));
     if (existingIndex >= 0) {
+      claimedSessionIndexes.add(existingIndex);
       const existing = next[existingIndex];
       if (existing.archivedAt) continue;
       const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);
-      const officialSessionId = existing.officialSessionId ?? official.id;
+      const officialSessionId = official.id;
+      const runtimeSessionId = lineageIds.size > 1 ? official.id : existing.runtimeSessionId;
       const engine = existing.engine ?? "kimi-code";
       const title = existing.titleLocked ? existing.title : catalogTitle(official) ?? existing.title;
       if (
         updatedAt === existing.updatedAt &&
         officialSessionId === existing.officialSessionId &&
+        runtimeSessionId === existing.runtimeSessionId &&
         engine === existing.engine &&
         title === existing.title &&
         existing.officialCatalogConfirmedAt
       ) continue;
       if (next === sessions) next = [...sessions];
-      next[existingIndex] = { ...existing, engine, officialSessionId, title, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
+      next[existingIndex] = { ...existing, engine, runtimeSessionId, officialSessionId, title, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
       changed = true;
       continue;
     }
@@ -145,16 +193,19 @@ export function reconcileOfficialSessionCatalog(
       events: [],
       isLoading: false,
     });
+    claimedSessionIndexes.add(next.length - 1);
     changed = true;
   }
 
-  if (serverAuthoritative || archivedOfficialIds.size > 0 || next.some((session) => isAbandonedEmptyMirror(session, projectPath))) {
+  if (serverAuthoritative || archivedOfficialIds.size > 0 || supersededOfficialIds.size > 0 || next.some((session) => isAbandonedEmptyMirror(session, projectPath))) {
     const archivedAt = Date.now();
     next.forEach((session, index) => {
       if (!isOfficialMirrorSession(session, projectPath)) return;
-      if (officialSessionIds(session).some((id) => visibleOfficialIds.has(id))) return;
+      if (claimedSessionIndexes.has(index)) return;
+      const referencesVisibleSession = officialSessionIds(session).some((id) => visibleOfficialIds.has(id));
       const explicitlyArchived = officialSessionIds(session).some((id) => archivedOfficialIds.has(id));
-      if (!serverAuthoritative && !explicitlyArchived && !isAbandonedEmptyMirror(session, projectPath)) return;
+      const supersededByTransparentFork = officialSessionIds(session).some((id) => supersededOfficialIds.has(id));
+      if (!serverAuthoritative && !referencesVisibleSession && !explicitlyArchived && !supersededByTransparentFork && !isAbandonedEmptyMirror(session, projectPath)) return;
       if (next === sessions) next = [...sessions];
       next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };
       changed = true;
