@@ -930,7 +930,7 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         onClick={() => hasDetail && setExpanded((value) => !value)}
         disabled={!hasDetail}
         className="grid w-full items-center text-left text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto auto", gap: 8, paddingTop: 8, paddingBottom: 8 }}
+        style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto auto", gap: 8, minHeight: 42, paddingTop: 3, paddingBottom: 3 }}
       >
         <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={13} />
