@@ -921,13 +921,16 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
   const hasDetail = detailText.trim().length > 0;
 
   return (
-    <div className="flex flex-col">
+    <div
+      className="flex flex-col"
+      style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
+    >
       <button
         type="button"
         onClick={() => hasDetail && setExpanded((value) => !value)}
         disabled={!hasDetail}
         className="flex w-full items-center text-left text-[13px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
+        style={{ gap: 8, minHeight: 42, paddingTop: 8, paddingBottom: 8 }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={13} />
@@ -994,19 +997,24 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   return (
     <div
       className="flex items-center text-[13px] leading-none text-[var(--kimix-panel-text-secondary)]"
-      style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
+      style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
-      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-        {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
-      </span>
-      <span className="flex h-5 min-w-0 flex-1 items-center">
-        <span className="truncate">{subagent.agentName || "子代理"}</span>
-      </span>
-      <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
-        <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
-        {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
-        {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
-      </span>
+      <div
+        className="flex w-full items-center text-[var(--kimix-panel-text-secondary)]"
+        style={{ gap: 8, minHeight: 42, paddingTop: 8, paddingBottom: 8 }}
+      >
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
+        </span>
+        <span className="flex h-5 min-w-0 flex-1 items-center">
+          <span className="truncate">{subagent.agentName || "子代理"}</span>
+        </span>
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
+          {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+          {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
+        </span>
+      </div>
     </div>
   );
 }
@@ -1049,19 +1057,24 @@ function KimiWebApprovalRow({ approval, isLast }: { approval: ApprovalEvent; isL
   return (
     <div
       className="flex items-center text-[13px] leading-none text-[var(--kimix-panel-text-secondary)]"
-      style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
+      style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
-      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-        <ShieldCheck size={13} />
-      </span>
-      <span className="flex h-5 min-w-0 flex-1 items-center">
-        <span className="truncate">{approval.description || approval.toolName || "工具请求"}</span>
-      </span>
-      <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
-        {approved && <Check size={13} className="text-accent-success" />}
-        {approval.status === "rejected" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
-        {approval.status === "pending" && <span className="h-1.5 w-1.5 rounded-full bg-accent-warning" />}
-      </span>
+      <div
+        className="flex w-full items-center text-[var(--kimix-panel-text-secondary)]"
+        style={{ gap: 8, minHeight: 42, paddingTop: 8, paddingBottom: 8 }}
+      >
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          <ShieldCheck size={13} />
+        </span>
+        <span className="flex h-5 min-w-0 flex-1 items-center">
+          <span className="truncate">{approval.description || approval.toolName || "工具请求"}</span>
+        </span>
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          {approved && <Check size={13} className="text-accent-success" />}
+          {approval.status === "rejected" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+          {approval.status === "pending" && <span className="h-1.5 w-1.5 rounded-full bg-accent-warning" />}
+        </span>
+      </div>
     </div>
   );
 }

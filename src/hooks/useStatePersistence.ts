@@ -81,6 +81,7 @@ export function useStatePersistence() {
     const handleBeforeUnload = () => {
       isUnloadingRef.current = true;
       clearConversationPersistTimer();
+      persistLocalConversationState();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 

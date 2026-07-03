@@ -253,7 +253,8 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
             title: current.titleLocked ? current.title : deriveSessionTitle(historyEvents, current.title),
             model: getLastUsedModelFromEvents(historyEvents) ?? current.model,
             isLoading: false,
-            updatedAt,          },
+            updatedAt,
+          },
         });
       }
       persistLocalConversationState();
@@ -1008,6 +1009,10 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
   const sessionRes = await window.api.startKimiCodeRuntime({
     workDir: projectPath,
     additionalWorkDirs,
+    yoloMode: appState.permissionMode === "yolo",
+    autoMode: appState.permissionMode === "auto",
+    planMode: appState.defaultPlanMode,
+    thinking: appState.defaultThinking,
   });
   if (!sessionRes.success) throw new Error(sessionRes.error);
 
@@ -1338,9 +1343,14 @@ function App() {
     const snapshot = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (!snapshot?.longTask) throw new Error("当前长程任务不存在，无法恢复用户审查流程");
 
+    const appState = useAppStore.getState();
     const startRes = await window.api.startKimiCodeRuntime({
       workDir: snapshot.projectPath,
-      additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+      additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
+      yoloMode: appState.permissionMode === "yolo",
+      autoMode: appState.permissionMode === "auto",
+      planMode: appState.defaultPlanMode,
+      thinking: appState.defaultThinking,
     });
     if (!startRes.success) throw new Error(startRes.error);
 
@@ -2104,10 +2114,15 @@ function App() {
               const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
               if (!latest && !sessionIdToStart) return;
 
+              const appState = useAppStore.getState();
               const startOptions = {
                 workDir: activeProject.path,
                 sessionId: sessionIdToStart,
-                additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+                additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
+                yoloMode: appState.permissionMode === "yolo",
+                autoMode: appState.permissionMode === "auto",
+                planMode: appState.defaultPlanMode,
+                thinking: appState.defaultThinking,
               };
               let startRes = await window.api.startKimiCodeRuntime(startOptions);
               if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
@@ -2398,9 +2413,14 @@ function App() {
       });
       const sourceSession = useSessionStore.getState().sessions.find((session) => session.id === detail.sourceSessionId);
       void (async () => {
+        const appState = useAppStore.getState();
         const startRes = await window.api.startKimiCodeRuntime({
           workDir: detail.projectPath,
-          additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+          additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
+          yoloMode: appState.permissionMode === "yolo",
+          autoMode: appState.permissionMode === "auto",
+          planMode: appState.defaultPlanMode,
+          thinking: appState.defaultThinking,
         });
         if (!startRes.success) throw new Error(startRes.error);
         rememberHiddenHandoffSession(startRes.data.sessionId);
