@@ -267,8 +267,9 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
                 marginRight: 2,
                 padding: "2px 6px",
                 lineHeight: 1.55,
-                overflowWrap: wrapLongLines ? "anywhere" : undefined,
-                wordBreak: wrapLongLines ? "break-word" : undefined,
+                whiteSpace: "normal",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
                 boxDecorationBreak: "clone",
                 WebkitBoxDecorationBreak: "clone",
               }}
