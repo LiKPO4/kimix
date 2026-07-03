@@ -2495,17 +2495,19 @@ export function Composer() {
                       setImageAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
                       if (previewImage?.id === attachment.id) setPreviewImage(null);
                     }}
-                    className="kimix-inline-icon-action is-roomy absolute z-10 rounded-full bg-accent-danger/85 text-white opacity-95 hover:bg-accent-danger"
+                    className="kimix-inline-icon-action absolute z-10 rounded-full bg-accent-danger/85 text-white opacity-95 hover:bg-accent-danger"
                     style={{
-                      top: 6,
-                      right: 6,
+                      top: 4,
+                      right: 4,
                       padding: 0,
+                      width: 20,
+                      height: 20,
                       lineHeight: 0,
                     }}
                     title={isImage ? "移除图片" : "移除附件"}
                     aria-label={isImage ? "移除图片" : "移除附件"}
                   >
-                    <X size={13} style={{ display: "block" }} />
+                    <X size={10} style={{ display: "block" }} />
                   </button>
                 </div>
               );
