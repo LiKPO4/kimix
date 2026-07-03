@@ -1193,7 +1193,7 @@ function App() {
     const retryAfter = runtimePrewarmRetryAfterRef.current.get(session.id) ?? 0;
     if (runtimePrewarmInFlightRef.current.has(session.id) || retryAfter > Date.now()) return;
     const runtimeCandidate = session.runtimeSessionId ?? session.officialSessionId ?? null;
-    const lastOkKey = runtimeCandidate ? `${runtimeCandidate}:${permissionMode}:${defaultPlanMode}` : "";
+    const lastOkKey = runtimeCandidate ?? "";
     if (lastOkKey) {
       const lastOk = runtimePrewarmLastOkRef.current.get(session.id);
       if (lastOk === lastOkKey) return;
@@ -1252,7 +1252,7 @@ function App() {
         });
         syncCurrentSessionFromStore(latest.id);
         runtimePrewarmRetryAfterRef.current.delete(latest.id);
-        runtimePrewarmLastOkRef.current.set(latest.id, `${runtimeSessionId}:${useAppStore.getState().permissionMode}:${useAppStore.getState().defaultPlanMode}`);
+        runtimePrewarmLastOkRef.current.set(latest.id, runtimeSessionId);
 
         const latestPermission = useAppStore.getState().permissionMode;
         const latestPlanMode = useAppStore.getState().defaultPlanMode;
@@ -1271,7 +1271,7 @@ function App() {
     }, KIMI_RUNTIME_PREWARM_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [currentSession, runningSessionId, permissionMode, defaultPlanMode]);
+  }, [currentSession, runningSessionId]);
 
   const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);

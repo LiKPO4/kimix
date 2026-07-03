@@ -444,6 +444,7 @@ export function Composer() {
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
+  const pendingPermissionChangeRef = useRef<{ sessionId: string; mode: PermissionMode } | null>(null);
   const activeSession = liveSession ?? currentSession;
   const pendingMessages = currentSession
     ? allPendingMessages.filter((msg) => msg.sessionId === currentSession.id)
@@ -873,6 +874,14 @@ export function Composer() {
           // sendPrompt below will return a session/not-active error and we will
           // rebuild the runtime once. This avoids a full preflight handshake on
           // the hot path.
+          const latestPermissionMode = useAppStore.getState().permissionMode;
+          const permissionRes = await window.api.setKimiCodePermission({
+            sessionId: knownRuntimeSessionId,
+            mode: latestPermissionMode,
+          });
+          if (!permissionRes.success) {
+            throw new Error(`应用权限模式失败：${permissionRes.error}`);
+          }
           updateLinkStatus("消息发送中", "info");
           return knownRuntimeSessionId;
         }
@@ -908,7 +917,14 @@ export function Composer() {
             targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
             // Re-apply the current UI permission mode so a resumed session honours
             // full-access (yolo) instead of keeping its persisted permission.
-            await window.api.setKimiCodePermission({ sessionId: resumeRes.data.sessionId, mode: permissionMode }).catch(logError("setKimiCodePermission"));
+            const latestPermissionMode = useAppStore.getState().permissionMode;
+            const permissionRes = await window.api.setKimiCodePermission({
+              sessionId: resumeRes.data.sessionId,
+              mode: latestPermissionMode,
+            });
+            if (!permissionRes.success) {
+              throw new Error(`应用权限模式失败：${permissionRes.error}`);
+            }
             updateLinkStatus("消息发送中", "info");
             return resumeRes.data.sessionId;
           }
@@ -1883,6 +1899,15 @@ export function Composer() {
 
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     const previousMode = permissionMode;
+    setShowPermissionMenu(false);
+    if (previousMode === mode) return;
+    if (activeSession && isCurrentSessionRunning) {
+      pendingPermissionChangeRef.current = { sessionId: activeSession.id, mode };
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "已记录，将在当前轮结束后安全切换权限",
+      }));
+      return;
+    }
     setPermissionMode(mode);
     if (mode === "yolo" && clarificationToolMode !== "off") {
       setClarificationToolMode("off");
@@ -1890,13 +1915,12 @@ export function Composer() {
         detail: "已关闭需求澄清工具：官方 yolo 模式不支持开启",
       }));
     }
-    setShowPermissionMenu(false);
     // Only push to the SDK when a real runtime session exists. Using the UI-id
     // fallback here would hit "session not active" before the first message is
     // sent and wrongly roll the UI mode back. New sessions carry permissionMode
     // into createKimiCodeSession at send time, so the local update is enough.
     const runtimeSessionId = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId;
-    if (!runtimeSessionId || previousMode === mode) return;
+    if (!runtimeSessionId) return;
     const res = await window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode });
     if (!res.success) {
       setPermissionMode(previousMode);
@@ -1909,6 +1933,13 @@ export function Composer() {
       detail: "权限模式已切换",
     }));
   };
+
+  useEffect(() => {
+    const pending = pendingPermissionChangeRef.current;
+    if (!pending || isCurrentSessionRunning || activeSession?.id !== pending.sessionId) return;
+    pendingPermissionChangeRef.current = null;
+    void handleSetPermissionMode(pending.mode);
+  }, [activeSession?.id, isCurrentSessionRunning]);
 
   const handleTogglePlanMode = async () => {
     if (!canTogglePlanMode) return;

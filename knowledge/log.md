@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+* **Turn-boundary permission changes**: Permission and Plan preferences no longer invalidate runtime prewarm; active-turn permission changes are deferred and applied to the existing runtime before the next prompt. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Active-context lifecycle boundary**: Active project/session state now flushes on real unload and is never written from React effect cleanup, preventing Strict Mode/HMR from erasing startup restoration state. See [/project/kimix.md](/project/kimix.md).
 * **Bilingual default-title handling**: English and Chinese Kimi placeholder titles now share one fallback rule across catalog and live metadata paths. See [/project/kimix.md](/project/kimix.md).
 * **First-frame stale placeholder filtering**: Shell and sidebar now share the same rule for hiding expired empty official sessions before catalog reconciliation. See [/project/kimix.md](/project/kimix.md).
