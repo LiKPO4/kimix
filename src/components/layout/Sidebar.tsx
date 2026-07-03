@@ -10,7 +10,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { getSessionConversationActivityAt, isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -769,7 +769,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                       {isSessionBusy ? (
                                         <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
                                       ) : (
-                                        formatRelativeTime(s.updatedAt)
+                                        formatRelativeTime(getSessionConversationActivityAt(s))
                                       )}
                                     </span>
                                     <div className="absolute inset-0 flex items-center justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -847,7 +847,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.10</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.13.11</span>
         </button>
       </div>
     </aside>

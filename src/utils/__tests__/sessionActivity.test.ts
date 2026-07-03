@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { getSessionConversationActivityAt, hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -50,5 +50,28 @@ describe("sessionActivity", () => {
     expect(isTimelineEventActive(staleAssistant, 1)).toBe(true);
     expect(isTimelineEventActive(staleAssistant, 1 + 3 * 60 * 1000)).toBe(false);
     expect(isSessionRuntimeRunning(session([staleAssistant]), null, 1 + 3 * 60 * 1000)).toBe(false);
+  });
+
+  it("uses the latest message time instead of runtime metadata updates", () => {
+    const restored = {
+      ...session([
+        { id: "user-1", type: "user_message", timestamp: 100, content: "Hello" },
+        { id: "tool-1", type: "tool_call", timestamp: 900, toolCallId: "call-1", toolName: "Read", status: "completed", arguments: {} },
+        { id: "assistant-1", type: "assistant_message", timestamp: 200, content: "Done", isThinking: false, isComplete: true },
+      ]),
+      updatedAt: 1_000,
+    } satisfies Session;
+
+    expect(getSessionConversationActivityAt(restored)).toBe(200);
+  });
+
+  it("moves recency forward after a new conversational message", () => {
+    const active = session([
+      { id: "assistant-1", type: "assistant_message", timestamp: 200, content: "Done", isThinking: false, isComplete: true },
+      { id: "user-2", type: "user_message", timestamp: 500, content: "Continue" },
+    ]);
+
+    expect(getSessionConversationActivityAt(active)).toBe(500);
+    expect(getSessionConversationActivityAt({ ...active, events: [], updatedAt: 700 })).toBe(700);
   });
 });

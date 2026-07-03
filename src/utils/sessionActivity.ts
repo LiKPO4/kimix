@@ -2,6 +2,22 @@ import type { Session, TimelineEvent } from "@/types/ui";
 import type { KimiCodeEngineStatus } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "./runtimeSession";
 
+const CONVERSATION_ACTIVITY_TYPES = new Set<TimelineEvent["type"]>([
+  "user_message",
+  "steer_message",
+  "assistant_message",
+]);
+
+export function getSessionConversationActivityAt(session: Session): number {
+  for (let index = session.events.length - 1; index >= 0; index -= 1) {
+    const event = session.events[index];
+    if (CONVERSATION_ACTIVITY_TYPES.has(event.type) && Number.isFinite(event.timestamp)) {
+      return event.timestamp;
+    }
+  }
+  return session.updatedAt;
+}
+
 const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
 
 export function isTerminalKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {

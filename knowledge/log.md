@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+* **Conversation-based sidebar recency**: Sidebar times now prefer the latest conversational event instead of generic session metadata updates. See [/project/kimix.md](/project/kimix.md).
 * **Markdown horizontal overflow containment**: Prose and inline code visually wrap long unbroken paths while fenced code, tables, and formulas keep local overflow ownership. See [/project/kimix.md](/project/kimix.md).
 * **Catalog-time title parity**: SDK summaries now carry first-prompt briefs and custom-title metadata so unlocked sidebar titles match post-hydration titles before users open a session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Explicit SDK archive reconciliation**: SDK catalogs include archived summaries so official `archived: true` identities close local mirrors and any stale loading view without relying on absence inference. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
