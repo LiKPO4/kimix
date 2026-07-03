@@ -921,16 +921,13 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
   const hasDetail = detailText.trim().length > 0;
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
-    >
+    <div className="flex flex-col">
       <button
         type="button"
         onClick={() => hasDetail && setExpanded((value) => !value)}
         disabled={!hasDetail}
         className="flex w-full items-center text-left text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 8, minHeight: 42, paddingTop: 3, paddingBottom: 3 }}
+        style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           <SquareTerminal size={13} />
@@ -995,7 +992,7 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   return (
     <div
       className="flex items-center text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]"
-      style={{ gap: 8, minHeight: 42, paddingTop: 3, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
+      style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
       <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
         {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
@@ -1050,7 +1047,7 @@ function KimiWebApprovalRow({ approval, isLast }: { approval: ApprovalEvent; isL
   return (
     <div
       className="flex items-center text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]"
-      style={{ gap: 8, minHeight: 42, paddingTop: 3, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
+      style={{ gap: 8, minHeight: 42, paddingTop: 4, paddingBottom: 3, borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
       <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
         <ShieldCheck size={13} />
