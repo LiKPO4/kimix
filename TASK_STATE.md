@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-03 v2.14.6 权限切换绑定真实轮次边界
+- 现象：超过两分钟的最后一个工具仍在运行时，延后的权限切换可能提前生效，随后没有 Assistant 正文。
+- 根因：Composer 以 `isCurrentSessionRunning` 下降沿代替官方轮次结束；该派生状态会受两分钟活动事件过期、`runningSessionId` 抖动和 status 对账影响，并不等价于 `turn.ended`。
+- 修复：待切换权限绑定 UI 会话与 runtime ID；仅同一 runtime 的非快照 `turn.ended` 能消费，工具完成、轮询终态和历史/在途快照回放均不能提前触发。
+
 ## 2026-07-03 v2.14.5 运行中权限切换隔离
 - 现象：切换权限模式偶发打开新窗口；在当前轮执行中切换时，可能导致本轮对话丢失。
 - 根因：权限状态更新既直接调用官方 `setPermission`，又触发 runtime 预热 effect 重新 resume/create，会并发竞争同一 UI 会话的 runtime 绑定。

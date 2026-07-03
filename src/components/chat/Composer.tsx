@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Plus, AlertTriangle, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -19,6 +19,7 @@ import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
+import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/utils/pendingPermissionChange";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -444,7 +445,7 @@ export function Composer() {
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
-  const pendingPermissionChangeRef = useRef<{ sessionId: string; mode: PermissionMode } | null>(null);
+  const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
   const pendingMessages = currentSession
     ? allPendingMessages.filter((msg) => msg.sessionId === currentSession.id)
@@ -1897,17 +1898,8 @@ export function Composer() {
     }));
   };
 
-  const handleSetPermissionMode = async (mode: PermissionMode) => {
-    const previousMode = permissionMode;
-    setShowPermissionMenu(false);
-    if (previousMode === mode) return;
-    if (activeSession && isCurrentSessionRunning) {
-      pendingPermissionChangeRef.current = { sessionId: activeSession.id, mode };
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "已记录，将在当前轮结束后安全切换权限",
-      }));
-      return;
-    }
+  const applyPermissionMode = useCallback(async (mode: PermissionMode, runtimeSessionId?: string) => {
+    const previousMode = useAppStore.getState().permissionMode;
     setPermissionMode(mode);
     if (mode === "yolo" && clarificationToolMode !== "off") {
       setClarificationToolMode("off");
@@ -1919,7 +1911,6 @@ export function Composer() {
     // fallback here would hit "session not active" before the first message is
     // sent and wrongly roll the UI mode back. New sessions carry permissionMode
     // into createKimiCodeSession at send time, so the local update is enough.
-    const runtimeSessionId = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId;
     if (!runtimeSessionId) return;
     const res = await window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode });
     if (!res.success) {
@@ -1932,14 +1923,38 @@ export function Composer() {
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: "权限模式已切换",
     }));
+  }, [clarificationToolMode, setClarificationToolMode, setPermissionMode]);
+
+  const handleSetPermissionMode = async (mode: PermissionMode) => {
+    const previousMode = permissionMode;
+    setShowPermissionMenu(false);
+    if (previousMode === mode) return;
+    if (activeSession && isCurrentSessionRunning) {
+      if (!activeRuntimeSessionId) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: "当前轮 runtime 尚未就绪，无法记录权限切换",
+        }));
+        return;
+      }
+      pendingPermissionChangeRef.current = {
+        sessionId: activeSession.id,
+        runtimeSessionId: activeRuntimeSessionId,
+        mode,
+      };
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "已记录，将在当前轮结束后安全切换权限",
+      }));
+      return;
+    }
+    await applyPermissionMode(mode, activeRuntimeSessionId);
   };
 
-  useEffect(() => {
+  useEffect(() => window.api.onKimiCodeEvent((payload) => {
     const pending = pendingPermissionChangeRef.current;
-    if (!pending || isCurrentSessionRunning || activeSession?.id !== pending.sessionId) return;
+    if (!isPendingPermissionTurnEnded(pending, payload)) return;
     pendingPermissionChangeRef.current = null;
-    void handleSetPermissionMode(pending.mode);
-  }, [activeSession?.id, isCurrentSessionRunning]);
+    void applyPermissionMode(pending.mode, pending.runtimeSessionId);
+  }), [applyPermissionMode]);
 
   const handleTogglePlanMode = async () => {
     if (!canTogglePlanMode) return;
