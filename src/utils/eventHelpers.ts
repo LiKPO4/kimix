@@ -147,6 +147,24 @@ export function hasLocalFailedSendAttempt(events: TimelineEvent[], userEventId: 
   return sawLocalSendMarker;
 }
 
+export function hasLocalOrphanUserSendAttempt(events: TimelineEvent[], userEventId: string): boolean {
+  const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
+  if (userIndex === -1) return false;
+
+  for (let index = userIndex + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "user_message" || event.type === "steer_message") return false;
+    if (event.type === "status_update") continue;
+    if (event.type === "assistant_message") {
+      if (isEmptyAssistantEvent(event)) continue;
+      return false;
+    }
+    if (event.type === "error") return true;
+    if (isRealTurnOutput(event)) return false;
+  }
+  return true;
+}
+
 export function removeLocalUserSendAttempt(events: TimelineEvent[], userEventId: string): TimelineEvent[] {
   const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
   if (userIndex === -1) return events;

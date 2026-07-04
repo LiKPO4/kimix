@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasMalformedAssistantMarkdown, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -88,6 +88,24 @@ describe("eventHelpers", () => {
 
     expect(hasLocalFailedSendAttempt(failedEvents, "user-1")).toBe(true);
     expect(hasLocalFailedSendAttempt(completedEvents, "user-1")).toBe(false);
+  });
+
+  it("marks a trailing user message without real output as a local orphan attempt", () => {
+    const events: TimelineEvent[] = [
+      { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "继续说。", isThinking: false, isComplete: true },
+      { id: "user-1", type: "user_message", timestamp: 2, content: "卡住了吗" },
+    ];
+
+    expect(hasLocalOrphanUserSendAttempt(events, "user-1")).toBe(true);
+  });
+
+  it("does not mark a user message with real assistant output as an orphan attempt", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "你好。", isThinking: false, isComplete: true },
+    ];
+
+    expect(hasLocalOrphanUserSendAttempt(events, "user-1")).toBe(false);
   });
 
   it("does not remove real assistant content after deleting a user message", () => {

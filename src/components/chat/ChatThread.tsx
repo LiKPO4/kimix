@@ -18,7 +18,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
-import { hasLocalFailedSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
+import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError } from "@/utils/reportError";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
@@ -1522,7 +1522,10 @@ export const ChatThread = memo(function ChatThread() {
     if (!session) return;
     const timestamp = Date.now();
     updateSession(session.id, (current) => {
-      if (!hasLocalFailedSendAttempt(current.events, eventId)) return current;
+      const currentRuntimeSessionId = getRuntimeSessionId(current);
+      const isCurrentSessionRunning = runningSessionId === current.id ||
+        Boolean(currentRuntimeSessionId && runningSessionId === currentRuntimeSessionId);
+      if (!hasLocalFailedSendAttempt(current.events, eventId) && (isCurrentSessionRunning || !hasLocalOrphanUserSendAttempt(current.events, eventId))) return current;
       return {
         ...current,
         events: removeLocalUserSendAttempt(current.events, eventId),
@@ -1530,14 +1533,7 @@ export const ChatThread = memo(function ChatThread() {
       };
     });
     syncCurrentSessionAfterLocalEdit(session.id);
-  }, [session, syncCurrentSessionAfterLocalEdit, updateSession]);
-
-  const deletableUserMessageIds = useMemo(() => {
-    if (!session) return new Set<string>();
-    return new Set(session.events
-      .filter((event) => event.type === "user_message" && hasLocalFailedSendAttempt(session.events, event.id))
-      .map((event) => event.id));
-  }, [session]);
+  }, [runningSessionId, session, syncCurrentSessionAfterLocalEdit, updateSession]);
 
   // Anchor capture (getBoundingClientRect + querySelectorAll) is expensive and
   // triggers forced layout. Keep it out of the hot scroll path; scrolling only
@@ -1635,6 +1631,15 @@ export const ChatThread = memo(function ChatThread() {
     runningSessionId === session.id ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   ));
+  const deletableUserMessageIds = useMemo(() => {
+    if (!session) return new Set<string>();
+    return new Set(session.events
+      .filter((event) => event.type === "user_message" && (
+        hasLocalFailedSendAttempt(session.events, event.id) ||
+        (!hasActiveTurn && hasLocalOrphanUserSendAttempt(session.events, event.id))
+      ))
+      .map((event) => event.id));
+  }, [hasActiveTurn, session]);
   const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
