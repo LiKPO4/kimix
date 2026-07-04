@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.30 Swarm 会话级锁定入口
+- 当前目标：恢复 Swarm 主打入口，同时避免为 Swarm 再引入会话分支、同名对话或 Server/SDK 路由漂移。
+- 修复：`+` 菜单在“需求澄清”下方新增 Swarm 模式；空闲会话可开启，运行中提示本轮结束后再开启；开启后本会话锁定，不能关闭。
+- 路由边界：Server-backed 会话开启 Swarm 时同一个官方 session id 切到 SDK route，并在 Host 层 pin 住，后续 prompt 不再自动 promote 回 Server。
+- 下一步：实机验证空会话/已有空闲会话开启 Swarm 后，不新增同名对话，下一条消息进入 Swarm，运行中点击只提示不切路由。
+
 ## 2026-07-04 Kimi Code 0.22.x 官方能力复核
 - 当前目标：确认官方最近版本里哪些能力可以减少 Kimix 内部兼容层，而不是继续用曲线救国。
 - 已完成：确认本机 CLI 与 npm latest 均为 `0.22.2`；`scripts/probe-kimi-code-plugins.mjs` 改为隔离临时 `KIMI_CODE_HOME` fixture，验证 SDK/RPC 可 `listPluginCommands()` 并 `activatePluginCommand()`，成功产生 `plugin_command.activated`、`turn.started/ended` 和 `session.meta.updated`。

@@ -106,6 +106,8 @@ export interface Session {
   kimiHistoryCacheVersion?: number;
   /** 最近一次被官方 Server/SDK 会话目录确认可见的时间。 */
   officialCatalogConfirmedAt?: number;
+  /** 本会话已锁定官方 Swarm 模式；锁定后保持同一官方会话 ID 走 SDK 兼容路由，不再回退到 Server。 */
+  swarmModeLockedAt?: number;
   titleLocked?: boolean;
   model?: string | null;
   /** 最近一次会话模型切换时间，用于阻止空闲状态污染上一轮消息元信息。 */

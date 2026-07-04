@@ -470,6 +470,7 @@ export function Composer() {
   const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const hasActiveAssistantTurn = isCurrentSessionRunning;
+  const swarmModeLocked = Boolean(activeSession?.swarmModeLockedAt);
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
     isCurrentSessionRunning
@@ -970,6 +971,16 @@ export function Composer() {
 
       try {
         let kimiCodeSessionId = await ensureKimiCodeRuntime();
+        if (targetSession.swarmModeLockedAt) {
+          const swarmRes = await window.api.swarmKimiCode({
+            sessionId: kimiCodeSessionId,
+            enabled: true,
+            trigger: "manual",
+          });
+          if (!swarmRes.success) {
+            throw new Error(`应用 Swarm 模式失败：${swarmRes.error}`);
+          }
+        }
         const markPromptDispatchStarted = () => {
           const startedAt = Date.now();
           updateSession(targetSession.id, (session) => ({
@@ -1109,6 +1120,19 @@ export function Composer() {
     });
   };
 
+  const lockSwarmModeForSession = (uiSessionId: string) => {
+    const timestamp = Date.now();
+    updateSession(uiSessionId, (session) => ({
+      ...session,
+      swarmModeLockedAt: session.swarmModeLockedAt ?? timestamp,
+      updatedAt: timestamp,
+    }));
+    const updated = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    if (updated && useAppStore.getState().currentSession?.id === uiSessionId) {
+      setCurrentSession(updated);
+    }
+  };
+
   const ensureOfficialRuntimeForSession = async () => {
     const targetSession = await ensureSession();
     if (!targetSession) return null;
@@ -1148,6 +1172,58 @@ export function Composer() {
     const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
     if (updated) setCurrentSession(updated);
     return { uiSessionId: targetSession.id, runtimeSessionId: createRes.data.sessionId };
+  };
+
+  const enableSwarmModeForCurrentSession = async (options?: { feedback?: "toast" | "status" }) => {
+    const feedback = options?.feedback ?? "toast";
+    const latestActiveSession = activeSession
+      ? useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession
+      : null;
+    if (latestActiveSession?.swarmModeLockedAt) {
+      if (feedback === "status") await appendStatusMessage("Swarm 模式已为本会话锁定。");
+      else {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: "Swarm 模式已为本会话锁定",
+        }));
+      }
+      return true;
+    }
+    if (latestActiveSession && isSessionRuntimeRunning(latestActiveSession, useAppStore.getState().runningSessionId)) {
+      const message = "当前轮正在运行，结束后再开启 Swarm。";
+      if (feedback === "status") await appendStatusMessage(message);
+      else {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: message,
+        }));
+      }
+      return false;
+    }
+    const runtime = await ensureOfficialRuntimeForSession();
+    if (!runtime) return false;
+    const res = await window.api.swarmKimiCode({
+      sessionId: runtime.runtimeSessionId,
+      enabled: true,
+      trigger: "manual",
+    });
+    if (!res.success) {
+      const message = `Swarm 模式开启失败：${res.error}`;
+      if (feedback === "status") await appendStatusMessage(message);
+      else {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: message,
+        }));
+      }
+      return false;
+    }
+    lockSwarmModeForSession(runtime.uiSessionId);
+    if (feedback === "status") {
+      await appendStatusMessage("Swarm 模式已为本会话锁定；后续消息会继续走同一会话的 SDK 兼容链路。");
+    } else {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "Swarm 模式已为本会话锁定",
+      }));
+    }
+    return true;
   };
 
   const syncOfficialGoal = (uiSessionId: string, goal: unknown, error?: string | null) => {
@@ -1384,8 +1460,6 @@ export function Composer() {
     }
     if (name === "swarm") {
       const normalized = args.toLowerCase();
-      const runtime = await ensureOfficialRuntimeForSession();
-      if (!runtime) return true;
       if (!args) {
         await appendSlashUserMessage(commandNotice);
         await appendStatusMessage("请输入 Swarm 任务，例如：/swarm 并行检查最近改动并给出修复建议；也可使用 /swarm on 或 /swarm off 切换模式。");
@@ -1394,11 +1468,27 @@ export function Composer() {
       if (normalized === "on" || normalized === "off") {
         await appendSlashUserMessage(commandNotice);
         const enabled = normalized === "on";
+        if (enabled) {
+          await enableSwarmModeForCurrentSession({ feedback: "status" });
+          return true;
+        }
+        const latestUiSessionId = activeSession?.id ?? currentSession?.id;
+        const latestSession = latestUiSessionId
+          ? useSessionStore.getState().sessions.find((session) => session.id === latestUiSessionId)
+          : null;
+        if (latestSession?.swarmModeLockedAt) {
+          await appendStatusMessage("本会话 Swarm 模式已锁定，不能关闭。");
+          return true;
+        }
+        const runtime = await ensureOfficialRuntimeForSession();
+        if (!runtime) return true;
         const res = await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, enabled, trigger: "manual" });
-        await appendStatusMessage(res.success ? (enabled ? "Swarm 模式已开启。" : "Swarm 模式已关闭。") : `Swarm 模式切换失败：${res.error}`);
+        await appendStatusMessage(res.success ? "Swarm 模式已关闭。" : `Swarm 模式切换失败：${res.error}`);
         return true;
       }
 
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
       const userEvent: TimelineEvent = {
         id: genId(),
         type: "user_message",
@@ -1421,6 +1511,9 @@ export function Composer() {
       }));
       setRunningSessionId(runtime.uiSessionId);
       const modeRes = await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, enabled: true, trigger: "task" });
+      if (modeRes.success) {
+        lockSwarmModeForSession(runtime.uiSessionId);
+      }
       const res = modeRes.success ? await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, content: args }) : modeRes;
       if (!res.success) {
         setRunningSessionId(null);
@@ -2829,6 +2922,38 @@ export function Composer() {
                             );
                           })}
                         </div>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
+                      <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
+                            <Zap size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                            <span>Swarm 模式</span>
+                          </div>
+                          <p className="m-0 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
+                            多子代理并行推进，开启后本会话锁定
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!canUseComposer || swarmModeLocked}
+                          onClick={() => {
+                            setShowAddMenu(false);
+                            void enableSwarmModeForCurrentSession({ feedback: "toast" });
+                          }}
+                          className={`kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] disabled:cursor-not-allowed disabled:opacity-55 ${swarmModeLocked ? "text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                          style={{ minWidth: 72, height: 32, paddingLeft: 12, paddingRight: 12 }}
+                          title={swarmModeLocked
+                            ? "Swarm 已为本会话锁定，后续消息继续在同一会话中使用"
+                            : hasActiveAssistantTurn
+                              ? "当前轮正在运行，结束后再开启 Swarm"
+                              : "开启 Swarm 后，本会话会锁定同一官方会话 ID 的 SDK 兼容链路"
+                          }
+                        >
+                          {swarmModeLocked ? "已锁定" : "开启"}
+                        </button>
                       </div>
                     </section>
 

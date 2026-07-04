@@ -2,6 +2,7 @@
 
 ## 2026-07-04
 
+* **Session-locked Swarm route**: Swarm remains SDK-only, but an idle Server-backed conversation may switch the same official session ID to SDK and stay pinned there instead of forking or later promoting back to Server. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **SDK Plugin command boundary**: SDK slash completion may expose current-session Plugin manifest commands and activate them through official `activatePluginCommand`, while Server sessions must not route those commands through the temporary plugin-management session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Same-ID Skill registry refresh**: Missing `/skill:...` activation now prefers reloading the same session ID; idle Server sessions may degrade to SDK route under that ID because Server 0.22 lacks reload REST, with `skill-*` fork retained only as fallback. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Read-only session hydration**: Opening or searching an old session may fill history but must not rewrite non-default titles or refresh recency; navigation clicks are not conversation activity. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

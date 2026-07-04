@@ -599,7 +599,7 @@ const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
 const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
 const SERVER_RELOAD_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂不支持直接重载配置；如需刷新 Skill、Plugin 或配置，请新建或 fork 会话。";
 const SERVER_GOAL_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Goal API；请使用兼容会话或等待官方 Server 支持。";
-const SERVER_SWARM_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Swarm API；请使用兼容会话或等待官方 Server 支持。";
+const sdkPinnedSessionIds = new Set<string>();
 let nextRequestId = 0;
 let activeLoginAbort: AbortController | null = null;
 const KIMI_CODE_MANAGED_PROVIDER_NAME = "managed:kimi-code";
@@ -805,7 +805,10 @@ export async function renameSession(sessionId: string, title: string): Promise<v
 export async function reloadSession(sessionId: string): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    await reloadServerSessionThroughSdk(sessionId, serverManaged);
+    await migrateServerSessionToSdk(sessionId, serverManaged, {
+      forcePluginSessionStartReminder: true,
+      runningMessage: "当前轮正在运行，不能刷新 Skill 注册表。请等本轮结束后重试。",
+    });
     return;
   }
   const managed = getManagedSession(sessionId);
@@ -813,17 +816,22 @@ export async function reloadSession(sessionId: string): Promise<void> {
   await managed.session.reloadSession({ forcePluginSessionStartReminder: true });
 }
 
-async function reloadServerSessionThroughSdk(
+async function migrateServerSessionToSdk(
   sessionId: string,
   serverManaged: ServerManagedSession,
-): Promise<void> {
+  options: {
+    forcePluginSessionStartReminder?: boolean;
+    pinToSdk?: boolean;
+    runningMessage: string;
+  },
+): Promise<ManagedSession> {
   if (serverManaged.status === "running" || serverManaged.status === "waiting_approval" || serverManaged.status === "waiting_question") {
-    throw new Error("当前轮正在运行，不能刷新 Skill 注册表。请等本轮结束后重试。");
+    throw new Error(options.runningMessage);
   }
 
   const sdkHarness = await getHarness();
   let session: KimiCodeSessionLike;
-  if (sdkHarness.reloadSession) {
+  if (options.forcePluginSessionStartReminder && sdkHarness.reloadSession) {
     session = await sdkHarness.reloadSession({
       id: sessionId,
       forcePluginSessionStartReminder: true,
@@ -833,8 +841,10 @@ async function reloadServerSessionThroughSdk(
       id: sessionId,
       additionalDirs: serverManaged.additionalDirs,
     });
-    if (!session.reloadSession) throw new Error(SERVER_RELOAD_UNSUPPORTED_MESSAGE);
-    await session.reloadSession({ forcePluginSessionStartReminder: true });
+    if (options.forcePluginSessionStartReminder) {
+      if (!session.reloadSession) throw new Error(SERVER_RELOAD_UNSUPPORTED_MESSAGE);
+      await session.reloadSession({ forcePluginSessionStartReminder: true });
+    }
   }
 
   let status: KimiCodeSessionStatus | undefined;
@@ -860,12 +870,16 @@ async function reloadServerSessionThroughSdk(
     kimiCodeServerHost.setRouting("sdk");
   }
 
+  if (options.pinToSdk) {
+    sdkPinnedSessionIds.add(sessionId);
+  }
   registerSession(session, "idle", {
     model: status?.model ?? serverManaged.model,
     thinking: status?.thinkingEffort ?? status?.thinkingLevel ?? serverManaged.thinking,
     permission,
     planMode: status?.planMode ?? serverManaged.planMode,
   });
+  return getManagedSession(sessionId);
 }
 
 export async function setModel(sessionId: string, model: string): Promise<void> {
@@ -962,7 +976,7 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
     serverManaged = serverSessions.get(sessionId);
   }
   await ensureModelOutputLimitBeforePrompt(serverManaged?.model ?? sessions.get(sessionId)?.model);
-  serverManaged ??= await promoteSdkSessionToServer(sessionId);
+  serverManaged ??= sdkPinnedSessionIds.has(sessionId) ? undefined : await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
     try {
@@ -1000,6 +1014,7 @@ export async function sendPrompt(sessionId: string, input: string | KimiCodeProm
 }
 
 async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManagedSession | undefined> {
+  if (sdkPinnedSessionIds.has(sessionId)) return undefined;
   const sdkManaged = sessions.get(sessionId);
   if (!sdkManaged || !shouldRouteNewSessionToServer()) return undefined;
   if (sdkManaged.status === "running" || sdkManaged.status === "waiting_approval" || sdkManaged.status === "waiting_question") {
@@ -1044,19 +1059,36 @@ function scheduleServerRecovery() {
 }
 
 export async function setSwarmMode(sessionId: string, enabled: boolean, trigger: "manual" | "task" = "manual"): Promise<void> {
-  if (serverSessions.has(sessionId)) throw new Error(SERVER_SWARM_UNSUPPORTED_MESSAGE);
+  sessionId = resolveMigratedSessionId(sessionId);
+  if (!enabled && sdkPinnedSessionIds.has(sessionId)) {
+    throw new Error("本会话 Swarm 模式已锁定，不能关闭。");
+  }
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await migrateServerSessionToSdk(sessionId, serverManaged, {
+      runningMessage: "当前轮正在运行，不能开启 Swarm。请等本轮结束后重试。",
+    });
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.setSwarmMode) throw new Error("当前兼容链路不支持 Swarm 模式。");
   await managed.session.setSwarmMode(enabled, trigger);
+  if (enabled) sdkPinnedSessionIds.add(sessionId);
 }
 
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
-  if (serverSessions.has(sessionId)) throw new Error(SERVER_SWARM_UNSUPPORTED_MESSAGE);
+  sessionId = resolveMigratedSessionId(sessionId);
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await migrateServerSessionToSdk(sessionId, serverManaged, {
+      runningMessage: "当前轮正在运行，不能发起 Swarm。请等本轮结束后重试。",
+    });
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.swarm) throw new Error("当前兼容链路不支持 Swarm。");
   setStatus(sessionId, "running");
   try {
     await managed.session.swarm(input);
+    sdkPinnedSessionIds.add(sessionId);
   } catch (error) {
     setStatus(sessionId, "error");
     throw error;
@@ -2010,6 +2042,7 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
 
 export async function closeSession(sessionId: string): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
+  sdkPinnedSessionIds.delete(sessionId);
   if (serverSessions.has(sessionId)) {
     serverSessions.delete(sessionId);
     await getServerClient().unsubscribe(sessionId);
