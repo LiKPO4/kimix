@@ -100,6 +100,8 @@ export interface Session {
   officialSessionId?: string;
   /** 当前官方 runtime 已加载到的本地 Agent Skill 最新修改时间。 */
   skillRegistrySyncedAt?: number;
+  /** Kimix 为刷新 Skill 注册表创建的透明 fork 父会话，用于历史加载兜底与目录折叠。 */
+  skillForkParentSessionId?: string;
   /** Kimix 官方历史映射格式版本，用于一次性刷新旧的本地事件缓存。 */
   kimiHistoryCacheVersion?: number;
   /** 最近一次被官方 Server/SDK 会话目录确认可见的时间。 */

@@ -58,15 +58,46 @@ function transparentSkillForkParent(item: OfficialSessionCatalogItem): string | 
   return typeof forkedFrom === "string" && forkedFrom.trim() ? forkedFrom : undefined;
 }
 
+function normalizedCatalogTitle(item: OfficialSessionCatalogItem): string {
+  return (catalogTitle(item) ?? "").trim().toLowerCase();
+}
+
+function inferTransparentSkillForkParent(
+  item: OfficialSessionCatalogItem,
+  candidates: OfficialSessionCatalogItem[],
+  projectPath: string,
+): string | undefined {
+  const explicitParent = transparentSkillForkParent(item);
+  if (explicitParent) return explicitParent;
+  if (!item.id.startsWith("skill-")) return undefined;
+  const title = normalizedCatalogTitle(item);
+  if (!title) return undefined;
+  const normalizedProjectPath = normalizeProjectPath(item.workDir || projectPath);
+  const parentCandidates = candidates
+    .filter((candidate) => (
+      candidate.id !== item.id &&
+      candidate.archived !== true &&
+      normalizeProjectPath(candidate.workDir || projectPath) === normalizedProjectPath &&
+      normalizedCatalogTitle(candidate) === title &&
+      (candidate.updatedAt || 0) <= (item.updatedAt || 0)
+    ))
+    .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
+  if (parentCandidates.length === 0) return undefined;
+  const latestUpdatedAt = parentCandidates[0].updatedAt || 0;
+  const latestParents = parentCandidates.filter((candidate) => (candidate.updatedAt || 0) === latestUpdatedAt);
+  return latestParents.length === 1 ? latestParents[0].id : undefined;
+}
+
 function officialLineageIds(
   item: OfficialSessionCatalogItem,
   byId: Map<string, OfficialSessionCatalogItem>,
+  parentById: Map<string, string>,
 ): Set<string> {
   const ids = new Set<string>();
   let current: OfficialSessionCatalogItem | undefined = item;
   while (current && !ids.has(current.id)) {
     ids.add(current.id);
-    const parentId = transparentSkillForkParent(current);
+    const parentId = parentById.get(current.id);
     if (!parentId) break;
     const parent = byId.get(parentId);
     if (!parent) {
@@ -124,8 +155,13 @@ export function reconcileOfficialSessionCatalog(
   const normalizedProjectPath = normalizeProjectPath(projectPath);
   const serverAuthoritative = options.source === "server" || officialSessions.some((session) => session.source === "server");
   const officialById = new Map(officialSessions.map((session) => [session.id, session]));
+  const parentById = new Map<string, string>();
+  for (const official of officialSessions) {
+    const parentId = inferTransparentSkillForkParent(official, officialSessions, projectPath);
+    if (parentId) parentById.set(official.id, parentId);
+  }
   const supersededOfficialIds = new Set(
-    officialSessions.map(transparentSkillForkParent).filter((id): id is string => Boolean(id)),
+    Array.from(parentById.values()),
   );
   const effectiveOfficialSessions = officialSessions.filter((official) => !supersededOfficialIds.has(official.id));
   const visibleOfficialIds = new Set(
@@ -148,7 +184,8 @@ export function reconcileOfficialSessionCatalog(
   for (const official of effectiveOfficialSessions) {
     if (!official.id || normalizeProjectPath(official.workDir || projectPath) !== normalizedProjectPath) continue;
     if (official.archived === true) continue;
-    const lineageIds = officialLineageIds(official, officialById);
+    const lineageIds = officialLineageIds(official, officialById, parentById);
+    const skillForkParentSessionId = parentById.get(official.id);
     const hasArchivedExactMirror = next.some((session) => (
       Boolean(session.archivedAt) && belongsToOfficialSession(session, official.id)
     ));
@@ -169,12 +206,13 @@ export function reconcileOfficialSessionCatalog(
         updatedAt === existing.updatedAt &&
         officialSessionId === existing.officialSessionId &&
         runtimeSessionId === existing.runtimeSessionId &&
+        skillForkParentSessionId === existing.skillForkParentSessionId &&
         engine === existing.engine &&
         title === existing.title &&
         existing.officialCatalogConfirmedAt
       ) continue;
       if (next === sessions) next = [...sessions];
-      next[existingIndex] = { ...existing, engine, runtimeSessionId, officialSessionId, title, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
+      next[existingIndex] = { ...existing, engine, runtimeSessionId, officialSessionId, skillForkParentSessionId, title, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
       changed = true;
       continue;
     }
@@ -184,6 +222,7 @@ export function reconcileOfficialSessionCatalog(
       id: official.id,
       engine: "kimi-code",
       officialSessionId: official.id,
+      skillForkParentSessionId,
       officialCatalogConfirmedAt: catalogConfirmedAt,
       model: null,
       title: catalogTitle(official) ?? "新会话",

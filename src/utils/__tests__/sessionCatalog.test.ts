@@ -228,6 +228,30 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result.find((session) => session.id === "session-parent")?.archivedAt).toBeTypeOf("number");
   });
 
+  it("metadata 丢失时仍把 skill-* 刷新 fork 折叠到原本地会话", () => {
+    const parent = localSession({
+      id: "local-conversation",
+      officialSessionId: "session-parent",
+      runtimeSessionId: "session-parent",
+      title: "不对，我是说之前...",
+      events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "原对话" }],
+    });
+    const result = reconcileOfficialSessionCatalog([parent], [
+      { id: "session-parent", workDir: "D:\\work\\demo", updatedAt: 100, title: "不对，我是说之前...", source: "sdk" },
+      { id: "skill-e19fe630-af18-439b-9ccf-b17fb747bdd1", workDir: "D:\\work\\demo", updatedAt: 200, title: "不对，我是说之前...", source: "sdk" },
+    ], "D:\\work\\demo", { source: "sdk" });
+
+    const visible = result.filter((session) => !session.archivedAt);
+    expect(visible).toHaveLength(1);
+    expect(visible[0]).toMatchObject({
+      id: "local-conversation",
+      officialSessionId: "skill-e19fe630-af18-439b-9ccf-b17fb747bdd1",
+      runtimeSessionId: "skill-e19fe630-af18-439b-9ccf-b17fb747bdd1",
+      skillForkParentSessionId: "session-parent",
+    });
+    expect(visible[0].events).toEqual(parent.events);
+  });
+
   it("不按标题合并真正独立的同名会话或用户手动分支", () => {
     const result = reconcileOfficialSessionCatalog([], [
       { id: "session-a", workDir: "D:\\work\\demo", updatedAt: 300, title: "同名", source: "server" },

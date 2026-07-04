@@ -1576,6 +1576,7 @@ export function Composer() {
       engine: "kimi-code",
       runtimeSessionId: nextRuntimeSessionId,
       officialSessionId: nextRuntimeSessionId,
+      skillForkParentSessionId: runtimeSessionId,
       skillRegistrySyncedAt: syncedAt,
       updatedAt: Date.now(),
     }));
