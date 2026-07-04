@@ -16,6 +16,7 @@ import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { reportError } from "@/utils/reportError";
 import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
+import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -567,16 +568,20 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       }
       return;
     }
-    updateSession(session.id, (current) => ({
-      ...current,
-      events: !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events,
-      kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-      title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
-        !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events,
-        current.title,
-      ),
-      isLoading: false,
-    }));
+    updateSession(session.id, (current) => {
+      const hydratedEvents = !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events;
+      return {
+        ...current,
+        events: hydratedEvents,
+        model: getLastUsedModelFromEvents(hydratedEvents) ?? current.model,
+        kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+        title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
+          hydratedEvents,
+          current.title,
+        ),
+        isLoading: false,
+      };
+    });
     const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
     if (updated) {
       syncProjectForSession(updated);
@@ -927,7 +932,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.39</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.40</span>
         </button>
       </div>
     </aside>

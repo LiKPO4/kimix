@@ -32,3 +32,22 @@ export function getLastUsedModelFromEvents(events: { type: string; message?: str
   }
   return null;
 }
+
+export function getSessionModelForDisplay(input: {
+  events: Array<{ type: string; timestamp?: number; message?: string | null; model?: string | null }>;
+  sessionModel?: string | null;
+  modelSwitchedAt?: number;
+}): string | null {
+  const sessionModel = input.sessionModel?.trim() || null;
+  const lastUsedModel = getLastUsedModelFromEvents(input.events);
+  const hasModelEvidenceAfterSwitch = typeof input.modelSwitchedAt === "number" && input.events.some((event) => (
+    typeof event.timestamp === "number" &&
+    event.timestamp > input.modelSwitchedAt! &&
+    (
+      (event.type === "assistant_message" && typeof event.model === "string" && Boolean(event.model.trim())) ||
+      (event.type === "status_update" && Boolean(extractModelFromStatusMessage(event.message)))
+    )
+  ));
+  const hasPendingManualSwitch = Boolean(sessionModel && input.modelSwitchedAt && !hasModelEvidenceAfterSwitch);
+  return hasPendingManualSwitch ? sessionModel : lastUsedModel ?? sessionModel;
+}

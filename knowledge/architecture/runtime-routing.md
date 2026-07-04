@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-04T19:13:15+08:00"
+timestamp: "2026-07-04T19:18:36+08:00"
 ---
 
 # Runtime Routing
@@ -69,6 +69,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 48. Opening or searching an existing session is read-only history hydration. It may fill message events, cache versions, and stale loading flags, but it must not rewrite a non-default catalog title or refresh `updatedAt` to the current time. Only default placeholder titles may be derived from loaded history. Conversation ordering follows real activity, not the user's navigation click.
 49. Withdrawing the latest completed user turn is an official history mutation, not an automatic duplicate prompt. Kimix calls official `undoHistory(1)` on the same idle runtime before truncating the local mirror from that user node, then restores the original text and attachments into the session-scoped Composer draft for user editing. It must not create an Assistant placeholder, set the session running, or dispatch the prompt automatically. If official undo fails, the old turn remains intact and the real error is shown. A failed or orphaned local send has no official turn to undo and is withdrawn locally, while older user nodes remain unavailable until Kimix can map their exact official history identities. Undo rewrites conversation context only; filesystem, command, and external side effects from the removed turn are not rolled back.
 50. Session recency and startup restoration use conversation identity, not mutable metadata recency. Sidebar ordering, project-default selection, and startup fallback compare the latest user, steer, or Assistant event timestamp before generic `updatedAt`. The active project/session context is snapshotted before startup subscriptions can rewrite local persistence, then restored by matching UI, runtime, official, Skill-parent, or long-task runtime identity. Catalog hydration may repair metadata afterward but must not replace that frozen startup target with another recently synchronized session.
+51. A hydrated session's displayed model follows the last actual per-turn model in Assistant or usage/status history, not a stale cached `session.model`. Startup and sidebar history hydration write that derived model back into the local mirror. The only temporary exception is an explicit manual model switch with no later Assistant event, where the selected session model remains visible until the next turn confirms the actual model.
 
 # Main Components
 

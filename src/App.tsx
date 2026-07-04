@@ -2077,23 +2077,24 @@ function App() {
               const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
 
               if (runtimeOwner) {
+                const hydratedEvents = runtimeOwner.events.length > 0 && !hasRicherKimiProcessHistory(runtimeOwner.events, events)
+                  ? settleInactiveEvents(runtimeOwner.events)
+                  : events;
                 const session = hydrateLongTaskProgressFromHistory({
                   ...runtimeOwner,
                   officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
-                  model: runtimeOwner.model ?? null,
-                events: runtimeOwner.events.length > 0 && !hasRicherKimiProcessHistory(runtimeOwner.events, events)
-                  ? settleInactiveEvents(runtimeOwner.events)
-                  : events,
-                kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-                isLoading: false,
-              });
-              useSessionStore.setState((state) => ({
-                sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
-              }));
-              useAppStore.setState({ currentSession: session });
-              setRunningSessionId(null);
-              return;
-            }
+                  model: getLastUsedModelFromEvents(hydratedEvents) ?? runtimeOwner.model ?? null,
+                  events: hydratedEvents,
+                  kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                  isLoading: false,
+                });
+                useSessionStore.setState((state) => ({
+                  sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
+                }));
+                useAppStore.setState({ currentSession: session });
+                setRunningSessionId(null);
+                return;
+              }
 
               const longTasksRes = await window.api.listLongTasks({ projectPath: activeProject.path });
               const matchedLongTask = longTasksRes.success
@@ -2105,7 +2106,7 @@ function App() {
 
               const session = hydrateLongTaskProgressFromHistory({
                 id: historySessionId,
-                model: activeLocalSession?.model ?? null,
+                model: getLastUsedModelFromEvents(events) ?? activeLocalSession?.model ?? null,
                 title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
                 projectPath: activeProject.path,
                 createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),

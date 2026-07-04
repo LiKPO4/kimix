@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents } from "../modelDisplay";
+import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getSessionModelForDisplay } from "../modelDisplay";
 
 describe("modelDisplay", () => {
   it("shows only the segment after the final slash", () => {
@@ -40,5 +40,23 @@ describe("modelDisplay", () => {
       { type: "user_message" },
     ];
     expect(getLastUsedModelFromEvents(events)).toBeNull();
+  });
+
+  it("prefers the last actual history model over stale session metadata", () => {
+    expect(getSessionModelForDisplay({
+      sessionModel: "kimi-for-coding",
+      events: [{ type: "assistant_message", timestamp: 100, model: "deepseek-v4-flash" }],
+    })).toBe("deepseek-v4-flash");
+  });
+
+  it("keeps a pending manual model switch visible until a new assistant confirms it", () => {
+    const events = [{ type: "assistant_message", timestamp: 100, model: "deepseek-v4-flash" }];
+    expect(getSessionModelForDisplay({ sessionModel: "kimi-for-coding", modelSwitchedAt: 200, events }))
+      .toBe("kimi-for-coding");
+    expect(getSessionModelForDisplay({
+      sessionModel: "kimi-for-coding",
+      modelSwitchedAt: 200,
+      events: [...events, { type: "assistant_message", timestamp: 300, model: "kimi-for-coding" }],
+    })).toBe("kimi-for-coding");
   });
 });

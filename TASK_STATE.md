@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.40 历史会话模型显示校准
+- 当前目标：修复打开历史会话时底部显示旧默认模型，发送一轮后才变为正确模型的问题。
+- 根因：ContextBar 优先使用 session.model，压过事件中最后实际使用模型；启动和侧栏 history hydration 载入事件后没有用事件模型回写 session.model。
+- 修复：新增 getSessionModelForDisplay；普通历史优先最后 assistant/status 实际模型，只有手动切换尚未产生新 assistant 时优先 session.model；启动和侧栏 hydration 均从最终采用的事件集回写 model。
+- 下一步：实机直接打开截图会话，确认发送前底部即显示 deepseek-v4-flash；手动切换模型后仍立即显示新模型。
+
 ## 2026-07-04 v2.14.39 会话真实活跃排序与启动恢复
 - 当前目标：修复最近 4 分钟会话未排顶部，以及退出时所在会话在重启后没有恢复的问题。
 - 根因：Sidebar 列表、项目默认选择和启动 fallback 仍按容易被配置/目录同步刷新的 session.updatedAt 排序；Bootstrap 回调再次读取 active context，可能读到被启动初始化订阅覆盖后的值；恢复只匹配本地 UI id，未覆盖 runtime/official/Skill parent 身份。
