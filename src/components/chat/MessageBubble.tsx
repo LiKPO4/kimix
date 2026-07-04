@@ -907,18 +907,18 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="text-left text-[13px] leading-[1.6] text-[var(--kimix-panel-text-muted)] transition-colors hover:text-[var(--kimix-panel-text-secondary)]"
+          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
         >
           {block.summary}
         </button>
       ) : (
-        <div className="text-left text-[13px] leading-[1.6] text-[var(--kimix-panel-text-muted)]">
+        <div className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">
           {block.summary}
         </div>
       )}
       {expanded && (
         <div
-          className="text-[13px] leading-[1.65] text-[var(--kimix-panel-text-muted)]"
+          className="text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
           style={{ whiteSpace: "pre-wrap" }}
         >
           {block.text}
@@ -969,7 +969,7 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         <SquareTerminal size={13} />
       </span>
       <span className="flex min-w-0 items-center overflow-hidden">
-        <span className="truncate leading-[20px]">{displayTarget}</span>
+        <span className="truncate leading-6">{displayTarget}</span>
       </span>
       <span className="flex h-5 items-center" style={{ gap: 8 }}>
         {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
@@ -992,14 +992,14 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="grid w-full items-center text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, height: 42 }}
+          className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42 }}
         >
           {rowContent}
         </button>
       ) : (
         <div
-          className="grid w-full items-center text-left text-[13px] text-[var(--kimix-panel-text-secondary)]"
+          className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)]"
           style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42 }}
         >
           {rowContent}
