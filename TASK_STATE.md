@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.16 权限切换跳顶诊断
+- 现象：v2.14.15 实测切换权限模式仍会瞬间顶到当前会话流顶部，前几轮基于推断的滚动修复没有命中根因。
+- 本轮策略：停止继续猜修，先写可对齐事件顺序的诊断日志；`Composer` 为点击、菜单关闭、延后切换、SDK `setPermission` 前后和 UI 权限状态写入前后打同一 `traceId`；`ChatThread` 监听权限诊断事件并记录 immediate / rAF1 / rAF2 的滚动状态，同时增加 `scrollJumpNearTop` 捕捉从中下位置突然到顶部附近的瞬间。
+- 待验收：用户启动 v2.14.16 后复现一次跳顶，回传诊断日志，重点搜索 `[Composer] permissionMode`、`[ChatThread] permissionDiag`、`[ChatThread] permissionDiag rAF1`、`[ChatThread] permissionDiag rAF2`、`[ChatThread] scrollJumpNearTop`。
+
 ## 2026-07-04 v2.14.15 权限切换污染 Assistant footer
 - 现象：点击切换权限后，上一条 Assistant 底部模型 / 时间 / Tokens / Context 元信息会闪一下，时间变成切换权限时刻，随后又被显示规则挤掉。
 - 根因：权限切换后的官方 runtime 会发 `agent.status.updated` 快照；Kimix 把它作为普通 `status_update` 追加到会话，`turn_end` 规则又把同一轮最后一个 status 当作 Assistant footer，导致配置操作的 idle 状态污染了上一条回复元信息。

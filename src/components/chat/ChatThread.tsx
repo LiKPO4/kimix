@@ -29,6 +29,18 @@ type RenderItem =
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
 
 type ViewportAnchor = { key: string; offsetTop: number };
+type PermissionModeDiagDetail = {
+  traceId?: string;
+  stage?: string;
+  requestedMode?: string;
+  previousMode?: string;
+  runtimeSessionId?: string;
+  activeSessionId?: string;
+  activeRuntimeSessionId?: string;
+  currentSessionId?: string;
+  runningSessionId?: string | null;
+  [key: string]: unknown;
+};
 
 function renderItemKey(item: RenderItem) {
   return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
@@ -1468,11 +1480,43 @@ export const ChatThread = memo(function ChatThread() {
   const handleScroll = () => {
     const node = scrollRef.current;
     if (!node) return;
+    const previousScrollTop = lastScrollTopRef.current;
+    const previousScrollHeight = lastScrollHeightRef.current;
     lastScrollTopRef.current = node.scrollTop;
     lastScrollHeightRef.current = node.scrollHeight;
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
     const now = Date.now();
+    if (
+      previousScrollTop !== null &&
+      previousScrollTop > Math.max(160, node.clientHeight * 0.5) &&
+      node.scrollTop <= 8
+    ) {
+      window.api.writeDiag?.({
+        message: "[ChatThread] scrollJumpNearTop",
+        data: {
+          previousScrollTop,
+          previousScrollHeight,
+          nextScrollTop: node.scrollTop,
+          nextScrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+          distance,
+          sessionId: session?.id,
+          runtimeSessionId: session ? getRuntimeSessionId(session) : undefined,
+          runningSessionId,
+          autoFollow: autoFollowRef.current,
+          userScroll: userScrollRef.current,
+          isAutoFollow: isAutoFollowRef.current,
+          ignoreScrollRemaining: Math.max(0, ignoreScrollUntilRef.current - now),
+          sessionAutoBottomRemaining: Math.max(0, sessionAutoBottomUntilRef.current - now),
+          showOlderItems,
+          primedSessionId,
+          expandedInitialTailSessionId,
+          userHasScrolled,
+          contentVersionLength: contentVersionRef.current.length,
+        },
+      }).catch(logError("writeDiag"));
+    }
     if (now - lastScrollDiagRef.current > 50) {
       lastScrollDiagRef.current = now;
       window.api.writeDiag?.({
@@ -1512,6 +1556,97 @@ export const ChatThread = memo(function ChatThread() {
   const eagerMarkdown = Boolean(session?.id && (
     Date.now() < sessionAutoBottomUntilRef.current || userHasScrolled
   ));
+
+  const readPermissionScrollDiagState = (phase: string, detail?: PermissionModeDiagDetail) => {
+    const node = scrollRef.current;
+    const contentNode = streamContentRef.current;
+    const items = Array.from(contentNode?.querySelectorAll<HTMLElement>("[data-kimix-render-key]") ?? []);
+    const distance = node ? node.scrollHeight - node.scrollTop - node.clientHeight : undefined;
+    return {
+      phase,
+      traceId: detail?.traceId,
+      permissionStage: detail?.stage,
+      requestedMode: detail?.requestedMode,
+      previousMode: detail?.previousMode,
+      diagRuntimeSessionId: detail?.runtimeSessionId,
+      diagActiveSessionId: detail?.activeSessionId,
+      diagActiveRuntimeSessionId: detail?.activeRuntimeSessionId,
+      diagCurrentSessionId: detail?.currentSessionId,
+      diagRunningSessionId: detail?.runningSessionId,
+      sessionId: session?.id,
+      runtimeSessionId,
+      runningSessionId,
+      currentSessionId: currentSession?.id,
+      scrollTop: node?.scrollTop,
+      scrollHeight: node?.scrollHeight,
+      clientHeight: node?.clientHeight,
+      distance,
+      contentOffsetHeight: contentNode?.offsetHeight,
+      contentScrollHeight: contentNode?.scrollHeight,
+      itemCount: items.length,
+      firstItemKey: items[0]?.dataset.kimixRenderKey,
+      lastItemKey: items.at(-1)?.dataset.kimixRenderKey,
+      renderItemsLength: renderItems.length,
+      visibleRenderItemsLength: visibleRenderItems.length,
+      visibleEventsLength: visibleEvents.length,
+      showOlderItems,
+      shouldFoldOlderItems,
+      isInitialTailOnly,
+      initialTailHiddenCount,
+      primedSessionId,
+      expandedInitialTailSessionId,
+      userHasScrolled,
+      autoFollow: autoFollowRef.current,
+      userScroll: userScrollRef.current,
+      isAutoFollow: isAutoFollowRef.current,
+      showScrollToBottom: showScrollToBottomRef.current,
+      ignoreScrollRemaining: Math.max(0, ignoreScrollUntilRef.current - Date.now()),
+      sessionAutoBottomRemaining: Math.max(0, sessionAutoBottomUntilRef.current - Date.now()),
+      contentVersionLength: contentVersionRef.current.length,
+      resizeContentVersionLength: resizeContentVersionRef.current.length,
+      lastScrollTop: lastScrollTopRef.current,
+      lastScrollHeight: lastScrollHeightRef.current,
+    };
+  };
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<PermissionModeDiagDetail>).detail;
+      window.api.writeDiag?.({
+        message: "[ChatThread] permissionDiag",
+        data: readPermissionScrollDiagState("event", detail),
+      }).catch(logError("writeDiag"));
+      window.requestAnimationFrame(() => {
+        window.api.writeDiag?.({
+          message: "[ChatThread] permissionDiag rAF1",
+          data: readPermissionScrollDiagState("rAF1", detail),
+        }).catch(logError("writeDiag"));
+        window.requestAnimationFrame(() => {
+          window.api.writeDiag?.({
+            message: "[ChatThread] permissionDiag rAF2",
+            data: readPermissionScrollDiagState("rAF2", detail),
+          }).catch(logError("writeDiag"));
+        });
+      });
+    };
+    window.addEventListener("kimix:permission-mode-diag", handler);
+    return () => window.removeEventListener("kimix:permission-mode-diag", handler);
+  }, [
+    currentSession?.id,
+    expandedInitialTailSessionId,
+    initialTailHiddenCount,
+    isInitialTailOnly,
+    primedSessionId,
+    renderItems.length,
+    runningSessionId,
+    runtimeSessionId,
+    session?.id,
+    shouldFoldOlderItems,
+    showOlderItems,
+    userHasScrolled,
+    visibleEvents.length,
+    visibleRenderItems.length,
+  ]);
 
   useEffect(() => {
     const pending = pendingFocusEventRef.current;

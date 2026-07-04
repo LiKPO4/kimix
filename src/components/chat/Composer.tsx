@@ -42,6 +42,19 @@ const permissionMenuIcons = {
   yolo: ShieldAlert,
 };
 
+function emitPermissionModeDiag(stage: string, data: Record<string, unknown>) {
+  const payload = {
+    stage,
+    at: Date.now(),
+    ...data,
+  };
+  window.dispatchEvent(new CustomEvent("kimix:permission-mode-diag", { detail: payload }));
+  window.api.writeDiag?.({
+    message: "[Composer] permissionMode",
+    data: payload,
+  }).catch(logError("writeDiag"));
+}
+
 const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc: string }[] = [
   { value: "on", label: "开启", desc: "优先澄清不明确需求" },
   { value: "off", label: "关闭", desc: "直接发送原消息" },
@@ -1844,8 +1857,21 @@ export function Composer() {
     }));
   };
 
-  const applyPermissionMode = useCallback(async (mode: PermissionMode, runtimeSessionId?: string) => {
+  const applyPermissionMode = useCallback(async (mode: PermissionMode, runtimeSessionId?: string, traceId = genId()) => {
     const previousMode = useAppStore.getState().permissionMode;
+    const stateSnapshot = useSessionStore.getState();
+    const activeSnapshot = activeSession;
+    emitPermissionModeDiag("apply:start", {
+      traceId,
+      requestedMode: mode,
+      previousMode,
+      runtimeSessionId,
+      activeSessionId: activeSnapshot?.id,
+      activeRuntimeSessionId: activeSnapshot ? getRuntimeSessionId(activeSnapshot) : undefined,
+      currentSessionId: useAppStore.getState().currentSession?.id,
+      runningSessionId: useAppStore.getState().runningSessionId,
+      sessionCount: stateSnapshot.sessions.length,
+    });
     // Only push to the SDK when a real runtime session exists. Using the UI-id
     // fallback here would hit "session not active" before the first message is
     // sent and wrongly roll the UI mode back. New sessions carry permissionMode
@@ -1857,6 +1883,16 @@ export function Composer() {
         session.runtimeSessionId === runtimeSessionId ||
         session.officialSessionId === runtimeSessionId
       ));
+      emitPermissionModeDiag("apply:before-set-permission", {
+        traceId,
+        requestedMode: mode,
+        previousMode,
+        runtimeSessionId,
+        targetSessionId: targetSession?.id,
+        targetRuntimeSessionId: targetSession ? getRuntimeSessionId(targetSession) : undefined,
+        targetEventCount: targetSession?.events.length,
+        targetUpdatedAt: targetSession?.updatedAt,
+      });
       const res = await setKimiCodePermissionWithRecovery({
         sessionId: runtimeSessionId,
         mode,
@@ -1866,6 +1902,14 @@ export function Composer() {
         resumeSession: window.api.resumeKimiCodeSession,
       });
       if (!res.success) {
+        emitPermissionModeDiag("apply:error", {
+          traceId,
+          requestedMode: mode,
+          previousMode,
+          runtimeSessionId,
+          targetSessionId: targetSession?.id,
+          error: res.error,
+        });
         setPermissionMode(previousMode);
         window.dispatchEvent(new CustomEvent("kimix:toast", {
           detail: `权限切换失败：${res.error}`,
@@ -1873,7 +1917,24 @@ export function Composer() {
         return;
       }
       appliedRuntimeSessionId = res.sessionId;
+      emitPermissionModeDiag("apply:after-set-permission", {
+        traceId,
+        requestedMode: mode,
+        previousMode,
+        runtimeSessionId,
+        appliedRuntimeSessionId,
+        targetSessionId: targetSession?.id,
+        recoveredRuntimeSession: appliedRuntimeSessionId !== runtimeSessionId,
+      });
       if (targetSession && appliedRuntimeSessionId !== runtimeSessionId) {
+        emitPermissionModeDiag("apply:update-runtime-binding", {
+          traceId,
+          requestedMode: mode,
+          previousMode,
+          targetSessionId: targetSession.id,
+          runtimeSessionId,
+          appliedRuntimeSessionId,
+        });
         updateSession(targetSession.id, (session) => ({
           ...session,
           runtimeSessionId: appliedRuntimeSessionId,
@@ -1882,7 +1943,26 @@ export function Composer() {
       }
     }
 
+    emitPermissionModeDiag("apply:before-set-ui-mode", {
+      traceId,
+      requestedMode: mode,
+      previousMode,
+      runtimeSessionId,
+      appliedRuntimeSessionId,
+      currentSessionId: useAppStore.getState().currentSession?.id,
+      runningSessionId: useAppStore.getState().runningSessionId,
+    });
     setPermissionMode(mode);
+    emitPermissionModeDiag("apply:after-set-ui-mode", {
+      traceId,
+      requestedMode: mode,
+      previousMode,
+      runtimeSessionId,
+      appliedRuntimeSessionId,
+      currentPermissionMode: useAppStore.getState().permissionMode,
+      currentSessionId: useAppStore.getState().currentSession?.id,
+      runningSessionId: useAppStore.getState().runningSessionId,
+    });
     if (mode === "yolo" && clarificationToolMode !== "off") {
       setClarificationToolMode("off");
       window.dispatchEvent(new CustomEvent("kimix:toast", {
@@ -1896,11 +1976,48 @@ export function Composer() {
   }, [clarificationToolMode, setClarificationToolMode, setPermissionMode, updateSession]);
 
   const handleSetPermissionMode = async (mode: PermissionMode) => {
+    const traceId = genId();
     const previousMode = permissionMode;
+    emitPermissionModeDiag("click", {
+      traceId,
+      requestedMode: mode,
+      previousMode,
+      activeSessionId: activeSession?.id,
+      activeRuntimeSessionId,
+      currentSessionId: currentSession?.id,
+      runningSessionId,
+      isCurrentSessionRunning,
+      hasPendingPermissionChange: Boolean(pendingPermissionChangeRef.current),
+      showPermissionMenu,
+    });
     setShowPermissionMenu(false);
-    if (previousMode === mode) return;
+    emitPermissionModeDiag("menu:closed", {
+      traceId,
+      requestedMode: mode,
+      previousMode,
+      activeSessionId: activeSession?.id,
+      activeRuntimeSessionId,
+      currentSessionId: currentSession?.id,
+      runningSessionId,
+      isCurrentSessionRunning,
+    });
+    if (previousMode === mode) {
+      emitPermissionModeDiag("click:noop-same-mode", {
+        traceId,
+        requestedMode: mode,
+        previousMode,
+      });
+      return;
+    }
     if (activeSession && isCurrentSessionRunning) {
       if (!activeRuntimeSessionId) {
+        emitPermissionModeDiag("pending:error-no-runtime", {
+          traceId,
+          requestedMode: mode,
+          previousMode,
+          activeSessionId: activeSession.id,
+          runningSessionId,
+        });
         window.dispatchEvent(new CustomEvent("kimix:toast", {
           detail: "当前轮 runtime 尚未就绪，无法记录权限切换",
         }));
@@ -1911,19 +2028,40 @@ export function Composer() {
         runtimeSessionId: activeRuntimeSessionId,
         mode,
       };
+      emitPermissionModeDiag("pending:stored", {
+        traceId,
+        requestedMode: mode,
+        previousMode,
+        activeSessionId: activeSession.id,
+        activeRuntimeSessionId,
+        currentSessionId: currentSession?.id,
+        runningSessionId,
+      });
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: "已记录，将在当前轮结束后安全切换权限",
       }));
       return;
     }
-    await applyPermissionMode(mode, activeRuntimeSessionId);
+    await applyPermissionMode(mode, activeRuntimeSessionId, traceId);
   };
 
   useEffect(() => window.api.onKimiCodeEvent((payload) => {
     const pending = pendingPermissionChangeRef.current;
     if (!isPendingPermissionTurnEnded(pending, payload)) return;
     pendingPermissionChangeRef.current = null;
-    void applyPermissionMode(pending.mode, pending.runtimeSessionId);
+    const traceId = genId();
+    emitPermissionModeDiag("pending:turn-ended", {
+      traceId,
+      requestedMode: pending.mode,
+      pendingSessionId: pending.sessionId,
+      pendingRuntimeSessionId: pending.runtimeSessionId,
+      eventType: payload.type,
+      eventSessionId: payload.sessionId,
+      eventRuntimeSessionId: payload.runtimeSessionId,
+      currentSessionId: useAppStore.getState().currentSession?.id,
+      runningSessionId: useAppStore.getState().runningSessionId,
+    });
+    void applyPermissionMode(pending.mode, pending.runtimeSessionId, traceId);
   }), [applyPermissionMode]);
 
   const handleTogglePlanMode = async () => {
