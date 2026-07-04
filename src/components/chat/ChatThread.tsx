@@ -1444,18 +1444,35 @@ export const ChatThread = memo(function ChatThread() {
     const runtimeSessionId = getRuntimeSessionId(session);
     if (!runtimeSessionId) throw new Error("当前会话没有可用的运行时 session");
 
+    const now = Date.now();
+    const resentUserEvent: TimelineEvent = {
+      id: crypto.randomUUID(),
+      type: "user_message",
+      timestamp: now,
+      content: lastPrompt.content,
+      images: lastPrompt.type === "user_message" ? lastPrompt.images : undefined,
+    };
+    const linkStatusEvent: TimelineEvent = {
+      id: crypto.randomUUID(),
+      type: "status_update",
+      timestamp: now,
+      message: "消息发送中",
+      source: "ipc",
+      tone: "info",
+      parentEventId: resentUserEvent.id,
+    };
     const placeholder: TimelineEvent = {
       id: crypto.randomUUID(),
       type: "assistant_message",
-      timestamp: Date.now(),
+      timestamp: now,
       content: "",
       isThinking: defaultThinking,
       isComplete: false,
     };
     updateSession(session.id, (current) => ({
       ...current,
-      events: [...current.events, placeholder],
-      updatedAt: Date.now(),
+      events: [...current.events, resentUserEvent, linkStatusEvent, placeholder],
+      updatedAt: now,
     }));
     const latest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
     if (latest) setCurrentSession(latest);
@@ -1482,7 +1499,9 @@ export const ChatThread = memo(function ChatThread() {
         events: [
           ...current.events.map((event) => event.type === "assistant_message" && event.id === placeholder.id
             ? { ...event, isComplete: true, isThinking: false }
-            : event
+            : event.id === linkStatusEvent.id && event.type === "status_update"
+              ? { ...event, timestamp: Date.now(), message: "消息发送失败", tone: "danger" as const }
+              : event
           ),
           {
             id: crypto.randomUUID(),

@@ -330,26 +330,75 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
       ? useSessionStore.getState().sessions.find((session) => session.id === appState.currentSession?.id) ?? appState.currentSession
       : null;
     if (!activeSession || appState.runningSessionId === activeSession.id) return;
+    const now = Date.now();
+    const resentUserEvent: TimelineEvent = {
+      id: crypto.randomUUID(),
+      type: "user_message",
+      timestamp: now,
+      content: event.content,
+      images: event.images,
+    };
+    const linkStatusEvent: TimelineEvent = {
+      id: crypto.randomUUID(),
+      type: "status_update",
+      timestamp: now,
+      message: "消息发送中",
+      source: "ipc",
+      tone: "info",
+      parentEventId: resentUserEvent.id,
+    };
     const responsePlaceholder: TimelineEvent = {
-      id: Math.random().toString(36).substring(2, 11),
+      id: crypto.randomUUID(),
       type: "assistant_message",
-      timestamp: Date.now(),
+      timestamp: now,
       content: "",
       isThinking: appState.defaultThinking,
       isComplete: false,
     };
     useSessionStore.getState().updateSession(activeSession.id, (session) => ({
       ...session,
-      events: [...session.events, responsePlaceholder],
-      updatedAt: Date.now(),
+      events: [...session.events, resentUserEvent, linkStatusEvent, responsePlaceholder],
+      updatedAt: now,
     }));
     appState.setRunningSessionId(activeSession.id);
     const runtimeSessionId = getRuntimeSessionId(activeSession);
     if (!runtimeSessionId) {
       appState.setRunningSessionId(null);
+      const failedAt = Date.now();
+      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
+        ...session,
+        events: [
+          ...session.events.map((sessionEvent) => {
+            if (sessionEvent.id === responsePlaceholder.id && sessionEvent.type === "assistant_message") {
+              return { ...sessionEvent, isComplete: true, isThinking: false };
+            }
+            if (sessionEvent.id === linkStatusEvent.id && sessionEvent.type === "status_update") {
+              return { ...sessionEvent, timestamp: failedAt, message: "消息发送失败", tone: "danger" as const };
+            }
+            return sessionEvent;
+          }),
+          {
+            id: crypto.randomUUID(),
+            type: "error",
+            timestamp: failedAt,
+            message: "当前会话没有可用的运行时 session",
+            source: "ipc",
+          },
+        ],
+        updatedAt: failedAt,
+      }));
       return;
     }
     try {
+      const dispatchStartedAt = Date.now();
+      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
+        ...session,
+        events: session.events.map((sessionEvent) => sessionEvent.id === responsePlaceholder.id
+          ? { ...sessionEvent, timestamp: dispatchStartedAt }
+          : sessionEvent
+        ),
+        updatedAt: dispatchStartedAt,
+      }));
       const res = await window.api.sendKimiCodePrompt({
         sessionId: runtimeSessionId,
         content: contentWithFileAttachments(event.content, images),
@@ -359,6 +408,30 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
     } catch (err) {
       console.error("Resend failed:", err);
       appState.setRunningSessionId(null);
+      const message = err instanceof Error ? err.message : String(err);
+      const failedAt = Date.now();
+      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
+        ...session,
+        events: [
+          ...session.events.map((sessionEvent) => {
+            if (sessionEvent.id === responsePlaceholder.id && sessionEvent.type === "assistant_message") {
+              return { ...sessionEvent, isComplete: true, isThinking: false };
+            }
+            if (sessionEvent.id === linkStatusEvent.id && sessionEvent.type === "status_update") {
+              return { ...sessionEvent, timestamp: failedAt, message: "消息发送失败", tone: "danger" as const };
+            }
+            return sessionEvent;
+          }),
+          {
+            id: crypto.randomUUID(),
+            type: "error",
+            timestamp: failedAt,
+            message,
+            source: "ipc",
+          },
+        ],
+        updatedAt: failedAt,
+      }));
     }
   };
 
