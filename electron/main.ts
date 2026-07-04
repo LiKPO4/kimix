@@ -5944,11 +5944,49 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
 });
 
 ipcMain.handle("kimi-code:listSlashCommands", async (_, request: unknown) => {
-  const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-  const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
-  if (!sessionId) return { success: false, error: "Missing sessionId" };
-  const runtime = kimiCodeHost.getSessionRuntimeKind(sessionId) ?? "server";
-  return { success: true, data: listKimiCodeSlashCommands(runtime) };
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const runtime = kimiCodeHost.getSessionRuntimeKind(sessionId) ?? "server";
+    const commands = listKimiCodeSlashCommands(runtime);
+    if (runtime !== "sdk") return { success: true, data: commands };
+    const pluginCommands = await kimiCodeHost.listPluginCommands(sessionId).catch((err) => {
+      console.warn(`[Kimi Code] list plugin commands failed for ${sessionId}:`, err);
+      return [];
+    });
+    return {
+      success: true,
+      data: [
+        ...commands,
+        ...pluginCommands.map((command) => ({
+          name: `${command.pluginId}:${command.name}`,
+          description: command.description,
+          aliases: [] as string[],
+          kind: "plugin-command" as const,
+          pluginId: command.pluginId,
+          commandName: command.name,
+        })),
+      ],
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:activatePluginCommand", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    const pluginId = typeof req.pluginId === "string" ? req.pluginId.trim() : "";
+    const commandName = typeof req.commandName === "string" ? req.commandName.trim() : "";
+    const args = typeof req.args === "string" && req.args.trim() ? req.args.trim() : undefined;
+    if (!sessionId || !pluginId || !commandName) return { success: false, error: "Missing sessionId, pluginId or commandName" };
+    await kimiCodeHost.activatePluginCommand(sessionId, pluginId, commandName, args);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("kimi:previewImportFromCcCodex", async (_, request: unknown) => {

@@ -299,7 +299,9 @@ type CompletionItem = {
   detail?: string;
   insertText: string;
   commandName?: string;
-  kind: "agent" | "plugin" | "file" | "slash" | "skill";
+  pluginId?: string;
+  pluginCommandName?: string;
+  kind: "agent" | "plugin" | "file" | "slash" | "skill" | "plugin-command";
 };
 
 const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
@@ -530,14 +532,23 @@ export function Composer() {
         setSlashCommands([]);
         return;
       }
-      setSlashCommands(res.data.map((command) => ({
-        id: `slash-${command.name}`,
-        label: `/${command.name}`,
-        detail: command.description,
-        insertText: `/${command.name} `,
-        commandName: command.name,
-        kind: "slash",
-      })));
+      setSlashCommands(res.data.map((command) => {
+        const isPluginCommand = command.kind === "plugin-command" && command.pluginId && command.commandName;
+        return {
+          id: isPluginCommand
+            ? `plugin-command-${command.pluginId}-${command.commandName}`
+            : `slash-${command.name}`,
+          label: `/${command.name}`,
+          detail: isPluginCommand
+            ? `${command.description} · Plugin ${command.pluginId}`
+            : command.description,
+          insertText: `/${command.name} `,
+          commandName: command.name,
+          pluginId: isPluginCommand ? command.pluginId : undefined,
+          pluginCommandName: isPluginCommand ? command.commandName : undefined,
+          kind: isPluginCommand ? "plugin-command" : "slash",
+        } satisfies CompletionItem;
+      }));
     }).catch((err) => {
       if (cancelled) return;
       console.warn("List slash commands failed:", err);
@@ -1322,6 +1333,39 @@ export function Composer() {
     return false;
   };
 
+  const findOfficialPluginCommand = (name: string) => {
+    const normalized = name.trim().toLowerCase();
+    if (!normalized) return undefined;
+    return slashCommands.find((command) =>
+      command.kind === "plugin-command" &&
+      command.commandName?.toLowerCase() === normalized &&
+      command.pluginId &&
+      command.pluginCommandName
+    );
+  };
+
+  const handleOfficialPluginCommand = async (command: CompletionItem, args?: string) => {
+    if (!command.pluginId || !command.pluginCommandName) return false;
+    const runtime = await ensureOfficialRuntimeForSession();
+    if (!runtime) return true;
+    const res = await window.api.activateKimiCodePluginCommand({
+      sessionId: runtime.runtimeSessionId,
+      pluginId: command.pluginId,
+      commandName: command.pluginCommandName,
+      args,
+    });
+    if (!res.success) {
+      await appendLocalEvent({
+        id: genId(),
+        type: "error",
+        timestamp: Date.now(),
+        message: `Plugin 命令 /${command.commandName ?? `${command.pluginId}:${command.pluginCommandName}`} 激活失败：${res.error}`,
+        source: "ui",
+      });
+    }
+    return true;
+  };
+
   const handleDirectSlashCommand = async (content: string) => {
     const match = content.trim().match(slashCommandPattern);
     if (!match) return false;
@@ -1623,6 +1667,7 @@ export function Composer() {
     const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
     const slashArgs = trimmed.match(slashCommandPattern)?.[2]?.trim() || undefined;
     const slashRouting = classifySlashCommand(slashName);
+    const pluginCommand = findOfficialPluginCommand(slashName);
     if (shouldActivateSkillBeforePrompt(slashName)) {
       const match = trimmed.match(slashCommandPattern);
       const skillName = match?.[1]?.slice("skill:".length) ?? "";
@@ -1640,6 +1685,22 @@ export function Composer() {
       }
       await appendSlashUserMessage(trimmed);
       await applySkillCommand(skillName, skillArgs || undefined);
+      return;
+    }
+    if (pluginCommand) {
+      if (imagesToSend.length > 0) {
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        return;
+      }
+      setInput("");
+      setImageAttachments([]);
+      setEditingPendingId(null);
+      inputRef.current?.reset();
+      if (!hasActiveAssistantTurn && activeSession) {
+        settlePendingClarifications(activeSession.id);
+      }
+      await appendSlashUserMessage(trimmed);
+      await handleOfficialPluginCommand(pluginCommand, slashArgs);
       return;
     }
     if (slashRouting === "official-skill-first") {

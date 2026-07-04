@@ -196,6 +196,9 @@ export type SlashCommandInfo = {
   name: string;
   description: string;
   aliases: string[];
+  kind?: "slash" | "plugin-command";
+  pluginId?: string;
+  commandName?: string;
 }
 
 export type ListSlashCommandsRequest = {
@@ -1562,6 +1565,13 @@ export type KimiCodePluginSummary = {
   github?: unknown;
 };
 
+export type KimiCodePluginCommandSummary = {
+  pluginId: string;
+  name: string;
+  description: string;
+  path: string;
+};
+
 export type KimiCodeSkillSummary = {
   name: string;
   description: string;
@@ -1800,6 +1810,13 @@ export type KimiCodeSetPluginMcpServerEnabledRequest = {
 export type KimiCodeSessionRequest = {
   sessionId: string;
   instruction?: string;
+};
+
+export type KimiCodeActivatePluginCommandRequest = {
+  sessionId: string;
+  pluginId: string;
+  commandName: string;
+  args?: string;
 };
 
 export type KimiCodeUndoHistoryRequest = {

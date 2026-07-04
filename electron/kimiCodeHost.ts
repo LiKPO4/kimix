@@ -118,6 +118,8 @@ type KimiCodeSessionLike = {
   cancelGoal?(input?: { reason?: string }): Promise<KimiCodeGoalSnapshot>;
   listSkills?(): Promise<readonly KimiCodeSkillSummary[]>;
   activateSkill?(name: string, args?: string): Promise<void>;
+  listPluginCommands?(): Promise<readonly KimiCodePluginCommandSummary[]>;
+  activatePluginCommand?(pluginId: string, commandName: string, args?: string): Promise<void>;
   listPlugins?(): Promise<readonly KimiCodePluginSummary[]>;
   installPlugin?(source: string): Promise<KimiCodePluginSummary>;
   setPluginEnabled?(id: string, enabled: boolean): Promise<void>;
@@ -336,6 +338,13 @@ export type KimiCodePluginSummary = {
   source: KimiCodePluginSource;
   originalSource?: string;
   github?: unknown;
+};
+
+export type KimiCodePluginCommandSummary = {
+  pluginId: string;
+  name: string;
+  description: string;
+  path: string;
 };
 
 export type KimiCodeSkillSummary = {
@@ -1761,6 +1770,24 @@ export async function activateSkill(sessionId: string, name: string, args?: stri
   const managed = getManagedSession(sessionId);
   if (!managed.session.activateSkill) throw new Error("当前兼容链路不支持激活 Skill。");
   await managed.session.activateSkill(name, args);
+}
+
+export async function listPluginCommands(sessionId: string): Promise<KimiCodePluginCommandSummary[]> {
+  if (serverSessions.has(sessionId)) {
+    throw new Error("当前 Server 会话暂不支持读取 Plugin 命令。请等待官方 Server API 暴露等价能力，或在 SDK route 会话中使用。");
+  }
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.listPluginCommands) throw new Error("当前兼容链路不支持读取 Plugin 命令。");
+  return [...await managed.session.listPluginCommands()];
+}
+
+export async function activatePluginCommand(sessionId: string, pluginId: string, commandName: string, args?: string): Promise<void> {
+  if (serverSessions.has(sessionId)) {
+    throw new Error("当前 Server 会话暂不支持激活 Plugin 命令。请等待官方 Server API 暴露等价能力，或在 SDK route 会话中使用。");
+  }
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.activatePluginCommand) throw new Error("当前兼容链路不支持激活 Plugin 命令。");
+  await managed.session.activatePluginCommand(pluginId, commandName, args);
 }
 
 export function toKimiCodeSkillSummary(skill: ServerSkill): KimiCodeSkillSummary {

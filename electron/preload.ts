@@ -106,6 +106,7 @@ import type {
   SettingsResponse,
   SaveSettingsRequest,
   KimiCodeApprovalResponseRequest,
+  KimiCodeActivatePluginCommandRequest,
   KimiCodeCreateSessionRequest,
   KimiCodeEventPayload,
   KimiCodeBackgroundTaskOutputPathResponse,
@@ -422,6 +423,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:listSkills", req),
   activateKimiCodeSkill: (req: { sessionId: string; name: string; args?: string }): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:activateSkill", req),
+  activateKimiCodePluginCommand: (req: KimiCodeActivatePluginCommandRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:activatePluginCommand", req),
   installKimiCodePlugin: (req: KimiCodeInstallPluginRequest): Promise<KimiCodePluginResponse> =>
     ipcRenderer.invoke("kimi-code:installPlugin", req),
   setKimiCodePluginEnabled: (req: KimiCodeSetPluginEnabledRequest): Promise<KimiCodeVoidResponse> =>
