@@ -1878,13 +1878,7 @@ export function Composer() {
           ...session,
           runtimeSessionId: appliedRuntimeSessionId,
           officialSessionId: appliedRuntimeSessionId,
-          updatedAt: Date.now(),
         }));
-        const current = useAppStore.getState().currentSession;
-        if (current?.id === targetSession.id) {
-          const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
-          if (updated) setCurrentSession(updated);
-        }
       }
     }
 
@@ -1899,7 +1893,7 @@ export function Composer() {
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: "权限模式已切换",
     }));
-  }, [clarificationToolMode, setClarificationToolMode, setCurrentSession, setPermissionMode, updateSession]);
+  }, [clarificationToolMode, setClarificationToolMode, setPermissionMode, updateSession]);
 
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     const previousMode = permissionMode;
