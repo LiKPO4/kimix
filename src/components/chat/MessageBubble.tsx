@@ -1373,7 +1373,9 @@ function AssistantMessageFooter({
             </button>
           </>
         )}
-        {showActions && hookBadgeEvents.length > 0 && (
+      </div>
+      {showActions && hookBadgeEvents.length > 0 && (
+        <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             type="button"
             className="kimix-muted-action flex h-8 items-center rounded-md text-[12px] text-text-muted"
@@ -1384,8 +1386,8 @@ function AssistantMessageFooter({
             <Webhook size={13} />
             <span>钩子 {hookBadgeEvents.length}</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {hasVisibleStatuses ? (
         <div className="flex min-w-0 max-w-full items-center justify-center" style={{ gap: 8, paddingLeft: 86, paddingRight: 86 }}>
           {visibleStatuses.map((status) => (
