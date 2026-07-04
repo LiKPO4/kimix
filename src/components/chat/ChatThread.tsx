@@ -91,6 +91,7 @@ const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
 const SESSION_LAYOUT_STABLE_MS = 80;
 const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
 const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
+const USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS = 700;
 const MAX_RESIZE_ANCHOR_RESTORE_PX = 300;
 
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
@@ -764,6 +765,7 @@ export const ChatThread = memo(function ChatThread() {
   const resizeContentVersionRef = useRef("");
   const touchStartYRef = useRef<number | null>(null);
   const userInputLockUntilRef = useRef(0);
+  const lastUserScrollAtRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
   const bottomTrackerFrameRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
@@ -962,6 +964,7 @@ export const ChatThread = memo(function ChatThread() {
 
   const pauseAutoFollowForUser = () => {
     cancelSessionAutoBottom();
+    lastUserScrollAtRef.current = Date.now();
     userScrollRef.current = true;
     scrollTokenRef.current += 1;
     if (!userHasScrolled) {
@@ -1252,6 +1255,7 @@ export const ChatThread = memo(function ChatThread() {
     lastScrollHeightRef.current = null;
     touchStartYRef.current = null;
     userInputLockUntilRef.current = 0;
+    lastUserScrollAtRef.current = 0;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
@@ -1427,8 +1431,17 @@ export const ChatThread = memo(function ChatThread() {
     }
     const node = scrollRef.current;
     if (!node) return;
-    if (userScrollRef.current && restoreManualScrollAnchor("contentVersion:user-scroll")) {
-      return;
+    if (userScrollRef.current) {
+      const isRecentUserScroll = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS;
+      if (isRecentUserScroll) {
+        scheduleIdleAnchorCapture();
+        const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+        updateShowScrollToBottom(distance > 80);
+        return;
+      }
+      if (restoreManualScrollAnchor("contentVersion:user-scroll")) {
+        return;
+      }
     }
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
@@ -1597,6 +1610,7 @@ export const ChatThread = memo(function ChatThread() {
     updateShowScrollToBottom(distance > 80);
     const now = Date.now();
     if (userScrollRef.current) {
+      lastUserScrollAtRef.current = now;
       scheduleIdleAnchorCapture();
     }
     if (

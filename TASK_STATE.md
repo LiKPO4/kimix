@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.36 流式输出中手动滚动防跳
+- 当前目标：修复 AI 正在输出正文时，用户向上滚动会出现内容跳动的问题。
+- 根因：用户上滚后 auto-follow 已暂停，但 contentVersion 流式更新仍可能立即用旧 resize anchor 调用 restoreManualScrollAnchor，把视口拉回旧锚点；滚动中的新锚点尚未捕获完成。
+- 修复：记录最近用户滚动时间；用户滚动保护窗口内，contentVersion 更新只刷新“回到底部”按钮并延迟捕获新锚点，不再立即按旧锚点恢复 scrollTop；连续滚动时保护窗口随 scroll 事件延长。
+- 下一步：实机验证 AI 流式输出时向上滚动，视口不再上下抖动；停滚后仍可稳定显示回到底部按钮。
+
 ## 2026-07-04 v2.14.35 重发轮次计时修复
 - 当前目标：修复点击用户消息“重新发送”后，新 assistant 直接显示旧轮次“处理了 30 分钟”的问题。
 - 根因：重发只追加 assistant 占位，没有追加新的 user_message；ChatThread 分组把新 assistant 归到旧用户消息所在轮次，turnStartedAt 继承旧时间。
