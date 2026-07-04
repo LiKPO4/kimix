@@ -1222,11 +1222,21 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const displayEvents = [...(changeEvent ? [changeEvent] : []), ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
     if (callIndex !== -1) {
       const call = result[callIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
+      const resultRecord = incoming.result && typeof incoming.result === "object" && !Array.isArray(incoming.result)
+        ? incoming.result as Record<string, unknown>
+        : null;
+      const resultText = typeof incoming.result === "string"
+        ? incoming.result
+        : typeof resultRecord?.output === "string"
+          ? resultRecord.output
+          : "";
+      const isErrorResult = resultRecord?.isError === true;
+      const isRecoveryInterruption = isErrorResult && /execution was interrupted|执行(?:已|被)?中断/i.test(resultText);
       result[callIndex] = {
         ...call,
-        status: "success",
+        status: isErrorResult ? "error" : "success",
         result: incoming.result,
-        durationMs: Math.max(0, incoming.timestamp - call.timestamp),
+        durationMs: isRecoveryInterruption ? undefined : Math.max(0, incoming.timestamp - call.timestamp),
       };
       const fallbackChangeEvent = displayEvents.length === 0 ? createChangeSummaryFromToolCall(call, incoming.timestamp) : null;
       return appendAroundTrailingSteer(result, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);

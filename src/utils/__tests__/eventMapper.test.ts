@@ -932,6 +932,28 @@ describe("mergeEvents", () => {
     expect(result).toHaveLength(1); // tool_call absorbed the result; no diff/todo appended
   });
 
+  it("does not turn a late recovery interruption into hours of tool duration", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "tool_call", timestamp: 1_000, toolCallId: "tc-stale", toolName: "Bash", status: "running", arguments: {} },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 8 * 60 * 60 * 1000,
+      toolCallId: "tc-stale",
+      toolName: "Bash",
+      result: {
+        output: "Tool execution was interrupted before its result was recorded.",
+        isError: true,
+      },
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const toolCall = result[0] as Extract<TimelineEvent, { type: "tool_call" }>;
+    expect(toolCall.status).toBe("error");
+    expect(toolCall.durationMs).toBeUndefined();
+  });
+
   it("adds change summary and diff when tool_result contains structured diff", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "edit", status: "running", arguments: {} },

@@ -868,26 +868,7 @@ export function Composer() {
       };
 
       const ensureKimiCodeRuntime = async () => {
-        const knownRuntimeSessionId = targetSession.runtimeSessionId;
-        if (knownRuntimeSessionId) {
-          // Fast path: a Kimix-created runtime id is already bound to this UI
-          // session. Do not re-resume it before every prompt; if it is stale,
-          // sendPrompt below will return a session/not-active error and we will
-          // rebuild the runtime once. This avoids a full preflight handshake on
-          // the hot path.
-          const latestPermissionMode = useAppStore.getState().permissionMode;
-          const permissionRes = await window.api.setKimiCodePermission({
-            sessionId: knownRuntimeSessionId,
-            mode: latestPermissionMode,
-          });
-          if (!permissionRes.success) {
-            throw new Error(`应用权限模式失败：${permissionRes.error}`);
-          }
-          updateLinkStatus("消息发送中", "info");
-          return knownRuntimeSessionId;
-        }
-
-        const knownOfficialSessionId = targetSession.officialSessionId;
+        const knownOfficialSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
         if (knownOfficialSessionId) {
           updateLinkStatus("消息发送中", "info");
           const resumeRes = await window.api.resumeKimiCodeSession({

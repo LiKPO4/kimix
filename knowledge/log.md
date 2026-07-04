@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-04
+
+* **Read-only old-session navigation**: Selecting an old conversation no longer resumes its runtime; stale tool calls and recovery interruptions settle without counting the offline interval as execution time. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-03
 
 * **No implicit prompt-time Skill forks**: Ordinary messages and already-visible Skills now reuse the current runtime; only an explicit missing `/skill:...` activation may trigger one controlled registry-refresh fork. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

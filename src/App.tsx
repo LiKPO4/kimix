@@ -83,8 +83,6 @@ const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后�
 - 关键文件/命令
 - 下一步最小行动`;
 const HANDOFF_TIMEOUT_MS = 180_000;
-const KIMI_RUNTIME_PREWARM_DELAY_MS = 3_000;
-const KIMI_RUNTIME_PREWARM_RETRY_COOLDOWN_MS = 30_000;
 let rendererWindowFocusedHint = typeof document !== "undefined" ? document.hasFocus() : false;
 
 interface HandoffJob {
@@ -1097,9 +1095,6 @@ function App() {
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
-  const runtimePrewarmInFlightRef = useRef<Set<string>>(new Set());
-  const runtimePrewarmRetryAfterRef = useRef<Map<string, number>>(new Map());
-  const runtimePrewarmLastOkRef = useRef<Map<string, string>>(new Map());
   const runtimeTerminalPollRef = useRef<Map<string, number>>(new Map());
 
   useRendererLagDetector();
@@ -1182,96 +1177,6 @@ function App() {
       useAppStore.getState().setCurrentSession(latest);
     }
   };
-
-  useEffect(() => {
-    const session = currentSession;
-    if (!session || session.engine !== "kimi-code") return;
-    if (!session.projectPath || session.archivedAt || session.longTask) return;
-    if (runningSessionId === session.id || Boolean(runningSessionId && runningSessionId === session.officialSessionId)) return;
-    if (session.events.some((event) => event.type === "assistant_message" && !event.isComplete)) return;
-
-    const retryAfter = runtimePrewarmRetryAfterRef.current.get(session.id) ?? 0;
-    if (runtimePrewarmInFlightRef.current.has(session.id) || retryAfter > Date.now()) return;
-    const runtimeCandidate = session.runtimeSessionId ?? session.officialSessionId ?? null;
-    const lastOkKey = runtimeCandidate ?? "";
-    if (lastOkKey) {
-      const lastOk = runtimePrewarmLastOkRef.current.get(session.id);
-      if (lastOk === lastOkKey) return;
-    }
-
-    const timer = window.setTimeout(async () => {
-      const latest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-      if (!latest || latest.archivedAt || latest.longTask) return;
-      if (latest.events.some((event) => event.type === "assistant_message" && !event.isComplete)) return;
-      const active = useAppStore.getState().currentSession;
-      if (active?.id !== latest.id) return;
-      const activeRunningSessionId = useAppStore.getState().runningSessionId;
-      if (activeRunningSessionId === latest.id || Boolean(activeRunningSessionId && activeRunningSessionId === latest.officialSessionId)) return;
-
-      runtimePrewarmInFlightRef.current.add(latest.id);
-      try {
-        let prewarmRes: Awaited<ReturnType<typeof window.api.createKimiCodeSession>> | null = null;
-        const existingRuntimeId = latest.runtimeSessionId ?? latest.officialSessionId;
-        if (existingRuntimeId) {
-          const resumeRes = await window.api.resumeKimiCodeSession({
-            sessionId: existingRuntimeId,
-            additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
-          });
-          if (resumeRes.success && (!latest.projectPath || isSameLocalProjectPath(resumeRes.data.workDir, latest.projectPath))) {
-            prewarmRes = resumeRes;
-          } else if (!resumeRes.success && isKimiCodeSessionMissingError(resumeRes.error)) {
-            useSessionStore.getState().updateSession(latest.id, (item) => ({
-              ...item,
-              runtimeSessionId: undefined,
-              officialSessionId: undefined,
-              updatedAt: Date.now(),
-            }));
-            syncCurrentSessionFromStore(latest.id);
-          }
-        }
-        if (!prewarmRes) {
-          prewarmRes = await window.api.createKimiCodeSession({
-            workDir: latest.projectPath,
-            permission: useAppStore.getState().permissionMode,
-            planMode: useAppStore.getState().defaultPlanMode,
-            additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
-          });
-        }
-        if (!prewarmRes.success) throw new Error(prewarmRes.error);
-
-        const runtimeSessionId = prewarmRes.data.sessionId;
-        useSessionStore.getState().updateSession(latest.id, (item) => {
-          if (item.events.some((event) => event.type === "assistant_message" && !event.isComplete)) return item;
-          return {
-            ...item,
-            engine: "kimi-code",
-            runtimeSessionId,
-            officialSessionId: item.officialSessionId ?? runtimeSessionId,
-            updatedAt: Date.now(),
-          };
-        });
-        syncCurrentSessionFromStore(latest.id);
-        runtimePrewarmRetryAfterRef.current.delete(latest.id);
-        runtimePrewarmLastOkRef.current.set(latest.id, runtimeSessionId);
-
-        const latestPermission = useAppStore.getState().permissionMode;
-        const latestPlanMode = useAppStore.getState().defaultPlanMode;
-        void window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode: latestPermission }).catch((err) => {
-          console.warn("[App] setKimiCodePermission failed:", err);
-        });
-        void window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: latestPlanMode }).catch((err) => {
-          console.warn("[App] setKimiCodePlanMode failed:", err);
-        });
-      } catch (err) {
-        runtimePrewarmRetryAfterRef.current.set(latest.id, Date.now() + KIMI_RUNTIME_PREWARM_RETRY_COOLDOWN_MS);
-        console.warn("Kimi Code runtime prewarm failed:", err);
-      } finally {
-        runtimePrewarmInFlightRef.current.delete(latest.id);
-      }
-    }, KIMI_RUNTIME_PREWARM_DELAY_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [currentSession, runningSessionId]);
 
   const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -2111,65 +2016,13 @@ function App() {
               const latest = (activeRuntimeIds.size > 0
                 ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))
                 : undefined) ?? activeSummaries[0];
-              const sessionIdToStart = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
-              if (!latest && !sessionIdToStart) return;
-
-              const appState = useAppStore.getState();
-              const startOptions = {
-                workDir: activeProject.path,
-                sessionId: sessionIdToStart,
-                additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
-                yoloMode: appState.permissionMode === "yolo",
-                autoMode: appState.permissionMode === "auto",
-                planMode: appState.defaultPlanMode,
-                thinking: appState.defaultThinking,
-              };
-              let startRes = await window.api.startKimiCodeRuntime(startOptions);
-              if (!startRes.success && isKimiCodeSessionMissingError(startRes.error)) {
-                console.warn(`[Kimi Code] startup session ${sessionIdToStart} is missing; creating a fresh runtime`);
-                startRes = await window.api.startKimiCodeRuntime({
-                  ...startOptions,
-                  sessionId: undefined,
-                });
-              }
-              if (!startRes.success) {
-                if (isKimiCodeSessionMissingError(startRes.error)) {
-                  console.warn("[Kimi Code] fresh startup runtime was not found; leaving recovery to background prewarm");
-                  setRunningSessionId(null);
-                  return;
-                }
-                if (activeLocalSession) {
-                  const errorSession = {
-                    ...activeLocalSession,
-                    events: [
-                      ...activeLocalSession.events,
-                      {
-                        id: crypto.randomUUID(),
-                        type: "error" as const,
-                        timestamp: Date.now(),
-                        message: `恢复上次 Kimi Code 会话失败：${startRes.error}`,
-                        canDismiss: false,
-                      },
-                    ],
-                    isLoading: false,
-                    updatedAt: Date.now(),
-                  };
-                  useSessionStore.setState((state) => ({
-                    sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
-                  }));
-                  useAppStore.setState({ currentProject: activeProject, currentSession: errorSession });
-                  setRunningSessionId(null);
-                } else {
-                  window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `恢复 Kimi Code 会话失败：${startRes.error}` }));
-                }
-                return;
-              }
-              const historySessionId = latest?.id ?? sessionIdToStart ?? startRes.data.sessionId;
-              if (hasArchivedLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id, activeProject.path)) {
+              const historySessionId = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
+              if (!historySessionId) return;
+              if (hasArchivedLocalSessionForRuntime(historySessionId, undefined, latest?.id, activeProject.path)) {
                 setRunningSessionId(null);
                 return;
               }
-              const runtimeOwner = findLocalSessionForRuntime(historySessionId, startRes.data.sessionId, latest?.id);
+              const runtimeOwner = findLocalSessionForRuntime(historySessionId, undefined, latest?.id);
               const loaded = await window.api.loadKimiCodeSession({
                 workDir: activeProject.path,
                 sessionId: historySessionId,
@@ -2178,7 +2031,6 @@ function App() {
                 if (activeLocalSession) {
                   const errorSession = {
                     ...activeLocalSession,
-                    runtimeSessionId: startRes.data.sessionId,
                     events: [
                       ...activeLocalSession.events,
                       {
@@ -2205,9 +2057,8 @@ function App() {
               if (runtimeOwner) {
                 const session = hydrateLongTaskProgressFromHistory({
                   ...runtimeOwner,
-                  runtimeSessionId: startRes.data.sessionId,
                   officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
-                  model: runtimeOwner.model ?? startRes.data.model ?? null,
+                  model: runtimeOwner.model ?? null,
                 events: runtimeOwner.events.length > 0 && !hasRicherKimiProcessHistory(runtimeOwner.events, events)
                   ? settleInactiveEvents(runtimeOwner.events)
                   : events,
@@ -2226,20 +2077,17 @@ function App() {
               const matchedLongTask = longTasksRes.success
                 ? longTasksRes.data.find((task) => (
                   task.executorSessionId === historySessionId ||
-                  task.reviewerSessionId === historySessionId ||
-                  task.executorSessionId === startRes.data.sessionId ||
-                  task.reviewerSessionId === startRes.data.sessionId
+                  task.reviewerSessionId === historySessionId
                 ))
                 : undefined;
 
               const session = hydrateLongTaskProgressFromHistory({
-                id: startRes.data.sessionId,
-                model: startRes.data.model ?? null,
+                id: historySessionId,
+                model: activeLocalSession?.model ?? null,
                 title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
                 projectPath: activeProject.path,
                 createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
                 updatedAt: latest?.updatedAt ?? activeLocalSession?.updatedAt ?? Date.now(),
-                runtimeSessionId: startRes.data.sessionId,
                 officialSessionId: historySessionId,
                 longTask: matchedLongTask ? toLongTaskMeta(matchedLongTask) : undefined,
                 events,

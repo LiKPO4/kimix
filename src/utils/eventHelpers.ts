@@ -112,8 +112,9 @@ export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.n
       if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
         return [{
           ...event,
-          status: "success" as const,
-          durationMs: reliableAssistantDurationMs(settledAt - event.timestamp),
+          status: "error" as const,
+          result: event.result ?? "工具执行已中断，未收到完成结果。",
+          durationMs: undefined,
         }];
       }
       return [event];

@@ -22,7 +22,7 @@ describe("eventHelpers", () => {
     expect(assistant.thinkingParts?.[0]?.text).toBe("分析项目结构");
   });
 
-  it("settles stale running tools as successful with a duration", () => {
+  it("settles stale running tools as interrupted without inventing a duration", () => {
     const now = 10 * 60 * 1000;
     const events: TimelineEvent[] = [{
       id: "tool-1",
@@ -37,8 +37,9 @@ describe("eventHelpers", () => {
     const settled = settleInactiveEvents(events, now);
     expect(settled).toHaveLength(1);
     const tool = settled[0] as Extract<TimelineEvent, { type: "tool_call" }>;
-    expect(tool.status).toBe("success");
-    expect(tool.durationMs).toBeGreaterThan(0);
+    expect(tool.status).toBe("error");
+    expect(tool.durationMs).toBeUndefined();
+    expect(tool.result).toContain("中断");
   });
 
   it("keeps recently running tools unchanged", () => {
