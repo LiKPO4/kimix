@@ -1272,7 +1272,7 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
   );
 
   return (
-    <div className={`w-full ${isKimiWeb ? "" : "border-b border-[var(--kimix-panel-divider)]"}`} style={{ paddingBottom: !isKimiWeb && expanded && hasDetails ? 8 : 12 }}>
+    <div className={`w-full ${isKimiWeb ? "" : "border-b border-[var(--kimix-panel-divider)]"}`} style={{ paddingBottom: isKimiWeb ? 6 : expanded && hasDetails ? 8 : 12 }}>
       {hasDetails ? (
         <button
           ref={summaryAnchorRef}
@@ -1454,10 +1454,11 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const fullCopyText = useMemo(() => buildAssistantFullCopyText(event), [event.content, event.thinking, event.thinkingParts, event.timestamp]);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
   const footerFallbackLabel = assistantFooterFallbackLabel(event, isActiveAssistant);
+  const processToBodyGap = processDisplayMode === "kimi-web" && !hideProcessSummary && shouldShowBodyFooter ? 12 : 20;
 
   return (
     <div className="group flex justify-start">
-      <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: processToBodyGap }}>
         {!hideProcessSummary && (
           <AssistantProcessSummary
             event={event}
