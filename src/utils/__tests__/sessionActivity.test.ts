@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { getSessionConversationActivityAt, hasActiveTimelineWorkEvents, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -50,6 +50,21 @@ describe("sessionActivity", () => {
     expect(isTimelineEventActive(staleAssistant, 1)).toBe(true);
     expect(isTimelineEventActive(staleAssistant, 1 + 3 * 60 * 1000)).toBe(false);
     expect(isSessionRuntimeRunning(session([staleAssistant]), null, 1 + 3 * 60 * 1000)).toBe(false);
+  });
+
+  it("can distinguish open work from recent active work for long swarm turns", () => {
+    const longRunningSubagent: TimelineEvent = {
+      id: "subagent-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "agent-1",
+      status: "running",
+      events: [],
+    };
+
+    expect(hasActiveTimelineWorkEvents([longRunningSubagent], 1 + 3 * 60 * 1000)).toBe(false);
+    expect(hasOpenTimelineWorkEvents([longRunningSubagent])).toBe(true);
   });
 
   it("uses the latest message time instead of runtime metadata updates", () => {

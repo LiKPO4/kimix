@@ -40,6 +40,29 @@ export function isTimelineEventActive(event: TimelineEvent, now = Date.now()) {
   }
 }
 
+export function isTimelineEventOpen(event: TimelineEvent) {
+  switch (event.type) {
+    case "assistant_message":
+      return !event.isComplete;
+    case "tool_call":
+      return event.status === "running";
+    case "steer_message":
+      return event.status === "sending" || event.status === "accepted";
+    case "subagent":
+      return event.status === "queued" || event.status === "running" || event.status === "suspended";
+    default:
+      return false;
+  }
+}
+
+export function hasOpenTimelineWorkEvents(events: TimelineEvent[]) {
+  return events.some(isTimelineEventOpen);
+}
+
+export function hasOpenTimelineWork(session: Session) {
+  return hasOpenTimelineWorkEvents(session.events);
+}
+
 export function hasActiveTimelineWorkEvents(events: TimelineEvent[], now = Date.now()) {
   return events.some((event) => isTimelineEventActive(event, now));
 }

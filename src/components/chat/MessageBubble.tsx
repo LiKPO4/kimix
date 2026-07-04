@@ -12,7 +12,7 @@ import { ChangeCard } from "./ChangeCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs } from "@/utils/duration";
-import { hasActiveTimelineWorkEvents } from "@/utils/sessionActivity";
+import { hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents } from "@/utils/sessionActivity";
 import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
@@ -1621,8 +1621,10 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   ));
   const hasRunningProcess = leadingTools.some((tool) => tool.status === "running") ||
     leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
-  const hasRecentTimelineActivity = hasActiveTimelineWorkEvents([event, ...leadingTools, ...leadingSubagents]);
-  const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity) && (!event.isComplete || hasRunningProcess));
+  const processEvents = [event, ...leadingTools, ...leadingSubagents];
+  const hasRecentTimelineActivity = hasActiveTimelineWorkEvents(processEvents);
+  const hasOpenTimelineActivity = hasOpenTimelineWorkEvents(processEvents);
+  const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity || hasOpenTimelineActivity) && (!event.isComplete || hasRunningProcess));
   const hasActualThinking = Boolean(
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)

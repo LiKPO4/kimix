@@ -17,7 +17,7 @@ import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromp
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
-import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { hasOpenTimelineWork, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -2778,6 +2778,11 @@ function App() {
         const response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
         if (disposed || !response.success) return;
         if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
+          runtimeTerminalPollRef.current.delete(runtimeSessionId);
+          return;
+        }
+        const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
+        if (hasOpenTimelineWork(latestSession)) {
           runtimeTerminalPollRef.current.delete(runtimeSessionId);
           return;
         }

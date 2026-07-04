@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.32 Swarm 长轮次 busy 状态防提前完成
+- 现象：Swarm 子代理仍在执行时，Assistant footer 已显示“已完成”，输入区允许发送；再次发送后官方报 `Cannot launch a new turn while another turn is active`。
+- 根因：Kimix 的 stale 防卡死逻辑把超过 2 分钟的 running 子代理/工具排除在 active 判断之外；同时 runtime status 轮询看到 terminal/idle 后清理 `runningSessionId`，导致 UI 提前解锁，但官方 runtime 仍有 active turn。
+- 修复：新增“未闭合工作项”判断，和原“近期活跃工作项”分离；status 轮询在本地仍有 open 子代理/工具/assistant 时不清 `runningSessionId`；Assistant footer 也使用 open work 判断保持“运行中”。
+- 下一步：实机验证 Swarm 长时间运行超过 2 分钟时，底部仍显示运行中，输入区不允许发起新 turn，直到官方真正结束。
+
 ## 2026-07-04 v2.14.31 Swarm 子代理明细展开
 - 当前目标：让 Kimi Web 风格过程区里的 Swarm 子代理可以查看子事件，同时避免大量子代理和大量事件造成层层嵌套。
 - 修复：子代理行在存在 `subagent.events` 时支持展开；明细用一层紧凑时间线展示，工具调用/结果按 `toolCallId` 合并，assistant/thinking/status/error 显示短摘要。
