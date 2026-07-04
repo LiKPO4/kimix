@@ -18,6 +18,7 @@ import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
+import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, replaceLatestUserTurn } from "@/utils/eventHelpers";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -311,13 +312,16 @@ function AttachmentThumb({
 const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: { event: Extract<TimelineEvent, { type: "user_message" }>; onDelete?: (eventId: string) => void }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
-  const { currentSessionId, runningSessionId, isLatestUserMessage, isLongTaskMessage } = useAppStore(useShallow((s) => {
+  const [resending, setResending] = useState(false);
+  const { isCurrentSessionRunning, isLatestUserMessage } = useAppStore(useShallow((s) => {
     const currentSession = s.currentSession;
+    const currentRuntimeSessionId = currentSession ? getRuntimeSessionId(currentSession) : undefined;
     return {
-      currentSessionId: currentSession?.id ?? null,
-      runningSessionId: s.runningSessionId,
+      isCurrentSessionRunning: Boolean(currentSession && (
+        s.runningSessionId === currentSession.id ||
+        Boolean(currentRuntimeSessionId && s.runningSessionId === currentRuntimeSessionId)
+      )),
       isLatestUserMessage: Boolean(currentSession && currentSession.events.findLast((e) => e.type === "user_message")?.id === event.id),
-      isLongTaskMessage: Boolean(currentSession?.longTask),
     };
   }));
   const images = event.images ?? [];
@@ -325,11 +329,48 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
   const copyText = hasText ? [event.content, attachmentCopyText(images)].filter(Boolean).join("\n\n") : attachmentCopyText(images);
 
   const handleResend = async () => {
+    if (resending) return;
     const appState = useAppStore.getState();
     const activeSession = appState.currentSession
       ? useSessionStore.getState().sessions.find((session) => session.id === appState.currentSession?.id) ?? appState.currentSession
       : null;
-    if (!activeSession || appState.runningSessionId === activeSession.id) return;
+    if (!activeSession || !isLatestUserInputEvent(activeSession.events, event.id)) return;
+    const runtimeSessionId = getRuntimeSessionId(activeSession);
+    const isSessionRunning = appState.runningSessionId === activeSession.id ||
+      Boolean(runtimeSessionId && appState.runningSessionId === runtimeSessionId);
+    if (isSessionRunning) return;
+
+    const syncCurrentSession = () => {
+      const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id);
+      if (latest && useAppStore.getState().currentSession?.id === activeSession.id) {
+        appState.setCurrentSession(latest);
+      }
+    };
+    const appendError = (message: string) => {
+      const failedAt = Date.now();
+      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
+        ...session,
+        events: [
+          ...session.events,
+          {
+            id: crypto.randomUUID(),
+            type: "error",
+            timestamp: failedAt,
+            message,
+            source: "ipc",
+          },
+        ],
+        updatedAt: failedAt,
+      }));
+      syncCurrentSession();
+    };
+    if (!runtimeSessionId) {
+      appendError("当前会话没有可用的运行时 session");
+      return;
+    }
+
+    setResending(true);
+    let localTurnReplaced = false;
     const now = Date.now();
     const resentUserEvent: TimelineEvent = {
       id: crypto.randomUUID(),
@@ -355,41 +396,30 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
       isThinking: appState.defaultThinking,
       isComplete: false,
     };
-    useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-      ...session,
-      events: [...session.events, resentUserEvent, linkStatusEvent, responsePlaceholder],
-      updatedAt: now,
-    }));
-    appState.setRunningSessionId(activeSession.id);
-    const runtimeSessionId = getRuntimeSessionId(activeSession);
-    if (!runtimeSessionId) {
-      appState.setRunningSessionId(null);
-      const failedAt = Date.now();
+    try {
+      const needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(activeSession.events, event.id);
+      if (needsOfficialUndo) {
+        const undoRes = await window.api.undoKimiCodeHistory({ sessionId: runtimeSessionId, count: 1 });
+        if (!undoRes.success) throw new Error(`撤回上一轮官方历史失败：${undoRes.error}`);
+      }
+
+      const resendStartedAt = Date.now();
       useSessionStore.getState().updateSession(activeSession.id, (session) => ({
         ...session,
-        events: [
-          ...session.events.map((sessionEvent) => {
-            if (sessionEvent.id === responsePlaceholder.id && sessionEvent.type === "assistant_message") {
-              return { ...sessionEvent, isComplete: true, isThinking: false };
-            }
-            if (sessionEvent.id === linkStatusEvent.id && sessionEvent.type === "status_update") {
-              return { ...sessionEvent, timestamp: failedAt, message: "消息发送失败", tone: "danger" as const };
-            }
-            return sessionEvent;
-          }),
-          {
-            id: crypto.randomUUID(),
-            type: "error",
-            timestamp: failedAt,
-            message: "当前会话没有可用的运行时 session",
-            source: "ipc",
-          },
-        ],
-        updatedAt: failedAt,
+        events: replaceLatestUserTurn(session.events, event.id, [
+          { ...resentUserEvent, timestamp: resendStartedAt },
+          { ...linkStatusEvent, timestamp: resendStartedAt },
+          { ...responsePlaceholder, timestamp: resendStartedAt },
+        ]),
+        updatedAt: resendStartedAt,
       }));
-      return;
-    }
-    try {
+      localTurnReplaced = true;
+      syncCurrentSession();
+      appState.setRunningSessionId(activeSession.id);
+      window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
+        detail: { sessionId: activeSession.id },
+      }));
+
       const dispatchStartedAt = Date.now();
       useSessionStore.getState().updateSession(activeSession.id, (session) => ({
         ...session,
@@ -409,6 +439,10 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
       console.error("Resend failed:", err);
       appState.setRunningSessionId(null);
       const message = err instanceof Error ? err.message : String(err);
+      if (!localTurnReplaced) {
+        appendError(message);
+        return;
+      }
       const failedAt = Date.now();
       useSessionStore.getState().updateSession(activeSession.id, (session) => ({
         ...session,
@@ -432,6 +466,9 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
         ],
         updatedAt: failedAt,
       }));
+      syncCurrentSession();
+    } finally {
+      setResending(false);
     }
   };
 
@@ -476,12 +513,12 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
           </button>
           <button
             onClick={handleResend}
-            disabled={currentSessionId ? runningSessionId === currentSessionId || (isLongTaskMessage && !isLatestUserMessage) : false}
+            disabled={resending || !isLatestUserMessage || isCurrentSessionRunning}
             className="kimix-inline-icon-action text-text-muted hover:bg-bg-hover hover:text-text-primary disabled:opacity-30"
-            title="重新发送"
-            aria-label="重新发送"
+            title={isLatestUserMessage ? "撤回本轮输出并重新发送" : "当前仅支持重新发送最新一轮"}
+            aria-label={isLatestUserMessage ? "撤回本轮输出并重新发送" : "当前仅支持重新发送最新一轮"}
           >
-            <RotateCcw size={13} />
+            {resending ? <Loader2 size={13} className="kimix-spin" /> : <RotateCcw size={13} />}
           </button>
           {onDelete && (
             <button

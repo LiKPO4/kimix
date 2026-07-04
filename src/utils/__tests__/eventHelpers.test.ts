@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, removeLocalUserSendAttempt, replaceLatestUserTurn, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -106,6 +106,49 @@ describe("eventHelpers", () => {
     ];
 
     expect(hasLocalOrphanUserSendAttempt(events, "user-1")).toBe(false);
+  });
+
+  it("replaces the latest user turn and all of its output for resend", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-0", type: "user_message", timestamp: 1, content: "上一轮" },
+      { id: "assistant-0", type: "assistant_message", timestamp: 2, content: "上一轮回复", isThinking: false, isComplete: true },
+      { id: "user-1", type: "user_message", timestamp: 3, content: "重发这一轮" },
+      { id: "tool-1", type: "tool_call", timestamp: 4, toolCallId: "call-1", toolName: "Read", status: "success", arguments: {} },
+      { id: "assistant-1", type: "assistant_message", timestamp: 5, content: "旧回复", isThinking: false, isComplete: true },
+    ];
+    const replacement: TimelineEvent[] = [
+      { id: "user-2", type: "user_message", timestamp: 6, content: "重发这一轮" },
+      { id: "assistant-2", type: "assistant_message", timestamp: 6, content: "", isThinking: false, isComplete: false },
+    ];
+
+    expect(isLatestUserInputEvent(events, "user-1")).toBe(true);
+    expect(replaceLatestUserTurn(events, "user-1", replacement).map((event) => event.id))
+      .toEqual(["user-0", "assistant-0", "user-2", "assistant-2"]);
+  });
+
+  it("refuses to replace a non-latest user turn", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "旧消息" },
+      { id: "user-2", type: "user_message", timestamp: 2, content: "最新消息" },
+    ];
+
+    expect(isLatestUserInputEvent(events, "user-1")).toBe(false);
+    expect(replaceLatestUserTurn(events, "user-1", [])).toBe(events);
+  });
+
+  it("distinguishes official turn evidence from a local-only failed send", () => {
+    const officialErrorEvents: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "触发官方错误" },
+      { id: "error-1", type: "error", timestamp: 2, message: "filtered", source: "sdk" },
+    ];
+    const localFailureEvents: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "本地发送失败" },
+      { id: "status-1", type: "status_update", timestamp: 2, message: "消息发送失败", source: "ipc", parentEventId: "user-1" },
+      { id: "error-1", type: "error", timestamp: 3, message: "session unavailable", source: "ipc" },
+    ];
+
+    expect(hasOfficialTurnEvidenceAfterUser(officialErrorEvents, "user-1")).toBe(true);
+    expect(hasOfficialTurnEvidenceAfterUser(localFailureEvents, "user-1")).toBe(false);
   });
 
   it("does not remove real assistant content after deleting a user message", () => {

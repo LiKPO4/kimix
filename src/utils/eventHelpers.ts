@@ -165,6 +165,45 @@ export function hasLocalOrphanUserSendAttempt(events: TimelineEvent[], userEvent
   return true;
 }
 
+export function isLatestUserInputEvent(events: TimelineEvent[], userEventId: string): boolean {
+  const latestUserInput = events.findLast((event) => event.type === "user_message" || event.type === "steer_message");
+  return latestUserInput?.type === "user_message" && latestUserInput.id === userEventId;
+}
+
+export function hasOfficialTurnEvidenceAfterUser(events: TimelineEvent[], userEventId: string): boolean {
+  const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
+  if (userIndex === -1) return false;
+  for (let index = userIndex + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "user_message" || event.type === "steer_message") break;
+    if (event.type === "assistant_message") {
+      if (!isEmptyAssistantEvent(event)) return true;
+      continue;
+    }
+    if (event.type === "error") {
+      if (event.source === "sdk") return true;
+      continue;
+    }
+    if (event.type === "status_update") {
+      if (event.source === "runtime") return true;
+      continue;
+    }
+    if (isRealTurnOutput(event)) return true;
+  }
+  return false;
+}
+
+export function replaceLatestUserTurn(
+  events: TimelineEvent[],
+  userEventId: string,
+  replacement: TimelineEvent[],
+): TimelineEvent[] {
+  if (!isLatestUserInputEvent(events, userEventId)) return events;
+  const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
+  if (userIndex === -1) return events;
+  return [...events.slice(0, userIndex), ...replacement];
+}
+
 export function removeLocalUserSendAttempt(events: TimelineEvent[], userEventId: string): TimelineEvent[] {
   const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
   if (userIndex === -1) return events;
