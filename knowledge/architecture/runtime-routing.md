@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-04T14:05:00+08:00"
+timestamp: "2026-07-04T14:35:00+08:00"
 ---
 
 # Runtime Routing
@@ -63,7 +63,8 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 	44. Persisted local session mirrors render before the first SDK catalog can finish initializing Harness, plugins, and MCP. Old Kimi Code placeholders with no user/steer content and no persisted official-catalog confirmation stay hidden during this gap. Catalog reconciliation stamps visible official mirrors with `officialCatalogConfirmedAt`, allowing real lazy-loaded sessions to render without waiting for body hydration while omitted empty or archived mirrors never flash in the sidebar.
 	45. SDK reconciliation requests `includeArchive: true`; an explicit official `archived: true` identity is authoritative even when the local mirror contains user events. Reconciliation archives every related local identity and clears an archived current-session view. Default SDK omission alone remains non-authoritative, preserving local history when no explicit archive state is available.
 	46. SDK catalog summaries are enriched with the first non-internal user prompt from each wire as `brief` and the persisted `isCustomTitle` flag. Reconciliation updates unlocked local titles before body hydration: official custom titles use `title`, while automatic titles prefer `brief`, then `lastPrompt`, then official `title`. User-renamed `titleLocked` values remain authoritative, preventing click-time title changes without overwriting explicit names.
-	47. Runtime prewarm is keyed only by runtime identity. Permission and Plan preferences are configuration mutations, not reasons to resume or recreate a session. A permission change made during an active turn remains a local desired value until the next prompt boundary, where Kimix applies it to the existing official runtime before dispatch; idle runtimes may be updated immediately. This prevents concurrent runtime rebinding from splitting one turn across old and new sessions. Permission recovery may repair the stored runtime ID, but it must not count as conversation activity, replace the active chat object, or trigger chat viewport re-priming.
+47. Runtime prewarm is keyed only by runtime identity. Permission and Plan preferences are configuration mutations, not reasons to resume or recreate a session. A permission change made during an active turn remains a local desired value until the next prompt boundary, where Kimix applies it to the existing official runtime before dispatch; idle runtimes may be updated immediately. This prevents concurrent runtime rebinding from splitting one turn across old and new sessions. Permission recovery may repair the stored runtime ID, but it must not count as conversation activity, replace the active chat object, or trigger chat viewport re-priming.
+48. Opening or searching an existing session is read-only history hydration. It may fill message events, cache versions, and stale loading flags, but it must not rewrite a non-default catalog title or refresh `updatedAt` to the current time. Only default placeholder titles may be derived from loaded history. Conversation ordering follows real activity, not the user's navigation click.
 
 # Main Components
 

@@ -5,7 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import type { KimiCodeSessionSummary } from "../../../electron/types/ipc";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { deriveSessionTitle, isDefaultSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
@@ -197,14 +197,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
         updateSession(session.id, (current) => ({
           ...current,
           events,
-          title: current.titleLocked ? current.title : deriveSessionTitle(events, current.title),
+          title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(events, current.title),
           isLoading: false,
         }));
         return;
       }
       setSearchOnlySessions((current) => current.map((item) => (
         item.id === session.id
-          ? { ...item, events, title: item.titleLocked ? item.title : deriveSessionTitle(events, item.title), isLoading: false }
+          ? { ...item, events, title: item.titleLocked || !isDefaultSessionTitle(item.title) ? item.title : deriveSessionTitle(events, item.title), isLoading: false }
           : item
       )));
     })).finally(() => {
@@ -335,7 +335,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       updateSession(session.id, (current) => ({
         ...current,
         events,
-        title: current.titleLocked ? current.title : deriveSessionTitle(events, current.title),
+        title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(events, current.title),
         kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
         isLoading: false,
       }));

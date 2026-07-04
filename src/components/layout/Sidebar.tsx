@@ -5,7 +5,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { deriveSessionTitle } from "@/utils/sessionTitle";
+import { deriveSessionTitle, isDefaultSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
@@ -568,12 +568,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       ...current,
       events: !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events,
       kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-      title: current.titleLocked ? current.title : deriveSessionTitle(
+      title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
         !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events,
         current.title,
       ),
       isLoading: false,
-      updatedAt: Date.now(),
     }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
     if (updated) {
@@ -925,7 +924,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.25</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.26</span>
         </button>
       </div>
     </aside>

@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.26 历史会话打开不污染标题和排序
+- 现象：点击旧会话 `5b6abf5a-3edf-4b4b-beac-5d817e563e0c` 后，侧栏标题从目录标题变成历史首条消息“最近怎么样”，并且该会话跳到项目会话列表顶部。
+- 根因：侧栏打开历史时把只读 hydration 当成会话活动更新：完整历史回填后无条件 `deriveSessionTitle()` 重算标题，同时写入 `updatedAt: Date.now()`，导致排序按“刚刚”重排。
+- 修复：侧栏和搜索面板加载历史只补 events / cache / loading；已有非默认标题保持不变，只有默认占位标题才从历史派生；打开历史不刷新 `updatedAt`。
+
 ## 2026-07-04 v2.14.25 侧栏 stale Skill mirror 标题去重
 - 现象：v2.14.24 仍在刚打开时显示两个同名会话，说明两条本地持久化镜像没有共享 runtime/official/skillForkParent 身份链；点击后能打开并折叠，说明它们实际仍是 Skill fork 的父/leaf stale mirror。
 - 修复：侧栏即时去重在身份链之外增加保守标题兜底：同项目、同标题，且至少一条带 `skill-*` 身份或 `skillForkParentSessionId` 时，按透明 Skill fork 镜像只展示一条；普通同名会话仍不按标题合并。
