@@ -363,7 +363,7 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-plan-off", label: "/plan off", detail: "关闭 Plan 模式", insertText: "/plan off ", commandName: "plan", kind: "slash" },
   { id: "slash-status", label: "/status", detail: "显示当前 Kimi Code 会话状态", insertText: "/status", commandName: "status", kind: "slash" },
   { id: "slash-usage", label: "/usage", detail: "显示当前 Kimi Code 会话用量", insertText: "/usage", commandName: "usage", kind: "slash" },
-  { id: "slash-reload", label: "/reload", detail: "重载当前会话配置；Server 会话暂不支持", insertText: "/reload", commandName: "reload", kind: "slash" },
+  { id: "slash-reload", label: "/reload", detail: "重载当前会话配置和 Skill 视图", insertText: "/reload", commandName: "reload", kind: "slash" },
   { id: "slash-btw", label: "/btw", detail: "侧问，不影响主轮次", insertText: "/btw ", commandName: "btw", kind: "slash" },
   { id: "slash-btw-template", label: "/btw 这个函数是谁调用的", detail: "带问题模板：侧问，不影响主轮次", insertText: "/btw 这个函数是谁调用的", commandName: "btw", kind: "slash" },
   { id: "slash-undo", label: "/undo", detail: "撤回最近一次官方历史", insertText: "/undo ", commandName: "undo", kind: "slash" },
@@ -1506,6 +1506,7 @@ export function Composer() {
 
     let officialSkill = await findOfficialSkill();
     let migrated = false;
+    let reloaded = false;
     if (!officialSkill && allowMigration) {
       const prepareRes = await window.api.prepareKimiSkill({ name: skillName });
       if (!prepareRes.success) {
@@ -1513,14 +1514,35 @@ export function Composer() {
         return false;
       }
       migrated = prepareRes.data.copied;
-      const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
-        runtime.uiSessionId,
-        runtimeSessionId,
-        Date.now(),
-      );
-      if (!refreshedRuntimeSessionId) return false;
-      runtimeSessionId = refreshedRuntimeSessionId;
+      const syncedAt = Date.now();
+      const reloadRes = await window.api.reloadKimiCodeSession({ sessionId: runtimeSessionId });
+      if (reloadRes.success) {
+        reloaded = true;
+        updateSession(runtime.uiSessionId, (session) => ({
+          ...session,
+          skillRegistrySyncedAt: syncedAt,
+        }));
+      } else {
+        const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
+          runtime.uiSessionId,
+          runtimeSessionId,
+          syncedAt,
+        );
+        if (!refreshedRuntimeSessionId) return false;
+        runtimeSessionId = refreshedRuntimeSessionId;
+      }
       officialSkill = await findOfficialSkill();
+      if (!officialSkill && reloaded) {
+        const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
+          runtime.uiSessionId,
+          runtimeSessionId,
+          syncedAt,
+        );
+        if (!refreshedRuntimeSessionId) return false;
+        runtimeSessionId = refreshedRuntimeSessionId;
+        reloaded = false;
+        officialSkill = await findOfficialSkill();
+      }
     }
     if (!officialSkill) {
       if (reportFailure) {
@@ -1550,7 +1572,7 @@ export function Composer() {
         type: activateRes.success ? "status_update" : "error",
         timestamp: Date.now(),
         message: activateRes.success
-          ? `${migrated ? "已迁移并" : "已"}调用官方 Skill：${officialSkill.name}`
+          ? `${migrated ? (reloaded ? "已迁移并刷新会话后" : "已迁移并") : "已"}调用官方 Skill：${officialSkill.name}`
           : `调用 Skill 失败：${activateRes.error}`,
         source: "ui",
       });

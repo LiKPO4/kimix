@@ -2,6 +2,7 @@
 
 ## 2026-07-04
 
+* **Same-ID Skill registry refresh**: Missing `/skill:...` activation now prefers reloading the same session ID; idle Server sessions may degrade to SDK route under that ID because Server 0.22 lacks reload REST, with `skill-*` fork retained only as fallback. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Read-only session hydration**: Opening or searching an old session may fill history but must not rewrite non-default titles or refresh recency; navigation clicks are not conversation activity. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **First-paint Skill mirror title guard**: Sidebar first-paint dedupe may use same-project/same-title only when a row carries `skill-*` or a recorded Skill-fork parent; ordinary same-title conversations remain distinct. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Local-parent Skill fork folding**: When the official catalog only returns a `skill-*` leaf, Kimix may use its local same-project/same-title non-skill mirror as the unique transparent parent and must fall back to that parent history during startup or sidebar loading. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

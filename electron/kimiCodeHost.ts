@@ -76,6 +76,7 @@ type KimiHarnessLike = {
   installPlugin?(source: string): Promise<KimiCodePluginSummary>;
   setPluginEnabled?(id: string, enabled: boolean): Promise<void>;
   setPluginMcpServerEnabled?(id: string, server: string, enabled: boolean): Promise<void>;
+  reloadSession?(input: { id: string; forcePluginSessionStartReminder?: boolean }): Promise<KimiCodeSessionLike>;
   close(): Promise<void>;
 };
 
@@ -795,11 +796,67 @@ export async function renameSession(sessionId: string, title: string): Promise<v
 export async function reloadSession(sessionId: string): Promise<void> {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    throw new Error(SERVER_RELOAD_UNSUPPORTED_MESSAGE);
+    await reloadServerSessionThroughSdk(sessionId, serverManaged);
+    return;
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.reloadSession) throw new Error("当前兼容链路不支持会话重载。");
   await managed.session.reloadSession({ forcePluginSessionStartReminder: true });
+}
+
+async function reloadServerSessionThroughSdk(
+  sessionId: string,
+  serverManaged: ServerManagedSession,
+): Promise<void> {
+  if (serverManaged.status === "running" || serverManaged.status === "waiting_approval" || serverManaged.status === "waiting_question") {
+    throw new Error("当前轮正在运行，不能刷新 Skill 注册表。请等本轮结束后重试。");
+  }
+
+  const sdkHarness = await getHarness();
+  let session: KimiCodeSessionLike;
+  if (sdkHarness.reloadSession) {
+    session = await sdkHarness.reloadSession({
+      id: sessionId,
+      forcePluginSessionStartReminder: true,
+    });
+  } else {
+    session = await sdkHarness.resumeSession({
+      id: sessionId,
+      additionalDirs: serverManaged.additionalDirs,
+    });
+    if (!session.reloadSession) throw new Error(SERVER_RELOAD_UNSUPPORTED_MESSAGE);
+    await session.reloadSession({ forcePluginSessionStartReminder: true });
+  }
+
+  let status: KimiCodeSessionStatus | undefined;
+  let permission = serverManaged.permission;
+  try {
+    status = await session.getStatus();
+    if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
+      permission = status.permission;
+    }
+  } catch {
+    // Best effort: keep the previous Server profile when SDK status is unavailable.
+  }
+
+  serverSessions.delete(sessionId);
+  await getServerClient().unsubscribe(sessionId).catch((error) => {
+    console.warn(`[KimiCodeServerHost] unsubscribe Server session ${sessionId} after SDK reload failed:`, error);
+  });
+  if (serverSessions.size === 0) {
+    unsubscribeServerFrames?.();
+    unsubscribeServerFrames = null;
+    await serverClient?.close().catch(() => undefined);
+    serverClient = null;
+    kimiCodeServerHost.setRouting("sdk");
+  }
+
+  registerSession(session, "idle", {
+    model: status?.model ?? serverManaged.model,
+    thinking: status?.thinkingEffort ?? status?.thinkingLevel ?? serverManaged.thinking,
+    permission,
+    planMode: status?.planMode ?? serverManaged.planMode,
+  });
 }
 
 export async function setModel(sessionId: string, model: string): Promise<void> {

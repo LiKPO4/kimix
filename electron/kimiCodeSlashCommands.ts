@@ -19,6 +19,7 @@ const COMMON_SLASH_COMMANDS: SlashCommandInfo[] = [
   { name: "btw 这个函数是谁调用的", description: "带问题模板：侧问，不影响主轮次", aliases: [] },
   { name: "undo", description: "撤回最近一次官方历史", aliases: [] },
   { name: "undo 1", description: "带次数模板：撤回最近 1 次官方历史", aliases: [] },
+  { name: "reload", description: "重载当前会话配置和 Skill 视图", aliases: [] },
   { name: "skill:", description: "通过官方链路调用 Skill", aliases: [] },
 ];
 
@@ -39,7 +40,6 @@ const SDK_ONLY_SLASH_COMMANDS: SlashCommandInfo[] = [
   { name: "swarm 并行检查最近改动并给出修复建议", description: "通过兼容链路发起 Swarm 任务", aliases: [] },
   { name: "swarm on", description: "开启 Swarm 模式", aliases: [] },
   { name: "swarm off", description: "关闭 Swarm 模式", aliases: [] },
-  { name: "reload", description: "重载当前会话配置", aliases: [] },
 ];
 
 export function listKimiCodeSlashCommands(runtime: KimiCodeSlashRuntime): SlashCommandInfo[] {

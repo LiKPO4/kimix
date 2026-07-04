@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.28 Skill 缺失优先同会话 reload
+- 现象：为了让已有会话识别新同步的 Skill，Kimix 过去直接 fork 出 `skill-*` runtime，造成同名会话、历史回退和侧栏折叠等一系列兼容补丁。
+- 探针：Kimi Code 0.22.2 SDK/RPC 的 `reloadSession` 可在同一个 session id 下刷新 Skill 视图并成功 activate；Server REST 仍没有公开 reload endpoint，活跃 Server session 经 SDK reload 后 Server REST 视图不会更新，但 SDK route 可在同一 id 上 activate。
+- 修复：`reloadKimiCodeSession` 对空闲 Server 会话改为同 id SDK reload 并将该会话切到 SDK route；Composer 在 Skill 缺失时优先 `prepare -> reload -> list/activate`，只有 reload 失败或仍不可见时才 fallback 到原 `skill-*` fork。
+
 ## 2026-07-04 v2.14.27 Assistant footer Hook 徽标右置
 - 现象：有 Hook 命中时，Assistant 底部元信息行左侧同时显示复制、全部复制和“钩子 1”，宽度超过中间状态胶囊预留，导致模型、时间、Tokens、Context 信息互相挤压省略。
 - 修复：保持 footer 小改动结构，把 Hook 徽标从左侧复制操作区移到右侧绝对区，和左侧复制按钮形成左右分区，减少对中间状态胶囊的挤压。
