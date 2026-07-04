@@ -2,6 +2,7 @@
 
 ## 2026-07-04
 
+* **Manual chat scroll anchoring**: After user wheel/touch/scrollbar intent, layout-only commits from permission controls, runtime snapshots, or deferred Markdown settlement must restore a rendered message anchor rather than allowing the container to reset to the top. See [/project/kimix.md](/project/kimix.md).
 * **Idle runtime status snapshots stay out of chat history**: Permission changes may trigger `agent.status.updated`, but idle snapshots are no longer appended to the visible conversation or allowed to rewrite Assistant footer time / Tokens / Context. Real `usage.record` events remain visible. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Permission changes do not re-render the chat stream**: `ChatThread` is memoized so parent permission-mode updates cannot force Markdown and message bubbles through a fresh render pass. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Permission controls are scroll-neutral**: Chat rendering no longer subscribes to permission preferences, and layout-only resizes from permission controls preserve the current viewport instead of re-running bottom-follow scrolling. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

@@ -1046,6 +1046,40 @@ export const ChatThread = memo(function ChatThread() {
     return true;
   };
 
+  const restoreManualScrollAnchor = (reason: string) => {
+    const node = scrollRef.current;
+    if (!node || !userScrollRef.current) return false;
+    const beforeScrollTop = node.scrollTop;
+    const beforeDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const restored = restoreResizeScrollAnchor();
+    const afterScrollTop = node.scrollTop;
+    const afterDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (restored) {
+      updateShowScrollToBottom(afterDistance > 80);
+      scheduleAnchorCapture();
+    }
+    if (restored || beforeScrollTop <= 8 || Math.abs(afterScrollTop - beforeScrollTop) > 0.5) {
+      window.api.writeDiag?.({
+        message: "[ChatThread] restoreManualScrollAnchor",
+        data: {
+          reason,
+          restored,
+          beforeScrollTop,
+          afterScrollTop,
+          beforeDistance,
+          afterDistance,
+          sessionId: session?.id,
+          runtimeSessionId: session ? getRuntimeSessionId(session) : undefined,
+          runningSessionId,
+          anchorKey: resizeScrollAnchorRef.current?.key,
+          userScroll: userScrollRef.current,
+          autoFollow: autoFollowRef.current,
+        },
+      }).catch(logError("writeDiag"));
+    }
+    return restored;
+  };
+
   const readScrollSize = (node: HTMLElement) => ({
     width: node.clientWidth,
     height: node.clientHeight,
@@ -1376,6 +1410,9 @@ export const ChatThread = memo(function ChatThread() {
     }
     const node = scrollRef.current;
     if (!node) return;
+    if (userScrollRef.current && restoreManualScrollAnchor("contentVersion:user-scroll")) {
+      return;
+    }
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
   }, [contentVersion]);
@@ -1487,6 +1524,9 @@ export const ChatThread = memo(function ChatThread() {
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
     const now = Date.now();
+    if (userScrollRef.current) {
+      scheduleIdleAnchorCapture();
+    }
     if (
       previousScrollTop !== null &&
       previousScrollTop > Math.max(160, node.clientHeight * 0.5) &&
@@ -1612,16 +1652,22 @@ export const ChatThread = memo(function ChatThread() {
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<PermissionModeDiagDetail>).detail;
+      if (userScrollRef.current) {
+        captureResizeScrollAnchor();
+        intentionalResizeRestoreUntilRef.current = Date.now() + 900;
+      }
       window.api.writeDiag?.({
         message: "[ChatThread] permissionDiag",
         data: readPermissionScrollDiagState("event", detail),
       }).catch(logError("writeDiag"));
       window.requestAnimationFrame(() => {
+        restoreManualScrollAnchor(`permission:${detail?.stage ?? "unknown"}:rAF1`);
         window.api.writeDiag?.({
           message: "[ChatThread] permissionDiag rAF1",
           data: readPermissionScrollDiagState("rAF1", detail),
         }).catch(logError("writeDiag"));
         window.requestAnimationFrame(() => {
+          restoreManualScrollAnchor(`permission:${detail?.stage ?? "unknown"}:rAF2`);
           window.api.writeDiag?.({
             message: "[ChatThread] permissionDiag rAF2",
             data: readPermissionScrollDiagState("rAF2", detail),

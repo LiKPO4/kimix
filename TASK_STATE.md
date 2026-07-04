@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.17 权限切换后手动滚动锚点保持
+- 现象：v2.14.16 诊断确认，刚进入会话时反复切换权限不跳顶；只要用户滚轮操作后，再切换权限就会把聊天流顶到顶部。
+- 证据：同一权限切换 trace 中，点击和 `setPermissionMode` 当帧仍可读到原滚动状态；约后续帧/内容版本变化后 `scrollTop` 变成 0，且当时 `userHasScrolled=true`、`userScroll=true`、`autoFollow=false`，说明不是主动追底，而是手动滚动状态下布局提交缺少锚点保护。
+- 根因：用户滚动后没有在 `handleScroll` 安排当前可见锚点捕获，权限切换引发菜单关闭、runtime 状态快照或 Markdown 延迟布局提交时，`restoreResizeScrollAnchor()` 没有可靠锚点可恢复，浏览器/React 布局可把滚动容器复位到顶部。
+- 修复：用户滚动时 idle 捕获可见锚点；权限切换诊断事件到达时立即捕获锚点，并在 rAF1/rAF2 与 `contentVersion` 变化后恢复手动滚动锚点。
+
 ## 2026-07-04 v2.14.16 权限切换跳顶诊断
 - 现象：v2.14.15 实测切换权限模式仍会瞬间顶到当前会话流顶部，前几轮基于推断的滚动修复没有命中根因。
 - 本轮策略：停止继续猜修，先写可对齐事件顺序的诊断日志；`Composer` 为点击、菜单关闭、延后切换、SDK `setPermission` 前后和 UI 权限状态写入前后打同一 `traceId`；`ChatThread` 监听权限诊断事件并记录 immediate / rAF1 / rAF2 的滚动状态，同时增加 `scrollJumpNearTop` 捕捉从中下位置突然到顶部附近的瞬间。
