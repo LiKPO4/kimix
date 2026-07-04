@@ -917,6 +917,15 @@ export function Composer() {
       };
 
       const ensureKimiCodeRuntime = async () => {
+        const ensureSwarmIfLocked = async (runtimeSessionId: string) => {
+          if (!targetSession.swarmModeLockedAt) return;
+          const res = await window.api.swarmKimiCode({
+            sessionId: runtimeSessionId,
+            enabled: true,
+            trigger: "manual",
+          });
+          if (!res.success) throw new Error(`应用 Swarm 模式失败：${res.error}`);
+        };
         const knownOfficialSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
         if (knownOfficialSessionId) {
           updateLinkStatus("消息发送中", "info");
@@ -957,6 +966,7 @@ export function Composer() {
               throw new Error(`应用权限模式失败：${permissionRes.error}`);
             }
             updateLinkStatus("消息发送中", "info");
+            await ensureSwarmIfLocked(resumeRes.data.sessionId);
             return resumeRes.data.sessionId;
           }
           updateLinkStatus("消息发送中", "info");
@@ -989,21 +999,12 @@ export function Composer() {
         }));
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         updateLinkStatus("消息发送中", "info");
+        await ensureSwarmIfLocked(createRes.data.sessionId);
         return createRes.data.sessionId;
       };
 
       try {
         let kimiCodeSessionId = await ensureKimiCodeRuntime();
-        if (targetSession.swarmModeLockedAt) {
-          const swarmRes = await window.api.swarmKimiCode({
-            sessionId: kimiCodeSessionId,
-            enabled: true,
-            trigger: "manual",
-          });
-          if (!swarmRes.success) {
-            throw new Error(`应用 Swarm 模式失败：${swarmRes.error}`);
-          }
-        }
         const markPromptDispatchStarted = () => {
           const startedAt = Date.now();
           updateSession(targetSession.id, (session) => ({
