@@ -1,5 +1,9 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.24 侧栏首屏 Skill fork 去重
+- 现象：v2.14.23 已修复点击后可打开历史，但刚启动首屏仍短暂显示两个同名 Skill fork 会话，点击后才折叠为一个。
+- 修复：侧栏渲染入口按 runtime/official/skillForkParent/longTask 身份做即时去重，优先保留当前会话或 skill leaf 后继，避免等待官方目录 reconciliation 后才消除重复。
+
 ## 2026-07-04 v2.14.23 Skill fork 本地父会话兜底
 - 现象：v2.14.22 仍会在首屏显示两个同名会话，点击后只剩一个但一直停在“正在同步最新会话”。现场说明官方目录可能只返回 `skill-*` leaf，父会话只存在于 Kimix 本地镜像，且选中缓存会话时旧 `isLoading` 没被清理。
 - 修复：目录折叠在 metadata 丢失时也会用本地同项目同标题的唯一非 `skill-*` 镜像推断父会话；启动恢复和侧栏点击都会在 `skill-*` leaf 历史为空时回退读取父历史；点击已有缓存会话会清除 stale loading。

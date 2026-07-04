@@ -46,6 +46,50 @@ function isSameProjectPath(a: string | undefined, b: string | undefined) {
   return Boolean(left && right && left === right);
 }
 
+function sessionIdentitySet(session: Session): Set<string> {
+  return new Set([
+    session.id,
+    session.runtimeSessionId,
+    session.officialSessionId,
+    session.skillForkParentSessionId,
+    session.longTask?.executorSessionId,
+    session.longTask?.reviewerSessionId,
+  ].filter((id): id is string => Boolean(id)));
+}
+
+function areRelatedSidebarSessions(left: Session, right: Session): boolean {
+  if (!isSameProjectPath(left.projectPath, right.projectPath)) return false;
+  const leftIds = sessionIdentitySet(left);
+  const rightIds = sessionIdentitySet(right);
+  for (const id of leftIds) {
+    if (rightIds.has(id)) return true;
+  }
+  return false;
+}
+
+function preferSidebarSession(left: Session, right: Session, currentSessionId?: string): Session {
+  if (left.id === currentSessionId && right.id !== currentSessionId) return left;
+  if (right.id === currentSessionId && left.id !== currentSessionId) return right;
+  const leftHasSkillLeaf = Boolean(left.runtimeSessionId?.startsWith("skill-") || left.officialSessionId?.startsWith("skill-"));
+  const rightHasSkillLeaf = Boolean(right.runtimeSessionId?.startsWith("skill-") || right.officialSessionId?.startsWith("skill-"));
+  if (leftHasSkillLeaf !== rightHasSkillLeaf) return leftHasSkillLeaf ? left : right;
+  if (left.events.length !== right.events.length) return left.events.length > right.events.length ? left : right;
+  return left.updatedAt >= right.updatedAt ? left : right;
+}
+
+function dedupeSidebarSessions(sessions: Session[], currentSessionId?: string): Session[] {
+  const result: Session[] = [];
+  for (const session of sessions) {
+    const existingIndex = result.findIndex((item) => areRelatedSidebarSessions(item, session));
+    if (existingIndex < 0) {
+      result.push(session);
+      continue;
+    }
+    result[existingIndex] = preferSidebarSession(result[existingIndex], session, currentSessionId);
+  }
+  return result.sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
 interface SidebarProps {
   width?: number;
 }
@@ -354,9 +398,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const { visibleSessions, sessionsByProjectPath } = useMemo(() => {
-    const visible = currentSession && !sessions.some((session) => session.id === currentSession.id)
+    const rawVisible = currentSession && !sessions.some((session) => session.id === currentSession.id)
       ? [currentSession, ...sessions]
       : sessions;
+    const visible = dedupeSidebarSessions(rawVisible, currentSession?.id);
     const byProject = new Map<string, Session[]>();
     for (const session of visible) {
       if (session.archivedAt || isHiddenInternalSession(session) || shouldHideOfficialSessionPlaceholder(session)) continue;
@@ -868,7 +913,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.23</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.24</span>
         </button>
       </div>
     </aside>
