@@ -20,6 +20,7 @@ import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/s
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
 import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/utils/pendingPermissionChange";
+import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -1845,6 +1846,48 @@ export function Composer() {
 
   const applyPermissionMode = useCallback(async (mode: PermissionMode, runtimeSessionId?: string) => {
     const previousMode = useAppStore.getState().permissionMode;
+    // Only push to the SDK when a real runtime session exists. Using the UI-id
+    // fallback here would hit "session not active" before the first message is
+    // sent and wrongly roll the UI mode back. New sessions carry permissionMode
+    // into createKimiCodeSession at send time, so the local update is enough.
+    let appliedRuntimeSessionId = runtimeSessionId;
+    if (runtimeSessionId) {
+      const targetSession = useSessionStore.getState().sessions.find((session) => (
+        session.id === runtimeSessionId ||
+        session.runtimeSessionId === runtimeSessionId ||
+        session.officialSessionId === runtimeSessionId
+      ));
+      const res = await setKimiCodePermissionWithRecovery({
+        sessionId: runtimeSessionId,
+        mode,
+        projectPath: targetSession?.projectPath,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+        setPermission: window.api.setKimiCodePermission,
+        resumeSession: window.api.resumeKimiCodeSession,
+      });
+      if (!res.success) {
+        setPermissionMode(previousMode);
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `权限切换失败：${res.error}`,
+        }));
+        return;
+      }
+      appliedRuntimeSessionId = res.sessionId;
+      if (targetSession && appliedRuntimeSessionId !== runtimeSessionId) {
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          runtimeSessionId: appliedRuntimeSessionId,
+          officialSessionId: appliedRuntimeSessionId,
+          updatedAt: Date.now(),
+        }));
+        const current = useAppStore.getState().currentSession;
+        if (current?.id === targetSession.id) {
+          const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
+          if (updated) setCurrentSession(updated);
+        }
+      }
+    }
+
     setPermissionMode(mode);
     if (mode === "yolo" && clarificationToolMode !== "off") {
       setClarificationToolMode("off");
@@ -1852,23 +1895,11 @@ export function Composer() {
         detail: "已关闭需求澄清工具：官方 yolo 模式不支持开启",
       }));
     }
-    // Only push to the SDK when a real runtime session exists. Using the UI-id
-    // fallback here would hit "session not active" before the first message is
-    // sent and wrongly roll the UI mode back. New sessions carry permissionMode
-    // into createKimiCodeSession at send time, so the local update is enough.
-    if (!runtimeSessionId) return;
-    const res = await window.api.setKimiCodePermission({ sessionId: runtimeSessionId, mode });
-    if (!res.success) {
-      setPermissionMode(previousMode);
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: `权限切换失败：${res.error}`,
-      }));
-      return;
-    }
+    if (!appliedRuntimeSessionId) return;
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: "权限模式已切换",
     }));
-  }, [clarificationToolMode, setClarificationToolMode, setPermissionMode]);
+  }, [clarificationToolMode, setClarificationToolMode, setCurrentSession, setPermissionMode, updateSession]);
 
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     const previousMode = permissionMode;
