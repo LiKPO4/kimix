@@ -2206,6 +2206,10 @@ button.bg-accent-primary:disabled:hover,
   text-wrap: pretty;
 }
 
+.kimix-thinking-detail .markdown-body {
+  color: var(--kimix-process-muted);
+}
+
 .markdown-body p,
 .markdown-body li,
 .markdown-body blockquote,

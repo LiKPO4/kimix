@@ -561,7 +561,7 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
         </div>
       )}
       {expanded && (
-        <div className="kimix-soft-card-strong mt-1 min-w-0 rounded-lg text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
+        <div className="kimix-thinking-detail kimix-soft-card-strong mt-1 min-w-0 rounded-lg text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
           <MarkdownRenderer content={normalizeThinkingMarkdown(block.text)} wrapLongLines />
         </div>
       )}
