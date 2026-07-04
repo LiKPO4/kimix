@@ -57,6 +57,15 @@ function sessionIdentitySet(session: Session): Set<string> {
   ].filter((id): id is string => Boolean(id)));
 }
 
+function normalizedSidebarSessionTitle(session: Session): string {
+  return session.title.trim().toLowerCase();
+}
+
+function hasSkillForkIdentity(session: Session): boolean {
+  return Boolean(session.skillForkParentSessionId) ||
+    Array.from(sessionIdentitySet(session)).some((id) => id.startsWith("skill-"));
+}
+
 function areRelatedSidebarSessions(left: Session, right: Session): boolean {
   if (!isSameProjectPath(left.projectPath, right.projectPath)) return false;
   const leftIds = sessionIdentitySet(left);
@@ -64,6 +73,9 @@ function areRelatedSidebarSessions(left: Session, right: Session): boolean {
   for (const id of leftIds) {
     if (rightIds.has(id)) return true;
   }
+  const sameTitle = normalizedSidebarSessionTitle(left) &&
+    normalizedSidebarSessionTitle(left) === normalizedSidebarSessionTitle(right);
+  if (sameTitle && (hasSkillForkIdentity(left) || hasSkillForkIdentity(right))) return true;
   return false;
 }
 
@@ -913,7 +925,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.24</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.25</span>
         </button>
       </div>
     </aside>

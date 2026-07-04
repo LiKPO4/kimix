@@ -1,5 +1,9 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.25 侧栏 stale Skill mirror 标题去重
+- 现象：v2.14.24 仍在刚打开时显示两个同名会话，说明两条本地持久化镜像没有共享 runtime/official/skillForkParent 身份链；点击后能打开并折叠，说明它们实际仍是 Skill fork 的父/leaf stale mirror。
+- 修复：侧栏即时去重在身份链之外增加保守标题兜底：同项目、同标题，且至少一条带 `skill-*` 身份或 `skillForkParentSessionId` 时，按透明 Skill fork 镜像只展示一条；普通同名会话仍不按标题合并。
+
 ## 2026-07-04 v2.14.24 侧栏首屏 Skill fork 去重
 - 现象：v2.14.23 已修复点击后可打开历史，但刚启动首屏仍短暂显示两个同名 Skill fork 会话，点击后才折叠为一个。
 - 修复：侧栏渲染入口按 runtime/official/skillForkParent/longTask 身份做即时去重，优先保留当前会话或 skill leaf 后继，避免等待官方目录 reconciliation 后才消除重复。

@@ -2,6 +2,7 @@
 
 ## 2026-07-04
 
+* **First-paint Skill mirror title guard**: Sidebar first-paint dedupe may use same-project/same-title only when a row carries `skill-*` or a recorded Skill-fork parent; ordinary same-title conversations remain distinct. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Local-parent Skill fork folding**: When the official catalog only returns a `skill-*` leaf, Kimix may use its local same-project/same-title non-skill mirror as the unique transparent parent and must fall back to that parent history during startup or sidebar loading. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Metadata-loss Skill fork folding**: `skill-*` registry-refresh forks remain transparent even when official catalog metadata omits `source=kimix-fork`; Kimix folds only same-project/same-title unique predecessors and falls back to parent history if the leaf snapshot is empty. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Large-delta manual scroll recovery**: Manual chat scroll anchoring must not reuse the small resize delta cap when recovering from jump-to-top; finding the anchor without applying the required delta is a false success. See [/project/kimix.md](/project/kimix.md).
