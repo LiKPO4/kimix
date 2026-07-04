@@ -928,23 +928,38 @@ function kimiWebGroupSummary(group: ProcessGroup) {
 
 function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
-  const canExpand = block.text.trim().length > 0 && block.text.trim() !== block.summary.trim();
+  const paragraphs = useMemo(() =>
+    block.text
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0),
+    [block.text]
+  );
+  // Match the official kimi-web ThinkingBlock.vue behavior:
+  // single-paragraph thinking is shown straight; multi-paragraph thinking
+  // is folded to its last paragraph and expands inline on click.
+  const isFoldable = paragraphs.length > 1;
+  const teaser = paragraphs.at(-1) ?? block.text;
   return (
-    <div className="flex flex-col" style={{ gap: expanded ? 8 : 0 }}>
-      {canExpand ? (
+    <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
+      {isFoldable ? (
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
           className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
+          style={{ whiteSpace: "pre-wrap" }}
         >
-          {block.summary}
+          {teaser}
         </button>
       ) : (
-        <div className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">
-          {block.summary}
+        <div
+          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
+          style={{ whiteSpace: "pre-wrap" }}
+        >
+          {block.text}
         </div>
       )}
-      {expanded && (
+      {expanded && isFoldable && (
         <div
           className="text-[14.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
           style={{ whiteSpace: "pre-wrap" }}
@@ -957,9 +972,25 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
 }
 
 function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
+  const dedupedBlocks = useMemo(() => {
+    const result: ThinkingBlock[] = [];
+    for (const block of blocks) {
+      const last = result.at(-1);
+      if (last && block.text.startsWith(last.text)) {
+        // The later block is a superset of (or identical to) the previous one,
+        // which happens when a tool boundary splits a single streaming thought
+        // into repeated parts. Keep the more complete version.
+        result[result.length - 1] = block;
+      } else {
+        result.push(block);
+      }
+    }
+    return result;
+  }, [blocks]);
+
   return (
     <div className="flex flex-col" style={{ gap: 8 }}>
-      {blocks.map((block) => (
+      {dedupedBlocks.map((block) => (
         <KimiWebThinkingItem key={block.id} block={block} />
       ))}
     </div>
