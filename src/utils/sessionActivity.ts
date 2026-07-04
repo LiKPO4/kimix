@@ -18,6 +18,13 @@ export function getSessionConversationActivityAt(session: Session): number {
   return session.updatedAt;
 }
 
+export function compareSessionsByRecentConversation(left: Session, right: Session): number {
+  return getSessionConversationActivityAt(right) - getSessionConversationActivityAt(left) ||
+    right.updatedAt - left.updatedAt ||
+    right.createdAt - left.createdAt ||
+    left.id.localeCompare(right.id);
+}
+
 export const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
 
 export function isTerminalKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {

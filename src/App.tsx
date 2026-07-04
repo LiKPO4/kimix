@@ -17,7 +17,7 @@ import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromp
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
-import { hasOpenTimelineWork, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, hasOpenTimelineWork, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -84,6 +84,7 @@ const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后�
 - 关键文件/命令
 - 下一步最小行动`;
 const HANDOFF_TIMEOUT_MS = 180_000;
+const STARTUP_ACTIVE_CONTEXT = readLocalActiveContext();
 let rendererWindowFocusedHint = typeof document !== "undefined" ? document.hasFocus() : false;
 
 interface HandoffJob {
@@ -101,15 +102,20 @@ interface StartHandoffDetail {
   recommendationEventId: string;
 }
 
-function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): Session | undefined {
+function findSessionByRuntimeIdentity(sessions: Session[], historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): Session | undefined {
   const ids = new Set([historySessionId, runtimeSessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
-  return useSessionStore.getState().sessions.find((session) => !session.archivedAt && (
+  return sessions.find((session) => !session.archivedAt && (
     ids.has(session.id) ||
     Boolean(session.officialSessionId && ids.has(session.officialSessionId)) ||
     Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId)) ||
+    Boolean(session.skillForkParentSessionId && ids.has(session.skillForkParentSessionId)) ||
     Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
     Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
   ));
+}
+
+function findLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): Session | undefined {
+  return findSessionByRuntimeIdentity(useSessionStore.getState().sessions, historySessionId, runtimeSessionId, officialSessionId);
 }
 
 function hasArchivedLocalSessionForRuntime(historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null, projectPath?: string): boolean {
@@ -205,7 +211,7 @@ function extractOfficialSessionTitle(event: unknown): string | null {
 }
 
 async function repairKimiCodeHistoryBodies(sessions: Session[]) {
-  const activeSessionId = readLocalActiveContext()?.sessionId;
+  const activeSessionId = STARTUP_ACTIVE_CONTEXT?.sessionId;
   const candidates = sessions
     .filter((session) => session.id !== activeSessionId && needsKimiCodeHistoryRepair(session))
     .slice(0, 12);
@@ -1956,13 +1962,13 @@ function App() {
     const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
       if (bootstrapDoneRef.current) return;
       bootstrapDoneRef.current = true;
-      const activeContext = readLocalActiveContext();
+      const activeContext = STARTUP_ACTIVE_CONTEXT;
       const localSessions = useSessionStore.getState().sessions;
       const latestLocalSession = [...localSessions]
         .filter((session) => !session.archivedAt && !isHiddenInternalSession(session))
-        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+        .sort(compareSessionsByRecentConversation)[0];
       const activeLocalSession = activeContext?.sessionId
-        ? localSessions.find((session) => session.id === activeContext.sessionId && !session.archivedAt && !isHiddenInternalSession(session))
+        ? findSessionByRuntimeIdentity(localSessions, activeContext.sessionId) ?? latestLocalSession
         : latestLocalSession;
 
       window.api.listRecentProjects().then(async (projectsRes) => {
@@ -2153,7 +2159,7 @@ function App() {
       try {
         const parsed = JSON.parse(storedSessions);
         if (Array.isArray(parsed)) {
-          const restoringActiveSessionId = readLocalActiveContext()?.sessionId;
+          const restoringActiveSessionId = STARTUP_ACTIVE_CONTEXT?.sessionId;
           const visibleSessions = parsed
             .filter((session) => !isHiddenInternalSession(session))
             .map((session) => ({

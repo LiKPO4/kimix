@@ -10,7 +10,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -86,6 +86,9 @@ function preferSidebarSession(left: Session, right: Session, currentSessionId?: 
   const rightHasSkillLeaf = Boolean(right.runtimeSessionId?.startsWith("skill-") || right.officialSessionId?.startsWith("skill-"));
   if (leftHasSkillLeaf !== rightHasSkillLeaf) return leftHasSkillLeaf ? left : right;
   if (left.events.length !== right.events.length) return left.events.length > right.events.length ? left : right;
+  const leftActivityAt = getSessionConversationActivityAt(left);
+  const rightActivityAt = getSessionConversationActivityAt(right);
+  if (leftActivityAt !== rightActivityAt) return leftActivityAt > rightActivityAt ? left : right;
   return left.updatedAt >= right.updatedAt ? left : right;
 }
 
@@ -99,7 +102,7 @@ function dedupeSidebarSessions(sessions: Session[], currentSessionId?: string): 
     }
     result[existingIndex] = preferSidebarSession(result[existingIndex], session, currentSessionId);
   }
-  return result.sort((left, right) => right.updatedAt - left.updatedAt);
+  return result.sort(compareSessionsByRecentConversation);
 }
 
 interface SidebarProps {
@@ -695,7 +698,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               if (isExpanded) lastAutoExpandedProjectId.current = project.id;
                               if (!isActive) {
                                 setCurrentProject(project);
-                                const latestSession = [...pSessions].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+                                const latestSession = [...pSessions].sort(compareSessionsByRecentConversation)[0];
                                 if (latestSession) {
                                   setWorkspaceView("chat");
                                   void selectSession(latestSession.id);
@@ -924,7 +927,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.38</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.39</span>
         </button>
       </div>
     </aside>

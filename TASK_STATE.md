@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.39 会话真实活跃排序与启动恢复
+- 当前目标：修复最近 4 分钟会话未排顶部，以及退出时所在会话在重启后没有恢复的问题。
+- 根因：Sidebar 列表、项目默认选择和启动 fallback 仍按容易被配置/目录同步刷新的 session.updatedAt 排序；Bootstrap 回调再次读取 active context，可能读到被启动初始化订阅覆盖后的值；恢复只匹配本地 UI id，未覆盖 runtime/official/Skill parent 身份。
+- 修复：共享 compareSessionsByRecentConversation 按最后 user/steer/assistant 时间排序，仅无对话事件时回退 updatedAt；Sidebar、项目选择和启动 fallback 统一使用；模块加载时冻结退出 active context，Bootstrap 和本地恢复只消费该快照，并按完整 runtime 身份匹配保存会话。
+- 下一步：实机确认 4 分钟会话排在项目顶部；停留该会话退出并重启后仍打开同一会话。
+
 ## 2026-07-04 v2.14.38 撤回到输入框
 - 当前目标：修正“重新发送”语义；点击后不自动发送，而是删除该轮并把原消息恢复到输入框供用户修改。
 - 修复：最新用户轮次按既有官方 undo 边界撤回，成功后从本地事件流删除该用户消息及其输出，通过 session-scoped 事件恢复文本和图片/文件附件到 Composer，并聚焦输入框；不创建 assistant 占位、不设置 running、不调用 sendPrompt。

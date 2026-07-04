@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { compareSessionsByRecentConversation, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -88,6 +88,22 @@ describe("sessionActivity", () => {
 
     expect(getSessionConversationActivityAt(active)).toBe(500);
     expect(getSessionConversationActivityAt({ ...active, events: [], updatedAt: 700 })).toBe(700);
+  });
+
+  it("sorts by real conversation activity before metadata updatedAt", () => {
+    const recentlyMessaged = {
+      ...session([{ id: "user-recent", type: "user_message", timestamp: 900, content: "Recent" }]),
+      id: "recent",
+      updatedAt: 1_000,
+    };
+    const metadataOnlyNewer = {
+      ...session([{ id: "user-old", type: "user_message", timestamp: 200, content: "Old" }]),
+      id: "metadata",
+      updatedAt: 2_000,
+    };
+
+    expect([metadataOnlyNewer, recentlyMessaged].sort(compareSessionsByRecentConversation).map((item) => item.id))
+      .toEqual(["recent", "metadata"]);
   });
 
   it("shows transient loading only on the current session row", () => {
