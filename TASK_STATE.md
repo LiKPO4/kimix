@@ -1,5 +1,9 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.19 不可展开过程行取消禁用光标
+- 现象：对话过程里不可展开的思考/工具/过程摘要行使用 disabled button，鼠标悬停时显示禁止符号，也影响文字选择和复制。
+- 修复：可展开项仍渲染为 button 并保留 hover/点击展开；不可展开项改为普通文本容器，不使用 disabled button，不显示 hover 反馈，也不阻断选择文本。
+
 ## 2026-07-04 v2.14.18 手动滚动锚点大位移恢复
 - 现象：v2.14.17 实测切换权限后仍会顶到顶部；截图确认版本已是 v2.14.17。
 - 证据：日志中 `restoreManualScrollAnchor` 多次显示 `restored:true`，但 `beforeScrollTop:0`、`afterScrollTop:0`、`beforeDistance:8127`、`afterDistance:8127`，说明恢复函数找到锚点却没有真正移动滚动位置。

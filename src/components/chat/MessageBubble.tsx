@@ -500,25 +500,38 @@ function describeTool(tool: ToolEvent) {
 function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = block.text.trim().length > 0;
+  const rowContent = (
+    <>
+      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <Brain size={15} />
+      </span>
+      <span className="min-w-0 flex-1 truncate leading-5">{block.summary}</span>
+      {canExpand && (
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        </span>
+      )}
+    </>
+  );
   return (
     <div className="kimix-soft-card overflow-hidden rounded-xl">
-      <button
-        type="button"
-        onClick={() => canExpand && setExpanded((value) => !value)}
-        disabled={!canExpand}
-        className="kimix-chat-process-row grid w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9 }}
-      >
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          <Brain size={15} />
-        </span>
-        <span className="min-w-0 flex-1 truncate leading-5">{block.summary}</span>
-        {canExpand && (
-          <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-          </span>
-        )}
-      </button>
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="kimix-chat-process-row grid w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] text-[var(--kimix-process-text)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+          style={{ gap: 9 }}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div
+          className="kimix-chat-process-row grid w-full grid-cols-[18px_minmax(0,1fr)_18px] items-center text-left text-[14px] text-[var(--kimix-process-text)]"
+          style={{ gap: 9 }}
+        >
+          {rowContent}
+        </div>
+      )}
       {expanded && (
         <div className="kimix-soft-card-strong mt-1 min-w-0 rounded-lg text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
           <MarkdownRenderer content={normalizeThinkingMarkdown(block.text)} wrapLongLines />
@@ -538,28 +551,41 @@ function ToolProcessItem({ tool }: { tool: ToolEvent }) {
     resultText ? `结果：\n${resultText}` : "",
   ].filter(Boolean).join("\n\n");
   const canExpand = detailText.trim().length > 0;
+  const rowContent = (
+    <>
+      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+        <SquareTerminal size={14} />
+      </span>
+      <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
+      <span className="min-w-0 flex-1 truncate leading-5">{describeTool(tool)}</span>
+      <span className="kimix-tabular-nums w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
+      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
+        <span className={`h-1.5 w-1.5 rounded-full ${tool.status === "error" ? "bg-accent-danger" : tool.status === "running" ? "bg-accent-warning" : "bg-accent-success"}`} />
+      </span>
+      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+      </span>
+    </>
+  );
   return (
     <div className="kimix-soft-card overflow-hidden rounded-xl text-[13.5px]">
-      <button
-        type="button"
-        onClick={() => canExpand && setExpanded((value) => !value)}
-        disabled={!canExpand}
-        className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9 }}
-      >
-        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
-          <SquareTerminal size={14} />
-        </span>
-        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">{tool.status === "running" ? "正在运行" : tool.status === "error" ? "命令失败" : "已完成"}</span>
-        <span className="min-w-0 flex-1 truncate leading-5">{describeTool(tool)}</span>
-        <span className="kimix-tabular-nums w-8 shrink-0 text-right leading-5 text-[var(--kimix-panel-text-muted)]">{tool.durationMs !== undefined ? `${Math.max(0, Math.round(tool.durationMs / 1000))}s` : ""}</span>
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center">
-          <span className={`h-1.5 w-1.5 rounded-full ${tool.status === "error" ? "bg-accent-danger" : tool.status === "running" ? "bg-accent-warning" : "bg-accent-success"}`} />
-        </span>
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
-        </span>
-      </button>
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+          style={{ gap: 9 }}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div
+          className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px_18px] items-center text-left"
+          style={{ gap: 9 }}
+        >
+          {rowContent}
+        </div>
+      )}
       {expanded && (
         <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13px] leading-6" style={{ padding: "12px 14px" }}>
           {detailText}
@@ -579,27 +605,40 @@ function ApprovalProcessItem({ approval }: { approval: ApprovalEvent }) {
     approval.details?.trim() ? `详情：\n${approval.details.trim()}` : "",
   ].filter(Boolean).join("\n\n");
   const canExpand = detailText.trim().length > 0;
+  const rowContent = (
+    <>
+      <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
+        <ShieldCheck size={14} />
+      </span>
+      <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">工具请求</span>
+      <span className="min-w-0 flex-1 truncate leading-5">{approval.description || approval.toolName || "工具请求"}</span>
+      <span className={`shrink-0 rounded-full text-[12px] leading-5 ${approved ? "text-accent-success" : "text-accent-danger"}`} style={{ paddingLeft: 8, paddingRight: 8 }}>
+        {decisionLabel}
+      </span>
+      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+      </span>
+    </>
+  );
   return (
     <div className="kimix-soft-card overflow-hidden rounded-xl text-[13.5px]">
-      <button
-        type="button"
-        onClick={() => canExpand && setExpanded((value) => !value)}
-        disabled={!canExpand}
-        className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gap: 9 }}
-      >
-        <span className="flex h-5 w-[18px] items-center justify-center text-[var(--kimix-process-muted)]">
-          <ShieldCheck size={14} />
-        </span>
-        <span className="shrink-0 leading-5 text-[var(--kimix-panel-text-secondary)]">工具请求</span>
-        <span className="min-w-0 flex-1 truncate leading-5">{approval.description || approval.toolName || "工具请求"}</span>
-        <span className={`shrink-0 rounded-full text-[12px] leading-5 ${approved ? "text-accent-success" : "text-accent-danger"}`} style={{ paddingLeft: 8, paddingRight: 8 }}>
-          {decisionLabel}
-        </span>
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
-        </span>
-      </button>
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+          style={{ gap: 9 }}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div
+          className="kimix-chat-process-row grid w-full grid-cols-[18px_auto_minmax(0,1fr)_auto_18px] items-center text-left"
+          style={{ gap: 9 }}
+        >
+          {rowContent}
+        </div>
+      )}
       {expanded && (
         <pre className="kimix-soft-card-strong mt-1 min-w-0 whitespace-pre-wrap break-words rounded-lg font-mono text-[13px] leading-6" style={{ padding: "12px 14px" }}>
           {detailText}
@@ -864,14 +903,19 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
   const canExpand = block.text.trim().length > 0 && block.text.trim() !== block.summary.trim();
   return (
     <div className="flex flex-col" style={{ gap: expanded ? 8 : 0 }}>
-      <button
-        type="button"
-        onClick={() => canExpand && setExpanded((value) => !value)}
-        disabled={!canExpand}
-        className="text-left text-[13px] leading-[1.6] text-[var(--kimix-panel-text-muted)] transition-colors hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:text-[var(--kimix-panel-text-muted)]"
-      >
-        {block.summary}
-      </button>
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="text-left text-[13px] leading-[1.6] text-[var(--kimix-panel-text-muted)] transition-colors hover:text-[var(--kimix-panel-text-secondary)]"
+        >
+          {block.summary}
+        </button>
+      ) : (
+        <div className="text-left text-[13px] leading-[1.6] text-[var(--kimix-panel-text-muted)]">
+          {block.summary}
+        </div>
+      )}
       {expanded && (
         <div
           className="text-[13px] leading-[1.65] text-[var(--kimix-panel-text-muted)]"
@@ -919,35 +963,48 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
     resultText ? `结果：\n${resultText}` : "",
   ].filter(Boolean).join("\n\n");
   const hasDetail = detailText.trim().length > 0;
+  const rowContent = (
+    <>
+      <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
+        <SquareTerminal size={13} />
+      </span>
+      <span className="flex min-w-0 items-center overflow-hidden">
+        <span className="truncate leading-[20px]">{displayTarget}</span>
+      </span>
+      <span className="flex h-5 items-center" style={{ gap: 8 }}>
+        {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
+        {tool.status === "success" && <Check size={13} className="text-accent-success" />}
+        {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+        {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
+      </span>
+      <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
+        {hasDetail ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+      </span>
+    </>
+  );
 
   return (
     <div
       className="flex flex-col"
       style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
-      <button
-        type="button"
-        onClick={() => hasDetail && setExpanded((value) => !value)}
-        disabled={!hasDetail}
-        className="grid w-full items-center text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, height: 42 }}
-      >
-        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
-          <SquareTerminal size={13} />
-        </span>
-        <span className="flex min-w-0 items-center overflow-hidden">
-          <span className="truncate leading-[20px]">{displayTarget}</span>
-        </span>
-        <span className="flex h-5 items-center" style={{ gap: 8 }}>
-          {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
-          {tool.status === "success" && <Check size={13} className="text-accent-success" />}
-          {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
-          {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
-        </span>
-        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
-          {hasDetail ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
-        </span>
-      </button>
+      {hasDetail ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="grid w-full items-center text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, height: 42 }}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div
+          className="grid w-full items-center text-left text-[13px] text-[var(--kimix-panel-text-secondary)]"
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42 }}
+        >
+          {rowContent}
+        </div>
+      )}
       {expanded && (
         <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 0 8px 26px" }}>
           {detailText}
@@ -1202,27 +1259,34 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
   }, [expanded]);
 
   const isKimiWeb = displayMode === "kimi-web";
+  const summaryContent = (
+    <>
+      {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
+      <span className="kimix-tabular-nums shrink-0">{label}</span>
+      {hasDetails && !isKimiWeb && (
+        <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
+          {summary}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <div className={`w-full ${isKimiWeb ? "" : "border-b border-[var(--kimix-panel-divider)]"}`} style={{ paddingBottom: !isKimiWeb && expanded && hasDetails ? 8 : 12 }}>
-      <button
-        ref={summaryAnchorRef}
-        type="button"
-        onClick={() => {
-          if (!hasDetails) return;
-          toggleWithStableAnchor(!expanded, "summary");
-        }}
-        disabled={!hasDetails}
-        className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--kimix-panel-text-secondary)]"
-      >
-        {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
-        <span className="kimix-tabular-nums shrink-0">{label}</span>
-        {hasDetails && !isKimiWeb && (
-          <span className="min-w-0 truncate text-[13px] text-[var(--kimix-panel-text-muted)]">
-            {summary}
-          </span>
-        )}
-      </button>
+      {hasDetails ? (
+        <button
+          ref={summaryAnchorRef}
+          type="button"
+          onClick={() => toggleWithStableAnchor(!expanded, "summary")}
+          className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"
+        >
+          {summaryContent}
+        </button>
+      ) : (
+        <div className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)]">
+          {summaryContent}
+        </div>
+      )}
       {isKimiWeb && (
         <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: 8 }} />
       )}
