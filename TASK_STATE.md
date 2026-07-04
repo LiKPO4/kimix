@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.18 手动滚动锚点大位移恢复
+- 现象：v2.14.17 实测切换权限后仍会顶到顶部；截图确认版本已是 v2.14.17。
+- 证据：日志中 `restoreManualScrollAnchor` 多次显示 `restored:true`，但 `beforeScrollTop:0`、`afterScrollTop:0`、`beforeDistance:8127`、`afterDistance:8127`，说明恢复函数找到锚点却没有真正移动滚动位置。
+- 根因：`restoreResizeScrollAnchor()` 只允许 300px 内的小位移恢复，权限切换后的跳顶需要恢复约 8127px，被阈值拦掉；同时函数在找到锚点但未应用位移时仍返回 `true`，造成诊断假阳性。
+- 修复：普通 resize 仍保留 300px 安全阈值；手动滚动锚点恢复使用无限位移上限来处理跳顶，并记录 delta、锚点偏移、目标节点和是否超过默认阈值。
+
 ## 2026-07-04 v2.14.17 权限切换后手动滚动锚点保持
 - 现象：v2.14.16 诊断确认，刚进入会话时反复切换权限不跳顶；只要用户滚轮操作后，再切换权限就会把聊天流顶到顶部。
 - 证据：同一权限切换 trace 中，点击和 `setPermissionMode` 当帧仍可读到原滚动状态；约后续帧/内容版本变化后 `scrollTop` 变成 0，且当时 `userHasScrolled=true`、`userScroll=true`、`autoFollow=false`，说明不是主动追底，而是手动滚动状态下布局提交缺少锚点保护。

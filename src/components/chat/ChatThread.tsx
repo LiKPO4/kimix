@@ -1030,7 +1030,7 @@ export const ChatThread = memo(function ChatThread() {
     };
   };
 
-  const restoreResizeScrollAnchor = () => {
+  const restoreResizeScrollAnchor = (maxDelta = MAX_RESIZE_ANCHOR_RESTORE_PX) => {
     const node = scrollRef.current;
     const anchor = resizeScrollAnchorRef.current;
     if (!node || !anchor?.key) return false;
@@ -1040,18 +1040,29 @@ export const ChatThread = memo(function ChatThread() {
     const containerRect = node.getBoundingClientRect();
     const nextOffsetTop = target.getBoundingClientRect().top - containerRect.top;
     const delta = nextOffsetTop - anchor.offsetTop;
-    if (Math.abs(delta) > 0.5 && Math.abs(delta) <= MAX_RESIZE_ANCHOR_RESTORE_PX) {
-      node.scrollTop += delta;
+    if (Math.abs(delta) <= 0.5) {
+      return true;
     }
-    return true;
+    if (Math.abs(delta) <= maxDelta) {
+      node.scrollTop += delta;
+      return true;
+    }
+    return false;
   };
 
   const restoreManualScrollAnchor = (reason: string) => {
     const node = scrollRef.current;
     if (!node || !userScrollRef.current) return false;
+    const anchor = resizeScrollAnchorRef.current;
     const beforeScrollTop = node.scrollTop;
     const beforeDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
-    const restored = restoreResizeScrollAnchor();
+    const target = anchor?.key
+      ? node.querySelector<HTMLElement>(`[data-kimix-render-key="${globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&")}"]`)
+      : null;
+    const containerRect = node.getBoundingClientRect();
+    const targetOffsetTop = target ? target.getBoundingClientRect().top - containerRect.top : undefined;
+    const delta = target && anchor ? targetOffsetTop! - anchor.offsetTop : undefined;
+    const restored = restoreResizeScrollAnchor(Number.POSITIVE_INFINITY);
     const afterScrollTop = node.scrollTop;
     const afterDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
     if (restored) {
@@ -1068,10 +1079,15 @@ export const ChatThread = memo(function ChatThread() {
           afterScrollTop,
           beforeDistance,
           afterDistance,
+          delta,
+          targetOffsetTop,
+          anchorOffsetTop: anchor?.offsetTop,
+          skippedByDefaultMax: typeof delta === "number" ? Math.abs(delta) > MAX_RESIZE_ANCHOR_RESTORE_PX : undefined,
           sessionId: session?.id,
           runtimeSessionId: session ? getRuntimeSessionId(session) : undefined,
           runningSessionId,
-          anchorKey: resizeScrollAnchorRef.current?.key,
+          anchorKey: anchor?.key,
+          targetFound: Boolean(target),
           userScroll: userScrollRef.current,
           autoFollow: autoFollowRef.current,
         },
