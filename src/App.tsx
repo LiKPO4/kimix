@@ -2024,10 +2024,25 @@ function App() {
                 return;
               }
               const runtimeOwner = findLocalSessionForRuntime(historySessionId, undefined, latest?.id);
-              const loaded = await window.api.loadKimiCodeSession({
+              let loaded = await window.api.loadKimiCodeSession({
                 workDir: activeProject.path,
                 sessionId: historySessionId,
               });
+              if (
+                loaded.success &&
+                Array.isArray(loaded.data.events) &&
+                loaded.data.events.length === 0 &&
+                runtimeOwner?.skillForkParentSessionId &&
+                historySessionId.startsWith("skill-")
+              ) {
+                const fallbackLoaded = await window.api.loadKimiCodeSession({
+                  workDir: activeProject.path,
+                  sessionId: runtimeOwner.skillForkParentSessionId,
+                });
+                if (fallbackLoaded.success && Array.isArray(fallbackLoaded.data.events) && fallbackLoaded.data.events.length > 0) {
+                  loaded = fallbackLoaded;
+                }
+              }
               if (!loaded.success) {
                 if (activeLocalSession) {
                   const errorSession = {

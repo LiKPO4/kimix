@@ -62,9 +62,14 @@ function normalizedCatalogTitle(item: OfficialSessionCatalogItem): string {
   return (catalogTitle(item) ?? "").trim().toLowerCase();
 }
 
+function normalizedSessionTitle(session: Session): string {
+  return (session.title ?? "").trim().toLowerCase();
+}
+
 function inferTransparentSkillForkParent(
   item: OfficialSessionCatalogItem,
   candidates: OfficialSessionCatalogItem[],
+  sessions: Session[],
   projectPath: string,
 ): string | undefined {
   const explicitParent = transparentSkillForkParent(item);
@@ -82,10 +87,25 @@ function inferTransparentSkillForkParent(
       (candidate.updatedAt || 0) <= (item.updatedAt || 0)
     ))
     .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
-  if (parentCandidates.length === 0) return undefined;
-  const latestUpdatedAt = parentCandidates[0].updatedAt || 0;
-  const latestParents = parentCandidates.filter((candidate) => (candidate.updatedAt || 0) === latestUpdatedAt);
-  return latestParents.length === 1 ? latestParents[0].id : undefined;
+  if (parentCandidates.length > 0) {
+    const latestUpdatedAt = parentCandidates[0].updatedAt || 0;
+    const latestParents = parentCandidates.filter((candidate) => (candidate.updatedAt || 0) === latestUpdatedAt);
+    if (latestParents.length === 1) return latestParents[0].id;
+  }
+  const localCandidates = sessions
+    .filter((session) => (
+      !session.archivedAt &&
+      isOfficialMirrorSession(session, projectPath) &&
+      normalizeProjectPath(session.projectPath) === normalizedProjectPath &&
+      normalizedSessionTitle(session) === title &&
+      !officialSessionIds(session).some((id) => id.startsWith("skill-"))
+    ))
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+  if (localCandidates.length === 0) return undefined;
+  const latestLocalUpdatedAt = localCandidates[0].updatedAt;
+  const latestLocalParents = localCandidates.filter((session) => session.updatedAt === latestLocalUpdatedAt);
+  if (latestLocalParents.length !== 1) return undefined;
+  return latestLocalParents[0].runtimeSessionId ?? latestLocalParents[0].officialSessionId ?? latestLocalParents[0].id;
 }
 
 function officialLineageIds(
@@ -157,7 +177,7 @@ export function reconcileOfficialSessionCatalog(
   const officialById = new Map(officialSessions.map((session) => [session.id, session]));
   const parentById = new Map<string, string>();
   for (const official of officialSessions) {
-    const parentId = inferTransparentSkillForkParent(official, officialSessions, projectPath);
+    const parentId = inferTransparentSkillForkParent(official, officialSessions, sessions, projectPath);
     if (parentId) parentById.set(official.id, parentId);
   }
   const supersededOfficialIds = new Set(
