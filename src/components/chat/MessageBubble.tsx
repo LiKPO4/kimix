@@ -1049,29 +1049,218 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
   );
 }
 
+const KIMI_WEB_SUBAGENT_DETAIL_LIMIT = 8;
+
+type KimiWebSubagentDetailItem = {
+  id: string;
+  timestamp: number;
+  kind: "assistant" | "thinking" | "tool" | "status" | "error";
+  label: string;
+  detail?: string;
+  tone?: "default" | "success" | "warning" | "danger";
+};
+
+function compactSubagentText(value: string, maxLength = 120) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function subagentToolTarget(event: Extract<TimelineEvent, { type: "tool_call" | "tool_result" }>) {
+  if (event.type === "tool_result") return "";
+  const directKeys = ["command", "cmd", "path", "filePath", "file_path", "pattern", "query", "content", "description"];
+  for (const key of directKeys) {
+    const value = event.arguments[key];
+    if (typeof value === "string" && value.trim()) return compactSubagentText(value, 88);
+  }
+  return compactSubagentText(toolArgumentPreview(event) || "", 88);
+}
+
+function buildKimiWebSubagentDetails(subagent: SubagentEvent): KimiWebSubagentDetailItem[] {
+  const details: KimiWebSubagentDetailItem[] = [];
+  const toolItems = new Map<string, KimiWebSubagentDetailItem>();
+
+  const upsertTool = (event: Extract<TimelineEvent, { type: "tool_call" | "tool_result" }>) => {
+    const key = event.toolCallId || event.id;
+    const existing = toolItems.get(key);
+    const target = subagentToolTarget(event);
+    const result = event.type === "tool_result"
+      ? formatToolResultForDisplay(event.result)
+      : formatToolResultForDisplay(event.result);
+    const status = event.type === "tool_call" ? event.status : "success";
+    const label = `${status === "running" ? "正在使用" : status === "error" ? "工具失败" : "工具完成"} ${event.toolName || "工具"}`;
+    const next: KimiWebSubagentDetailItem = {
+      id: existing?.id ?? `tool-${key}`,
+      timestamp: existing?.timestamp ?? event.timestamp,
+      kind: "tool",
+      label,
+      detail: compactSubagentText([target, result].filter(Boolean).join(" · "), 160),
+      tone: status === "error" ? "danger" : status === "running" ? "warning" : "success",
+    };
+    if (!existing) {
+      details.push(next);
+    } else {
+      const index = details.findIndex((item) => item.id === existing.id);
+      if (index >= 0) details[index] = next;
+    }
+    toolItems.set(key, next);
+  };
+
+  subagent.events.forEach((event) => {
+    if (event.type === "tool_call" || event.type === "tool_result") {
+      upsertTool(event);
+      return;
+    }
+    if (event.type === "assistant_message") {
+      const text = event.content || event.thinking || "";
+      if (!text.trim()) return;
+      details.push({
+        id: event.id,
+        timestamp: event.timestamp,
+        kind: event.thinking && !event.content ? "thinking" : "assistant",
+        label: event.thinking && !event.content ? "思考" : "输出",
+        detail: compactSubagentText(text, 180),
+      });
+      return;
+    }
+    if (event.type === "status_update" && event.message) {
+      details.push({
+        id: event.id,
+        timestamp: event.timestamp,
+        kind: "status",
+        label: "状态",
+        detail: compactSubagentText(event.message, 160),
+        tone: event.tone === "danger" ? "danger" : event.tone === "warning" ? "warning" : event.tone === "success" ? "success" : "default",
+      });
+      return;
+    }
+    if (event.type === "error") {
+      details.push({
+        id: event.id,
+        timestamp: event.timestamp,
+        kind: "error",
+        label: "错误",
+        detail: compactSubagentText(event.message, 160),
+        tone: "danger",
+      });
+    }
+  });
+
+  return details.sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function KimiWebSubagentDetailIcon({ item }: { item: KimiWebSubagentDetailItem }) {
+  const className = item.tone === "danger"
+    ? "text-accent-danger"
+    : item.tone === "warning"
+      ? "text-accent-warning"
+      : item.tone === "success"
+        ? "text-accent-success"
+        : "text-[var(--kimix-process-muted)]";
+  if (item.kind === "tool") return <SquareTerminal size={12} className={className} />;
+  if (item.kind === "thinking") return <Brain size={12} className={className} />;
+  if (item.kind === "error") return <FileText size={12} className={className} />;
+  if (item.kind === "status") return <FileText size={12} className={className} />;
+  return <Bot size={12} className={className} />;
+}
+
+function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
+  const [showAll, setShowAll] = useState(false);
+  const details = useMemo(() => buildKimiWebSubagentDetails(subagent), [subagent]);
+  const visibleDetails = showAll ? details : details.slice(-KIMI_WEB_SUBAGENT_DETAIL_LIMIT);
+  const hiddenCount = Math.max(0, details.length - visibleDetails.length);
+  if (details.length === 0) {
+    return (
+      <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "0 12px 10px 26px" }}>
+        暂无可展示的子事件详情。
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: "0 12px 10px 26px" }}>
+      <div
+        className="min-w-0 border-l border-[var(--kimix-panel-divider)]"
+        style={{ paddingLeft: 12 }}
+      >
+        <div className="flex flex-col" style={{ gap: 6 }}>
+          {visibleDetails.map((item) => (
+            <div
+              key={item.id}
+              className="grid min-w-0 items-start text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+              style={{ gridTemplateColumns: "16px minmax(46px, auto) minmax(0, 1fr)", columnGap: 8 }}
+            >
+              <span className="flex h-5 items-center justify-center">
+                <KimiWebSubagentDetailIcon item={item} />
+              </span>
+              <span className="shrink-0 whitespace-nowrap text-[var(--kimix-panel-text-muted)]">{item.label}</span>
+              <span className="min-w-0 break-words">{item.detail || "无详情"}</span>
+            </div>
+          ))}
+        </div>
+        {details.length > KIMI_WEB_SUBAGENT_DETAIL_LIMIT && (
+          <button
+            type="button"
+            onClick={() => setShowAll((value) => !value)}
+            className="kimix-muted-action rounded-md text-[12.5px]"
+            style={{ minHeight: 28, marginTop: 8, paddingLeft: 8, paddingRight: 8 }}
+          >
+            {showAll ? "收起部分子事件" : `显示全部 ${details.length} 条子事件（还有 ${hiddenCount} 条）`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isLast: boolean }) {
+  const [expanded, setExpanded] = useState(false);
   const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
+  const canExpand = subagent.events.length > 0;
+  useEffect(() => {
+    if (!canExpand && expanded) setExpanded(false);
+  }, [canExpand, expanded]);
+  const rowContent = (
+    <>
+      <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
+        {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
+      </span>
+      <span className="flex min-w-0 items-center overflow-hidden">
+        <span className="truncate leading-[20px]">{subagent.agentName || "子代理"}</span>
+      </span>
+      <span className="flex h-5 items-center" style={{ gap: 8 }}>
+        <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
+        {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+        {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
+      </span>
+      <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
+        {canExpand ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+      </span>
+    </>
+  );
   return (
     <div
-      className="text-[13px] text-[var(--kimix-panel-text-secondary)]"
+      className="flex flex-col text-[13px] text-[var(--kimix-panel-text-secondary)]"
       style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
-      <div
-        className="grid w-full items-center"
-        style={{ gridTemplateColumns: "18px 1fr auto", gap: 8, height: 42 }}
-      >
-        <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
-          {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
-        </span>
-        <span className="flex min-w-0 items-center overflow-hidden">
-          <span className="truncate leading-[20px]">{subagent.agentName || "子代理"}</span>
-        </span>
-        <span className="flex h-5 items-center" style={{ gap: 8 }}>
-          <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
-          {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
-          {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
-        </span>
-      </div>
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42 }}
+          title={expanded ? "收起子事件" : "展开子事件"}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <div
+          className="grid w-full items-center text-left"
+          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42 }}
+        >
+          {rowContent}
+        </div>
+      )}
+      {expanded && <KimiWebSubagentDetails subagent={subagent} />}
     </div>
   );
 }
