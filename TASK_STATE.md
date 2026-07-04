@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.33 失败发送本地撤回
+- 当前目标：允许删除失败发送产生的用户消息，并同步移除 Kimix 本地错误信息，做到“像没发生过”。
+- 修复：用户气泡操作区收紧间距；失败发送的用户消息新增删除按钮；删除用户消息时会清理同一发送尝试里的 parent status、空 assistant 占位和紧随错误卡；错误卡关闭按钮改为从 session events 移除错误。
+- 边界：删除只影响 Kimix 本地展示，不回滚已经进入官方 runtime 的远端上下文；如果消息后面已经有真实 assistant 正文，不会误删正文。
+- 下一步：实机验证失败消息删除后，用户气泡、发送中状态和错误卡一起消失，重进会话不会恢复。
+
 ## 2026-07-04 v2.14.32 Swarm 长轮次 busy 状态防提前完成
 - 现象：Swarm 子代理仍在执行时，Assistant footer 已显示“已完成”，输入区允许发送；再次发送后官方报 `Cannot launch a new turn while another turn is active`。
 - 根因：Kimix 的 stale 防卡死逻辑把超过 2 分钟的 running 子代理/工具排除在 active 判断之外；同时 runtime status 轮询看到 terminal/idle 后清理 `runningSessionId`，导致 UI 提前解锁，但官方 runtime 仍有 active turn。

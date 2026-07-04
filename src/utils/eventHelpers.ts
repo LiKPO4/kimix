@@ -96,6 +96,90 @@ export function latestAssistantVisibleOrThinkingContent(events: TimelineEvent[])
   return parts || assistant.thinking?.trim() || "";
 }
 
+function isEmptyAssistantEvent(event: Extract<TimelineEvent, { type: "assistant_message" }>) {
+  return !event.content.trim() &&
+    !event.thinking?.trim() &&
+    !event.thinkingParts?.some((part) => part.text.trim());
+}
+
+function isLocalSendStatus(event: Extract<TimelineEvent, { type: "status_update" }>) {
+  const message = event.message?.trim() ?? "";
+  return event.source === "ipc" ||
+    /消息(?:发送中|处理中|处理失败|发送失败)/.test(message);
+}
+
+function isRealTurnOutput(event: TimelineEvent) {
+  return event.type === "tool_call" ||
+    event.type === "tool_result" ||
+    event.type === "subagent" ||
+    event.type === "hook" ||
+    event.type === "approval_request" ||
+    event.type === "question_request" ||
+    event.type === "change_summary" ||
+    event.type === "diff" ||
+    event.type === "file_artifact" ||
+    event.type === "session_recommendation" ||
+    event.type === "todo" ||
+    event.type === "compaction";
+}
+
+export function hasLocalFailedSendAttempt(events: TimelineEvent[], userEventId: string): boolean {
+  const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
+  if (userIndex === -1) return false;
+
+  let sawLocalSendMarker = false;
+  for (let index = userIndex + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "user_message" || event.type === "steer_message") break;
+    if (event.type === "status_update") {
+      if (event.parentEventId === userEventId || (!event.parentEventId && isLocalSendStatus(event))) {
+        sawLocalSendMarker = true;
+      }
+      continue;
+    }
+    if (event.type === "assistant_message") {
+      if (isEmptyAssistantEvent(event)) continue;
+      return false;
+    }
+    if (event.type === "error") return true;
+    if (isRealTurnOutput(event)) return false;
+  }
+  return sawLocalSendMarker;
+}
+
+export function removeLocalUserSendAttempt(events: TimelineEvent[], userEventId: string): TimelineEvent[] {
+  const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
+  if (userIndex === -1) return events;
+
+  const removeIds = new Set<string>([userEventId]);
+  for (let index = userIndex + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "user_message" || event.type === "steer_message") break;
+    if (event.type === "status_update") {
+      if (event.parentEventId === userEventId || (!event.parentEventId && isLocalSendStatus(event))) {
+        removeIds.add(event.id);
+        continue;
+      }
+      continue;
+    }
+    if (event.type === "assistant_message") {
+      if (isEmptyAssistantEvent(event)) {
+        removeIds.add(event.id);
+        continue;
+      }
+      break;
+    }
+    if (event.type === "error") {
+      removeIds.add(event.id);
+      continue;
+    }
+    if (isRealTurnOutput(event)) {
+      break;
+    }
+  }
+  return events.filter((event) => !removeIds.has(event.id));
+}
+
 function isStaleRunningEvent(event: TimelineEvent, settledAt: number) {
   return settledAt - event.timestamp > STALE_TIMELINE_WORK_MS;
 }

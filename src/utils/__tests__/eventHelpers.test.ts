@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasMalformedAssistantMarkdown, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasMalformedAssistantMarkdown, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -59,6 +59,46 @@ describe("eventHelpers", () => {
     const tool = settled[0] as Extract<TimelineEvent, { type: "tool_call" }>;
     expect(tool.status).toBe("running");
     expect(tool.durationMs).toBeUndefined();
+  });
+
+  it("removes a local failed send attempt with its status, empty placeholder, and error", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "卡住了吗" },
+      { id: "status-1", type: "status_update", timestamp: 2, message: "消息发送中", parentEventId: "user-1", source: "ipc" },
+      { id: "assistant-empty", type: "assistant_message", timestamp: 3, content: "", isThinking: false, isComplete: true },
+      { id: "error-1", type: "error", timestamp: 4, message: "Cannot launch a new turn while another turn is active", source: "ipc" },
+      { id: "user-2", type: "user_message", timestamp: 5, content: "下一条" },
+    ];
+
+    expect(removeLocalUserSendAttempt(events, "user-1").map((event) => event.id))
+      .toEqual(["user-2"]);
+  });
+
+  it("marks only local failed send attempts as deletable", () => {
+    const failedEvents: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "卡住了吗" },
+      { id: "status-1", type: "status_update", timestamp: 2, message: "消息发送中", parentEventId: "user-1", source: "ipc" },
+      { id: "error-1", type: "error", timestamp: 3, message: "Cannot launch a new turn while another turn is active", source: "ipc" },
+    ];
+    const completedEvents: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "你好，有什么可以帮你？", isThinking: false, isComplete: true },
+      { id: "error-later", type: "error", timestamp: 3, message: "unrelated", source: "ipc" },
+    ];
+
+    expect(hasLocalFailedSendAttempt(failedEvents, "user-1")).toBe(true);
+    expect(hasLocalFailedSendAttempt(completedEvents, "user-1")).toBe(false);
+  });
+
+  it("does not remove real assistant content after deleting a user message", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "你好，有什么可以帮你？", isThinking: false, isComplete: true },
+      { id: "error-later", type: "error", timestamp: 3, message: "unrelated", source: "ipc" },
+    ];
+
+    expect(removeLocalUserSendAttempt(events, "user-1").map((event) => event.id))
+      .toEqual(["assistant-1", "error-later"]);
   });
 });
 

@@ -6,6 +6,7 @@ import type { TimelineEvent } from "@/types/ui";
 interface ErrorCardProps {
   event: Extract<TimelineEvent, { type: "error" }>;
   onRetry?: () => Promise<void>;
+  onDismiss?: () => void;
 }
 
 type ErrorRecoveryKind = "login" | "model_config" | "context" | "terminated" | "compact" | "generic";
@@ -53,7 +54,7 @@ function classifyError(message: string): { kind: ErrorRecoveryKind; title: strin
   };
 }
 
-export const ErrorCard = memo(function ErrorCard({ event, onRetry }: ErrorCardProps) {
+export const ErrorCard = memo(function ErrorCard({ event, onRetry, onDismiss }: ErrorCardProps) {
   const [dismissed, setDismissed] = useState(false);
   const [loginState, setLoginState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [loginMessage, setLoginMessage] = useState("");
@@ -86,6 +87,14 @@ export const ErrorCard = memo(function ErrorCard({ event, onRetry }: ErrorCardPr
   }, [dismissed, isKimiLoginError]);
 
   if (dismissed) return null;
+
+  const dismissError = () => {
+    if (onDismiss) {
+      onDismiss();
+      return;
+    }
+    setDismissed(true);
+  };
 
   const handleLogin = async () => {
     setLoginState("running");
@@ -206,7 +215,7 @@ export const ErrorCard = memo(function ErrorCard({ event, onRetry }: ErrorCardPr
               {event.canDismiss !== false && (
                 <button
                   type="button"
-                  onClick={() => setDismissed(true)}
+                  onClick={dismissError}
                   className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
                   style={{ minWidth: 32, paddingLeft: 8, paddingRight: 8 }}
                   aria-label="关闭错误提示"

@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -35,6 +35,7 @@ interface MessageBubbleProps {
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
   eagerMarkdown?: boolean;
+  onDeleteUserMessage?: (eventId: string) => void;
 }
 
 function timelineEventMemoKey(event: TimelineEvent) {
@@ -158,6 +159,7 @@ function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubblePr
   return timelineEventMemoKey(prev.event) === timelineEventMemoKey(next.event) &&
     prev.sessionId === next.sessionId &&
     prev.runtimeSessionId === next.runtimeSessionId &&
+    prev.onDeleteUserMessage === next.onDeleteUserMessage &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.hideProcessSummary === next.hideProcessSummary &&
     prev.eagerMarkdown === next.eagerMarkdown &&
@@ -306,7 +308,7 @@ function AttachmentThumb({
   );
 }
 
-const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Extract<TimelineEvent, { type: "user_message" }> }) {
+const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: { event: Extract<TimelineEvent, { type: "user_message" }>; onDelete?: (eventId: string) => void }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const { currentSessionId, runningSessionId, isLatestUserMessage, isLongTaskMessage } = useAppStore(useShallow((s) => {
@@ -386,10 +388,10 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
             {event.content}
           </div>
         )}
-        <div className="mt-2.5 flex justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" style={{ gap: 10 }}>
+        <div className="mt-1.5 flex justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" style={{ gap: 4 }}>
           <button
             onClick={() => trigger(copyText)}
-            className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary"
+            className="kimix-inline-icon-action text-text-muted hover:bg-bg-hover hover:text-text-primary"
             title="复制"
             aria-label="复制"
           >
@@ -402,12 +404,22 @@ const UserMessageBubble = memo(function UserMessageBubble({ event }: { event: Ex
           <button
             onClick={handleResend}
             disabled={currentSessionId ? runningSessionId === currentSessionId || (isLongTaskMessage && !isLatestUserMessage) : false}
-            className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary disabled:opacity-30"
+            className="kimix-inline-icon-action text-text-muted hover:bg-bg-hover hover:text-text-primary disabled:opacity-30"
             title="重新发送"
             aria-label="重新发送"
           >
             <RotateCcw size={13} />
           </button>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(event.id)}
+              className="kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
+              title="删除本地消息"
+              aria-label="删除本地消息"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
       {previewImage?.dataUrl && (
@@ -1707,9 +1719,9 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, eagerMarkdown }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, eagerMarkdown, onDeleteUserMessage }: MessageBubbleProps) {
   if (event.type === "user_message") {
-    return <UserMessageBubble event={event} />;
+    return <UserMessageBubble event={event} onDelete={onDeleteUserMessage} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;

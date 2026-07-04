@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { memo, useRef, useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -18,6 +18,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { hasLocalFailedSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError } from "@/utils/reportError";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
@@ -328,12 +329,12 @@ function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () 
   );
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError, eagerMarkdown }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; eagerMarkdown?: boolean }) {
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean }) {
   switch (event.type) {
     case "user_message":
       return (
         <>
-          <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />
+          <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} onDeleteUserMessage={deletableUserMessageIds?.has(event.id) ? onDeleteUserMessage : undefined} />
           <UserAttachedStatuses statuses={attachedUserStatuses} />
         </>
       );
@@ -364,7 +365,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
     case "diff":
       return <ChangeCard changes={[{ path: event.filePath, oldText: event.oldText, newText: event.newText }]} />;
     case "error":
-      return <ErrorCard event={event} />;
+      return <ErrorCard event={event} onDismiss={onDismissError ? () => onDismissError(event.id) : undefined} />;
     case "subagent":
       return (
         <div className="kimix-soft-card flex items-center gap-2 rounded-xl text-[14.5px]" style={{ paddingLeft: 14, paddingRight: 16, paddingTop: 10, paddingBottom: 10 }}>
@@ -1498,6 +1499,46 @@ export const ChatThread = memo(function ChatThread() {
       throw new Error(res.error);
     }
   };
+
+  const syncCurrentSessionAfterLocalEdit = useCallback((sessionId: string) => {
+    const latest = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (latest && currentSession?.id === sessionId) {
+      setCurrentSession(latest);
+    }
+  }, [currentSession?.id, setCurrentSession]);
+
+  const dismissErrorEvent = useCallback((eventId: string) => {
+    if (!session) return;
+    const timestamp = Date.now();
+    updateSession(session.id, (current) => ({
+      ...current,
+      events: current.events.filter((event) => event.id !== eventId),
+      updatedAt: timestamp,
+    }));
+    syncCurrentSessionAfterLocalEdit(session.id);
+  }, [session, syncCurrentSessionAfterLocalEdit, updateSession]);
+
+  const deleteUserMessageAttempt = useCallback((eventId: string) => {
+    if (!session) return;
+    const timestamp = Date.now();
+    updateSession(session.id, (current) => {
+      if (!hasLocalFailedSendAttempt(current.events, eventId)) return current;
+      return {
+        ...current,
+        events: removeLocalUserSendAttempt(current.events, eventId),
+        updatedAt: timestamp,
+      };
+    });
+    syncCurrentSessionAfterLocalEdit(session.id);
+  }, [session, syncCurrentSessionAfterLocalEdit, updateSession]);
+
+  const deletableUserMessageIds = useMemo(() => {
+    if (!session) return new Set<string>();
+    return new Set(session.events
+      .filter((event) => event.type === "user_message" && hasLocalFailedSendAttempt(session.events, event.id))
+      .map((event) => event.id));
+  }, [session]);
+
   // Anchor capture (getBoundingClientRect + querySelectorAll) is expensive and
   // triggers forced layout. Keep it out of the hot scroll path; scrolling only
   // schedules one idle capture after the wheel/touch stream settles.
@@ -1874,7 +1915,7 @@ export const ChatThread = memo(function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                    : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} eagerMarkdown={eagerMarkdown} />
+                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} />
               }
             </div>
           ))}
