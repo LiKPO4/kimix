@@ -946,7 +946,7 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
       )}
       {expanded && (
         <div
-          className="text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+          className="text-[14.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
           style={{ whiteSpace: "pre-wrap" }}
         >
           {block.text}
