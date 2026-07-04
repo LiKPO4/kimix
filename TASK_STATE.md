@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.14 权限切换消息气泡闪烁
+- 现象：切换权限模式时，消息的信息气泡会闪一下，视觉上像突然变长一段又变短。
+- 根因：v2.14.13 移除了 `ChatThread` 自身的权限订阅，但父级 `AppShell` 仍订阅 `permissionMode`；React 父组件重渲染会继续调用未 memo 的 `ChatThread`，导致整棵消息流重新渲染，离屏 Markdown/气泡高度可能重新估算后再测回真实高度。
+- 修复：将 `ChatThread` 改为无 props memo 组件，让权限切换只更新 Composer/设置等真实消费者，不再打穿到消息流。
+
 ## 2026-07-04 v2.14.13 反复权限切换顶到顶部
 - 现象：v2.14.12 后反复切换权限仍会偶发把聊天流顶到当前会话最顶部。
 - 根因：上一轮只阻断了权限恢复写回当前会话对象，但 `ChatThread` 仍无意义订阅 `permissionMode`，每次权限切换都会重渲染聊天流；同时底部权限菜单/控件开合触发 ResizeObserver 时，即使消息内容没变，也可能走 auto-follow 的 `scrollToBottom`，在 popover 开合瞬间 last item 测量失真时得到接近 0 的目标滚动位置。

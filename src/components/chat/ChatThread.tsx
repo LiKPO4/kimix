@@ -1,4 +1,4 @@
-import { useRef, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { memo, useRef, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -718,7 +718,7 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
   });
 }
 
-export function ChatThread() {
+export const ChatThread = memo(function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -1707,4 +1707,4 @@ export function ChatThread() {
       </div>
     </div>
   );
-}
+});

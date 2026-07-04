@@ -2,6 +2,7 @@
 
 ## 2026-07-04
 
+* **Permission changes do not re-render the chat stream**: `ChatThread` is memoized so parent permission-mode updates cannot force Markdown and message bubbles through a fresh render pass. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Permission controls are scroll-neutral**: Chat rendering no longer subscribes to permission preferences, and layout-only resizes from permission controls preserve the current viewport instead of re-running bottom-follow scrolling. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Scroll-neutral permission recovery**: Permission-mode recovery repairs inactive runtime IDs without refreshing conversation recency or replacing the current chat object, so configuration changes do not reset the chat viewport. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Inactive-session permission recovery**: User-triggered permission changes resume and verify the same old session only when `setPermission` reports inactive, then retry without creating a replacement runtime or drifting the UI mode. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
