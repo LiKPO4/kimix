@@ -723,8 +723,6 @@ export function ChatThread() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
-  const permissionMode = useAppStore((s) => s.permissionMode);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
@@ -749,6 +747,8 @@ export function ChatThread() {
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const lastScrollHeightRef = useRef<number | null>(null);
+  const contentVersionRef = useRef("");
+  const resizeContentVersionRef = useRef("");
   const touchStartYRef = useRef<number | null>(null);
   const userInputLockUntilRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
@@ -781,6 +781,7 @@ export function ChatThread() {
       return `${event.id}:${event.type}`;
     }).join("|");
   }, [session?.events]);
+  contentVersionRef.current = contentVersion;
 
   const updateAutoFollow = (value: boolean) => {
     if (isAutoFollowRef.current === value) return;
@@ -1250,6 +1251,7 @@ export function ChatThread() {
     if (!node || typeof ResizeObserver === "undefined") return;
     let resizeFrame = 0;
     lastScrollSizeRef.current = readScrollSize(node);
+    resizeContentVersionRef.current = contentVersionRef.current;
     scheduleAnchorCapture();
 
     const processResize = () => {
@@ -1273,7 +1275,24 @@ export function ChatThread() {
         message: "[ChatThread] processResize",
         data: { previousSize, nextSize, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
       }).catch(logError("writeDiag"));
+      const hasConversationContentChanged = contentVersionRef.current !== resizeContentVersionRef.current;
+      resizeContentVersionRef.current = contentVersionRef.current;
       if (Date.now() < intentionalResizeRestoreUntilRef.current) {
+        scheduleAnchorCapture();
+        const activeNode = scrollRef.current;
+        if (activeNode) {
+          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          updateShowScrollToBottom(distance > 80);
+        }
+        return;
+      }
+      // Permission menus and footer controls can resize the chat viewport without
+      // changing any conversation item. Treat those as layout-only changes:
+      // keep the visible anchor instead of running the bottom-follow algorithm,
+      // whose last-item measurement can be transiently stale during popover
+      // open/close and produce a jump to scrollTop=0.
+      if (!hasConversationContentChanged) {
+        restoreResizeScrollAnchor();
         scheduleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {

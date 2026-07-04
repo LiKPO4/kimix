@@ -2,6 +2,7 @@
 
 ## 2026-07-04
 
+* **Permission controls are scroll-neutral**: Chat rendering no longer subscribes to permission preferences, and layout-only resizes from permission controls preserve the current viewport instead of re-running bottom-follow scrolling. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Scroll-neutral permission recovery**: Permission-mode recovery repairs inactive runtime IDs without refreshing conversation recency or replacing the current chat object, so configuration changes do not reset the chat viewport. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Inactive-session permission recovery**: User-triggered permission changes resume and verify the same old session only when `setPermission` reports inactive, then retry without creating a replacement runtime or drifting the UI mode. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Read-only old-session navigation**: Selecting an old conversation no longer resumes its runtime; stale tool calls and recovery interruptions settle without counting the offline interval as execution time. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
