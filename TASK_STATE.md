@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 Kimi Code 0.22.x 官方能力复核
+- 当前目标：确认官方最近版本里哪些能力可以减少 Kimix 内部兼容层，而不是继续用曲线救国。
+- 已完成：确认本机 CLI 与 npm latest 均为 `0.22.2`；`scripts/probe-kimi-code-plugins.mjs` 改为隔离临时 `KIMI_CODE_HOME` fixture，验证 SDK/RPC 可 `listPluginCommands()` 并 `activatePluginCommand()`，成功产生 `plugin_command.activated`、`turn.started/ended` 和 `session.meta.updated`。
+- 已完成：临时验证 vendored SDK 导出 `compressImageForModel` / `compressBase64ForModel`，小图和非图片输入会安全 passthrough。
+- 未完成：Server REST 是否有 plugin command 等价 endpoint 尚未确认；图片压缩仍需大图样本回归；历史/中断兼容层需用本地样本复验后再删。
+- 下一步：优先做 SDK route 的 plugin commands 只读补全与激活入口；Server route 暂不强行接入，避免再次引入隐形分支。
+
 ## 2026-07-04 v2.14.28 Skill 缺失优先同会话 reload
 - 现象：为了让已有会话识别新同步的 Skill，Kimix 过去直接 fork 出 `skill-*` runtime，造成同名会话、历史回退和侧栏折叠等一系列兼容补丁。
 - 探针：Kimi Code 0.22.2 SDK/RPC 的 `reloadSession` 可在同一个 session id 下刷新 Skill 视图并成功 activate；Server REST 仍没有公开 reload endpoint，活跃 Server session 经 SDK reload 后 Server REST 视图不会更新，但 SDK route 可在同一 id 上 activate。
