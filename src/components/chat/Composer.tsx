@@ -515,6 +515,29 @@ export function Composer() {
   }, []);
 
   useEffect(() => {
+    const handleRestoreComposerDraft = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        sessionId?: string;
+        content?: string;
+        images?: Array<{ id?: string; kind?: "image" | "file"; name: string; dataUrl?: string; filePath?: string }>;
+      }>).detail;
+      if (!detail?.sessionId || useAppStore.getState().currentSession?.id !== detail.sessionId) return;
+      setInput(detail.content ?? "");
+      setImageAttachments((detail.images ?? []).map((image) => ({
+        id: image.id ?? genId(),
+        kind: image.kind,
+        name: image.name,
+        dataUrl: image.dataUrl,
+        filePath: image.filePath,
+      })));
+      setEditingPendingId(null);
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    };
+    window.addEventListener("kimix:restore-composer-draft", handleRestoreComposerDraft);
+    return () => window.removeEventListener("kimix:restore-composer-draft", handleRestoreComposerDraft);
+  }, []);
+
+  useEffect(() => {
     if (!currentSession) {
       setSlashCommands([]);
       return;

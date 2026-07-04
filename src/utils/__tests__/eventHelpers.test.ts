@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, removeLocalUserSendAttempt, replaceLatestUserTurn, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -108,7 +108,7 @@ describe("eventHelpers", () => {
     expect(hasLocalOrphanUserSendAttempt(events, "user-1")).toBe(false);
   });
 
-  it("replaces the latest user turn and all of its output for resend", () => {
+  it("removes the latest user turn and all of its output for withdraw-to-draft", () => {
     const events: TimelineEvent[] = [
       { id: "user-0", type: "user_message", timestamp: 1, content: "上一轮" },
       { id: "assistant-0", type: "assistant_message", timestamp: 2, content: "上一轮回复", isThinking: false, isComplete: true },
@@ -116,14 +116,9 @@ describe("eventHelpers", () => {
       { id: "tool-1", type: "tool_call", timestamp: 4, toolCallId: "call-1", toolName: "Read", status: "success", arguments: {} },
       { id: "assistant-1", type: "assistant_message", timestamp: 5, content: "旧回复", isThinking: false, isComplete: true },
     ];
-    const replacement: TimelineEvent[] = [
-      { id: "user-2", type: "user_message", timestamp: 6, content: "重发这一轮" },
-      { id: "assistant-2", type: "assistant_message", timestamp: 6, content: "", isThinking: false, isComplete: false },
-    ];
-
     expect(isLatestUserInputEvent(events, "user-1")).toBe(true);
-    expect(replaceLatestUserTurn(events, "user-1", replacement).map((event) => event.id))
-      .toEqual(["user-0", "assistant-0", "user-2", "assistant-2"]);
+    expect(truncateLatestUserTurn(events, "user-1").map((event) => event.id))
+      .toEqual(["user-0", "assistant-0"]);
   });
 
   it("refuses to replace a non-latest user turn", () => {
@@ -133,7 +128,7 @@ describe("eventHelpers", () => {
     ];
 
     expect(isLatestUserInputEvent(events, "user-1")).toBe(false);
-    expect(replaceLatestUserTurn(events, "user-1", [])).toBe(events);
+    expect(truncateLatestUserTurn(events, "user-1")).toBe(events);
   });
 
   it("distinguishes official turn evidence from a local-only failed send", () => {

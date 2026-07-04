@@ -18,7 +18,7 @@ import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
-import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, replaceLatestUserTurn } from "@/utils/eventHelpers";
+import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, truncateLatestUserTurn } from "@/utils/eventHelpers";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -248,28 +248,6 @@ function attachmentCopyText(images: UserMessageImage[] = []) {
   }).join("\n");
 }
 
-function promptImages(images: UserMessageImage[] = []) {
-  return images
-    .filter((image): image is UserMessageImage & { dataUrl: string } => Boolean(image.dataUrl))
-    .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
-}
-
-function contentWithFileAttachments(content: string, images: UserMessageImage[] = []) {
-  const files = images.filter((image) => image.kind === "file" || Boolean(image.filePath));
-  if (files.length === 0) return content;
-  const fileLines = files.map((file, index) => {
-    const filePath = file.filePath?.trim();
-    return `${index + 1}. ${file.name}${filePath ? `\n   绝对路径：${filePath}` : "\n   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件"}`;
-  });
-  return [
-    content.trim(),
-    "附件文件：",
-    ...fileLines,
-    "",
-    "请直接使用上述绝对路径读取附件内容，不要只按文件名搜索。",
-  ].filter(Boolean).join("\n");
-}
-
 function AttachmentThumb({
   image,
   index,
@@ -370,32 +348,6 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
     }
 
     setResending(true);
-    let localTurnReplaced = false;
-    const now = Date.now();
-    const resentUserEvent: TimelineEvent = {
-      id: crypto.randomUUID(),
-      type: "user_message",
-      timestamp: now,
-      content: event.content,
-      images: event.images,
-    };
-    const linkStatusEvent: TimelineEvent = {
-      id: crypto.randomUUID(),
-      type: "status_update",
-      timestamp: now,
-      message: "消息发送中",
-      source: "ipc",
-      tone: "info",
-      parentEventId: resentUserEvent.id,
-    };
-    const responsePlaceholder: TimelineEvent = {
-      id: crypto.randomUUID(),
-      type: "assistant_message",
-      timestamp: now,
-      content: "",
-      isThinking: appState.defaultThinking,
-      isComplete: false,
-    };
     try {
       const needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(activeSession.events, event.id);
       if (needsOfficialUndo) {
@@ -403,70 +355,24 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
         if (!undoRes.success) throw new Error(`撤回上一轮官方历史失败：${undoRes.error}`);
       }
 
-      const resendStartedAt = Date.now();
+      const withdrawnAt = Date.now();
       useSessionStore.getState().updateSession(activeSession.id, (session) => ({
         ...session,
-        events: replaceLatestUserTurn(session.events, event.id, [
-          { ...resentUserEvent, timestamp: resendStartedAt },
-          { ...linkStatusEvent, timestamp: resendStartedAt },
-          { ...responsePlaceholder, timestamp: resendStartedAt },
-        ]),
-        updatedAt: resendStartedAt,
+        events: truncateLatestUserTurn(session.events, event.id),
+        updatedAt: withdrawnAt,
       }));
-      localTurnReplaced = true;
       syncCurrentSession();
-      appState.setRunningSessionId(activeSession.id);
-      window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
-        detail: { sessionId: activeSession.id },
+      window.dispatchEvent(new CustomEvent("kimix:restore-composer-draft", {
+        detail: {
+          sessionId: activeSession.id,
+          content: event.content,
+          images: event.images ?? [],
+        },
       }));
-
-      const dispatchStartedAt = Date.now();
-      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-        ...session,
-        events: session.events.map((sessionEvent) => sessionEvent.id === responsePlaceholder.id
-          ? { ...sessionEvent, timestamp: dispatchStartedAt }
-          : sessionEvent
-        ),
-        updatedAt: dispatchStartedAt,
-      }));
-      const res = await window.api.sendKimiCodePrompt({
-        sessionId: runtimeSessionId,
-        content: contentWithFileAttachments(event.content, images),
-        images: promptImages(images),
-      });
-      if (!res.success) throw new Error(res.error);
     } catch (err) {
-      console.error("Resend failed:", err);
-      appState.setRunningSessionId(null);
+      console.error("Withdraw to composer failed:", err);
       const message = err instanceof Error ? err.message : String(err);
-      if (!localTurnReplaced) {
-        appendError(message);
-        return;
-      }
-      const failedAt = Date.now();
-      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-        ...session,
-        events: [
-          ...session.events.map((sessionEvent) => {
-            if (sessionEvent.id === responsePlaceholder.id && sessionEvent.type === "assistant_message") {
-              return { ...sessionEvent, isComplete: true, isThinking: false };
-            }
-            if (sessionEvent.id === linkStatusEvent.id && sessionEvent.type === "status_update") {
-              return { ...sessionEvent, timestamp: failedAt, message: "消息发送失败", tone: "danger" as const };
-            }
-            return sessionEvent;
-          }),
-          {
-            id: crypto.randomUUID(),
-            type: "error",
-            timestamp: failedAt,
-            message,
-            source: "ipc",
-          },
-        ],
-        updatedAt: failedAt,
-      }));
-      syncCurrentSession();
+      appendError(message);
     } finally {
       setResending(false);
     }
@@ -515,8 +421,8 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
             onClick={handleResend}
             disabled={resending || !isLatestUserMessage || isCurrentSessionRunning}
             className="kimix-inline-icon-action text-text-muted hover:bg-bg-hover hover:text-text-primary disabled:opacity-30"
-            title={isLatestUserMessage ? "撤回本轮输出并重新发送" : "当前仅支持重新发送最新一轮"}
-            aria-label={isLatestUserMessage ? "撤回本轮输出并重新发送" : "当前仅支持重新发送最新一轮"}
+            title={isLatestUserMessage ? "撤回到输入框" : "当前仅支持撤回最新一轮"}
+            aria-label={isLatestUserMessage ? "撤回到输入框" : "当前仅支持撤回最新一轮"}
           >
             {resending ? <Loader2 size={13} className="kimix-spin" /> : <RotateCcw size={13} />}
           </button>

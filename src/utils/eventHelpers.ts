@@ -193,15 +193,11 @@ export function hasOfficialTurnEvidenceAfterUser(events: TimelineEvent[], userEv
   return false;
 }
 
-export function replaceLatestUserTurn(
-  events: TimelineEvent[],
-  userEventId: string,
-  replacement: TimelineEvent[],
-): TimelineEvent[] {
+export function truncateLatestUserTurn(events: TimelineEvent[], userEventId: string): TimelineEvent[] {
   if (!isLatestUserInputEvent(events, userEventId)) return events;
   const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
   if (userIndex === -1) return events;
-  return [...events.slice(0, userIndex), ...replacement];
+  return events.slice(0, userIndex);
 }
 
 export function removeLocalUserSendAttempt(events: TimelineEvent[], userEventId: string): TimelineEvent[] {

@@ -2,7 +2,7 @@
 
 ## 2026-07-04
 
-* **Official resend boundary**: Resending the latest completed user turn first applies official `undoHistory(1)`, then truncates the local mirror and dispatches the replacement; failed local sends skip undo, older nodes remain disabled, and external tool side effects are not rolled back. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Official withdraw-to-draft boundary**: Withdrawing the latest completed user turn first applies official `undoHistory(1)`, then truncates the local mirror and restores text/attachments into the Composer without automatic dispatch; failed local sends skip undo, older nodes remain disabled, and external tool side effects are not rolled back. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Open-work busy boundary**: Runtime terminal/idle status cannot clear a visible turn while local live events still contain open subagents, tools, steer messages, or assistant output; the stale window is only for historical residue cleanup. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Session-locked Swarm route**: Swarm remains SDK-only, but an idle Server-backed conversation may switch the same official session ID to SDK and stay pinned there instead of forking or later promoting back to Server. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **SDK Plugin command boundary**: SDK slash completion may expose current-session Plugin manifest commands and activate them through official `activatePluginCommand`, while Server sessions must not route those commands through the temporary plugin-management session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

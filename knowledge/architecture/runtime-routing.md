@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-04T18:52:26+08:00"
+timestamp: "2026-07-04T19:02:47+08:00"
 ---
 
 # Runtime Routing
@@ -67,7 +67,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 	46. SDK catalog summaries are enriched with the first non-internal user prompt from each wire as `brief` and the persisted `isCustomTitle` flag. Reconciliation updates unlocked local titles before body hydration: official custom titles use `title`, while automatic titles prefer `brief`, then `lastPrompt`, then official `title`. User-renamed `titleLocked` values remain authoritative, preventing click-time title changes without overwriting explicit names.
 47. Runtime prewarm is keyed only by runtime identity. Permission and Plan preferences are configuration mutations, not reasons to resume or recreate a session. A permission change made during an active turn remains a local desired value until the next prompt boundary, where Kimix applies it to the existing official runtime before dispatch; idle runtimes may be updated immediately. This prevents concurrent runtime rebinding from splitting one turn across old and new sessions. Permission recovery may repair the stored runtime ID, but it must not count as conversation activity, replace the active chat object, or trigger chat viewport re-priming.
 48. Opening or searching an existing session is read-only history hydration. It may fill message events, cache versions, and stale loading flags, but it must not rewrite a non-default catalog title or refresh `updatedAt` to the current time. Only default placeholder titles may be derived from loaded history. Conversation ordering follows real activity, not the user's navigation click.
-49. Resending the latest completed user turn is an official history mutation, not a local duplicate prompt. Kimix calls official `undoHistory(1)` on the same idle runtime before truncating the local mirror from that user node and dispatching the replacement prompt. If official undo fails, the old turn remains intact and the real error is shown. A failed or orphaned local send has no official turn to undo and is replaced locally, while older user nodes remain non-resendable until Kimix can map their exact official history identities. Undo rewrites conversation context only; filesystem, command, and external side effects from the removed turn are not rolled back.
+49. Withdrawing the latest completed user turn is an official history mutation, not an automatic duplicate prompt. Kimix calls official `undoHistory(1)` on the same idle runtime before truncating the local mirror from that user node, then restores the original text and attachments into the session-scoped Composer draft for user editing. It must not create an Assistant placeholder, set the session running, or dispatch the prompt automatically. If official undo fails, the old turn remains intact and the real error is shown. A failed or orphaned local send has no official turn to undo and is withdrawn locally, while older user nodes remain unavailable until Kimix can map their exact official history identities. Undo rewrites conversation context only; filesystem, command, and external side effects from the removed turn are not rolled back.
 
 # Main Components
 
