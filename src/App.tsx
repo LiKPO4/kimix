@@ -18,6 +18,7 @@ import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import {
@@ -2345,6 +2346,15 @@ function App() {
       if (!mapped) return;
       const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
       const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
+      if (!shouldAppendRuntimeStatusToTimeline({
+        rawType: typeof rawEvent?.type === "string" ? rawEvent.type : undefined,
+        mappedEvent: mappedWithRole,
+        session: targetSession,
+        runtimeSessionId: payload.sessionId,
+        runningSessionId: useAppStore.getState().runningSessionId,
+      })) {
+        return;
+      }
       if (
         mappedWithRole.type === "status_update" &&
         targetSession?.modelSwitchedAt &&

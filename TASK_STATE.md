@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-04 v2.14.15 权限切换污染 Assistant footer
+- 现象：点击切换权限后，上一条 Assistant 底部模型 / 时间 / Tokens / Context 元信息会闪一下，时间变成切换权限时刻，随后又被显示规则挤掉。
+- 根因：权限切换后的官方 runtime 会发 `agent.status.updated` 快照；Kimix 把它作为普通 `status_update` 追加到会话，`turn_end` 规则又把同一轮最后一个 status 当作 Assistant footer，导致配置操作的 idle 状态污染了上一条回复元信息。
+- 修复：事件入库前区分 runtime 快照和真实轮次状态；空闲 `agent.status.updated` 不再进入消息流，活跃轮次状态和 `usage.record` 仍保留。
+
 ## 2026-07-04 v2.14.14 权限切换消息气泡闪烁
 - 现象：切换权限模式时，消息的信息气泡会闪一下，视觉上像突然变长一段又变短。
 - 根因：v2.14.13 移除了 `ChatThread` 自身的权限订阅，但父级 `AppShell` 仍订阅 `permissionMode`；React 父组件重渲染会继续调用未 memo 的 `ChatThread`，导致整棵消息流重新渲染，离屏 Markdown/气泡高度可能重新估算后再测回真实高度。
