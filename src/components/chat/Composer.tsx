@@ -2957,7 +2957,7 @@ export function Composer() {
                             <span>Swarm 模式</span>
                           </div>
                           <p className="m-0 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
-                            多子代理并行推进，开启后本会话锁定
+                            多子代理并行推进
                           </p>
                         </div>
                         <button
