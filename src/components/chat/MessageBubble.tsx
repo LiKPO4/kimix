@@ -7,7 +7,7 @@ import type { TimelineEvent, UserMessageImage, ProcessDisplayMode } from "@/type
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { restoreAssistantProgressParagraphs } from "@/utils/assistantParagraphs";
 import { FileCard } from "./FileCard";
-import { StatusCard } from "./StatusCard";
+import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
@@ -1559,6 +1559,11 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
   );
 }
 
+const ASSISTANT_FOOTER_ACTION_TEXT_STYLE = {
+  ...STATUS_CARD_TEXT_STYLE,
+  fontSize: STATUS_CARD_TEXT_STYLE.fontSize - 1.5,
+} as const;
+
 function AssistantMessageFooter({
   statuses,
   fallbackLabel,
@@ -1608,7 +1613,7 @@ function AssistantMessageFooter({
             <button
               onClick={onCopyAll}
               className="kimix-muted-action flex h-8 items-center rounded-md text-text-muted"
-              style={{ gap: 5, paddingLeft: 9, paddingRight: 9, fontSize: 11, lineHeight: "18px" }}
+              style={{ gap: 5, paddingLeft: 9, paddingRight: 9, ...ASSISTANT_FOOTER_ACTION_TEXT_STYLE }}
               title="全部复制（含思考）"
               aria-label="全部复制（含思考）"
             >
@@ -1627,7 +1632,7 @@ function AssistantMessageFooter({
           <button
             type="button"
             className="kimix-muted-action flex h-8 items-center rounded-md text-text-muted"
-            style={{ gap: 5, paddingLeft: 9, paddingRight: 9, fontSize: 11, lineHeight: "18px" }}
+            style={{ gap: 5, paddingLeft: 9, paddingRight: 9, ...ASSISTANT_FOOTER_ACTION_TEXT_STYLE }}
             title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
             aria-label="Hook 命中"
           >

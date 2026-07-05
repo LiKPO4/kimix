@@ -10,6 +10,11 @@ interface StatusCardProps {
   allowModelOnly?: boolean;
 }
 
+export const STATUS_CARD_TEXT_STYLE = {
+  fontSize: 13,
+  lineHeight: "18px",
+} as const;
+
 function formatK(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(2)}k`;
   return String(tokens);
@@ -62,7 +67,7 @@ export const StatusCard = memo(function StatusCard({ event, inline = false, allo
   const pill = (
       <div
         className={`inline-flex max-w-full items-center rounded-full ${toneClass}`}
-        style={{ gap: 12, paddingLeft: inline ? 13 : 16, paddingRight: inline ? 13 : 16, paddingTop: inline ? 5 : 6, paddingBottom: inline ? 5 : 6, fontSize: 13, lineHeight: "18px" }}
+        style={{ gap: 12, paddingLeft: inline ? 13 : 16, paddingRight: inline ? 13 : 16, paddingTop: inline ? 5 : 6, paddingBottom: inline ? 5 : 6, ...STATUS_CARD_TEXT_STYLE }}
       >
         {details.map((detail, index) => (
           <span key={`${event.id}-${index}`} className={`${detail.tabular ? "kimix-tabular-nums " : ""}truncate`}>{detail.text}</span>
