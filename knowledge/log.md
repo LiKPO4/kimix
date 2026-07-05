@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-05
+
+* **Active-turn reload recovery**: Renderer reload now restores busy state from the still-managed official runtime, keeps in-flight snapshot Assistant content open, and reconciles richer snapshots after a quiet stream interval instead of falsely completing the turn. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-04
 
 * **Hydrated session model authority**: Historical Assistant/usage events override stale cached session model metadata, while a pending manual switch remains visible until a later Assistant confirms the active model. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

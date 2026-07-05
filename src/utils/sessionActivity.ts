@@ -31,6 +31,10 @@ export function isTerminalKimiCodeEngineStatus(status: KimiCodeEngineStatus | un
   return status === "completed" || status === "interrupted" || status === "error" || status === "idle";
 }
 
+export function isActiveKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {
+  return status === "running" || status === "waiting_approval" || status === "waiting_question";
+}
+
 export function isTimelineEventActive(event: TimelineEvent, now = Date.now()) {
   if (now - event.timestamp > STALE_TIMELINE_WORK_MS) return false;
   switch (event.type) {

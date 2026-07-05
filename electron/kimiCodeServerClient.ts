@@ -1065,7 +1065,7 @@ function snapshotMessageToServerFrames(
   if (role === "assistant") {
     const messageText = contentToText(message.content);
     const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageId, messageText, messageTimestamp);
-    if (frames.length > 0) {
+    if (frames.length > 0 && replayMode === "history") {
       frames.push({
         type: "turn.ended",
         session_id: sessionId,

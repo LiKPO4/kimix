@@ -17,7 +17,7 @@ import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromp
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
-import { compareSessionsByRecentConversation, hasOpenTimelineWork, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, hasOpenTimelineWork, isActiveKimiCodeEngineStatus, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -1103,6 +1103,8 @@ function App() {
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
   const runtimeTerminalPollRef = useRef<Map<string, number>>(new Map());
+  const runtimeLastStreamEventAtRef = useRef<Map<string, number>>(new Map());
+  const runtimeHistoryRefreshAtRef = useRef<Map<string, number>>(new Map());
 
   useRendererLagDetector();
   useSettingsSync();
@@ -2074,11 +2076,18 @@ function App() {
                 }
                 return;
               }
-              const events = settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
+              const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId: historySessionId }).catch(() => null);
+              const runtimeIsActive = Boolean(
+                runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
+              );
+              const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+              const events = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
 
               if (runtimeOwner) {
-                const hydratedEvents = runtimeOwner.events.length > 0 && !hasRicherKimiProcessHistory(runtimeOwner.events, events)
-                  ? settleInactiveEvents(runtimeOwner.events)
+                const canonicalHistoryIsRicher = assistantBodySize(events) > assistantBodySize(runtimeOwner.events) ||
+                  hasRicherKimiProcessHistory(runtimeOwner.events, events);
+                const hydratedEvents = runtimeOwner.events.length > 0 && !canonicalHistoryIsRicher
+                  ? (runtimeIsActive ? runtimeOwner.events : settleInactiveEvents(runtimeOwner.events))
                   : events;
                 const session = hydrateLongTaskProgressFromHistory({
                   ...runtimeOwner,
@@ -2092,7 +2101,7 @@ function App() {
                   sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
                 }));
                 useAppStore.setState({ currentSession: session });
-                setRunningSessionId(null);
+                setRunningSessionId(runtimeIsActive ? session.id : null);
                 return;
               }
 
@@ -2131,7 +2140,7 @@ function App() {
                 };
               });
               useAppStore.setState({ currentSession: session });
-              setRunningSessionId(null);
+              setRunningSessionId(runtimeIsActive ? session.id : null);
             } catch {
               setRunningSessionId(null);
             } finally {
@@ -2368,6 +2377,9 @@ function App() {
       if (!mapped) return;
       const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
       const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
+      if (mappedWithRole.type !== "status_update") {
+        runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
+      }
       if (!shouldAppendRuntimeStatusToTimeline({
         rawType: typeof rawEvent?.type === "string" ? rawEvent.type : undefined,
         mappedEvent: mappedWithRole,
@@ -2472,6 +2484,7 @@ function App() {
       if (targetSession?.longTask) return;
 
       if (payload.status === "running") {
+        runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         runtimeTurnStartRef.current.set(payload.sessionId, {
           eventStartIndex: runningSession?.events.length ?? 0,
@@ -2490,6 +2503,8 @@ function App() {
         hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
         longTaskReviewDispatch: longTaskReviewDispatchRef.current,
       });
+      runtimeLastStreamEventAtRef.current.delete(payload.sessionId);
+      runtimeHistoryRefreshAtRef.current.delete(payload.sessionId);
 
       flushStreamEvents();
       void refreshOfficialGoalState(uiSessionId, payload.sessionId);
@@ -2786,6 +2801,40 @@ function App() {
         if (disposed || !response.success) return;
         if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
           runtimeTerminalPollRef.current.delete(runtimeSessionId);
+          const now = Date.now();
+          const lastStreamEventAt = runtimeLastStreamEventAtRef.current.get(runtimeSessionId) ?? reconciliationStartedAt;
+          const lastHistoryRefreshAt = runtimeHistoryRefreshAtRef.current.get(runtimeSessionId) ?? 0;
+          if (
+            response.data.engineStatus === "running" &&
+            now - lastStreamEventAt >= 4_000 &&
+            now - lastHistoryRefreshAt >= 4_000
+          ) {
+            runtimeHistoryRefreshAtRef.current.set(runtimeSessionId, now);
+            const loaded = await window.api.loadKimiCodeSession({
+              workDir: session.projectPath,
+              sessionId: runtimeSessionId,
+            }).catch(() => null);
+            if (disposed || !loaded?.success) return;
+            const snapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+            const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
+            const snapshotBody = assistantBodyText(snapshotEvents);
+            const localBody = assistantBodyText(latestSession.events);
+            const snapshotBodySize = assistantBodySize(snapshotEvents);
+            const localBodySize = assistantBodySize(latestSession.events);
+            const snapshotIsRicher = snapshotBodySize > localBodySize ||
+              (snapshotBodySize === localBodySize && Boolean(snapshotBody) && snapshotBody !== localBody) ||
+              hasRicherKimiProcessHistory(latestSession.events, snapshotEvents);
+            if (snapshotIsRicher) {
+              updateSession(session.id, (item) => ({
+                ...item,
+                events: snapshotEvents,
+                model: getLastUsedModelFromEvents(snapshotEvents) ?? item.model,
+                kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                updatedAt: Date.now(),
+              }));
+              syncCurrentSessionFromStore(session.id);
+            }
+          }
           return;
         }
         const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
@@ -2799,6 +2848,8 @@ function App() {
         runtimeTerminalPollRef.current.set(runtimeSessionId, terminalPolls);
         if (terminalPolls < 2) return;
         runtimeTerminalPollRef.current.delete(runtimeSessionId);
+        runtimeLastStreamEventAtRef.current.delete(runtimeSessionId);
+        runtimeHistoryRefreshAtRef.current.delete(runtimeSessionId);
 
         const latestRunningId = useAppStore.getState().runningSessionId;
         if (latestRunningId !== session.id && latestRunningId !== runtimeSessionId) return;

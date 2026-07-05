@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { compareSessionsByRecentConversation, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { compareSessionsByRecentConversation, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -21,6 +21,14 @@ describe("sessionActivity", () => {
     expect(isTerminalKimiCodeEngineStatus("idle")).toBe(true);
     expect(isTerminalKimiCodeEngineStatus("running")).toBe(false);
     expect(isTerminalKimiCodeEngineStatus("waiting_question")).toBe(false);
+  });
+
+  it("recognizes official states that must keep a restored session busy", () => {
+    expect(isActiveKimiCodeEngineStatus("running")).toBe(true);
+    expect(isActiveKimiCodeEngineStatus("waiting_approval")).toBe(true);
+    expect(isActiveKimiCodeEngineStatus("waiting_question")).toBe(true);
+    expect(isActiveKimiCodeEngineStatus("completed")).toBe(false);
+    expect(isActiveKimiCodeEngineStatus(undefined)).toBe(false);
   });
 
   it("treats running tool work as active timeline work", () => {

@@ -10,6 +10,7 @@ import {
   toServerConfigPatch,
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
+import { mapHistoryEvents } from "../eventMapper";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -625,19 +626,6 @@ describe("KimiCodeServerClient protocol adapters", () => {
         },
       },
       {
-        type: "turn.ended",
-        session_id: "session-1",
-        seq: 42,
-        epoch: "epoch-1",
-        payload: {
-          type: "turn.ended",
-          snapshotReplay: "in_flight",
-          snapshotMessageId: "msg-active",
-          snapshotMessageText: "先分析\n最终回答",
-          snapshotRole: "assistant",
-        },
-      },
-      {
         type: "tool.result",
         session_id: "session-1",
         seq: 42,
@@ -653,6 +641,17 @@ describe("KimiCodeServerClient protocol adapters", () => {
         },
       },
     ]);
+    expect(frames.some((frame) => (
+      frame.type === "turn.ended" &&
+      (frame.payload as { snapshotReplay?: unknown } | undefined)?.snapshotReplay === "in_flight"
+    ))).toBe(false);
+    const mapped = mapHistoryEvents(frames.map((frame) => ({ type: frame.type, payload: frame.payload })));
+    const activeAssistant = mapped.findLast((event) => event.type === "assistant_message");
+    expect(activeAssistant).toMatchObject({
+      type: "assistant_message",
+      content: "最终回答",
+      isComplete: false,
+    });
   });
 
   it("adds pending approvals and questions when loading a server snapshot as history", () => {
