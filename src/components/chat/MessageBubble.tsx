@@ -1607,8 +1607,8 @@ function AssistantMessageFooter({
             </button>
             <button
               onClick={onCopyAll}
-              className="kimix-muted-action flex h-8 items-center rounded-md text-[12px] text-text-muted"
-              style={{ gap: 5, paddingLeft: 9, paddingRight: 9 }}
+              className="kimix-muted-action flex h-8 items-center rounded-md text-text-muted"
+              style={{ gap: 5, paddingLeft: 9, paddingRight: 9, fontSize: 11, lineHeight: "18px" }}
               title="全部复制（含思考）"
               aria-label="全部复制（含思考）"
             >
@@ -1626,8 +1626,8 @@ function AssistantMessageFooter({
         <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             type="button"
-            className="kimix-muted-action flex h-8 items-center rounded-md text-[12px] text-text-muted"
-            style={{ gap: 5, paddingLeft: 9, paddingRight: 9 }}
+            className="kimix-muted-action flex h-8 items-center rounded-md text-text-muted"
+            style={{ gap: 5, paddingLeft: 9, paddingRight: 9, fontSize: 11, lineHeight: "18px" }}
             title={hookBadgeEvents.map((hook) => `${hook.eventName} ${hook.phase === "resolved" ? hook.action ?? "allow" : "运行"}${hook.reason ? `：${hook.reason}` : ""}`).join("\n")}
             aria-label="Hook 命中"
           >
