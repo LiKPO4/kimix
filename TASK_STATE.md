@@ -4241,3 +4241,7 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 ## 验证
 - `pnpm build` 通过，renderer hash：`assets/index-DaR0L8bW.js`。
 - `pnpm preview` 生产预览日志顺序已变为 renderer content check 先出现，Kimi Server 后台启动日志后出现。
+## 2026-07-05 v2.14.45 Assistant footer 操作文字层级统一
+- 现象：“全部复制”从 12px 调到 13px 后，相对中间状态气泡显得偏大；同层级 Hook 按钮仍为 12px。
+- 修复：“全部复制”和 Hook 按钮统一使用 12px 文字，保留 13px 图标与 32px 按钮高度。
+- 下一步：实机确认两侧操作文字与中间状态气泡的视觉层级协调。

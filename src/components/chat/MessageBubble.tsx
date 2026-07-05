@@ -1607,7 +1607,7 @@ function AssistantMessageFooter({
             </button>
             <button
               onClick={onCopyAll}
-              className="kimix-muted-action flex h-8 items-center rounded-md text-[13px] text-text-muted"
+              className="kimix-muted-action flex h-8 items-center rounded-md text-[12px] text-text-muted"
               style={{ gap: 5, paddingLeft: 9, paddingRight: 9 }}
               title="全部复制（含思考）"
               aria-label="全部复制（含思考）"
