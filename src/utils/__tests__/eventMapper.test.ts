@@ -139,6 +139,19 @@ describe("mapStreamEvent", () => {
     expect(status.contextSize).toBe(200);
   });
 
+  it("keeps missing StatusUpdate context unknown instead of fabricating zero", () => {
+    const event = mapStreamEvent({
+      type: "StatusUpdate",
+      payload: {
+        model: "deepseek-v4-flash",
+        token_usage: { output: 206 },
+      },
+    });
+    const status = event as Extract<TimelineEvent, { type: "status_update" }>;
+    expect(status.contextSize).toBeUndefined();
+    expect(status.contextLimit).toBeUndefined();
+  });
+
   it("maps TurnChanges", () => {
     const event = mapStreamEvent({
       type: "TurnChanges",

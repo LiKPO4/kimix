@@ -881,7 +881,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         (isNumber(tokenUsage.input_other) ? tokenUsage.input_other : 0) +
         (isNumber(tokenUsage.input_cache_read) ? tokenUsage.input_cache_read : 0) +
         (isNumber(tokenUsage.input_cache_creation) ? tokenUsage.input_cache_creation : 0);
-      const contextSize = isNumber(payload.context_usage) ? payload.context_usage : 0;
+      const contextSize = isNumber(payload.context_usage) ? payload.context_usage : undefined;
       return {
         id: generateId(),
         type: "status_update",
@@ -889,7 +889,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         tokenCount: isNumber(tokenUsage.output) ? tokenUsage.output : 0,
         inputTokenCount,
         contextSize,
-        contextLimit: 256000,
+        contextLimit: contextSize !== undefined ? 256000 : undefined,
         planMode: typeof payload.plan_mode === "boolean" ? payload.plan_mode : undefined,
         message: isString(payload.model)
           ? `模型：${payload.model}`

@@ -15,6 +15,10 @@ export const STATUS_CARD_TEXT_STYLE = {
   lineHeight: "18px",
 } as const;
 
+export function shouldDisplayStatusContext(event: Extract<TimelineEvent, { type: "status_update" }>): boolean {
+  return typeof event.contextSize === "number" && event.contextSize > 0;
+}
+
 function formatK(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(2)}k`;
   return String(tokens);
@@ -61,7 +65,7 @@ export const StatusCard = memo(function StatusCard({ event, inline = false, allo
     { text: event.message ? compactModelText(event.message) : "", tabular: false },
     { text: formatTimestamp(event.timestamp), tabular: true },
     { text: event.tokenCount !== undefined ? `Tokens: ${formatK(event.tokenCount)}` : "", tabular: true },
-    { text: event.contextSize !== undefined ? `Context: ${formatContext(event, detailedContext)}` : "", tabular: true },
+    { text: shouldDisplayStatusContext(event) ? `Context: ${formatContext(event, detailedContext)}` : "", tabular: true },
   ].filter((detail) => Boolean(detail.text));
 
   const pill = (
