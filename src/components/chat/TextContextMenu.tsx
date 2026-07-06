@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Copy, ExternalLink, FolderOpen, TextSelect } from "lucide-react";
+import { Copy, ExternalLink, FolderOpen, Languages, TextSelect } from "lucide-react";
 
 type MenuState = {
   x: number;
@@ -78,7 +78,7 @@ export function TextContextMenu() {
 
       event.preventDefault();
 
-      const itemCount = (selectedText ? 1 : 0) + 1 + (linkUrl ? 1 : 0) + (localPath ? 1 : 0);
+      const itemCount = (selectedText ? 2 : 0) + 1 + (linkUrl ? 1 : 0) + (localPath ? 1 : 0);
       const menuH = itemCount * 34 + 14;  // 14px = 2 × 7px padding
       const menuW = 176;
 
@@ -142,6 +142,14 @@ export function TextContextMenu() {
     }
   };
 
+  const handleTranslate = async () => {
+    const text = menu.selectedText;
+    setMenu(null);
+    if (!text) return;
+    await navigator.clipboard.writeText(`将以下内容翻译成中文：${text}`);
+    await window.api.openExternal("https://www.doubao.com/");
+  };
+
   return createPortal(
     <div
       role="menu"
@@ -162,6 +170,18 @@ export function TextContextMenu() {
         >
           <Copy size={15} />
           <span>复制</span>
+        </button>
+      )}
+      {menu.selectedText && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => void handleTranslate()}
+          className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+          style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
+        >
+          <Languages size={15} />
+          <span>翻译（豆包）</span>
         </button>
       )}
       <button
