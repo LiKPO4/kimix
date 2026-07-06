@@ -4288,3 +4288,7 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 目标：Swarm 模式开启/锁定后，在 Composer 底部增加和 Plan/思考同层级的临时状态按钮，放在 Plan 左侧，不常驻。
 - 修复：`swarmModeLocked` 为真时显示“Swarm 开”按钮，复用 active 状态边框、背景、字号和图标文字按钮尺寸；未锁定时不渲染。
 - 下一步：实机确认 Swarm 锁定会话底部显示按钮，普通会话不显示。
+## 2026-07-06 v2.14.56 工具运行期间渲染卡顿
+- 现场：运行工具/命令时 `diag.log` 高频写入 `contentVersion effect`、`restoreManualScrollAnchor`、`processResize`，同一运行会话多次生成 renderer freeze 报告；计时器不更新说明 renderer 主线程被阻塞。
+- 修复：移除正常流式路径的 contentVersion/resize 诊断写入；手动滚动锚点恢复 350ms 节流且只记录真实位移/失败；普通滚动诊断从 50ms 放宽到 500ms。
+- 下一步：实机在工具调用和全屏切换期间观察计时器是否持续更新、窗口是否不再卡住。

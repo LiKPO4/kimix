@@ -777,6 +777,7 @@ export const ChatThread = memo(function ChatThread() {
   const userInputLockUntilRef = useRef(0);
   const lastUserScrollAtRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
+  const lastManualAnchorRestoreAtRef = useRef(0);
   const bottomTrackerFrameRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
   const [showOlderItems, setShowOlderItems] = useState(false);
@@ -1083,7 +1084,7 @@ export const ChatThread = memo(function ChatThread() {
       updateShowScrollToBottom(afterDistance > 80);
       scheduleAnchorCapture();
     }
-    if (restored || beforeScrollTop <= 8 || Math.abs(afterScrollTop - beforeScrollTop) > 0.5) {
+    if (beforeScrollTop <= 8 || Math.abs(afterScrollTop - beforeScrollTop) > 0.5 || (!restored && anchor?.key)) {
       window.api.writeDiag?.({
         message: "[ChatThread] restoreManualScrollAnchor",
         data: {
@@ -1348,10 +1349,6 @@ export const ChatThread = memo(function ChatThread() {
       ) {
         return;
       }
-      window.api.writeDiag?.({
-        message: "[ChatThread] processResize",
-        data: { previousSize, nextSize, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
-      }).catch(logError("writeDiag"));
       const hasConversationContentChanged = contentVersionRef.current !== resizeContentVersionRef.current;
       resizeContentVersionRef.current = contentVersionRef.current;
       if (Date.now() < intentionalResizeRestoreUntilRef.current) {
@@ -1456,10 +1453,6 @@ export const ChatThread = memo(function ChatThread() {
   useLayoutEffect(() => {
     const remaining = sessionAutoBottomUntilRef.current - Date.now();
     const isSettlingOpenedSession = remaining > 0 && !userScrollRef.current;
-    window.api.writeDiag?.({
-      message: "[ChatThread] contentVersion effect",
-      data: { isSettlingOpenedSession, remaining, autoFollow: autoFollowRef.current, userScroll: userScrollRef.current },
-    }).catch(logError("writeDiag"));
     if (isSettlingOpenedSession) {
       autoFollowRef.current = true;
       updateAutoFollow(true);
@@ -1480,6 +1473,14 @@ export const ChatThread = memo(function ChatThread() {
         updateShowScrollToBottom(distance > 80);
         return;
       }
+      const now = Date.now();
+      if (now - lastManualAnchorRestoreAtRef.current < 350) {
+        scheduleIdleAnchorCapture();
+        const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+        updateShowScrollToBottom(distance > 80);
+        return;
+      }
+      lastManualAnchorRestoreAtRef.current = now;
       if (restoreManualScrollAnchor("contentVersion:user-scroll")) {
         return;
       }
@@ -1684,7 +1685,7 @@ export const ChatThread = memo(function ChatThread() {
         },
       }).catch(logError("writeDiag"));
     }
-    if (now - lastScrollDiagRef.current > 50) {
+    if (now - lastScrollDiagRef.current > 500) {
       lastScrollDiagRef.current = now;
       window.api.writeDiag?.({
         message: "[ChatThread] handleScroll",

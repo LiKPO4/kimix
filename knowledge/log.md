@@ -2,6 +2,7 @@
 
 ## 2026-07-06
 
+* **Streaming scroll diagnostics stay off hot paths**: Routine contentVersion/resize logs and no-op manual anchor restores are removed or throttled so tool output does not block renderer timers and painting. See [/project/kimix.md](/project/kimix.md).
 * **Streaming content shrink preserves the viewport**: Auto-follow snapshots the pre-commit bottom distance and restores it synchronously when Kimi Web thinking folds from multiple lines to a shorter paragraph. See [/project/kimix.md](/project/kimix.md).
 * **Terminal runtime errors close all visible work**: SDK failure reasons, including quota HTTP 403, now terminate open subagents, tools, partial Assistant output, timers, and busy indicators instead of leaving the local timeline running. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Missing terminal-envelope display recovery**: An official `turn.step.completed` with `finishReason: end_turn` now closes Assistant display and timing when `turn.ended` is absent, without weakening the live turn boundary required by permission and other runtime mutations. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
