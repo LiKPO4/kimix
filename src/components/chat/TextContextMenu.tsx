@@ -181,7 +181,7 @@ export function TextContextMenu() {
           style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           <Languages size={15} />
-          <span>翻译（豆包）</span>
+          <span>翻译</span>
         </button>
       )}
       <button
