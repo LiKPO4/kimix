@@ -3013,6 +3013,26 @@ export function Composer() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
+            {swarmModeLocked && (
+              <button
+                type="button"
+                disabled
+                className="kimix-icon-text-button kimix-muted-action is-compact min-w-[104px] border disabled:cursor-default"
+                style={{
+                  borderColor: "var(--accent-primary-soft)",
+                  backgroundColor: "var(--accent-primary-light)",
+                  color: "var(--accent-primary-dark)",
+                  boxShadow: "inset 0 0 0 1px rgba(25, 130, 255, 0.16)",
+                  opacity: 1,
+                }}
+                title="Swarm 模式已为本会话锁定，后续消息会继续使用多子代理并行推进。"
+                aria-label="Swarm 模式已开启"
+                aria-pressed="true"
+              >
+                <Zap size={14} className="shrink-0" />
+                <span>Swarm 开</span>
+              </button>
+            )}
             <button
               disabled={!canTogglePlanMode}
               onClick={() => void handleTogglePlanMode()}
