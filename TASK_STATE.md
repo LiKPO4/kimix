@@ -4271,3 +4271,7 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 现象：子代理详情左侧有多余竖线；类型列按内容自适应，“输出/状态/工具完成 Bash”等长度不同导致详情起点乱窜。
 - 修复：移除详情容器左边框；类型列固定为 104px，超长类型截断并保留 title，详情列统一起点。
 - 下一步：实机检查多种子事件混排时的详情列对齐和长文本换行。
+## 2026-07-06 v2.14.52 缺失 turn.ended 的回复收尾
+- 现场：`session_d378904e-1b5d-460c-ac59-269b701a5f31`最后有`turn.step.completed + finishReason=end_turn`，但缺少后续`turn.ended/prompt.completed/status idle`；本地`runningSessionId=null`，Assistant仍`isComplete=false`并永久计时。
+- 修复：Server `turn.step.completed`仅在`finishReason=end_turn`时映射Assistant完成事件；`tool_use`等中间步骤保持未完成。Todo残留不是本次忙态根因。
+- 下一步：实机打开该会话，确认计时停止、footer不再显示“消息处理中”。

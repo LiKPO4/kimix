@@ -2,6 +2,7 @@
 
 ## 2026-07-06
 
+* **Missing terminal-envelope display recovery**: An official `turn.step.completed` with `finishReason: end_turn` now closes Assistant display and timing when `turn.ended` is absent, without weakening the live turn boundary required by permission and other runtime mutations. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Inactive-session model mutation recovery**: Chat-footer model switching now shares the verified inactive-runtime recovery boundary with permission changes, including same-session resume, project-root validation, retry on the returned runtime ID, and no replacement session creation. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-05

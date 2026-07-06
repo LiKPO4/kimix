@@ -144,6 +144,8 @@ describe("mapKimiCodeEvent", () => {
     }, options);
     const stepStarted = mapKimiCodeEvent({ type: "turn.step.started", step: 5 }, options);
     const stepCompleted = mapKimiCodeEvent({ type: "turn.step.completed", step: 5 }, options);
+    const intermediateStepCompleted = mapKimiCodeEvent({ type: "turn.step.completed", step: 6, finishReason: "tool_use" }, options);
+    const finalStepCompleted = mapKimiCodeEvent({ type: "turn.step.completed", step: 7, finishReason: "end_turn" }, options);
     const interrupted = mapKimiCodeEvent({ type: "turn.step.interrupted", step: 2, message: "cancelled" }, options);
     const compaction = mapKimiCodeEvent({ type: "compaction.completed" }, options);
     const error = mapKimiCodeEvent({ type: "error", message: "broken" }, options);
@@ -167,6 +169,8 @@ describe("mapKimiCodeEvent", () => {
     expect(usageRecord.tokenCount).toBe(20);
     expect(stepStarted).toBeNull();
     expect(stepCompleted).toBeNull();
+    expect(intermediateStepCompleted).toBeNull();
+    expect(finalStepCompleted).toMatchObject({ type: "assistant_message", isComplete: true });
     expect(interrupted?.type).toBe("status_update");
     expect((interrupted as Extract<TimelineEvent, { type: "status_update" }>).message).toBe("输出打断");
     expect(compaction?.type).toBe("compaction");

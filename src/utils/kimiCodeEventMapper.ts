@@ -442,8 +442,26 @@ export function mapKimiCodeEvent(
     }
 
     case "turn.step.started":
-    case "turn.step.completed":
       return null;
+
+    case "turn.step.completed": {
+      const finishReason = isString(event.finishReason)
+        ? event.finishReason
+        : isString(event.finish_reason)
+          ? event.finish_reason
+          : "";
+      if (finishReason !== "end_turn") return null;
+      return {
+        id: getId(options),
+        type: "assistant_message",
+        timestamp,
+        agentId: getAgentId(event),
+        content: "",
+        model: isString(event.model) ? event.model : undefined,
+        isThinking: false,
+        isComplete: true,
+      };
+    }
 
     case "turn.step.retrying":
     case "turn.step.interrupted":
