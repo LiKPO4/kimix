@@ -1238,7 +1238,7 @@ function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
   return (
     <div style={{ padding: "0 12px 10px 26px" }}>
       <div
-        className="min-w-0 border-l border-[var(--kimix-panel-divider)]"
+        className="min-w-0"
         style={{ paddingLeft: 12 }}
       >
         <div className="flex flex-col" style={{ gap: 6 }}>
@@ -1246,12 +1246,12 @@ function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
             <div
               key={item.id}
               className="grid min-w-0 items-start text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
-              style={{ gridTemplateColumns: "16px minmax(46px, auto) minmax(0, 1fr)", columnGap: 8 }}
+              style={{ gridTemplateColumns: "16px 104px minmax(0, 1fr)", columnGap: 8 }}
             >
               <span className="flex h-5 items-center justify-center">
                 <KimiWebSubagentDetailIcon item={item} />
               </span>
-              <span className="shrink-0 whitespace-nowrap text-[var(--kimix-panel-text-muted)]">{item.label}</span>
+              <span className="min-w-0 truncate whitespace-nowrap text-[var(--kimix-panel-text-muted)]" title={item.label}>{item.label}</span>
               <span className="min-w-0 break-words">{item.detail || "无详情"}</span>
             </div>
           ))}
