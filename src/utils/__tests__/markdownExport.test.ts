@@ -28,6 +28,32 @@ describe("sessionToMarkdown", () => {
     expect(markdown).toContain("批次2完成。\n\n现在运行");
   });
 
+  it("restores paragraphs for long flattened narrative without explicit boundary words", () => {
+    const session: Session = {
+      id: "s2",
+      title: "叙事段落测试",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 2,
+      isLoading: false,
+      events: [
+        {
+          id: "a2",
+          type: "assistant_message",
+          timestamp: 1,
+          content: "好的，我先全面审查所有新代码，然后走 TapTap 流程。先让我检查完整数据和测试。发现一个问题——龙象劲的日志不够准确，升级版说\"耗尽\"不对。测试失败是因为新加了 5 枚骰子，图鉴滚动页数不够了。增大滚动次数。问题找到了——'百花剑·全谱'被找到但在 y=618，比屏幕 600px 矮一点。加大滚动距离。",
+          isThinking: false,
+          isComplete: true,
+        },
+      ],
+    };
+
+    const markdown = sessionToMarkdown(session);
+    expect(markdown).toContain("流程。\n\n先让我检查");
+    expect(markdown).toContain("不对。\n\n测试失败");
+    expect(markdown).toContain("不够了。\n\n增大滚动");
+  });
+
   it("repairs markdown table separators split across streamed lines", () => {
     const session: Session = {
       id: "s1",

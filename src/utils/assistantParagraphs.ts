@@ -392,8 +392,19 @@ export function restoreInlineMarkdownHeadings(content: string) {
 export function restoreAssistantProgressParagraphs(content: string): string {
   const withTables = restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content))));
   if (withTables.length < 120 || withTables.includes("\n") || !hasProgressBoundary(withTables)) return withTables;
-  const pattern = /([。！？；.!?])(?=(先|现在|然后|同时|接着|下一步|利用|构建|分析|批次\d*|云端|版本号|上传|修复))/g;
-  const restored = withTables.replace(pattern, "$1\n\n");
-  const paragraphCount = restored.split(/\n\n+/).filter((part) => part.trim()).length;
-  return paragraphCount >= 3 ? restored : withTables;
+
+  // Primary: split before explicit progress boundary words. This keeps the
+  // restoration conservative for content that already has some structure.
+  const boundaryPattern = /([。！？；.!?])(?=(先|现在|然后|同时|接着|下一步|利用|构建|分析|批次\d*|云端|版本号|上传|修复))/g;
+  const boundaryRestored = withTables.replace(boundaryPattern, "$1\n\n");
+  const boundaryParagraphCount = boundaryRestored.split(/\n\n+/).filter((part) => part.trim()).length;
+  if (boundaryParagraphCount >= 3) return boundaryRestored;
+
+  // Fallback: long flattened narrative text often streams as a single paragraph.
+  // Split after Chinese sentence endings to improve readability, while avoiding
+  // fragments that look like list markers or numeric sequences.
+  const sentencePattern = /([。！？；])(?=\S)(?!(\d|•|·|-)\s)/g;
+  const sentenceRestored = withTables.replace(sentencePattern, "$1\n\n");
+  const sentenceParagraphCount = sentenceRestored.split(/\n\n+/).filter((part) => part.trim()).length;
+  return sentenceParagraphCount >= 3 ? sentenceRestored : withTables;
 }
