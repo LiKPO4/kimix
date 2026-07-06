@@ -20,6 +20,7 @@ import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError } from "@/utils/reportError";
+import { scrollTopPreservingBottomDistance } from "@/utils/scrollIntent";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
@@ -763,6 +764,15 @@ export const ChatThread = memo(function ChatThread() {
   const lastScrollHeightRef = useRef<number | null>(null);
   const contentVersionRef = useRef("");
   const resizeContentVersionRef = useRef("");
+  const contentResizeSnapshotRef = useRef<{
+    sessionId?: string;
+    contentVersion: string;
+    scrollHeight: number;
+    scrollTop: number;
+    clientHeight: number;
+    autoFollow: boolean;
+    userScroll: boolean;
+  } | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const userInputLockUntilRef = useRef(0);
   const lastUserScrollAtRef = useRef(0);
@@ -1411,6 +1421,37 @@ export const ChatThread = memo(function ChatThread() {
       if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     };
   }, [session?.id, showOlderItems]);
+
+  useLayoutEffect(() => {
+    const node = scrollRef.current;
+    const snapshot = contentResizeSnapshotRef.current;
+    if (
+      node &&
+      snapshot &&
+      snapshot.sessionId === session?.id &&
+      snapshot.autoFollow &&
+      !snapshot.userScroll &&
+      node.scrollHeight < snapshot.scrollHeight
+    ) {
+      ignoreScrollUntilRef.current = Date.now() + 120;
+      node.scrollTop = scrollTopPreservingBottomDistance({
+        previousScrollHeight: snapshot.scrollHeight,
+        previousScrollTop: snapshot.scrollTop,
+        previousClientHeight: snapshot.clientHeight,
+        nextScrollHeight: node.scrollHeight,
+        nextClientHeight: node.clientHeight,
+      });
+    }
+    contentResizeSnapshotRef.current = node ? {
+      sessionId: session?.id,
+      contentVersion,
+      scrollHeight: node.scrollHeight,
+      scrollTop: node.scrollTop,
+      clientHeight: node.clientHeight,
+      autoFollow: autoFollowRef.current,
+      userScroll: userScrollRef.current,
+    } : null;
+  }, [contentVersion, session?.id]);
 
   useLayoutEffect(() => {
     const remaining = sessionAutoBottomUntilRef.current - Date.now();

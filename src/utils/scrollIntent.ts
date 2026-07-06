@@ -1,5 +1,25 @@
 export const USER_SCROLL_INTENT_MS = 1_500;
 
+export function scrollTopPreservingBottomDistance({
+  previousScrollHeight,
+  previousScrollTop,
+  previousClientHeight,
+  nextScrollHeight,
+  nextClientHeight,
+}: {
+  previousScrollHeight: number;
+  previousScrollTop: number;
+  previousClientHeight: number;
+  nextScrollHeight: number;
+  nextClientHeight: number;
+}) {
+  const bottomDistance = Math.max(0, previousScrollHeight - previousScrollTop - previousClientHeight);
+  return Math.max(0, Math.min(
+    nextScrollHeight - nextClientHeight,
+    nextScrollHeight - nextClientHeight - bottomDistance,
+  ));
+}
+
 export function shouldPauseAutoFollowForScroll({
   previousScrollTop,
   currentScrollTop,

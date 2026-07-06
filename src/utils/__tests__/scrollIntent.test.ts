@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { shouldPauseAutoFollowForScroll } from "../scrollIntent";
+import { scrollTopPreservingBottomDistance, shouldPauseAutoFollowForScroll } from "../scrollIntent";
 
 describe("scroll intent", () => {
+  it("preserves the viewport when streaming content shrinks", () => {
+    expect(scrollTopPreservingBottomDistance({
+      previousScrollHeight: 2000,
+      previousScrollTop: 1400,
+      previousClientHeight: 600,
+      nextScrollHeight: 1880,
+      nextClientHeight: 600,
+    })).toBe(1280);
+    expect(scrollTopPreservingBottomDistance({
+      previousScrollHeight: 2000,
+      previousScrollTop: 1200,
+      previousClientHeight: 600,
+      nextScrollHeight: 1880,
+      nextClientHeight: 600,
+    })).toBe(1080);
+  });
+
   it("does not treat browser clamp after content shrink as user scrolling", () => {
     expect(shouldPauseAutoFollowForScroll({
       previousScrollTop: 4051,

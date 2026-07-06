@@ -4280,3 +4280,7 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 根因：SDK failed/error 的 `turn.ended` 被主进程归为 completed；renderer 的 error/interrupted 收尾只删除未完成 Assistant，没有关闭子代理与工具。
 - 修复：失败原因进入 engine error；终态错误统一将未结束子代理/工具标为 error，并保留、收尾已有的部分 Assistant 正文。
 - 下一步：实机制造一次可控失败，确认计时、消息处理中、底部运行中和子代理运行态同时停止。
+## 2026-07-06 v2.14.54 Web 思考缩短时视口上跳
+- 现象：Kimi Web 流式思考先占满 5–6 行，追加下一段后折叠为最新 1 行时，内容总高度瞬间缩短，浏览器先钳制 scrollTop，导致当前视口向上跳。
+- 修复：contentVersion 布局提交前记录 scrollHeight、scrollTop、clientHeight 和底部距离；自动跟随且非用户滚动时，如果提交后内容变短，在绘制前按原底部距离同步恢复 scrollTop。
+- 下一步：实机观察连续思考段由多行切到一行，确认当前消息和下方工具卡位置不再突跳。

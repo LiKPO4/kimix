@@ -2,6 +2,7 @@
 
 ## 2026-07-06
 
+* **Streaming content shrink preserves the viewport**: Auto-follow snapshots the pre-commit bottom distance and restores it synchronously when Kimi Web thinking folds from multiple lines to a shorter paragraph. See [/project/kimix.md](/project/kimix.md).
 * **Terminal runtime errors close all visible work**: SDK failure reasons, including quota HTTP 403, now terminate open subagents, tools, partial Assistant output, timers, and busy indicators instead of leaving the local timeline running. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Missing terminal-envelope display recovery**: An official `turn.step.completed` with `finishReason: end_turn` now closes Assistant display and timing when `turn.ended` is absent, without weakening the live turn boundary required by permission and other runtime mutations. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Inactive-session model mutation recovery**: Chat-footer model switching now shares the verified inactive-runtime recovery boundary with permission changes, including same-session resume, project-root validation, retry on the returned runtime ID, and no replacement session creation. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
