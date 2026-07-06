@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -59,6 +59,19 @@ describe("eventHelpers", () => {
     const tool = settled[0] as Extract<TimelineEvent, { type: "tool_call" }>;
     expect(tool.status).toBe("running");
     expect(tool.durationMs).toBeUndefined();
+  });
+
+  it("settles all open work as failed when the runtime errors", () => {
+    const events: TimelineEvent[] = [
+      { id: "agent-1", type: "subagent", timestamp: 10, agentName: "worker", status: "running", events: [] },
+      { id: "tool-1", type: "tool_call", timestamp: 20, toolCallId: "tc-1", toolName: "bash", status: "running", arguments: {} },
+      { id: "assistant-1", type: "assistant_message", timestamp: 30, content: "已有部分输出", isThinking: true, isComplete: false },
+    ];
+
+    const settled = settleFailedEvents(events, "额度不足。", 100);
+    expect(settled[0]).toMatchObject({ type: "subagent", status: "error", error: "额度不足。" });
+    expect(settled[1]).toMatchObject({ type: "tool_call", status: "error", result: "额度不足。", durationMs: 80 });
+    expect(settled[2]).toMatchObject({ type: "assistant_message", isThinking: false, isComplete: true, content: "已有部分输出" });
   });
 
   it("removes a local failed send attempt with its status, empty placeholder, and error", () => {

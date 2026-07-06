@@ -4275,3 +4275,8 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 现场：`session_d378904e-1b5d-460c-ac59-269b701a5f31`最后有`turn.step.completed + finishReason=end_turn`，但缺少后续`turn.ended/prompt.completed/status idle`；本地`runningSessionId=null`，Assistant仍`isComplete=false`并永久计时。
 - 修复：Server `turn.step.completed`仅在`finishReason=end_turn`时映射Assistant完成事件；`tool_use`等中间步骤保持未完成。Todo残留不是本次忙态根因。
 - 下一步：实机打开该会话，确认计时停止、footer不再显示“消息处理中”。
+## 2026-07-06 v2.14.53 额度 403 后残留忙态
+- 现场：`session_01e4f589-c2c5-473e-adbe-62406f8098ef` 的 SDK 在 21:11:38 因额度耗尽返回 HTTP 403 并记录 `turn failed`，但本地 5 个子代理和工具事件仍为 running，导致 `runningSessionId=null` 后界面继续显示运行中。
+- 根因：SDK failed/error 的 `turn.ended` 被主进程归为 completed；renderer 的 error/interrupted 收尾只删除未完成 Assistant，没有关闭子代理与工具。
+- 修复：失败原因进入 engine error；终态错误统一将未结束子代理/工具标为 error，并保留、收尾已有的部分 Assistant 正文。
+- 下一步：实机制造一次可控失败，确认计时、消息处理中、底部运行中和子代理运行态同时停止。

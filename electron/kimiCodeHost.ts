@@ -2773,7 +2773,14 @@ function updateStatusFromEvent(sessionId: string, event: unknown) {
   }
   if (type === "turn.ended") {
     const reason = (event as { reason?: unknown }).reason;
-    setStatus(sessionId, reason === "cancelled" ? "interrupted" : "completed");
+    setStatus(
+      sessionId,
+      reason === "cancelled"
+        ? "interrupted"
+        : reason === "failed" || reason === "error"
+          ? "error"
+          : "completed",
+    );
     return;
   }
   const loopEvent = getLoopEvent(event);

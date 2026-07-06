@@ -268,6 +268,40 @@ export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.n
   return closeOpenCompaction(settled);
 }
 
+export function settleFailedEvents(
+  events: TimelineEvent[],
+  message = "当前轮执行失败。",
+  settledAt = Date.now(),
+): TimelineEvent[] {
+  const settled = events.flatMap((event) => {
+    if (event.type === "subagent" && ["queued", "running", "suspended"].includes(event.status)) {
+      return [{ ...event, status: "error" as const, error: event.error ?? message }];
+    }
+    if (event.type === "tool_call" && event.status === "running") {
+      return [{
+        ...event,
+        status: "error" as const,
+        result: event.result ?? message,
+        durationMs: Math.max(0, settledAt - event.timestamp),
+      }];
+    }
+    if (event.type !== "assistant_message" || event.isComplete) return [event];
+    const hasContent = event.content.trim().length > 0;
+    const hasThinking = Boolean(
+      event.thinking?.trim() ||
+      event.thinkingParts?.some((part) => part.text.trim().length > 0)
+    );
+    if (!hasContent && !hasThinking) return [];
+    return [{
+      ...event,
+      isThinking: false,
+      isComplete: true,
+      durationMs: reliableAssistantDurationMs(event.durationMs ?? Math.max(0, settledAt - event.timestamp)),
+    }];
+  });
+  return closeOpenCompaction(settled);
+}
+
 export function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
   const lastCompaction = [...events].reverse().find((event) => event.type === "compaction");
   if (!lastCompaction || lastCompaction.type !== "compaction" || lastCompaction.phase !== "begin") {

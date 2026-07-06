@@ -23,6 +23,7 @@ import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/uti
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import {
   settleInactiveEvents,
+  settleFailedEvents,
   sanitizePersistedEvents,
   sanitizeKimiSkillActivationTitle,
   hasMalformedAssistantMarkdown,
@@ -2516,10 +2517,11 @@ function App() {
 
       if (payload.status === "error" || payload.status === "interrupted") {
         runtimeTurnStartRef.current.delete(payload.sessionId);
+        const failureMessage = payload.status === "interrupted" ? "当前轮已中断。" : "当前轮执行失败。";
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: settlePendingSteerMessages(
-            settlePendingQuestions(closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)))),
+            settlePendingQuestions(settleFailedEvents(session.events, failureMessage)),
             "failed",
             payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
           ),
@@ -2615,10 +2617,11 @@ function App() {
 
       if (payload.status === "error" || payload.status === "interrupted") {
         runtimeTurnStartRef.current.delete(payload.sessionId);
+        const failureMessage = payload.status === "interrupted" ? "当前轮已中断。" : "当前轮执行失败。";
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: settlePendingSteerMessages(
-            settlePendingQuestions(closeOpenCompaction(session.events.filter((event) => !(event.type === "assistant_message" && !event.isComplete)))),
+            settlePendingQuestions(settleFailedEvents(session.events, failureMessage)),
             "failed",
             payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
           ),
