@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-06
+
+* **Inactive-session model mutation recovery**: Chat-footer model switching now shares the verified inactive-runtime recovery boundary with permission changes, including same-session resume, project-root validation, retry on the returned runtime ID, and no replacement session creation. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-05
 
 * **Active-turn reload recovery**: Renderer reload now restores busy state from the still-managed official runtime, keeps in-flight snapshot Assistant content open, and reconciles richer snapshots after a quiet stream interval instead of falsely completing the turn. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

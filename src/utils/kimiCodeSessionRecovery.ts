@@ -32,6 +32,43 @@ export function isKimiCodeSessionInactiveError(error: unknown) {
   return /Kimi (?:Code|Server) session is not active/i.test(message);
 }
 
+type SessionMutationResponse = { success: true; data: unknown } | { success: false; error: string };
+type ResumeSessionResponse = {
+  success: true;
+  data: { sessionId: string; workDir: string };
+} | { success: false; error: string };
+
+function isSameWorkDir(left?: string, right?: string) {
+  return Boolean(left && right) && left!.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() === right!.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+export async function runKimiCodeSessionMutationWithRecovery(input: {
+  sessionId: string;
+  projectPath?: string;
+  additionalWorkDirs: string[];
+  crossProjectError: string;
+  mutate: (sessionId: string) => Promise<SessionMutationResponse>;
+  resumeSession: (request: { sessionId: string; additionalWorkDirs: string[] }) => Promise<ResumeSessionResponse>;
+}): Promise<{ success: true; sessionId: string } | { success: false; error: string }> {
+  const initial = await input.mutate(input.sessionId);
+  if (initial.success) return { success: true, sessionId: input.sessionId };
+  if (!isKimiCodeSessionInactiveError(initial.error)) return initial;
+
+  const resumed = await input.resumeSession({
+    sessionId: input.sessionId,
+    additionalWorkDirs: input.additionalWorkDirs,
+  });
+  if (!resumed.success) return { success: false, error: `恢复会话失败：${resumed.error}` };
+  if (input.projectPath && !isSameWorkDir(resumed.data.workDir, input.projectPath)) {
+    return { success: false, error: input.crossProjectError };
+  }
+
+  const retried = await input.mutate(resumed.data.sessionId);
+  return retried.success
+    ? { success: true, sessionId: resumed.data.sessionId }
+    : { success: false, error: retried.error };
+}
+
 export function removeStaleKimiCodeStartupErrors<T extends MessageEventLike>(events: T[]) {
   return events.filter((event) => !(
     event.type === "error" &&

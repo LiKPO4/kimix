@@ -11,6 +11,8 @@ import { displayProjectName } from "@/utils/projectDisplay";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sessionModelCatalog";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -342,7 +344,14 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: switchedAt, switchedToModel: model, updatedAt: switchedAt }));
     let result;
     try {
-      result = await window.api.setKimiCodeModel({ sessionId: runtimeSessionId, model });
+      result = await runKimiCodeSessionMutationWithRecovery({
+        sessionId: runtimeSessionId,
+        projectPath: activeSession.projectPath,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+        crossProjectError: "恢复后的会话属于其他项目，已拒绝切换模型",
+        mutate: (sessionId) => window.api.setKimiCodeModel({ sessionId, model }),
+        resumeSession: window.api.resumeKimiCodeSession,
+      });
     } catch (error) {
       setSwitchingModel(null);
       updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: undefined, switchedToModel: undefined, updatedAt: Date.now() }));
@@ -355,7 +364,14 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
       showToast(`切换模型失败：${result.error}`);
       return;
     }
-    updateSession(activeSession.id, (current) => ({ ...current, model, switchedToModel: undefined, updatedAt: switchedAt }));
+    updateSession(activeSession.id, (current) => ({
+      ...current,
+      model,
+      runtimeSessionId: result.sessionId,
+      officialSessionId: result.sessionId,
+      switchedToModel: undefined,
+      updatedAt: switchedAt,
+    }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
     if (updated && currentSession?.id === updated.id) setCurrentSession(updated);
     setModelMenuOpen(false);

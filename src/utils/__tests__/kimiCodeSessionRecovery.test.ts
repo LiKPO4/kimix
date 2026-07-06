@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "../kimiCodeSessionRecovery";
+import { describe, expect, it, vi } from "vitest";
+import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors, runKimiCodeSessionMutationWithRecovery } from "../kimiCodeSessionRecovery";
 
 describe("Kimi Code session recovery", () => {
   const missingMessage = "恢复上次 Kimi Code 会话失败：/api/v1/sessions/session_fb2569cb-6649-4a2d-a879-3ecb1e532141/profile: Session \"session_fb2569cb-6649-4a2d-a879-3ecb1e532141\" was not found";
@@ -22,5 +22,51 @@ describe("Kimi Code session recovery", () => {
     ];
 
     expect(removeStaleKimiCodeStartupErrors(events).map((event) => event.id)).toEqual(["other", "assistant"]);
+  });
+});
+
+describe("runKimiCodeSessionMutationWithRecovery", () => {
+  it("resumes an inactive session and retries the mutation on the recovered runtime", async () => {
+    const mutate = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: "Kimi Code session is not active: session-1" })
+      .mockResolvedValueOnce({ success: true, data: undefined });
+    const resumeSession = vi.fn().mockResolvedValue({
+      success: true,
+      data: { sessionId: "session-2", workDir: "D:/work/demo" },
+    });
+
+    await expect(runKimiCodeSessionMutationWithRecovery({
+      sessionId: "session-1",
+      projectPath: "d:\\work\\demo\\",
+      additionalWorkDirs: ["D:/shared"],
+      crossProjectError: "wrong project",
+      mutate,
+      resumeSession,
+    })).resolves.toEqual({ success: true, sessionId: "session-2" });
+    expect(mutate).toHaveBeenNthCalledWith(1, "session-1");
+    expect(mutate).toHaveBeenNthCalledWith(2, "session-2");
+    expect(resumeSession).toHaveBeenCalledWith({ sessionId: "session-1", additionalWorkDirs: ["D:/shared"] });
+  });
+
+  it("does not recover unrelated errors or accept another project", async () => {
+    const unrelatedResume = vi.fn();
+    await expect(runKimiCodeSessionMutationWithRecovery({
+      sessionId: "session-1",
+      projectPath: "D:/work/demo",
+      additionalWorkDirs: [],
+      crossProjectError: "wrong project",
+      mutate: vi.fn().mockResolvedValue({ success: false, error: "network unavailable" }),
+      resumeSession: unrelatedResume,
+    })).resolves.toEqual({ success: false, error: "network unavailable" });
+    expect(unrelatedResume).not.toHaveBeenCalled();
+
+    await expect(runKimiCodeSessionMutationWithRecovery({
+      sessionId: "session-1",
+      projectPath: "D:/work/demo",
+      additionalWorkDirs: [],
+      crossProjectError: "wrong project",
+      mutate: vi.fn().mockResolvedValue({ success: false, error: "Kimi Code session is not active: session-1" }),
+      resumeSession: vi.fn().mockResolvedValue({ success: true, data: { sessionId: "session-2", workDir: "D:/work/other" } }),
+    })).resolves.toEqual({ success: false, error: "wrong project" });
   });
 });
