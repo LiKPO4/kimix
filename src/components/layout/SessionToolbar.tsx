@@ -364,9 +364,12 @@ export function SessionToolbar({
 
   return (
     <>
-    <div className="kimix-app-shell-toolbar flex h-14 shrink-0 items-center justify-between border-b" style={{ paddingLeft: 30, paddingRight: 12 }}>
+    <div
+      className="kimix-app-shell-toolbar grid h-14 shrink-0 items-center border-b"
+      style={{ gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 30, paddingRight: 12 }}
+    >
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
+        <div className="min-w-0 max-w-[300px] flex-1 truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
           {title}
         </div>
         <div ref={sessionMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
