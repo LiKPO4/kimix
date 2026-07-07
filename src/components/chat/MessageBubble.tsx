@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode } from "react";
+import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type ReactNode } from "react";
 import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
@@ -926,6 +926,15 @@ function kimiWebGroupSummary(group: ProcessGroup) {
   return `${group.approvals.length} 个工具请求`;
 }
 
+const KIMI_WEB_THINKING_SUMMARY_STYLE: CSSProperties = {
+  fontSize: "14.5px",
+  lineHeight: "24px",
+  fontFamily: "var(--font-sans)",
+  fontWeight: 400,
+  letterSpacing: 0,
+  whiteSpace: "pre-wrap",
+};
+
 function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
   const paragraphs = useMemo(() =>
@@ -946,14 +955,17 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
-          style={{ whiteSpace: "pre-wrap" }}
+          className="kimix-kimi-web-foldable-summary text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
+          style={KIMI_WEB_THINKING_SUMMARY_STYLE}
         >
           {teaser}
         </button>
       ) : (
-        <div className="kimix-kimi-web-inline-body relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-          <MarkdownRenderer content={block.text} />
+        <div
+          className="kimix-kimi-web-inline-summary text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+          style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+        >
+          {block.text}
         </div>
       )}
       {expanded && isFoldable && (
@@ -1733,7 +1745,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
           <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
             {hasContent && (
               <>
-                <div className="kimix-assistant-body relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
+                <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
                   <MarkdownRenderer content={displayContent} deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && displayContent.length > 1200} />
                 </div>
                 {mdArtifacts.length > 0 && (
