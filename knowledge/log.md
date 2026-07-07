@@ -2,6 +2,7 @@
 
 ## 2026-07-07
 
+* **Electron chat shell uses viewport units**: Runtime DOM measurement proved `height: 100%` expanded with an 18k-pixel history despite an 800px root; `height/max-height: 100dvh` is the definite outer boundary that keeps Composer visible and delegates long content to the inner scroller. See [/project/kimix.md](/project/kimix.md).
 * **Startup catalog has no implicit navigation ownership**: Official catalog reconciliation may populate the sidebar, but it may hydrate and select a startup conversation only when it matches a persisted active/local runtime identity; catalog position zero is not a navigation fallback. See [/project/kimix.md](/project/kimix.md).
 * **Chat shell height ownership**: Definite Grid tracks own the application and chat-panel height, every nested viewport remains shrinkable, and only the inner message viewport owns overflow; long histories cannot push Composer or ContextBar outside the Electron window. See [/project/kimix.md](/project/kimix.md).
 * **Thinking defaults preserve official ownership**: Missing session `thinking` is no longer normalized to `off`; Kimix omits the field for Kimi managed defaults and only sends `off` for explicit user disablement or known third-party downgrade. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

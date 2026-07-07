@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-07 v2.14.82 Electron 视口确定高度
+
+- 当前目标：彻底修复长会话仍把聊天壳撑到窗口外，导致滚动条和 Composer 消失的问题。
+- 运行态证据：Electron 视口和 `#root` 均为 800px，但使用 `h-full` / `height: 100%` 时 `.kimix-app-shell` 实际为 18626px，Footer 顶部位于 18437px；运行时改为固定 800px 或 `100dvh` 后，壳体恢复 800px、消息区 506px、Footer 底边 799px，正文 18332px 仅作为内部 `scrollHeight`。
+- 根因：Chromium 当前包含块链中的百分比高度不是 definite size，Grid 仍按长消息的 min-content 高度扩张；前两轮只约束子级和百分比高度，未固定最外层真实视口高度。
+- 修复：应用壳直接使用 `height/maxHeight: 100dvh`，不再依赖 Tailwind `h-full` 或祖先百分比高度链。
+- 验收：源码 HMR 后调试协议测得视口/壳体均为 800px、主面板 752px、消息区 506px、Footer 位于 611-799px，长正文 `scrollHeight` 18332px；运行截图确认滚动条、Composer 和 ContextBar 均恢复。
+- 下一步：完成构建与提交，由用户在 v2.14.82 窗口复验同一长会话。
+
 ## 2026-07-07 v2.14.81 启动会话与聊天壳确定性布局
 
 - 当前目标：修复启动后先显示 Project06 新会话、随后自动跳到目录首个旧会话，同时长会话再次把 Composer 挤出窗口的问题。

@@ -1772,8 +1772,8 @@ ${isFinalStep
 
   return (
     <div
-      className="kimix-app-shell grid h-full w-full overflow-hidden text-[15px] text-text-primary"
-      style={{ gridTemplateRows: "48px minmax(0, 1fr)", minHeight: 0 }}
+      className="kimix-app-shell grid w-full overflow-hidden text-[15px] text-text-primary"
+      style={{ height: "100dvh", maxHeight: "100dvh", gridTemplateRows: "48px minmax(0, 1fr)", minHeight: 0 }}
     >
         <TopMenuBar
           sidebarOpen={sidebarOpen}
