@@ -3,7 +3,7 @@ import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, Shie
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette } from "@/types/ui";
+import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, UserMessageImage } from "@/types/ui";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -458,6 +458,7 @@ export function Composer() {
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
+  const [editingPendingSnapshot, setEditingPendingSnapshot] = useState<{ sessionId: string; content: string; images?: UserMessageImage[] } | null>(null);
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
@@ -533,6 +534,7 @@ export function Composer() {
         filePath: image.filePath,
       })));
       setEditingPendingId(null);
+      setEditingPendingSnapshot(null);
       window.requestAnimationFrame(() => inputRef.current?.focus());
     };
     window.addEventListener("kimix:restore-composer-draft", handleRestoreComposerDraft);
@@ -2405,13 +2407,19 @@ export function Composer() {
       filePath: image.filePath,
     })));
     setEditingPendingId(id);
+    setEditingPendingSnapshot({ sessionId: pending.sessionId, content: pending.content, images: pending.images });
     removePendingMessage(id);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleCancelPendingEdit = () => {
+    if (editingPendingSnapshot) {
+      addPendingMessage(editingPendingSnapshot.sessionId, editingPendingSnapshot.content, editingPendingSnapshot.images);
+    }
     setInput("");
+    setImageAttachments([]);
     setEditingPendingId(null);
+    setEditingPendingSnapshot(null);
     inputRef.current?.reset();
   };
 
