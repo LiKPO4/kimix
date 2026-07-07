@@ -5508,6 +5508,21 @@ ipcMain.handle("kimi-code:getServerModelCatalog", async () => {
   }
 });
 
+const KimiCodeExperimentalFeatureSchema = z.object({
+  id: z.literal("tool-select"),
+  enabled: z.boolean(),
+});
+
+ipcMain.handle("kimi-code:setExperimentalFeature", async (_, request: unknown) => {
+  try {
+    const req = KimiCodeExperimentalFeatureSchema.parse(request);
+    await kimiCodeHost.setExperimentalFeature(req.id, req.enabled);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:archiveSession", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -6342,6 +6357,7 @@ const SettingsSchema = z.object({
   expandToolCalls: z.boolean().optional(),
   experimentalKimiServer: z.boolean().optional(),
   experimentalKimiServerSessions: z.boolean().optional(),
+  experimentalKimiToolSelect: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),
   selectedLaunchCommand: z.string().optional(),

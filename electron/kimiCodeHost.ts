@@ -1998,6 +1998,10 @@ export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeCon
   return sdkHarness.setConfig(patch);
 }
 
+export async function setExperimentalFeature(id: "tool-select", enabled: boolean): Promise<KimiCodeConfig> {
+  return setConfig({ experimental: { [id]: enabled } } as KimiCodeConfigPatch);
+}
+
 function normalizeCatalogMaxContextSize(value: number | null) {
   const fallback = 262144;
   const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;

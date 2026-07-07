@@ -244,11 +244,13 @@ describe("KimiCodeServerClient protocol adapters", () => {
       defaultModel: "openai/gpt",
       providers: { openai: { type: "openai", apiKey: "secret", baseUrl: "https://api.example", defaultModel: "gpt" } },
       models: { "openai/gpt": { provider: "openai", model: "gpt", maxContextSize: 128000, adaptiveThinking: true, overrides: { maxOutputSize: 32768, supportEfforts: ["low", "high"], defaultEffort: "high" } } },
+      experimental: { "tool-select": true },
     });
     expect(patch).toEqual({
       default_model: "openai/gpt",
       providers: { openai: { type: "openai", api_key: "secret", base_url: "https://api.example", default_model: "gpt" } },
       models: { "openai/gpt": { provider: "openai", model: "gpt", max_context_size: 128000, adaptive_thinking: true, overrides: { max_output_size: 32768, support_efforts: ["low", "high"], default_effort: "high" } } },
+      experimental: { "tool-select": true },
     });
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({
       code: 0, data: { providers: {}, default_model: "openai/gpt" },

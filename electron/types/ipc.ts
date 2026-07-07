@@ -1343,6 +1343,7 @@ export type AppSettings = {
   expandToolCalls: boolean;
   experimentalKimiServer: boolean;
   experimentalKimiServerSessions: boolean;
+  experimentalKimiToolSelect: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;
   selectedLaunchCommand?: string;
@@ -1404,6 +1405,11 @@ export type SettingsResponse = {
 };
 
 export type SaveSettingsRequest = Partial<AppSettings>;
+
+export type KimiCodeSetExperimentalFeatureRequest = {
+  id: string;
+  enabled: boolean;
+};
 
 export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
 
@@ -1995,6 +2001,14 @@ export type KimiCodePromptQueueResponse = {
 export type KimiCodeServerModelCatalogResponse = {
   success: true;
   data: KimiCodeServerModelCatalog;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeSetExperimentalFeatureResponse = {
+  success: true;
+  data: void;
 } | {
   success: false;
   error: string;

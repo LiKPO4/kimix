@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   expandToolCalls: false,
   experimentalKimiServer: true,
   experimentalKimiServerSessions: true,
+  experimentalKimiToolSelect: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   enabledSkillNames: [],

@@ -40,7 +40,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.14.65";
+const KIMIX_VERSION = "2.14.66";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -466,6 +466,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
   const [experimentalKimiServer, setExperimentalKimiServer] = useState(true);
   const [experimentalKimiServerSessions, setExperimentalKimiServerSessions] = useState(true);
+  const [experimentalKimiToolSelect, setExperimentalKimiToolSelect] = useState(false);
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
@@ -1189,20 +1190,39 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }
     setExperimentalKimiServer(Boolean(res.data.experimentalKimiServer));
     setExperimentalKimiServerSessions(Boolean(res.data.experimentalKimiServerSessions));
-    setExperimentalSettingsMessage("修改后需要完全重启 Kimix 才会影响新会话路由。");
+    setExperimentalKimiToolSelect(Boolean(res.data.experimentalKimiToolSelect));
+    setExperimentalSettingsMessage("Server 路由修改后需要完全重启 Kimix；工具按需加载会同步写入官方配置。");
   };
 
-  const saveExperimentalSettings = async (next: { server?: boolean; sessions?: boolean }) => {
+  const saveExperimentalSettings = async (next: { server?: boolean; sessions?: boolean; toolSelect?: boolean }) => {
     const serverEnabled = next.server ?? experimentalKimiServer;
     const sessionsEnabled = next.sessions ?? experimentalKimiServerSessions;
     const normalizedSessionsEnabled = serverEnabled ? sessionsEnabled : false;
+    const toolSelectEnabled = next.toolSelect ?? experimentalKimiToolSelect;
     setExperimentalKimiServer(serverEnabled);
     setExperimentalKimiServerSessions(normalizedSessionsEnabled);
+    setExperimentalKimiToolSelect(toolSelectEnabled);
     setExperimentalSettingsSaving(true);
     const res = await window.api.saveSettings({
       experimentalKimiServer: serverEnabled,
       experimentalKimiServerSessions: normalizedSessionsEnabled,
+      experimentalKimiToolSelect: toolSelectEnabled,
     });
+    if (res.success && next.toolSelect !== undefined) {
+      const featureRes = await window.api.setKimiCodeExperimentalFeature({
+        id: "tool-select",
+        enabled: toolSelectEnabled,
+      });
+      setExperimentalSettingsSaving(false);
+      if (!featureRes.success) {
+        setExperimentalSettingsMessage(`本地已保存；同步官方 tool-select 失败：${featureRes.error}`);
+        return;
+      }
+      setExperimentalSettingsMessage(toolSelectEnabled
+        ? "已开启工具按需加载；仅在支持 select_tools 的模型上生效。"
+        : "已关闭工具按需加载。");
+      return;
+    }
     setExperimentalSettingsSaving(false);
     if (res.success) {
       setExperimentalSettingsMessage("已保存；完全关闭并重新打开 Kimix 后生效。");
@@ -1958,6 +1978,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         {experimentalKimiServerSessions ? "已开启" : "关闭"}
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveExperimentalSettings({ toolSelect: !experimentalKimiToolSelect })}
+                      disabled={experimentalSettingsLoading || experimentalSettingsSaving}
+                      className={`kimix-settings-permission ${experimentalKimiToolSelect ? "is-active" : ""}`}
+                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                    >
+                      <SelectionIndicator selected={experimentalKimiToolSelect} />
+                      <div className="kimix-settings-permission-copy">
+                        <div className="kimix-settings-permission-label">工具按需加载（select_tools）</div>
+                        <div className="kimix-settings-permission-desc">
+                          同步开启官方 tool-select 实验 flag；只有模型同时支持工具调用和 select_tools 时才会减少 MCP 工具注入。
+                        </div>
+                      </div>
+                      <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                        {experimentalKimiToolSelect ? "已开启" : "关闭"}
+                      </span>
+                    </button>
                   </div>
                   <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
                     {experimentalSettingsMessage || "读取 Server 路由状态中..."}
@@ -2041,7 +2079,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                       <div className="truncate text-[11.5px] leading-5 text-text-muted">{model.provider} · Context {model.maxContextSize.toLocaleString()}</div>
                                     </div>
                                     <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                      {model.capabilities.includes("thinking") ? "支持思考" : "标准"}
+                                      {[
+                                        model.capabilities.includes("thinking") ? "思考" : null,
+                                        model.capabilities.includes("select_tools") ? "按需工具" : null,
+                                      ].filter(Boolean).join(" / ") || "标准"}
                                     </span>
                                   </div>
                                 </div>
