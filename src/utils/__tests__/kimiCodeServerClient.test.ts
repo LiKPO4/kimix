@@ -400,13 +400,36 @@ describe("KimiCodeServerClient protocol adapters", () => {
           metadata: { cwd: "D:/repo" },
           agent_config: {
             model: "kimi-code/kimi-for-coding",
-            thinking: "off",
             permission_mode: "auto",
             plan_mode: false,
           },
         }),
       },
     ]);
+  });
+
+  it("sends thinking only when explicitly requested", async () => {
+    const calls: Array<{ url: string; body?: BodyInit | null }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body });
+      const data = String(url).endsWith("/api/v1/workspaces")
+        ? { id: "wd_repo_123456789abc", root: "D:/repo", name: "repo", is_git_repo: true, branch: "main", created_at: "2026-06-21T00:00:00Z", last_opened_at: "2026-06-21T00:00:00Z", session_count: 0 }
+        : { id: "session-1", workspace_id: "wd_repo_123456789abc", status: "idle", metadata: { cwd: "D:/repo" } };
+      return new Response(JSON.stringify({ code: 0, data }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await client.createSession({ workDir: "D:\\repo", thinking: "off" });
+    const sessionCall = calls.find((call) => call.url.endsWith("/api/v1/sessions"));
+    expect(sessionCall?.body).toBe(JSON.stringify({
+      workspace_id: "wd_repo_123456789abc",
+      metadata: { cwd: "D:/repo" },
+      agent_config: {
+        thinking: "off",
+        permission_mode: "manual",
+        plan_mode: false,
+      },
+    }));
   });
 
   it("merges official children with Kimix fork metadata for the session tree", () => {

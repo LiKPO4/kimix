@@ -550,7 +550,7 @@ type ServerManagedSession = {
   workDir: string;
   status: KimiCodeEngineStatus;
   model?: string;
-  thinking: string;
+  thinking?: string;
   permission: KimiCodePermissionMode;
   planMode: boolean;
   swarmMode: boolean;
@@ -2318,7 +2318,7 @@ async function registerServerSession(
     workDir,
     status: mapServerStatus(session.status),
     model: typeof config.model === "string" ? config.model : options.model,
-    thinking: typeof config.thinking === "string" ? config.thinking : options.thinking ?? "off",
+    thinking: typeof config.thinking === "string" ? config.thinking : options.thinking,
     permission: config.permission_mode === "auto" || config.permission_mode === "yolo"
       ? config.permission_mode
       : options.permission ?? "manual",

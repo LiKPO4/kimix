@@ -461,18 +461,19 @@ export class KimiCodeServerClient {
     metadata?: Record<string, unknown>;
   }): Promise<ServerSession> {
     const workspace = await this.createWorkspace(input.workDir);
+    const agentConfig = {
+      model: input.model,
+      ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
+      permission_mode: input.permission ?? "manual",
+      plan_mode: input.planMode ?? false,
+    };
     return this.request("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({
         id: input.id,
         workspace_id: workspace.id,
         metadata: { ...input.metadata, cwd: workspace.root },
-        agent_config: {
-          model: input.model,
-          thinking: input.thinking ?? "off",
-          permission_mode: input.permission ?? "manual",
-          plan_mode: input.planMode ?? false,
-        },
+        agent_config: agentConfig,
       }),
     });
   }

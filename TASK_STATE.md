@@ -8,7 +8,7 @@
 - [x] Swarm footer / 浮动卡收敛到消息流 inline 过程卡。
 - [x] AskUserQuestion 可读答案格式兼容。
 - [x] `@` 文件补全覆盖额外工作目录和深层文件。
-- [ ] Preserved Thinking 默认值对齐官方：Kimi 模型默认保留思考，第三方/DeepSeek 等模型按能力降级。
+- [x] Preserved Thinking 默认值对齐官方：Kimi 模型默认保留思考，第三方/DeepSeek 等模型按能力降级。
 - [x] 上下文压缩 summary 展示对齐官方：压缩完成后能在消息流里看到可读 summary，而不是只有开始/结束胶囊。
 - [x] Bash/Edit 工具过程卡稳定性复核：长命令、后台命令、编辑 diff/审批上下文在消息流里与官方 0.23 表达一致。
 - [x] Plan reminder / notice 对齐：进入 Plan 模式后的官方提醒、退出计划审批与本地 Plan 预览不重复、不丢失。
@@ -41,6 +41,13 @@
 - 当前目标：继续对齐 Kimi Code 0.23.0，确认 Gemini / 第三方 thinking 的 signature 元数据在实时事件和历史回放中不丢失，也不会被误显示为空思考。
 - 根因：官方 thinking content schema 支持 `signature`，但 Kimix `ThinkingPart` 只存 text；server snapshot replay 也只转发 thinking 文本。
 - 修复：`ThinkingPart` 新增可选 `signature`；SDK/native mapper 从 `thinking.delta`、`content.part` 的 `think/thinking` 中保留 signature；server snapshot replay 透传 signature；空 thinking 仍返回 null，不进入可见思考块。
+- 下一步：做 0.23.0 Web 视觉细节巡检。
+
+## 2026-07-07 v2.14.78 Preserved Thinking 默认值
+
+- 当前目标：继续对齐 Kimi Code 0.23.0，让 Kimi 模型默认沿用官方 preserved thinking，第三方/DeepSeek 等模型按能力显式降级。
+- 根因：Electron `startRuntime` 已对 Kimi 默认不传 `thinking`，但 Server client 在创建会话时把缺省值转成 `"off"`，导致走官方 Server 路由时 Kimi 默认思考被意外关闭。
+- 修复：Server 创建会话仅在 Kimix 明确传入 `thinking` 时写入 agent_config；DeepSeek/用户关闭思考仍会显式传 `"off"`；Server managed session 不再把缺失 thinking 状态硬标记为 off。
 - 下一步：做 0.23.0 Web 视觉细节巡检。
 
 ## 2026-07-07 v2.14.73 @ 文件补全覆盖额外目录和深层文件
