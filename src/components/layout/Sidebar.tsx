@@ -617,7 +617,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   return (
-    <aside style={{ width, paddingLeft: 12, paddingRight: 10 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col pb-2">
+    <aside style={{ width, paddingLeft: 12, paddingRight: 6 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col pb-2">
       <div className="no-drag space-y-1 px-2 pb-2">
         <button
           onClick={async () => {
@@ -660,7 +660,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
       </div>
 
-      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 2, paddingRight: 6, marginRight: -4, scrollbarGutter: "stable" }}>
+      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 2, paddingRight: 4, marginRight: -6, scrollbarGutter: "stable" }}>
         <div className="mb-2 flex items-center justify-between px-3">
           <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button
@@ -959,7 +959,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.58</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.59</span>
         </button>
       </div>
     </aside>
