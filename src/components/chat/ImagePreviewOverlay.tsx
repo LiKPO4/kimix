@@ -30,7 +30,7 @@ export function ImagePreviewOverlay({ image, onClose, onSaveDrawing }: ImagePrev
   return createPortal(
     <>
       <div
-        className="kimix-preview-overlay fixed inset-0 z-[80] flex items-center justify-center"
+        className="kimix-preview-overlay fixed inset-0 z-[140] flex items-center justify-center"
         onClick={() => {
           if (contextMenu) {
             setContextMenu(null);
@@ -103,7 +103,7 @@ export function ImagePreviewOverlay({ image, onClose, onSaveDrawing }: ImagePrev
           <div
             role="menu"
             aria-label="图片操作"
-            className="fixed z-[90] rounded-lg border border-border bg-surface-elevated shadow-elevated-token"
+            className="fixed z-[160] rounded-lg border border-border bg-surface-elevated shadow-elevated-token"
             style={{
               left: contextMenu.left,
               top: contextMenu.top,

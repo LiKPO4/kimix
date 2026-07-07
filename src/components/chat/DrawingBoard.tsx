@@ -1089,7 +1089,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
   const rotateHandle = selectedShape ? getRotateHandle(selectedShape) : null;
 
   return (
-    <div className="kimix-preview-overlay fixed inset-0 z-[90] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="画板">
+    <div className="kimix-preview-overlay fixed inset-0 z-[150] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="画板">
       <div
         className="kimix-modal-card flex w-[min(1120px,94vw)] flex-col rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
         style={{ boxSizing: "border-box", height: "min(720px, 92vh)", padding: 20 }}
