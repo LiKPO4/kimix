@@ -2020,11 +2020,16 @@ function App() {
           ? { ...activeLocalSession, isLoading: true }
           : null;
         if (startupActiveSession) {
-          useSessionStore.setState((state) => ({
-            sessions: state.sessions.map((session) => (
-              session.id === startupActiveSession.id ? startupActiveSession : session
-            )),
-          }));
+          useSessionStore.setState((state) => {
+            const exists = state.sessions.some((session) => session.id === startupActiveSession.id);
+            return {
+              sessions: exists
+                ? state.sessions.map((session) => (
+                    session.id === startupActiveSession.id ? startupActiveSession : session
+                  ))
+                : [startupActiveSession, ...state.sessions],
+            };
+          });
         }
         useAppStore.setState({
           currentProject: activeProject,
@@ -2069,16 +2074,17 @@ function App() {
                 workDir: activeProject.path,
                 sessionId: historySessionId,
               });
+              const skillForkParentSessionId = runtimeOwner?.skillForkParentSessionId ?? activeLocalSession?.skillForkParentSessionId;
               if (
                 loaded.success &&
                 Array.isArray(loaded.data.events) &&
                 loaded.data.events.length === 0 &&
-                runtimeOwner?.skillForkParentSessionId &&
+                skillForkParentSessionId &&
                 historySessionId.startsWith("skill-")
               ) {
                 const fallbackLoaded = await window.api.loadKimiCodeSession({
                   workDir: activeProject.path,
-                  sessionId: runtimeOwner.skillForkParentSessionId,
+                  sessionId: skillForkParentSessionId,
                 });
                 if (fallbackLoaded.success && Array.isArray(fallbackLoaded.data.events) && fallbackLoaded.data.events.length > 0) {
                   loaded = fallbackLoaded;
