@@ -140,6 +140,7 @@ describe("mapKimiCodeEvent", () => {
       contextTokens: 120,
       maxContextTokens: 1000,
       planMode: true,
+      swarmMode: true,
       usage: { currentTurn: { inputOther: 10, inputCacheRead: 2, inputCacheCreation: 3, output: 20 } },
     }, options);
     const stepStarted = mapKimiCodeEvent({ type: "turn.step.started", step: 5 }, options);
@@ -153,6 +154,7 @@ describe("mapKimiCodeEvent", () => {
     expect(status?.type).toBe("status_update");
     expect((status as Extract<TimelineEvent, { type: "status_update" }>).inputTokenCount).toBe(15);
     expect((status as Extract<TimelineEvent, { type: "status_update" }>).tokenCount).toBe(20);
+    expect((status as Extract<TimelineEvent, { type: "status_update" }>).swarmMode).toBe(true);
     const idleStatus = mapKimiCodeEvent({
       type: "agent.status.updated",
       model: "deepseek-v4-flash",

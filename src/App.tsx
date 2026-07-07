@@ -73,6 +73,12 @@ function contentWithFileAttachments(content: string, attachments: UserMessageIma
   ].filter(Boolean).join("\n");
 }
 
+function extractSwarmModeStatus(value: unknown): boolean | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as { swarmMode?: unknown };
+  return typeof record.swarmMode === "boolean" ? record.swarmMode : undefined;
+}
+
 const HANDOFF_PROMPT = `请阅读项目规则，优先参考 AGENTS.md，然后生成可直接交给下一个 agent 的交接提示词。
 只输出一个 Markdown 代码块，不要输出解释。
 
@@ -1188,6 +1194,17 @@ function App() {
     }
   };
 
+  const syncSessionSwarmMode = useCallback((uiSessionId: string, source: unknown) => {
+    const swarmMode = extractSwarmModeStatus(source);
+    if (swarmMode === undefined) return;
+    updateSession(uiSessionId, (session) => (
+      session.swarmMode === swarmMode
+        ? session
+        : { ...session, swarmMode, updatedAt: Date.now() }
+    ));
+    syncCurrentSessionFromStore(uiSessionId);
+  }, [updateSession]);
+
   const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (!target?.officialGoal) return;
@@ -2094,6 +2111,7 @@ function App() {
               const runtimeIsActive = Boolean(
                 runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
               );
+              const runtimeSwarmMode = runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined;
               const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
               const events = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
 
@@ -2107,6 +2125,7 @@ function App() {
                   ...runtimeOwner,
                   officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
                   model: getLastUsedModelFromEvents(hydratedEvents) ?? runtimeOwner.model ?? null,
+                  swarmMode: runtimeSwarmMode ?? runtimeOwner.swarmMode,
                   events: hydratedEvents,
                   kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
                   isLoading: false,
@@ -2130,6 +2149,7 @@ function App() {
               const session = hydrateLongTaskProgressFromHistory({
                 id: historySessionId,
                 model: getLastUsedModelFromEvents(events) ?? activeLocalSession?.model ?? null,
+                swarmMode: runtimeSwarmMode ?? activeLocalSession?.swarmMode,
                 title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
                 projectPath: activeProject.path,
                 createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
@@ -2367,6 +2387,9 @@ function App() {
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
+      if (rawEvent?.type === "agent.status.updated") {
+        syncSessionSwarmMode(uiSessionId, rawEvent);
+      }
       const officialTitle = extractOfficialSessionTitle(rawEvent);
       if (officialTitle && !targetSession?.titleLocked) {
         updateSession(uiSessionId, (session) => ({
@@ -2482,10 +2505,11 @@ function App() {
           if (latest) useAppStore.getState().setCurrentSession(latest);
         }
         void window.api.getKimiCodeStatus({ sessionId: payload.migratedTo }).then((response) => {
-          if (!response.success || !response.data.model) return;
+          if (!response.success) return;
           updateSession(uiSessionId, (session) => ({
             ...session,
-            model: response.data.model,
+            model: response.data.model ?? session.model,
+            swarmMode: extractSwarmModeStatus(response.data) ?? session.swarmMode,
             updatedAt: Date.now(),
           }));
           syncCurrentSessionFromStore(uiSessionId);
@@ -2802,7 +2826,7 @@ function App() {
       goalRefreshTimersRef.current.clear();
       goalLastRefreshRef.current.clear();
     };
-  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents]);
+  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
     if (!runningSessionId) return;
@@ -2825,6 +2849,7 @@ function App() {
       try {
         const response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
         if (disposed || !response.success) return;
+        syncSessionSwarmMode(session.id, response.data);
         if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
           runtimeTerminalPollRef.current.delete(runtimeSessionId);
           const now = Date.now();
@@ -2902,7 +2927,7 @@ function App() {
       window.removeEventListener("focus", syncNow);
       document.removeEventListener("visibilitychange", syncNow);
     };
-  }, [runningSessionId, setRunningSessionId, updateSession, flushStreamEvents]);
+  }, [runningSessionId, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

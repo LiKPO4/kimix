@@ -185,6 +185,7 @@ export type KimiCodeSessionStatus = {
   thinkingEffort?: string;
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
+  swarmMode?: boolean;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;
@@ -543,6 +544,7 @@ type ServerManagedSession = {
   thinking: string;
   permission: KimiCodePermissionMode;
   planMode: boolean;
+  swarmMode: boolean;
   additionalDirs: readonly string[];
   btwRuns: Map<string, BtwRun>;
 };
@@ -2280,6 +2282,7 @@ async function registerServerSession(
       ? config.permission_mode
       : options.permission ?? "manual",
     planMode: typeof config.plan_mode === "boolean" ? config.plan_mode : options.planMode ?? false,
+    swarmMode: typeof config.swarm_mode === "boolean" ? config.swarm_mode : false,
     additionalDirs: options.additionalDirs ?? [],
     btwRuns: new Map(),
   };
@@ -2403,6 +2406,7 @@ async function refreshServerSessionStatus(sessionId: string, emitEvent: boolean)
     managed.permission = status.permission;
   }
   managed.planMode = status.plan_mode;
+  managed.swarmMode = status.swarm_mode;
   if (emitEvent) eventSink?.({ sessionId, event: serverStatusToAgentEvent(status) });
   return status;
 }
@@ -2430,6 +2434,7 @@ function serverStatusToKimiCodeStatus(status: ServerSessionStatus, usage: unknow
       ? status.permission
       : undefined,
     planMode: status.plan_mode,
+    swarmMode: status.swarm_mode,
     contextTokens: status.context_tokens,
     maxContextTokens: status.max_context_tokens,
     contextUsage: status.context_usage,

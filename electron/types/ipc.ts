@@ -1433,6 +1433,7 @@ export type KimiCodeSessionStatus = {
   thinkingLevel?: string;
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
+  swarmMode?: boolean;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;

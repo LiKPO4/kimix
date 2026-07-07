@@ -112,6 +112,7 @@ function formatKimiCodeStatus(status: Record<string, unknown>): string {
     typeof status.model === "string" ? `模型：${status.model}` : "",
     typeof status.permission === "string" ? `权限：${status.permission}` : "",
     typeof status.planMode === "boolean" ? `Plan：${status.planMode ? "开" : "关"}` : "",
+    typeof status.swarmMode === "boolean" ? `Swarm：${status.swarmMode ? "开" : "关"}` : "",
     typeof status.thinkingLevel === "string" ? `思考强度：${status.thinkingLevel}` : "",
     contextTokens !== undefined && maxContextTokens !== undefined
       ? `上下文：${contextTokens.toLocaleString()} / ${maxContextTokens.toLocaleString()}${contextUsage ? ` (${contextUsage})` : ""}`
@@ -470,6 +471,7 @@ export function Composer() {
   const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const hasActiveAssistantTurn = isCurrentSessionRunning;
+  const swarmModeEnabled = Boolean(activeSession?.swarmMode || activeSession?.swarmModeLockedAt);
   const swarmModeLocked = Boolean(activeSession?.swarmModeLockedAt);
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
@@ -1151,6 +1153,7 @@ export function Composer() {
     updateSession(uiSessionId, (session) => ({
       ...session,
       swarmModeLockedAt: session.swarmModeLockedAt ?? timestamp,
+      swarmMode: true,
       updatedAt: timestamp,
     }));
     const updated = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -2964,21 +2967,21 @@ export function Composer() {
                         </div>
                         <button
                           type="button"
-                          disabled={!canUseComposer || swarmModeLocked}
+                          disabled={!canUseComposer || swarmModeEnabled}
                           onClick={() => {
                             setShowAddMenu(false);
                             void enableSwarmModeForCurrentSession({ feedback: "toast" });
                           }}
-                          className={`kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] disabled:cursor-not-allowed disabled:opacity-55 ${swarmModeLocked ? "text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                          className={`kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] disabled:cursor-not-allowed disabled:opacity-55 ${swarmModeEnabled ? "text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                           style={{ minWidth: 72, height: 32, paddingLeft: 12, paddingRight: 12 }}
-                          title={swarmModeLocked
-                            ? "Swarm 已为本会话锁定，后续消息继续在同一会话中使用"
+                          title={swarmModeEnabled
+                            ? "官方会话当前处于 Swarm 模式"
                             : hasActiveAssistantTurn
                               ? "当前轮正在运行，结束后再开启 Swarm"
                               : "开启 Swarm 后，本会话会锁定同一官方会话 ID 的 SDK 兼容链路"
                           }
                         >
-                          {swarmModeLocked ? "已锁定" : "开启"}
+                          {swarmModeEnabled ? "已开启" : "开启"}
                         </button>
                       </div>
                     </section>
@@ -3015,7 +3018,7 @@ export function Composer() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
-            {swarmModeLocked && (
+            {swarmModeEnabled && (
               <button
                 type="button"
                 disabled
@@ -3027,7 +3030,7 @@ export function Composer() {
                   boxShadow: "inset 0 0 0 1px rgba(25, 130, 255, 0.16)",
                   opacity: 1,
                 }}
-                title="Swarm 模式已为本会话锁定，后续消息会继续使用多子代理并行推进。"
+                title="官方会话当前处于 Swarm 模式，多子代理会并行推进。"
                 aria-label="Swarm 模式已开启"
                 aria-pressed="true"
               >

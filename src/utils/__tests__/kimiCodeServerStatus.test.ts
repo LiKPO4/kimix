@@ -46,14 +46,14 @@ describe("Kimi Server session status adapter", () => {
     }, "bounded")).toBeNull();
   });
 
-  it("maps official context fields to the existing SDK status event", () => {
+  it("maps official context and swarm fields to the existing SDK status event", () => {
     expect(serverStatusToAgentEvent({
       status: "idle",
       model: "kimi-code/kimi-for-coding",
       thinking_level: "high",
       permission: "manual",
       plan_mode: true,
-      swarm_mode: false,
+      swarm_mode: true,
       context_tokens: 64000,
       max_context_tokens: 256000,
       context_usage: 0.25,
@@ -63,7 +63,7 @@ describe("Kimi Server session status adapter", () => {
       thinkingLevel: "high",
       permission: "manual",
       planMode: true,
-      swarmMode: false,
+      swarmMode: true,
       contextTokens: 64000,
       maxContextTokens: 256000,
       contextUsage: 0.25,
