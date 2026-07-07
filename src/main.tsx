@@ -88,7 +88,7 @@ const defaultBrowserPreviewSettings = {
     accent: "#B85C38",
   },
   kimiThemePalettes: [],
-  fontSize: 14,
+  fontSize: 15,
   showThinking: true,
   detailedContext: false,
   statusUpdateDisplay: "turn_end",

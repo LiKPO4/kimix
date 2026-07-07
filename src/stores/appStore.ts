@@ -109,7 +109,7 @@ export const useAppStore = create<AppStore>((set) => ({
   creatingSessionProjectPath: null,
   defaultThinking: true,
   defaultPlanMode: false,
-  fontSize: 14,
+  fontSize: 15,
   additionalWorkDirs: [],
   detailedContext: false,
   statusUpdateDisplay: "turn_end",

@@ -2,6 +2,7 @@
 
 ## 2026-07-07
 
+* **Font-size baseline migration**: The adjustable UI font setting now preserves the historical 15px chat/Composer baseline and migrates the accidentally persisted 14px default once, while a migration marker protects later explicit 14px choices. See [/project/kimix.md](/project/kimix.md).
 * **Non-foldable process text matches thinking summaries**: Kimi Web single-paragraph items without expandable detail share the same secondary typography as foldable thinking summaries; only the foldable item gains button, hover, and disclosure behavior, while final Assistant Markdown remains primary text. See [/project/kimix.md](/project/kimix.md).
 * **Electron chat shell uses viewport units**: Runtime DOM measurement proved `height: 100%` expanded with an 18k-pixel history despite an 800px root; `height/max-height: 100dvh` is the definite outer boundary that keeps Composer visible and delegates long content to the inner scroller. See [/project/kimix.md](/project/kimix.md).
 * **Startup catalog has no implicit navigation ownership**: Official catalog reconciliation may populate the sidebar, but it may hydrate and select a startup conversation only when it matches a persisted active/local runtime identity; catalog position zero is not a navigation fallback. See [/project/kimix.md](/project/kimix.md).

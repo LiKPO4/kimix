@@ -1794,7 +1794,7 @@ button.bg-accent-primary:disabled:hover,
   border: 1px solid var(--border-default);
   background: var(--surface-elevated);
   color: var(--text-primary);
-  font-size: var(--kimix-composer-font-size, 14px);
+  font-size: var(--kimix-composer-font-size, 15px);
   box-shadow: var(--shadow-hover);
   border-radius: var(--radius-lg);
   transition: border-color var(--duration-base) var(--ease-hover),
@@ -1808,7 +1808,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-composer-surface textarea {
-  font-size: var(--kimix-composer-font-size, 14px) !important;
+  font-size: var(--kimix-composer-font-size, 15px) !important;
   line-height: 1.45 !important;
 }
 

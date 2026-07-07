@@ -21,7 +21,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     accent: "#B85C38",
   },
   kimiThemePalettes: [],
-  fontSize: 14,
+  fontSize: 15,
+  fontSizeBaselineVersion: 1,
   showThinking: true,
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
@@ -61,11 +62,21 @@ export function loadSettings(): AppSettings {
       return { ...DEFAULT_SETTINGS };
     }
     const rawSettings = parsed as Partial<AppSettings> & { clarificationToolEnabled?: boolean };
+    const shouldMigrateLegacyFontSize = (rawSettings.fontSizeBaselineVersion ?? 0) < 1 && rawSettings.fontSize === 14;
     const clarificationToolMode = rawSettings.clarificationToolMode ??
       (rawSettings.clarificationToolEnabled === true ? "on" :
         rawSettings.clarificationToolEnabled === false ? "off" :
           DEFAULT_SETTINGS.clarificationToolMode);
-    const settings = { ...DEFAULT_SETTINGS, ...rawSettings, clarificationToolMode };
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...rawSettings,
+      fontSize: shouldMigrateLegacyFontSize ? 15 : rawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
+      fontSizeBaselineVersion: 1,
+      clarificationToolMode,
+    };
+    if (shouldMigrateLegacyFontSize || rawSettings.fontSizeBaselineVersion !== 1) {
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ ...rawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2), "utf-8");
+    }
     const legacyKimiThemePalette = (rawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;
     if ((!settings.kimiThemePalettes || settings.kimiThemePalettes.length === 0) && legacyKimiThemePalette) {
       settings.kimiThemePalettes = [{

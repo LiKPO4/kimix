@@ -41,7 +41,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.14.84";
+const KIMIX_VERSION = "2.14.85";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -1445,7 +1445,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       min={11}
                       max={20}
                       value={fontSize}
-                      onChange={(event) => setFontSize(Number(event.target.value || 14))}
+                      onChange={(event) => setFontSize(Number(event.target.value || 15))}
                       className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>

@@ -1334,6 +1334,7 @@ export type AppSettings = {
   kimiThemePalettes: KimiThemePreset[];
   kimiThemePalette?: KimiThemePalette;
   fontSize: number;
+  fontSizeBaselineVersion?: number;
   showThinking: boolean;
   detailedContext: boolean;
   statusUpdateDisplay: "each" | "turn_end";

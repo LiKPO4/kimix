@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-07-07T21:58:00+08:00"
+timestamp: "2026-07-07T22:10:00+08:00"
 ---
 
 # Kimix
@@ -17,6 +17,7 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 * The Electron main process lives under `electron/` and owns filesystem, settings, session, runtime, and IPC integration.
 * Kimi Code is the authoritative agent runtime. Kimix presents and adapts its APIs; it does not define a second agent protocol.
 * The chat shell owns the viewport height. Its outer height is fixed directly to the Electron viewport with `height/max-height: 100dvh`; ancestor percentage heights and Tailwind `h-full` are not a definite-size boundary for this Grid. The shell uses `48px minmax(0, 1fr)` tracks and the chat panel uses `toolbar + minmax(0, 1fr) + Composer`; every nested viewport remains shrinkable with `min-height: 0`, and only the inner chat scroll area owns message overflow.
+* The user-facing font-size setting keeps the historical 15px chat and Composer baseline, with the sidebar one pixel smaller. The first font-size baseline migration upgrades the accidentally introduced persisted 14px default once, records `fontSizeBaselineVersion: 1`, and never overrides a later explicit 14px user choice.
 * Assistant process rendering preserves the official step timeline. Local wire history must retain `tool.call` and `tool.result` nested inside `context.append_loop_event`; thinking parts before and after those calls remain separate phases, a think part sharing the tool timestamp is ordered before that tool, and each collapsed phase uses its final natural paragraph as the summary title. In Kimi Web mode, foldable summaries and non-foldable single-paragraph process items share the same secondary typography; foldability changes interaction only, while expanded details remain muted and final Assistant Markdown remains primary text.
 * Persisted Kimi history carries a Kimix mapping-version marker. When the mapping changes, the active or selected stale cache is reloaded once from official history and replaced when the canonical timeline contains richer process events; non-empty cached messages alone must not permanently block history repair.
 * Chat auto-follow distinguishes browser scroll events from user intent. Content shrink, history replacement, Markdown settlement, and browser scroll clamping may move `scrollTop` upward without user input and must not disable the session-open bottom-settle window. A content-version layout commit snapshots the pre-mutation bottom distance and restores it synchronously when the new stream content is shorter, so Kimi Web thinking folding cannot shift the visible viewport. Only recent wheel, touch, middle-button autoscroll, or scrollbar-drag intent may hand scrolling control to the user.

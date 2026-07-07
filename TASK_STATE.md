@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-07 v2.14.85 恢复正文默认字号
+
+- 当前目标：修复今日接入全局字号设置后，默认 14px 导致 Assistant 正文比此前固定 15px 小 1px的问题。
+- 结论：v2.14.83/v2.14.84 最终正文 JSX 与 v2.14.82 相同；实际缩小来自更早的 `3a6fce0`，它让 `.markdown-body` 读取全局字号，而默认和已写入配置均为 14px。
+- 修复：界面正文与 Composer 默认恢复 15px，侧栏继续使用正文减 1px；旧 14px 默认配置在首次加载时一次性迁移到 15px并写入 `fontSizeBaselineVersion: 1`，之后用户主动设置 14px不会再被覆盖。
+- 验收：`pnpm build` 与 `pnpm knowledge:validate` 通过；v2.14.85 运行态 `.markdown-body` 和 Composer 均为 15px、侧栏为 14px，旧配置已迁移为 `fontSize: 15`、`fontSizeBaselineVersion: 1`。
+- 下一步：等待用户视觉验收正文大小。
+
 ## 2026-07-07 v2.14.84 单段过程与思考总结一致
 
 - 当前目标：纠正 v2.14.83 的语义误判；不可展开的单段过程应与可展开思考的总结一致，而不是与最终 Assistant 正文一致。
