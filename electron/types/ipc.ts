@@ -1636,6 +1636,19 @@ export type KimiCodePromptRequest = {
   images?: { name: string; dataUrl: string }[];
 };
 
+export type KimiCodePromptActionRequest = {
+  sessionId: string;
+  promptId: string;
+};
+
+export type KimiCodeQueuedPrompt = {
+  promptId: string;
+  userMessageId?: string;
+  status: string;
+  createdAt?: string;
+  content: string;
+};
+
 export type KimiCodeBtwRequest = {
   sessionId: string;
   content: string;
@@ -1986,6 +1999,17 @@ export type KimiCodePromptQueueResponse = {
     activeId: string | null;
     activeStatus: string | null;
     queuedIds: string[];
+    queued: KimiCodeQueuedPrompt[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeQueuePromptResponse = {
+  success: true;
+  data: {
+    promptId: string;
   };
 } | {
   success: false;

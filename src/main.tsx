@@ -432,6 +432,9 @@ function installBrowserPreviewApi() {
     renameKimiCodeSession: (): Promise<VoidResponse> => fail("重命名 Kimi Code 会话"),
     reloadKimiCodeSession: (): Promise<VoidResponse> => fail("重载 Kimi Code 会话"),
     sendKimiCodePrompt: (): Promise<KimiCodePromptResponse> => fail("发送 Kimi Code 消息"),
+    queueKimiCodePrompt: () => Promise.resolve({ success: false, error: unsupported("使用官方消息队列") }),
+    cancelKimiCodePrompt: (): Promise<VoidResponse> => fail("删除官方队列消息"),
+    steerKimiCodePrompt: (): Promise<VoidResponse> => fail("引导官方队列消息"),
     askKimiCodeBtw: () => Promise.resolve({ success: false, error: unsupported("使用 Kimi Code BTW 侧问") }),
     swarmKimiCode: (): Promise<VoidResponse> => fail("使用 Kimi Code Swarm"),
     createKimiCodeGoal: (): Promise<KimiCodeGoalResponse> => fail("创建 Kimi Code Goal"),
@@ -457,7 +460,7 @@ function installBrowserPreviewApi() {
     getKimiCodeServerRuntimeDiagnostics: (): Promise<KimiCodeServerRuntimeDiagnosticsResponse> => fail("读取 Kimi Server 运行时诊断"),
     getKimiCodePromptQueue: (): Promise<KimiCodePromptQueueResponse> => Promise.resolve({
       success: true,
-      data: { supported: false, activeId: null, activeStatus: null, queuedIds: [] },
+      data: { supported: false, activeId: null, activeStatus: null, queuedIds: [], queued: [] },
     }),
     getKimiCodeServerModelCatalog: (): Promise<KimiCodeServerModelCatalogResponse> => fail("读取 Kimi Server 模型目录"),
     reconnectKimiCodeMcpServer: (): Promise<VoidResponse> => fail("重连 Kimi Code MCP 服务"),

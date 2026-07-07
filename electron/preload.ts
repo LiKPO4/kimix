@@ -134,8 +134,10 @@ import type {
   KimiCodeMcpStartupMetricsResponse,
   KimiCodeServerRuntimeDiagnosticsResponse,
   KimiCodePromptQueueResponse,
+  KimiCodePromptActionRequest,
   KimiCodeServerModelCatalogResponse,
   KimiCodePluginResponse,
+  KimiCodeQueuePromptResponse,
   KimiCodePromptResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
@@ -331,6 +333,12 @@ const api = {
     ipcRenderer.invoke("kimi-code:reloadSession", req),
   sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodePromptResponse> =>
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
+  queueKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodeQueuePromptResponse> =>
+    ipcRenderer.invoke("kimi-code:queuePrompt", req),
+  cancelKimiCodePrompt: (req: KimiCodePromptActionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:cancelPrompt", req),
+  steerKimiCodePrompt: (req: KimiCodePromptActionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:steerPrompt", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
     ipcRenderer.invoke("kimi-code:askBtw", req),
   swarmKimiCode: (req: KimiCodeSwarmRequest): Promise<KimiCodeVoidResponse> =>
