@@ -461,6 +461,8 @@ function installBrowserPreviewApi() {
       data: { supported: false, activeId: null, activeStatus: null, queuedIds: [] },
     }),
     getKimiCodeServerModelCatalog: (): Promise<KimiCodeServerModelCatalogResponse> => fail("读取 Kimi Server 模型目录"),
+    listKimiCodeArchivedSessions: () => Promise.resolve({ success: true, data: [] }),
+    restoreKimiCodeArchivedSession: () => fail("恢复官方归档会话"),
     setKimiCodeExperimentalFeature: (): Promise<VoidResponse> => fail("切换 Kimi Code 实验功能"),
     reconnectKimiCodeMcpServer: (): Promise<VoidResponse> => fail("重连 Kimi Code MCP 服务"),
     listKimiCodeBackgroundTasks: (): Promise<KimiCodeListBackgroundTasksResponse> => fail("读取 Kimi Code 后台任务"),

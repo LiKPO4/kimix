@@ -624,6 +624,27 @@ export class KimiCodeServerClient {
     return sessions;
   }
 
+  async listArchivedSessions(): Promise<ServerSession[]> {
+    const sessions: ServerSession[] = [];
+    let beforeId: string | undefined;
+    for (let page = 0; page < 100; page += 1) {
+      const query = new URLSearchParams({ page_size: "100", archived_only: "true" });
+      if (beforeId) query.set("before_id", beforeId);
+      const result = await this.request<{ items: ServerSession[]; has_more: boolean }>(`/api/v1/sessions?${query}`);
+      sessions.push(...result.items.filter((session) => session.archived === true));
+      if (!result.has_more || result.items.length === 0) break;
+      beforeId = result.items.at(-1)?.id;
+    }
+    return sessions;
+  }
+
+  restoreSession(sessionId: string): Promise<ServerSession> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:restore`, {
+      method: "POST",
+      body: "{}",
+    });
+  }
+
   forkSession(sessionId: string, body: { title?: string; metadata?: Record<string, unknown> } = {}) {
     return this.request<ServerSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}:fork`, {
       method: "POST", body: JSON.stringify(body),

@@ -2,6 +2,7 @@
 
 ## 2026-07-07
 
+* **Official archive restore**: Settings now distinguishes official archived sessions from local archive records, lists official archived sessions via `archived_only=true`, and restores them through Server `:restore` before clearing local tombstones. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Official `select_tools` flag passthrough**: Kimix exposes Kimi Code 0.23's `tool-select` experimental flag as a narrow setting and writes it through the official config merge route while relying on the upstream model capability gate. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Queue UI ownership matches official Web**: Editable queued messages remain a frontend-local queue, while Server prompt active/queued state is only a dispatch gate; Server 0.23 token headers remain required when present. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Server archive restore boundary**: Official Server active catalog rows may now clear local archive state, while SDK active rows remain blocked by tombstones to avoid accidental resurrection. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

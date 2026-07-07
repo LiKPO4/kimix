@@ -135,6 +135,8 @@ import type {
   KimiCodeServerRuntimeDiagnosticsResponse,
   KimiCodePromptQueueResponse,
   KimiCodeServerModelCatalogResponse,
+  KimiCodeArchivedSessionResponse,
+  KimiCodeArchivedSessionsResponse,
   KimiCodeSetExperimentalFeatureRequest,
   KimiCodeSetExperimentalFeatureResponse,
   KimiCodePluginResponse,
@@ -385,6 +387,10 @@ const api = {
     ipcRenderer.invoke("kimi-code:getPromptQueue", req),
   getKimiCodeServerModelCatalog: (): Promise<KimiCodeServerModelCatalogResponse> =>
     ipcRenderer.invoke("kimi-code:getServerModelCatalog"),
+  listKimiCodeArchivedSessions: (): Promise<KimiCodeArchivedSessionsResponse> =>
+    ipcRenderer.invoke("kimi-code:listArchivedSessions"),
+  restoreKimiCodeArchivedSession: (req: KimiCodeSessionRequest): Promise<KimiCodeArchivedSessionResponse> =>
+    ipcRenderer.invoke("kimi-code:restoreArchivedSession", req),
   setKimiCodeExperimentalFeature: (req: KimiCodeSetExperimentalFeatureRequest): Promise<KimiCodeSetExperimentalFeatureResponse> =>
     ipcRenderer.invoke("kimi-code:setExperimentalFeature", req),
   reconnectKimiCodeMcpServer: (req: KimiCodeMcpServerRequest): Promise<KimiCodeVoidResponse> =>

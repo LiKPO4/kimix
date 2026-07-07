@@ -5535,6 +5535,25 @@ ipcMain.handle("kimi-code:archiveSession", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:listArchivedSessions", async () => {
+  try {
+    return { success: true, data: await kimiCodeHost.listArchivedSessions() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:restoreArchivedSession", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    return { success: true, data: await kimiCodeHost.restoreArchivedSession(sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:listServerTerminals", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

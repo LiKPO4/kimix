@@ -104,6 +104,12 @@ export function forgetArchivedSessionTombstone(session: Session) {
   writeArchivedSessionTombstones(getArchivedSessionTombstones().filter((item) => !item.ids.some((id) => ids.includes(id))));
 }
 
+export function forgetArchivedSessionTombstonesByIds(ids: string[]) {
+  const normalizedIds = new Set(ids.filter((id) => typeof id === "string" && Boolean(id.trim())));
+  if (normalizedIds.size === 0) return;
+  writeArchivedSessionTombstones(getArchivedSessionTombstones().filter((item) => !item.ids.some((id) => normalizedIds.has(id))));
+}
+
 export function isArchivedSessionTombstoned(ids: Array<string | undefined | null>, projectPath?: string) {
   const normalizedIds = new Set(ids.filter((id): id is string => typeof id === "string" && Boolean(id.trim())));
   if (normalizedIds.size === 0) return false;

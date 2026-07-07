@@ -13,8 +13,9 @@ import {
   formatSessionBackupImportSummary,
   hasSessionBackupImportChanges,
 } from "@/utils/sessionBackup";
+import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
-import type { KimiCodeServerModelCatalog } from "@electron/types/ipc";
+import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog } from "@electron/types/ipc";
 import { usePresence } from "@/hooks/usePresence";
 
 type FreezeReport = {
@@ -40,7 +41,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.14.66";
+const KIMIX_VERSION = "2.14.67";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -446,6 +447,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
+  const [officialArchivedSessions, setOfficialArchivedSessions] = useState<KimiCodeArchivedSessionSummary[]>([]);
+  const [officialArchivedLoading, setOfficialArchivedLoading] = useState(false);
+  const [officialArchivedMessage, setOfficialArchivedMessage] = useState("");
+  const [restoringOfficialArchivedId, setRestoringOfficialArchivedId] = useState<string | null>(null);
   const [migrationBusy, setMigrationBusy] = useState<"export" | "import" | null>(null);
   const [migrationDragActive, setMigrationDragActive] = useState(false);
   const [migrationMessage, setMigrationMessage] = useState("");
@@ -1232,12 +1237,45 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     void refreshExperimentalSettings();
   };
 
+  const refreshOfficialArchivedSessions = async () => {
+    setOfficialArchivedLoading(true);
+    const res = await window.api.listKimiCodeArchivedSessions();
+    setOfficialArchivedLoading(false);
+    if (!res.success) {
+      setOfficialArchivedMessage(`读取官方归档失败：${res.error}`);
+      return;
+    }
+    setOfficialArchivedSessions(res.data);
+    setOfficialArchivedMessage(res.data.length > 0 ? `已读取 ${res.data.length} 个官方归档对话。` : "官方暂无归档对话。");
+  };
+
+  const handleRestoreOfficialArchivedSession = async (session: KimiCodeArchivedSessionSummary) => {
+    setRestoringOfficialArchivedId(session.id);
+    const res = await window.api.restoreKimiCodeArchivedSession({ sessionId: session.id });
+    setRestoringOfficialArchivedId(null);
+    if (!res.success) {
+      setOfficialArchivedMessage(`恢复「${session.title}」失败：${res.error}`);
+      return;
+    }
+    forgetArchivedSessionTombstonesByIds([session.id]);
+    useSessionStore.setState((state) => ({
+      sessions: state.sessions.map((item) => (
+        item.id === session.id || item.runtimeSessionId === session.id || item.officialSessionId === session.id
+          ? { ...item, archivedAt: undefined }
+          : item
+      )),
+    }));
+    setOfficialArchivedSessions((items) => items.filter((item) => item.id !== session.id));
+    setOfficialArchivedMessage(`已恢复「${res.data.title || session.title}」。切换到对应项目后会重新同步到侧栏。`);
+  };
+
   useEffect(() => {
     if (settingsOpen || variant === "workspace") {
       if (!settingsStatusCache.connection) void checkConnection(false);
       if (!settingsStatusCache.auth) void refreshAuth();
       if (!settingsStatusCache.modelConfig) void refreshModelConfig();
       void refreshExperimentalSettings();
+      void refreshOfficialArchivedSessions();
       loadFreezeReports();
     }
   }, [settingsOpen, variant]);
@@ -1324,6 +1362,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   ];
   const archivedSessions = [...archivedSessionSummaries]
     .sort((a, b) => b.archivedAt - a.archivedAt);
+  const officialArchivedSorted = [...officialArchivedSessions]
+    .sort((a, b) => Date.parse(b.archivedAt || b.updatedAt) - Date.parse(a.archivedAt || a.updatedAt));
   const visibleArchivedSessions = archivedExpanded ? archivedSessions : archivedSessions.slice(0, SETTINGS_PREVIEW_ITEM_LIMIT);
   const expandableArchivedCount = Math.max(0, archivedSessions.length - visibleArchivedSessions.length);
   const canToggleArchivedList = archivedSessions.length > SETTINGS_PREVIEW_ITEM_LIMIT;
@@ -1695,28 +1735,84 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   </div>
                   <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                     <span className="kimix-settings-badge text-[12.5px] leading-5" style={{ paddingLeft: 10, paddingRight: 10 }}>
-                      {archivedSessions.length}
+                      {officialArchivedSorted.length + archivedSessions.length}
                     </span>
                     {settingsDragHandle("archived", "归档对话")}
                   </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
-                  {archivedSessions.length > 0 ? (
-                    <div className="flex flex-col" style={{ gap: 10 }}>
-                      {visibleArchivedSessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className="kimix-settings-list-item grid min-w-0 items-center"
-                          style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12, padding: "12px 12px 12px 14px" }}
-                        >
-                          <div className="flex min-w-0 items-start" style={{ gap: 10 }}>
-                            <MessageSquare size={15} className="mt-0.5 shrink-0 text-text-muted" />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{session.title}</div>
-                              <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{session.projectPath}</div>
-                            </div>
+                  <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">官方归档</div>
+                      <div className="mt-0.5 text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                        从 Kimi Code Server 读取，可恢复后重新出现在会话列表。
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void refreshOfficialArchivedSessions()}
+                      disabled={officialArchivedLoading}
+                      className="kimix-settings-check-button shrink-0"
+                    >
+                      <RefreshCw size={15} className={officialArchivedLoading ? "kimix-spin" : ""} />
+                      <span>刷新</span>
+                    </button>
+                  </div>
+                  <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                    {officialArchivedSorted.length > 0 ? officialArchivedSorted.map((session) => (
+                      <div
+                        key={session.id}
+                        className="kimix-settings-list-item grid min-w-0 items-center"
+                        style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12, padding: "12px 12px 12px 14px" }}
+                      >
+                        <div className="flex min-w-0 items-start" style={{ gap: 10 }}>
+                          <MessageSquare size={15} className="mt-0.5 shrink-0 text-text-muted" />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{session.title}</div>
+                            <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{session.projectPath || "未知项目路径"}</div>
                           </div>
-                          <div className="flex shrink-0 items-center justify-end" style={{ gap: 8 }}>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleRestoreOfficialArchivedSession(session)}
+                          disabled={restoringOfficialArchivedId === session.id}
+                          className="kimix-icon-text-button is-compact shrink-0 text-accent-primary hover:bg-accent-primary-light"
+                          style={{ minWidth: 70, justifyContent: "center" }}
+                        >
+                          <Archive size={13} />
+                          {restoringOfficialArchivedId === session.id ? "恢复中" : "恢复"}
+                        </button>
+                      </div>
+                    )) : (
+                      <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">
+                        {officialArchivedLoading ? "正在读取官方归档..." : "官方暂无归档对话。"}
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "10px 12px", marginTop: 14 }}>
+                    {officialArchivedMessage || "官方归档状态会在打开设置时自动刷新。"}
+                  </div>
+
+                  <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 16, paddingTop: 16 }}>
+                    <div className="text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">本地归档记录</div>
+                    <div className="mt-0.5 text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                      仅清理 Kimix 本机隐藏记录，不改变官方归档状态。
+                    </div>
+                    {archivedSessions.length > 0 ? (
+                      <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
+                        {visibleArchivedSessions.map((session) => (
+                          <div
+                            key={session.id}
+                            className="kimix-settings-list-item grid min-w-0 items-center"
+                            style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12, padding: "12px 12px 12px 14px" }}
+                          >
+                            <div className="flex min-w-0 items-start" style={{ gap: 10 }}>
+                              <MessageSquare size={15} className="mt-0.5 shrink-0 text-text-muted" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[14px] font-medium leading-5 text-[var(--kimix-panel-text)]">{session.title}</div>
+                                <div className="mt-0.5 truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{session.projectPath}</div>
+                              </div>
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleDeleteArchivedSession(session)}
@@ -1727,23 +1823,23 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                               移除记录
                             </button>
                           </div>
-                        </div>
-                      ))}
-                      {canToggleArchivedList && (
-                        <button
-                          type="button"
-                          onClick={() => setArchivedExpanded((current) => !current)}
-                          className="kimix-icon-text-button kimix-muted-action is-compact self-start"
-                          style={{ marginTop: 2 }}
-                        >
-                          {archivedExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                          <span>{archivedExpanded ? `收起归档列表，仅保留最近 ${SETTINGS_PREVIEW_ITEM_LIMIT} 个` : `展开剩余 ${expandableArchivedCount} 个归档对话`}</span>
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">暂无归档对话。</div>
-                  )}
+                        ))}
+                        {canToggleArchivedList && (
+                          <button
+                            type="button"
+                            onClick={() => setArchivedExpanded((current) => !current)}
+                            className="kimix-icon-text-button kimix-muted-action is-compact self-start"
+                            style={{ marginTop: 2 }}
+                          >
+                            {archivedExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            <span>{archivedExpanded ? `收起归档列表，仅保留最近 ${SETTINGS_PREVIEW_ITEM_LIMIT} 个` : `展开剩余 ${expandableArchivedCount} 个归档对话`}</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 12 }}>暂无本地归档记录。</div>
+                    )}
+                  </div>
                 </div>
               </div>
 

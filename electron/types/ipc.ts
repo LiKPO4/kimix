@@ -1523,6 +1523,15 @@ export type KimiCodeServerModelCatalog = {
   }>;
 };
 
+export type KimiCodeArchivedSessionSummary = {
+  id: string;
+  title: string;
+  projectPath: string;
+  archivedAt: string;
+  updatedAt: string;
+  createdAt: string;
+};
+
 export type KimiCodeBackgroundTaskInfo = {
   taskId: string;
   command: string;
@@ -2001,6 +2010,22 @@ export type KimiCodePromptQueueResponse = {
 export type KimiCodeServerModelCatalogResponse = {
   success: true;
   data: KimiCodeServerModelCatalog;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeArchivedSessionsResponse = {
+  success: true;
+  data: KimiCodeArchivedSessionSummary[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeArchivedSessionResponse = {
+  success: true;
+  data: KimiCodeArchivedSessionSummary;
 } | {
   success: false;
   error: string;

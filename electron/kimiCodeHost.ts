@@ -267,6 +267,15 @@ export type KimiCodeServerModelCatalog = {
   }>;
 };
 
+export type KimiCodeArchivedSessionSummary = {
+  id: string;
+  title: string;
+  projectPath: string;
+  archivedAt: string;
+  updatedAt: string;
+  createdAt: string;
+};
+
 export type KimiCodeBackgroundTaskStatus =
   | "running"
   | "awaiting_approval"
@@ -1273,6 +1282,32 @@ export async function archiveSession(sessionId: string): Promise<void> {
     return;
   }
   await getServerClient().archiveSession(sessionId);
+}
+
+function serverSessionProjectPath(session: ServerSession) {
+  const cwd = session.metadata?.cwd;
+  return typeof cwd === "string" ? cwd : "";
+}
+
+function toArchivedSessionSummary(session: ServerSession): KimiCodeArchivedSessionSummary {
+  return {
+    id: session.id,
+    title: session.title?.trim() || "未命名对话",
+    projectPath: serverSessionProjectPath(session),
+    archivedAt: session.updated_at,
+    updatedAt: session.updated_at,
+    createdAt: session.created_at,
+  };
+}
+
+export async function listArchivedSessions(): Promise<KimiCodeArchivedSessionSummary[]> {
+  const sessions = await getServerClient().listArchivedSessions();
+  return sessions.map(toArchivedSessionSummary);
+}
+
+export async function restoreArchivedSession(sessionId: string): Promise<KimiCodeArchivedSessionSummary> {
+  const restored = await getServerClient().restoreSession(sessionId);
+  return toArchivedSessionSummary(restored);
 }
 
 export async function archiveSdkSession(
