@@ -2024,8 +2024,7 @@ function App() {
               ].filter((id): id is string => Boolean(id)));
               const isUsableHistorySession = (session: { id: string; title?: string; lastPrompt?: string }) => (
                 !hiddenHandoffSessionIds.has(session.id) &&
-                !isHiddenInternalSession(session) &&
-                !hasArchivedLocalSessionForRuntime(session.id, undefined, undefined, activeProject.path)
+                !isHiddenInternalSession(session)
               );
 
               const res = await window.api.listKimiCodeSessions({ workDir: activeProject.path });
@@ -2042,7 +2041,7 @@ function App() {
                 : undefined) ?? activeSummaries[0];
               const historySessionId = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
               if (!historySessionId) return;
-              if (hasArchivedLocalSessionForRuntime(historySessionId, undefined, latest?.id, activeProject.path)) {
+              if (res.source !== "server" && hasArchivedLocalSessionForRuntime(historySessionId, undefined, latest?.id, activeProject.path)) {
                 setRunningSessionId(null);
                 return;
               }

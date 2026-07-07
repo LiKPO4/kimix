@@ -307,6 +307,18 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].archivedAt).toBe(30);
   });
 
+  it("官方 Server 明确恢复归档会话时同步取消本地归档", () => {
+    const archived = localSession({ id: "official-1", officialSessionId: "official-1", archivedAt: 30, updatedAt: 30 });
+    const result = reconcileOfficialSessionCatalog([archived], [
+      { id: "official-1", workDir: "D:\\work\\demo", updatedAt: 200, brief: "已恢复", source: "server" },
+    ], "D:\\work\\demo", { source: "server" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].archivedAt).toBeUndefined();
+    expect(result[0].title).toBe("已恢复");
+    expect(result[0].updatedAt).toBe(200);
+  });
+
   it("忽略其他项目的目录项", () => {
     const result = reconcileOfficialSessionCatalog([], [
       { id: "other", workDir: "D:\\work\\other", updatedAt: 200, brief: "其他项目" },

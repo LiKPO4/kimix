@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-06T21:32:00+08:00"
+timestamp: "2026-07-07T12:12:00+08:00"
 ---
 
 # Runtime Routing
@@ -73,6 +73,7 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 52. Assistant display completion tolerates a missing terminal envelope only when the official Server emits `turn.step.completed` with `finishReason: "end_turn"`; that event closes the visible Assistant and its timer, while `tool_use` and other intermediate finish reasons do not. This is a presentation-recovery boundary, not a replacement for the authoritative live `turn.ended` event used by deferred permission changes and other turn-scoped mutations.
 53. Renderer reload cannot settle a turn from cached history alone. Startup hydration first checks the still-managed official runtime status; running, approval-waiting, and question-waiting sessions retain their busy identity and open timeline events. Server snapshot replay may emit `turn.ended` only for committed history, never for `in_flight` Assistant content. While a runtime remains running, Kimix may periodically reconcile a richer official snapshot after a quiet stream interval so missed WebSocket body events recover without allowing a conflicting prompt.
 54. A terminal runtime error is authoritative for every open event in that turn. Failed SDK `turn.ended` reasons map to engine error, and renderer error cleanup marks queued/running/suspended subagents and running tools as failed while preserving partial Assistant output as complete. Local open-work detection must not keep timing or display a busy state after the official runtime has failed, including quota HTTP 403 failures.
+55. Archive tombstones are still reconciliation insurance against SDK rediscovery, but a successful Server catalog row with `archived !== true` is now an authoritative official restore signal. In that case Kimix clears the matching local `archivedAt` and lets normal persistence remove the tombstone. SDK-sourced active rows must not bypass tombstones, because older fallback scans can still rediscover locally archived sessions without proving an official unarchive.
 
 # Main Components
 

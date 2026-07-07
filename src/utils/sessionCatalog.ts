@@ -206,10 +206,35 @@ export function reconcileOfficialSessionCatalog(
     if (official.archived === true) continue;
     const lineageIds = officialLineageIds(official, officialById, parentById);
     const skillForkParentSessionId = parentById.get(official.id);
-    const hasArchivedExactMirror = next.some((session) => (
-      Boolean(session.archivedAt) && belongsToOfficialSession(session, official.id)
+    const archivedMirrorIndex = next.findIndex((session) => (
+      Boolean(session.archivedAt) &&
+      normalizeProjectPath(session.projectPath) === normalizedProjectPath &&
+      belongsToOfficialSession(session, official.id)
     ));
-    if (hasArchivedExactMirror) continue;
+    if (archivedMirrorIndex >= 0) {
+      if (!serverAuthoritative) continue;
+      const existing = next[archivedMirrorIndex];
+      const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);
+      const officialSessionId = official.id;
+      const runtimeSessionId = lineageIds.size > 1 ? official.id : existing.runtimeSessionId;
+      const engine = existing.engine ?? "kimi-code";
+      const title = existing.titleLocked ? existing.title : catalogTitle(official) ?? existing.title;
+      if (next === sessions) next = [...sessions];
+      next[archivedMirrorIndex] = {
+        ...existing,
+        engine,
+        runtimeSessionId,
+        officialSessionId,
+        skillForkParentSessionId,
+        title,
+        updatedAt,
+        archivedAt: undefined,
+        officialCatalogConfirmedAt: catalogConfirmedAt,
+      };
+      claimedSessionIndexes.add(archivedMirrorIndex);
+      changed = true;
+      continue;
+    }
     const existingIndex = next.findIndex((session, index) => (
       !session.archivedAt && !claimedSessionIndexes.has(index) && belongsToOfficialLineage(session, lineageIds)
     ));

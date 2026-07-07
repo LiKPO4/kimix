@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-07
+
+* **Server archive restore boundary**: Official Server active catalog rows may now clear local archive state, while SDK active rows remain blocked by tombstones to avoid accidental resurrection. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-06
 
 * **Streaming scroll diagnostics stay off hot paths**: Routine contentVersion/resize logs and no-op manual anchor restores are removed or throttled so tool output does not block renderer timers and painting. See [/project/kimix.md](/project/kimix.md).
