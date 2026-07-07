@@ -952,11 +952,8 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
           {teaser}
         </button>
       ) : (
-        <div
-          className="text-left text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
-          style={{ whiteSpace: "pre-wrap" }}
-        >
-          {block.text}
+        <div className="kimix-kimi-web-inline-body relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
+          <MarkdownRenderer content={block.text} />
         </div>
       )}
       {expanded && isFoldable && (
@@ -1736,7 +1733,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
           <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
             {hasContent && (
               <>
-                <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
+                <div className="kimix-assistant-body relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
                   <MarkdownRenderer content={displayContent} deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && displayContent.length > 1200} />
                 </div>
                 {mdArtifacts.length > 0 && (
