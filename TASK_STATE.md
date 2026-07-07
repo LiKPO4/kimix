@@ -13,7 +13,7 @@
 - [x] Bash/Edit 工具过程卡稳定性复核：长命令、后台命令、编辑 diff/审批上下文在消息流里与官方 0.23 表达一致。
 - [x] Plan reminder / notice 对齐：进入 Plan 模式后的官方提醒、退出计划审批与本地 Plan 预览不重复、不丢失。
 - [x] Gemini thinking signature / 第三方 thinking 兼容：确认历史回放和实时事件不丢签名相关字段，不误显示为空思考。
-- [ ] 0.23.0 Web 视觉细节巡检：Swarm inline、问题卡、文件补全、队列卡在 Kimix / Kimi Web 两种过程模式下无重复展示。
+- [x] 0.23.0 Web 视觉细节巡检：Swarm inline、问题卡、文件补全、队列卡在 Kimix / Kimi Web 两种过程模式下无重复展示。
 
 ## 2026-07-07 v2.14.74 上下文压缩摘要展示
 
@@ -49,6 +49,13 @@
 - 根因：Electron `startRuntime` 已对 Kimi 默认不传 `thinking`，但 Server client 在创建会话时把缺省值转成 `"off"`，导致走官方 Server 路由时 Kimi 默认思考被意外关闭。
 - 修复：Server 创建会话仅在 Kimix 明确传入 `thinking` 时写入 agent_config；DeepSeek/用户关闭思考仍会显式传 `"off"`；Server managed session 不再把缺失 thinking 状态硬标记为 off。
 - 下一步：做 0.23.0 Web 视觉细节巡检。
+
+## 2026-07-07 v2.14.79 Kimi Web 过程视觉巡检
+
+- 当前目标：完成 0.23.0 Web 视觉细节巡检，确认 Swarm inline、问题卡、文件补全、队列卡在 Kimix / Kimi Web 两种过程模式下无重复展示。
+- 巡检结论：`SwarmPanel` 浮动面板已无残留；Swarm 子代理只通过消息流 process summary / Kimi Web process list 展示，Composer 底部仅保留状态按钮；`QuestionCard` 只有 `ChatThread` 独立事件入口；`@` 文件补全只在 Composer 候选层；本地 prompt queue 已在官方 active/queued 存在时延后派发。
+- 验收：相关测试覆盖 Swarm lifecycle/reduce、subagent-only assistant header、官方队列延后、本地 slash routing；完整构建通过。
+- 下一步：等待用户实机截图验收，若无反馈则 0.23.0 对齐 TodoList 已全部完成。
 
 ## 2026-07-07 v2.14.73 @ 文件补全覆盖额外目录和深层文件
 
