@@ -885,6 +885,8 @@ export const ChatThread = memo(function ChatThread() {
     const items = Array.from(contentNode?.querySelectorAll<HTMLElement>("[data-kimix-render-key]") ?? []);
     const lastItem = items.at(-1) ?? null;
     let targetTop: number;
+    let delta: number | undefined;
+    let candidate: number | undefined;
     if (lastItem) {
       // Compute a scroll-position-INDEPENDENT delta: how far the last item's
       // bottom (plus the bottom spacer) currently sits below the viewport
@@ -896,9 +898,9 @@ export const ChatThread = memo(function ChatThread() {
       const nodeRect = node.getBoundingClientRect();
       const lastItemBottom = lastItem.getBoundingClientRect().bottom;
       const viewportBottom = nodeRect.top + node.clientHeight;
-      const delta = lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - viewportBottom;
+      delta = lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - viewportBottom;
       const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
-      const candidate = node.scrollTop + delta;
+      candidate = node.scrollTop + delta;
       // When content shrinks (e.g. a multi-line thinking block collapses to its
       // one-line teaser), delta becomes negative. Preserve the current viewport
       // position as long as the resulting scroll position is still valid; only
