@@ -22,12 +22,13 @@ describe("mapKimiCodeEvent", () => {
 
   it("maps assistant and thinking deltas to assistant_message chunks", () => {
     const options = testOptions();
-    const thinking = mapKimiCodeEvent({ type: "thinking.delta", delta: "思考中" }, options);
+    const thinking = mapKimiCodeEvent({ type: "thinking.delta", delta: "思考中", signature: "sig-delta" }, options);
     const assistant = mapKimiCodeEvent({ type: "assistant.delta", delta: "完成" }, options);
 
     expect(thinking?.type).toBe("assistant_message");
     expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinking).toBe("思考中");
     expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinkingParts).toHaveLength(1);
+    expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinkingParts?.[0].signature).toBe("sig-delta");
     expect(assistant?.type).toBe("assistant_message");
     expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("完成");
   });
@@ -37,7 +38,7 @@ describe("mapKimiCodeEvent", () => {
     const thinking = mapKimiCodeEvent({
       type: "context.append_loop_event",
       time: 2000,
-      event: { type: "content.part", part: { type: "think", think: "先想一下" } },
+      event: { type: "content.part", part: { type: "thinking", thinking: "先想一下", signature: "sig-part" } },
     }, options);
     const assistant = mapKimiCodeEvent({
       type: "context.append_loop_event",
@@ -47,6 +48,7 @@ describe("mapKimiCodeEvent", () => {
 
     expect(thinking?.type).toBe("assistant_message");
     expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinking).toBe("先想一下");
+    expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinkingParts?.[0].signature).toBe("sig-part");
     expect(thinking?.timestamp).toBe(2000);
     expect(assistant?.type).toBe("assistant_message");
     expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("正文结果");

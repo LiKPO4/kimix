@@ -66,11 +66,12 @@ describe("mapStreamEvent", () => {
   it("maps ContentPart think to assistant_message with thinking", () => {
     const event = mapStreamEvent({
       type: "ContentPart",
-      payload: { type: "think", think: "Let me think..." },
+      payload: { type: "thinking", thinking: "Let me think...", signature: "sig-content" },
     });
     expect(event?.type).toBe("assistant_message");
     const assistant = event as Extract<TimelineEvent, { type: "assistant_message" }>;
     expect(assistant.thinking).toBe("Let me think...");
+    expect(assistant.thinkingParts?.[0].signature).toBe("sig-content");
     expect(assistant.isThinking).toBe(true);
   });
 

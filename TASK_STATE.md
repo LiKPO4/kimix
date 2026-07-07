@@ -12,7 +12,7 @@
 - [x] 上下文压缩 summary 展示对齐官方：压缩完成后能在消息流里看到可读 summary，而不是只有开始/结束胶囊。
 - [x] Bash/Edit 工具过程卡稳定性复核：长命令、后台命令、编辑 diff/审批上下文在消息流里与官方 0.23 表达一致。
 - [x] Plan reminder / notice 对齐：进入 Plan 模式后的官方提醒、退出计划审批与本地 Plan 预览不重复、不丢失。
-- [ ] Gemini thinking signature / 第三方 thinking 兼容：确认历史回放和实时事件不丢签名相关字段，不误显示为空思考。
+- [x] Gemini thinking signature / 第三方 thinking 兼容：确认历史回放和实时事件不丢签名相关字段，不误显示为空思考。
 - [ ] 0.23.0 Web 视觉细节巡检：Swarm inline、问题卡、文件补全、队列卡在 Kimix / Kimi Web 两种过程模式下无重复展示。
 
 ## 2026-07-07 v2.14.74 上下文压缩摘要展示
@@ -35,6 +35,13 @@
 - 根因：system-reminder 已会被 Kimix 剥离，但官方 ExitPlanMode approval 的 `display.kind=plan_review`、`plan`、`path`、`options` 只存在于 display 内，旧 mapper 未保留；审批响应也无法回传官方多方案 `selectedLabel`。
 - 修复：approval 事件保留官方 display；审批卡在 `plan_review` 时展示计划正文、路径和多方案选项；IPC/host 响应支持 `selectedLabel`，普通工具审批保持原按钮语义。
 - 下一步：继续确认 Gemini thinking signature / 第三方 thinking 兼容。
+
+## 2026-07-07 v2.14.77 第三方 thinking signature 保留
+
+- 当前目标：继续对齐 Kimi Code 0.23.0，确认 Gemini / 第三方 thinking 的 signature 元数据在实时事件和历史回放中不丢失，也不会被误显示为空思考。
+- 根因：官方 thinking content schema 支持 `signature`，但 Kimix `ThinkingPart` 只存 text；server snapshot replay 也只转发 thinking 文本。
+- 修复：`ThinkingPart` 新增可选 `signature`；SDK/native mapper 从 `thinking.delta`、`content.part` 的 `think/thinking` 中保留 signature；server snapshot replay 透传 signature；空 thinking 仍返回 null，不进入可见思考块。
+- 下一步：做 0.23.0 Web 视觉细节巡检。
 
 ## 2026-07-07 v2.14.73 @ 文件补全覆盖额外目录和深层文件
 

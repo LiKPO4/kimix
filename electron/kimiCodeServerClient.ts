@@ -1179,12 +1179,13 @@ function contentPartsToFrames(
     }
     if ((type === "think" || type === "thinking") && typeof (part.think ?? part.thinking ?? part.text) === "string") {
       const think = String(part.think ?? part.thinking ?? part.text);
+      const signature = typeof part.signature === "string" ? part.signature : undefined;
       return think ? [{
         type: "content.part",
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ part: { type: "think", think } }, replayMode, messageId, messageText, "assistant", messageTimestamp),
+        payload: snapshotReplayPayload({ part: { type: "think", think, ...(signature ? { signature } : {}) } }, replayMode, messageId, messageText, "assistant", messageTimestamp),
       }] : [];
     }
     return [];

@@ -708,6 +708,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     case "thinking.delta": {
       const delta = payloadString(payload, source, "delta");
       if (!delta) return null;
+      const signature = payloadString(payload, source, "signature");
       return {
         id: generateId(),
         type: "assistant_message",
@@ -715,7 +716,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         agentId: payloadString(payload, source, "agentId"),
         content: "",
         thinking: delta,
-        thinkingParts: [{ id: generateId(), timestamp: eventTimestamp, text: delta }],
+        thinkingParts: [{ id: generateId(), timestamp: eventTimestamp, text: delta, signature }],
         model: payloadString(payload, source, "model")?.trim() || undefined,
         isThinking: true,
         isComplete: false,
@@ -838,17 +839,19 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           isComplete: false,
         };
       }
-      if (partType === "think" && isString(part.think)) {
-        if (isKimixSyntheticThinking(part.think)) return null;
+      if ((partType === "think" || partType === "thinking") && (isString(part.think) || isString(part.thinking))) {
+        const think = isString(part.think) ? part.think : isString(part.thinking) ? part.thinking : "";
+        if (isKimixSyntheticThinking(think)) return null;
         const id = generateId();
         const timestamp = eventTimestamp;
+        const signature = isString(part.signature) ? part.signature : undefined;
         return {
           id,
           type: "assistant_message",
           timestamp,
           content: "",
-          thinking: part.think,
-          thinkingParts: [{ id: generateId(), timestamp, text: part.think }],
+          thinking: think,
+          thinkingParts: [{ id: generateId(), timestamp, text: think, signature }],
           model: payloadString(payload, source, "model")?.trim() || undefined,
           isThinking: true,
           isComplete: false,

@@ -305,9 +305,14 @@ export function mapKimiCodeEvent(
           isComplete: false,
         };
       }
-      if (part.type === "think") {
-        const think = isString(part.think) ? part.think : "";
+      if (part.type === "think" || part.type === "thinking") {
+        const think = isString(part.think)
+          ? part.think
+          : isString(part.thinking)
+            ? part.thinking
+            : "";
         if (!think) return null;
+        const signature = isString(part.signature) ? part.signature : undefined;
         return {
           id: getId(options),
           type: "assistant_message",
@@ -315,7 +320,7 @@ export function mapKimiCodeEvent(
           agentId: getAgentId(event),
           content: "",
           thinking: think,
-          thinkingParts: [{ id: getId(options), timestamp, text: think }],
+          thinkingParts: [{ id: getId(options), timestamp, text: think, signature }],
           model: isString(event.model) ? event.model : undefined,
           isThinking: true,
           isComplete: false,
@@ -327,6 +332,7 @@ export function mapKimiCodeEvent(
     case "thinking.delta": {
       const delta = isString(event.delta) ? event.delta : "";
       if (!delta) return null;
+      const signature = isString(event.signature) ? event.signature : undefined;
       return {
         id: getId(options),
         type: "assistant_message",
@@ -334,7 +340,7 @@ export function mapKimiCodeEvent(
         agentId: getAgentId(event),
         content: "",
         thinking: delta,
-        thinkingParts: [{ id: getId(options), timestamp, text: delta }],
+        thinkingParts: [{ id: getId(options), timestamp, text: delta, signature }],
         model: isString(event.model) ? event.model : undefined,
         isThinking: true,
         isComplete: false,

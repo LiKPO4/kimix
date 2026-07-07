@@ -238,6 +238,7 @@ export interface ThinkingPart {
   id: string;
   timestamp: number;
   text: string;
+  signature?: string;
 }
 
 export interface ToolCallEvent {
