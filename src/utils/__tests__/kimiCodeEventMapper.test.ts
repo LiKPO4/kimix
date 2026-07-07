@@ -491,7 +491,14 @@ describe("reduceKimiCodeEvents", () => {
 
   it("merges shell tool progress into the running tool call", () => {
     const events = reduceKimiCodeEvents([], [
-      { type: "tool.call.started", toolCallId: "call-1", name: "Bash", args: { command: "printf hi" } },
+      {
+        type: "tool.call.started",
+        toolCallId: "call-1",
+        name: "Bash",
+        args: { command: "printf hi" },
+        description: "Running: printf hi",
+        display: { kind: "command", command: "printf hi", cwd: "D:/WORKS", language: "bash" },
+      },
       { type: "tool.progress", toolCallId: "call-1", name: "Bash", update: { kind: "stdout", text: "h" } },
       { type: "tool.progress", toolCallId: "call-1", name: "Bash", update: { kind: "stdout", text: "i" } },
     ], testOptions());
@@ -500,6 +507,9 @@ describe("reduceKimiCodeEvents", () => {
     const tool = events[0] as Extract<TimelineEvent, { type: "tool_call" }>;
     expect(tool.status).toBe("running");
     expect(tool.arguments).toEqual({ command: "printf hi" });
+    expect(tool.description).toBe("Running: printf hi");
+    expect(tool.display?.command).toBe("printf hi");
+    expect(tool.display?.cwd).toBe("D:/WORKS");
     expect(tool.result).toBe("hi");
   });
 

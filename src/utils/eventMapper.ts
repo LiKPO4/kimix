@@ -108,6 +108,54 @@ function normalizeNativeToolProgress(payload: Record<string, unknown>, source: R
   return update.kind === "stderr" ? `[stderr] ${text}` : text;
 }
 
+function normalizeNativeToolDisplay(payload: Record<string, unknown>, source: Record<string, unknown>): Extract<TimelineEvent, { type: "tool_result" }>["display"] | undefined {
+  const result = isRecord(payload.result) ? payload.result : isRecord(source.result) ? source.result : {};
+  const output = "output" in payload ? payload.output : "output" in source ? source.output : result.output;
+  const commandDisplay = isRecord(payload.display)
+    ? payload.display
+    : isRecord(source.display)
+      ? source.display
+      : isRecord(result.display)
+        ? result.display
+        : {};
+  const displayBlocks = Array.isArray(payload.display)
+    ? payload.display
+    : Array.isArray(source.display)
+      ? source.display
+      : Array.isArray(result.display)
+        ? result.display
+        : Array.isArray(output)
+          ? output
+          : [];
+  const display: Extract<TimelineEvent, { type: "tool_result" }>["display"] = {};
+  if (isString(commandDisplay.kind)) display.kind = commandDisplay.kind;
+  if (isString(commandDisplay.command)) display.command = commandDisplay.command;
+  if (isString(commandDisplay.cwd)) display.cwd = commandDisplay.cwd;
+  if (isString(commandDisplay.description)) display.description = commandDisplay.description;
+  if (isString(commandDisplay.language)) display.language = commandDisplay.language;
+
+  const blocks = displayBlocks.filter(isRecord);
+  const diffBlock = blocks.find((block) => block.type === "diff");
+  if (diffBlock) {
+    const path = isString(diffBlock.path) ? diffBlock.path : undefined;
+    const oldText = isString(diffBlock.old_text)
+      ? diffBlock.old_text
+      : isString(diffBlock.oldText)
+        ? diffBlock.oldText
+        : undefined;
+    const newText = isString(diffBlock.new_text)
+      ? diffBlock.new_text
+      : isString(diffBlock.newText)
+        ? diffBlock.newText
+        : undefined;
+    if (path && oldText !== undefined && newText !== undefined) {
+      display.diff = { path, oldText, newText };
+    }
+  }
+
+  return Object.keys(display).length > 0 ? display : undefined;
+}
+
 function appendAssistantContent(existingContent: string, incomingContent: string): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
@@ -671,6 +719,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     case "tool.call":
     case "tool.call.started": {
       const args = payloadValue(payload, source, "args");
+      const parsedArgs = parseArguments(args);
       return {
         id: generateId(),
         type: "tool_call",
@@ -679,8 +728,10 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         toolCallId: payloadString(payload, source, "toolCallId") ?? payloadString(payload, source, "id") ?? generateId(),
         toolName: payloadString(payload, source, "name") ?? payloadString(payload, source, "toolName") ?? "unknown",
         status: "running",
-        arguments: parseArguments(args),
-        rawArguments: isString(args) ? args : undefined,
+        arguments: parsedArgs,
+        rawArguments: isString(args) ? args : Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs) : undefined,
+        description: payloadString(payload, source, "description"),
+        display: normalizeNativeToolDisplay(payload, source),
       };
     }
 
@@ -709,6 +760,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         toolCallId: payloadString(payload, source, "toolCallId") ?? payloadString(payload, source, "id") ?? "",
         toolName: payloadString(payload, source, "name") ?? payloadString(payload, source, "toolName") ?? "unknown",
         result: payloadValue(payload, source, "result") ?? payloadValue(payload, source, "output") ?? "",
+        display: normalizeNativeToolDisplay(payload, source),
       };
 
     case "compaction.started":
@@ -1200,6 +1252,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         toolName: incoming.toolName && incoming.toolName !== "unknown" ? incoming.toolName : last.toolName,
         arguments: mergeArguments(rawArguments ?? "", fallbackArguments),
         rawArguments,
+        description: incoming.description ?? last.description,
+        display: incoming.display ?? last.display,
         result: mergeToolResult(last.result, incoming.result),
       };
       const result = [...existing];
@@ -1284,6 +1338,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       result[callIndex] = {
         ...call,
         status: isErrorResult ? "error" : "success",
+        display: incoming.display ?? call.display,
         result: incoming.result,
         durationMs: isRecoveryInterruption ? undefined : Math.max(0, incoming.timestamp - call.timestamp),
       };

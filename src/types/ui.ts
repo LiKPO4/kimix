@@ -250,6 +250,8 @@ export interface ToolCallEvent {
   status: "running" | "success" | "error";
   arguments: Record<string, unknown>;
   rawArguments?: string;
+  description?: string;
+  display?: ToolDisplay;
   result?: unknown;
   durationMs?: number;
 }
@@ -279,6 +281,11 @@ export interface HookEvent {
 }
 
 export interface ToolDisplay {
+  kind?: string;
+  command?: string;
+  cwd?: string;
+  description?: string;
+  language?: string;
   diff?: FileDiff;
   todo?: TodoItem[];
   status?: string;

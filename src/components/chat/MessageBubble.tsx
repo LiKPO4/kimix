@@ -1000,17 +1000,20 @@ function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
 function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const argumentPreview = toolArgumentPreview(tool) || tool.toolName || "工具调用";
+  const officialDescription = tool.description || tool.display?.description || "";
   const command = typeof tool.arguments?.command === "string"
     ? tool.arguments.command
     : typeof tool.arguments?.cmd === "string"
       ? tool.arguments.cmd
-      : "";
+      : typeof tool.display?.command === "string"
+        ? tool.display.command
+        : "";
   const path = typeof tool.arguments?.path === "string"
     ? tool.arguments.path
     : typeof tool.arguments?.file_path === "string"
       ? tool.arguments.file_path
       : "";
-  const displayTarget = command || path || argumentPreview;
+  const displayTarget = officialDescription || command || path || argumentPreview;
   const lineCount = typeof tool.result === "string"
     ? tool.result.split(/\r?\n/).length
     : 0;
@@ -1018,6 +1021,7 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
   const resultText = formatToolResultForDisplay(tool.result);
   const detailText = [
     `工具：${tool.toolName || "未知工具"}`,
+    officialDescription ? `展示：${officialDescription}` : "",
     argumentText ? `参数：\n${argumentText}` : "",
     resultText ? `结果：\n${resultText}` : "",
   ].filter(Boolean).join("\n\n");

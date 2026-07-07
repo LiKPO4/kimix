@@ -86,6 +86,11 @@ function extractCompactionSummary(event: Record<string, unknown>): string | unde
 function normalizeToolDisplay(event: Record<string, unknown>): Extract<TimelineEvent, { type: "tool_result" }>["display"] | undefined {
   const result = isRecord(event.result) ? event.result : {};
   const output = "output" in event ? event.output : result.output;
+  const commandDisplay = isRecord(event.display)
+    ? event.display
+    : isRecord(result.display)
+      ? result.display
+      : {};
   const displayBlocks = Array.isArray(event.display)
     ? event.display
     : Array.isArray(result.display)
@@ -93,12 +98,17 @@ function normalizeToolDisplay(event: Record<string, unknown>): Extract<TimelineE
       : Array.isArray(output)
         ? output
         : [];
-  if (displayBlocks.length === 0) return undefined;
+  const display: Extract<TimelineEvent, { type: "tool_result" }>["display"] = {};
+  if (isString(commandDisplay.kind)) display.kind = commandDisplay.kind;
+  if (isString(commandDisplay.command)) display.command = commandDisplay.command;
+  if (isString(commandDisplay.cwd)) display.cwd = commandDisplay.cwd;
+  if (isString(commandDisplay.description)) display.description = commandDisplay.description;
+  if (isString(commandDisplay.language)) display.language = commandDisplay.language;
+  if (displayBlocks.length === 0) return Object.keys(display).length > 0 ? display : undefined;
 
   const blocks = displayBlocks.filter(isRecord);
   const diffBlock = blocks.find((block) => block.type === "diff");
   const todoBlock = blocks.find((block) => block.type === "todo");
-  let display: Extract<TimelineEvent, { type: "tool_result" }>["display"] | undefined;
 
   if (diffBlock) {
     const path = isString(diffBlock.path) ? diffBlock.path : undefined;
@@ -113,27 +123,24 @@ function normalizeToolDisplay(event: Record<string, unknown>): Extract<TimelineE
         ? diffBlock.newText
         : undefined;
     if (path && oldText !== undefined && newText !== undefined) {
-      display = { diff: { path, oldText, newText } };
+      display.diff = { path, oldText, newText };
     }
   }
 
   if (todoBlock && Array.isArray(todoBlock.items)) {
-    display = {
-      ...display,
-      todo: todoBlock.items.filter(isRecord).map((item, index) => {
-        const status = isString(item.status) && ["pending", "in_progress", "done"].includes(item.status)
-          ? item.status as "pending" | "in_progress" | "done"
-          : "pending";
-        return {
-          id: isString(item.id) ? item.id : `todo-${index}`,
-          content: isString(item.content) ? item.content : isString(item.title) ? item.title : "",
-          status,
-        };
-      }),
-    };
+    display.todo = todoBlock.items.filter(isRecord).map((item, index) => {
+      const status = isString(item.status) && ["pending", "in_progress", "done"].includes(item.status)
+        ? item.status as "pending" | "in_progress" | "done"
+        : "pending";
+      return {
+        id: isString(item.id) ? item.id : `todo-${index}`,
+        content: isString(item.content) ? item.content : isString(item.title) ? item.title : "",
+        status,
+      };
+    });
   }
 
-  return display;
+  return Object.keys(display).length > 0 ? display : undefined;
 }
 
 function normalizeToolProgress(event: Record<string, unknown>): string {
@@ -393,6 +400,8 @@ export function mapKimiCodeEvent(
         status: "running",
         arguments: parseJsonObject(rawArguments),
         rawArguments,
+        description: isString(event.description) ? event.description : undefined,
+        display: normalizeToolDisplay(event),
       };
     }
 
@@ -409,6 +418,8 @@ export function mapKimiCodeEvent(
         status: "running",
         arguments: args,
         rawArguments: Object.keys(args).length > 0 ? JSON.stringify(args) : undefined,
+        description: isString(event.description) ? event.description : undefined,
+        display: normalizeToolDisplay(event),
       };
     }
 

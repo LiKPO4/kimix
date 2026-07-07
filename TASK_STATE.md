@@ -10,7 +10,7 @@
 - [x] `@` 文件补全覆盖额外工作目录和深层文件。
 - [ ] Preserved Thinking 默认值对齐官方：Kimi 模型默认保留思考，第三方/DeepSeek 等模型按能力降级。
 - [x] 上下文压缩 summary 展示对齐官方：压缩完成后能在消息流里看到可读 summary，而不是只有开始/结束胶囊。
-- [ ] Bash/Edit 工具过程卡稳定性复核：长命令、后台命令、编辑 diff/审批上下文在消息流里与官方 0.23 表达一致。
+- [x] Bash/Edit 工具过程卡稳定性复核：长命令、后台命令、编辑 diff/审批上下文在消息流里与官方 0.23 表达一致。
 - [ ] Plan reminder / notice 对齐：进入 Plan 模式后的官方提醒、退出计划审批与本地 Plan 预览不重复、不丢失。
 - [ ] Gemini thinking signature / 第三方 thinking 兼容：确认历史回放和实时事件不丢签名相关字段，不误显示为空思考。
 - [ ] 0.23.0 Web 视觉细节巡检：Swarm inline、问题卡、文件补全、队列卡在 Kimix / Kimi Web 两种过程模式下无重复展示。
@@ -21,6 +21,13 @@
 - 根因：`compaction.completed` / `CompactionEnd` 在事件映射时只保留 begin/end phase，`summary`、`result.summary`、`payload.summary` 等字段进入 UI 前被丢弃。
 - 修复：压缩事件类型新增 `summary`；SDK 和旧 stream mapper 均保留 summary；聊天流在完成态有摘要时渲染为小摘要卡，无摘要时保持原来的短胶囊。
 - 下一步：继续复核 Bash/Edit 工具过程卡稳定性。
+
+## 2026-07-07 v2.14.75 Bash/Edit 工具过程卡官方展示字段
+
+- 当前目标：继续对齐 Kimi Code 0.23.0，复核 Bash/Edit 工具过程卡在长命令、后台命令、编辑 diff/审批上下文里的展示来源。
+- 根因：官方 `tool.call` 会附带 `description` 和 `display` 元数据，但 Kimix 只保留 args/result；因此 Bash 的 `Running:` / `Starting background:` 和 display command/cwd 可能被本地 preview 覆盖。
+- 修复：工具调用类型保留官方 `description/display`；SDK 与 native mapper 均解析这些字段；工具结果合并时不覆盖已保存的 display；Kimi Web 过程行优先展示官方 description，并继续保留 Edit structured diff。
+- 下一步：继续对齐 Plan reminder / notice。
 
 ## 2026-07-07 v2.14.73 @ 文件补全覆盖额外目录和深层文件
 

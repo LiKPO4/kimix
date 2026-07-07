@@ -1043,6 +1043,24 @@ describe("mergeEvents", () => {
     expect(diff.filePath).toBe("src/app.ts");
   });
 
+  it("keeps native tool display metadata on tool calls", () => {
+    const mapped = mapStreamEvent({
+      type: "tool.call",
+      payload: {
+        toolCallId: "call-1",
+        name: "Bash",
+        args: { command: "pnpm build" },
+        description: "Running: pnpm build",
+        display: { kind: "command", command: "pnpm build", cwd: "D:/WORKS", language: "bash" },
+      },
+    });
+
+    const tool = mapped as Extract<TimelineEvent, { type: "tool_call" }>;
+    expect(tool.description).toBe("Running: pnpm build");
+    expect(tool.display?.command).toBe("pnpm build");
+    expect(tool.rawArguments).toBe(JSON.stringify({ command: "pnpm build" }));
+  });
+
   it("adds change summary for successful Write tool without structured diff", () => {
     const existing: TimelineEvent[] = [
       {
