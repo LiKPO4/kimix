@@ -3660,6 +3660,73 @@ function parseKimiUsagePayload(payload: Record<string, unknown>) {
   };
 }
 
+function usagePeriodFromManagedRow(label: string, row: Record<string, unknown> | null): KimiUsagePeriod {
+  if (!row) return { label, available: false, percent: 0, message: "暂无官方数据" };
+  const limit = toNumber(row.limit);
+  const used = toNumber(row.used);
+  if (limit === undefined || used === undefined || limit <= 0) {
+    return { label, available: false, percent: 0, message: "暂无官方数据" };
+  }
+  return {
+    label,
+    used,
+    limit,
+    percent: Math.max(0, Math.min(100, (used / limit) * 100)),
+    available: true,
+  };
+}
+
+function findManagedUsageLimit(limits: unknown[], pattern: RegExp) {
+  for (const item of limits) {
+    const row = getRecord(item);
+    if (!row) continue;
+    const label = typeof row.label === "string" ? row.label : "";
+    if (pattern.test(label)) return row;
+  }
+  return null;
+}
+
+function parseManagedUsagePayload(payload: unknown) {
+  const record = getRecord(payload);
+  if (!record) throw new Error("Kimi 用量接口返回格式异常");
+  if (record.kind === "error") {
+    const message = typeof record.message === "string" ? record.message : "Kimi 用量服务暂时不可用";
+    throw new Error(formatKimiUsageError(message));
+  }
+  if (record.kind !== "ok") throw new Error("Kimi 用量接口返回格式异常");
+  const limits = Array.isArray(record.limits) ? record.limits : [];
+  const fiveHourRow = findManagedUsageLimit(limits, /(^|\b)(5h|300m|5\s*小时)/i);
+  const weeklyRow = getRecord(record.summary) ?? findManagedUsageLimit(limits, /week|weekly|本周|每周|一周/i);
+  const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow);
+  const weekly = usagePeriodFromManagedRow("本周", weeklyRow);
+  return {
+    available: [fiveHour, weekly].some((period) => period.available),
+    updatedAt: Date.now(),
+    source: "Kimi Code 官方用量接口",
+    periods: [fiveHour, weekly],
+  };
+}
+
+function stripHtmlForError(value: string) {
+  return value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatKimiUsageError(message: string) {
+  const cleaned = stripHtmlForError(message);
+  if (/HTTP\s+(502|503|504)\b|gateway|time-?out|timed?\s*out/i.test(cleaned)) {
+    return "Kimi 官方用量服务暂时不可用，请稍后再试。";
+  }
+  if (/401|unauthorized|授权|login|token/i.test(cleaned)) {
+    return "Kimi 授权失败，请重新登录 Kimi Code。";
+  }
+  return cleaned || "Kimi 用量服务暂时不可用，请稍后再试。";
+}
+
 function getPackagedUserDataDir(): string {
   const platform = process.platform;
   const home = os.homedir();
@@ -6076,6 +6143,15 @@ ipcMain.handle("kimi-code:listHistorySessions", async (_, request: { workDir: st
 
 ipcMain.handle("kimi-code:getAccountUsage", async () => {
   try {
+    try {
+      return { success: true, data: parseManagedUsagePayload(await kimiCodeHost.getManagedUsage()) };
+    } catch (sdkError) {
+      const sdkMessage = sdkError instanceof Error ? sdkError.message : String(sdkError);
+      if (!/不支持读取套餐用量|unsupported|not support/i.test(sdkMessage)) {
+        throw new Error(formatKimiUsageError(sdkMessage));
+      }
+    }
+
     const accessToken = await resolveKimiAccessToken();
     const res = await fetch(KIMI_CODE_USAGE_URL, {
       method: "GET",
@@ -6083,20 +6159,22 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
         ...kimiCommonHeaders(),
         "Authorization": `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      const summary = detail.trim() ? `：${detail.trim().slice(0, 220)}` : "";
+      const cleaned = stripHtmlForError(detail).slice(0, 220);
+      const summary = cleaned ? `：${cleaned}` : "";
       if (res.status === 401) {
-        throw new Error(`Kimi 授权失败，请重新登录 Kimi Code${summary}`);
+        throw new Error(formatKimiUsageError(`HTTP ${res.status}${summary}`));
       }
-      throw new Error(`Kimi 用量接口返回 HTTP ${res.status}${summary}`);
+      throw new Error(formatKimiUsageError(`HTTP ${res.status}${summary}`));
     }
     const payload = getRecord(await res.json());
     if (!payload) throw new Error("Kimi 用量接口返回格式异常");
     return { success: true, data: parseKimiUsagePayload(payload) };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    return { success: false, error: formatKimiUsageError(err instanceof Error ? err.message : String(err)) };
   }
 });
 
