@@ -660,7 +660,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
       </div>
 
-      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 8, paddingRight: 16, marginRight: -8, scrollbarGutter: "stable" }}>
+      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 2, paddingRight: 6, marginRight: -4, scrollbarGutter: "stable" }}>
         <div className="mb-2 flex items-center justify-between px-3">
           <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button
@@ -959,7 +959,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.56</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.57</span>
         </button>
       </div>
     </aside>
