@@ -252,13 +252,6 @@ type ImageAttachment = {
   filePath?: string;
 };
 
-type OfficialQueuedPrompt = {
-  promptId: string;
-  content: string;
-  status: string;
-  createdAt?: string;
-};
-
 function isImageAttachment(attachment: ImageAttachment): attachment is ImageAttachment & { dataUrl: string } {
   return Boolean(attachment.dataUrl);
 }
@@ -466,7 +459,6 @@ export function Composer() {
   const [isFocused, setIsFocused] = useState(false);
   const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
-  const [officialQueuedPrompts, setOfficialQueuedPrompts] = useState<OfficialQueuedPrompt[]>([]);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
@@ -488,32 +480,6 @@ export function Composer() {
   const shouldShowStopButton = isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
   const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn;
-  const queuedMessageCount = officialQueuedPrompts.length + pendingMessages.length;
-
-  const refreshOfficialPromptQueue = useCallback(async () => {
-    if (!activeRuntimeSessionId) {
-      setOfficialQueuedPrompts([]);
-      return;
-    }
-    const res = await window.api.getKimiCodePromptQueue({ sessionId: activeRuntimeSessionId }).catch(() => null);
-    if (!res?.success || !res.data.supported) {
-      setOfficialQueuedPrompts([]);
-      return;
-    }
-    setOfficialQueuedPrompts((res.data.queued ?? []).map((prompt) => ({
-      promptId: prompt.promptId,
-      content: prompt.content,
-      status: prompt.status,
-      createdAt: prompt.createdAt,
-    })));
-  }, [activeRuntimeSessionId]);
-
-  useEffect(() => {
-    void refreshOfficialPromptQueue();
-    if (!activeRuntimeSessionId) return;
-    const timer = window.setInterval(() => void refreshOfficialPromptQueue(), hasActiveAssistantTurn ? 1500 : 3000);
-    return () => window.clearInterval(timer);
-  }, [activeRuntimeSessionId, hasActiveAssistantTurn, refreshOfficialPromptQueue]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -1817,18 +1783,6 @@ export function Composer() {
       setImageAttachments([]);
       setEditingPendingId(null);
       inputRef.current?.reset();
-      const runtimeSessionId = activeRuntimeSessionId;
-      if (runtimeSessionId) {
-        const queueRes = await window.api.queueKimiCodePrompt({
-          sessionId: runtimeSessionId,
-          content: buildAttachmentPromptContent(trimmed, imagesToSend),
-          images: imagesToSend.filter(isImageAttachment).map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
-        }).catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }));
-        if (queueRes.success) {
-          void refreshOfficialPromptQueue();
-          return;
-        }
-      }
       addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
       return;
     }
@@ -2439,40 +2393,6 @@ export function Composer() {
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已发送引导请求" }));
   };
 
-  const handleCancelOfficialPrompt = async (promptId: string) => {
-    if (!activeRuntimeSessionId) return;
-    const previous = officialQueuedPrompts;
-    setOfficialQueuedPrompts((items) => items.filter((item) => item.promptId !== promptId));
-    const res = await window.api.cancelKimiCodePrompt({ sessionId: activeRuntimeSessionId, promptId });
-    if (!res.success) {
-      setOfficialQueuedPrompts(previous);
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `删除官方队列消息失败：${res.error}` }));
-      return;
-    }
-    void refreshOfficialPromptQueue();
-  };
-
-  const handleSteerOfficialPrompt = async (prompt: OfficialQueuedPrompt) => {
-    if (!activeRuntimeSessionId || !activeSession || !canSteerActiveTurn) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "当前没有可引导的运行轮次，这条消息会继续排队等待本轮结束。",
-      }));
-      return;
-    }
-    const steerId = insertLocalSteerMessage(activeSession.id, prompt.content || "[官方队列消息]");
-    setOfficialQueuedPrompts((items) => items.filter((item) => item.promptId !== prompt.promptId));
-    const res = await window.api.steerKimiCodePrompt({ sessionId: activeRuntimeSessionId, promptId: prompt.promptId });
-    if (!res.success) {
-      updateSteerStatus(activeSession.id, steerId, "failed", res.error);
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
-      void refreshOfficialPromptQueue();
-      return;
-    }
-    updateSteerStatus(activeSession.id, steerId, "accepted");
-    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已发送引导请求" }));
-    void refreshOfficialPromptQueue();
-  };
-
   const handleEditPending = (id: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending) return;
@@ -2585,13 +2505,13 @@ export function Composer() {
         />
       )}
 
-      {queuedMessageCount > 0 && !pendingHidden && (
+      {pendingMessages.length > 0 && !pendingHidden && (
         <div
           className="kimix-floating-panel overflow-hidden rounded-[15px] text-[13px]"
           style={{ marginBottom: 8 }}
         >
           <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 12, paddingLeft: 20, paddingRight: 14 }}>
-            <span className="min-w-0 truncate">{queuedMessageCount} 条消息正在排队</span>
+            <span className="min-w-0 truncate">{pendingMessages.length} 条消息正在排队</span>
             {hasActiveAssistantTurn && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">当前任务结束后继续</span>}
             <button
               type="button"
@@ -2604,39 +2524,6 @@ export function Composer() {
             </button>
           </div>
           <div className="max-h-40 overflow-y-auto">
-            {officialQueuedPrompts.map((msg) => (
-              <div
-                key={msg.promptId}
-                className="group flex min-h-[42px] min-w-0 items-center gap-2 border-b border-[var(--kimix-panel-divider)] last:border-b-0 hover:bg-[var(--kimix-panel-soft-bg)]"
-                style={{ paddingLeft: 18, paddingRight: 18 }}
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)]">
-                  <GripVertical size={15} />
-                </div>
-                <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">
-                  {msg.content || "[官方队列消息]"}
-                  <span className="text-[12.5px] text-[var(--kimix-panel-text-muted)]"> · 官方</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
-                  {canSteerActiveTurn ? (
-                    <button onClick={() => void handleSteerOfficialPrompt(msg)} className="kimix-icon-text-button is-compact text-[13px] text-accent-blue hover:bg-accent-blue/10" title="立即引导：把这条官方队列消息插入运行中的对话">
-                      <Zap size={13} />
-                      <span>引导</span>
-                    </button>
-                  ) : hasActiveAssistantTurn ? (
-                    <span className="shrink-0 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                      等待
-                    </span>
-                  ) : null}
-                  <button onClick={() => void handleCancelOfficialPrompt(msg.promptId)} className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-accent-red/10 hover:text-accent-red" title="删除官方队列消息" aria-label="删除官方队列消息">
-                    <Trash2 size={13} />
-                  </button>
-                  <button className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="更多" aria-label="更多">
-                    <MoreHorizontal size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
             {pendingMessages.map((msg) => (
               <div
                 key={msg.id}

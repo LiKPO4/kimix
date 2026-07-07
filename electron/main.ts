@@ -5103,62 +5103,6 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
   }
 });
 
-ipcMain.handle("kimi-code:queuePrompt", async (_, request: unknown) => {
-  try {
-    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    const content = typeof req.content === "string" ? req.content : "";
-    const images = parseKimiCodeImages(req.images);
-    if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
-    const model = kimiCodeHost.getSessionModel(sessionId);
-    const enqueue = async (promptContent: string, promptImages: { name: string; dataUrl: string }[]) => {
-      const input = toKimiCodePromptInput(promptContent, promptImages);
-      const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
-      const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-      return kimiCodeHost.queuePrompt(sessionId, finalInput);
-    };
-    const adapted = adaptPromptForModel(content, images, model);
-    try {
-      return { success: true, data: await enqueue(adapted.content, adapted.images) };
-    } catch (err) {
-      if (isImageUnsupportedError(err)) {
-        markModelAsNonVision(model);
-        const fallback = adaptPromptForModel(content, images, model);
-        return { success: true, data: await enqueue(fallback.content, fallback.images) };
-      }
-      throw err;
-    }
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi-code:cancelPrompt", async (_, request: unknown) => {
-  try {
-    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    const promptId = typeof req.promptId === "string" ? req.promptId : "";
-    if (!sessionId || !promptId) return { success: false, error: "Missing sessionId or promptId" };
-    await kimiCodeHost.cancelPrompt(sessionId, promptId);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi-code:steerPrompt", async (_, request: unknown) => {
-  try {
-    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
-    const promptId = typeof req.promptId === "string" ? req.promptId : "";
-    if (!sessionId || !promptId) return { success: false, error: "Missing sessionId or promptId" };
-    await kimiCodeHost.steerPrompt(sessionId, promptId);
-    return { success: true, data: undefined };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
 ipcMain.handle("kimi-code:askBtw", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

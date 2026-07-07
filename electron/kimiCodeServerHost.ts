@@ -81,25 +81,6 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function readServerToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  for (const value of [env.KIMIX_KIMI_SERVER_TOKEN, env.KIMI_SERVER_TOKEN]) {
-    const token = value?.trim();
-    if (token) return token;
-  }
-  try {
-    const token = fs.readFileSync(path.join(os.homedir(), ".kimi-code", "server.token"), "utf-8").trim();
-    if (token) return token;
-  } catch {
-    // Older server builds did not require a token.
-  }
-  return undefined;
-}
-
-function serverAuthHeaders(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
-  const token = readServerToken(env);
-  return token ? { authorization: `Bearer ${token}`, "x-kimi-server-token": token } : {};
-}
-
 export class KimiCodeServerHost {
   private child: ReturnType<typeof spawn> | null = null;
   private stderr = "";
@@ -285,7 +266,6 @@ export class KimiCodeServerHost {
       headers: {
         accept: "application/json",
         ...(options?.body === undefined ? {} : { "content-type": "application/json" }),
-        ...serverAuthHeaders(this.env),
         ...(options?.headers ?? {}),
       },
       signal: AbortSignal.timeout(2_500),

@@ -194,14 +194,6 @@ export type KimiCodeSessionStatus = {
 
 export type KimiCodeSessionUsage = Record<string, unknown>;
 
-export type KimiCodeQueuedPrompt = {
-  promptId: string;
-  userMessageId?: string;
-  status: string;
-  createdAt?: string;
-  content: string;
-};
-
 export type KimiCodeMcpServerInfo = {
   id?: string;
   name: string;
@@ -1085,27 +1077,6 @@ export async function setSwarmMode(sessionId: string, enabled: boolean, trigger:
   if (enabled) sdkPinnedSessionIds.add(sessionId);
 }
 
-export async function queuePrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<{ promptId: string }> {
-  sessionId = resolveMigratedSessionId(sessionId);
-  const serverManaged = serverSessions.get(sessionId);
-  if (!serverManaged) throw new Error("当前会话不支持官方消息队列。");
-  await ensureModelOutputLimitBeforePrompt(serverManaged.model);
-  const result = await getServerClient().enqueuePrompt(sessionId, input, serverControls(serverManaged));
-  return { promptId: result.prompt_id };
-}
-
-export async function cancelPrompt(sessionId: string, promptId: string): Promise<void> {
-  sessionId = resolveMigratedSessionId(sessionId);
-  if (!serverSessions.has(sessionId)) throw new Error("当前会话不支持官方消息队列。");
-  await getServerClient().abortPrompt(sessionId, promptId);
-}
-
-export async function steerPrompt(sessionId: string, promptId: string): Promise<void> {
-  sessionId = resolveMigratedSessionId(sessionId);
-  if (!serverSessions.has(sessionId)) throw new Error("当前会话不支持官方消息队列。");
-  await getServerClient().steerPrompts(sessionId, [promptId]);
-}
-
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
@@ -1546,10 +1517,9 @@ export async function getPromptQueueState(sessionId: string): Promise<{
   activeId: string | null;
   activeStatus: string | null;
   queuedIds: string[];
-  queued: KimiCodeQueuedPrompt[];
 }> {
   if (!serverSessions.has(sessionId)) {
-    return { supported: false, activeId: null, activeStatus: null, queuedIds: [], queued: [] };
+    return { supported: false, activeId: null, activeStatus: null, queuedIds: [] };
   }
   const prompts = await getServerClient().listPrompts(sessionId);
   return {
@@ -1557,26 +1527,7 @@ export async function getPromptQueueState(sessionId: string): Promise<{
     activeId: prompts.active?.prompt_id ?? null,
     activeStatus: prompts.active?.status ?? null,
     queuedIds: prompts.queued.map((prompt) => prompt.prompt_id),
-    queued: prompts.queued.map((prompt) => ({
-      promptId: prompt.prompt_id,
-      userMessageId: prompt.user_message_id,
-      status: prompt.status,
-      createdAt: prompt.created_at,
-      content: serverPromptContentText(prompt.content),
-    })),
   };
-}
-
-function serverPromptContentText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content.map((part) => {
-    if (!part || typeof part !== "object" || Array.isArray(part)) return "";
-    const record = part as Record<string, unknown>;
-    if (record.type === "text" && typeof record.text === "string") return record.text;
-    if (typeof record.content === "string") return record.content;
-    return "";
-  }).filter(Boolean).join("\n");
 }
 
 export async function searchServerSessionFiles(

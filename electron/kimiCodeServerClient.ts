@@ -14,6 +14,25 @@ type ServerClientOptions = {
   reconnectFailureThreshold?: number;
 };
 
+function readServerToken(): string | undefined {
+  for (const value of [process.env.KIMIX_KIMI_SERVER_TOKEN, process.env.KIMI_SERVER_TOKEN]) {
+    const token = value?.trim();
+    if (token) return token;
+  }
+  try {
+    const token = fs.readFileSync(path.join(os.homedir(), ".kimi-code", "server.token"), "utf-8").trim();
+    if (token) return token;
+  } catch {
+    // Older server builds did not require a token.
+  }
+  return undefined;
+}
+
+function serverAuthHeaders(): Record<string, string> {
+  const token = readServerToken();
+  return token ? { authorization: `Bearer ${token}`, "x-kimi-server-token": token } : {};
+}
+
 export type ServerSession = {
   id: string;
   workspace_id?: string;
@@ -173,7 +192,6 @@ export type ServerPromptSummary = {
   user_message_id: string;
   status: string;
   created_at: string;
-  content?: unknown[];
 };
 
 export type ServerTerminal = {
@@ -215,28 +233,9 @@ export type ServerSnapshot = {
   pending_questions?: unknown[];
 };
 
-function readServerToken(): string | undefined {
-  for (const value of [process.env.KIMIX_KIMI_SERVER_TOKEN, process.env.KIMI_SERVER_TOKEN]) {
-    const token = value?.trim();
-    if (token) return token;
-  }
-  try {
-    const token = fs.readFileSync(path.join(os.homedir(), ".kimi-code", "server.token"), "utf-8").trim();
-    if (token) return token;
-  } catch {
-    // Older server builds did not require a token.
-  }
-  return undefined;
-}
-
-function serverAuthHeaders(): Record<string, string> {
-  const token = readServerToken();
-  return token ? { authorization: `Bearer ${token}`, "x-kimi-server-token": token } : {};
-}
-
-  const CONTROL_TIMEOUT_MS = 5_000;
-  const PROMPT_TIMEOUT_MS = 120_000;
-  const UPLOAD_TIMEOUT_MS = 300_000;
+const CONTROL_TIMEOUT_MS = 5_000;
+const PROMPT_TIMEOUT_MS = 120_000;
+const UPLOAD_TIMEOUT_MS = 300_000;
 
 export function isKimiCodeServerSessionRoutingEnabled(
   env: NodeJS.ProcessEnv = process.env,
@@ -694,18 +693,6 @@ export class KimiCodeServerClient {
     return result;
   }
 
-  async enqueuePrompt(sessionId: string, input: unknown, controls: Record<string, unknown>) {
-    const content = await toServerPromptContent(
-      input as Parameters<typeof toServerPromptContent>[0],
-      (file) => this.uploadFile(file),
-    );
-    return this.request<{ prompt_id: string }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, {
-      method: "POST",
-      body: JSON.stringify({ content, ...controls }),
-      timeoutMs: PROMPT_TIMEOUT_MS,
-    });
-  }
-
   async steer(sessionId: string, input: unknown, controls: Record<string, unknown>) {
     const content = await toServerPromptContent(
       input as Parameters<typeof toServerPromptContent>[0],
@@ -722,22 +709,6 @@ export class KimiCodeServerClient {
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
     return queued;
-  }
-
-  steerPrompts(sessionId: string, promptIds: string[]): Promise<{ steered: true; prompt_ids: string[] }> {
-    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
-      method: "POST",
-      body: JSON.stringify({ prompt_ids: promptIds }),
-      timeoutMs: PROMPT_TIMEOUT_MS,
-    });
-  }
-
-  abortPrompt(sessionId: string, promptId: string): Promise<{ aborted: boolean; at_seq?: number }> {
-    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts/${encodeURIComponent(promptId)}:abort`, {
-      method: "POST",
-      body: "{}",
-      timeoutMs: PROMPT_TIMEOUT_MS,
-    });
   }
 
   abort(sessionId: string): Promise<unknown> {

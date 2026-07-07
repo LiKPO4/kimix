@@ -2,7 +2,7 @@
 
 ## 2026-07-07
 
-* **Official prompt queue ownership**: Server-backed mid-turn submissions now enter the official prompt queue first, with Kimix local pending messages retained only as SDK/unsupported fallback; Server 0.23 REST requests may require the local `server.token`. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Queue UI ownership matches official Web**: Editable queued messages remain a frontend-local queue, while Server prompt active/queued state is only a dispatch gate; Server 0.23 token headers remain required when present. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Server archive restore boundary**: Official Server active catalog rows may now clear local archive state, while SDK active rows remain blocked by tombstones to avoid accidental resurrection. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-06

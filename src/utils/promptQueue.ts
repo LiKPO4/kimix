@@ -3,7 +3,6 @@ export interface OfficialPromptQueueState {
   activeId: string | null;
   activeStatus: string | null;
   queuedIds: string[];
-  queued?: Array<{ promptId: string; content: string; status: string; createdAt?: string }>;
 }
 
 export function shouldDeferLocalPendingDispatch(state: OfficialPromptQueueState | null | undefined) {
