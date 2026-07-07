@@ -244,6 +244,34 @@ describe("mergeEvents", () => {
     expect(result[1].type).toBe("assistant_message");
   });
 
+  it("keeps local user image data when the official echo only has an image file id", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "user_message",
+        timestamp: 1,
+        content: "看这张图",
+        images: [{ id: "img-1", name: "shot.png", dataUrl: "data:image/png;base64,local" }],
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "user_message",
+      timestamp: 2,
+      content: [
+        "看这张图",
+        "附件文件：",
+        "1. image.png",
+        "   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件",
+      ].join("\n"),
+      images: [{ name: "image.png" }],
+    };
+    const result = mergeEvents(existing, incoming);
+    const user = result[0] as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(result).toHaveLength(1);
+    expect(user.images?.[0].dataUrl).toBe("data:image/png;base64,local");
+  });
+
   it("merges streaming assistant content", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Hel", isThinking: false, isComplete: false },

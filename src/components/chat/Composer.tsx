@@ -733,12 +733,14 @@ export function Composer() {
     if (imageFiles.length === 0) return;
     const attachments = await Promise.all(
       imageFiles.map((file) => new Promise<ImageAttachment>((resolve, reject) => {
+        const filePath = getDraggedFilePath(file);
         const reader = new FileReader();
         reader.onload = () => resolve({
           id: genId(),
           kind: "image",
-          name: file.name || "粘贴图片",
+          name: file.name || filePath.split(/[\\/]/).pop() || "粘贴图片",
           dataUrl: String(reader.result),
+          filePath,
         });
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);

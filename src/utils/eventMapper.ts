@@ -535,7 +535,9 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
 }
 
 function normalizeUserContent(content: string): string {
-  return content
+  const attachmentMarkerIndex = content.search(/(?:^|\n)附件文件：/);
+  const visibleContent = attachmentMarkerIndex >= 0 ? content.slice(0, attachmentMarkerIndex) : content;
+  return visibleContent
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line && !/^\[图片(?::[^\]]*)?\]$/.test(line))
@@ -551,6 +553,13 @@ function getUserImageSignature(event: Extract<TimelineEvent, { type: "user_messa
 
 function hasDisplayableImages(images?: { dataUrl?: string }[]) {
   return Boolean(images?.some((image) => typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")));
+}
+
+function shouldPreserveLocalUserImages(
+  local: Extract<TimelineEvent, { type: "user_message" }>,
+  incoming: Extract<TimelineEvent, { type: "user_message" }>,
+) {
+  return hasDisplayableImages(local.images) && !hasDisplayableImages(incoming.images);
 }
 
 function readTimestampCandidate(value: unknown): number | null {
@@ -1031,6 +1040,9 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           return existing;
         }
         if (lastContent === incomingContent && incomingContent.length === 0) {
+          if (shouldPreserveLocalUserImages(lastUser, incoming)) {
+            return existing;
+          }
           if (getUserImageSignature(lastUser) === getUserImageSignature(incoming)) {
             return existing;
           }
