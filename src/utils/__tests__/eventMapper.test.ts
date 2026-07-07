@@ -961,6 +961,26 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "question_request" }>).status).toBe("answered");
   });
 
+  it("preserves official question and option ids from history", () => {
+    const event = mapStreamEvent({
+      type: "QuestionRequest",
+      timestamp: 10,
+      payload: {
+        id: "ask-1",
+        questions: [{
+          id: "q_0",
+          question: "请选择",
+          options: [{ id: "opt_0_1", label: "继续", description: "继续执行" }],
+        }],
+      },
+    });
+
+    expect(event?.type).toBe("question_request");
+    const question = event as Extract<TimelineEvent, { type: "question_request" }>;
+    expect(question.questions[0].id).toBe("q_0");
+    expect(question.questions[0].options[0]).toMatchObject({ id: "opt_0_1", label: "继续" });
+  });
+
   it("updates tool_result and linked tool_call", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "read", status: "running", arguments: {} },

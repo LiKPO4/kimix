@@ -872,10 +872,12 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         rpcRequestId: isString(payload.rpc_request_id) ? payload.rpc_request_id : (isString(payload.id) ? payload.id : ""),
         toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : "",
         questions: questions.map((question) => ({
+          id: isString(question.id) ? question.id : undefined,
           question: isString(question.question) ? question.question : "请选择后续处理方式？",
           header: isString(question.header) ? question.header : undefined,
           multiSelect: typeof question.multi_select === "boolean" ? question.multi_select : false,
           options: (Array.isArray(question.options) ? question.options.filter(isRecord) : []).map((option) => ({
+            id: isString(option.id) ? option.id : undefined,
             label: isString(option.label) ? option.label : "选项",
             description: isString(option.description) ? option.description : undefined,
           })),

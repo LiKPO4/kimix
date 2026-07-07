@@ -287,15 +287,18 @@ describe("SDK request mapping", () => {
     const event = mapKimiCodeQuestionRequest({
       toolCallId: "ask-1",
       questions: [{
+        id: "q-mode",
         header: "模式",
         question: "请选择",
-        options: [{ label: "继续", description: "继续当前计划" }],
+        options: [{ id: "opt-continue", label: "继续", description: "继续当前计划" }],
       }],
     }, testOptions());
 
     expect(event?.type).toBe("question_request");
     const question = event as Extract<TimelineEvent, { type: "question_request" }>;
     expect(question.requestId).toBe("ask-1");
+    expect(question.questions[0].id).toBe("q-mode");
+    expect(question.questions[0].options[0].id).toBe("opt-continue");
     expect(question.questions[0].options[0].label).toBe("继续");
     expect(question.status).toBe("pending");
   });

@@ -321,6 +321,7 @@ export interface QuestionRequestEvent {
 }
 
 export interface QuestionRequestItem {
+  id?: string;
   question: string;
   header?: string;
   multiSelect?: boolean;
@@ -328,6 +329,7 @@ export interface QuestionRequestItem {
 }
 
 export interface QuestionRequestOption {
+  id?: string;
   label: string;
   description?: string;
 }

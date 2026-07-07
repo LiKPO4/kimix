@@ -15,6 +15,20 @@ function optionKey(question: string, label: string) {
   return `${question}::${label}`;
 }
 
+type QuestionItem = Extract<TimelineEvent, { type: "question_request" }>["questions"][number];
+
+function questionAnswerKey(question: QuestionItem) {
+  return question.question;
+}
+
+function savedAnswerForQuestion(event: Extract<TimelineEvent, { type: "question_request" }>, question: QuestionItem) {
+  return event.answers?.[question.question]?.trim() || (question.id ? event.answers?.[question.id]?.trim() : undefined) || "";
+}
+
+function optionLabelForSavedValue(question: QuestionItem, value: string) {
+  return question.options.find((option) => option.label === value || option.id === value)?.label;
+}
+
 export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -22,26 +36,26 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
   const initialAnswers = useMemo<LocalAnswers>(() => {
     const next: LocalAnswers = {};
     event.questions.forEach((question) => {
-      const saved = event.answers?.[question.question]?.trim();
+      const key = questionAnswerKey(question);
+      const saved = savedAnswerForQuestion(event, question);
       if (saved) {
-        const labels = question.options.map((option) => option.label);
-        next[question.question] = question.multiSelect
-          ? saved.split(/\s*,\s*/).filter((item) => labels.includes(item))
-          : labels.includes(saved) ? [saved] : [];
+        next[key] = question.multiSelect
+          ? saved.split(/\s*,\s*/).map((item) => optionLabelForSavedValue(question, item)).filter((item): item is string => Boolean(item))
+          : optionLabelForSavedValue(question, saved) ? [optionLabelForSavedValue(question, saved) as string] : [];
         return;
       }
       const first = event.status === "pending" ? question.options[0]?.label : undefined;
-      next[question.question] = first ? [first] : [];
+      next[key] = first ? [first] : [];
     });
     return next;
   }, [event.answers, event.questions, event.status]);
   const initialCustomAnswers = useMemo<Record<string, string>>(() => {
     const next: Record<string, string> = {};
     event.questions.forEach((question) => {
-      const saved = event.answers?.[question.question]?.trim();
+      const key = questionAnswerKey(question);
+      const saved = savedAnswerForQuestion(event, question);
       if (!saved) return;
-      const labels = question.options.map((option) => option.label);
-      if (!labels.includes(saved)) next[question.question] = saved;
+      if (!optionLabelForSavedValue(question, saved)) next[key] = saved;
     });
     return next;
   }, [event.answers, event.questions]);
@@ -86,13 +100,14 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
   const buildAnswerPayload = () => {
     const payload: Record<string, string> = {};
     event.questions.forEach((question) => {
-      const custom = customAnswers[question.question]?.trim();
-      if (custom && customSelected[question.question]) {
-        payload[question.question] = custom;
+      const key = questionAnswerKey(question);
+      const custom = customAnswers[key]?.trim();
+      if (custom && customSelected[key]) {
+        payload[key] = custom;
         return;
       }
-      const selected = answers[question.question] ?? [];
-      payload[question.question] = selected.join(", ");
+      const selected = answers[key] ?? [];
+      payload[key] = selected.join(", ");
     });
     return payload;
   };
@@ -177,9 +192,10 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
 
         <div className="flex flex-col" style={{ gap: 18 }}>
           {event.questions.map((question, questionIndex) => {
-            const selected = answers[question.question] ?? [];
-            const customValue = customAnswers[question.question] ?? "";
-            const customActive = Boolean(customSelected[question.question] && customValue.trim().length > 0);
+            const key = questionAnswerKey(question);
+            const selected = answers[key] ?? [];
+            const customValue = customAnswers[key] ?? "";
+            const customActive = Boolean(customSelected[key] && customValue.trim().length > 0);
             return (
               <div key={`${question.question}-${questionIndex}`} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 17 }}>
                 <div className="flex items-center" style={{ gap: 12, minHeight: 30 }}>
@@ -198,7 +214,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
                         key={optionKey(question.question, option.label)}
                         type="button"
                         disabled={!isPending || isSubmitting}
-                        onClick={() => setQuestionAnswer(question.question, option.label, question.multiSelect)}
+                        onClick={() => setQuestionAnswer(key, option.label, question.multiSelect)}
                         className={`flex w-full items-center rounded-xl border text-left text-[13.5px] transition-colors disabled:cursor-not-allowed ${active ? "border-accent-primary bg-accent-primary-light text-accent-primary-dark" : "border-border-subtle bg-surface-elevated text-text-primary hover:bg-surface-hover"}`}
                         style={{ gap: 10, minHeight: 62, paddingLeft: 13, paddingRight: 13, paddingTop: 10, paddingBottom: 10 }}
                         title={option.description}
@@ -217,9 +233,9 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
                 {(isPending || customValue) && (
                   <input
                     value={customValue}
-                    onChange={(inputEvent) => setQuestionCustomAnswer(question.question, inputEvent.target.value)}
-                    onClick={() => selectQuestionCustomAnswer(question.question)}
-                    onFocus={() => selectQuestionCustomAnswer(question.question)}
+                    onChange={(inputEvent) => setQuestionCustomAnswer(key, inputEvent.target.value)}
+                    onClick={() => selectQuestionCustomAnswer(key)}
+                    onFocus={() => selectQuestionCustomAnswer(key)}
                     placeholder="其他回答（可选）"
                     className={`w-full rounded-xl border text-[13.5px] outline-none transition-colors placeholder:text-text-muted ${customActive ? "border-accent-primary bg-accent-primary-light text-accent-primary-dark" : "border-border-subtle bg-surface-base text-text-primary focus:border-accent-primary-soft focus:bg-surface-elevated"}`}
                     style={{ height: 40, marginTop: 14, paddingLeft: 14, paddingRight: 14 }}

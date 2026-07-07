@@ -572,6 +572,7 @@ export function mapKimiCodeQuestionRequest(
     rpcRequestId: requestId,
     toolCallId: isString(request.toolCallId) ? request.toolCallId : "",
     questions: questions.map((question) => ({
+      id: isString(question.id) ? question.id : undefined,
       question: isString(question.question)
         ? question.question
         : (isString(question.label) ? question.label : "请选择后续处理方式？"),
@@ -581,10 +582,12 @@ export function mapKimiCodeQuestionRequest(
         : (typeof question.multi_select === "boolean" ? question.multi_select : false),
       options: [
         ...(Array.isArray(question.options) ? question.options.filter(isRecord) : []).map((option) => ({
+          id: isString(option.id) ? option.id : undefined,
           label: isString(option.label) ? option.label : "选项",
           description: isString(option.description) ? option.description : undefined,
         })),
         ...(isString(question.otherLabel) ? [{
+          id: isString(question.otherId) ? question.otherId : undefined,
           label: question.otherLabel,
           description: isString(question.otherDescription) ? question.otherDescription : undefined,
         }] : []),

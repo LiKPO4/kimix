@@ -2504,10 +2504,13 @@ function toServerQuestionAnswers(
   const questions = Array.isArray(request?.questions) ? request.questions : [];
   return Object.fromEntries(questions.flatMap((raw) => {
     if (!raw || typeof raw !== "object") return [];
-    const question = raw as { id?: unknown; options?: unknown };
+    const question = raw as { id?: unknown; question?: unknown; label?: unknown; options?: unknown };
     if (typeof question.id !== "string") return [];
     if (skipped) return [[question.id, { kind: "skipped" }]];
-    const value = answers[question.id];
+    const readableQuestion = typeof question.question === "string"
+      ? question.question
+      : (typeof question.label === "string" ? question.label : undefined);
+    const value = answers[question.id] ?? (readableQuestion ? answers[readableQuestion] : undefined);
     const options = Array.isArray(question.options) ? question.options : [];
     const option = options.find((rawOption) => {
       if (!rawOption || typeof rawOption !== "object") return false;
