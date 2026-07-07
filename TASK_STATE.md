@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-07 v2.14.70 Swarm 展示收敛到 Kimi Web inline
+
+- 当前目标：让 Swarm 在 Kimi Web 过程展示模式下不再同时出现输入区浮动面板和消息流 inline 卡片。
+- 修复：Kimi Web 模式隐藏 Composer 上方浮动 `SwarmPanel` 及右侧收起恢复入口；Kimix 模式继续保留浮动面板。
+- 修复：Kimi Web 模式下如果 Swarm 子代理事件先于 assistant 正文出现，会生成空 assistant 承载 `leadingSubagents`，确保实时进度仍进入消息流 inline 过程卡。
+- 下一步：实机用 Swarm 会话验证 Kimi Web 模式只显示消息流内子代理卡，Kimix 模式仍显示输入区上方浮动卡。
+
 ## 2026-07-05 v2.14.44 活跃轮次刷新恢复与正文漏流回补
 
 - 根因一：Ctrl+R 后启动恢复无条件结算历史事件并清空 `runningSessionId`，没有复核主进程仍存活的官方 turn。

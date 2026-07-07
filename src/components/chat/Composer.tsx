@@ -442,6 +442,7 @@ export function Composer() {
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
+  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const clarificationLockedByYolo = permissionMode === "yolo";
   const effectiveClarificationToolMode = clarificationLockedByYolo ? "off" : clarificationToolMode;
 
@@ -2475,6 +2476,7 @@ export function Composer() {
   const visibleSwarmAgents = activeSession ? getVisibleSwarmAgents(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
   const swarmHidden = hiddenCards.includes("swarm");
+  const showFloatingSwarmPanel = processDisplayMode !== "kimi-web";
   const pendingHidden = hiddenCards.includes("pending");
   const goalHidden = hiddenCards.includes("goal");
   const currentGoal = activeSession?.officialGoal?.goal ?? null;
@@ -2506,7 +2508,7 @@ export function Composer() {
         />
       )}
 
-      {activeSession && visibleSwarmAgents.length > 0 && !swarmHidden && (
+      {activeSession && showFloatingSwarmPanel && visibleSwarmAgents.length > 0 && !swarmHidden && (
         <SwarmPanel
           events={activeSession.events}
           onDismiss={() => hideComposerCard("swarm", "Swarm 子进程")}

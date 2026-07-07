@@ -285,6 +285,7 @@ export function AppShell() {
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
+  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
   const addSession = useSessionStore((s) => s.addSession);
@@ -988,6 +989,7 @@ export function AppShell() {
     ? { ...btwTransientState, rounds: liveCurrentSession.btwRounds ?? [] }
     : EMPTY_BTW_PANEL_STATE;
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
+  const showFloatingSwarmPanel = processDisplayMode !== "kimi-web";
   const rawCurrentGoal = liveCurrentSession?.officialGoal?.goal ?? null;
   const currentGoal = rawCurrentGoal && !isTerminalGoalStatus(rawCurrentGoal.status) ? rawCurrentGoal : null;
   const currentGoalStatus = currentGoal?.status ?? "";
@@ -1009,7 +1011,7 @@ export function AppShell() {
           icon: MessageSquarePlus,
         }
       : null,
-    hiddenComposerCardList.includes("swarm") && visibleSwarmAgents.length > 0
+    hiddenComposerCardList.includes("swarm") && showFloatingSwarmPanel && visibleSwarmAgents.length > 0
       ? {
           key: "swarm" as const,
           title: "Swarm 子进程",
