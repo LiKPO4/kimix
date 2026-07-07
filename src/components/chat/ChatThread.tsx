@@ -898,13 +898,14 @@ export const ChatThread = memo(function ChatThread() {
       const viewportBottom = nodeRect.top + node.clientHeight;
       const delta = lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - viewportBottom;
       const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      const candidate = node.scrollTop + delta;
       // When content shrinks (e.g. a multi-line thinking block collapses to its
-      // one-line teaser), the last item can end up above the viewport and delta
-      // becomes a large negative number. In that case scroll to the new bottom
-      // instead of undershooting and leaving the viewport far above the content.
-      targetTop = delta >= 0
-        ? Math.min(maxScrollTop, node.scrollTop + delta)
-        : maxScrollTop;
+      // one-line teaser), delta becomes negative. Preserve the current viewport
+      // position as long as the resulting scroll position is still valid; only
+      // snap to the new bottom when even scrolling to the top would leave the
+      // last item above its target. This avoids the jarring jump caused by the
+      // previous "always snap to maxScrollTop when delta < 0" behavior.
+      targetTop = candidate < 0 ? maxScrollTop : Math.min(maxScrollTop, candidate);
     } else {
       targetTop = Math.max(0, node.scrollHeight - node.clientHeight);
     }
@@ -918,6 +919,8 @@ export const ChatThread = memo(function ChatThread() {
         beforeScrollTop,
         beforeScrollHeight,
         targetTop,
+        delta,
+        candidate,
         itemCount: items.length,
         lastItemOffsetTop: lastItem?.offsetTop,
         lastItemOffsetHeight: lastItem?.offsetHeight,
