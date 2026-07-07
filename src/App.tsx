@@ -1970,8 +1970,11 @@ function App() {
       const latestLocalSession = [...localSessions]
         .filter((session) => !session.archivedAt && !isHiddenInternalSession(session))
         .sort(compareSessionsByRecentConversation)[0];
+      const activeContextSession = activeContext?.sessionId
+        ? findSessionByRuntimeIdentity(localSessions, activeContext.sessionId)
+        : undefined;
       const activeLocalSession = activeContext?.sessionId
-        ? findSessionByRuntimeIdentity(localSessions, activeContext.sessionId) ?? latestLocalSession
+        ? activeContextSession
         : latestLocalSession;
 
       window.api.listRecentProjects().then(async (projectsRes) => {
@@ -2002,6 +2005,7 @@ function App() {
             try {
               const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
               const activeRuntimeIds = new Set([
+                activeContext?.sessionId,
                 activeLocalSession?.id,
                 activeLocalSession?.officialSessionId,
                 activeLocalSession?.runtimeSessionId,
