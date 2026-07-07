@@ -953,7 +953,7 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
         </button>
       ) : (
         <div
-          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
+          className="text-left text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
           style={{ whiteSpace: "pre-wrap" }}
         >
           {block.text}
@@ -961,7 +961,7 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
       )}
       {expanded && isFoldable && (
         <div
-          className="text-[14.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
+          className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
           style={{ whiteSpace: "pre-wrap" }}
         >
           {block.text}

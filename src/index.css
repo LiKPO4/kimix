@@ -2207,6 +2207,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-thinking-detail .markdown-body {
+  font-size: 14px;
   color: var(--kimix-process-muted);
 }
 
