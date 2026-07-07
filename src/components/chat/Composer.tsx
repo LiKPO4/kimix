@@ -7,7 +7,6 @@ import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, Clarific
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
-import { SwarmPanel, getVisibleSwarmAgents } from "./SwarmPanel";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
@@ -442,7 +441,6 @@ export function Composer() {
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
-  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const clarificationLockedByYolo = permissionMode === "yolo";
   const effectiveClarificationToolMode = clarificationLockedByYolo ? "off" : clarificationToolMode;
 
@@ -2473,10 +2471,7 @@ export function Composer() {
   const composerCardSessionId = activeSession?.id ?? "__global__";
   const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
   const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
-  const visibleSwarmAgents = activeSession ? getVisibleSwarmAgents(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
-  const swarmHidden = hiddenCards.includes("swarm");
-  const showFloatingSwarmPanel = processDisplayMode !== "kimi-web";
   const pendingHidden = hiddenCards.includes("pending");
   const goalHidden = hiddenCards.includes("goal");
   const currentGoal = activeSession?.officialGoal?.goal ?? null;
@@ -2505,13 +2500,6 @@ export function Composer() {
         <TodoPanel
           events={activeSession.events}
           onDismiss={() => hideComposerCard("todo", "TodoList")}
-        />
-      )}
-
-      {activeSession && showFloatingSwarmPanel && visibleSwarmAgents.length > 0 && !swarmHidden && (
-        <SwarmPanel
-          events={activeSession.events}
-          onDismiss={() => hideComposerCard("swarm", "Swarm 子进程")}
         />
       )}
 

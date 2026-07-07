@@ -5,7 +5,6 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Composer } from "@/components/chat/Composer";
 import { ContextBar } from "@/components/chat/ContextBar";
 import { getVisibleTodos } from "@/components/chat/TodoPanel";
-import { getVisibleSwarmAgents } from "@/components/chat/SwarmPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { SearchOverlay } from "./SearchOverlay";
 import { SkillsPanel } from "./SkillsPanel";
@@ -18,7 +17,6 @@ import {
   FileText,
   LucideIcon,
   MessageSquarePlus,
-  Network,
   Target,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
@@ -285,7 +283,6 @@ export function AppShell() {
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
-  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
   const addSession = useSessionStore((s) => s.addSession);
@@ -934,7 +931,6 @@ export function AppShell() {
     [liveCurrentSession?.events],
   );
   const latestTodos = useMemo(() => getVisibleTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
-  const visibleSwarmAgents = useMemo(() => getVisibleSwarmAgents(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
   const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
   const btwSessionId = liveCurrentSession?.id ?? "__global__";
 
@@ -989,7 +985,6 @@ export function AppShell() {
     ? { ...btwTransientState, rounds: liveCurrentSession.btwRounds ?? [] }
     : EMPTY_BTW_PANEL_STATE;
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
-  const showFloatingSwarmPanel = processDisplayMode !== "kimi-web";
   const rawCurrentGoal = liveCurrentSession?.officialGoal?.goal ?? null;
   const currentGoal = rawCurrentGoal && !isTerminalGoalStatus(rawCurrentGoal.status) ? rawCurrentGoal : null;
   const currentGoalStatus = currentGoal?.status ?? "";
@@ -1009,14 +1004,6 @@ export function AppShell() {
           title: "排队消息",
           desc: `${pendingMessages.length} 条消息正在排队`,
           icon: MessageSquarePlus,
-        }
-      : null,
-    hiddenComposerCardList.includes("swarm") && showFloatingSwarmPanel && visibleSwarmAgents.length > 0
-      ? {
-          key: "swarm" as const,
-          title: "Swarm 子进程",
-          desc: `${visibleSwarmAgents.filter((agent) => agent.status === "completed").length}/${visibleSwarmAgents.length} 已完成`,
-          icon: Network,
         }
       : null,
     hiddenComposerCardList.includes("goal") && hasVisibleGoalModeCard

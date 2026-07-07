@@ -22,7 +22,7 @@ import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUs
 import { logError } from "@/utils/reportError";
 import { scrollTopPreservingBottomDistance } from "@/utils/scrollIntent";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
-import type { LongTaskSessionMeta, ProcessDisplayMode, TimelineEvent, ToolCallEvent } from "@/types/ui";
+import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type RenderItem =
   | { type: "event"; event: TimelineEvent; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
@@ -442,10 +442,8 @@ function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
   attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
-  processDisplayMode: ProcessDisplayMode = "kimix",
 ): RenderItem[] {
   const items: RenderItem[] = [];
-  const renderSwarmInline = processDisplayMode === "kimi-web";
 
   const pushStandaloneTools = (tools: ToolCallEvent[], turnStartedAt?: number) => {
     if (tools.length === 0) return;
@@ -649,7 +647,7 @@ function buildRenderItems(
         .filter(shouldRenderStandaloneStatusUpdate)
         .forEach((event) => items.push({ type: "event", event }));
     }
-    if (!assistantAttached && renderSwarmInline && subagents.length > 0) {
+    if (!assistantAttached && subagents.length > 0) {
       items.push({
         type: "event",
         event: createSubagentOnlyAssistantEvent(subagents),
@@ -658,11 +656,8 @@ function buildRenderItems(
         trailingStatuses: [],
       });
       assistantAttached = true;
-    } else if (!assistantAttached && subagents.length === 1) {
-      subagents.forEach((event) => items.push({ type: "event", event }));
     }
-    // Kimix mode keeps multi-agent Swarm progress in the floating SwarmPanel.
-    // Kimi Web mode renders it inline above so the Web-style process stream stays authoritative.
+    // Subagent progress belongs to the message stream so it stays aligned with the turn timeline.
   };
 
   let turnBody: TimelineEvent[] = [];
@@ -767,7 +762,6 @@ export const ChatThread = memo(function ChatThread() {
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
-  const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const updateSession = useSessionStore((s) => s.updateSession);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
@@ -825,8 +819,8 @@ export const ChatThread = memo(function ChatThread() {
   );
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(
-    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, processDisplayMode),
-    [visibleEvents, session?.engine, splitEvents.attachedByUserId, processDisplayMode]
+    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId),
+    [visibleEvents, session?.engine, splitEvents.attachedByUserId]
   );
   const contentVersion = useMemo(() => {
     return (session?.events ?? []).map((event) => {
