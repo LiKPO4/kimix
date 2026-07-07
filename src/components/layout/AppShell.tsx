@@ -1766,7 +1766,10 @@ ${isFinalStep
   };
 
   return (
-    <div className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary">
+    <div
+      className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary"
+      style={{ height: "100%", minHeight: 0 }}
+    >
         <TopMenuBar
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
@@ -1779,14 +1782,20 @@ ${isFinalStep
         onOpenUpdates={() => setHelpDialog("updates")}
       />
 
-      <div style={{ paddingBottom: 0, paddingRight: 0, gap: 0 }} className="flex min-h-0 flex-1">
+      <div
+        style={{ height: "100%", minHeight: 0, paddingBottom: 0, paddingRight: 0, gap: 0, overflow: "hidden" }}
+        className="flex flex-1"
+      >
         <Sidebar width={sidebarWidth} />
         {sidebarOpen ? (
           <ResizeHandle ariaLabel="调整左侧栏宽度" onPointerDown={startSidebarResize} />
         ) : (
           <div className="kimix-layout-spacer" />
         )}
-        <main className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+        <main
+          className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]"
+          style={{ height: "100%", minHeight: 0 }}
+        >
           {chatWorkspaceActive && (
             <SessionToolbar
               title={sessionTitle}
@@ -1831,7 +1840,7 @@ ${isFinalStep
             />
           ) : (
             <>
-              <div className="relative min-h-0 flex-1 overflow-hidden">
+              <div className="relative flex-1 overflow-hidden" style={{ minHeight: 0 }}>
                 <ChatThread />
               </div>
               <div className="kimix-app-shell-footer kimix-content-x shrink-0" style={{ paddingTop: 10, paddingBottom: 10 }}>

@@ -1974,7 +1974,7 @@ export const ChatThread = memo(function ChatThread() {
 
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full" style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
       {session.longTask && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
           <div className="kimix-chat-stream-column pointer-events-auto">
