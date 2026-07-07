@@ -897,7 +897,14 @@ export const ChatThread = memo(function ChatThread() {
       const lastItemBottom = lastItem.getBoundingClientRect().bottom;
       const viewportBottom = nodeRect.top + node.clientHeight;
       const delta = lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - viewportBottom;
-      targetTop = Math.max(0, node.scrollTop + delta);
+      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      // When content shrinks (e.g. a multi-line thinking block collapses to its
+      // one-line teaser), the last item can end up above the viewport and delta
+      // becomes a large negative number. In that case scroll to the new bottom
+      // instead of undershooting and leaving the viewport far above the content.
+      targetTop = delta >= 0
+        ? Math.min(maxScrollTop, node.scrollTop + delta)
+        : maxScrollTop;
     } else {
       targetTop = Math.max(0, node.scrollHeight - node.clientHeight);
     }
