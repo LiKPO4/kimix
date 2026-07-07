@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-07 v2.14.79 Release notes 准备
+
+- 当前目标：为已完成的 0.23.0 对齐与本轮修复补齐专属 Release notes，避免发版时复用旧说明。
+- 已完成：新增 `docs/release-notes/v2.14.79.md`，按功能、修复、改进聚合 `v2.14.56..HEAD` 的 34 个 commit。
+- 下一步：验证并提交；如用户确认发布，再推送 `master` 并打 `v2.14.79` tag 触发 GitHub Actions。
+
 ## 2026-07-07 Kimi Code 0.23.0 对齐 TodoList
 
 - [x] 官方 Web 本地消息队列：展示、删除、重排、附件状态保留。
