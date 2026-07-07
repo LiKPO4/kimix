@@ -10,6 +10,7 @@ import "katex/dist/katex.min.css";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
+import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 
 interface MarkdownRendererProps {
@@ -290,6 +291,22 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
         const safe = href?.startsWith("http://") || href?.startsWith("https://") || href?.startsWith("mailto:");
         if (!safe) {
           return <span className="text-text-secondary">{children}</span>;
+        }
+        const split = splitCjkTrailingTextFromAutolink(nodeText(children));
+        if (split) {
+          return (
+            <>
+              <a
+                href={split.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-blue hover:underline"
+              >
+                {split.linkText}
+              </a>
+              {split.trailingText}
+            </>
+          );
         }
         return (
           <a
