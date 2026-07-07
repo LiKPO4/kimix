@@ -20,7 +20,9 @@ export function formatEventAsMarkdown(event: TimelineEvent): string {
   if (event.type === "error") return `> 错误：${event.message}`;
   if (event.type === "todo") return `> TodoList：${event.items.length} 项`;
   if (event.type === "session_recommendation") return `> 会话建议：已进行 ${event.turnCount} 轮，推荐上限 ${event.turnLimit} 轮。`;
-  if (event.type === "compaction") return `> 上下文压缩${event.phase === "begin" ? "开始" : "完成"}`;
+  if (event.type === "compaction") return event.summary
+    ? `> 上下文压缩${event.phase === "begin" ? "开始" : "完成"}\n\n${event.summary}`
+    : `> 上下文压缩${event.phase === "begin" ? "开始" : "完成"}`;
   if (event.type === "diff") return `> Diff：${event.filePath}`;
   if (event.type === "approval_request") return `> 审批请求：${event.description}`;
   if (event.type === "question_request") return `> 需求澄清：${event.questions.map((question) => question.question).join(" / ")}`;

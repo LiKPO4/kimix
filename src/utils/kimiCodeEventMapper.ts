@@ -54,6 +54,35 @@ function normalizeResult(event: Record<string, unknown>): unknown {
   return result ?? "";
 }
 
+function nestedString(value: unknown, key: string): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const nestedValue = value[key];
+  return isString(nestedValue) && nestedValue.trim() ? nestedValue.trim() : undefined;
+}
+
+function extractCompactionSummary(event: Record<string, unknown>): string | undefined {
+  const direct =
+    nestedString(event, "summary") ??
+    nestedString(event, "compaction_summary") ??
+    nestedString(event, "text") ??
+    nestedString(event, "message");
+  if (direct) return direct;
+
+  const result =
+    nestedString(event.result, "summary") ??
+    nestedString(event.result, "compaction_summary") ??
+    nestedString(event.result, "text") ??
+    nestedString(event.result, "message");
+  if (result) return result;
+
+  const payload =
+    nestedString(event.payload, "summary") ??
+    nestedString(event.payload, "compaction_summary") ??
+    nestedString(event.payload, "text") ??
+    nestedString(event.payload, "message");
+  return payload;
+}
+
 function normalizeToolDisplay(event: Record<string, unknown>): Extract<TimelineEvent, { type: "tool_result" }>["display"] | undefined {
   const result = isRecord(event.result) ? event.result : {};
   const output = "output" in event ? event.output : result.output;
@@ -505,6 +534,7 @@ export function mapKimiCodeEvent(
         type: "compaction",
         timestamp,
         phase: "end",
+        summary: extractCompactionSummary(event),
       };
 
     case "error":

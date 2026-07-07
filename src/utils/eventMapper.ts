@@ -52,6 +52,39 @@ function payloadString(payload: Record<string, unknown>, source: Record<string, 
   return isString(value) ? value : undefined;
 }
 
+function nestedString(value: unknown, key: string): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const nestedValue = value[key];
+  return isString(nestedValue) && nestedValue.trim() ? nestedValue.trim() : undefined;
+}
+
+function compactSummaryFromRecord(record: Record<string, unknown>): string | undefined {
+  const direct =
+    nestedString(record, "summary") ??
+    nestedString(record, "compaction_summary") ??
+    nestedString(record, "text") ??
+    nestedString(record, "message");
+  if (direct) return direct;
+
+  const result =
+    nestedString(record.result, "summary") ??
+    nestedString(record.result, "compaction_summary") ??
+    nestedString(record.result, "text") ??
+    nestedString(record.result, "message");
+  if (result) return result;
+
+  const payload =
+    nestedString(record.payload, "summary") ??
+    nestedString(record.payload, "compaction_summary") ??
+    nestedString(record.payload, "text") ??
+    nestedString(record.payload, "message");
+  return payload;
+}
+
+function extractCompactionSummary(payload: Record<string, unknown>, source: Record<string, unknown>): string | undefined {
+  return compactSummaryFromRecord(payload) ?? compactSummaryFromRecord(source);
+}
+
 function mergeToolResult(current: unknown, incoming: unknown): unknown {
   if (incoming === undefined) return current;
   if (current === undefined) return incoming;
@@ -693,6 +726,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         type: "compaction",
         timestamp: eventTimestamp,
         phase: "end",
+        summary: extractCompactionSummary(payload, source),
       };
 
     case "TurnBegin": {
@@ -971,6 +1005,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         type: "compaction",
         timestamp: eventTimestamp,
         phase: "end",
+        summary: extractCompactionSummary(payload, source),
       };
 
     case "SubagentEvent": {

@@ -187,6 +187,12 @@ describe("mapStreamEvent", () => {
     const end = mapStreamEvent({ type: "CompactionEnd", payload: {} });
     expect(end?.type).toBe("compaction");
     expect((end as Extract<TimelineEvent, { type: "compaction" }>).phase).toBe("end");
+
+    const endWithSummary = mapStreamEvent({
+      type: "CompactionEnd",
+      payload: { summary: "保留用户目标和已完成文件列表。" },
+    });
+    expect((endWithSummary as Extract<TimelineEvent, { type: "compaction" }>).summary).toBe("保留用户目标和已完成文件列表。");
   });
 
   it("strips Kimix clarification instructions from user input", () => {

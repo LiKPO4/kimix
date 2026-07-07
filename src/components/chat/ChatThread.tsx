@@ -244,7 +244,7 @@ function CompactionLabel({
   const isStale = event.phase === "begin" && !isSessionRunning && elapsed >= COMPACTION_STALE_MS;
   const dots = useAnimatedDots(event.phase === "begin" && !isStale);
   if (isStale) return <>上下文压缩可能已卡住，可重新尝试</>;
-  if (event.phase === "end") return <>上下文压缩完成</>;
+  if (event.phase === "end") return <>{event.summary ? "上下文压缩完成，已生成摘要" : "上下文压缩完成"}</>;
   if (isLongRunning) {
     return (
       <>
@@ -397,7 +397,21 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
         </div>
       );
     case "compaction":
-      return (
+      return event.phase === "end" && event.summary ? (
+        <div className="flex justify-center" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <div
+            className="w-full max-w-[680px] rounded-xl bg-surface-hover text-text-muted"
+            style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 10, paddingBottom: 12 }}
+          >
+            <div style={{ fontSize: 13, lineHeight: "18px", marginBottom: 8 }}>
+              <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
+            </div>
+            <div className="text-text-secondary" style={{ fontSize: 13, lineHeight: "21px" }}>
+              <MarkdownRenderer content={event.summary} wrapLongLines />
+            </div>
+          </div>
+        </div>
+      ) : (
         <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
           <div
             className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-text-muted"

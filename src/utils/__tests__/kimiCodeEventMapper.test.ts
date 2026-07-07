@@ -148,7 +148,7 @@ describe("mapKimiCodeEvent", () => {
     const intermediateStepCompleted = mapKimiCodeEvent({ type: "turn.step.completed", step: 6, finishReason: "tool_use" }, options);
     const finalStepCompleted = mapKimiCodeEvent({ type: "turn.step.completed", step: 7, finishReason: "end_turn" }, options);
     const interrupted = mapKimiCodeEvent({ type: "turn.step.interrupted", step: 2, message: "cancelled" }, options);
-    const compaction = mapKimiCodeEvent({ type: "compaction.completed" }, options);
+    const compaction = mapKimiCodeEvent({ type: "compaction.completed", result: { summary: "压缩后保留当前任务清单。" } }, options);
     const error = mapKimiCodeEvent({ type: "error", message: "broken" }, options);
 
     expect(status?.type).toBe("status_update");
@@ -177,6 +177,7 @@ describe("mapKimiCodeEvent", () => {
     expect((interrupted as Extract<TimelineEvent, { type: "status_update" }>).message).toBe("输出打断");
     expect(compaction?.type).toBe("compaction");
     expect((compaction as Extract<TimelineEvent, { type: "compaction" }>).phase).toBe("end");
+    expect((compaction as Extract<TimelineEvent, { type: "compaction" }>).summary).toBe("压缩后保留当前任务清单。");
     expect(error?.type).toBe("error");
     expect((error as Extract<TimelineEvent, { type: "error" }>).source).toBe("sdk");
   });

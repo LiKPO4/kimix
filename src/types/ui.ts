@@ -410,6 +410,7 @@ export interface CompactionEvent {
   type: "compaction";
   timestamp: number;
   phase: "begin" | "end";
+  summary?: string;
 }
 
 export interface ErrorEvent {
