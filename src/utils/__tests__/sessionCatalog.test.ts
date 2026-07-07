@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session } from "@/types/ui";
-import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "../sessionCatalog";
+import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog, selectStartupOfficialSession, shouldHideOfficialSessionPlaceholder } from "../sessionCatalog";
 
 function localSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -17,6 +17,13 @@ function localSession(overrides: Partial<Session> = {}): Session {
 }
 
 describe("reconcileOfficialSessionCatalog", () => {
+  it("启动时没有明确恢复身份则目录首项不抢占当前会话", () => {
+    const sessions = [{ id: "newest" }, { id: "older" }];
+
+    expect(selectStartupOfficialSession(sessions, new Set())).toBeUndefined();
+    expect(selectStartupOfficialSession(sessions, new Set(["older"]))).toEqual({ id: "older" });
+  });
+
   it("把全部官方非归档目录项补成本地轻量会话", () => {
     const result = reconcileOfficialSessionCatalog([], [
       { id: "official-1", workDir: "D:\\work\\demo", updatedAt: 200, brief: "第一条" },

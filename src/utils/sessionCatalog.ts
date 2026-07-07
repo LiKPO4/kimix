@@ -16,6 +16,14 @@ export interface OfficialSessionCatalogItem {
   metadata?: Record<string, unknown>;
 }
 
+export function selectStartupOfficialSession<T extends { id: string }>(
+  sessions: T[],
+  activeRuntimeIds: ReadonlySet<string>,
+): T | undefined {
+  if (activeRuntimeIds.size === 0) return undefined;
+  return sessions.find((session) => activeRuntimeIds.has(session.id));
+}
+
 function normalizeProjectPath(projectPath: string | undefined) {
   return (projectPath ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }

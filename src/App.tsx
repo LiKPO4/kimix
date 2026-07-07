@@ -10,7 +10,7 @@ import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapp
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
-import { reconcileOfficialSessionCatalog } from "@/utils/sessionCatalog";
+import { reconcileOfficialSessionCatalog, selectStartupOfficialSession } from "@/utils/sessionCatalog";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
@@ -2057,9 +2057,7 @@ function App() {
               useSessionStore.setState((state) => ({
                 sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSummaries, activeProject.path, { source: res.source }),
               }));
-              const latest = (activeRuntimeIds.size > 0
-                ? activeSummaries.find((summary) => activeRuntimeIds.has(summary.id))
-                : undefined) ?? activeSummaries[0];
+              const latest = selectStartupOfficialSession(activeSummaries, activeRuntimeIds);
               const historySessionId = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
               if (!historySessionId) return;
               if (res.source !== "server" && hasArchivedLocalSessionForRuntime(historySessionId, undefined, latest?.id, activeProject.path)) {

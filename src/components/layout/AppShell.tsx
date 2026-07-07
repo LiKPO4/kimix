@@ -1764,11 +1764,16 @@ ${isFinalStep
     setLongTaskInspectorOpen(true);
     setGitDetailsOpenSignal((value) => value + 1);
   };
+  const mainGridRows = chatWorkspaceActive
+    ? previewFile
+      ? "auto minmax(0, 1fr)"
+      : "auto minmax(0, 1fr) auto"
+    : "minmax(0, 1fr)";
 
   return (
     <div
-      className="kimix-app-shell flex h-full w-full flex-col overflow-hidden text-[15px] text-text-primary"
-      style={{ height: "100%", minHeight: 0 }}
+      className="kimix-app-shell grid h-full w-full overflow-hidden text-[15px] text-text-primary"
+      style={{ gridTemplateRows: "48px minmax(0, 1fr)", minHeight: 0 }}
     >
         <TopMenuBar
           sidebarOpen={sidebarOpen}
@@ -1783,8 +1788,8 @@ ${isFinalStep
       />
 
       <div
-        style={{ height: "100%", minHeight: 0, paddingBottom: 0, paddingRight: 0, gap: 0, overflow: "hidden" }}
-        className="flex flex-1"
+        style={{ minHeight: 0, paddingBottom: 0, paddingRight: 0, gap: 0, overflow: "hidden" }}
+        className="flex"
       >
         <Sidebar width={sidebarWidth} />
         {sidebarOpen ? (
@@ -1793,8 +1798,8 @@ ${isFinalStep
           <div className="kimix-layout-spacer" />
         )}
         <main
-          className="kimix-app-shell-main relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]"
-          style={{ height: "100%", minHeight: 0 }}
+          className="kimix-app-shell-main relative grid min-w-0 flex-1 overflow-hidden rounded-[20px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]"
+          style={{ gridTemplateRows: mainGridRows, minHeight: 0 }}
         >
           {chatWorkspaceActive && (
             <SessionToolbar
@@ -1840,7 +1845,7 @@ ${isFinalStep
             />
           ) : (
             <>
-              <div className="relative flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+              <div className="relative overflow-hidden" style={{ minHeight: 0 }}>
                 <ChatThread />
               </div>
               <div className="kimix-app-shell-footer kimix-content-x shrink-0" style={{ paddingTop: 10, paddingBottom: 10 }}>
