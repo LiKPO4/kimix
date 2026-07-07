@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "../kimiCodeSendRetry";
+import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "../kimiCodeSendRetry";
 
 describe("kimiCodeSendRetry", () => {
   afterEach(() => {
@@ -20,6 +20,12 @@ describe("kimiCodeSendRetry", () => {
       "session_c9bf8475-65a8-405e-8674-8640bbcfe46",
     );
     expect(getKimiAlreadyExistsSessionId("fetch failed")).toBeNull();
+  });
+
+  it("recognizes user abort errors", () => {
+    expect(isKimiAbortError("ChatProviderError: Error: Request was aborted.")).toBe(true);
+    expect(isKimiAbortError("AbortError: The operation was aborted")).toBe(true);
+    expect(isKimiAbortError("network unavailable")).toBe(false);
   });
 
   it("does not cancel an active turn after retrying", async () => {

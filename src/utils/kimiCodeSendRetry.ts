@@ -11,6 +11,10 @@ export function isKimiActiveTurnError(message: string) {
   return /another turn .* active|turn .* active|Cannot launch a new turn/i.test(message);
 }
 
+export function isKimiAbortError(message: string) {
+  return /request was aborted|aborted|aborterror|cancelled|canceled/i.test(message);
+}
+
 export function getKimiAlreadyExistsSessionId(message: string) {
   if (!/already exists/i.test(message)) return null;
   return message.match(/Session\s+"([^"]+)"/i)?.[1]

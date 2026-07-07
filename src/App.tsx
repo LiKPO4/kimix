@@ -13,11 +13,11 @@ import { reconcileOfficialSessionCatalog } from "@/utils/sessionCatalog";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
-import { getKimiAlreadyExistsSessionId, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
-import { compareSessionsByRecentConversation, hasOpenTimelineWork, isActiveKimiCodeEngineStatus, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -1774,6 +1774,16 @@ function App() {
             message = recoveryRes.error;
           }
         }
+        if (isKimiAbortError(message)) {
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            events: settleInactiveEvents(session.events.filter((event) => event.id !== placeholderId)),
+            updatedAt: Date.now(),
+          }));
+          syncCurrentSessionFromStore(uiSessionId);
+          setRunningSessionId(null);
+          return;
+        }
         useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
         if (isKimiActiveTurnError(message)) {
           updateSession(uiSessionId, (session) => {
@@ -2720,6 +2730,16 @@ function App() {
               throw new Error(res.error);
             }).catch((err) => {
               const message = err instanceof Error ? err.message : String(err);
+              if (isKimiAbortError(message)) {
+                updateSession(uiSessionId, (session) => ({
+                  ...session,
+                  events: settleInactiveEvents(session.events.filter((event) => event.id !== placeholderId)),
+                  updatedAt: Date.now(),
+                }));
+                syncCurrentSessionFromStore(uiSessionId);
+                setRunningSessionId(null);
+                return;
+              }
               useSessionStore.getState().addPendingMessage(uiSessionId, next.content, next.images);
               if (isKimiActiveTurnError(message)) {
                 updateSession(uiSessionId, (session) => {
@@ -2842,11 +2862,6 @@ function App() {
               syncCurrentSessionFromStore(session.id);
             }
           }
-          return;
-        }
-        const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
-        if (hasOpenTimelineWork(latestSession)) {
-          runtimeTerminalPollRef.current.delete(runtimeSessionId);
           return;
         }
         if (Date.now() - reconciliationStartedAt < 2500) return;
