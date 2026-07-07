@@ -3071,13 +3071,20 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
   return targetPath;
 }
 
-function searchProjectFiles(projectPath: string, query = "", limit = 40) {
+function searchProjectFiles(projectPath: string, query = "", limit = 40, additionalWorkDirs: string[] = []) {
   const normalizedQuery = query.trim().toLowerCase();
   const maxResults = Math.max(1, Math.min(limit, 80));
-  const results: { path: string; name: string }[] = [];
+  const results: { path: string; name: string; rootPath?: string; sourceLabel?: string }[] = [];
+  const roots = [
+    { root: path.resolve(projectPath), sourceLabel: "当前项目", useAbsolutePath: false },
+    ...additionalWorkDirs.map((dir) => ({ root: path.resolve(dir), sourceLabel: path.basename(path.resolve(dir)) || "额外目录", useAbsolutePath: true })),
+  ].filter((entry, index, entries) => (
+    fs.existsSync(entry.root) &&
+    entries.findIndex((candidate) => candidate.root.toLowerCase() === entry.root.toLowerCase()) === index
+  ));
 
-  function walk(dir: string, depth: number) {
-    if (results.length >= maxResults || depth > 8) return;
+  function walk(root: string, dir: string, depth: number, sourceLabel: string, useAbsolutePath: boolean) {
+    if (results.length >= maxResults || depth > 32) return;
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -3091,18 +3098,22 @@ function searchProjectFiles(projectPath: string, query = "", limit = 40) {
       if (FILE_SEARCH_IGNORES.has(entry.name)) continue;
 
       const fullPath = path.join(dir, entry.name);
-      const relativePath = path.relative(projectPath, fullPath).replace(/\\/g, "/");
+      const relativePath = path.relative(root, fullPath).replace(/\\/g, "/");
+      const candidatePath = useAbsolutePath ? fullPath.replace(/\\/g, "/") : relativePath;
       if (entry.isDirectory()) {
-        walk(fullPath, depth + 1);
+        walk(root, fullPath, depth + 1, sourceLabel, useAbsolutePath);
         continue;
       }
       if (!entry.isFile()) continue;
-      if (normalizedQuery && !relativePath.toLowerCase().includes(normalizedQuery)) continue;
-      results.push({ path: relativePath, name: entry.name });
+      if (normalizedQuery && !relativePath.toLowerCase().includes(normalizedQuery) && !candidatePath.toLowerCase().includes(normalizedQuery)) continue;
+      results.push({ path: candidatePath, name: entry.name, rootPath: root, sourceLabel });
     }
   }
 
-  walk(projectPath, 0);
+  for (const root of roots) {
+    if (results.length >= maxResults) break;
+    walk(root.root, root.root, 0, root.sourceLabel, root.useAbsolutePath);
+  }
   return results;
 }
 
@@ -4314,7 +4325,7 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     if (!request || typeof request !== "object") {
       return { success: false, error: "Invalid request" };
     }
-    const req = request as { projectPath?: unknown; sessionId?: unknown; query?: unknown; limit?: unknown };
+    const req = request as { projectPath?: unknown; sessionId?: unknown; query?: unknown; limit?: unknown; additionalWorkDirs?: unknown };
     if (typeof req.projectPath !== "string" || !req.projectPath) {
       return { success: false, error: "Invalid project path" };
     }
@@ -4324,15 +4335,18 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     const query = typeof req.query === "string" ? req.query : "";
     const limit = typeof req.limit === "number" ? req.limit : 40;
     const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    const additionalWorkDirs = Array.isArray(req.additionalWorkDirs)
+      ? req.additionalWorkDirs.filter((dir): dir is string => typeof dir === "string" && dir.trim().length > 0)
+      : [];
     if (sessionId && query.trim()) {
       try {
         const official = await kimiCodeHost.searchServerSessionFiles(sessionId, req.projectPath, query, limit);
-        if (official) return { success: true, data: official };
+        if (official && official.length > 0) return { success: true, data: official };
       } catch (error) {
         console.warn("[KimiCodeServerHost] official file search failed; using local fallback:", error);
       }
     }
-    return { success: true, data: searchProjectFiles(req.projectPath, query, limit) };
+    return { success: true, data: searchProjectFiles(req.projectPath, query, limit, additionalWorkDirs) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

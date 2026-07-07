@@ -712,6 +712,7 @@ export function Composer() {
       void window.api.searchProjectFiles({
         projectPath: currentProject.path,
         sessionId: activeRuntimeSessionId,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         query,
         limit: 12,
       }).then((res) => {
@@ -719,7 +720,7 @@ export function Composer() {
         setFileItems(res.data.map((file) => ({
           id: `file-${file.path}`,
           label: file.name,
-          detail: file.path,
+          detail: file.sourceLabel && file.rootPath ? `${file.path} · ${file.sourceLabel}` : file.path,
           insertText: `@${file.path} `,
           kind: "file",
         })));
@@ -729,7 +730,7 @@ export function Composer() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeCompletion?.mode, activeCompletion?.query, activeRuntimeSessionId, currentProject?.path]);
+  }, [activeCompletion?.mode, activeCompletion?.query, activeRuntimeSessionId, additionalWorkDirs, currentProject?.path]);
 
   const addImageFiles = async (files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));

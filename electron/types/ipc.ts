@@ -1071,11 +1071,14 @@ export type SearchProjectFilesRequest = {
   sessionId?: string;
   query?: string;
   limit?: number;
+  additionalWorkDirs?: string[];
 }
 
 export type ProjectFileCandidate = {
   path: string;
   name: string;
+  rootPath?: string;
+  sourceLabel?: string;
 }
 
 export type SearchProjectFilesResponse = {
