@@ -15,8 +15,9 @@ import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { reportError } from "@/utils/reportError";
-import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
+import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
+import { getHiddenHandoffSessionIds } from "@/utils/persistence";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -138,6 +139,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
   const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; left: number } | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
+  const projectCatalogRefreshInFlightRef = useRef<Set<string>>(new Set());
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
 
   const toast = (message: string) => {
@@ -177,6 +179,31 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setExpandedProjectIds((current) => new Set([...current, currentProject.id]));
     }
   }, [currentProject?.id]);
+
+  useEffect(() => {
+    for (const project of recentProjects) {
+      if (!expandedProjectIds.has(project.id)) continue;
+      const projectKey = normalizeProjectPath(project.path);
+      if (!projectKey || projectCatalogRefreshInFlightRef.current.has(projectKey)) continue;
+
+      projectCatalogRefreshInFlightRef.current.add(projectKey);
+      void window.api.listKimiCodeSessions({ workDir: project.path }).then((res) => {
+        if (!res.success) return;
+        const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
+        const catalogSessions = res.data.filter((session) => (
+          !hiddenHandoffSessionIds.has(session.id) &&
+          !isHiddenInternalSession(session)
+        ));
+        useSessionStore.setState((state) => ({
+          sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSessions, project.path, { source: res.source }),
+        }));
+      }).catch((err: unknown) => {
+        reportError(err, { context: "refreshExpandedProjectSessions" });
+      }).finally(() => {
+        projectCatalogRefreshInFlightRef.current.delete(projectKey);
+      });
+    }
+  }, [expandedProjectIds, recentProjects]);
 
   const currentSessionId = currentSession?.id;
   const currentSessionUpdatedAt = currentSession?.updatedAt;
