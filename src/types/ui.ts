@@ -55,6 +55,7 @@ export interface AppState {
   creatingSessionProjectPath: string | null;
   defaultThinking: boolean;
   defaultPlanMode: boolean;
+  fontSize: number;
   additionalWorkDirs: string[];
   detailedContext: boolean;
   statusUpdateDisplay: StatusUpdateDisplay;

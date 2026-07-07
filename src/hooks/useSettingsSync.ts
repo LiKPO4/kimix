@@ -13,6 +13,7 @@ export function useSettingsSync() {
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
         state.defaultPlanMode !== prev.defaultPlanMode ||
+        state.fontSize !== prev.fontSize ||
         state.additionalWorkDirs !== prev.additionalWorkDirs ||
         state.detailedContext !== prev.detailedContext ||
         state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
@@ -37,6 +38,7 @@ export function useSettingsSync() {
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
           defaultPlanMode: state.defaultPlanMode,
+          fontSize: state.fontSize,
           additionalWorkDirs: state.additionalWorkDirs,
           detailedContext: state.detailedContext,
           statusUpdateDisplay: state.statusUpdateDisplay,

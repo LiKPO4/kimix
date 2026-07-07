@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useMemo } from "react";
+import type { CSSProperties } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { useAppStore } from "@/stores/appStore";
@@ -1075,6 +1076,7 @@ function App() {
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
+  const setFontSize = useAppStore((s) => s.setFontSize);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
@@ -1088,6 +1090,7 @@ function App() {
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
+  const fontSize = useAppStore((s) => s.fontSize);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
@@ -1137,6 +1140,7 @@ function App() {
       setPermissionMode,
       setDefaultThinking,
       setDefaultPlanMode,
+      setFontSize,
       setAdditionalWorkDirs,
       setDetailedContext,
       setStatusUpdateDisplay,
@@ -1149,7 +1153,7 @@ function App() {
       setRecentProjects,
     }), [
       setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
-      setPermissionMode, setDefaultThinking, setDefaultPlanMode,
+      setPermissionMode, setDefaultThinking, setDefaultPlanMode, setFontSize,
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setClarificationToolMode,
@@ -2954,7 +2958,15 @@ function App() {
 
   return (
     <ThemeProvider>
-      <AppShell />
+      <div
+        style={{
+          "--kimix-chat-font-size": `${fontSize}px`,
+          "--kimix-composer-font-size": `${Math.max(12, fontSize)}px`,
+          "--kimix-sidebar-font-size": `${Math.max(12, fontSize - 1)}px`,
+        } as CSSProperties}
+      >
+        <AppShell />
+      </div>
     </ThemeProvider>
   );
 }

@@ -287,7 +287,7 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 15px;
+  font-size: var(--kimix-chat-font-size, 15px);
   line-height: 1.7;
 }
 
@@ -847,6 +847,12 @@ button.bg-accent-primary:disabled:hover,
 .kimix-sidebar {
   background: var(--surface-ground);
   color: var(--text-primary);
+  font-size: var(--kimix-sidebar-font-size, 14px);
+}
+
+.kimix-sidebar button,
+.kimix-sidebar span {
+  font-size: inherit;
 }
 
 .kimix-sidebar-nav-item {
@@ -1788,6 +1794,7 @@ button.bg-accent-primary:disabled:hover,
   border: 1px solid var(--border-default);
   background: var(--surface-elevated);
   color: var(--text-primary);
+  font-size: var(--kimix-composer-font-size, 14px);
   box-shadow: var(--shadow-hover);
   border-radius: var(--radius-lg);
   transition: border-color var(--duration-base) var(--ease-hover),
@@ -1798,6 +1805,11 @@ button.bg-accent-primary:disabled:hover,
   border-color: var(--accent-primary-soft);
   box-shadow: 0 0 0 3px var(--accent-primary-light),
               var(--shadow-elevated);
+}
+
+.kimix-composer-surface textarea {
+  font-size: var(--kimix-composer-font-size, 14px) !important;
+  line-height: 1.45 !important;
 }
 
 /* ── Floating Panel ── */
@@ -2198,7 +2210,7 @@ button.bg-accent-primary:disabled:hover,
 /* ── Markdown Body ── */
 
 .markdown-body {
-  font-size: 15px;
+  font-size: var(--kimix-chat-font-size, 15px);
   line-height: 1.68;
   color: var(--text-primary);
   min-width: 0;

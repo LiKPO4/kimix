@@ -41,7 +41,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.14.68";
+const KIMIX_VERSION = "2.14.69";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -398,6 +398,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setThemePalette = useAppStore((s) => s.setThemePalette);
   const customThemePalette = useAppStore((s) => s.customThemePalette);
   const setCustomThemePalette = useAppStore((s) => s.setCustomThemePalette);
+  const fontSize = useAppStore((s) => s.fontSize);
+  const setFontSize = useAppStore((s) => s.setFontSize);
   const kimiThemePalettes = useAppStore((s) => s.kimiThemePalettes);
   const setKimiThemePalettes = useAppStore((s) => s.setKimiThemePalettes);
   const removeKimiThemePalette = useAppStore((s) => s.removeKimiThemePalette);
@@ -1428,6 +1430,25 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <span>{t.label}</span>
                     </button>
                   ))}
+                </div>
+                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
+                  <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px", gap: 14 }}>
+                    <div className="min-w-0">
+                      <label htmlFor="kimix-font-size" className="kimix-settings-permission-label block">界面字号</label>
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
+                        同步影响对话正文、输入框和左侧项目/会话列表。
+                      </div>
+                    </div>
+                    <input
+                      id="kimix-font-size"
+                      type="number"
+                      min={11}
+                      max={20}
+                      value={fontSize}
+                      onChange={(event) => setFontSize(Number(event.target.value || 14))}
+                      className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                    />
+                  </div>
                 </div>
                 <div className="kimix-settings-subsection-row">
                   <div className="kimix-settings-subsection-title">色彩方案</div>
