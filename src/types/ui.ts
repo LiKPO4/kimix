@@ -313,6 +313,21 @@ export interface ApprovalRequestEvent {
   details: string;
   riskLevel: "low" | "medium" | "high";
   status: "pending" | "approved" | "rejected";
+  display?: ApprovalDisplay;
+}
+
+export interface ApprovalDisplay {
+  kind?: string;
+  title?: string;
+  description?: string;
+  plan?: string;
+  path?: string;
+  options?: ApprovalDisplayOption[];
+}
+
+export interface ApprovalDisplayOption {
+  label: string;
+  description?: string;
 }
 
 export interface QuestionRequestEvent {

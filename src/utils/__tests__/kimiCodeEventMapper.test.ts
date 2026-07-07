@@ -284,6 +284,25 @@ describe("SDK request mapping", () => {
     expect(approval.status).toBe("pending");
   });
 
+  it("keeps official ExitPlanMode plan review display", () => {
+    const event = mapKimiCodeApprovalRequest({
+      toolCallId: "call-plan",
+      toolName: "ExitPlanMode",
+      display: {
+        kind: "plan_review",
+        plan: "# Plan\n\n1. Verify\n2. Implement",
+        path: ".kimi/plans/plan.md",
+        options: [{ label: "方案 A", description: "直接实现" }],
+      },
+    }, testOptions());
+
+    const approval = event as Extract<TimelineEvent, { type: "approval_request" }>;
+    expect(approval.description).toBe("审阅计划");
+    expect(approval.display?.kind).toBe("plan_review");
+    expect(approval.display?.plan).toContain("Verify");
+    expect(approval.display?.options?.[0].label).toBe("方案 A");
+  });
+
   it("maps question handler requests to pending question_request", () => {
     const event = mapKimiCodeQuestionRequest({
       toolCallId: "ask-1",

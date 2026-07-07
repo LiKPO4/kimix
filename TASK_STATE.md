@@ -11,7 +11,7 @@
 - [ ] Preserved Thinking 默认值对齐官方：Kimi 模型默认保留思考，第三方/DeepSeek 等模型按能力降级。
 - [x] 上下文压缩 summary 展示对齐官方：压缩完成后能在消息流里看到可读 summary，而不是只有开始/结束胶囊。
 - [x] Bash/Edit 工具过程卡稳定性复核：长命令、后台命令、编辑 diff/审批上下文在消息流里与官方 0.23 表达一致。
-- [ ] Plan reminder / notice 对齐：进入 Plan 模式后的官方提醒、退出计划审批与本地 Plan 预览不重复、不丢失。
+- [x] Plan reminder / notice 对齐：进入 Plan 模式后的官方提醒、退出计划审批与本地 Plan 预览不重复、不丢失。
 - [ ] Gemini thinking signature / 第三方 thinking 兼容：确认历史回放和实时事件不丢签名相关字段，不误显示为空思考。
 - [ ] 0.23.0 Web 视觉细节巡检：Swarm inline、问题卡、文件补全、队列卡在 Kimix / Kimi Web 两种过程模式下无重复展示。
 
@@ -28,6 +28,13 @@
 - 根因：官方 `tool.call` 会附带 `description` 和 `display` 元数据，但 Kimix 只保留 args/result；因此 Bash 的 `Running:` / `Starting background:` 和 display command/cwd 可能被本地 preview 覆盖。
 - 修复：工具调用类型保留官方 `description/display`；SDK 与 native mapper 均解析这些字段；工具结果合并时不覆盖已保存的 display；Kimi Web 过程行优先展示官方 description，并继续保留 Edit structured diff。
 - 下一步：继续对齐 Plan reminder / notice。
+
+## 2026-07-07 v2.14.76 Plan 审批展示对齐官方
+
+- 当前目标：继续对齐 Kimi Code 0.23.0，确保官方 Plan reminder 不重复显示，ExitPlanMode 审批里的计划正文和多方案选项不丢失。
+- 根因：system-reminder 已会被 Kimix 剥离，但官方 ExitPlanMode approval 的 `display.kind=plan_review`、`plan`、`path`、`options` 只存在于 display 内，旧 mapper 未保留；审批响应也无法回传官方多方案 `selectedLabel`。
+- 修复：approval 事件保留官方 display；审批卡在 `plan_review` 时展示计划正文、路径和多方案选项；IPC/host 响应支持 `selectedLabel`，普通工具审批保持原按钮语义。
+- 下一步：继续确认 Gemini thinking signature / 第三方 thinking 兼容。
 
 ## 2026-07-07 v2.14.73 @ 文件补全覆盖额外目录和深层文件
 

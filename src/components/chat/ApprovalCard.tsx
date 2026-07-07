@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 type ApprovalDiffPreview = {
   path: string;
@@ -148,7 +149,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
     });
   }, [diffPreviews, summary.paths]);
 
-  const handleApprove = async (scope?: "once" | "session") => {
+  const handleApprove = async (scope?: "once" | "session", selectedLabel?: string) => {
     if (!currentSession) return;
     const runtimeSessionId = getRuntimeSessionId(currentSession);
     if (!runtimeSessionId) return;
@@ -158,6 +159,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
         requestId: event.requestId,
         approved: true,
         scope,
+        selectedLabel,
       });
       updateSession(currentSession.id, (session) => ({
         ...session,
@@ -197,6 +199,10 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
 
   const isPending = event.status === "pending";
   const detailPreview = summary.prettyDetails.trim();
+  const planReview = event.display?.kind === "plan_review" && event.display.plan?.trim()
+    ? event.display
+    : null;
+  const planOptions = planReview?.options ?? [];
 
   return (
     <div id={`kimix-approval-${event.id}`} className="flex justify-center">
@@ -296,6 +302,49 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
           </div>
         )}
 
+        {planReview && (
+          <div style={{ marginTop: 12 }}>
+            <div className="flex items-center text-xs text-text-muted" style={{ gap: 8 }}>
+              <FileText size={14} className="shrink-0" />
+              <span>Plan 审阅</span>
+            </div>
+            <div
+              className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+              style={{ marginTop: 8, padding: "12px 14px" }}
+            >
+              {planReview.path && (
+                <code
+                  className="block rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
+                  style={{ padding: "7px 10px", marginBottom: 12 }}
+                >
+                  {planReview.path}
+                </code>
+              )}
+              <div className="max-h-72 overflow-y-auto text-sm leading-6 text-text-secondary">
+                <MarkdownRenderer content={planReview.plan ?? ""} wrapLongLines />
+              </div>
+              {planOptions.length > 0 && (
+                <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
+                  {planOptions.map((option) => (
+                    <div
+                      key={option.label}
+                      className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]"
+                      style={{ padding: "9px 11px" }}
+                    >
+                      <div className="text-sm font-medium text-text-primary">{option.label}</div>
+                      {option.description && (
+                        <div className="text-xs leading-5 text-text-muted" style={{ marginTop: 4 }}>
+                          {option.description}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {detailPreview && (
           <div style={{ marginTop: 12 }}>
             <div className="flex items-center justify-between" style={{ gap: 12 }}>
@@ -319,7 +368,35 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
           </div>
         )}
 
-        {isPending ? (
+        {isPending && planReview ? (
+          <div className="flex flex-wrap" style={{ gap: 10, marginTop: 14 }}>
+            {planOptions.length > 0 ? planOptions.map((option) => (
+              <button
+                key={option.label}
+                onClick={() => handleApprove(undefined, option.label)}
+                className="kimix-icon-text-button bg-accent-primary text-text-inverse text-sm hover:bg-accent-primary-dark"
+              >
+                <Check size={14} />
+                <span>{option.label}</span>
+              </button>
+            )) : (
+              <button
+                onClick={() => handleApprove(undefined, "Approve")}
+                className="kimix-icon-text-button bg-accent-primary text-text-inverse text-sm hover:bg-accent-primary-dark"
+              >
+                <Check size={14} />
+                <span>批准计划</span>
+              </button>
+            )}
+            <button
+              onClick={handleReject}
+              className="kimix-icon-text-button bg-bg-hover text-text-primary text-sm hover:bg-bg-tertiary"
+            >
+              <X size={14} />
+              <span>拒绝</span>
+            </button>
+          </div>
+        ) : isPending ? (
           <div className="flex flex-wrap" style={{ gap: 10, marginTop: 14 }}>
             <button
               onClick={() => handleApprove("once")}

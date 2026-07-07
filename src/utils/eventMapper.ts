@@ -156,6 +156,23 @@ function normalizeNativeToolDisplay(payload: Record<string, unknown>, source: Re
   return Object.keys(display).length > 0 ? display : undefined;
 }
 
+function normalizeApprovalDisplay(display: Record<string, unknown>): Extract<TimelineEvent, { type: "approval_request" }>["display"] | undefined {
+  const normalized: Extract<TimelineEvent, { type: "approval_request" }>["display"] = {};
+  if (isString(display.kind)) normalized.kind = display.kind;
+  if (isString(display.title)) normalized.title = display.title;
+  if (isString(display.description)) normalized.description = display.description;
+  if (isString(display.plan)) normalized.plan = display.plan;
+  if (isString(display.path)) normalized.path = display.path;
+  if (Array.isArray(display.options)) {
+    const options = display.options.filter(isRecord).map((option) => ({
+      label: isString(option.label) ? option.label : "",
+      description: isString(option.description) ? option.description : undefined,
+    })).filter((option) => option.label.trim());
+    if (options.length > 0) normalized.options = options;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 function appendAssistantContent(existingContent: string, incomingContent: string): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
@@ -935,16 +952,21 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     }
 
     case "ApprovalRequest": {
+      const display = isRecord(payload.display) ? payload.display : {};
+      const normalizedDisplay = normalizeApprovalDisplay(display);
       return {
         id: generateId(),
         type: "approval_request",
         timestamp: eventTimestamp,
         requestId: isString(payload.id) ? payload.id : "",
         toolName: isString(payload.sender) ? payload.sender : "unknown",
-        description: isString(payload.description) ? payload.description : "需要审批",
+        description: isString(payload.description)
+          ? payload.description
+          : normalizedDisplay?.description ?? normalizedDisplay?.title ?? (normalizedDisplay?.kind === "plan_review" ? "审阅计划" : "需要审批"),
         details: isString(payload.action) ? payload.action : "",
         riskLevel: "medium",
         status: "pending",
+        display: normalizedDisplay,
       };
     }
 

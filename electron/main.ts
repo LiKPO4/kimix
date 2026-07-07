@@ -5327,9 +5327,10 @@ ipcMain.handle("kimi-code:respondApproval", async (_, request: unknown) => {
     const requestId = typeof req.requestId === "string" ? req.requestId : "";
     const approved = typeof req.approved === "boolean" ? req.approved : null;
     const scope = req.scope === "once" || req.scope === "session" ? req.scope : undefined;
+    const selectedLabel = typeof req.selectedLabel === "string" ? req.selectedLabel : undefined;
     const feedback = typeof req.feedback === "string" ? req.feedback : undefined;
     if (!sessionId || !requestId || approved === null) return { success: false, error: "Missing sessionId, requestId or approved" };
-    kimiCodeHost.respondApproval(sessionId, requestId, approved, scope, feedback);
+    kimiCodeHost.respondApproval(sessionId, requestId, approved, scope, feedback, selectedLabel);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

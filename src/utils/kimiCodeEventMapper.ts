@@ -143,6 +143,23 @@ function normalizeToolDisplay(event: Record<string, unknown>): Extract<TimelineE
   return Object.keys(display).length > 0 ? display : undefined;
 }
 
+function normalizeApprovalDisplay(display: Record<string, unknown>): Extract<TimelineEvent, { type: "approval_request" }>["display"] | undefined {
+  const normalized: Extract<TimelineEvent, { type: "approval_request" }>["display"] = {};
+  if (isString(display.kind)) normalized.kind = display.kind;
+  if (isString(display.title)) normalized.title = display.title;
+  if (isString(display.description)) normalized.description = display.description;
+  if (isString(display.plan)) normalized.plan = display.plan;
+  if (isString(display.path)) normalized.path = display.path;
+  if (Array.isArray(display.options)) {
+    const options = display.options.filter(isRecord).map((option) => ({
+      label: isString(option.label) ? option.label : "",
+      description: isString(option.description) ? option.description : undefined,
+    })).filter((option) => option.label.trim());
+    if (options.length > 0) normalized.options = options;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 function normalizeToolProgress(event: Record<string, unknown>): string {
   const update = isRecord(event.update) ? event.update : {};
   const text = isString(update.text) ? update.text : "";
@@ -579,6 +596,7 @@ export function mapKimiCodeApprovalRequest(
   const display = isRecord(request.display) ? request.display : {};
   const timestamp = options.now ?? Date.now();
   const action = isString(request.action) ? request.action : "";
+  const normalizedDisplay = normalizeApprovalDisplay(display);
 
   return {
     id: getId(options),
@@ -586,10 +604,11 @@ export function mapKimiCodeApprovalRequest(
     timestamp,
     requestId: isString(request.toolCallId) ? request.toolCallId : getId(options),
     toolName: isString(request.toolName) ? request.toolName : "unknown",
-    description: isString(display.description) ? display.description : (isString(display.title) ? display.title : "需要审批"),
+    description: normalizedDisplay?.description ?? normalizedDisplay?.title ?? (normalizedDisplay?.kind === "plan_review" ? "审阅计划" : "需要审批"),
     details: action,
     riskLevel: action === "write" || action === "delete" ? "high" : "medium",
     status: "pending",
+    display: normalizedDisplay,
   };
 }
 

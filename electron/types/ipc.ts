@@ -1751,6 +1751,7 @@ export type KimiCodeApprovalResponseRequest = {
   requestId: string;
   approved: boolean;
   scope?: "once" | "session";
+  selectedLabel?: string;
   feedback?: string;
 };
 

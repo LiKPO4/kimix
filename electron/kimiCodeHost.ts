@@ -2214,6 +2214,7 @@ export function respondApproval(
   approved: boolean,
   scope?: "once" | "session",
   feedback?: string,
+  selectedLabel?: string,
 ): void {
   const serverKey = pendingKey(sessionId, requestId);
   if (serverApprovalIds.delete(serverKey)) {
@@ -2222,6 +2223,7 @@ export function respondApproval(
       decision: approved ? "approved" : "rejected",
       scope: approved && scope === "session" ? "session" : undefined,
       feedback,
+      selectedLabel: selectedLabel ?? (approved ? (scope === "session" ? "Allow for session" : "Allow") : "Reject"),
     }).catch((error) => emitServerError(sessionId, error));
     return;
   }
@@ -2234,7 +2236,7 @@ export function respondApproval(
     decision: approved ? "approved" : "rejected",
     scope: approved && scope === "session" ? "session" : undefined,
     feedback,
-    selectedLabel: approved ? (scope === "session" ? "Allow for session" : "Allow") : "Reject",
+    selectedLabel: selectedLabel ?? (approved ? (scope === "session" ? "Allow for session" : "Allow") : "Reject"),
   });
 }
 

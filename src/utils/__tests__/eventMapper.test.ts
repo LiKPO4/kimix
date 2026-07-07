@@ -124,6 +124,21 @@ describe("mapStreamEvent", () => {
     expect(req.riskLevel).toBe("medium");
   });
 
+  it("maps ApprovalRequest plan review display", () => {
+    const event = mapStreamEvent({
+      type: "ApprovalRequest",
+      payload: {
+        id: "plan-1",
+        sender: "ExitPlanMode",
+        display: { kind: "plan_review", plan: "# Plan", path: ".kimi/plans/plan.md" },
+      },
+    });
+    const req = event as Extract<TimelineEvent, { type: "approval_request" }>;
+    expect(req.description).toBe("审阅计划");
+    expect(req.display?.kind).toBe("plan_review");
+    expect(req.display?.path).toBe(".kimi/plans/plan.md");
+  });
+
   it("maps StatusUpdate", () => {
     const event = mapStreamEvent({
       type: "StatusUpdate",
