@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-08 v2.14.102 Swarm 可随时开关
+
+- 当前目标：对齐官方 Web，允许同一会话反复开启和关闭 Swarm，运行中切换在下一轮生效。
+- 官方核验：SDK `session.setSwarmMode(enabled)` 明确支持 `true` 与 `false`；“开启后不能关闭”来自 Kimix 的 `sdkPinnedSessionIds` 限制，不是官方契约。
+- 修复：Host 移除关闭禁令；SDK 路由固定与 Swarm 当前状态分离，关闭 Swarm 不会拆分或新建会话。空闲切换立即调用官方 API，运行中切换只记录下一轮目标，并在下次发送前应用。
+- UI：Composer 常驻显示可点击的 `Swarm 开 / Swarm 关`；待生效时显示“· 下轮”。加号菜单和 `/swarm on|off` 复用同一状态逻辑。
+- 活跃时间：Swarm 配置和官方状态同步不再修改会话 `updatedAt`，避免配置点击改变侧栏排序。
+- 验收：Swarm 状态与事件承载相关测试 37 项通过；`pnpm build` 与 `pnpm knowledge:validate` 通过。
+- 下一步：完成知识库门禁后，由用户验收空闲开关、运行中下轮开关和连续点击取消待生效三种场景。
+
 ## 2026-07-08 v2.14.101 思考按钮文案对齐
 
 - 当前目标：让 Composer 的思考状态按钮与 `Swarm 开`、`Plan 开`使用一致的词间距。

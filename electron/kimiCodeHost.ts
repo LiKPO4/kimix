@@ -1071,11 +1071,12 @@ function scheduleServerRecovery() {
 
 export async function setSwarmMode(sessionId: string, enabled: boolean, trigger: "manual" | "task" = "manual"): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
-  if (!enabled && sdkPinnedSessionIds.has(sessionId)) {
-    throw new Error("本会话 Swarm 模式已锁定，不能关闭。");
-  }
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
+    if (!enabled) {
+      serverManaged.swarmMode = false;
+      return;
+    }
     await migrateServerSessionToSdk(sessionId, serverManaged, {
       runningMessage: "当前轮正在运行，不能开启 Swarm。请等本轮结束后重试。",
     });
@@ -1083,7 +1084,7 @@ export async function setSwarmMode(sessionId: string, enabled: boolean, trigger:
   const managed = getManagedSession(sessionId);
   if (!managed.session.setSwarmMode) throw new Error("当前兼容链路不支持 Swarm 模式。");
   await managed.session.setSwarmMode(enabled, trigger);
-  if (enabled) sdkPinnedSessionIds.add(sessionId);
+  sdkPinnedSessionIds.add(sessionId);
 }
 
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {

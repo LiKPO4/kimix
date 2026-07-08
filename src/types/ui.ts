@@ -107,10 +107,12 @@ export interface Session {
   kimiHistoryCacheVersion?: number;
   /** 最近一次被官方 Server/SDK 会话目录确认可见的时间。 */
   officialCatalogConfirmedAt?: number;
-  /** 本会话已锁定官方 Swarm 模式；锁定后保持同一官方会话 ID 走 SDK 兼容路由，不再回退到 Server。 */
+  /** 本会话曾为 Swarm 迁移到 SDK；保持同一官方会话 ID 走 SDK 路由，不代表 Swarm 当前开启。 */
   swarmModeLockedAt?: number;
   /** 官方会话当前报告的 Swarm 模式状态，仅用于精确显示端内状态。 */
   swarmMode?: boolean;
+  /** 运行中切换 Swarm 时记录的下一轮目标状态；应用成功后清除。 */
+  swarmModeDesired?: boolean;
   titleLocked?: boolean;
   model?: string | null;
   /** 最近一次会话模型切换时间，用于阻止空闲状态污染上一轮消息元信息。 */

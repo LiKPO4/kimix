@@ -1201,7 +1201,7 @@ function App() {
     updateSession(uiSessionId, (session) => (
       session.swarmMode === swarmMode
         ? session
-        : { ...session, swarmMode, updatedAt: Date.now() }
+        : { ...session, swarmMode }
     ));
     syncCurrentSessionFromStore(uiSessionId);
   }, [updateSession]);
