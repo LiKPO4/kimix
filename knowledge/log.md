@@ -2,6 +2,7 @@
 
 ## 2026-07-08
 
+* **Narrow right-inspector Git actions reflow**: Below 340px, the three primary Git actions use two columns with Push spanning the second row, preventing button overflow at the supported 280px inspector minimum. See [/project/kimix.md](/project/kimix.md).
 * **Session toolbar obeys the shrunken main-grid width**: Runtime geometry showed a 615px main box whose implicit `auto` grid column and toolbar still measured 754.67px; an explicit `minmax(0, 1fr)` main column plus a shrinkable toolbar grid item keeps all actions left of the right inspector. See [/project/kimix.md](/project/kimix.md).
 * **Update history comes from GitHub Releases**: The dialog receives the latest three repository releases through the main-process update check, with the GitHub Releases Atom feed as a rate-limit fallback instead of bundled stale records. See [/project/kimix.md](/project/kimix.md).
 

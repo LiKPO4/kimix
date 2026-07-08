@@ -1717,7 +1717,10 @@ export function LongTaskInspectorPanel({
                   </div>
                   {gitError && <div className="mt-2 line-clamp-2 text-[12.5px] leading-5 text-accent-danger">{gitError}</div>}
                 </div>
-                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                <div
+                  className="grid"
+                  style={{ gridTemplateColumns: width < 340 ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", gap: 8 }}
+                >
                   <button
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
@@ -1741,6 +1744,7 @@ export function LongTaskInspectorPanel({
                     disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
                     onClick={() => void pushGit()}
                     className="kimix-icon-text-button is-compact justify-center bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+                    style={{ gridColumn: width < 340 ? "1 / -1" : undefined }}
                   >
                     {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
                     <span>推送</span>
