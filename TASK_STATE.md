@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-08 v2.14.103 Release 完整信息展示
+
+- 当前目标：更新记录不再截取前三条正文，而是展示 GitHub Release 的完整说明。
+- 根因：数据层已返回完整 `body`，但弹窗 `summarizeReleaseBody` 主动过滤标题并只保留前三个非空行。
+- 修复：移除摘要函数；每条 Release 改为信息卡，正文使用现有 Markdown 渲染器完整显示标题、段落、列表、代码与链接；标题行保留 GitHub 外链入口。
+- 验收：`pnpm build` 与 `pnpm knowledge:validate` 通过。
+- 下一步：由用户验收三条长 Release 的完整内容、卡片间距和弹窗滚动。
+
 ## 2026-07-08 v2.14.102 Swarm 可随时开关
 
 - 当前目标：对齐官方 Web，允许同一会话反复开启和关闭 Swarm，运行中切换在下一轮生效。

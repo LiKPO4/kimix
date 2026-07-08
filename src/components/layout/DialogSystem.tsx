@@ -15,6 +15,7 @@ import type { DownloadUpdateProgress, KimiCliUpdateInfo } from "@electron/types/
 import { formatDownloadPercent, formatDownloadDetail, formatReleaseDate, type DownloadProgressInfo } from "@/utils/format";
 import { useRef } from "react";
 import { usePresence } from "@/hooks/usePresence";
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -27,17 +28,6 @@ type ReleaseInfo = {
   htmlUrl: string;
   assets: { name: string; downloadUrl: string }[];
 };
-
-function summarizeReleaseBody(body: string) {
-  const summary = body
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => line.replace(/^[-*]\s+/, "").replace(/`([^`]+)`/g, "$1"))
-    .slice(0, 3)
-    .join("；");
-  return summary || "该版本没有填写更新说明。";
-}
 
 const updateActionColumnStyle = { display: "flex", flexDirection: "column", alignItems: "center", gap: 7 } as const;
 const updatePrimaryButtonStyle = { height: 40, minHeight: 40, paddingLeft: 16, paddingRight: 18 } as const;
@@ -502,19 +492,28 @@ function HelpDialogPanel({
               </div>
               <div className="flex flex-col" style={{ gap: 12 }}>
                 {updateState.releases.map((release) => (
-                  <button
+                  <article
                     key={release.tagName}
-                    type="button"
-                    onClick={() => void window.api.openExternal(release.htmlUrl)}
-                    className="rounded-xl border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-surface-hover"
+                    className="rounded-lg border border-border-subtle bg-surface-elevated text-left"
                     style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-text-primary">{release.name || release.tagName}</span>
+                    <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => void window.api.openExternal(release.htmlUrl)}
+                        className="flex min-w-0 items-center text-left font-semibold text-text-primary hover:text-accent-primary"
+                        style={{ gap: 8, minHeight: 32 }}
+                        title="在 GitHub 查看完整 Release"
+                      >
+                        <span className="min-w-0 truncate">{release.name || release.tagName}</span>
+                        <ExternalLink size={14} className="shrink-0" />
+                      </button>
                       <span className="text-[13px] text-text-muted">{formatReleaseDate(release.publishedAt)}</span>
                     </div>
-                    <p className="mt-3 leading-6">{summarizeReleaseBody(release.body)}</p>
-                  </button>
+                    <div className="min-w-0 text-[14px] text-text-secondary" style={{ marginTop: 12 }}>
+                      <MarkdownRenderer content={release.body.trim() || "该版本没有填写更新说明。"} wrapLongLines />
+                    </div>
+                  </article>
                 ))}
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 ## 2026-07-08
 
+* **Update history renders complete Release notes**: Each of the latest three GitHub Releases now shows its full Markdown body instead of a three-line summary, with a separate title link to GitHub. See [/project/kimix.md](/project/kimix.md).
 * **Swarm mode is reversible and next-turn aware**: Idle sessions apply official on/off immediately, active turns retain a cancellable desired state for the next prompt, and SDK route identity no longer makes Swarm permanently enabled. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Preference toggles preserve session recovery**: Thinking, Plan, and permission changes no longer restart the long-lived runtime listener or cancel one-shot startup history recovery, preventing recoverable conversations from appearing empty. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Swarm progress and update fallbacks are truthful**: Swarm width now follows completed/total, Atom tags decode safely, enclosure assets are parsed, asset-less feeds open the Release page, and non-vision fallback accepts both image URL field spellings. See [/project/kimix.md](/project/kimix.md) and [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
