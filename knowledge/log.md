@@ -2,6 +2,7 @@
 
 ## 2026-07-08
 
+* **Swarm has an official-event aggregate status card**: The message flow now projects subagent lifecycle events into completed/total progress, active and failed counts, indexed role rows, and expandable activity without reintroducing a floating panel. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Official historical image content is restored**: User and steer history mapping now accepts Kimi Server's native base64 `image/source` parts, while the repair path replaces stale name-only attachments from official history. See [/project/kimix.md](/project/kimix.md).
 * **Image preview navigation is bounded and Escape-closeable**: Directional navigation stops at the first and last image instead of wrapping, while Escape closes both single- and multi-image previews. See [/project/kimix.md](/project/kimix.md).
 * **Shared image preview supports directional navigation**: Composer, user-message, and steer-message image groups now use overlay-level Left/Up previous and Right/Down next navigation with wraparound. See [/project/kimix.md](/project/kimix.md).

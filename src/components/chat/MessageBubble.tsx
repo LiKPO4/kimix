@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type ReactNode } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2 } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, GitBranch, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -1300,6 +1300,18 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   const [expanded, setExpanded] = useState(false);
   const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
   const canExpand = subagent.events.length > 0;
+  const taskName = subagent.description?.trim() || subagent.agentName || "子任务";
+  const roleName = subagent.description && subagent.agentName ? subagent.agentName : "";
+  const indexedTaskName = subagent.swarmIndex ? `${taskName} #${subagent.swarmIndex}` : taskName;
+  const statusText = subagent.status === "queued"
+    ? "排队中"
+    : subagent.status === "suspended"
+      ? "已暂停"
+      : subagent.status === "running"
+        ? "运行中"
+        : subagent.status === "error"
+          ? "失败"
+          : "已完成";
   useEffect(() => {
     if (!canExpand && expanded) setExpanded(false);
   }, [canExpand, expanded]);
@@ -1309,11 +1321,13 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
         {isRunning ? <Loader2 size={13} className="kimix-spin" /> : <Bot size={13} />}
       </span>
       <span className="flex min-w-0 items-center overflow-hidden">
-        <span className="truncate leading-[20px]">{subagent.agentName || "子代理"}</span>
+        <span className="truncate leading-[20px]" title={[indexedTaskName, roleName].filter(Boolean).join(" ")}>
+          {indexedTaskName}{roleName && <span className="text-[var(--kimix-panel-text-muted)]"> ({roleName})</span>}
+        </span>
       </span>
       <span className="flex h-5 items-center" style={{ gap: 8 }}>
-        <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.events.length} 条子事件</span>
-        {subagent.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+        <span className={subagent.status === "error" ? "text-accent-danger" : isRunning ? "text-accent-primary" : "text-[var(--kimix-panel-text-muted)]"}>{statusText}</span>
+        {subagent.status === "error" && <X size={13} className="text-accent-danger" />}
         {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
       </span>
       <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -1331,7 +1345,7 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
           type="button"
           onClick={() => setExpanded((value) => !value)}
           className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42 }}
+          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42, paddingLeft: 16, paddingRight: 16 }}
           title={expanded ? "收起子事件" : "展开子事件"}
         >
           {rowContent}
@@ -1339,7 +1353,7 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
       ) : (
         <div
           className="grid w-full items-center text-left"
-          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42 }}
+          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42, paddingLeft: 16, paddingRight: 16 }}
         >
           {rowContent}
         </div>
@@ -1350,32 +1364,57 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
 }
 
 function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const statusText = kimiWebGroupStatusText({ type: "subagent", subagents });
+  const activeCount = subagents.filter((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended").length;
+  const completedCount = subagents.filter((subagent) => subagent.status === "completed").length;
+  const failedCount = subagents.filter((subagent) => subagent.status === "error").length;
+  const totalCount = subagents.length;
+  const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const descriptions = Array.from(new Set(subagents.map((subagent) => subagent.description?.trim()).filter(Boolean)));
+  const title = descriptions.length === 1 ? descriptions[0] : `${totalCount} 个并行任务`;
+  const [expanded, setExpanded] = useState(activeCount > 0);
   return (
-    <div className="kimix-soft-card overflow-hidden rounded-xl">
+    <div className="kimix-soft-card overflow-hidden rounded-lg">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ gap: 9, padding: "8px 12px" }}
+        style={{ gap: 9, minHeight: 42, padding: "9px 16px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          <Bot size={14} />
+          <GitBranch size={14} />
         </span>
         <span className="flex h-5 min-w-0 flex-1 items-center">
-          <span className="truncate">{kimiWebGroupSummary({ type: "subagent", subagents })}</span>
+          <span className="truncate"><strong className="font-medium text-[var(--kimix-panel-text)]">Swarm</strong><span className="text-[var(--kimix-panel-text-muted)]"> · </span>{title}</span>
         </span>
         <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
-          {statusText && <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
+          <span className={`h-1.5 w-1.5 rounded-full ${activeCount > 0 ? "bg-accent-primary" : failedCount > 0 ? "bg-accent-danger" : "bg-accent-success"}`} />
+          <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{completedCount} / {totalCount}</span>
         </span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </span>
       </button>
       {expanded && (
-        <div style={{ padding: "5px 12px" }}>
-          {subagents.map((subagent, index) => <KimiWebSubagentRow key={subagent.id} subagent={subagent} isLast={index === subagents.length - 1} />)}
+        <div style={{ borderTop: "1px solid var(--kimix-panel-divider)" }}>
+          <div style={{ padding: "11px 16px 12px" }}>
+            <div className="flex items-center text-[13px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8 }}>
+              <span className="kimix-tabular-nums font-medium text-[var(--kimix-panel-text)]">{completedCount} / {totalCount}</span>
+              <span>{activeCount > 0 ? `${activeCount} 个进行中` : failedCount > 0 ? `${failedCount} 个失败` : "全部完成"}</span>
+            </div>
+            <div
+              className="overflow-hidden rounded-full bg-[var(--kimix-panel-divider)]"
+              style={{ height: 4, marginTop: 10 }}
+              aria-label={`Swarm 已完成 ${completedCount} / ${totalCount}`}
+            >
+              <div
+                className="h-full rounded-full bg-accent-primary transition-[width] duration-300"
+                style={{ width: activeCount > 0 ? "100%" : `${progress}%` }}
+              />
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid var(--kimix-panel-divider)" }}>
+            {subagents.map((subagent, index) => <KimiWebSubagentRow key={subagent.id} subagent={subagent} isLast={index === subagents.length - 1} />)}
+          </div>
         </div>
       )}
     </div>
