@@ -281,6 +281,16 @@ describe("mapKimiCodeEvent", () => {
     expect(completed.status).toBe("completed");
     expect(completed.resultSummary).toBe("样式检查完成");
   });
+
+  it("keeps the internal subagent id out of the visible fallback name", () => {
+    const subagent = mapKimiCodeEvent({
+      type: "subagent.started",
+      subagentId: "agent-6",
+    }, testOptions()) as Extract<TimelineEvent, { type: "subagent" }>;
+
+    expect(subagent.agentId).toBe("agent-6");
+    expect(subagent.agentName).toBe("子代理");
+  });
 });
 
 describe("SDK request mapping", () => {

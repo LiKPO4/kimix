@@ -1302,7 +1302,7 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   const canExpand = subagent.events.length > 0;
   const taskName = subagent.description?.trim() || subagent.agentName || "子任务";
   const roleName = subagent.description && subagent.agentName ? subagent.agentName : "";
-  const indexedTaskName = subagent.swarmIndex ? `${taskName} #${subagent.swarmIndex}` : taskName;
+  const indexedTaskName = typeof subagent.swarmIndex === "number" ? `${taskName} #${subagent.swarmIndex}` : taskName;
   const statusText = subagent.status === "queued"
     ? "排队中"
     : subagent.status === "suspended"

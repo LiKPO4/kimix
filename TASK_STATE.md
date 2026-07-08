@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-08 v2.14.104 子代理名称与完成态核对
+
+- 当前目标：避免把全会话递增的 `agent-N` 内部 ID 误展示成子代理名称，并确认完成项不会被过程卡过滤。
+- 根因：官方 session 的 agent ID 跨调用递增，独立 `Agent` 调用可能只有一个代理但 ID 已到 `agent-6`；缺少 `subagentName` 时 Kimix 又把该 ID 当作可见名称。
+- 修复：内部 ID 仅用于生命周期合并，名称缺失时显示“子代理”；任务描述仍优先展示；修正 `swarmIndex = 0` 的编号显示。聚合卡继续统计并展示 queued/running/suspended/completed/error 全部子代理。
+- 验收：`kimiCodeEventMapper` 31 项测试、`pnpm build`、`pnpm knowledge:validate` 通过。
+- 下一步：验证独立 Agent 显示任务描述与完成态，并验证 Swarm 的 `#0` 编号。
+
 ## 2026-07-08 v2.14.103 Release 完整信息展示
 
 - 当前目标：更新记录不再截取前三条正文，而是展示 GitHub Release 的完整说明。

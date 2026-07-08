@@ -272,7 +272,7 @@ function mapSubagentEvent(
     parentToolCallId: isString(event.parentToolCallId) ? event.parentToolCallId : undefined,
     swarmIndex: isNumber(event.swarmIndex) ? event.swarmIndex : undefined,
     description: isString(event.description) ? event.description : undefined,
-    agentName: isString(event.subagentName) ? event.subagentName : (subagentId ?? "subagent"),
+    agentName: isString(event.subagentName) ? event.subagentName : "子代理",
     status,
     resultSummary: isString(event.resultSummary) ? event.resultSummary : undefined,
     error: isString(event.error) ? event.error : undefined,
