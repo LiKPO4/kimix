@@ -24,7 +24,14 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (drawingBoardRequest || previewImages.length < 2) return;
+      if (drawingBoardRequest) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (previewImages.length < 2) return;
       const direction = event.key === "ArrowLeft" || event.key === "ArrowUp"
         ? -1
         : event.key === "ArrowRight" || event.key === "ArrowDown"
@@ -36,13 +43,14 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
       const currentIndex = previewImages.findIndex((item) => (
         (image.id && item.id === image.id) || item.dataUrl === image.dataUrl
       ));
-      const nextIndex = ((Math.max(0, currentIndex) + direction) % previewImages.length + previewImages.length) % previewImages.length;
+      const nextIndex = Math.max(0, currentIndex) + direction;
+      if (nextIndex < 0 || nextIndex >= previewImages.length) return;
       setContextMenu(null);
       onNavigate?.(previewImages[nextIndex]);
     };
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [drawingBoardRequest, image.dataUrl, image.id, onNavigate, previewImages]);
+  }, [drawingBoardRequest, image.dataUrl, image.id, onClose, onNavigate, previewImages]);
 
   const handleCopyImage = async () => {
     setContextMenu(null);
