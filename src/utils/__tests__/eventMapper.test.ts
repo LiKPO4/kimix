@@ -1163,6 +1163,46 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).status).toBe("completed");
   });
 
+  it("merges a late terminal lifecycle event into an already settled subagent", () => {
+    const existing: TimelineEvent[] = [{
+      id: "agent-running",
+      type: "subagent",
+      timestamp: 10,
+      agentId: "agent-6",
+      agentName: "coder",
+      status: "completed",
+      events: [{
+        id: "child-output",
+        type: "assistant_message",
+        timestamp: 11,
+        content: "审查完成",
+        isThinking: false,
+        isComplete: true,
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "agent-completed",
+      type: "subagent",
+      timestamp: 12,
+      agentId: "agent-6",
+      agentName: "子代理",
+      status: "completed",
+      resultSummary: "发现两项问题",
+      events: [],
+    };
+
+    const result = mergeEvents(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "subagent",
+      agentId: "agent-6",
+      status: "completed",
+      resultSummary: "发现两项问题",
+    });
+    expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).events).toHaveLength(1);
+  });
+
   it("appends change_summary after moving last status_update before it", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "status_update", timestamp: 1, tokenCount: 10, inputTokenCount: 5, contextSize: 100, contextLimit: 256000 },

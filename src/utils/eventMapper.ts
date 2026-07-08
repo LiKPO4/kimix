@@ -1396,7 +1396,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   }
 
   if (incoming.type === "subagent") {
-    const matchingSubagentIndex = existing.findLastIndex((e) => (
+    let matchingSubagentIndex = existing.findLastIndex((e) => (
       e.type === "subagent" &&
       (
         (incoming.agentId && e.agentId === incoming.agentId) ||
@@ -1404,6 +1404,15 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       ) &&
       (e.status === "queued" || e.status === "running" || e.status === "suspended")
     ));
+    if (
+      matchingSubagentIndex === -1 &&
+      incoming.agentId &&
+      (incoming.status === "completed" || incoming.status === "error")
+    ) {
+      matchingSubagentIndex = existing.findLastIndex((event) => (
+        event.type === "subagent" && event.agentId === incoming.agentId
+      ));
+    }
     if (matchingSubagentIndex !== -1) {
       const result = [...existing];
       result[matchingSubagentIndex] = mergeSubagentLifecycle(
