@@ -726,30 +726,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           }`}
                         >
                           <button
-                            onClick={async () => {
+                            onClick={() => {
                               if (isExpanded) lastAutoExpandedProjectId.current = project.id;
-                              if (!isActive) {
-                                setCurrentProject(project);
-                                const latestSession = [...pSessions].sort(compareSessionsByRecentConversation)[0];
-                                if (latestSession) {
-                                  setWorkspaceView("chat");
-                                  void selectSession(latestSession.id);
-                                } else {
-                                  setCurrentSession(null);
-                                }
-                              } else {
-                                // Only toggle expansion when clicking the already-active project.
-                                // Clicking an expanded-but-inactive project should just select it.
-                                setExpandedProjectIds((current) => {
-                                  const next = new Set(current);
-                                  if (isExpanded) next.delete(project.id);
-                                  else next.add(project.id);
-                                  return next;
-                                });
-                                if (!isExpanded && pSessions.length === 0 && !useAppStore.getState().creatingSessionProjectPath) {
-                                  await createSessionForProject(project);
-                                }
-                              }
+                              setExpandedProjectIds((current) => {
+                                const next = new Set(current);
+                                if (next.has(project.id)) next.delete(project.id);
+                                else next.add(project.id);
+                                return next;
+                              });
                             }}
                             className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                           >
@@ -959,7 +943,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.93</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.94</span>
         </button>
       </div>
     </aside>
