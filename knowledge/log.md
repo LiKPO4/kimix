@@ -2,6 +2,7 @@
 
 ## 2026-07-08
 
+* **Preference toggles preserve session recovery**: Thinking, Plan, and permission changes no longer restart the long-lived runtime listener or cancel one-shot startup history recovery, preventing recoverable conversations from appearing empty. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Swarm progress and update fallbacks are truthful**: Swarm width now follows completed/total, Atom tags decode safely, enclosure assets are parsed, asset-less feeds open the Release page, and non-vision fallback accepts both image URL field spellings. See [/project/kimix.md](/project/kimix.md) and [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Swarm has an official-event aggregate status card**: The message flow now projects subagent lifecycle events into completed/total progress, active and failed counts, indexed role rows, and expandable activity without reintroducing a floating panel. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Official historical image content is restored**: User and steer history mapping now accepts Kimi Server's native base64 `image/source` parts, while the repair path replaces stale name-only attachments from official history. See [/project/kimix.md](/project/kimix.md).

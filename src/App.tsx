@@ -1088,10 +1088,7 @@ function App() {
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
-  const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const fontSize = useAppStore((s) => s.fontSize);
-  const permissionMode = useAppStore((s) => s.permissionMode);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
@@ -2834,7 +2831,9 @@ function App() {
       goalRefreshTimersRef.current.clear();
       goalLastRefreshRef.current.clear();
     };
-  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, defaultThinking, defaultPlanMode, permissionMode, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
+  // Runtime listeners own session continuity. Preference changes are read from
+  // useAppStore at operation time and must never restart bootstrap or history recovery.
+  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
     if (!runningSessionId) return;
@@ -2958,7 +2957,7 @@ function App() {
       }
     }, 1400);
     return () => clearTimeout(timer);
-  }, [defaultThinking, defaultPlanMode, permissionMode, updateSession]);
+  }, [updateSession]);
 
   return (
     <ThemeProvider>
