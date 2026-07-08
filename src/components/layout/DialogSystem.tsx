@@ -35,6 +35,7 @@ const RELEASE_TIMELINE = [
   { version: "v2.4.22", date: "2026-05-10", text: "收敛按钮尺寸、圆角框灰色化，并优化 TodoList 面板密度。" },
   { version: "v2.4.18", date: "2026-05-10", text: "接入官方 slash 命令和项目文件候选。" },
 ];
+const VISIBLE_RELEASE_TIMELINE = RELEASE_TIMELINE.slice(0, 3);
 
 const updateActionColumnStyle = { display: "flex", flexDirection: "column", alignItems: "center", gap: 7 } as const;
 const updatePrimaryButtonStyle = { height: 40, minHeight: 40, paddingLeft: 16, paddingRight: 18 } as const;
@@ -506,7 +507,7 @@ function HelpDialogPanel({
                 </div>
               )}
               <div className="flex flex-col" style={{ gap: 12 }}>
-                {RELEASE_TIMELINE.map((item) => (
+                {VISIBLE_RELEASE_TIMELINE.map((item) => (
                   <div key={item.version} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold text-text-primary">{item.version}</span>
