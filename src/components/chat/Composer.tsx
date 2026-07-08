@@ -3030,7 +3030,7 @@ export function Composer() {
                 const next = !defaultThinking;
                 setDefaultThinking(next);
                 window.dispatchEvent(new CustomEvent("kimix:toast", {
-                  detail: next ? "思考开" : "思考关",
+                  detail: next ? "思考 开" : "思考 关",
                 }));
               }}
               className="kimix-icon-text-button kimix-muted-action is-compact min-w-[100px] border disabled:cursor-not-allowed disabled:opacity-35"
@@ -3044,7 +3044,7 @@ export function Composer() {
               aria-pressed={defaultThinking}
             >
               <Brain size={14} className="shrink-0" />
-              <span>{defaultThinking ? "思考开" : "思考关"}</span>
+              <span>{defaultThinking ? "思考 开" : "思考 关"}</span>
             </button>
 
             <ContextRing />
