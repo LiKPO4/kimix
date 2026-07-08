@@ -23,6 +23,21 @@ describe("mapStreamEvent", () => {
     expect((event as Extract<TimelineEvent, { type: "user_message" }>).content).toBe("Hello");
   });
 
+  it("restores server base64 image parts from TurnBegin history", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "text", text: "看看这张图" },
+          { type: "image", source: { kind: "base64", media_type: "image/png", data: "AA==" } },
+        ],
+      },
+    }) as Extract<TimelineEvent, { type: "user_message" }>;
+
+    expect(event.content).toBe("看看这张图");
+    expect(event.images).toEqual([{ name: "图片 2", dataUrl: "data:image/png;base64,AA==" }]);
+  });
+
   it("ignores empty TurnBegin", () => {
     expect(mapStreamEvent({ type: "TurnBegin", payload: { user_input: "" } })).toBeNull();
   });

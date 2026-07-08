@@ -200,6 +200,19 @@ describe("mapKimiCodeEvent", () => {
     expect(steer.images?.[0].name).toBe("shot.png");
   });
 
+  it("restores server base64 image parts from steer history", () => {
+    const steer = mapKimiCodeEvent({
+      type: "turn.steer",
+      input: [
+        { type: "text", text: "参考这张图" },
+        { type: "image", source: { kind: "base64", media_type: "image/jpeg", data: "AQ==" } },
+      ],
+    }, testOptions()) as Extract<TimelineEvent, { type: "steer_message" }>;
+
+    expect(steer.content).toBe("参考这张图");
+    expect(steer.images).toEqual([{ name: "图片 2", dataUrl: "data:image/jpeg;base64,AQ==" }]);
+  });
+
   it("does not treat Kimix fallback steer record as official confirmation", () => {
     const steer = mapKimiCodeEvent({
       type: "turn.steer",

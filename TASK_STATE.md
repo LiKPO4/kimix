@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-08 v2.14.97 恢复官方历史图片数据
+
+- 当前目标：修复旧会话图片只显示“未读取到绝对路径”，无法像官方 Web 一样长期恢复的问题。
+- 官方结论：Kimi Web 将上传文件保存在会话 `uploads/` 中；Kimi Server 原生提示则在 `prompt.submitted.content` 中长期保存 `type: image + source.kind: base64`。
+- 根因：Kimix 历史映射只识别旧 `image_url`，忽略新版 Server `image/source`，把仍存在的 base64 图片误降级为空附件。
+- 修复：普通用户消息和引导消息映射均支持 `image/source` 的 base64、媒体类型和 data URL；现有丢图历史修复会重新读取官方记录并替换空附件。
+- 验收：`eventMapper` 与 `kimiCodeEventMapper` 定向测试 104 项通过；`pnpm build` 与 `pnpm knowledge:validate` 通过。
+- 下一步：构建后重新打开截图中的旧会话，确认图片缩略图与预览恢复。
+
 ## 2026-07-08 v2.14.96 图片预览 Esc 与有界切换
 
 - 当前目标：图片预览支持 Esc 退出，并取消方向键首尾循环。

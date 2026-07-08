@@ -624,6 +624,28 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
       const id = isString(imageUrl.id) ? imageUrl.id : undefined;
       images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined });
       if (!url) textParts.push("[图片]");
+      return;
+    }
+    if (part.type === "image" && isRecord(part.source)) {
+      const mediaType = isString(part.source.media_type)
+        ? part.source.media_type
+        : isString(part.source.mediaType)
+          ? part.source.mediaType
+          : "image/png";
+      const data = isString(part.source.data) ? part.source.data : undefined;
+      const url = isString(part.source.url) ? part.source.url : undefined;
+      const id = isString(part.id)
+        ? part.id
+        : isString(part.source.file_id)
+          ? part.source.file_id
+          : undefined;
+      const dataUrl = data
+        ? (data.startsWith("data:image/") ? data : `data:${mediaType};base64,${data}`)
+        : url?.startsWith("data:image/")
+          ? url
+          : undefined;
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl });
+      if (!dataUrl) textParts.push("[图片]");
     }
   });
   return {

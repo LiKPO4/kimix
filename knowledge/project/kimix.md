@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-07-08T02:08:00+08:00"
+timestamp: "2026-07-08T12:02:00+08:00"
 ---
 
 # Kimix
@@ -23,6 +23,7 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 * Editing a queued prompt is a destructive restore-to-Composer action, not a separate edit mode: the queued item is removed, its text and attachments become the ordinary draft, and subsequent send/queue behavior is identical to newly typed input. Kimix does not retain an edit snapshot or expose Save/Cancel Edit controls.
 * Sidebar project rows own expansion only. Clicking a project toggles its session list without changing the active project/session or creating a conversation; only a session row changes the active conversation, and the explicit New Conversation action creates one.
 * Image preview keyboard navigation is owned by the shared overlay, not individual thumbnails. Composer attachments, user messages, and steer messages provide their previewable image group; Left/Up selects the previous image and Right/Down the next without wrapping at either boundary, and Escape closes single- or multi-image preview. An open drawing board retains keyboard ownership.
+* Historical image recovery follows official Kimi persistence formats instead of requiring an OS drag path. Kimi Web uploads live under the session `uploads/` directory, while Kimi Server prompts persist native `{ type: "image", source: { kind: "base64", media_type, data } }` content. Kimix maps both legacy `image_url` and native `image/source` records back to displayable data URLs, allowing history repair to replace stale name-only attachments.
 * The user-facing font-size setting keeps the historical 15px chat and Composer baseline, with the sidebar one pixel smaller. The first font-size baseline migration upgrades the accidentally introduced persisted 14px default once, records `fontSizeBaselineVersion: 1`, and never overrides a later explicit 14px user choice.
 * Assistant process rendering preserves the official step timeline. Local wire history must retain `tool.call` and `tool.result` nested inside `context.append_loop_event`; thinking parts before and after those calls remain separate phases, a think part sharing the tool timestamp is ordered before that tool, and each collapsed phase uses its final natural paragraph as the summary title. In Kimi Web mode, foldable summaries and non-foldable single-paragraph process items share the same secondary typography; foldability changes interaction only, while expanded details remain muted and final Assistant Markdown remains primary text.
 * Persisted Kimi history carries a Kimix mapping-version marker. When the mapping changes, the active or selected stale cache is reloaded once from official history and replaced when the canonical timeline contains richer process events; non-empty cached messages alone must not permanently block history repair.
@@ -44,3 +45,5 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 
 * [Project README](https://github.com/LiKPO4/kimix/blob/master/README.md)
 * [Package manifest](https://github.com/LiKPO4/kimix/blob/master/package.json)
+* [Kimi Web session stream](https://github.com/MoonshotAI/kimi-cli/blob/main/web/src/hooks/useSessionStream.ts)
+* [Kimi Web session uploads API](https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/web/api/sessions.py)
