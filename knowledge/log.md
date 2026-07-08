@@ -2,6 +2,7 @@
 
 ## 2026-07-08
 
+* **Shared image preview supports directional navigation**: Composer, user-message, and steer-message image groups now use overlay-level Left/Up previous and Right/Down next navigation with wraparound. See [/project/kimix.md](/project/kimix.md).
 * **Sidebar project rows only toggle expansion**: Project clicks no longer select a recent conversation, clear the active conversation, or create one for an empty project; conversation navigation belongs exclusively to session rows. See [/project/kimix.md](/project/kimix.md).
 * **Queued-prompt edit restores a normal draft**: Editing removes the queued item and restores its content to the ordinary Composer without an edit snapshot, Cancel Edit control, or Save Edit send state. See [/project/kimix.md](/project/kimix.md).
 * **Narrow right-inspector Git actions reflow**: Below 340px, the three primary Git actions use two columns with Push spanning the second row, preventing button overflow at the supported 280px inspector minimum. See [/project/kimix.md](/project/kimix.md).

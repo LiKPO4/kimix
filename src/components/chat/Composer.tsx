@@ -9,7 +9,7 @@ import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
-import { ImagePreviewOverlay } from "./ImagePreviewOverlay";
+import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
@@ -407,7 +407,7 @@ function getActiveCompletion(value: string): { mode: CompletionMode; query: stri
 export function Composer() {
   const [input, setInput] = useState("");
   const [imageAttachments, setImageAttachments] = useState<ImageAttachment[]>([]);
-  const [previewImage, setPreviewImage] = useState<ImageAttachment | null>(null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [slashCommands, setSlashCommands] = useState<CompletionItem[]>([]);
   const [skillItems, setSkillItems] = useState<CompletionItem[]>([]);
@@ -3089,6 +3089,8 @@ export function Composer() {
       {previewImage && (
         <ImagePreviewOverlay
           image={previewImage}
+          images={imageAttachments.filter(isImageAttachment).map((attachment) => ({ id: attachment.id, name: attachment.name, dataUrl: attachment.dataUrl }))}
+          onNavigate={setPreviewImage}
           onClose={() => setPreviewImage(null)}
           onSaveDrawing={handleSaveDrawingBoard}
         />

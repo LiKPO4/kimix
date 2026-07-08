@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Copy, Palette, X } from "lucide-react";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
@@ -11,13 +11,38 @@ export type PreviewImage = {
 
 type ImagePreviewOverlayProps = {
   image: PreviewImage;
+  images?: PreviewImage[];
+  onNavigate?: (image: PreviewImage) => void;
   onClose: () => void;
   onSaveDrawing: (image: { name: string; dataUrl: string; sourceId?: string }) => void;
 };
 
-export function ImagePreviewOverlay({ image, onClose, onSaveDrawing }: ImagePreviewOverlayProps) {
+export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSaveDrawing }: ImagePreviewOverlayProps) {
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [contextMenu, setContextMenu] = useState<{ left: number; top: number } | null>(null);
+  const previewImages = images?.length ? images : [image];
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (drawingBoardRequest || previewImages.length < 2) return;
+      const direction = event.key === "ArrowLeft" || event.key === "ArrowUp"
+        ? -1
+        : event.key === "ArrowRight" || event.key === "ArrowDown"
+          ? 1
+          : 0;
+      if (!direction) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const currentIndex = previewImages.findIndex((item) => (
+        (image.id && item.id === image.id) || item.dataUrl === image.dataUrl
+      ));
+      const nextIndex = ((Math.max(0, currentIndex) + direction) % previewImages.length + previewImages.length) % previewImages.length;
+      setContextMenu(null);
+      onNavigate?.(previewImages[nextIndex]);
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [drawingBoardRequest, image.dataUrl, image.id, onNavigate, previewImages]);
 
   const handleCopyImage = async () => {
     setContextMenu(null);

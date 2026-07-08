@@ -287,6 +287,12 @@ function AttachmentThumb({
   );
 }
 
+function getPreviewImages(images: UserMessageImage[]): PreviewImage[] {
+  return images
+    .filter((image): image is UserMessageImage & { dataUrl: string } => Boolean(image.dataUrl))
+    .map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl }));
+}
+
 const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: { event: Extract<TimelineEvent, { type: "user_message" }>; onDelete?: (eventId: string) => void }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
@@ -303,6 +309,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
     };
   }));
   const images = event.images ?? [];
+  const previewImages = getPreviewImages(images);
   const hasText = event.content.trim().length > 0;
   const copyText = hasText ? [event.content, attachmentCopyText(images)].filter(Boolean).join("\n\n") : attachmentCopyText(images);
 
@@ -441,6 +448,8 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
       {previewImage?.dataUrl && (
         <ImagePreviewOverlay
           image={previewImage}
+          images={previewImages}
+          onNavigate={setPreviewImage}
           onClose={() => setPreviewImage(null)}
           onSaveDrawing={handleSaveDrawingBoard}
         />
@@ -452,6 +461,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
 const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = false }: { event: Extract<TimelineEvent, { type: "steer_message" }>; embedded?: boolean }) {
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const images = event.images ?? [];
+  const previewImages = getPreviewImages(images);
   const hasText = event.content.trim().length > 0 && event.content.trim() !== "[图片]";
   const label = event.status === "sending"
     ? "引导发送中"
@@ -496,6 +506,8 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
       {previewImage?.dataUrl && (
         <ImagePreviewOverlay
           image={previewImage}
+          images={previewImages}
+          onNavigate={setPreviewImage}
           onClose={() => setPreviewImage(null)}
           onSaveDrawing={handleSaveDrawingBoard}
         />
