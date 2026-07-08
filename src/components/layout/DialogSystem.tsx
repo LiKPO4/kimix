@@ -29,6 +29,13 @@ type ReleaseInfo = {
   assets: { name: string; downloadUrl: string }[];
 };
 
+// Release body 来自 GitHub，质量可信，但 markdown 里的 `![alt](url)`
+// 会被 react-markdown 渲染成 <img>，在更新弹窗里自动加载外部图片，
+// 既是隐私跟踪面，也会拖慢弹窗首次渲染。只去掉图片，保留 alt 文本和其它结构。
+function stripReleaseImages(body: string) {
+  return body.replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1");
+}
+
 const updateActionColumnStyle = { display: "flex", flexDirection: "column", alignItems: "center", gap: 7 } as const;
 const updatePrimaryButtonStyle = { height: 40, minHeight: 40, paddingLeft: 16, paddingRight: 18 } as const;
 const updateLinkButtonStyle = { height: 20, minHeight: 20, paddingLeft: 2, paddingRight: 2 } as const;
@@ -511,7 +518,7 @@ function HelpDialogPanel({
                       <span className="text-[13px] text-text-muted">{formatReleaseDate(release.publishedAt)}</span>
                     </div>
                     <div className="min-w-0 text-[14px] text-text-secondary" style={{ marginTop: 12 }}>
-                      <MarkdownRenderer content={release.body.trim() || "该版本没有填写更新说明。"} wrapLongLines />
+                      <MarkdownRenderer content={stripReleaseImages(release.body.trim() || "该版本没有填写更新说明。")} wrapLongLines />
                     </div>
                   </article>
                 ))}

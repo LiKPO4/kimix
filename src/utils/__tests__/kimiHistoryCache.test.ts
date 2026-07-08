@@ -52,4 +52,29 @@ describe("Kimi history cache migration", () => {
     expect(hasCanonicalKimiThinkingHistory(cached, canonical)).toBe(true);
     expect(hasCanonicalKimiThinkingHistory(canonical, canonical)).toBe(false);
   });
+
+  it("ignores subagent-internal thinking when deciding top-level thinking migration", () => {
+    // 顶层 assistant 无思考；子代理内部有思考。当前实现只扫描顶层
+    // assistant_message，因此不触发迁移判断（整体替换仍会带走子代理）。
+    const cachedWithSubagentThought: TimelineEvent[] = [{
+      ...assistant,
+      content: "",
+    }, {
+      id: "sub",
+      type: "subagent",
+      timestamp: 2,
+      agentId: "agent-1",
+      agentName: "子代理",
+      status: "completed",
+      events: [{
+        ...assistant,
+        id: "sub-assistant",
+        thinking: "sub thought",
+        thinkingParts: [{ id: "sub-think", timestamp: 2, text: "sub thought" }],
+      }],
+    }];
+    const canonicalEmpty: TimelineEvent[] = [{ ...assistant, content: "" }];
+
+    expect(hasCanonicalKimiThinkingHistory(cachedWithSubagentThought, canonicalEmpty)).toBe(false);
+  });
 });

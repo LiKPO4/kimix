@@ -533,6 +533,9 @@ function mergeSubagentLifecycle(
   return {
     ...current,
     ...incoming,
+    // 子代理名字在创建时确定，生命周期内不应变更；迟到事件若只带兜底名"子代理"，
+    // 优先保留已存在的更具体名字（例如 "coder"），没有时才退回 incoming 的兜底。
+    agentName: current.agentName ?? incoming.agentName,
     description: incoming.description ?? current.description,
     parentToolCallId: incoming.parentToolCallId ?? current.parentToolCallId,
     swarmIndex: incoming.swarmIndex ?? current.swarmIndex,
@@ -1115,7 +1118,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         id: generateId(),
         type: "subagent",
         timestamp: eventTimestamp,
-        agentName: isString(payload.agent_name) ? payload.agent_name : "subagent",
+        agentName: isString(payload.agent_name) ? payload.agent_name : "子代理",
         status: subagentStatus,
         events: [],
       };

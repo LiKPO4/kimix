@@ -1200,6 +1200,8 @@ describe("mergeEvents", () => {
       status: "completed",
       resultSummary: "发现两项问题",
     });
+    // 迟到的完成事件若用兜底名"子代理"，不应覆盖原有更具体的"coder"。
+    expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).agentName).toBe("coder");
     expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).events).toHaveLength(1);
   });
 
