@@ -456,8 +456,6 @@ export function Composer() {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
-  const [editingPendingSnapshot, setEditingPendingSnapshot] = useState<{ sessionId: string; content: string; images?: UserMessageImage[] } | null>(null);
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
@@ -532,8 +530,6 @@ export function Composer() {
         dataUrl: image.dataUrl,
         filePath: image.filePath,
       })));
-      setEditingPendingId(null);
-      setEditingPendingSnapshot(null);
       window.requestAnimationFrame(() => inputRef.current?.focus());
     };
     window.addEventListener("kimix:restore-composer-draft", handleRestoreComposerDraft);
@@ -1783,7 +1779,6 @@ export function Composer() {
     if (hasActiveAssistantTurn && currentSession) {
       setInput("");
       setImageAttachments([]);
-      setEditingPendingId(null);
       inputRef.current?.reset();
       addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
       return;
@@ -1802,7 +1797,6 @@ export function Composer() {
       }
       setInput("");
       setImageAttachments([]);
-      setEditingPendingId(null);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
@@ -1818,7 +1812,6 @@ export function Composer() {
       }
       setInput("");
       setImageAttachments([]);
-      setEditingPendingId(null);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
@@ -1834,7 +1827,6 @@ export function Composer() {
       }
       setInput("");
       setImageAttachments([]);
-      setEditingPendingId(null);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
@@ -1866,7 +1858,6 @@ export function Composer() {
       }
       setInput("");
       setImageAttachments([]);
-      setEditingPendingId(null);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id);
@@ -1880,13 +1871,11 @@ export function Composer() {
     if (slashHandled) {
       setInput("");
       setImageAttachments([]);
-      setEditingPendingId(null);
       inputRef.current?.reset();
       return;
     }
     setInput("");
     setImageAttachments([]);
-    setEditingPendingId(null);
     inputRef.current?.reset();
 
     if (!hasActiveAssistantTurn && activeSession) {
@@ -1969,7 +1958,6 @@ export function Composer() {
     const steerId = insertLocalSteerMessage(activeSession.id, trimmed || (imagesToSend.length > 0 ? "[附件]" : ""), imagesToSend);
     setInput("");
     setImageAttachments([]);
-    setEditingPendingId(null);
     inputRef.current?.reset();
     const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
@@ -2406,21 +2394,8 @@ export function Composer() {
       dataUrl: image.dataUrl,
       filePath: image.filePath,
     })));
-    setEditingPendingId(id);
-    setEditingPendingSnapshot({ sessionId: pending.sessionId, content: pending.content, images: pending.images });
     removePendingMessage(id);
     requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
-  const handleCancelPendingEdit = () => {
-    if (editingPendingSnapshot) {
-      addPendingMessage(editingPendingSnapshot.sessionId, editingPendingSnapshot.content, editingPendingSnapshot.images);
-    }
-    setInput("");
-    setImageAttachments([]);
-    setEditingPendingId(null);
-    setEditingPendingSnapshot(null);
-    inputRef.current?.reset();
   };
 
   const applyCompletion = (item: CompletionItem) => {
@@ -2889,11 +2864,6 @@ export function Composer() {
 
         <div className="mt-2 flex h-9 min-w-0 flex-nowrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-1" style={{ marginLeft: -6 }}>
-            {editingPendingId && (
-              <button onClick={handleCancelPendingEdit} className="kimix-muted-action shrink-0 rounded-xl px-2.5 py-1 text-[13px]">
-                取消修改
-              </button>
-            )}
             <div ref={addBtnRef} className="relative">
               <button disabled={!canUseComposer} onClick={() => setShowAddMenu((value) => !value)} className={iconButtonClass} title="更多工具" aria-label="更多工具">
                 <Plus size={18} />
@@ -3108,7 +3078,7 @@ export function Composer() {
                 </button>
               </>
             ) : (
-              <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title={editingPendingId ? "保存修改" : "发送"} aria-label={editingPendingId ? "保存修改" : "发送"}>
+              <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title="发送" aria-label="发送">
                 <ArrowUp size={17} strokeWidth={2.5} />
               </button>
             )}
