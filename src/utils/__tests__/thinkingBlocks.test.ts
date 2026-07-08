@@ -33,6 +33,18 @@ describe("buildThinkingBlocks", () => {
     expect(blocks[0].summary).toBe("Concise summary.");
   });
 
+  it("uses only the last paragraph of the real blind-versus-miasma thought as summary", () => {
+    const text = "The user is asking about the logical difference between 盲目 (blind) and 瘴气 (miasma) in the game.\n\nLet me think about this:\n\n1. 玩家身上的盲目。\n2. 敌人身上的盲目。\n3. 玩家身上的瘴气。\n\nSo the key differences:\n- 概率不同\n- 影响范围不同\n\nSince the user asked about the logical difference, let me give a clear comparison.";
+    const blocks = buildThinkingBlocks({
+      timestamp: 1_000,
+      thinkingParts: [{ id: "blind-miasma", timestamp: 1_000, text }],
+    });
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].summary).toBe("Since the user asked about the logical difference, let me give a clear comparison.");
+    expect(blocks[0].text).toBe(text);
+  });
+
   it("restores the official think and tool step boundaries when timestamps match", () => {
     const blocks = buildThinkingBlocks({
       timestamp: 1_782_047_971_173,

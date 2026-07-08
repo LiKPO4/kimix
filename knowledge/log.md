@@ -2,6 +2,7 @@
 
 ## 2026-07-08
 
+* **Canonical history repairs thinking assembly**: Cache migration now compares official and local thinking bodies, replacing duplicated or concatenated local thoughts; collapsed summaries use the final official paragraph. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Late subagent terminal events are idempotent**: A formal completed/failed event arriving after turn-boundary settlement merges into the latest same-agent row and preserves its nested activity instead of creating an empty duplicate. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Subagent IDs stay internal**: Session-global IDs such as `agent-6` remain lifecycle correlation keys, while process rows show task descriptions or a neutral fallback, retain completed agents, and preserve zero-based Swarm indices. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Update history renders complete Release notes**: Each of the latest three GitHub Releases now shows its full Markdown body instead of a three-line summary, with a separate title link to GitHub. See [/project/kimix.md](/project/kimix.md).

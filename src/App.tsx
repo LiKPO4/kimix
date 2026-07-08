@@ -49,7 +49,7 @@ import { useSettingsSync } from "@/hooks/useSettingsSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
-import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { logError } from "@/utils/reportError";
 
 function promptImages(attachments: UserMessageImage[] = []) {
@@ -240,7 +240,8 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       const canonicalAssistantBody = assistantBodyText(historyEvents);
       const repairsStreamAssembly = Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(session.events);
       const hasMoreProcessDetails = hasRicherKimiProcessHistory(session.events, historyEvents);
-      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown && !repairsStreamAssembly && !hasMoreProcessDetails) continue;
+      const repairsThinkingAssembly = hasCanonicalKimiThinkingHistory(session.events, historyEvents);
+      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown && !repairsStreamAssembly && !hasMoreProcessDetails && !repairsThinkingAssembly) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
         sessions: state.sessions.map((item) => item.id === session.id

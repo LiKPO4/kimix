@@ -12,7 +12,7 @@ import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { compareSessionsByRecentConversation, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
-import { hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { reportError } from "@/utils/reportError";
 import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
@@ -596,7 +596,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       return;
     }
     updateSession(session.id, (current) => {
-      const hydratedEvents = !hasConversation || hasRicherKimiProcessHistory(current.events, events) ? events : current.events;
+      const hydratedEvents = !hasConversation ||
+        hasRicherKimiProcessHistory(current.events, events) ||
+        hasCanonicalKimiThinkingHistory(current.events, events)
+        ? events
+        : current.events;
       return {
         ...current,
         events: hydratedEvents,
@@ -943,7 +947,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.105</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.106</span>
         </button>
       </div>
     </aside>

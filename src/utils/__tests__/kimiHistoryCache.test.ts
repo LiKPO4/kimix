@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { hasRicherKimiProcessHistory, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
 
 const assistant: TimelineEvent = {
   id: "assistant",
@@ -31,5 +31,25 @@ describe("Kimi history cache migration", () => {
   it("does not replace a richer local process timeline", () => {
     expect(hasRicherKimiProcessHistory([assistant, tool], [assistant])).toBe(false);
     expect(hasRicherKimiProcessHistory([assistant], [])).toBe(false);
+  });
+
+  it("prefers canonical thinking when the local mirror duplicated a thought", () => {
+    const thought = "Detailed reasoning.\n\nFinal summary.";
+    const canonical: TimelineEvent[] = [{
+      ...assistant,
+      thinking: thought,
+      thinkingParts: [{ id: "official-think", timestamp: 1, text: thought }],
+    }];
+    const cached: TimelineEvent[] = [{
+      ...assistant,
+      thinking: thought + thought,
+      thinkingParts: [
+        { id: "cached-think-1", timestamp: 1, text: thought },
+        { id: "cached-think-2", timestamp: 2, text: thought },
+      ],
+    }];
+
+    expect(hasCanonicalKimiThinkingHistory(cached, canonical)).toBe(true);
+    expect(hasCanonicalKimiThinkingHistory(canonical, canonical)).toBe(false);
   });
 });
