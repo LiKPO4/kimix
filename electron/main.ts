@@ -24,6 +24,7 @@ import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
 import * as longTaskService from "./longTaskService";
+import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
@@ -2633,44 +2634,12 @@ function mapGitHubRelease(data: {
   };
 }
 
-function decodeXmlText(value: string) {
-  return value
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&amp;/g, "&");
-}
-
-function parseReleaseAtom(xml: string, limit: number) {
-  return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)]
-    .slice(0, limit)
-    .map((match) => {
-      const entry = match[1];
-      const title = decodeXmlText(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? "");
-      const publishedAt = entry.match(/<updated>([\s\S]*?)<\/updated>/)?.[1]?.trim() ?? "";
-      const htmlUrl = decodeXmlText(entry.match(/<link[^>]+rel="alternate"[^>]+href="([^"]+)"/)?.[1] ?? `https://github.com/${GITHUB_REPO}/releases`);
-      const encodedBody = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] ?? "";
-      const body = decodeXmlText(encodedBody)
-        .replace(/<\/?(?:h\d|p|ul|ol)[^>]*>/gi, "\n")
-        .replace(/<li[^>]*>/gi, "\n- ")
-        .replace(/<\/li>/gi, "")
-        .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`")
-        .replace(/<[^>]+>/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-      const tagName = decodeURIComponent(htmlUrl.split("/tag/")[1] ?? title);
-      return { tagName, name: title, body, publishedAt, htmlUrl, assets: [] };
-    })
-    .filter((release) => release.tagName);
-}
-
 async function fetchReleaseAtom(limit: number) {
   const res = await fetch(`https://github.com/${GITHUB_REPO}/releases.atom`, {
     headers: { "User-Agent": "Kimix" },
   });
   if (!res.ok) throw new Error(`GitHub Releases 返回 ${res.status}`);
-  return parseReleaseAtom(await res.text(), limit);
+  return parseReleaseAtom(await res.text(), limit, `https://github.com/${GITHUB_REPO}/releases`);
 }
 
 async function fetchRecentReleases(limit = 3) {
@@ -6348,7 +6317,15 @@ ipcMain.handle("app:downloadUpdate", async () => {
     }
     const asset = pickUpdateAsset(latest.assets);
     if (!asset) {
-      return { success: false, error: "未找到适合当前系统的升级包" };
+      await shell.openExternal(latest.htmlUrl || `https://github.com/${GITHUB_REPO}/releases/latest`);
+      return {
+        success: true,
+        data: {
+          filePath: "",
+          assetName: "",
+          message: "当前更新源未提供安装包清单，已打开 GitHub Release 页面",
+        },
+      };
     }
     const filePath = await downloadUpdateAsset(asset, latest.tagName);
     const openError = await shell.openPath(filePath);

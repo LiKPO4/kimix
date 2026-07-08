@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-08 v2.14.99 Swarm 进度与更新 fallback 修复
+
+- 当前目标：修正 Swarm 错误满进度，并修复 GitHub Atom 更新和非视觉图片降级的真实缺口。
+- 修复：Swarm 蓝色进度始终使用 `completed / total`，运行中不再强制显示 100%。
+- 修复：Atom parser 安全提取和解码 `/tag/`，非法 `%` 保留原始 tag；解析任意属性顺序的 enclosure 资产。Atom 没有资产清单时，应用内升级改为打开对应 GitHub Release 页面，不再报“未找到适合当前系统的升级包”。
+- 修复：非视觉模型降级同时读取 SDK 序列化的 `image_url` 和旧兼容 `imageUrl` 字段，保留图片标识。
+- 验收：Atom、非视觉图片及 Kimi 事件映射测试 34 项通过；`pnpm build` 与 `pnpm knowledge:validate` 通过。
+- 下一步：完成知识库门禁后，由用户验收 Swarm 0%、部分完成进度及 Atom fallback 升级入口。
+
 ## 2026-07-08 v2.14.98 Swarm 聚合状态卡
 
 - 当前目标：对齐官方新版 Web 的 Swarm 消息流状态 UI，而不恢复独立浮动面板。

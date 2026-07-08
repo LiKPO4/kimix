@@ -1408,7 +1408,7 @@ function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] })
             >
               <div
                 className="h-full rounded-full bg-accent-primary transition-[width] duration-300"
-                style={{ width: activeCount > 0 ? "100%" : `${progress}%` }}
+                style={{ width: `${progress}%` }}
               />
             </div>
           </div>

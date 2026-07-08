@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
+import { rewriteOpenAIContentForNonVision } from "./nonVisionContent";
 
 const nonVisionModels = new Set<string>();
 
@@ -75,33 +76,6 @@ function requestModelIsNonVision(requestModel: unknown): boolean {
     if (normalized.endsWith(`/${knownNormalized}`)) return true;
   }
   return false;
-}
-
-function rewriteOpenAIContentForNonVision(content: unknown): unknown {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return content;
-
-  const textParts: string[] = [];
-  const imageRefs: string[] = [];
-  let hasImage = false;
-
-  for (const part of content) {
-    if (!part || typeof part !== "object") continue;
-    const p = part as Record<string, unknown>;
-    if (p.type === "text" && typeof p.text === "string") {
-      textParts.push(p.text);
-    } else if (p.type === "image_url") {
-      hasImage = true;
-      const imageUrl = p.imageUrl as Record<string, unknown> | undefined;
-      const id = imageUrl?.id;
-      const name = typeof id === "string" && id.trim() ? id : "[图片]";
-      imageRefs.push(`[图片: ${name}]`);
-    }
-  }
-
-  if (!hasImage) return content;
-  const combined = [...textParts, ...imageRefs].join("\n");
-  return combined || "";
 }
 
 function rewriteOpenAIBodyForNonVision(body: Record<string, unknown>): Record<string, unknown> {
