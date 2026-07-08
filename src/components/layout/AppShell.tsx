@@ -307,12 +307,13 @@ export function AppShell() {
   const [helpDialog, setHelpDialog] = useState<HelpDialog | null>(null);
   const [infoTopic, setInfoTopic] = useState<{ title: string; body: string; url?: string } | null>(null);
   const [appInfo, setAppInfo] = useState({ name: "Kimix", version: "2.5.0", author: "@linjianglu", repository: "https://github.com/LiKPO4/kimix" });
-  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; downloadProgress: DownloadProgressInfo | null; message: string; latest: ReleaseInfo | null; hasUpdate: boolean }>({
+  const [updateState, setUpdateState] = useState<{ loading: boolean; downloading: boolean; downloadProgress: DownloadProgressInfo | null; message: string; latest: ReleaseInfo | null; releases: ReleaseInfo[]; hasUpdate: boolean }>({
     loading: false,
     downloading: false,
     downloadProgress: null,
     message: "尚未检查更新",
     latest: null,
+    releases: [],
     hasUpdate: false,
   });
   const [cliUpdateState, setCliUpdateState] = useState<{ loading: boolean; updating: boolean; progressStartedAt: number | null; progressPercent: number; progressPhase: KimiCodeInstallPhase | null; message: string; info: KimiCliUpdateInfo | null; hasUpdate: boolean }>({
@@ -682,12 +683,12 @@ export function AppShell() {
   const handleCheckUpdates = async () => {
     setUpdateState((state) => ({ ...state, loading: true, message: "正在检查 GitHub 发布版本..." }));
     if (typeof window.api.checkForUpdates !== "function") {
-      setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: "更新检查接口尚未载入，请重启应用后再试", latest: null, releases: [], hasUpdate: false });
       return;
     }
     const res = await window.api.checkForUpdates();
     if (!res.success) {
-      setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: `检查失败：${res.error}`, latest: null, hasUpdate: false });
+      setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: `检查失败：${res.error}`, latest: null, releases: [], hasUpdate: false });
       return;
     }
     setUpdateState((state) => ({
@@ -696,6 +697,7 @@ export function AppShell() {
       downloadProgress: null,
       message: res.data.message,
       latest: res.data.latest,
+      releases: res.data.releases,
       hasUpdate: res.data.hasUpdate,
     }));
   };
@@ -786,10 +788,11 @@ export function AppShell() {
           downloadProgress: null,
           message: appRes.data.message,
           latest: appRes.data.latest,
+          releases: appRes.data.releases,
           hasUpdate: appRes.data.hasUpdate,
         }));
       } else if (appRes && !appRes.success) {
-        setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: `检查失败：${appRes.error}`, latest: null, hasUpdate: false });
+        setUpdateState({ loading: false, downloading: false, downloadProgress: null, message: `检查失败：${appRes.error}`, latest: null, releases: [], hasUpdate: false });
       }
       if (cliRes?.success) {
         setCliUpdateState((state) => ({

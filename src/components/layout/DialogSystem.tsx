@@ -28,14 +28,16 @@ type ReleaseInfo = {
   assets: { name: string; downloadUrl: string }[];
 };
 
-const RELEASE_TIMELINE = [
-  { version: "v2.5.0", date: "2026-05-10", text: "补齐顶部中文菜单、关于与更新页面，接入 GitHub Release 检查更新。" },
-  { version: "v2.4.24", date: "2026-05-10", text: "修复引导状态显示、官方 steer 事件映射、队列续发顺序和 dev 白屏。" },
-  { version: "v2.4.23", date: "2026-05-10", text: "增加启动后渲染内容自检，空 root 时自动重载一次。" },
-  { version: "v2.4.22", date: "2026-05-10", text: "收敛按钮尺寸、圆角框灰色化，并优化 TodoList 面板密度。" },
-  { version: "v2.4.18", date: "2026-05-10", text: "接入官方 slash 命令和项目文件候选。" },
-];
-const VISIBLE_RELEASE_TIMELINE = RELEASE_TIMELINE.slice(0, 3);
+function summarizeReleaseBody(body: string) {
+  const summary = body
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.replace(/^[-*]\s+/, "").replace(/`([^`]+)`/g, "$1"))
+    .slice(0, 3)
+    .join("；");
+  return summary || "该版本没有填写更新说明。";
+}
 
 const updateActionColumnStyle = { display: "flex", flexDirection: "column", alignItems: "center", gap: 7 } as const;
 const updatePrimaryButtonStyle = { height: 40, minHeight: 40, paddingLeft: 16, paddingRight: 18 } as const;
@@ -300,6 +302,7 @@ interface HelpDialogProps {
     downloadProgress: DownloadProgressInfo | null;
     message: string;
     latest: ReleaseInfo | null;
+    releases: ReleaseInfo[];
     hasUpdate: boolean;
   };
   cliUpdateState: {
@@ -497,24 +500,21 @@ function HelpDialogPanel({
                   </div>
                 </div>
               </div>
-              {updateState.latest && (
-                <div className="rounded-xl border border-border-subtle" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
-                  <div className="font-semibold text-text-primary">{updateState.latest.name || updateState.latest.tagName}</div>
-                  <p className="mt-3 whitespace-pre-wrap leading-6">{updateState.latest.body || "该版本没有填写更新说明。"}</p>
-                  <button className="kimix-icon-text-button is-compact mt-4 text-accent-primary hover:bg-accent-primary-light" onClick={() => window.api.openExternal(updateState.latest!.htmlUrl)}>
-                    打开发布页面 <ExternalLink size={13} />
-                  </button>
-                </div>
-              )}
               <div className="flex flex-col" style={{ gap: 12 }}>
-                {VISIBLE_RELEASE_TIMELINE.map((item) => (
-                  <div key={item.version} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
+                {updateState.releases.map((release) => (
+                  <button
+                    key={release.tagName}
+                    type="button"
+                    onClick={() => void window.api.openExternal(release.htmlUrl)}
+                    className="rounded-xl border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-surface-hover"
+                    style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}
+                  >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-text-primary">{item.version}</span>
-                      <span className="text-[13px] text-text-muted">{item.date}</span>
+                      <span className="font-semibold text-text-primary">{release.name || release.tagName}</span>
+                      <span className="text-[13px] text-text-muted">{formatReleaseDate(release.publishedAt)}</span>
                     </div>
-                    <p className="mt-3 leading-6">{item.text}</p>
-                  </div>
+                    <p className="mt-3 leading-6">{summarizeReleaseBody(release.body)}</p>
+                  </button>
                 ))}
               </div>
             </div>

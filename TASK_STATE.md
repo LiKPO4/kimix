@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-08 v2.14.90 从 GitHub 获取三条 Release
+
+- 当前目标：纠正 v2.14.89 仅裁切本地旧时间线的错误实现，更新记录必须展示 GitHub 最新三条 Release。
+- 修复：更新检查改用 GitHub Releases 列表 API 返回三条记录；匿名 API 遇到 403/429 时改读同仓库 `releases.atom`；弹窗移除本地旧数组和重复的单条详情，只展示三条 GitHub Release 卡片。
+- 验收：`pnpm build` 通过；Electron 运行态直接调用 `window.api.checkForUpdates()`，确认返回 `v2.14.56`、`v2.14.42`、`v2.14.0` 三条 GitHub Release。
+- 下一步：由用户视觉验收更新记录弹窗。
+
 ## 2026-07-08 v2.14.89 更新记录仅显示三条
 
 - 当前目标：更新记录弹窗只展示最新三条历史记录，避免旧记录占据过多空间。

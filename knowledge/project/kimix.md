@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-07-07T22:35:00+08:00"
+timestamp: "2026-07-08T00:35:00+08:00"
 ---
 
 # Kimix
@@ -15,6 +15,7 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 
 * The renderer lives under `src/` and communicates with privileged capabilities through the preload bridge.
 * The Electron main process lives under `electron/` and owns filesystem, settings, session, runtime, and IPC integration.
+* Update history is sourced from the latest three GitHub Releases, never from a bundled historical timeline. The main process prefers the GitHub Releases list API and falls back to the repository Releases Atom feed on anonymous API rate-limit responses (403/429); both sources remain GitHub-owned.
 * Kimi Code is the authoritative agent runtime. Kimix presents and adapts its APIs; it does not define a second agent protocol.
 * The chat shell owns the viewport height. Its outer height is fixed directly to the Electron viewport with `height/max-height: 100dvh`; ancestor percentage heights and Tailwind `h-full` are not a definite-size boundary for this Grid. The shell uses `48px minmax(0, 1fr)` tracks and the chat panel uses `toolbar + minmax(0, 1fr) + Composer`; every nested viewport remains shrinkable with `min-height: 0`, and only the inner chat scroll area owns message overflow.
 * The session toolbar uses an explicit `minmax(0, 1fr) auto` title/actions grid. Its title column owns truncation and overflow, while the fixed action column remains inside the shrinking chat main area when a right-side inspector opens.

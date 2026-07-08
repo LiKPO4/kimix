@@ -1214,6 +1214,7 @@ export type CheckUpdateResponse = {
   data: {
     currentVersion: string;
     latest: ReleaseInfo | null;
+    releases: ReleaseInfo[];
     hasUpdate: boolean;
     message: string;
   };

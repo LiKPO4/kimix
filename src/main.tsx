@@ -503,6 +503,7 @@ function installBrowserPreviewApi() {
       data: {
         currentVersion: "browser-preview",
         latest: null,
+        releases: [],
         hasUpdate: false,
         message: unsupported("检查更新"),
       },

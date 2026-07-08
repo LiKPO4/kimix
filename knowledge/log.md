@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-08
+
+* **Update history comes from GitHub Releases**: The dialog receives the latest three repository releases through the main-process update check, with the GitHub Releases Atom feed as a rate-limit fallback instead of bundled stale records. See [/project/kimix.md](/project/kimix.md).
+
 ## 2026-07-07
 
 * **Session toolbar actions stay inside the chat main area**: The toolbar now uses a shrinkable title column plus a fixed actions column, so opening the right inspector moves the complete action group left instead of clipping its trailing buttons. See [/project/kimix.md](/project/kimix.md).

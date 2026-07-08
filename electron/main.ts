@@ -2607,23 +2607,14 @@ function isVersionGreater(a: string, b: string): boolean {
   return false;
 }
 
-async function fetchLatestRelease() {
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-    headers: {
-      "Accept": "application/vnd.github+json",
-      "User-Agent": "Kimix",
-    },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
-  const data = await res.json() as {
-    tag_name?: unknown;
-    name?: unknown;
-    body?: unknown;
-    published_at?: unknown;
-    html_url?: unknown;
-    assets?: unknown;
-  };
+function mapGitHubRelease(data: {
+  tag_name?: unknown;
+  name?: unknown;
+  body?: unknown;
+  published_at?: unknown;
+  html_url?: unknown;
+  assets?: unknown;
+}) {
   const assets = Array.isArray(data.assets) ? data.assets : [];
   return {
     tagName: typeof data.tag_name === "string" ? data.tag_name : "",
@@ -2640,6 +2631,68 @@ async function fetchLatestRelease() {
       }))
       .filter((asset) => asset.downloadUrl.length > 0),
   };
+}
+
+function decodeXmlText(value: string) {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function parseReleaseAtom(xml: string, limit: number) {
+  return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)]
+    .slice(0, limit)
+    .map((match) => {
+      const entry = match[1];
+      const title = decodeXmlText(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? "");
+      const publishedAt = entry.match(/<updated>([\s\S]*?)<\/updated>/)?.[1]?.trim() ?? "";
+      const htmlUrl = decodeXmlText(entry.match(/<link[^>]+rel="alternate"[^>]+href="([^"]+)"/)?.[1] ?? `https://github.com/${GITHUB_REPO}/releases`);
+      const encodedBody = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] ?? "";
+      const body = decodeXmlText(encodedBody)
+        .replace(/<\/?(?:h\d|p|ul|ol)[^>]*>/gi, "\n")
+        .replace(/<li[^>]*>/gi, "\n- ")
+        .replace(/<\/li>/gi, "")
+        .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      const tagName = decodeURIComponent(htmlUrl.split("/tag/")[1] ?? title);
+      return { tagName, name: title, body, publishedAt, htmlUrl, assets: [] };
+    })
+    .filter((release) => release.tagName);
+}
+
+async function fetchReleaseAtom(limit: number) {
+  const res = await fetch(`https://github.com/${GITHUB_REPO}/releases.atom`, {
+    headers: { "User-Agent": "Kimix" },
+  });
+  if (!res.ok) throw new Error(`GitHub Releases 返回 ${res.status}`);
+  return parseReleaseAtom(await res.text(), limit);
+}
+
+async function fetchRecentReleases(limit = 3) {
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${limit}`, {
+    headers: {
+      "Accept": "application/vnd.github+json",
+      "User-Agent": "Kimix",
+    },
+  });
+  if (res.status === 403 || res.status === 429) return fetchReleaseAtom(limit);
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
+  const data = await res.json() as unknown;
+  if (!Array.isArray(data)) return [];
+  return data
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .map(mapGitHubRelease)
+    .filter((release) => release.tagName);
+}
+
+async function fetchLatestRelease() {
+  return (await fetchRecentReleases(1))[0] ?? null;
 }
 
 type ReleaseAssetInfo = {
@@ -6253,13 +6306,15 @@ ipcMain.handle("app:getInfo", async () => {
 ipcMain.handle("app:checkForUpdates", async () => {
   try {
     const currentVersion = app.getVersion();
-    const latest = await fetchLatestRelease();
+    const releases = await fetchRecentReleases(3);
+    const latest = releases[0] ?? null;
     if (!latest || !latest.tagName) {
       return {
         success: true,
         data: {
           currentVersion,
           latest: null,
+          releases: [],
           hasUpdate: false,
           message: "暂未找到 GitHub 发布版本",
         },
@@ -6271,6 +6326,7 @@ ipcMain.handle("app:checkForUpdates", async () => {
       data: {
         currentVersion,
         latest,
+        releases,
         hasUpdate,
         message: hasUpdate ? `发现新版本 ${latest.tagName}` : "当前已经是最新版本",
       },
