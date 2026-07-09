@@ -139,7 +139,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const projectDisplayName = displayProjectName(project);
   const sessionModel = getSessionModelForDisplay({
     events: activeSession?.events ?? [],
-    sessionModel: activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null,
+    sessionModel: activeSession?.switchedToModel || (activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null),
     modelSwitchedAt: activeSession?.modelSwitchedAt,
   });
   const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
