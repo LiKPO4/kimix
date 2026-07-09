@@ -403,7 +403,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
             className="w-full max-w-[680px] rounded-xl bg-surface-hover text-text-muted"
             style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 10, paddingBottom: 12 }}
           >
-            <div style={{ fontSize: 13, lineHeight: "18px", marginBottom: 8 }}>
+            <div className="text-center" style={{ fontSize: 13, lineHeight: "18px", marginBottom: 8 }}>
               <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
             </div>
             <div className="text-text-secondary" style={{ fontSize: 13, lineHeight: "21px" }}>
