@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Copy, Palette, X } from "lucide-react";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
@@ -20,37 +20,39 @@ type ImagePreviewOverlayProps = {
 export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSaveDrawing }: ImagePreviewOverlayProps) {
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [contextMenu, setContextMenu] = useState<{ left: number; top: number } | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const previewImages = images?.length ? images : [image];
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (drawingBoardRequest) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (previewImages.length < 2) return;
-      const direction = event.key === "ArrowLeft" || event.key === "ArrowUp"
-        ? -1
-        : event.key === "ArrowRight" || event.key === "ArrowDown"
-          ? 1
-          : 0;
-      if (!direction) return;
+    overlayRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (drawingBoardRequest) return;
+    if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      const currentIndex = previewImages.findIndex((item) => (
-        (image.id && item.id === image.id) || item.dataUrl === image.dataUrl
-      ));
-      const nextIndex = Math.max(0, currentIndex) + direction;
-      if (nextIndex < 0 || nextIndex >= previewImages.length) return;
-      setContextMenu(null);
-      onNavigate?.(previewImages[nextIndex]);
-    };
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [drawingBoardRequest, image.dataUrl, image.id, onClose, onNavigate, previewImages]);
+      onClose();
+      return;
+    }
+    if (previewImages.length < 2) return;
+    const direction = event.key === "ArrowLeft" || event.key === "ArrowUp"
+      ? -1
+      : event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : 0;
+    if (!direction) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const currentIndex = previewImages.findIndex((item) => (
+      (image.id && item.id === image.id) || item.dataUrl === image.dataUrl
+    ));
+    if (currentIndex === -1) return;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= previewImages.length) return;
+    setContextMenu(null);
+    onNavigate?.(previewImages[nextIndex]);
+  };
 
   const handleCopyImage = async () => {
     setContextMenu(null);
@@ -63,7 +65,10 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
   return createPortal(
     <>
       <div
-        className="kimix-preview-overlay fixed inset-0 z-[140] flex items-center justify-center"
+        ref={overlayRef}
+        tabIndex={-1}
+        className="kimix-preview-overlay fixed inset-0 z-[140] flex items-center justify-center focus:outline-none"
+        onKeyDown={handleKeyDown}
         onClick={() => {
           if (contextMenu) {
             setContextMenu(null);
