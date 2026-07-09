@@ -44,7 +44,7 @@ function parseDurationToSeconds(value: string): number | undefined {
   const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
   let total = 0;
   let hasMatch = false;
-  const regex = /(\d+(?:\.\d+)?)([dhm s])/g;
+  const regex = /(\d+(?:\.\d+)?)([dhms])/g;
   let match;
   while ((match = regex.exec(normalized)) !== null) {
     const amount = Number(match[1]);
@@ -229,6 +229,9 @@ function usagePeriodFromManagedRow(
     percent: Math.max(0, Math.min(100, (used / limit) * 100)),
     available: true,
     refreshAt,
+    // Managed usage rows don't carry explicit duration+timeUnit. The UI falls
+    // back to label-based heuristics (5h / weekly) in getPeriodWindowMs(),
+    // which are reliable for the current managed plan types.
   };
 }
 

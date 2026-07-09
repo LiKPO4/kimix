@@ -9,6 +9,12 @@ export type PreviewImage = {
   dataUrl: string;
 };
 
+export function findPreviewImageIndex(current: PreviewImage, images: PreviewImage[]): number {
+  return images.findIndex((item) => (
+    (current.id && item.id === current.id) || item.dataUrl === current.dataUrl
+  ));
+}
+
 type ImagePreviewOverlayProps = {
   image: PreviewImage;
   images?: PreviewImage[];
@@ -44,9 +50,7 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
     if (!direction) return;
     event.preventDefault();
     event.stopPropagation();
-    const currentIndex = previewImages.findIndex((item) => (
-      (image.id && item.id === image.id) || item.dataUrl === image.dataUrl
-    ));
+    const currentIndex = findPreviewImageIndex(image, previewImages);
     if (currentIndex === -1) return;
     const nextIndex = currentIndex + direction;
     if (nextIndex < 0 || nextIndex >= previewImages.length) return;
