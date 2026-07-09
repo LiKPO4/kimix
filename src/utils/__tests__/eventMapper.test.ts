@@ -1290,6 +1290,24 @@ describe("mapHistoryEvents", () => {
     expect(tool?.result).toBe("D:/WORKS\n");
   });
 
+  it("places compaction completion right after its begin event", () => {
+    const result = mapHistoryEvents([
+      { type: "compaction.started", payload: {}, time: 100 },
+      { type: "assistant.delta", payload: { delta: "压缩后第一段" }, time: 110 },
+      { type: "compaction.completed", payload: { compaction_summary: "摘要" }, time: 120 },
+      { type: "assistant.delta", payload: { delta: "压缩后第二段" }, time: 130 },
+      { type: "turn.ended", payload: {}, time: 200 },
+    ]);
+
+    const types = result.map((event) => event.type);
+    const compactionBeginIndex = types.indexOf("compaction");
+    const compactionEndIndex = types.findIndex((event, index) => event === "compaction" && index > compactionBeginIndex);
+    const assistantIndex = types.indexOf("assistant_message");
+    expect(compactionBeginIndex).toBeLessThan(assistantIndex);
+    expect(compactionEndIndex).toBe(compactionBeginIndex + 1);
+    expect((result[compactionEndIndex] as Extract<TimelineEvent, { type: "compaction" }>).phase).toBe("end");
+  });
+
   it("maps official Server snapshot history replay into user and assistant messages", () => {
     const result = mapHistoryEvents([
       {

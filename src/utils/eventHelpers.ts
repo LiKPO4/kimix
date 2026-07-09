@@ -302,18 +302,29 @@ export function settleFailedEvents(
   return closeOpenCompaction(settled);
 }
 
-export function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
-  const lastCompaction = [...events].reverse().find((event) => event.type === "compaction");
-  if (!lastCompaction || lastCompaction.type !== "compaction" || lastCompaction.phase !== "begin") {
-    return events;
+export function findUnmatchedCompactionBeginIndex(events: TimelineEvent[]): number {
+  let endCount = 0;
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type !== "compaction") continue;
+    if (event.phase === "end") {
+      endCount += 1;
+    } else if (event.phase === "begin") {
+      if (endCount === 0) return index;
+      endCount -= 1;
+    }
   }
-  return [
-    ...events,
-    {
-      id: Math.random().toString(36).substring(2, 11),
-      type: "compaction",
-      timestamp: Date.now(),
-      phase: "end",
-    },
-  ];
+  return -1;
+}
+
+export function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
+  const beginIndex = findUnmatchedCompactionBeginIndex(events);
+  if (beginIndex === -1) return events;
+  const endEvent: TimelineEvent = {
+    id: Math.random().toString(36).substring(2, 11),
+    type: "compaction",
+    timestamp: Date.now(),
+    phase: "end",
+  };
+  return [...events.slice(0, beginIndex + 1), endEvent, ...events.slice(beginIndex + 1)];
 }

@@ -1,5 +1,5 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
-import { formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
+import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -1187,6 +1187,18 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           }
         }
       }
+    }
+  }
+
+  // Keep compaction completion aligned with its start event. If it is appended
+  // after assistant content that streamed in while compaction was running, it
+  // would visually appear below the agent output for the same turn.
+  if (incoming.type === "compaction") {
+    const unmatchedBeginIndex = findUnmatchedCompactionBeginIndex(existing);
+    if (incoming.phase === "end" && unmatchedBeginIndex !== -1) {
+      const result = [...existing];
+      result.splice(unmatchedBeginIndex + 1, 0, incoming);
+      return result;
     }
   }
 
