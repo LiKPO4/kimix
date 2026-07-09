@@ -167,6 +167,16 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const firstPendingQuestion = activeSession?.events.find((event) => event.type === "question_request" && event.status === "pending");
   const latestError = [...(activeSession?.events ?? [])].reverse().find((event) => event.type === "error");
   const isSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
+  const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
+  // Only block model switching when the active session is the one currently
+  // tracked as running. A session with stale open timeline work should not
+  // prevent the user from switching models in a different session.
+  const isActiveRuntimeSessionRunning = Boolean(
+    runningSessionId && activeSession && (
+      runningSessionId === activeSession.id ||
+      Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
+    )
+  );
   const kimiStatus = pendingApprovalCount > 0
     ? { label: "待审批", tone: "warning" as const, icon: PauseCircle, detail: `${pendingApprovalCount} 个权限请求等待处理` }
     : pendingQuestionCount > 0
@@ -326,7 +336,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
 
   const handleSelectModel = async (model: string) => {
     if (!activeSession || activeSession.isLoading || switchingModel) return;
-    if (isSessionRunning) {
+    if (isActiveRuntimeSessionRunning) {
       showToast("本轮结束后可切换模型");
       return;
     }
@@ -662,7 +672,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                     当前：{compactDisplayModel}
                   </div>
                 </div>
-                {isSessionRunning && (
+                {isActiveRuntimeSessionRunning && (
                   <span className="shrink-0 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">本轮结束后可切换</span>
                 )}
               </div>
@@ -710,7 +720,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                                 type="button"
                                 role="menuitemradio"
                                 aria-checked={selected}
-                                disabled={isSessionRunning || Boolean(switchingModel) || activeSession?.isLoading}
+                                disabled={isActiveRuntimeSessionRunning || Boolean(switchingModel) || activeSession?.isLoading}
                                 onClick={() => void handleSelectModel(option.id)}
                                 className="grid w-full items-center rounded-lg text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{
