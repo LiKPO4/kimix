@@ -96,6 +96,11 @@ export function isSessionSidebarBusy(
   currentSessionId?: string,
   now = Date.now(),
 ) {
+  // Sidebar spinner must stay visible for any session with open timeline work,
+  // not just the single session tracked by runningSessionId. The active-work
+  // check used elsewhere has a 2-minute stale timeout, which causes long turns
+  // in concurrently running sessions to briefly lose their loading indicator.
   return (session.isLoading && session.id === currentSessionId) ||
-    isSessionRuntimeRunning(session, runningSessionId, now);
+    isSessionRuntimeRunning(session, runningSessionId, now) ||
+    hasOpenTimelineWork(session);
 }

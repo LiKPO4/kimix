@@ -121,4 +121,14 @@ describe("sessionActivity", () => {
     expect(isSessionSidebarBusy(loading, null, loading.id, 1)).toBe(true);
     expect(isSessionSidebarBusy({ ...loading, isLoading: false }, loading.runtimeSessionId ?? null, "other-session", 1)).toBe(true);
   });
+
+  it("keeps sidebar busy for long-running open work beyond the active-work timeout", () => {
+    const longRunning = session([
+      { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
+    ]);
+    const staleNow = 1 + 3 * 60 * 1000;
+
+    expect(isSessionRuntimeRunning(longRunning, null, staleNow)).toBe(false);
+    expect(isSessionSidebarBusy(longRunning, null, undefined, staleNow)).toBe(true);
+  });
 });
