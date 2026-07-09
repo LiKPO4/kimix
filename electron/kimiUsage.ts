@@ -27,8 +27,66 @@ function toTimestamp(value: unknown): number | undefined {
   return undefined;
 }
 
-function findRefreshTimestamp(detail: Record<string, unknown> | null, fallback: number): number {
-  const keys = [
+function toSeconds(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  }
+  if (typeof value === "string") {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return Math.floor(numeric);
+    return parseDurationToSeconds(value);
+  }
+  return undefined;
+}
+
+function parseDurationToSeconds(value: string): number | undefined {
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
+  let total = 0;
+  let hasMatch = false;
+  const regex = /(\d+(?:\.\d+)?)([dhm s])/g;
+  let match;
+  while ((match = regex.exec(normalized)) !== null) {
+    const amount = Number(match[1]);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const unit = match[2];
+    const multiplier = unit === "d" ? 86400 : unit === "h" ? 3600 : unit === "m" ? 60 : 1;
+    total += amount * multiplier;
+    hasMatch = true;
+  }
+  return hasMatch ? Math.floor(total) : undefined;
+}
+
+function refreshTimestampFromSeconds(detail: Record<string, unknown> | null, now: number): number | undefined {
+  const keys = ["reset_in", "resetIn", "ttl", "window"];
+  for (const source of [detail, getRecord(detail?.window)]) {
+    if (!source) continue;
+    for (const key of keys) {
+      const seconds = toSeconds(source[key]);
+      if (seconds !== undefined) return now + seconds * 1000;
+    }
+  }
+  return undefined;
+}
+
+function refreshTimestampFromResetHint(resetHint: unknown, now: number): number | undefined {
+  if (typeof resetHint !== "string" || !resetHint) return undefined;
+  const normalized = resetHint.toLowerCase();
+  const inMatch = normalized.match(/resets?\s+in\s+(.+)/);
+  if (inMatch?.[1]) {
+    const seconds = parseDurationToSeconds(inMatch[1]);
+    if (seconds !== undefined) return now + seconds * 1000;
+  }
+  const atMatch = normalized.match(/resets?\s+(?:at\s+)?(.+)/);
+  if (atMatch?.[1]) {
+    const timestamp = toTimestamp(atMatch[1].trim());
+    if (timestamp !== undefined) return timestamp;
+  }
+  return undefined;
+}
+
+function findRefreshTimestamp(detail: Record<string, unknown> | null, fallback: number, now = Date.now()): number {
+  const timestampKeys = [
     "refreshAt",
     "resetTime",
     "refreshTime",
@@ -46,15 +104,35 @@ function findRefreshTimestamp(detail: Record<string, unknown> | null, fallback: 
   ];
   for (const source of [detail, getRecord(detail?.window)]) {
     if (!source) continue;
-    for (const key of keys) {
+    for (const key of timestampKeys) {
       const timestamp = toTimestamp(source[key]);
       if (timestamp !== undefined) return timestamp;
     }
   }
+  const fromSeconds = refreshTimestampFromSeconds(detail, now);
+  if (fromSeconds !== undefined) return fromSeconds;
   return fallback;
 }
 
-function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | null, fallbackRefreshAt: number): UsagePeriod {
+function windowMsFromWindow(window: Record<string, unknown> | null): number | undefined {
+  if (!window) return undefined;
+  const duration = toNumber(window.duration);
+  const unit = String(window.timeUnit ?? "").toUpperCase();
+  if (duration === undefined || duration <= 0) return undefined;
+  if (unit.includes("MINUTE")) return duration * 60 * 1000;
+  if (unit.includes("HOUR")) return duration * 60 * 60 * 1000;
+  if (unit.includes("DAY")) return duration * 24 * 60 * 60 * 1000;
+  if (unit.includes("SECOND")) return duration * 1000;
+  return undefined;
+}
+
+function usagePeriodFromDetail(
+  label: string,
+  detail: Record<string, unknown> | null,
+  fallbackRefreshAt: number,
+  now = Date.now(),
+  windowMs?: number,
+): UsagePeriod {
   if (!detail) return { label, available: false, percent: 0, refreshAt: fallbackRefreshAt, message: "暂无官方数据" };
   const limit = toNumber(detail.limit);
   const remaining = toNumber(detail.remaining);
@@ -62,9 +140,9 @@ function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | 
   if (used === undefined && limit !== undefined && remaining !== undefined) {
     used = Math.max(0, limit - remaining);
   }
-  const refreshAt = findRefreshTimestamp(detail, fallbackRefreshAt);
+  const refreshAt = findRefreshTimestamp(detail, fallbackRefreshAt, now);
   if (limit === undefined || used === undefined || limit <= 0) {
-    return { label, available: false, percent: 0, refreshAt, message: "暂无官方数据" };
+    return { label, available: false, percent: 0, refreshAt, message: "暂无官方数据", windowMs };
   }
   return {
     label,
@@ -73,6 +151,7 @@ function usagePeriodFromDetail(label: string, detail: Record<string, unknown> | 
     percent: Math.max(0, Math.min(100, (used / limit) * 100)),
     available: true,
     refreshAt,
+    windowMs,
   };
 }
 
@@ -86,7 +165,7 @@ function findWindowLimit(payload: Record<string, unknown>, duration: number, tim
     const itemDuration = toNumber(window?.duration ?? itemRecord.duration ?? detail.duration);
     const itemUnit = String(window?.timeUnit ?? itemRecord.timeUnit ?? detail.timeUnit ?? "");
     if (itemDuration === duration && itemUnit.includes(timeUnit)) {
-      return { ...detail, window };
+      return { detail: { ...detail, window }, windowMs: windowMsFromWindow(window) };
     }
   }
   return null;
@@ -102,8 +181,23 @@ function nextWeekRefreshAt(now: number) {
 }
 
 export function parseKimiUsagePayload(payload: Record<string, unknown>, now = Date.now()): KimiUsageData {
-  const fiveHour = usagePeriodFromDetail("5小时", findWindowLimit(payload, 300, "MINUTE"), now + 5 * 60 * 60 * 1000);
-  const weekly = usagePeriodFromDetail("本周", getRecord(payload.usage), nextWeekRefreshAt(now));
+  const fiveHourLimit = findWindowLimit(payload, 300, "MINUTE");
+  const fiveHour = usagePeriodFromDetail(
+    "5小时",
+    fiveHourLimit?.detail ?? null,
+    now + 5 * 60 * 60 * 1000,
+    now,
+    fiveHourLimit?.windowMs,
+  );
+  const weeklyUsage = getRecord(payload.usage);
+  const weeklyWindow = getRecord(weeklyUsage?.window);
+  const weekly = usagePeriodFromDetail(
+    "本周",
+    weeklyUsage,
+    nextWeekRefreshAt(now),
+    now,
+    windowMsFromWindow(weeklyWindow),
+  );
   const totalQuota = toNumber(payload.totalQuota);
   return {
     available: [fiveHour, weekly].some((period) => period.available),
@@ -114,11 +208,17 @@ export function parseKimiUsagePayload(payload: Record<string, unknown>, now = Da
   };
 }
 
-function usagePeriodFromManagedRow(label: string, row: Record<string, unknown> | null, fallbackRefreshAt: number): UsagePeriod {
+function usagePeriodFromManagedRow(
+  label: string,
+  row: Record<string, unknown> | null,
+  fallbackRefreshAt: number,
+  now = Date.now(),
+): UsagePeriod {
   if (!row) return { label, available: false, percent: 0, refreshAt: fallbackRefreshAt, message: "暂无官方数据" };
   const limit = toNumber(row.limit);
   const used = toNumber(row.used);
-  const refreshAt = findRefreshTimestamp(row, fallbackRefreshAt);
+  const fromResetHint = refreshTimestampFromResetHint(row.resetHint, now);
+  const refreshAt = fromResetHint ?? findRefreshTimestamp(row, fallbackRefreshAt, now);
   if (limit === undefined || used === undefined || limit <= 0) {
     return { label, available: false, percent: 0, refreshAt, message: "暂无官方数据" };
   }
@@ -153,8 +253,8 @@ export function parseManagedUsagePayload(payload: unknown, now = Date.now()): Ki
   const limits = Array.isArray(record.limits) ? record.limits : [];
   const fiveHourRow = findManagedUsageLimit(limits, /(^|\b)(5h|300m|5\s*小时)/i);
   const weeklyRow = getRecord(record.summary) ?? findManagedUsageLimit(limits, /week|weekly|本周|每周|一周/i);
-  const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000);
-  const weekly = usagePeriodFromManagedRow("本周", weeklyRow, nextWeekRefreshAt(now));
+  const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000, now);
+  const weekly = usagePeriodFromManagedRow("本周", weeklyRow, nextWeekRefreshAt(now), now);
   return {
     available: [fiveHour, weekly].some((period) => period.available),
     updatedAt: now,

@@ -65,7 +65,9 @@ function getPeriodWindowMs(label: string): number | null {
 
 function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
   const percent = Math.max(0, Math.min(100, period.percent ?? 0));
-  const windowMs = getPeriodWindowMs(period.label);
+  // Prefer the actual window duration reported by the upstream API. Only fall
+  // back to label-based heuristics when it is unavailable.
+  const windowMs = period.windowMs ?? getPeriodWindowMs(period.label);
   // Elapsed-time bar: how much of the window has already passed.
   // e.g. 5h window with 1h remaining → elapsed = 4h → 80% green.
   const timePercent = (period.refreshAt && windowMs)

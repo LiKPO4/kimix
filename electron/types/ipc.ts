@@ -976,6 +976,8 @@ export type UsagePeriod = {
   percent?: number;
   available: boolean;
   refreshAt?: number;
+  /** Actual window duration in milliseconds, if known from the upstream response. */
+  windowMs?: number;
   message?: string;
 };
 
