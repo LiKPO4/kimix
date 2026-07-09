@@ -2418,12 +2418,9 @@ function clearTaskbarAttention() {
 function showTurnCompleteNotification(title: string, body: string, rendererWindowFocused = false, rendererPageVisible = false) {
   const settings = settingsService.loadSettings();
   const notificationMode = settings.notificationMode ?? "unfocused";
-  const windowAvailable = Boolean(mainWindow && !mainWindow.isDestroyed());
   const windowFocused = rendererWindowFocused || Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
-  const windowVisible = windowAvailable && Boolean(mainWindow?.isVisible()) && !mainWindow?.isMinimized();
-  const userCanSeeKimix = windowFocused || (rendererPageVisible && windowVisible);
   if (notificationMode === "never") return;
-  if (notificationMode === "unfocused" && userCanSeeKimix) return;
+  if (notificationMode === "unfocused" && windowFocused) return;
   if (!windowFocused) setTaskbarAttention();
   if (!Notification.isSupported()) return;
   const notification = new Notification({
