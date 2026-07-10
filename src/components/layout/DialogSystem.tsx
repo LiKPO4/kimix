@@ -16,6 +16,7 @@ import { formatDownloadPercent, formatDownloadDetail, formatReleaseDate, type Do
 import { useRef } from "react";
 import { usePresence } from "@/hooks/usePresence";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { isWindows } from "@/utils/platform";
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -43,6 +44,7 @@ const updateLinkButtonStyle = { height: 20, minHeight: 20, paddingLeft: 2, paddi
 const KIMI_CODE_DOCS_URL = "https://www.kimi.com/code/docs/kimi-code-cli/guides/getting-started.html";
 const KIMI_CODE_UPDATE_PAGE_URL = "https://www.kimi.com/code/docs/kimi-code/whats-new.html";
 const KIMI_CODE_WINDOWS_INSTALL_COMMAND = "irm https://code.kimi.com/kimi-code/install.ps1 | iex";
+const KIMI_CODE_POSIX_INSTALL_COMMAND = "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash";
 
 interface KimiOnboardingProps {
   show: boolean;
@@ -105,7 +107,7 @@ function KimiOnboardingDialog({
             <div>3. 登录完成后返回 Kimix，点击"刷新"或重新发送消息。</div>
           </div>
           <div className="mt-4 rounded-lg border border-border-subtle bg-surface-elevated font-mono text-[12.5px] leading-5 text-text-primary" style={{ padding: "12px 12px" }}>
-            {KIMI_CODE_WINDOWS_INSTALL_COMMAND}
+            {isWindows() ? KIMI_CODE_WINDOWS_INSTALL_COMMAND : KIMI_CODE_POSIX_INSTALL_COMMAND}
           </div>
           <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
             检测结果：{message}
@@ -152,7 +154,7 @@ function KimiOnboardingDialog({
             </button>
             <button
               type="button"
-              onClick={() => void copyToClipboard(KIMI_CODE_WINDOWS_INSTALL_COMMAND, "已复制安装命令")}
+              onClick={() => void copyToClipboard(isWindows() ? KIMI_CODE_WINDOWS_INSTALL_COMMAND : KIMI_CODE_POSIX_INSTALL_COMMAND, "已复制安装命令")}
               className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
               style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
             >

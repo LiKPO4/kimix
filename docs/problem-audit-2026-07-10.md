@@ -131,7 +131,9 @@
 
 - **影响**：手动安装回退命令错误，macOS/Linux 用户无法执行。
 - **证据**：`src/components/layout/DialogSystem.tsx:1`
-- **验证状态**：未抽查，基于审查结论纳入
+- **验证状态**：已抽查 `DialogSystem.tsx` 确认
+- **修复状态**：已修复（commit `d1b3020`）
+- **说明**：`DialogSystem.tsx` 新增 POSIX 安装命令常量；安装引导面板与“复制安装命令”按钮根据 `isWindows()` 动态显示 Windows PowerShell 或 macOS/Linux curl|bash 命令。
 - **建议**：按平台生成对应 shell 命令。
 
 ### 13. Kimix 更新包缺少应用层校验
