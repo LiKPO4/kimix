@@ -383,7 +383,8 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
 
     return { success: true };
   } catch (err) {
-    persistQueue = null;
+    // Keep persistQueue so the latest snapshot can be retried on the next
+    // persistLocalConversationState call instead of being silently dropped.
     reportPersistError("persistLocalConversationState", err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
