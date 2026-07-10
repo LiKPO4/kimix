@@ -113,7 +113,9 @@
 
 - **影响**：x64、arm64 都会构建，但更新逻辑只寻找第一个 DMG/ZIP，没有按 `process.arch` 选择；Intel Mac 无法运行 arm64 包。
 - **证据**：`electron-builder.yml:1`、`electron/main.ts:2804`
-- **验证状态**：未抽查，基于审查结论纳入
+- **验证状态**：已抽查 `pickUpdateAsset` 确认
+- **修复状态**：已修复（commit `6110a9b`）
+- **说明**：`electron/main.ts` 的 `pickUpdateAsset` 在 `process.platform === "darwin"` 分支中，先按 `process.arch`（arm64/x64）筛选文件名包含对应架构的 `.dmg` / `.zip`，找不到再 fallback 到任意 dmg/zip，避免 Intel Mac 下载 arm64 包。
 - **建议**：按 `process.arch` 匹配对应架构资产。
 
 ### 11. 语音快捷键和定时关机在非 Windows 平台仍被正常展示

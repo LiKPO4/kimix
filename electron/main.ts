@@ -2812,7 +2812,10 @@ function pickUpdateAsset(assets: ReleaseAssetInfo[]) {
     return preferred ?? names.find((asset) => asset.lowerName.endsWith(".exe")) ?? null;
   }
   if (process.platform === "darwin") {
-    return names.find((asset) => asset.lowerName.endsWith(".dmg")) ??
+    const arch = process.arch === "arm64" ? "arm64" : "x64";
+    return names.find((asset) => asset.lowerName.includes(arch) && asset.lowerName.endsWith(".dmg")) ??
+      names.find((asset) => asset.lowerName.includes(arch) && asset.lowerName.endsWith(".zip")) ??
+      names.find((asset) => asset.lowerName.endsWith(".dmg")) ??
       names.find((asset) => asset.lowerName.endsWith(".zip")) ??
       null;
   }
