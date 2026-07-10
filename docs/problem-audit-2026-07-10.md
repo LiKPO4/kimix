@@ -207,6 +207,8 @@
 - **影响**：无效 HTML 语义和键盘行为；`stopPropagation` 无法修复无障碍问题。
 - **证据**：`src/components/layout/SearchOverlay.tsx:417`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `08c6bd1`）
+- **说明**：`SearchOverlay.tsx` 中“全部工作目录”结果列表的整行元素由 `<button>` 改为 `<div role="button" tabIndex={0}>`，保留点击与键盘选中逻辑；内部“复制命令”按钮保持独立 `<button>`，避免 HTML 按钮嵌套。
 - **建议**：将外层改为 `div` + 点击处理，内部复制按钮独立；或改用语义正确的行布局。
 
 ### 21. 搜索界面展示 `Ctrl+1…9`，但没有实现对应快捷键
