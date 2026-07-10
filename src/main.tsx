@@ -169,6 +169,7 @@ function installBrowserPreviewApi() {
     listPreviewFiles: () => Promise.resolve({ success: true, data: [] }),
     openFile: () => fail<VoidResponse>("打开文件"),
     revertFiles: () => fail<VoidResponse>("回退文件"),
+    checkRevertConflicts: () => Promise.resolve({ success: true, conflicts: [] }),
     openProjectEditor: () => fail<VoidResponse>("打开编辑器"),
     openProjectTerminal: () => fail<VoidResponse>("打开终端"),
     searchProjectFiles: (): Promise<SearchProjectFilesResponse> => Promise.resolve({ success: true, data: [] }),

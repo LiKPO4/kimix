@@ -4,6 +4,8 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import type { TimelineEvent } from "@/types/ui";
+import type { RevertConflict } from "../../../../electron/types/ipc";
+import { sha256Hex } from "@/utils/hash";
 
 interface Change {
   path: string;
@@ -211,21 +213,61 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     if (!window.confirm(confirmMessage)) return;
     setReverting(true);
     setError("");
-    const res = await window.api.revertFiles({
-      projectPath,
-      additionalWorkDirs,
-      files: targetFiles.map((file) => ({
-        path: file.path,
-        additions: file.additions,
-        deletions: file.deletions,
-      })),
-    });
-    setReverting(false);
-    if (!res.success) {
-      setError(res.error);
-      return;
+    try {
+      const filesWithSnapshot = await Promise.all(targetFiles.map(async (file) => {
+        const key = normalizePath(file.path);
+        const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path) : null;
+        const change = changesByPath.get(key);
+        const newText = change?.newText ?? diffEvent?.newText;
+        const snapshotHash = newText ? await sha256Hex(newText) : undefined;
+        return {
+          path: file.path,
+          additions: file.additions,
+          deletions: file.deletions,
+          snapshotHash,
+        };
+      }));
+      const conflictCheck = await window.api.checkRevertConflicts({
+        projectPath,
+        additionalWorkDirs,
+        files: filesWithSnapshot.map((f) => ({ path: f.path, snapshotHash: f.snapshotHash })),
+      });
+      if (!conflictCheck.success) {
+        setError(conflictCheck.error);
+        setReverting(false);
+        return;
+      }
+      if (conflictCheck.conflicts.length > 0) {
+        const conflictPaths = conflictCheck.conflicts.slice(0, 6).map((c) => c.path);
+        const moreCount = Math.max(0, conflictCheck.conflicts.length - conflictPaths.length);
+        const conflictList = [
+          ...conflictPaths,
+          moreCount > 0 ? `…以及另外 ${moreCount} 个文件` : "",
+        ].filter(Boolean).join("\n");
+        const forceMessage = conflictCheck.conflicts.length === 1
+          ? `以下文件在 Agent 修改后已被变更，撤销将覆盖这些新修改：\n\n${conflictList}\n\n确定要继续吗？`
+          : `以下 ${conflictCheck.conflicts.length} 个文件在 Agent 修改后已被变更，撤销将覆盖这些新修改：\n\n${conflictList}\n\n确定要继续吗？`;
+        if (!window.confirm(forceMessage)) {
+          setReverting(false);
+          return;
+        }
+      }
+      const res = await window.api.revertFiles({
+        projectPath,
+        additionalWorkDirs,
+        files: filesWithSnapshot,
+        force: conflictCheck.conflicts.length > 0,
+      });
+      setReverting(false);
+      if (!res.success) {
+        setError(res.error);
+        return;
+      }
+      removeRevertedFiles(targetFiles.map((file) => file.path));
+    } catch (err) {
+      setReverting(false);
+      setError(err instanceof Error ? err.message : String(err));
     }
-    removeRevertedFiles(targetFiles.map((file) => file.path));
   };
 
   const renderFileRow = (file: { path: string; additions?: number; deletions?: number }) => {

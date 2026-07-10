@@ -79,6 +79,8 @@ import type {
   ReadTextFileRequest,
   ReadTextFileResponse,
   RevertFilesRequest,
+  CheckRevertConflictsRequest,
+  CheckRevertConflictsResponse,
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
   ListSkillsResponse,
@@ -215,6 +217,8 @@ const api = {
     ipcRenderer.invoke("project:openFile", req),
   revertFiles: (req: RevertFilesRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:revertFiles", req),
+  checkRevertConflicts: (req: CheckRevertConflictsRequest): Promise<CheckRevertConflictsResponse> =>
+    ipcRenderer.invoke("project:checkRevertConflicts", req),
   openProjectEditor: (req: OpenEditorRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openEditor", req),
   openProjectTerminal: (req: OpenTerminalRequest): Promise<VoidResponse> =>

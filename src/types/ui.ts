@@ -392,6 +392,8 @@ export interface ChangeSummaryFile {
   path: string;
   additions?: number;
   deletions?: number;
+  /** SHA-256 of the file content after the Agent modification. Used to detect subsequent user edits before revert. */
+  snapshotHash?: string;
 }
 
 export interface ChangeSummaryEvent {

@@ -4408,13 +4408,17 @@ ipcMain.handle("project:revertFiles", async (_, request: unknown) => {
     if (!request || typeof request !== "object") {
       return { success: false, error: "Invalid request" };
     }
-    const req = request as { projectPath?: unknown; files?: unknown };
+    const req = request as { projectPath?: unknown; files?: unknown; additionalWorkDirs?: unknown; force?: unknown };
     if (typeof req.projectPath !== "string" || !Array.isArray(req.files)) {
       return { success: false, error: "Invalid revert request" };
     }
     if (!fs.existsSync(req.projectPath)) {
       return { success: false, error: "Project path does not exist" };
     }
+    const additionalWorkDirs = Array.isArray(req.additionalWorkDirs)
+      ? req.additionalWorkDirs.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    const allowedRoots = [req.projectPath, ...additionalWorkDirs];
     const files = req.files
       .map((file) => {
         if (typeof file === "string" && file.trim().length > 0) {
@@ -4423,21 +4427,70 @@ ipcMain.handle("project:revertFiles", async (_, request: unknown) => {
         if (file && typeof file === "object" && typeof (file as { path?: unknown }).path === "string" && (file as { path: string }).path.trim().length > 0) {
           const additions = (file as { additions?: unknown }).additions;
           const deletions = (file as { deletions?: unknown }).deletions;
+          const snapshotHash = (file as { snapshotHash?: unknown }).snapshotHash;
           return {
             path: (file as { path: string }).path,
             additions: typeof additions === "number" ? additions : undefined,
             deletions: typeof deletions === "number" ? deletions : undefined,
+            snapshotHash: typeof snapshotHash === "string" ? snapshotHash : undefined,
           };
         }
         return null;
       })
       .filter((file): file is projectService.RevertFileTarget => file !== null);
-    files.forEach((file) => resolveProjectFile(req.projectPath as string, file.path));
-    const additionalWorkDirs = Array.isArray(req.additionalWorkDirs)
-      ? req.additionalWorkDirs.filter((item): item is string => typeof item === "string")
-      : [];
-    await projectService.revertGitFiles(req.projectPath, files, additionalWorkDirs);
+    for (const file of files) {
+      const resolved = path.isAbsolute(file.path) ? path.resolve(file.path) : path.resolve(req.projectPath, file.path);
+      if (!allowedRoots.some((root) => isPathInside(root, resolved))) {
+        throw new Error(`文件路径不在允许的工作区内：${file.path}`);
+      }
+    }
+    const force = req.force === true;
+    const conflicts = await projectService.revertGitFiles(req.projectPath, files, additionalWorkDirs, force);
+    if (conflicts.length > 0 && !force) {
+      return { success: false, error: "文件内容已在 Agent 修改后被变更", conflicts };
+    }
     return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("project:checkRevertConflicts", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") {
+      return { success: false, error: "Invalid request" };
+    }
+    const req = request as { projectPath?: unknown; files?: unknown; additionalWorkDirs?: unknown };
+    if (typeof req.projectPath !== "string" || !Array.isArray(req.files)) {
+      return { success: false, error: "Invalid request" };
+    }
+    if (!fs.existsSync(req.projectPath)) {
+      return { success: false, error: "Project path does not exist" };
+    }
+    const additionalWorkDirs = Array.isArray(req.additionalWorkDirs)
+      ? req.additionalWorkDirs.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    const allowedRoots = [req.projectPath, ...additionalWorkDirs];
+    const targets = req.files
+      .map((file) => {
+        if (file && typeof file === "object" && typeof (file as { path?: unknown }).path === "string" && (file as { path: string }).path.trim().length > 0) {
+          const snapshotHash = (file as { snapshotHash?: unknown }).snapshotHash;
+          return {
+            path: (file as { path: string }).path,
+            snapshotHash: typeof snapshotHash === "string" ? snapshotHash : undefined,
+          };
+        }
+        return null;
+      })
+      .filter((file): file is projectService.RevertFileTarget => file !== null);
+    for (const target of targets) {
+      const resolved = path.isAbsolute(target.path) ? path.resolve(target.path) : path.resolve(req.projectPath, target.path);
+      if (!allowedRoots.some((root) => isPathInside(root, resolved))) {
+        throw new Error(`文件路径不在允许的工作区内：${target.path}`);
+      }
+    }
+    const conflicts = await projectService.checkRevertConflicts(req.projectPath, targets, additionalWorkDirs);
+    return { success: true, conflicts };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

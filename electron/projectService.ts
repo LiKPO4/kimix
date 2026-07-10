@@ -3,8 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import { exec, execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createHash } from "node:crypto";
 import { shell } from "electron";
-import type { GitGraphEntry, Project } from "./types/ipc";
+import type { GitGraphEntry, Project, RevertConflict } from "./types/ipc";
 
 /** 串行 mutex — 确保并发读写不相互覆盖。 */
 let projectOpQueue: Promise<unknown> = Promise.resolve();
@@ -387,6 +388,7 @@ export type RevertFileTarget = {
   path: string;
   additions?: number;
   deletions?: number;
+  snapshotHash?: string;
 };
 
 export function parseGitStatus(status: string): GitStatusFile[] {
@@ -548,11 +550,50 @@ async function findGitRoot(startPath: string): Promise<string | null> {
   }
 }
 
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input, "utf-8").digest("hex");
+}
+
 function resolveRevertTarget(projectPath: string, target: RevertFileTarget) {
   const absolutePath = path.isAbsolute(target.path)
     ? path.resolve(target.path)
     : path.resolve(projectPath, target.path);
   return { ...target, absolutePath };
+}
+
+async function readTextFileIfExists(absolutePath: string): Promise<string | null> {
+  try {
+    const stat = await fs.promises.stat(absolutePath);
+    if (!stat.isFile() || stat.size > 2 * 1024 * 1024) return null;
+    return await fs.promises.readFile(absolutePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+async function checkRevertSnapshot(
+  target: RevertFileTarget & { absolutePath: string },
+  force: boolean,
+): Promise<{ ok: true } | { ok: false; conflict: RevertConflict }> {
+  if (!target.snapshotHash) return { ok: true };
+  const currentText = await readTextFileIfExists(target.absolutePath);
+  if (currentText === null) {
+    // 文件已不存在；允许继续撤销（Git checkout 会处理，未跟踪文件删除到回收站）。
+    return { ok: true };
+  }
+  const currentHash = sha256Hex(currentText);
+  if (currentHash === target.snapshotHash) return { ok: true };
+  if (force) return { ok: true };
+  return {
+    ok: false,
+    conflict: {
+      path: target.path,
+      snapshotHash: target.snapshotHash,
+      currentHash,
+      currentText,
+      oldText: undefined,
+    },
+  };
 }
 
 function isInsideAllowedRoots(absolutePath: string, roots: string[]): boolean {
@@ -618,8 +659,9 @@ export async function revertGitFiles(
   projectPath: string,
   targets: RevertFileTarget[],
   additionalWorkDirs: string[] = [],
-): Promise<void> {
-  if (targets.length === 0) return;
+  force = false,
+): Promise<RevertConflict[]> {
+  if (targets.length === 0) return [];
   const allowedRoots = [projectPath, ...additionalWorkDirs].filter(Boolean);
   if (allowedRoots.length === 0) {
     throw new Error("缺少有效的项目路径");
@@ -630,6 +672,16 @@ export async function revertGitFiles(
       throw new Error(`撤销目标不在允许的工作区内：${target.path}`);
     }
   }
+
+  const conflicts: RevertConflict[] = [];
+  for (const target of resolvedTargets) {
+    const check = await checkRevertSnapshot(target, force);
+    if (!check.ok) conflicts.push(check.conflict);
+  }
+  if (conflicts.length > 0 && !force) {
+    return conflicts;
+  }
+
   const gitGroups = new Map<string, Array<RevertFileTarget & { absolutePath: string }>>();
   const nonGitTargets: Array<RevertFileTarget & { absolutePath: string }> = [];
 
@@ -650,4 +702,30 @@ export async function revertGitFiles(
   for (const target of nonGitTargets) {
     await revertNonGitGeneratedFile(projectPath, target);
   }
+  return [];
+}
+
+export async function checkRevertConflicts(
+  projectPath: string,
+  targets: RevertFileTarget[],
+  additionalWorkDirs: string[] = [],
+): Promise<RevertConflict[]> {
+  if (targets.length === 0) return [];
+  const allowedRoots = [projectPath, ...additionalWorkDirs].filter(Boolean);
+  if (allowedRoots.length === 0) {
+    throw new Error("缺少有效的项目路径");
+  }
+  const resolvedTargets = targets.map((target) => resolveRevertTarget(projectPath, target));
+  for (const target of resolvedTargets) {
+    if (!isInsideAllowedRoots(target.absolutePath, allowedRoots)) {
+      throw new Error(`撤销目标不在允许的工作区内：${target.path}`);
+    }
+  }
+
+  const conflicts: RevertConflict[] = [];
+  for (const target of resolvedTargets) {
+    const check = await checkRevertSnapshot(target, false);
+    if (!check.ok) conflicts.push(check.conflict);
+  }
+  return conflicts;
 }

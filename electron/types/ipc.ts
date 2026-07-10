@@ -1053,8 +1053,35 @@ export type RevertFilesRequest = {
     path: string;
     additions?: number;
     deletions?: number;
+    snapshotHash?: string;
   }>;
+  force?: boolean;
 }
+
+export type RevertConflict = {
+  path: string;
+  snapshotHash: string;
+  currentHash: string;
+  currentText: string;
+  oldText?: string;
+};
+
+export type CheckRevertConflictsRequest = {
+  projectPath: string;
+  additionalWorkDirs?: string[];
+  files: Array<{
+    path: string;
+    snapshotHash?: string;
+  }>;
+};
+
+export type CheckRevertConflictsResponse = {
+  success: true;
+  conflicts: RevertConflict[];
+} | {
+  success: false;
+  error: string;
+};
 
 export type OpenEditorRequest = {
   path: string;
