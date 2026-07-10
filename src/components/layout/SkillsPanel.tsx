@@ -273,7 +273,7 @@ export function SkillsPanel({
   const trustMeta = (skill: SkillInfo) => {
     switch (skill.trustLevel) {
       case "kimi-official":
-        return { label: "官方", className: "bg-accent-primary text-white" };
+        return { label: "插件提供", className: "bg-accent-primary text-white" };
       case "curated":
         return { label: "精选", className: "bg-accent-success-light text-accent-success" };
       case "third-party":
