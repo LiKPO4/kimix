@@ -279,6 +279,8 @@
 - **影响**：UI 按技能名称记录启用状态；同步时按名称构造 Map，同名技能只保留最后一份；用户点击 A 来源的技能，实际复制的可能是 B 来源版本。
 - **证据**：`src/components/layout/SkillsPanel.tsx:164`、`electron/main.ts:3462`
 - **验证状态**：已抽查 `SkillsPanel.tsx` 确认
+- **修复状态**：已修复（commit `759447f`）
+- **说明**：`SkillInfo` 新增稳定 `id`（取 `skill.path`）；`SkillsPanel` 切换启用时改用 `skill.id`；`saveEnabledSkills` 请求/响应改为 `ids`/`enabledIds`；`syncEnabledSkills` 按 id 匹配，同名不同路径技能可独立启用；`enabledSkillNames` 仍作为设置键但存储 id（路径），旧 name 仅在加载时作兼容回退。
 - **建议**：技能标识包含来源路径；明确优先级或让用户选择来源。
 
 ### 29. 插件“官方”标签表达的是安装位置，不一定代表发布者可信
