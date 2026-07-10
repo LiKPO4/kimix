@@ -105,6 +105,8 @@
 - **影响**：macOS/Linux 用户复制命令后无法执行。
 - **证据**：`src/components/layout/SearchOverlay.tsx:43`（`formatResumeCommand`）
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `c5c1187`）
+- **说明**：`formatResumeCommand` 现在读取 `window.api.platform`；Windows 保持 PowerShell 格式 `Set-Location -LiteralPath '...'; kimi -S <id>`，macOS/Linux 生成 POSIX shell 格式 `cd '...' && kimi -S <id>`；对路径中的单引号做了正确转义。
 - **建议**：按平台生成 `cd` + `kimi -S` 命令。
 
 ### 10. macOS 更新包没有按 CPU 架构筛选

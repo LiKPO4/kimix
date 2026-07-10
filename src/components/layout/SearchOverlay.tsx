@@ -54,8 +54,18 @@ function quotePowerShellLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+function quotePosixShellLiteral(value: string): string {
+  return `'${value.replace(/'/g, "'\''")}'`;
+}
+
 function formatResumeCommand(session: KimiCodeSessionSummary): string {
-  return `Set-Location -LiteralPath ${quotePowerShellLiteral(session.workDir)}; kimi -S ${session.id}`;
+  const platform = typeof window !== "undefined" && window.api ? (window.api as { platform?: NodeJS.Platform }).platform : undefined;
+  const workDir = session.workDir;
+  const sessionId = session.id;
+  if (platform === "win32") {
+    return `Set-Location -LiteralPath ${quotePowerShellLiteral(workDir)}; kimi -S ${sessionId}`;
+  }
+  return `cd ${quotePosixShellLiteral(workDir)} && kimi -S ${sessionId}`;
 }
 
 function loadWithTimeout(session: Session, timeoutMs = 8000) {
