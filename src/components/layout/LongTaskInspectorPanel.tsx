@@ -649,22 +649,6 @@ export function LongTaskInspectorPanel({
     setGitGraphLimit(nextLimit);
     void loadGitGraph(nextLimit, "more");
   };
-  const lastGitDetailsOpenSignalRef = useRef(0);
-  useEffect(() => {
-    const nextSignal = gitDetailsOpenSignal ?? 0;
-    if (nextSignal === lastGitDetailsOpenSignalRef.current) return;
-    lastGitDetailsOpenSignalRef.current = nextSignal;
-    if (nextSignal <= 0) return;
-    openGitDetails();
-  }, [gitDetailsOpenSignal]);
-  const lastGitGraphOpenSignalRef = useRef(0);
-  useEffect(() => {
-    const nextSignal = gitGraphOpenSignal ?? 0;
-    if (nextSignal === lastGitGraphOpenSignalRef.current) return;
-    lastGitGraphOpenSignalRef.current = nextSignal;
-    if (nextSignal <= 0) return;
-    openGitGraph();
-  }, [gitGraphOpenSignal]);
   useEffect(() => {
     gitInfoRequestIdRef.current += 1;
     gitDetailsRequestIdRef.current += 1;
@@ -691,6 +675,22 @@ export function LongTaskInspectorPanel({
     if (gitGraphOpen) void loadGitGraph(GIT_GRAPH_PAGE_SIZE);
     else void refreshGitInfo("silent");
   }, [projectPathForGit]);
+  const lastGitDetailsOpenSignalRef = useRef(0);
+  useEffect(() => {
+    const nextSignal = gitDetailsOpenSignal ?? 0;
+    if (nextSignal === lastGitDetailsOpenSignalRef.current) return;
+    lastGitDetailsOpenSignalRef.current = nextSignal;
+    if (nextSignal <= 0) return;
+    openGitDetails();
+  }, [gitDetailsOpenSignal]);
+  const lastGitGraphOpenSignalRef = useRef(0);
+  useEffect(() => {
+    const nextSignal = gitGraphOpenSignal ?? 0;
+    if (nextSignal === lastGitGraphOpenSignalRef.current) return;
+    lastGitGraphOpenSignalRef.current = nextSignal;
+    if (nextSignal <= 0) return;
+    openGitGraph();
+  }, [gitGraphOpenSignal]);
   const commitSelectedGitFiles = async () => {
     if (!projectPathForGit || gitBusy) return;
     const message = gitCommitMessage.trim();

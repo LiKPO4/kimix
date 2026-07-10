@@ -4702,3 +4702,23 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/layout/LongTaskInspectorPanel.tsx`
 ## 下一步
 - 用户实机复验 v2.14.116 的底部分支入口；右侧 Git 卡片的“详情”和“图谱”入口保持原语义。
+# 2026-07-10 v2.14.117 Git 图谱首次直开永久加载修复
+## 当前目标
+- 修复从底部分支按钮首次挂载图谱宿主时，请求结果被丢弃并永久停在“正在读取 Git 图谱”的问题。
+## 根因
+- 外部图谱信号 effect 先发起请求，随后项目路径初始化 effect 递增请求代号；首个请求因此被判定为过期，结果与 loading 收尾均被忽略。
+## 已完成
+- 将项目路径重置与请求失效 effect 调整到外部 Git 详情/图谱信号 effect 之前，确保首次直开请求使用初始化后的有效代号。
+- 同步覆盖 Git 详情的首次直开顺序，避免相同生命周期竞态。
+- 版本号三处同步到 v2.14.117。
+## 未完成
+- 等待用户用 v2.14.117 实机确认图谱可正常加载。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、390 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-COiBIsiW.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、119 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/layout/LongTaskInspectorPanel.tsx`
+## 下一步
+- 用户点击底部 `master`，确认图谱提交列表正常出现且关闭后可再次打开。

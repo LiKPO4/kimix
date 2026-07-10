@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+* **Overlay-only Git hosts initialize before consuming open signals**: Project-path reset and request invalidation now precede external Git graph/details signals, preventing the first request from being discarded as stale with a permanent loading indicator. See [/project/kimix.md](/project/kimix.md).
 * **Footer branch control opens Git graph directly**: The ContextBar branch action uses an independent overlay signal to reuse the inspector's existing graph implementation without opening the inspector or routing through commit details. See [/project/kimix.md](/project/kimix.md).
 * **Long local histories no longer lose their earliest events**: Wire parsing keeps the complete recognizable history, while ChatThread remains responsible for the bounded initial render and older-history expansion. See [/project/kimix.md](/project/kimix.md).
 * **Kimi Web long histories mount only the latest process details**: Historical turns keep final Markdown visible but leave thinking/tool/subagent lists collapsed and unmounted until the user expands them. See [/project/kimix.md](/project/kimix.md).
