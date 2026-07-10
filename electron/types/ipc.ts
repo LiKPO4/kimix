@@ -1107,6 +1107,7 @@ export type ListSkillsResponse = {
   success: true;
   data: {
     skills: SkillInfo[];
+    scanErrors: { path: string; reason: string }[];
     enabledIds: string[];
     enabledDir: string;
   };

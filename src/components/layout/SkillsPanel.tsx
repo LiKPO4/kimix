@@ -41,6 +41,7 @@ export function SkillsPanel({
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [enabledIds, setEnabledIds] = useState<string[]>([]);
   const [enabledDir, setEnabledDir] = useState("");
+  const [scanErrors, setScanErrors] = useState<{ path: string; reason: string }[]>([]);
   const [message, setMessage] = useState("正在扫描本地 Skills...");
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -135,10 +136,13 @@ export function SkillsPanel({
       return;
     }
     const nextSkills = asArray(res.data.skills);
+    const nextErrors = asArray(res.data.scanErrors);
     setSkills(nextSkills);
     setEnabledIds(asArray(res.data.enabledIds));
     setEnabledDir(res.data.enabledDir);
-    setMessage(nextMessage ?? (nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill"));
+    setScanErrors(nextErrors);
+    const errorHint = nextErrors.length > 0 ? `（${nextErrors.length} 个文件扫描异常）` : "";
+    setMessage((nextMessage ?? (nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill")) + errorHint);
   };
 
   useEffect(() => {
@@ -152,10 +156,13 @@ export function SkillsPanel({
         return;
       }
       const nextSkills = asArray(res.data.skills);
+      const nextErrors = asArray(res.data.scanErrors);
       setSkills(nextSkills);
       setEnabledIds(asArray(res.data.enabledIds));
       setEnabledDir(res.data.enabledDir);
-      setMessage(nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill");
+      setScanErrors(nextErrors);
+      const errorHint = nextErrors.length > 0 ? `（${nextErrors.length} 个文件扫描异常）` : "";
+      setMessage((nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill") + errorHint);
     });
     return () => {
       cancelled = true;
@@ -606,6 +613,22 @@ export function SkillsPanel({
                 <div>{message}{saving ? "，正在保存..." : ""}</div>
                 {enabledDir && <div className="mt-1 break-all" title={enabledDir}>启用目录：{enabledDir}</div>}
               </div>
+              {scanErrors.length > 0 && (
+                <div className="kimix-soft-card rounded-xl border border-accent-warning/35 bg-accent-warning-light/40 text-[13px] leading-6" style={{ padding: "14px 16px" }}>
+                  <div className="font-medium text-accent-warning">{scanErrors.length} 个文件扫描异常</div>
+                  <div className="flex flex-col" style={{ gap: 8, marginTop: 10 }}>
+                    {scanErrors.slice(0, 5).map((error, index) => (
+                      <div key={`${index}:${error.path}`} className="rounded-md bg-surface-elevated text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "8px 10px" }} title={`${error.reason}: ${error.path}`}>
+                        <div className="truncate">{error.reason}</div>
+                        <div className="truncate text-[var(--kimix-panel-text-muted)]">{error.path}</div>
+                      </div>
+                    ))}
+                    {scanErrors.length > 5 && (
+                      <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">还有 {scanErrors.length - 5} 个异常文件未展示</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </aside>
             <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridAutoRows: 174, gap: 12 }}>
               {skills.map((skill) => (

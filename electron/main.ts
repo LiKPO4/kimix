@@ -3225,7 +3225,7 @@ function parseSkillFrontmatter(content: string): { name?: string; description?: 
   return fields;
 }
 
-function listLocalSkills() {
+function scanSkillsWithDiagnostics() {
   const roots = [
     path.join(os.homedir(), ".kimix", "skills"),
     path.join(os.homedir(), ".kimi-code", "skills"),
@@ -3239,6 +3239,7 @@ function listLocalSkills() {
   const enabled = new Set(settings.enabledSkillNames ?? []);
   const results: { id: string; name: string; description: string; path: string; source: string; sourceLabel: string; trustLevel: "kimi-official" | "curated" | "third-party" | "local"; enabled: boolean }[] = [];
   const seen = new Set<string>();
+  const errors: { path: string; reason: string }[] = [];
 
   function classifySkillSource(root: string, skillPath: string) {
     const normalizedRoot = root.replace(/\\/g, "/").toLowerCase();
@@ -3324,7 +3325,7 @@ function listLocalSkills() {
           });
           seen.add(normalizedManifestPath);
         } catch {
-          // Ignore malformed plugin manifests; Plugin management surfaces install errors separately.
+          errors.push({ path: manifestPath, reason: "插件清单解析失败" });
         }
       }
       continue;
@@ -3351,12 +3352,16 @@ function listLocalSkills() {
         });
         seen.add(normalizedSkillPath);
       } catch {
-        // Ignore unreadable skill files.
+        errors.push({ path: skillPath, reason: "SKILL.md 读取或解析失败" });
       }
     }
   }
 
-  return results.sort((a, b) => a.name.localeCompare(b.name));
+  return { skills: results.sort((a, b) => a.name.localeCompare(b.name)), errors };
+}
+
+function listLocalSkills() {
+  return scanSkillsWithDiagnostics().skills;
 }
 
 function enabledSkillsDir() {
@@ -4487,10 +4492,12 @@ ipcMain.handle("project:listPreviewFiles", async (_, request: unknown) => {
 ipcMain.handle("project:listSkills", async () => {
   try {
     const settings = settingsService.loadSettings();
+    const { skills, errors } = scanSkillsWithDiagnostics();
     return {
       success: true,
       data: {
-        skills: listLocalSkills(),
+        skills,
+        scanErrors: errors,
         enabledIds: settings.enabledSkillNames ?? [],
         enabledDir: settings.enabledSkillsDir || enabledSkillsDir(),
       },
