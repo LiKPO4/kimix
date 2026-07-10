@@ -4619,3 +4619,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/layout/LongTaskInspectorPanel.tsx`
 ## 下一步
 - 用户实机截图确认普通宽度和右侧栏展开态；版本号须为 v2.14.112，再决定是否需要视觉微调。
+# 2026-07-10 v2.14.113 左侧项目与会话列表密度优化
+## 当前目标
+- 在保留层级间距的前提下，收紧左侧项目、项目到会话、会话之间过大的历史留白。
+## 已完成
+- 项目 section 间距从 18px 调整为 6px。
+- 项目标题到展开会话列表从 8px 调整为 4px。
+- 会话 sibling 间距从 5px 调整为 2px。
+- 保留项目行 36px、会话行 32px，不压缩文字和操作热区；版本号三处同步到 v2.14.113。
+## 未完成
+- 等待用户用 v2.14.113 截图复验折叠项目、单会话和多会话混排密度。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、389 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-Bt1FhMnE.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、115 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/layout/Sidebar.tsx`
+## 下一步
+- 用户用 v2.14.113 截图确认后，再决定是否需要 1-2px 微调。

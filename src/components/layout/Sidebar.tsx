@@ -677,7 +677,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {recentProjects.map((project, projectIndex) => {
                     const isExpanded = expandedProjectIds.has(project.id);
                     const isActive = currentProject?.id === project.id;
@@ -697,7 +697,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           position: "relative",
                           display: "flex",
                           flexDirection: "column",
-                          gap: 8,
+                          gap: 4,
                           marginTop: showRegionDivider ? 6 : 0,
                           borderTop: showRegionDivider ? "1px solid var(--kimix-panel-divider, rgba(127,127,127,0.18))" : undefined,
                           paddingTop: showRegionDivider ? 12 : 0,
@@ -834,7 +834,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               paddingRight: 4,
                               display: "flex",
                               flexDirection: "column",
-                              gap: 5,
+                              gap: 2,
                             }}
                           >
                             {pSessions.map((s) => {
@@ -947,7 +947,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.112</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.14.113</span>
         </button>
       </div>
     </aside>
