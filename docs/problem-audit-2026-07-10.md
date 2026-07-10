@@ -148,7 +148,13 @@
 ### 14. macOS 签名和公证流程从仓库配置中不可确认
 
 - **影响**：若正式宣称支持 macOS，应验证 CI secrets、签名和 notarization，否则 Gatekeeper 体验会很差。
-- **验证状态**：待验证
+- **验证状态**：已验证，仓库配置中无法确认
+- **修复状态**：阻塞（需用户补充 CI secrets 与证书）
+- **说明**：
+  - `electron-builder.yml` 已配置 `mac.hardenedRuntime: true`、`gatekeeperAssess: false` 和 `build/entitlements.mac.plist`，但缺少 `identity`（签名证书）和 `notarize` 配置。
+  - `.github/workflows/release.yml` 的 `build-mac` job 仅注入 `GH_TOKEN`，没有 `APPLE_ID`、`APPLE_TEAM_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`CSC_LINK`、`CSC_KEY_PASSWORD` 等签名/公证所需 secrets。
+  - `build/entitlements.mac.plist` 存在，内容仅涉及 JIT 与内存权限，未涉及签名或公证。
+  - 因此从仓库可见配置无法确认 macOS 签名和公证流程已启用；需要在 GitHub 仓库设置中添加 Apple Developer 证书与 Notarization 凭据，并在 `electron-builder.yml` 中补充 `identity` 与 `notarize`。
 - **建议**：检查 `electron-builder.yml` 和 GitHub Actions secrets 配置。
 
 ### 15. 设置自动保存失败时界面仍显示成功状态
