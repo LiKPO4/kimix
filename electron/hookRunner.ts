@@ -85,9 +85,11 @@ function runHookCommand(
       (error, stdout, stderr) => {
         const execError = error as { code?: unknown; killed?: boolean } | null;
         const code =
-          typeof execError?.code === "number"
-            ? (execError as { code: number }).code
-            : null;
+          error === null
+            ? 0
+            : typeof execError?.code === "number"
+              ? (execError as { code: number }).code
+              : null;
         resolve({
           stdout: decodeHookOutput(stdout).trim(),
           stderr: decodeHookOutput(stderr).trim(),
