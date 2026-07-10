@@ -1076,19 +1076,19 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
   const rowContent = (
     <>
       <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
-        <SquareTerminal size={13} />
+        <SquareTerminal size={14} />
       </span>
       <span className="flex min-w-0 items-center overflow-hidden">
         <span className="truncate leading-6">{displayTarget}</span>
       </span>
       <span className="flex h-5 items-center" style={{ gap: 8 }}>
         {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
-        {tool.status === "success" && <Check size={13} className="text-accent-success" />}
+        {tool.status === "success" && <Check size={14} className="text-accent-success" />}
         {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
-        {tool.status === "running" && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
+        {tool.status === "running" && <Loader2 size={14} className="kimix-spin text-accent-warning" />}
       </span>
       <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
-        {hasDetail ? (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : null}
+        {hasDetail ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
       </span>
     </>
   );
@@ -1103,20 +1103,20 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
           type="button"
           onClick={() => setExpanded((value) => !value)}
           className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42, paddingLeft: 12, paddingRight: 12 }}
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           {rowContent}
         </button>
       ) : (
         <div
           className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)]"
-          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42, paddingLeft: 12, paddingRight: 12 }}
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           {rowContent}
         </div>
       )}
       {expanded && (
-        <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 12px 8px 38px" }}>
+        <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 12px 6px 38px" }}>
           {detailText}
         </pre>
       )}
@@ -1144,14 +1144,14 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
         </span>
         <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
           {statusText && <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
-          {allDone && <Check size={13} className="text-accent-success" />}
+          {allDone && <Check size={14} className="text-accent-success" />}
         </span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
       </button>
       {expanded && (
-        <div className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 5, paddingBottom: 5 }}>
+        <div className="border-t border-[var(--kimix-panel-divider)] flex flex-col">
           {tools.map((tool, index) => <KimiWebToolRow key={tool.id} tool={tool} isLast={index === tools.length - 1} />)}
         </div>
       )}
