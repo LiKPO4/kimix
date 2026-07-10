@@ -332,6 +332,8 @@
 - **影响**：正式发布 macOS/Linux 后，生成的模板命令无法直接执行。
 - **证据**：`electron/hookRunner.ts:1`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `88d033f`）
+- **说明**：`HooksPanel.tsx` 读取 `window.api.platform`；Windows 保持 PowerShell 模板，macOS/Linux 改为 `printf`/`date`/`exit 2` 等 POSIX shell 命令，避免跨平台发布后模板命令无法执行。
 - **建议**：按当前 shell 生成模板。
 
 ### 35. Hook matcher 允许复杂正则在主进程同步运行
