@@ -15,7 +15,6 @@ type MenuAction =
   | "close-chat"
   | "new-window"
   | "new-chat"
-  | "quick-chat"
   | "open-project"
   | "settings"
   | "about"
@@ -66,7 +65,6 @@ const MENU_ITEMS: Record<string, MenuEntry[]> = {
     { label: "关闭对话", hint: "Ctrl+W", action: "close-chat" },
     { label: "新建窗口", hint: "Ctrl+Shift+N", action: "new-window", disabled: true, note: "新建窗口暂未接入" },
     { label: "新对话", hint: "Ctrl+N", action: "new-chat" },
-    { label: "快速对话", hint: "Alt+Ctrl+N", action: "quick-chat" },
     { label: "打开项目...", hint: "Ctrl+O", action: "open-project" },
     { type: "separator" },
     { label: "设置...", hint: "Ctrl+逗号", action: "settings" },

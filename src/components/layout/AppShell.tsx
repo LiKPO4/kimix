@@ -30,7 +30,7 @@ import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
 import { type DownloadProgressInfo } from "@/utils/format";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
-import { sendDocumentCommand, isInputLike } from "@/utils/dom";
+import { sendDocumentCommand, deleteSelection } from "@/utils/dom";
 import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
 import { clampWidth } from "@/utils/number";
 import { persistLocalConversationState } from "@/utils/persistence";
@@ -840,7 +840,7 @@ export function AppShell() {
 
     const action = entry.action;
     if (action === "close-chat") setCurrentSession(null);
-    if (action === "new-chat" || action === "quick-chat") void createSessionForProject();
+    if (action === "new-chat") void createSessionForProject();
     if (action === "open-project") void handleOpenProject();
     if (action === "settings") setWorkspaceView("settings");
     if (action === "about") setHelpDialog("about");
@@ -859,7 +859,7 @@ export function AppShell() {
     if (action === "cut") sendDocumentCommand("cut");
     if (action === "copy") sendDocumentCommand("copy");
     if (action === "paste") sendDocumentCommand("paste");
-    if (action === "delete" && isInputLike(document.activeElement)) document.activeElement.setRangeText("");
+    if (action === "delete") deleteSelection();
     if (action === "select-all") sendDocumentCommand("selectAll");
     if (action === "toggle-sidebar") toggleSidebar();
     if (action === "toggle-terminal") openProjectTerminal();
