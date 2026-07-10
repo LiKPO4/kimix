@@ -341,6 +341,7 @@ export function AppShell() {
   const [longTaskControlBusy, setLongTaskControlBusy] = useState(false);
   const [sessionLongTasks, setSessionLongTasks] = useState<LongTaskSummary[]>([]);
   const [gitDetailsOpenSignal, setGitDetailsOpenSignal] = useState(0);
+  const [gitGraphOpenSignal, setGitGraphOpenSignal] = useState(0);
   const [sessionLongTasksLoading, setSessionLongTasksLoading] = useState(false);
   const [shutdownAfterLongTaskId, setShutdownAfterLongTaskId] = useState<string | null>(null);
   const [shutdownDialog, setShutdownDialog] = useState<{ taskId: string; taskTitle: string; remainingSeconds: number } | null>(null);
@@ -1763,9 +1764,10 @@ ${isFinalStep
     setPluginPanelTab(tab);
     if (workspaceView === "mcp") setWorkspaceView("plugins");
   };
-  const openGitDetailsFromContextBar = () => {
+  const openGitGraphFromContextBar = () => {
     setDiffPanelOpen(false);
-    setGitDetailsOpenSignal((value) => value + 1);
+    setGitDetailsOpenSignal(0);
+    setGitGraphOpenSignal((value) => value + 1);
   };
   const mainGridRows = chatWorkspaceActive
     ? previewFile
@@ -1857,7 +1859,7 @@ ${isFinalStep
                 <div className="kimix-chat-column">
                   <Composer />
                   <div style={{ marginTop: 10 }}>
-                    <ContextBar onOpenGitDetails={openGitDetailsFromContextBar} />
+                    <ContextBar onOpenGitGraph={openGitGraphFromContextBar} />
                   </div>
                 </div>
               </div>
@@ -1867,7 +1869,7 @@ ${isFinalStep
         {chatWorkspaceActive && (longTaskInspectorOpen || diffPanelOpen) && (
           <ResizeHandle ariaLabel="调整右侧栏宽度" onPointerDown={startRightPanelResize} />
         )}
-        {chatWorkspaceActive && (longTaskInspectorOpen || gitDetailsOpenSignal > 0) && (
+        {chatWorkspaceActive && (longTaskInspectorOpen || gitDetailsOpenSignal > 0 || gitGraphOpenSignal > 0) && (
           <LongTaskInspectorPanel
             panelOpen={longTaskInspectorOpen}
             width={rightPanelWidth}
@@ -1903,11 +1905,16 @@ ${isFinalStep
             defaultPlanMode={defaultPlanMode}
             officialGoal={liveCurrentSession?.officialGoal}
             gitDetailsOpenSignal={gitDetailsOpenSignal}
+            gitGraphOpenSignal={gitGraphOpenSignal}
             onGitDetailsOpenChange={(open) => {
               if (!open) setGitDetailsOpenSignal(0);
             }}
+            onGitGraphOpenChange={(open) => {
+              if (!open) setGitGraphOpenSignal(0);
+            }}
             onClose={() => {
               setGitDetailsOpenSignal(0);
+              setGitGraphOpenSignal(0);
               setLongTaskInspectorOpen(false);
             }}
             onPatchLongTaskMeta={patchLongTaskMeta}

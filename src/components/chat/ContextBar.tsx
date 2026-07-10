@@ -176,7 +176,7 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
   );
 }
 
-export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void }) {
+export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -727,11 +727,11 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         {gitBranch && (
           <button
             type="button"
-            onClick={onOpenGitDetails}
+            onClick={onOpenGitGraph}
             className="kimix-contextbar-action kimix-muted-action hidden min-w-0 items-center rounded-lg md:flex"
             style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
-            title={gitBranch}
-            aria-label={`当前分支：${gitBranch}`}
+            title={`${gitBranch} · 打开 Git 图谱`}
+            aria-label={`当前分支：${gitBranch}，打开 Git 图谱`}
           >
             <GitBranch size={16} className="shrink-0" />
             {!iconOnly && <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>}

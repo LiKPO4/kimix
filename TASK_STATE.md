@@ -4681,3 +4681,24 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/utils/__tests__/sessionHistory.test.ts`
 ## 下一步
 - 用户用 v2.14.115 重开并复验指定 session 的最早历史。
+# 2026-07-10 v2.14.116 底部分支按钮直接打开 Git 图谱
+## 当前目标
+- 点击 ContextBar 的当前分支按钮时直接显示 Git 图谱，不再进入提交详情弹窗，也不展开右侧会话侧栏。
+## 已完成
+- ContextBar 分支按钮改为发送独立的 Git 图谱打开请求，并补充明确的 title 与无障碍标签。
+- AppShell 为 Git 图谱维护独立信号，可仅挂载既有 `LongTaskInspectorPanel` 弹窗宿主而隐藏侧栏主体。
+- `LongTaskInspectorPanel` 复用原有图谱加载、刷新、分页与弹窗 UI，增加外部打开及关闭回调，没有复制 Git 数据读取逻辑。
+- 版本号三处同步到 v2.14.116。
+## 未完成
+- 等待用户用 v2.14.116 点击底部 `master` 按钮，复验直接出现 Git 图谱且右侧栏保持原状态。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、390 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-9uqbSkTo.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、118 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/chat/ContextBar.tsx`
+- `src/components/layout/AppShell.tsx`
+- `src/components/layout/LongTaskInspectorPanel.tsx`
+## 下一步
+- 用户实机复验 v2.14.116 的底部分支入口；右侧 Git 卡片的“详情”和“图谱”入口保持原语义。

@@ -244,7 +244,9 @@ interface LongTaskInspectorPanelProps {
   defaultPlanMode: boolean;
   officialGoal: Session["officialGoal"] | null | undefined;
   gitDetailsOpenSignal?: number;
+  gitGraphOpenSignal?: number;
   onGitDetailsOpenChange?: (open: boolean) => void;
+  onGitGraphOpenChange?: (open: boolean) => void;
   onClose: () => void;
   onPatchLongTaskMeta: (
     patch: Partial<NonNullable<Session["longTask"]>>,
@@ -308,7 +310,9 @@ export function LongTaskInspectorPanel({
   defaultPlanMode,
   officialGoal,
   gitDetailsOpenSignal,
+  gitGraphOpenSignal,
   onGitDetailsOpenChange,
+  onGitGraphOpenChange,
   onClose,
   onPatchLongTaskMeta,
   onApplyTargetStep,
@@ -632,8 +636,13 @@ export function LongTaskInspectorPanel({
   };
   const openGitGraph = () => {
     setGitGraphOpen(true);
+    onGitGraphOpenChange?.(true);
     setGitGraphLimit(GIT_GRAPH_PAGE_SIZE);
     void loadGitGraph(GIT_GRAPH_PAGE_SIZE);
+  };
+  const closeGitGraph = () => {
+    setGitGraphOpen(false);
+    onGitGraphOpenChange?.(false);
   };
   const loadMoreGitGraph = () => {
     const nextLimit = gitGraphLimit + GIT_GRAPH_PAGE_SIZE;
@@ -648,6 +657,14 @@ export function LongTaskInspectorPanel({
     if (nextSignal <= 0) return;
     openGitDetails();
   }, [gitDetailsOpenSignal]);
+  const lastGitGraphOpenSignalRef = useRef(0);
+  useEffect(() => {
+    const nextSignal = gitGraphOpenSignal ?? 0;
+    if (nextSignal === lastGitGraphOpenSignalRef.current) return;
+    lastGitGraphOpenSignalRef.current = nextSignal;
+    if (nextSignal <= 0) return;
+    openGitGraph();
+  }, [gitGraphOpenSignal]);
   useEffect(() => {
     gitInfoRequestIdRef.current += 1;
     gitDetailsRequestIdRef.current += 1;
@@ -2375,7 +2392,7 @@ export function LongTaskInspectorPanel({
       </div>
     )}
     {gitGraphOpen && (
-      <div className="fixed inset-0 z-[87] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={() => setGitGraphOpen(false)}>
+      <div className="fixed inset-0 z-[87] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={closeGitGraph}>
         <div
           className="w-full max-w-[1020px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
           onMouseDown={(event) => event.stopPropagation()}
@@ -2397,7 +2414,7 @@ export function LongTaskInspectorPanel({
               {gitGraphLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               刷新
             </button>
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={() => setGitGraphOpen(false)} aria-label="关闭 Git 图谱">
+            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={closeGitGraph} aria-label="关闭 Git 图谱">
               <X size={16} />
             </button>
           </div>
