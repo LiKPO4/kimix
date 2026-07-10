@@ -353,7 +353,7 @@ export function SessionToolbar({
   }
 
   const reloadKimixWindow = () => {
-    persistLocalConversationState();
+    void persistLocalConversationState();
     persistLocalActiveContext();
     if (typeof window.api.reloadWindow === "function") {
       void window.api.reloadWindow();

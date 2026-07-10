@@ -595,5 +595,5 @@ export async function applySessionBackupImportPlan(plan: SessionBackupImportPlan
   for (const project of plan.projectsToPersist) {
     await window.api.addRecentProject(project).catch(() => undefined);
   }
-  persistLocalConversationState();
+  await persistLocalConversationState();
 }

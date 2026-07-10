@@ -26,12 +26,12 @@ export function useStatePersistence() {
       }
     };
 
-    const flushLocalConversationState = () => {
+    const flushLocalConversationState = async () => {
       clearConversationPersistTimer();
       if (!conversationDirtyRef.current) return;
       conversationDirtyRef.current = false;
       lastConversationPersistAtRef.current = Date.now();
-      persistLocalConversationState();
+      await persistLocalConversationState();
     };
 
     const scheduleLocalConversationPersist = () => {
@@ -43,7 +43,7 @@ export function useStatePersistence() {
         persistenceTimerRef.current = null;
         conversationDirtyRef.current = false;
         lastConversationPersistAtRef.current = Date.now();
-        persistLocalConversationState();
+        void persistLocalConversationState();
       }, delay);
     };
 
@@ -68,7 +68,7 @@ export function useStatePersistence() {
             forgetArchivedSessionTombstone(session);
           }
         }
-        flushLocalConversationState();
+        void flushLocalConversationState();
         return;
       }
       scheduleLocalConversationPersist();
@@ -81,7 +81,7 @@ export function useStatePersistence() {
     const handleBeforeUnload = () => {
       isUnloadingRef.current = true;
       clearConversationPersistTimer();
-      persistLocalConversationState();
+      void persistLocalConversationState();
       persistLocalActiveContext();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -91,7 +91,7 @@ export function useStatePersistence() {
       unsubscribeActiveContextPersistence();
       window.removeEventListener("beforeunload", handleBeforeUnload);
       clearConversationPersistTimer();
-      if (!isUnloadingRef.current) flushLocalConversationState();
+      if (!isUnloadingRef.current) void flushLocalConversationState();
     };
   }, []);
 }

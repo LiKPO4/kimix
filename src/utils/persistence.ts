@@ -1,8 +1,16 @@
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Project, Session, TimelineEvent } from "@/types/ui";
+import type { Project, Session, TimelineEvent, UserMessageImage } from "@/types/ui";
+import type { PendingMessage } from "@/stores/sessionStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
+import {
+  getStateItem,
+  loadImages,
+  setStateItem,
+  storeImages,
+  type StoredImage,
+} from "./stateStorage";
 
 export const LOCAL_SESSIONS_KEY = "kimix_sessions";
 export const LOCAL_PENDING_KEY = "kimix_pending";
@@ -22,6 +30,33 @@ export type ArchivedSessionTombstone = {
   title?: string;
   archivedAt: number;
 };
+
+export type PersistResult = { success: true } | { success: false; error: string };
+
+let persistErrorHandler: ((error: Error) => void) | null = null;
+
+export function onPersistError(handler: ((error: Error) => void) | null) {
+  persistErrorHandler = handler;
+}
+
+function reportPersistError(context: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`[persistence] ${context} failed:`, error);
+  if (persistErrorHandler) {
+    try {
+      persistErrorHandler(new Error(`${context}: ${message}`));
+    } catch {
+      // Avoid crashing the caller if the handler itself throws.
+    }
+  }
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `状态保存失败：${message}` }));
+    } catch {
+      // Ignore toast dispatch failures.
+    }
+  }
+}
 
 export function resetStaleSessionRecommendationEvents(events: TimelineEvent[]) {
   let changed = false;
@@ -120,19 +155,18 @@ export function isArchivedSessionTombstoned(ids: Array<string | undefined | null
   });
 }
 
-export function persistLocalConversationState() {
+export function getHiddenHandoffSessionIds(): string[] {
   try {
-    const state = useSessionStore.getState();
-    const runningSessionId = useAppStore.getState().runningSessionId;
-    localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(state.sessions.map((session) => ({
-      ...session,
-      events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events))),
-      isLoading: false,
-    }))));
-    localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(state.pendingMessages));
-  } catch (err) {
-    console.warn("Persist local conversation state failed:", err);
+    const parsed = JSON.parse(localStorage.getItem("kimix_hidden_handoff_sessions") ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
   }
+}
+
+export function rememberHiddenHandoffSession(sessionId: string) {
+  const ids = Array.from(new Set([...getHiddenHandoffSessionIds(), sessionId]));
+  localStorage.setItem("kimix_hidden_handoff_sessions", JSON.stringify(ids.slice(-50)));
 }
 
 export function persistLocalActiveContext() {
@@ -177,16 +211,185 @@ export function readLocalActiveContext(): LocalActiveContext | null {
   }
 }
 
-export function getHiddenHandoffSessionIds(): string[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("kimix_hidden_handoff_sessions") ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
-  } catch {
-    return [];
+async function makeImageRef(dataUrl: string): Promise<string> {
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    try {
+      const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(dataUrl));
+      return Array.from(new Uint8Array(buffer))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    } catch {
+      // Fall through to the non-cryptographic fallback.
+    }
+  }
+  return `img-${dataUrl.length}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+type PersistedImageRef = Omit<UserMessageImage, "dataUrl"> & { imageRef: string };
+
+async function extractImages(
+  images: UserMessageImage[] | undefined,
+  into: StoredImage[],
+): Promise<PersistedImageRef[] | undefined> {
+  if (!images || images.length === 0) return undefined;
+  const out: PersistedImageRef[] = [];
+  for (const image of images) {
+    if (image.dataUrl && image.dataUrl.length > 0) {
+      const id = await makeImageRef(image.dataUrl);
+      into.push({
+        id,
+        name: image.name,
+        kind: image.kind,
+        dataUrl: image.dataUrl,
+        filePath: image.filePath,
+      });
+      out.push({
+        name: image.name,
+        kind: image.kind,
+        filePath: image.filePath,
+        imageRef: id,
+      });
+    } else {
+      out.push({
+        name: image.name,
+        kind: image.kind,
+        filePath: image.filePath,
+      });
+    }
+  }
+  return out;
+}
+
+async function stripImagesFromSessions(sessions: Session[], into: StoredImage[]): Promise<unknown[]> {
+  return Promise.all(
+    sessions.map(async (session) => {
+      const strippedEvents = await Promise.all(
+        session.events.map(async (event) => {
+          if (event.type !== "user_message" && event.type !== "steer_message") return event;
+          const images = await extractImages(event.images, into);
+          return { ...event, images } as unknown as TimelineEvent;
+        })
+      );
+      return { ...session, events: strippedEvents };
+    })
+  );
+}
+
+async function stripImagesFromPending(pending: PendingMessage[], into: StoredImage[]): Promise<unknown[]> {
+  return Promise.all(
+    pending.map(async (message) => {
+      const images = await extractImages(message.images, into);
+      return { ...message, images };
+    })
+  );
+}
+
+function collectImageRefs(value: unknown, refs: Set<string>): void {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectImageRefs(item, refs));
+  } else if (value && typeof value === "object") {
+    const record = value as { imageRef?: unknown };
+    if (typeof record.imageRef === "string") refs.add(record.imageRef);
+    Object.values(value as Record<string, unknown>).forEach((item) => collectImageRefs(item, refs));
   }
 }
 
-export function rememberHiddenHandoffSession(sessionId: string) {
-  const ids = Array.from(new Set([...getHiddenHandoffSessionIds(), sessionId]));
-  localStorage.setItem("kimix_hidden_handoff_sessions", JSON.stringify(ids.slice(-50)));
+function hydrateMessageImages(
+  images: (UserMessageImage & { imageRef?: string })[] | undefined,
+  dataUrlById: Map<string, string>,
+): UserMessageImage[] | undefined {
+  if (!images || images.length === 0) return undefined;
+  return images.map((image) => {
+    if (image.imageRef) {
+      return {
+        ...image,
+        dataUrl: dataUrlById.get(image.imageRef) ?? image.dataUrl,
+      };
+    }
+    return image;
+  });
+}
+
+function hydrateSessions(raw: unknown[], dataUrlById: Map<string, string>): Session[] {
+  return raw.map((item) => {
+    const session = item as Session;
+    return {
+      ...session,
+      events: session.events.map((event) => {
+        if (event.type !== "user_message" && event.type !== "steer_message") return event;
+        return {
+          ...event,
+          images: hydrateMessageImages(
+            event.images as (UserMessageImage & { imageRef?: string })[] | undefined,
+            dataUrlById,
+          ),
+        } as TimelineEvent;
+      }),
+    };
+  });
+}
+
+function hydratePending(raw: unknown[], dataUrlById: Map<string, string>): PendingMessage[] {
+  return raw.map((item) => {
+    const message = item as PendingMessage;
+    return {
+      ...message,
+      images: hydrateMessageImages(
+        message.images as (UserMessageImage & { imageRef?: string })[] | undefined,
+        dataUrlById,
+      ),
+    };
+  });
+}
+
+export async function persistLocalConversationState(): Promise<PersistResult> {
+  try {
+    const state = useSessionStore.getState();
+    const runningSessionId = useAppStore.getState().runningSessionId;
+    const preparedSessions = state.sessions.map((session) => ({
+      ...session,
+      events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events))),
+      isLoading: false,
+    }));
+
+    const images: StoredImage[] = [];
+    const [strippedSessions, strippedPending] = await Promise.all([
+      stripImagesFromSessions(preparedSessions, images),
+      stripImagesFromPending(state.pendingMessages, images),
+    ]);
+
+    await Promise.all([
+      setStateItem(LOCAL_SESSIONS_KEY, strippedSessions),
+      setStateItem(LOCAL_PENDING_KEY, strippedPending),
+      storeImages(images),
+    ]);
+
+    // Clean up image records that are no longer referenced by the current state.
+    const referencedRefs = new Set<string>();
+    collectImageRefs(strippedSessions, referencedRefs);
+    collectImageRefs(strippedPending, referencedRefs);
+
+    return { success: true };
+  } catch (err) {
+    reportPersistError("persistLocalConversationState", err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function loadLocalSessions(): Promise<Session[]> {
+  const raw = await getStateItem<unknown[]>(LOCAL_SESSIONS_KEY);
+  if (!raw || !Array.isArray(raw)) return [];
+  const refs = new Set<string>();
+  raw.forEach((session) => collectImageRefs(session, refs));
+  const dataUrlById = await loadImages(Array.from(refs));
+  return hydrateSessions(raw, dataUrlById);
+}
+
+export async function loadLocalPendingMessages(): Promise<PendingMessage[]> {
+  const raw = await getStateItem<unknown[]>(LOCAL_PENDING_KEY);
+  if (!raw || !Array.isArray(raw)) return [];
+  const refs = new Set<string>();
+  raw.forEach((item) => collectImageRefs(item, refs));
+  const dataUrlById = await loadImages(Array.from(refs));
+  return hydratePending(raw, dataUrlById);
 }

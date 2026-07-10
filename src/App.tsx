@@ -40,8 +40,8 @@ import {
   persistLocalConversationState,
   readLocalActiveContext,
   resetStaleSessionRecommendationEvents,
-  LOCAL_SESSIONS_KEY,
-  LOCAL_PENDING_KEY,
+  loadLocalSessions,
+  loadLocalPendingMessages,
 } from "@/utils/persistence";
 import { useRendererLagDetector } from "@/hooks/useRendererLagDetector";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -275,7 +275,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           },
         });
       }
-      persistLocalConversationState();
+      void persistLocalConversationState();
       break;
     }
   }
@@ -1705,12 +1705,12 @@ function App() {
     try {
       const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (latestSession && hasPendingQuestion(latestSession.events)) {
-        persistLocalConversationState();
+        void persistLocalConversationState();
         return false;
       }
       if (await shouldWaitForOfficialPromptQueue(runtimeSessionId)) {
         setRunningSessionId(uiSessionId);
-        persistLocalConversationState();
+        void persistLocalConversationState();
         return false;
       }
       const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
@@ -2207,11 +2207,10 @@ function App() {
       }).catch(logError("loadKimiCodeSession"));
     });
 
-    const storedSessions = localStorage.getItem(LOCAL_SESSIONS_KEY);
-    if (storedSessions) {
+    void (async () => {
       try {
-        const parsed = JSON.parse(storedSessions);
-        if (Array.isArray(parsed)) {
+        const parsed = await loadLocalSessions();
+        if (parsed.length > 0) {
           const restoringActiveSessionId = STARTUP_ACTIVE_CONTEXT?.sessionId;
           const visibleSessions = parsed
             .filter((session) => !isHiddenInternalSession(session))
@@ -2220,9 +2219,6 @@ function App() {
               title: typeof session.title === "string" ? sanitizeKimiSkillActivationTitle(session.title) : "新会话",
               events: removeStaleKimiCodeStartupErrors(resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? session.events : []))),
             }));
-          if (JSON.stringify(visibleSessions) !== storedSessions) {
-            localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(visibleSessions));
-          }
           const restoredSessions = visibleSessions.map((session) => {
             const rawEngine = (session as { engine?: unknown }).engine;
             const knownEngine = rawEngine === "prompt" || rawEngine === "kimi-code";
@@ -2239,41 +2235,16 @@ function App() {
           void repairKimiCodeHistoryBodies(restoredSessions);
         }
       } catch {
-        // ignore parse error
+        // ignore load error
       }
-    }
 
-    const storedPending = localStorage.getItem(LOCAL_PENDING_KEY);
-    if (storedPending) {
       try {
-        const parsed = JSON.parse(storedPending);
-        if (Array.isArray(parsed)) {
-          const pendingMessages = parsed
-            .map((item) => {
-              // 排队消息现按会话隔离：缺少 sessionId 的旧持久化数据无法归属任何会话，丢弃。
-              if (item && typeof item === "object" && typeof item.id === "string" && typeof item.sessionId === "string" && typeof item.content === "string" && typeof item.createdAt === "number") {
-                const images = Array.isArray((item as { images?: unknown }).images)
-                  ? (item as { images: unknown[] }).images.filter((image): image is UserMessageImage => {
-                      if (!image || typeof image !== "object") return false;
-                      const record = image as { name?: unknown; dataUrl?: unknown; filePath?: unknown; kind?: unknown };
-                      if (typeof record.name !== "string") return false;
-                      const hasDataUrl = typeof record.dataUrl === "string" && record.dataUrl.length > 0;
-                      const hasFilePath = typeof record.filePath === "string" && record.filePath.length > 0;
-                      const validKind = record.kind === undefined || record.kind === "image" || record.kind === "file";
-                      return validKind && (hasDataUrl || hasFilePath);
-                    })
-                  : undefined;
-                return { ...item, images };
-              }
-              return null;
-            })
-            .filter((item): item is PendingMessage => item !== null);
-          useSessionStore.setState({ pendingMessages });
-        }
+        const pendingMessages = await loadLocalPendingMessages();
+        useSessionStore.setState({ pendingMessages });
       } catch {
         // ignore
       }
-    }
+    })();
 
     const markRendererWindowFocused = () => {
       rendererWindowFocusedHint = true;
@@ -2458,7 +2429,7 @@ function App() {
         }
         if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
           flushStreamEvents();
-          persistLocalConversationState();
+          void persistLocalConversationState();
         }
         return;
       }
@@ -2482,7 +2453,7 @@ function App() {
       }
       if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
         flushStreamEvents();
-        persistLocalConversationState();
+        void persistLocalConversationState();
       }
     });
 
@@ -2712,14 +2683,14 @@ function App() {
 
         const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         if (latestSession && hasPendingQuestion(latestSession.events)) {
-          persistLocalConversationState();
+          void persistLocalConversationState();
           return;
         }
 
         void shouldWaitForOfficialPromptQueue(payload.sessionId).then((shouldWait) => {
           if (shouldWait) {
             setRunningSessionId(uiSessionId);
-            persistLocalConversationState();
+            void persistLocalConversationState();
             return;
           }
           const next = useSessionStore.getState().shiftPendingMessage(uiSessionId);
