@@ -6,29 +6,7 @@
  * 当成同一个目录。
  */
 
-type KimixPlatform = NodeJS.Platform | "browser-preview";
-
-function getRendererPlatform(): KimixPlatform | undefined {
-  if (typeof window !== "undefined" && window.api && (window.api as { platform?: KimixPlatform }).platform) {
-    return (window.api as { platform?: KimixPlatform }).platform;
-  }
-  return undefined;
-}
-
-function inferPlatform(): KimixPlatform | undefined {
-  const rendererPlatform = getRendererPlatform();
-  if (rendererPlatform) return rendererPlatform;
-  if (typeof process !== "undefined" && process.platform) {
-    return process.platform;
-  }
-  if (typeof navigator !== "undefined" && navigator.platform) {
-    const p = navigator.platform;
-    if (p.startsWith("Win")) return "win32";
-    if (p.startsWith("Mac")) return "darwin";
-    if (p.startsWith("Linux")) return "linux";
-  }
-  return undefined;
-}
+import { getPlatform, type KimixPlatform } from "./platform";
 
 export function isWindowsCaseInsensitive(platform?: KimixPlatform): boolean {
   return platform === "win32";
@@ -36,7 +14,7 @@ export function isWindowsCaseInsensitive(platform?: KimixPlatform): boolean {
 
 export function normalizePathForComparison(
   input: string | undefined | null,
-  platform: KimixPlatform | undefined = inferPlatform(),
+  platform: KimixPlatform | undefined = getPlatform(),
 ): string {
   const normalized = (input ?? "").replace(/\\/g, "/").replace(/\/+$/, "");
   return isWindowsCaseInsensitive(platform) ? normalized.toLowerCase() : normalized;

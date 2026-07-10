@@ -3,6 +3,7 @@ import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { isWindows } from "@/utils/platform";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
@@ -2562,34 +2563,36 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("voice", 10)}>
-                <div className="kimix-settings-section-title">
-                  <Mic size={16} className="text-text-muted" />
-                  <span>语音输入</span>
-                  {settingsDragHandle("voice", "语音输入")}
-                </div>
-                <div className="kimix-settings-card" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 16, alignItems: "center", padding: "14px 16px" }}>
-                  <div className="flex min-w-0 items-start" style={{ gap: 12 }}>
-                    <Keyboard size={18} className="mt-0.5 shrink-0 text-text-muted" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">语音按钮触发快捷键</div>
-                      <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
+              {isWindows() && (
+                <div className="kimix-settings-section" {...settingsSectionProps("voice", 10)}>
+                  <div className="kimix-settings-section-title">
+                    <Mic size={16} className="text-text-muted" />
+                    <span>语音输入</span>
+                    {settingsDragHandle("voice", "语音输入")}
+                  </div>
+                  <div className="kimix-settings-card" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 16, alignItems: "center", padding: "14px 16px" }}>
+                    <div className="flex min-w-0 items-start" style={{ gap: 12 }}>
+                      <Keyboard size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14.5px] font-medium text-[var(--kimix-panel-text)]">语音按钮触发快捷键</div>
+                        <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">点击输入区麦克风后，会触发该系统快捷键，用于调用你自己的语音输入工具。</div>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <label htmlFor="voice-shortcut" className="mb-1 block text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">快捷键</label>
+                      <input
+                        id="voice-shortcut"
+                        type="text"
+                        value={voiceShortcut}
+                        onChange={(event) => setVoiceShortcut(event.target.value)}
+                        placeholder="Win+H"
+                        className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                      />
+                      <div className="kimix-settings-hint mt-1 text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V</div>
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <label htmlFor="voice-shortcut" className="mb-1 block text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">快捷键</label>
-                    <input
-                      id="voice-shortcut"
-                      type="text"
-                      value={voiceShortcut}
-                      onChange={(event) => setVoiceShortcut(event.target.value)}
-                      placeholder="Win+H"
-                      className="kimix-settings-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
-                    />
-                    <div className="kimix-settings-hint mt-1 text-right text-[12.5px] leading-5">示例：Win+H、Ctrl+Alt+V</div>
-                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="kimix-settings-section" {...settingsSectionProps("freeze", 13)}>
                 <div className="kimix-settings-row-title">

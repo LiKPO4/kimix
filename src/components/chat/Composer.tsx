@@ -12,6 +12,7 @@ import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { isWindows } from "@/utils/platform";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
@@ -3078,16 +3079,18 @@ export function Composer() {
             </button>
 
             <ContextRing />
-            <button
-              disabled={!canUseComposer}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => void handleVoiceShortcut()}
-              className={iconButtonClass}
-              title={`语音快捷键：${voiceShortcut || "Win+H"}`}
-              aria-label="语音"
-            >
-              <Mic size={16} />
-            </button>
+            {isWindows() && (
+              <button
+                disabled={!canUseComposer}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleVoiceShortcut()}
+                className={iconButtonClass}
+                title={`语音快捷键：${voiceShortcut || "Win+H"}`}
+                aria-label="语音"
+              >
+                <Mic size={16} />
+              </button>
+            )}
 
             {shouldShowStopButton ? (
               <>

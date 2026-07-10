@@ -122,7 +122,9 @@
 
 - **影响**：后端已抛出“不支持”，但用户仍可配置，完成后才发现功能不可用。
 - **证据**：`src/components/settings/SettingsPanel.tsx:2576`、`electron/main.ts:2036`
-- **验证状态**：未抽查，基于审查结论纳入
+- **验证状态**：已抽查 `SettingsPanel.tsx`、`Composer.tsx`、`LongTaskInspectorPanel.tsx` 确认
+- **修复状态**：已修复（commit `d874b8c`）
+- **说明**：新增 `src/utils/platform.ts` 统一读取 `window.api.platform`；非 Windows 平台下，`SettingsPanel` 隐藏“语音输入”设置区，`Composer` 隐藏麦克风按钮，`LongTaskInspectorPanel` 隐藏“执行完成后关机”复选框。
 - **建议**：按平台隐藏或禁用，并说明原因。
 
 ### 12. 安装引导固定展示 Windows PowerShell 命令

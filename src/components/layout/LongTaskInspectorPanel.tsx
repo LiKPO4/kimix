@@ -48,6 +48,7 @@ import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus } from "@/utils/diff";
 
 const GIT_GRAPH_PAGE_SIZE = 100;
@@ -1166,15 +1167,17 @@ export function LongTaskInspectorPanel({
                       placeholder={totalLongTaskSteps ? `1-${totalLongTaskSteps}` : "Step"}
                     />
                   </div>
-                  <label className="flex items-center justify-between rounded-lg bg-surface-elevated text-[13px] leading-5 text-text-primary" style={{ gap: 14, marginTop: 18, padding: "13px 14px" }}>
-                    <span className="min-w-0">执行完成后关机</span>
-                    <input
-                      type="checkbox"
-                      checked={shutdownAfterLongTaskId === longTaskMeta.taskId}
-                      onChange={(event) => onSetShutdownAfterLongTaskId(event.target.checked ? longTaskMeta.taskId : null)}
-                      className="h-4 w-4 shrink-0 accent-accent-primary"
-                    />
-                  </label>
+                  {isWindows() && (
+                    <label className="flex items-center justify-between rounded-lg bg-surface-elevated text-[13px] leading-5 text-text-primary" style={{ gap: 14, marginTop: 18, padding: "13px 14px" }}>
+                      <span className="min-w-0">执行完成后关机</span>
+                      <input
+                        type="checkbox"
+                        checked={shutdownAfterLongTaskId === longTaskMeta.taskId}
+                        onChange={(event) => onSetShutdownAfterLongTaskId(event.target.checked ? longTaskMeta.taskId : null)}
+                        className="h-4 w-4 shrink-0 accent-accent-primary"
+                      />
+                    </label>
+                  )}
                   <div className="flex items-center" style={{ gap: 14, marginTop: 20 }}>
                     <button
                       type="button"
