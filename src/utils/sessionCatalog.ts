@@ -1,4 +1,5 @@
 import type { Session } from "@/types/ui";
+import { normalizePathForComparison } from "@/utils/pathCase";
 import { isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 
 const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
@@ -25,7 +26,7 @@ export function selectStartupOfficialSession<T extends { id: string }>(
 }
 
 function normalizeProjectPath(projectPath: string | undefined) {
-  return (projectPath ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return normalizePathForComparison(projectPath);
 }
 
 function belongsToOfficialSession(session: Session, officialId: string) {

@@ -174,6 +174,8 @@ import type {
 } from "./types/ipc";
 
 const api = {
+  platform: process.platform,
+
   // Project
   openProject: (req?: OpenProjectRequest): Promise<OpenProjectResponse> =>
     ipcRenderer.invoke("project:open", req),

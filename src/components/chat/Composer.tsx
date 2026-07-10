@@ -17,6 +17,7 @@ import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { isSamePath } from "@/utils/pathCase";
 import { logError } from "@/utils/reportError";
 import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/utils/pendingPermissionChange";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
@@ -942,8 +943,7 @@ export function Composer() {
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = toPromptImages(images);
-      const sameWorkDir = (a?: string, b?: string) =>
-        Boolean(a && b) && a!.replace(/\\/g, "/").toLowerCase() === b!.replace(/\\/g, "/").toLowerCase();
+      const sameWorkDir = (a?: string, b?: string) => isSamePath(a, b);
       const updateLinkStatus = (message: string, tone: Extract<TimelineEvent, { type: "status_update" }>["tone"] = "info") => {
         const timestamp = Date.now();
         updateSession(targetSession.id, (session) => ({

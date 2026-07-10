@@ -148,6 +148,7 @@ function installBrowserPreviewApi() {
     Promise.resolve({ success: false, error: unsupported(action) } as T);
 
   const previewApi: WindowAPI = {
+    platform: "linux" as NodeJS.Platform,
     openProject: (): Promise<OpenProjectResponse> => Promise.resolve({ success: true, data: null }),
     chooseDirectory: () => Promise.resolve({ success: true, data: null }),
     listRecentProjects: (): Promise<ListRecentResponse> => Promise.resolve({ success: true, data: [] }),

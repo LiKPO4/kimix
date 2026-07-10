@@ -28,6 +28,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
 import { type DownloadProgressInfo } from "@/utils/format";
+import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
 import { sendDocumentCommand, isInputLike } from "@/utils/dom";
 import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
@@ -68,13 +69,11 @@ const EMPTY_BTW_TRANSIENT_STATE: BtwTransientState = {
 };
 
 function normalizeProjectPath(path: string | undefined) {
-  return (path ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return normalizePathForComparison(path);
 }
 
 function isSameProjectPath(a: string | undefined, b: string | undefined) {
-  const left = normalizeProjectPath(a);
-  const right = normalizeProjectPath(b);
-  return Boolean(left && right && left === right);
+  return isSamePath(a, b);
 }
 
 function goalStatusLabel(status: string) {

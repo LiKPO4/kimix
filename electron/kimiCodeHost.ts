@@ -7,6 +7,7 @@ import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, re
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as settingsService from "./settingsService";
+import { normalizePathForComparison } from "../src/utils/pathCase";
 import {
   flattenServerEvent,
   getKimiCodeSessionAlreadyExistsId,
@@ -1574,8 +1575,8 @@ export async function searchServerSessionFiles(
 ): Promise<Array<{ path: string; name: string }> | undefined> {
   const managed = serverSessions.get(sessionId);
   if (!managed) return undefined;
-  const expectedRoot = path.resolve(workDir).replace(/\\/g, "/").toLowerCase();
-  const sessionRoot = path.resolve(managed.workDir).replace(/\\/g, "/").toLowerCase();
+  const expectedRoot = normalizePathForComparison(path.resolve(workDir));
+  const sessionRoot = normalizePathForComparison(path.resolve(managed.workDir));
   if (expectedRoot !== sessionRoot) return undefined;
   const result = await getServerClient().searchFiles(sessionId, query, limit);
   return result.items
@@ -1590,8 +1591,8 @@ export async function readServerSessionTextFile(
 ): Promise<{ path: string; content: string } | undefined> {
   const managed = serverSessions.get(sessionId);
   if (!managed) return undefined;
-  const expectedRoot = path.resolve(workDir).replace(/\\/g, "/").toLowerCase();
-  const sessionRoot = path.resolve(managed.workDir).replace(/\\/g, "/").toLowerCase();
+  const expectedRoot = normalizePathForComparison(path.resolve(workDir));
+  const sessionRoot = normalizePathForComparison(path.resolve(managed.workDir));
   if (expectedRoot !== sessionRoot) return undefined;
   const result = await getServerClient().readFile(sessionId, filePath);
   if (result.is_binary || result.encoding !== "utf-8") throw new Error("Only text files can be read");
@@ -1929,10 +1930,10 @@ export async function setPluginMcpServerEnabled(id: string, server: string, enab
 
 export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
   if (shouldRouteNewSessionToServer()) {
-    const normalizedWorkDir = workDir ? path.resolve(workDir).toLowerCase() : undefined;
+    const normalizedWorkDir = workDir ? normalizePathForComparison(path.resolve(workDir)) : undefined;
     return (await getServerClient().listSessions())
       .filter((session) => !normalizedWorkDir || (
-        typeof session.metadata?.cwd === "string" && path.resolve(session.metadata.cwd).toLowerCase() === normalizedWorkDir
+        typeof session.metadata?.cwd === "string" && normalizePathForComparison(path.resolve(session.metadata.cwd)) === normalizedWorkDir
       ))
       .map(serverSessionSummary);
   }

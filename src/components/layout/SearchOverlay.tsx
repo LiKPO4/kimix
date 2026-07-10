@@ -9,6 +9,7 @@ import { deriveSessionTitle, isDefaultSessionTitle } from "@/utils/sessionTitle"
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { isSamePath } from "@/utils/pathCase";
 
 type SearchMatch = {
   session: Session;
@@ -308,7 +309,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       isLoading: true,
     };
     if (!existing) addSession(session);
-    const project = recentProjects.find((item) => item.path.toLowerCase() === summary.workDir.toLowerCase()) ?? {
+    const project = recentProjects.find((item) => isSamePath(item.path, summary.workDir)) ?? {
       id: summary.workDir,
       name: summary.workDir.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || summary.workDir,
       path: summary.workDir,

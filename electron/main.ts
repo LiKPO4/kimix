@@ -23,6 +23,7 @@ import {
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
+import { normalizePathForComparison } from "../src/utils/pathCase";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
@@ -5088,7 +5089,7 @@ function normalizeAdditionalDirs(value: unknown): string[] {
     if (typeof item !== "string") continue;
     const trimmed = item.trim();
     if (!trimmed) continue;
-    const key = path.resolve(trimmed).replace(/\\/g, "/").toLowerCase();
+    const key = normalizePathForComparison(path.resolve(trimmed));
     if (seen.has(key)) continue;
     seen.add(key);
     dirs.push(trimmed);
@@ -5902,7 +5903,7 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
     const additionalDirs = normalizeAdditionalDirs(request.additionalDirs ?? request.additionalWorkDirs);
     const permission = request.yoloMode ? "yolo" as const : request.autoMode ? "auto" as const : "manual" as const;
     const sameWorkDir = (a: string, b: string) =>
-      path.resolve(a).replace(/\\/g, "/").toLowerCase() === path.resolve(b).replace(/\\/g, "/").toLowerCase();
+      normalizePathForComparison(path.resolve(a)) === normalizePathForComparison(path.resolve(b));
     const modelSummary = await readKimiModelConfigWithSdk().catch(() => readKimiModelConfig());
     const selectedModelAlias = request.model || modelSummary.defaultModel || undefined;
     const thinking = isDeepSeekModelConfig(modelSummary, selectedModelAlias)

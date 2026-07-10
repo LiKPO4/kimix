@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, ChevronUp, FileText, RotateCcw } from "lucid
 import { memo, useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { normalizePathForComparison } from "@/utils/pathCase";
 import type { TimelineEvent } from "@/types/ui";
 
 interface Change {
@@ -31,7 +32,7 @@ function countLines(value?: string) {
 }
 
 function normalizePath(value: string) {
-  return value.replace(/\\/g, "/").toLowerCase();
+  return normalizePathForComparison(value);
 }
 
 function mergeChangeRows(rows: ChangeRow[]) {

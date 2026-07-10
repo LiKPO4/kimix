@@ -1,3 +1,4 @@
+import { normalizePathForComparison } from "./pathCase";
 const DEFAULT_PROJECT_ID = "default-kimi-project";
 const DEFAULT_PROJECT_DISPLAY_NAME = "Kimix 默认项目";
 
@@ -8,7 +9,7 @@ type ProjectLike = {
 } | null | undefined;
 
 function normalizeProjectPath(value?: string) {
-  return (value ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return normalizePathForComparison(value);
 }
 
 export function isDefaultKimixProject(project: ProjectLike) {

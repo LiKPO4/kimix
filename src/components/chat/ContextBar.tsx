@@ -13,6 +13,7 @@ import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { normalizePathForComparison } from "@/utils/pathCase";
 import { runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
@@ -314,8 +315,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }
     const selected = res.data?.trim();
     if (!selected) return;
-    const normalizedSelected = selected.replace(/\\/g, "/").toLowerCase();
-    const exists = additionalWorkDirs.some((dir) => dir.replace(/\\/g, "/").toLowerCase() === normalizedSelected);
+    const normalizedSelected = normalizePathForComparison(selected);
+    const exists = additionalWorkDirs.some((dir) => normalizePathForComparison(dir) === normalizedSelected);
     if (exists) {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "该目录已在额外工作目录中" }));
       return;

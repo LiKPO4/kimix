@@ -19,6 +19,7 @@ import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, truncateLatestUserTurn } from "@/utils/eventHelpers";
+import { normalizePathForComparison } from "@/utils/pathCase";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -1744,10 +1745,10 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const displayContent = restoreAssistantProgressParagraphs(event.content);
   const hasContent = displayContent.trim().length > 0;
-  const changedSet = new Set(changedFiles.map((f) => f.toLowerCase()));
+  const changedSet = new Set(changedFiles.map((f) => normalizePathForComparison(f)));
   const mdArtifacts = Array.from(new Set(
     displayContent.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
-  )).filter((path) => changedSet.has(path.toLowerCase())).slice(0, 3);
+  )).filter((path) => changedSet.has(normalizePathForComparison(path))).slice(0, 3);
   const isRunningThisSession = Boolean(sessionId && (
     runningSessionId === sessionId ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)

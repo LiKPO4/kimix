@@ -1,3 +1,5 @@
+import { isSamePath } from "./pathCase";
+
 type MessageEventLike = {
   type: string;
   message?: string;
@@ -39,9 +41,8 @@ type ResumeSessionResponse = {
 } | { success: false; error: string };
 
 function isSameWorkDir(left?: string, right?: string) {
-  return Boolean(left && right) && left!.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() === right!.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return isSamePath(left, right);
 }
-
 export async function runKimiCodeSessionMutationWithRecovery(input: {
   sessionId: string;
   projectPath?: string;

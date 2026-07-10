@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { normalizePathForComparison } from "@/utils/pathCase";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 type ApprovalDiffPreview = {
@@ -88,7 +89,7 @@ function riskLabel(riskLevel: "low" | "medium" | "high") {
 }
 
 function normalizePath(value: string) {
-  return value.replace(/\\/g, "/").toLowerCase();
+  return normalizePathForComparison(value);
 }
 
 function countChangedLines(oldText = "", newText = "") {

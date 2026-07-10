@@ -22,6 +22,7 @@ import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isTe
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import {
   settleInactiveEvents,
   settleFailedEvents,
@@ -143,13 +144,11 @@ function hasArchivedLocalSessionForRuntime(historySessionId: string, runtimeSess
 }
 
 function normalizeLocalProjectPath(projectPath: string | undefined) {
-  return (projectPath ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return normalizePathForComparison(projectPath);
 }
 
 function isSameLocalProjectPath(a: string | undefined, b: string | undefined) {
-  const left = normalizeLocalProjectPath(a);
-  const right = normalizeLocalProjectPath(b);
-  return Boolean(left && right && left === right);
+  return isSamePath(a, b);
 }
 
 function assistantBodySize(events: TimelineEvent[]) {

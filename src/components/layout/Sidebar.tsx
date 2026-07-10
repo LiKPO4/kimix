@@ -14,6 +14,7 @@ import { compareSessionsByRecentConversation, getSessionConversationActivityAt, 
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { reportError } from "@/utils/reportError";
 import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
@@ -39,13 +40,11 @@ const collapsedNavButtonStyle = { width: 40, height: 40, minWidth: 40, minHeight
 const collapsedSettingsButtonStyle = { width: 40, height: 36, minWidth: 40, minHeight: 36, padding: 0 } as const;
 
 function normalizeProjectPath(path: string | undefined) {
-  return (path ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return normalizePathForComparison(path);
 }
 
 function isSameProjectPath(a: string | undefined, b: string | undefined) {
-  const left = normalizeProjectPath(a);
-  const right = normalizeProjectPath(b);
-  return Boolean(left && right && left === right);
+  return isSamePath(a, b);
 }
 
 function sessionIdentitySet(session: Session): Set<string> {

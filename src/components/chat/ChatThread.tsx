@@ -3,6 +3,7 @@ import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, R
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { normalizePathForComparison } from "@/utils/pathCase";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
@@ -129,7 +130,7 @@ function isKimixSyntheticThinking(text: string) {
 }
 
 function normalizeFilePath(value: string) {
-  return value.replace(/\\/g, "/").toLowerCase();
+  return normalizePathForComparison(value);
 }
 
 function slashNoticeCommand(event: Extract<TimelineEvent, { type: "status_update" }>): string | null {

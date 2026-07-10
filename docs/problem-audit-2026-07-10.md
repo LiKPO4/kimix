@@ -96,6 +96,8 @@
 - **影响**：Linux 中 `/Foo` 和 `/foo` 是两个目录，但 Kimix 会当作同一个项目，造成会话串项目、归档错位或附加目录去重错误。
 - **证据**：`src/App.tsx:146`、`src/utils/additionalWorkDirs.ts:1`、`electron/kimiCodeHost.ts:1577`
 - **验证状态**：已抽查 `App.tsx`、`additionalWorkDirs.ts` 确认
+- **修复状态**：已修复（commit `1fe1902`）
+- **说明**：新增 `src/utils/pathCase.ts`，提供 `normalizePathForComparison` 与 `isSamePath`；仅在 `process.platform === "win32"` 时转小写，macOS/Linux 保留原始大小写；`preload.ts` 向渲染进程暴露 `platform` 字段，确保浏览器/测试环境与 Electron 环境均能获得准确平台信息；统一替换 `App.tsx`、`Sidebar.tsx`、`AppShell.tsx`、`SearchOverlay.tsx`、`MessageBubble.tsx`、`Composer.tsx`、`ContextBar.tsx`、`ChangeCard.tsx`、`ApprovalCard.tsx`、`ChatThread.tsx`、`sessionCatalog.ts`、`kimiCodeSessionRecovery.ts`、`projectDisplay.ts`、`additionalWorkDirs.ts` 以及 `electron/kimiCodeHost.ts`、`electron/main.ts` 中的路径比较/去重逻辑。
 - **建议**：Windows 下可转小写，Linux/macOS 必须按原始大小写比较。
 
 ### 9. 搜索结果复制出的恢复命令固定为 PowerShell
