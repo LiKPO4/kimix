@@ -252,6 +252,8 @@
 - **影响**：两个入口行为一致，增加理解成本。
 - **证据**：`src/components/layout/AppShell.tsx:842`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `d45d654`）
+- **说明**：`TopMenuBar.tsx` 移除“快速对话”菜单项；`AppShell.tsx` 的 `handleMenuAction` 删除 `quick-chat` 分支，统一走 `new-chat`。
 - **建议**：若定义相同则删除一个；若“快速”应减少步骤则实现差异。
 
 ### 26. 菜单“删除”通过直接修改 DOM selection 工作
@@ -259,6 +261,8 @@
 - **影响**：受控 React 输入框可能把内容恢复，且不触发 input/change；非输入区域文本选择也无法删除。
 - **证据**：`src/components/layout/AppShell.tsx:862`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `d45d654`）
+- **说明**：新增 `src/utils/dom.ts#deleteSelection`：对 `input`/`textarea` 先 `setRangeText("")` 再 dispatch `input`/`change` 事件，确保受控组件状态同步；对非输入可编辑区域回退 `document.execCommand("delete")`。
 - **建议**：对受控输入框通过 React 状态删除；对普通可编辑区域使用标准命令。
 
 ### 27. 队列“更多”按钮没有行为，排序仅支持鼠标拖动
