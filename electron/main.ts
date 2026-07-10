@@ -3550,18 +3550,25 @@ function syncEnabledSkills(ids: string[]) {
   const targetDir = enabledSkillsDir();
   fs.rmSync(targetDir, { recursive: true, force: true });
   fs.mkdirSync(targetDir, { recursive: true });
-  const enabledNames: string[] = [];
+  // 同名技能只保留一份：后出现的覆盖先出现的，避免同一路径被覆盖导致行为不确定。
+  const enabledByName = new Map<string, { skill: typeof allSkills[0]; id: string }>();
   for (const id of uniqueIds) {
     const skill = byId.get(id) ?? byName.get(id);
     if (!skill) continue;
+    enabledByName.set(skill.name, { skill, id });
+  }
+  const enabledNames: string[] = [];
+  const enabledIds: string[] = [];
+  for (const { skill, id } of enabledByName.values()) {
     const sourceDir = path.dirname(skill.path);
     const safeName = skill.name.replace(/[<>:"/\\|?*]+/g, "_");
     const targetSkillDir = path.join(targetDir, safeName);
     fs.cpSync(sourceDir, targetSkillDir, { recursive: true });
     enabledNames.push(skill.name);
+    enabledIds.push(id);
   }
-  settingsService.saveSettings({ enabledSkillNames: uniqueIds, enabledSkillsDir: targetDir });
-  return { enabledIds: uniqueIds, enabledNames, enabledDir: targetDir };
+  settingsService.saveSettings({ enabledSkillNames: enabledIds, enabledSkillsDir: targetDir });
+  return { enabledIds, enabledNames, enabledDir: targetDir };
 }
 
 function prepareLocalSkillForKimi(name: string) {
