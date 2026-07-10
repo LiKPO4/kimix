@@ -11,6 +11,7 @@ import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
+import { truncateMarkdownForPreview } from "@/utils/markdownTruncate";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 
 interface MarkdownRendererProps {
@@ -52,41 +53,6 @@ function estimateMarkdownHeight(content: string) {
 }
 
 const DEFAULT_COLLAPSIBLE_THRESHOLD = 50_000;
-
-function isInsideFencedCodeBlock(content: string, index: number): boolean {
-  const before = content.slice(0, index);
-  const fences = before.match(/^```[a-zA-Z0-9]*\s*$/gm);
-  return fences ? fences.length % 2 === 1 : false;
-}
-
-function truncateMarkdownForPreview(content: string, maxLength: number): string {
-  if (content.length <= maxLength) return content;
-  const minPos = Math.floor(maxLength * 0.75);
-
-  // Prefer paragraph boundaries that are not inside fenced code blocks.
-  const paragraphBoundary = content.lastIndexOf("\n\n", maxLength);
-  if (paragraphBoundary >= minPos && !isInsideFencedCodeBlock(content, paragraphBoundary)) {
-    return content.slice(0, paragraphBoundary);
-  }
-
-  // Fall back to line boundaries outside fenced code blocks.
-  let lineBoundary = content.lastIndexOf("\n", maxLength);
-  while (lineBoundary >= minPos) {
-    if (!isInsideFencedCodeBlock(content, lineBoundary)) {
-      return content.slice(0, lineBoundary);
-    }
-    lineBoundary = content.lastIndexOf("\n", lineBoundary - 1);
-  }
-
-  // If every boundary is inside a fenced block, extend to the end of that block.
-  const after = content.slice(maxLength);
-  const nextFenceEnd = after.search(/\n```/);
-  if (nextFenceEnd !== -1) {
-    return content.slice(0, maxLength + nextFenceEnd + 4);
-  }
-
-  return content.slice(0, maxLength);
-}
 
 const DEFERRED_RENDER_MARGIN = 1800;
 

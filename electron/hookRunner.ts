@@ -7,6 +7,7 @@
 import { exec } from "node:child_process";
 import type { HookRule, HookRunLogEntry } from "./types/ipc";
 import * as settingsService from "./settingsService";
+import { matchesHookTarget } from "../src/utils/hookMatcher";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,32 +45,6 @@ function hookRuleApplies(rule: HookRule, workDir: string): boolean {
   if (!rule.enabled || !rule.command?.trim()) return false;
   if (rule.scope !== "project") return true;
   return Boolean(rule.projectPath && isPathInside(rule.projectPath, workDir));
-}
-
-const MAX_HOOK_MATCHER_LENGTH = 500;
-const MAX_HOOK_TARGET_LENGTH = 4096;
-
-// 检测可能导致灾难性回溯的简易模式：嵌套量词或反向引用。
-function hasBacktrackingRisk(pattern: string): boolean {
-  if (/\\[1-9]/.test(pattern)) return true;
-  // 嵌套量词，例如 (a+)+、(a*)*、(a+)*、(a?)+。
-  if (/\([^()]*[*+?][^()]*\)[*+?]/.test(pattern)) return true;
-  return false;
-}
-
-function matchesHookTarget(rule: HookRule, target: string): boolean {
-  const matcher = rule.matcher?.trim();
-  if (!matcher || matcher === ".*") return true;
-  if (matcher.length > MAX_HOOK_MATCHER_LENGTH) return false;
-  const input = target.length > MAX_HOOK_TARGET_LENGTH ? target.slice(0, MAX_HOOK_TARGET_LENGTH) : target;
-  if (hasBacktrackingRisk(matcher)) {
-    return input.toLowerCase().includes(matcher.toLowerCase());
-  }
-  try {
-    return new RegExp(matcher, "i").test(input);
-  } catch {
-    return input.toLowerCase().includes(matcher.toLowerCase());
-  }
 }
 
 type HookRequest = {
@@ -205,7 +180,7 @@ export async function applyPromptSubmitHooks(
   const rules = (settingsService.loadSettings().hookRules ?? [])
     .filter((rule) => rule.event === "UserPromptSubmit")
     .filter((rule) => hookRuleApplies(rule, workDir))
-    .filter((rule) => matchesHookTarget(rule, target));
+    .filter((rule) => matchesHookTarget(rule.matcher, target));
   if (rules.length === 0) return content;
 
   const outputs: string[] = [];

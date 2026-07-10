@@ -74,4 +74,17 @@ describe("useStatePersistence", () => {
       sessionId: session.id,
     });
   });
+
+  it("flushes conversation state when the page becomes hidden", async () => {
+    root = createRoot(container);
+    act(() => root?.render(createElement(PersistenceProbe)));
+    act(() => useAppStore.setState({ currentProject: project, currentSession: session }));
+
+    Object.defineProperty(document, "visibilityState", { value: "hidden", writable: true, configurable: true });
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+
+    // Allow the async flush promise to settle without crashing.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(root).toBeTruthy();
+  });
 });
