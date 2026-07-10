@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseKimiCodeRecord, readKimiCodeSessionModelFromWire } from "../../../electron/sessionHistory";
+import { getSessionHistory, kimiWorkDirBucketNames, parseKimiCodeRecord, readKimiCodeSessionModelFromWire } from "../../../electron/sessionHistory";
 import { mapHistoryEvents } from "../eventMapper";
 import { buildThinkingBlocks } from "../thinkingBlocks";
 
@@ -169,6 +169,31 @@ describe("Kimi Code wire history", () => {
       "Read around line 4380-4420 for event panel.",
       "Events are displayed directly with title/body.",
     ]);
+  });
+
+  it("keeps history older than the former 2000-event parser limit", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-long-history-"));
+    const workDir = path.join(home, "project");
+    const sessionId = "session_11111111-1111-4111-8111-111111111111";
+    const wireDir = path.join(home, "sessions", kimiWorkDirBucketNames(workDir)[0], sessionId, "agents", "main");
+    const previousHome = process.env.KIMI_CODE_HOME;
+    fs.mkdirSync(wireDir, { recursive: true });
+    fs.writeFileSync(path.join(wireDir, "wire.jsonl"), Array.from({ length: 2_105 }, (_, index) => JSON.stringify({
+      type: "turn.prompt",
+      input: `message-${index}`,
+      time: index,
+    })).join("\n"));
+    process.env.KIMI_CODE_HOME = home;
+    try {
+      const history = await getSessionHistory(workDir, sessionId);
+      expect(history).toHaveLength(2_105);
+      expect(history[0]).toMatchObject({ type: "TurnBegin", payload: { user_input: "message-0" } });
+      expect(history.at(-1)).toMatchObject({ type: "TurnBegin", payload: { user_input: "message-2104" } });
+    } finally {
+      if (previousHome === undefined) delete process.env.KIMI_CODE_HOME;
+      else process.env.KIMI_CODE_HOME = previousHome;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 
 });

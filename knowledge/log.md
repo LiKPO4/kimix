@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+* **Long local histories no longer lose their earliest events**: Wire parsing keeps the complete recognizable history, while ChatThread remains responsible for the bounded initial render and older-history expansion. See [/project/kimix.md](/project/kimix.md).
 * **Kimi Web long histories mount only the latest process details**: Historical turns keep final Markdown visible but leave thinking/tool/subagent lists collapsed and unmounted until the user expands them. See [/project/kimix.md](/project/kimix.md).
 * **Sidebar project hierarchy uses compact spacing**: Project sections, project-to-session transitions, and session siblings now use a 6/4/2px rhythm while preserving existing row heights. See [/project/kimix.md](/project/kimix.md).
 * **ContextBar overlays no longer depend on clipped layout or inspector visibility**: Workspace, usage, and model panels use viewport-clamped body portals; Git details can mount its existing host without opening the right inspector. See [/project/kimix.md](/project/kimix.md).

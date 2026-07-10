@@ -4658,3 +4658,26 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/chat/MessageBubble.tsx`
 ## 下一步
 - 用户用 v2.14.114 实机复验后，再判断是否需要进一步虚拟化历史正文。
+# 2026-07-10 v2.14.115 长会话顶部历史被静默截断修复
+## 当前目标
+- 修复 `session_b8c1f05f-2dbe-43c4-994e-32eaa2844da3` 滚到顶部后仍缺少更早内容、且没有继续加载入口的问题。
+## 根因
+- 该会话主 wire 文件约 7.4MB、4,614 行；`electron/sessionHistory.ts` 只保留最后 2,000 个可识别事件并直接删除最早事件。
+- ChatThread 的 28 项渲染窗口只能折叠“已经进入 renderer 的历史”，无法恢复数据层已删除的早期轮次，因此会出现假顶部。
+## 已完成
+- 移除本地 wire 解析层的 2,000 事件静默截断，完整历史交给 ChatThread 的首屏窗口和“展开更早记录”控制渲染规模。
+- 新增 2,105 条 wire 事件回归测试，验证第一条和最后一条均保留。
+- 版本号三处同步到 v2.14.115。
+## 未完成
+- 等待用户用 v2.14.115 重开指定会话，确认顶部出现更早历史入口并能继续查看最初轮次。
+## 验证
+- 新增长历史回归测试通过：2,105 条事件完整保留首尾。
+- `pnpm test:run` 通过：54 个测试文件、390 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-CjAYba47.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、117 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `electron/sessionHistory.ts`
+- `src/utils/__tests__/sessionHistory.test.ts`
+## 下一步
+- 用户用 v2.14.115 重开并复验指定 session 的最早历史。
