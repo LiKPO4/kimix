@@ -234,6 +234,8 @@
 - **影响**：优先使用单一的 `runningSessionId`，不保证它是当前可见会话；用户想停止当前任务，却可能静默停止另一个项目中的任务。
 - **证据**：`src/App.tsx:1126`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `b297263`）
+- **说明**：`App.tsx` 的 `handleEscape` 改为仅当 `runningSessionId` 与当前可见会话 `currentSession.id` 一致时才执行取消；去掉了对 `runningSessionId` 为 null 时直接 fallback 到 `currentSession.id` 的逻辑，避免用户查看非运行会话时误停后台任务。
 - **建议**：Escape 停止操作应绑定当前可见会话/运行时。
 
 ### 24. 菜单和快捷键帮助展示了未实现的命令
