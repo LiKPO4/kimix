@@ -87,6 +87,8 @@
 - **影响**：每次查询使用同步递归文件扫描，深度最多 32 层；无匹配时可能遍历整个大型仓库或网络目录，导致整窗卡顿甚至被判定无响应。
 - **证据**：`electron/main.ts:3129`、`src/components/chat/Composer.tsx:701`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `4fc3b0a`）
+- **说明**：`searchProjectFiles` 改为 `async`，使用 `fs.promises.readdir`；新增 `activeSearchControllers` 在同一会话发起新查询时取消旧查询；扫描过程每 64 个条目让出事件循环，并设置 600ms 总时间预算，超时或结果数达标立即返回。
 - **建议**：建立文件索引，或改为异步分批扫描并支持 `AbortSignal`。
 
 ### 8. 所有平台都将路径转小写比较
