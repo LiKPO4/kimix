@@ -288,6 +288,8 @@
 - **影响**：位于特定插件目录的清单会被标记为“官方”，用户会理解为“由 Kimi 官方发布或审核”。
 - **证据**：`src/components/layout/SkillsPanel.tsx:272`、`electron/main.ts:3189`
 - **验证状态**：已抽查 `SkillsPanel.tsx` 确认
+- **修复状态**：已修复（commit `3174e8c`）
+- **说明**：`SkillsPanel` 将 `trustLevel === "kimi-official"` 的卡片标签从“官方”改为“插件提供”，避免与“由 Kimi 官方发布/审核”混淆；sourceLabel 与路径仍显示安装来源。
 - **建议**：改为“插件提供”并单独显示发布者和来源。
 
 ### 30. 技能扫描遇到损坏文件时静默忽略
