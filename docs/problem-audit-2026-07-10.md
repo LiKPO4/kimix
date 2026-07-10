@@ -141,6 +141,8 @@
 - **影响**：安装包下载后直接打开，没有校验 SHA256，签名验证配置也被关闭；网络正常结束但文件不完整时仍可能重命名并尝试打开。
 - **证据**：`electron/main.ts:3063`、`electron-builder.yml:1`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `ae90d4a`）
+- **说明**：`ReleaseAssetInfo` 扩展 `sha256` 字段；新增 `parseReleaseSha256()` 从 release 的 `SHA256SUMS.txt` 解析每个文件的 SHA256；`mapGitHubRelease` 改为 async 并附加校验值；`downloadUpdateAsset` 在重命名前校验实际文件大小与 `asset.size` 一致，并计算 SHA256 与 `asset.sha256` 比对，失败则删除临时文件并抛错；`.github/workflows/release.yml` 新增生成并上传 `SHA256SUMS.txt` 的步骤。
 - **建议**：下载后校验 SHA256 和长度；与 Kimi Code 二进制安装流程保持同等安全标准。
 
 ### 14. macOS 签名和公证流程从仓库配置中不可确认

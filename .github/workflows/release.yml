@@ -116,3 +116,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+
+      - name: Generate and upload SHA256SUMS.txt
+        run: |
+          mkdir -p release-assets
+          gh release download "$GITHUB_REF_NAME" -D release-assets || true
+          if [ "$(ls -A release-assets)" ]; then
+            (cd release-assets && sha256sum * > ../SHA256SUMS.txt)
+            gh release upload "$GITHUB_REF_NAME" SHA256SUMS.txt --clobber
+          else
+            echo "No release assets to checksum"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}

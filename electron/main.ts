@@ -2606,7 +2606,38 @@ function isVersionGreater(a: string, b: string): boolean {
   return false;
 }
 
-function mapGitHubRelease(data: {
+async function parseReleaseSha256(assets: { name?: unknown; browser_download_url?: unknown; size?: unknown }[]): Promise<Map<string, string>> {
+  const checksumAsset = assets.find((asset) =>
+    typeof asset === "object" && asset !== null &&
+    typeof (asset as { name?: unknown }).name === "string" &&
+    (asset as { name: string }).name.toLowerCase() === "sha256sums.txt"
+  );
+  const checksumUrl = checksumAsset && typeof (checksumAsset as { browser_download_url?: unknown }).browser_download_url === "string"
+    ? (checksumAsset as { browser_download_url: string }).browser_download_url
+    : undefined;
+  if (!checksumUrl) return new Map();
+  try {
+    const res = await fetchGitHubUpdateUrl(checksumUrl, { headers: { "User-Agent": "Kimix" } });
+    if (!res.ok) return new Map();
+    const text = await res.text();
+    const map = new Map<string, string>();
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const parts = trimmed.split(/\s+/);
+      if (parts.length >= 2) {
+        const hash = parts[0].toLowerCase();
+        const filename = parts[1];
+        if (/^[0-9a-f]{64}$/.test(hash)) map.set(filename, hash);
+      }
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+async function mapGitHubRelease(data: {
   tag_name?: unknown;
   name?: unknown;
   body?: unknown;
@@ -2615,6 +2646,7 @@ function mapGitHubRelease(data: {
   assets?: unknown;
 }) {
   const assets = Array.isArray(data.assets) ? data.assets : [];
+  const sha256Map = await parseReleaseSha256(assets);
   return {
     tagName: typeof data.tag_name === "string" ? data.tag_name : "",
     name: typeof data.name === "string" ? data.name : "",
@@ -2627,6 +2659,7 @@ function mapGitHubRelease(data: {
         name: typeof asset.name === "string" ? asset.name : "下载文件",
         downloadUrl: typeof asset.browser_download_url === "string" ? asset.browser_download_url : "",
         size: typeof asset.size === "number" && Number.isFinite(asset.size) ? asset.size : undefined,
+        sha256: sha256Map.get(typeof asset.name === "string" ? asset.name : "") ?? undefined,
       }))
       .filter((asset) => asset.downloadUrl.length > 0),
   };
@@ -2652,10 +2685,10 @@ async function fetchRecentReleases(limit = 3) {
   if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
   const data = await res.json() as unknown;
   if (!Array.isArray(data)) return [];
-  return data
+  const mapped = await Promise.all(data
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
-    .map(mapGitHubRelease)
-    .filter((release) => release.tagName);
+    .map((item) => mapGitHubRelease(item)));
+  return mapped.filter((release) => release.tagName);
 }
 
 async function fetchLatestRelease() {
@@ -2666,6 +2699,7 @@ type ReleaseAssetInfo = {
   name: string;
   downloadUrl: string;
   size?: number;
+  sha256?: string;
 };
 
 let githubUpdateSessionPromise: Promise<Electron.Session> | null = null;
@@ -3121,6 +3155,14 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
       });
     }
     emitDownloadUpdateProgress(receivedBytes, knownTotalBytes ?? receivedBytes, speed());
+    const actualSize = (await fs.promises.stat(tempPath)).size;
+    if (asset.size && actualSize !== asset.size) {
+      throw new Error(`下载完整性校验失败：大小不匹配（期望 ${asset.size}，实际 ${actualSize}）`);
+    }
+    const actualSha256 = createHash("sha256").update(await fs.promises.readFile(tempPath)).digest("hex");
+    if (asset.sha256 && actualSha256 !== asset.sha256) {
+      throw new Error(`下载完整性校验失败：SHA256 不匹配（期望 ${asset.sha256}，实际 ${actualSha256}）`);
+    }
     await fs.promises.rename(tempPath, targetPath);
   } catch (err) {
     await fs.promises.rm(tempPath, { force: true }).catch(() => {});
