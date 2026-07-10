@@ -69,6 +69,8 @@
 - **影响**：完整会话事件、图片 Base64、待发送消息一并写入 localStorage；超出配额后仅控制台警告，新状态停止保存，重启后可能丢失待发送队列、图片或本地 UI 事件。
 - **证据**：`src/utils/persistence.ts:123`、`src/hooks/useStatePersistence.ts:1`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `e2af08e`）
+- **说明**：新增 `src/utils/stateStorage.ts`，IndexedDB 不可用（如 jsdom 测试或浏览器预览）时回退到 localStorage；生产环境绘画会话、待发送消息、图片均持久化到 IndexedDB，图片以 SHA-256 引用单独存储；持久化失败时通过 `kimix:toast` 提示用户。
 - **建议**：迁移至 IndexedDB 或主进程文件数据库；图片单独存储；增加容量监控和失败提示。
 
 ### 6. 图片粘贴没有数量、尺寸和总容量限制
