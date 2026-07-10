@@ -4784,3 +4784,28 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/chat/MessageBubble.tsx`
 ## 下一步
 - 用户分别悬停折叠和展开状态下的工具命令行，确认内容对齐不变且 hover 横向铺满。
+# 2026-07-10 v2.14.121 官方思考历史统一纠错
+## 当前目标
+- 根除本地缓存中的思考正文重复、列表换行丢失或段落粘连在当前会话中继续显示的问题。
+## 根因
+- v2.14.108 的官方思考修复只覆盖后台迁移；当前会话恢复和运行中快照仍仅比较正文长度、正文差异或过程事件数量，正文与工具数量相同时会继续保留损坏的 thinking 缓存。
+## 已完成
+- 抽取统一的 `shouldReplaceWithCanonicalKimiHistory` 判断，同时比较正文、图片、Markdown 完整性、过程事件和思考正文。
+- 后台缓存迁移、当前会话首次恢复、运行中安静期快照对账三条路径全部复用该判断。
+- Kimi 历史缓存版本升级到 3，强制旧缓存重新接受官方历史纠错。
+- 新增取自本次问题的中文物品列表回归场景，覆盖正文与工具数量不变但 `\n- ` 被粘连的情况。
+- 版本号三处同步到 v2.14.121。
+## 未完成
+- 等待用户用 v2.14.121 在目标会话重新触发官方历史同步，复验列表换行和段落结构。
+## 验证
+- `pnpm exec vitest run src/utils/__tests__/kimiHistoryCache.test.ts` 通过：1 个测试文件、6 个测试。
+- `pnpm test:run` 通过：54 个测试文件、392 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-BcBckMON.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、123 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/App.tsx`
+- `src/utils/kimiHistoryCache.ts`
+- `src/utils/__tests__/kimiHistoryCache.test.ts`
+## 下一步
+- 完整验证后启动 v2.14.121，重新打开目标会话；缓存版本 3 应使用官方 wire 中保留换行的 thinking 替换本地粘连版本。

@@ -1,6 +1,6 @@
 import type { TimelineEvent } from "@/types/ui";
 
-export const KIMI_HISTORY_CACHE_VERSION = 2;
+export const KIMI_HISTORY_CACHE_VERSION = 3;
 
 const PROCESS_EVENT_TYPES = new Set<TimelineEvent["type"]>([
   "tool_call",

@@ -186,6 +186,17 @@ function hasPossiblyLostUserImages(events: TimelineEvent[]) {
   });
 }
 
+function shouldReplaceWithCanonicalKimiHistory(cachedEvents: TimelineEvent[], canonicalEvents: TimelineEvent[]) {
+  if (canonicalEvents.length === 0) return false;
+  const canonicalAssistantBody = assistantBodyText(canonicalEvents);
+  return assistantBodySize(canonicalEvents) > assistantBodySize(cachedEvents) ||
+    displayableUserImageCount(canonicalEvents) > displayableUserImageCount(cachedEvents) ||
+    (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
+    (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(cachedEvents)) ||
+    hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
+    hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
+}
+
 function needsKimiCodeHistoryRepair(session: Session) {
   return session.engine === "kimi-code" &&
     !session.longTask &&
@@ -234,14 +245,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           ? loaded.data.events
           : [];
       const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
-      const hasMoreAssistantBody = assistantBodySize(historyEvents) > assistantBodySize(session.events);
-      const hasMoreDisplayableImages = displayableUserImageCount(historyEvents) > displayableUserImageCount(session.events);
-      const repairsMalformedMarkdown = hasMalformedAssistantMarkdown(session.events) && !hasMalformedAssistantMarkdown(historyEvents);
-      const canonicalAssistantBody = assistantBodyText(historyEvents);
-      const repairsStreamAssembly = Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(session.events);
-      const hasMoreProcessDetails = hasRicherKimiProcessHistory(session.events, historyEvents);
-      const repairsThinkingAssembly = hasCanonicalKimiThinkingHistory(session.events, historyEvents);
-      if (!hasMoreAssistantBody && !hasMoreDisplayableImages && !repairsMalformedMarkdown && !repairsStreamAssembly && !hasMoreProcessDetails && !repairsThinkingAssembly) continue;
+      if (!shouldReplaceWithCanonicalKimiHistory(session.events, historyEvents)) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
         sessions: state.sessions.map((item) => item.id === session.id
@@ -2122,9 +2126,8 @@ function App() {
               const events = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
 
               if (runtimeOwner) {
-                const canonicalHistoryIsRicher = assistantBodySize(events) > assistantBodySize(runtimeOwner.events) ||
-                  hasRicherKimiProcessHistory(runtimeOwner.events, events);
-                const hydratedEvents = runtimeOwner.events.length > 0 && !canonicalHistoryIsRicher
+                const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(runtimeOwner.events, events);
+                const hydratedEvents = runtimeOwner.events.length > 0 && !shouldUseCanonicalHistory
                   ? (runtimeIsActive ? runtimeOwner.events : settleInactiveEvents(runtimeOwner.events))
                   : events;
                 const session = hydrateLongTaskProgressFromHistory({
@@ -2876,14 +2879,7 @@ function App() {
             if (disposed || !loaded?.success) return;
             const snapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
             const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
-            const snapshotBody = assistantBodyText(snapshotEvents);
-            const localBody = assistantBodyText(latestSession.events);
-            const snapshotBodySize = assistantBodySize(snapshotEvents);
-            const localBodySize = assistantBodySize(latestSession.events);
-            const snapshotIsRicher = snapshotBodySize > localBodySize ||
-              (snapshotBodySize === localBodySize && Boolean(snapshotBody) && snapshotBody !== localBody) ||
-              hasRicherKimiProcessHistory(latestSession.events, snapshotEvents);
-            if (snapshotIsRicher) {
+            if (shouldReplaceWithCanonicalKimiHistory(latestSession.events, snapshotEvents)) {
               updateSession(session.id, (item) => ({
                 ...item,
                 events: snapshotEvents,

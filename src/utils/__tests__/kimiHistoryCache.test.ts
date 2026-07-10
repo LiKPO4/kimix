@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
 
 const assistant: TimelineEvent = {
   id: "assistant",
@@ -22,6 +22,10 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
+  it("uses cache version 3 for canonical thinking repair across every history entry point", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(3);
+  });
+
   it("prefers canonical history when old cache lost process events", () => {
     expect(kimiHistoryProcessEventCount([assistant])).toBe(0);
     expect(kimiHistoryProcessEventCount([assistant, tool])).toBe(1);
@@ -51,6 +55,32 @@ describe("Kimi history cache migration", () => {
 
     expect(hasCanonicalKimiThinkingHistory(cached, canonical)).toBe(true);
     expect(hasCanonicalKimiThinkingHistory(canonical, canonical)).toBe(false);
+  });
+
+  it("prefers canonical thinking when a cached Chinese list lost its line breaks", () => {
+    const canonicalThought = [
+      "截图中可见的物品（后期）：",
+      "- 超燃蛋小黄物品 1074667572",
+      "- 月薪喵物品 1074745391",
+      "",
+      "早期物品（看不到的）：",
+      "- 木哑铃物品 1073913963",
+      "- 大理石哑铃物品 1073918025",
+    ].join("\n");
+    const cachedThought = canonicalThought.replace(/\n(?=- )/g, "");
+    const canonical: TimelineEvent[] = [{
+      ...assistant,
+      thinking: canonicalThought,
+      thinkingParts: [{ id: "official-list", timestamp: 1, text: canonicalThought }],
+    }];
+    const cached: TimelineEvent[] = [{
+      ...assistant,
+      thinking: cachedThought,
+      thinkingParts: [{ id: "cached-list", timestamp: 1, text: cachedThought }],
+    }];
+
+    expect(cachedThought).toContain("1074667572- 月薪喵物品");
+    expect(hasCanonicalKimiThinkingHistory(cached, canonical)).toBe(true);
   });
 
   it("ignores subagent-internal thinking when deciding top-level thinking migration", () => {
