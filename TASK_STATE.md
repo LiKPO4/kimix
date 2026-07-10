@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-10 v2.14.109 更新下载走本地代理
+
+- 当前目标：让软件内 GitHub Release 检查和安装包下载与浏览器使用同一代理路径。
+- 根因：Node `fetch` 不会自动读取 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY`；原实现优先使用 Node `fetch`，下载失败才尝试 Electron `net.fetch`，元数据请求没有代理感知 fallback。当前机器环境代理为 `127.0.0.1:7890`，但 Windows 系统代理开关关闭。
+- 修复：新增独立 GitHub 更新 Session，优先将环境代理配置到 Electron Chromium Session；Release API、Atom 降级和资产下载统一走该 Session，Session 失败才回退直连 Node `fetch`，不改变 Kimi 运行时全局网络。
+- 验收：`pnpm build`、`pnpm knowledge:validate`、`git diff --check` 通过；真实代理下载速度尚未在本轮实测。
+- 下一步：在代理软件开启时用 `v2.14.109` 测试检查更新和下载速度；关闭代理后确认仍能直连或给出明确失败。
+
 ## 2026-07-08 v2.14.106 官方思考摘要恢复
 
 - 当前目标：让思考折叠摘要只显示官方思考的最后一段，并清除旧本地镜像里重复、黏连的思考正文。

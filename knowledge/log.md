@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-10
+
+* **GitHub update traffic honors local proxy settings**: Release metadata, Atom fallback, and installer assets now use a dedicated Electron Session configured from `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`, without changing Kimi's default network session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-08
 
 * **Canonical history repairs thinking assembly**: Cache migration now compares official and local thinking bodies, replacing duplicated or concatenated local thoughts; collapsed summaries use the final official paragraph. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

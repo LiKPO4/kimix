@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, Notification, session, shell } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -2632,7 +2632,7 @@ function mapGitHubRelease(data: {
 }
 
 async function fetchReleaseAtom(limit: number) {
-  const res = await fetch(`https://github.com/${GITHUB_REPO}/releases.atom`, {
+  const res = await fetchGitHubUpdateUrl(`https://github.com/${GITHUB_REPO}/releases.atom`, {
     headers: { "User-Agent": "Kimix" },
   });
   if (!res.ok) throw new Error(`GitHub Releases 返回 ${res.status}`);
@@ -2640,7 +2640,7 @@ async function fetchReleaseAtom(limit: number) {
 }
 
 async function fetchRecentReleases(limit = 3) {
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${limit}`, {
+  const res = await fetchGitHubUpdateUrl(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${limit}`, {
     headers: {
       "Accept": "application/vnd.github+json",
       "User-Agent": "Kimix",
@@ -2666,6 +2666,53 @@ type ReleaseAssetInfo = {
   downloadUrl: string;
   size?: number;
 };
+
+let githubUpdateSessionPromise: Promise<Electron.Session> | null = null;
+
+function getUpdateProxyRules() {
+  const proxyValue = [process.env.HTTPS_PROXY, process.env.HTTP_PROXY, process.env.ALL_PROXY]
+    .find((value) => typeof value === "string" && value.trim())
+    ?.trim();
+  if (!proxyValue) return undefined;
+  try {
+    const proxy = new URL(proxyValue);
+    const hostPort = `${proxy.hostname}${proxy.port ? `:${proxy.port}` : ""}`;
+    if (proxy.protocol.startsWith("socks")) return proxyValue;
+    return `http=${hostPort};https=${hostPort}`;
+  } catch {
+    return undefined;
+  }
+}
+
+async function getGitHubUpdateSession() {
+  if (!githubUpdateSessionPromise) {
+    githubUpdateSessionPromise = (async () => {
+      const updateSession = session.fromPartition("persist:kimix-github-updates");
+      const proxyRules = getUpdateProxyRules();
+      await updateSession.setProxy({
+        mode: proxyRules ? "fixed_servers" : "system",
+        proxyRules,
+        proxyBypassRules: process.env.NO_PROXY?.trim() || "localhost,127.0.0.1,::1",
+      });
+      return updateSession;
+    })();
+  }
+  return githubUpdateSessionPromise;
+}
+
+async function fetchGitHubUpdateUrl(url: string, init?: RequestInit) {
+  try {
+    const updateSession = await getGitHubUpdateSession();
+    return await updateSession.fetch(url, init);
+  } catch (sessionError) {
+    try {
+      return await fetch(url, init);
+    } catch (directError) {
+      const detail = sessionError instanceof Error ? sessionError.message : directError instanceof Error ? directError.message : String(sessionError);
+      throw new Error(`GitHub 请求失败：${detail}`);
+    }
+  }
+}
 
 function emitDownloadUpdateProgress(receivedBytes: number, totalBytes?: number, bytesPerSecond?: number) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -3018,25 +3065,13 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
   ensureDirectoryExists(updateDir);
   const targetPath = path.join(updateDir, sanitizeDownloadName(asset.name));
   const tempPath = `${targetPath}.download`;
-  let response: Response;
-  try {
-    response = await fetch(asset.downloadUrl, {
-      headers: {
-        "User-Agent": "Kimix",
-      },
-    });
-  } catch (fetchError) {
-    try {
-      response = await net.fetch(asset.downloadUrl, {
-        headers: {
-          "User-Agent": "Kimix",
-        },
-      });
-    } catch (netError) {
-      const detail = netError instanceof Error ? netError.message : fetchError instanceof Error ? fetchError.message : String(netError);
-      throw new Error(`下载失败：${detail}`);
-    }
-  }
+  const response = await fetchGitHubUpdateUrl(asset.downloadUrl, {
+    headers: {
+      "User-Agent": "Kimix",
+    },
+  }).catch((error) => {
+    throw new Error(`下载失败：${error instanceof Error ? error.message : String(error)}`);
+  });
   if (!response.ok) throw new Error(`下载失败：GitHub 返回 ${response.status}`);
   const totalBytesHeader = response.headers.get("content-length");
   const parsedTotalBytes = totalBytesHeader ? Number.parseInt(totalBytesHeader, 10) : undefined;
