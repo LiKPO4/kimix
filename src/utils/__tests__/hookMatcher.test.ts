@@ -15,6 +15,8 @@ describe("hasBacktrackingRisk", () => {
     expect(hasBacktrackingRisk("(a*)*")).toBe(true);
     expect(hasBacktrackingRisk("(a+)*")).toBe(true);
     expect(hasBacktrackingRisk("(a?)+")).toBe(true);
+    expect(hasBacktrackingRisk("((a+)+)")).toBe(true);
+    expect(hasBacktrackingRisk("((a+|b+)+)")).toBe(true);
   });
 
   it("returns true for backreferences", () => {
