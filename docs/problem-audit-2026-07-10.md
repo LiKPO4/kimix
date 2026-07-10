@@ -323,6 +323,8 @@
 - **影响**：非阻断 Hook 失败后继续发送消息可能是合理策略，但日志必须显示失败，不能把“继续执行”误写成“执行成功”。
 - **证据**：`electron/hookRunner.ts:1`
 - **验证状态**：未抽查完整逻辑，基于审查结论纳入
+- **修复状态**：已修复（commit `6908b26`）
+- **说明**：`hookRunner.ts` 让 `runHookCommand` 返回 `killed` 标志与 `number|null` 的退出码；`applyPromptSubmitHooks` 在非 block 规则遇到退出码非 0 或超时时记录 `result: "error"` 并跳过，不再把失败写成成功。
 - **建议**：明确记录 `error` 结果；必要时通知用户。
 
 ### 34. Hook 模板和生成命令偏向 PowerShell
