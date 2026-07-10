@@ -2394,14 +2394,18 @@ function clearTaskbarAttention() {
 function showTurnCompleteNotification(title: string, body: string, rendererWindowFocused = false, rendererPageVisible = false) {
   const settings = settingsService.loadSettings();
   const notificationMode = settings.notificationMode ?? "unfocused";
+  const notificationShowContent = settings.notificationShowContent ?? false;
   const windowFocused = rendererWindowFocused || Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
   if (notificationMode === "never") return;
   if (notificationMode === "unfocused" && windowFocused) return;
   if (!windowFocused) setTaskbarAttention();
   if (!Notification.isSupported()) return;
+  const safeBody = notificationShowContent
+    ? body.trim()
+    : "";
   const notification = new Notification({
     title: title.trim() || "Kimix 本轮已完成",
-    body: body.trim() || "当前轮次处理已完成，可以回来查看结果。",
+    body: safeBody || "当前轮次处理已完成，可以回来查看结果。",
     silent: false,
   });
   notification.on("click", () => {
@@ -6551,6 +6555,7 @@ const SettingsSchema = z.object({
   sessionRecommendationTurnLimit: z.number().int().min(1).max(200).optional(),
   voiceShortcut: z.string().min(1).max(80).optional(),
   notificationMode: z.enum(["never", "unfocused", "always"]).optional(),
+  notificationShowContent: z.boolean().optional(),
   clarificationToolMode: z.enum(["off", "on", "auto"]).optional(),
   clarificationToolEnabled: z.boolean().optional(),
   filePreviewExtensions: z.array(z.string().trim().min(1).max(16)).max(20).optional(),

@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sessionRecommendationTurnLimit: 10,
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
+  notificationShowContent: false,
   clarificationToolMode: "auto",
   filePreviewExtensions: ["md", "txt"],
   expandToolCalls: false,

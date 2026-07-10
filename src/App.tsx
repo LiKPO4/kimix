@@ -395,7 +395,8 @@ function extractAssistantContentForTurn(
 function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label?: string, assistantContent?: string) {
   const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
   const sessionTitle = session?.title?.trim() || "当前会话";
-  const summary = summarizeNotificationBody(assistantContent ?? "");
+  const showContent = useAppStore.getState().notificationShowContent ?? false;
+  const summary = showContent ? summarizeNotificationBody(assistantContent ?? "") : "";
   const suffix = label ? `（${label}）` : "";
   void window.api.notifyTurnComplete({
     title: `Kimix 本轮已完成${suffix}`,
@@ -410,7 +411,8 @@ function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label
 function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string, questionContent?: string) {
   const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
   const sessionTitle = session?.title?.trim() || "当前会话";
-  const summary = summarizeNotificationBody(questionContent ?? "");
+  const showContent = useAppStore.getState().notificationShowContent ?? false;
+  const summary = showContent ? summarizeNotificationBody(questionContent ?? "") : "";
   void window.api.notifyTurnComplete({
     title: "Kimix 需要你回复需求澄清",
     body: summary || `「${sessionTitle}」正在等待你的澄清回复。`,
@@ -1088,6 +1090,7 @@ function App() {
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
+  const setNotificationShowContent = useAppStore((s) => s.setNotificationShowContent);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
@@ -1151,6 +1154,7 @@ function App() {
       setSessionRecommendationTurnLimit,
       setVoiceShortcut,
       setNotificationMode,
+      setNotificationShowContent,
       setClarificationToolMode,
       setFilePreviewExtensions,
       setRecentProjects,
@@ -1159,8 +1163,8 @@ function App() {
       setPermissionMode, setDefaultThinking, setDefaultPlanMode, setFontSize,
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
-      setVoiceShortcut, setNotificationMode, setClarificationToolMode,
-      setFilePreviewExtensions, setRecentProjects,
+      setVoiceShortcut, setNotificationMode, setNotificationShowContent,
+      setClarificationToolMode, setFilePreviewExtensions, setRecentProjects,
     ]);
     useBootstrap(bootstrapSetters);
 

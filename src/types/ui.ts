@@ -63,6 +63,7 @@ export interface AppState {
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;
   notificationMode: NotificationMode;
+  notificationShowContent: boolean;
   clarificationToolMode: ClarificationToolMode;
   processDisplayMode: ProcessDisplayMode;
   filePreviewExtensions: string[];

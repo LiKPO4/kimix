@@ -425,6 +425,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const notificationMode = useAppStore((s) => s.notificationMode);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
+  const notificationShowContent = useAppStore((s) => s.notificationShowContent);
+  const setNotificationShowContent = useAppStore((s) => s.setNotificationShowContent);
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const setProcessDisplayMode = useAppStore((s) => s.setProcessDisplayMode);
   const filePreviewExtensions = useAppStore((s) => s.filePreviewExtensions);
@@ -2567,6 +2569,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       </div>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setNotificationShowContent(!notificationShowContent)}
+                    className={`kimix-settings-permission ${notificationShowContent ? "is-active" : ""}`}
+                  >
+                    <SelectionIndicator selected={notificationShowContent} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">通知中显示对话内容</div>
+                      <div className="kimix-settings-permission-desc">默认关闭，开启后通知正文会展示 Agent 回复或澄清问题的摘要</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 

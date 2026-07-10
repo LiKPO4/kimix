@@ -73,6 +73,7 @@ export interface AppStore extends AppState {
   setSessionRecommendationTurnLimit: (limit: number) => void;
   setVoiceShortcut: (shortcut: string) => void;
   setNotificationMode: (mode: NotificationMode) => void;
+  setNotificationShowContent: (enabled: boolean) => void;
   setClarificationToolMode: (mode: ClarificationToolMode) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setFilePreviewExtensions: (extensions: string[]) => void;
@@ -117,6 +118,7 @@ export const useAppStore = create<AppStore>((set) => ({
   sessionRecommendationTurnLimit: 10,
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
+  notificationShowContent: false,
   clarificationToolMode: "auto",
   processDisplayMode: readProcessDisplayMode(),
   filePreviewExtensions: ["md", "txt"],
@@ -153,6 +155,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setSessionRecommendationTurnLimit: (limit) => set({ sessionRecommendationTurnLimit: Math.max(1, Math.min(200, Math.round(limit))) }),
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
   setNotificationMode: (mode) => set({ notificationMode: mode }),
+  setNotificationShowContent: (enabled) => set({ notificationShowContent: enabled }),
   setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
   setProcessDisplayMode: (mode) => {
     writeProcessDisplayMode(mode);

@@ -1363,6 +1363,7 @@ export type AppSettings = {
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;
   notificationMode: "never" | "unfocused" | "always";
+  notificationShowContent: boolean;
   clarificationToolMode: "off" | "on" | "auto";
   filePreviewExtensions: string[];
   expandToolCalls: boolean;
