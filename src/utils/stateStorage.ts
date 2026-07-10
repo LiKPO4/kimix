@@ -81,16 +81,7 @@ async function migrateFromLocalStorage(key: string): Promise<string | null> {
   }
 }
 
-export async function getStateItem<T>(key: string): Promise<T | null> {
-  if (!isIndexedDBAvailable()) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T) : null;
-    } catch {
-      return null;
-    }
-  }
-
+async function tryGetStateItemFromIndexedDB<T>(key: string): Promise<T | null> {
   const db = await openDb();
   const tx = db.transaction(STATE_STORE, "readonly");
   const store = tx.objectStore(STATE_STORE);
@@ -109,13 +100,38 @@ export async function getStateItem<T>(key: string): Promise<T | null> {
     }
   }
 
+  return null;
+}
+
+export async function getStateItem<T>(key: string): Promise<T | null> {
+  if (!isIndexedDBAvailable()) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const value = await tryGetStateItemFromIndexedDB<T>(key);
+    if (value !== null) return value;
+  } catch (error) {
+    console.warn(`[stateStorage] IndexedDB read failed for ${key}, falling back to localStorage:`, error);
+    dbPromise = null;
+  }
+
   const migrated = await migrateFromLocalStorage(key);
   if (migrated !== null) {
-    await setStateItem(key, JSON.parse(migrated) as T);
     try {
-      localStorage.removeItem(key);
-    } catch {
-      // Ignore cleanup failure; the migrated value is already in IndexedDB.
+      await setStateItem(key, JSON.parse(migrated) as T);
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore cleanup failure; the migrated value is already in IndexedDB.
+      }
+    } catch (error) {
+      console.warn(`[stateStorage] Failed to migrate ${key} to IndexedDB, keeping localStorage fallback:`, error);
     }
     return JSON.parse(migrated) as T;
   }
