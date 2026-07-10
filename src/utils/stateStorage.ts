@@ -24,11 +24,32 @@ function isIndexedDBAvailable(): boolean {
   return typeof window !== "undefined" && "indexedDB" in window && !!window.indexedDB;
 }
 
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error ?? new Error("Failed to open IndexedDB"));
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error ?? new Error("Failed to open IndexedDB"));
+    };
+    request.onblocked = () => {
+      dbPromise = null;
+      reject(new Error("IndexedDB open blocked by another tab"));
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      db.onclose = () => {
+        dbPromise = null;
+      };
+      resolve(db);
+    };
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STATE_STORE)) {
@@ -39,6 +60,7 @@ function openDb(): Promise<IDBDatabase> {
       }
     };
   });
+  return dbPromise;
 }
 
 function transactionComplete(tx: IDBTransaction): Promise<void> {
