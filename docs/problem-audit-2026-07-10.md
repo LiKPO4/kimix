@@ -376,6 +376,8 @@
 - **影响**：高权限模式不仅放宽执行权限，还锁定 clarification；权限越高，猜错后的损失反而越大。
 - **证据**：`src/components/chat/Composer.tsx:445`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `d95f974`）
+- **说明**：移除 `Composer.tsx` 中的 `clarificationLockedByYolo` 与 `effectiveClarificationToolMode`。`yolo` 权限模式不再覆盖 clarification 设置，切换权限时也不再自动关闭需求澄清工具；UI 中需求澄清选项不再因 yolo 而禁用或降低透明度。
 - **建议**：将“执行权限”和“澄清能力”拆分为两个独立维度。
 
 ---
