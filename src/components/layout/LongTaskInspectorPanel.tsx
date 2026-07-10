@@ -636,6 +636,7 @@ export function LongTaskInspectorPanel({
     const nextSignal = gitDetailsOpenSignal ?? 0;
     if (nextSignal === lastGitDetailsOpenSignalRef.current) return;
     lastGitDetailsOpenSignalRef.current = nextSignal;
+    if (nextSignal <= 0) return;
     openGitDetails();
   }, [gitDetailsOpenSignal]);
   useEffect(() => {

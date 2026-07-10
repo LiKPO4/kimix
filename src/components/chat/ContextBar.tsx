@@ -137,6 +137,8 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const usageRequestIdRef = useRef(0);
   const workDirsRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+  const contextBarRef = useRef<HTMLDivElement>(null);
+  const [iconOnly, setIconOnly] = useState(false);
   const activeSession = session ?? currentSession;
   const projectDisplayName = displayProjectName(project);
   const sessionModel = getSessionModelForDisplay({
@@ -180,6 +182,21 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
       Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
     )
   );
+
+  useEffect(() => {
+    const node = contextBarRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const updateMode = (width: number) => {
+      const nextIconOnly = width < 760;
+      setIconOnly((current) => current === nextIconOnly ? current : nextIconOnly);
+    };
+    const observer = new ResizeObserver((entries) => {
+      updateMode(entries[0]?.contentRect.width ?? node.getBoundingClientRect().width);
+    });
+    observer.observe(node);
+    updateMode(node.getBoundingClientRect().width);
+    return () => observer.disconnect();
+  }, []);
   const kimiStatus = pendingApprovalCount > 0
     ? { label: "待审批", tone: "warning" as const, icon: PauseCircle, detail: `${pendingApprovalCount} 个权限请求等待处理` }
     : pendingQuestionCount > 0
@@ -510,19 +527,19 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   }, [usageOpen, workDirsOpen, modelMenuOpen]);
 
   return (
-    <div className="flex w-full items-center justify-between gap-2 px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ height: 36, lineHeight: "20px" }}>
-      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+    <div ref={contextBarRef} className="flex w-full items-center justify-between px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8, height: 36, lineHeight: "20px" }}>
+      <div className="flex min-w-0 flex-1 items-center" style={{ gap: 8 }}>
         <div ref={workDirsRef} className="relative min-w-0 shrink-0">
           <button
             type="button"
             onClick={() => setWorkDirsOpen((value) => !value)}
             className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
-            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
+            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title={project?.path ?? "当前项目"}
             aria-label={project ? `当前项目：${projectDisplayName}` : "当前项目"}
           >
             <FolderOpen size={16} className="shrink-0" />
-            <span style={{ lineHeight: "20px", paddingBottom: 1 }}>工作空间</span>
+            {!iconOnly && <span style={{ lineHeight: "20px", paddingBottom: 1 }}>工作空间</span>}
           </button>
           {workDirsOpen && (
             <div className="kimix-floating-panel absolute bottom-9 left-0 z-40 w-[360px] rounded-xl" style={{ padding: "16px 18px 18px" }}>
@@ -581,12 +598,12 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             type="button"
             onClick={toggleUsage}
             className="kimix-icon-text-button kimix-muted-action is-compact min-w-0"
-            style={{ height: 36, paddingLeft: 12, paddingRight: 12 }}
+            style={{ height: 36, paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title="套餐用量"
             aria-label="套餐用量"
           >
             <BarChart3 size={16} className="shrink-0" />
-            <span className="truncate">套餐用量</span>
+            {!iconOnly && <span className="truncate">套餐用量</span>}
           </button>
           {usageOpen && (
             <div
@@ -637,29 +654,29 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             type="button"
             onClick={onOpenGitDetails}
             className="kimix-contextbar-action kimix-muted-action hidden min-w-0 items-center rounded-lg md:flex"
-            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
+            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title={gitBranch}
             aria-label={`当前分支：${gitBranch}`}
           >
             <GitBranch size={16} className="shrink-0" />
-            <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>
+            {!iconOnly && <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>}
           </button>
         )}
-        <div ref={modelMenuRef} className="relative hidden min-w-0 max-w-[280px] flex-1 lg:block">
+        <div ref={modelMenuRef} className={`relative hidden min-w-0 max-w-[280px] lg:block ${iconOnly ? "shrink-0" : "flex-1"}`}>
           <button
             type="button"
             onClick={toggleModelMenu}
             className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
-            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: 12, paddingRight: 12 }}
+            style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title={modelTitle}
             aria-label={`${modelTitle}，选择会话模型`}
             aria-haspopup="menu"
             aria-expanded={modelMenuOpen}
           >
             <Bot size={16} className="shrink-0" />
-            <span className="shrink-0" style={{ lineHeight: "20px", paddingBottom: 1 }}>模型</span>
-            <span className="min-w-0 flex-1 truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1, fontSize: modelDisplayFontSize }}>{compactDisplayModel}</span>
-            <ChevronDown size={14} className={`shrink-0 transition-transform duration-150 ${modelMenuOpen ? "rotate-180" : ""}`} />
+            {!iconOnly && <span className="shrink-0" style={{ lineHeight: "20px", paddingBottom: 1 }}>模型</span>}
+            {!iconOnly && <span className="min-w-0 flex-1 truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1, fontSize: modelDisplayFontSize }}>{compactDisplayModel}</span>}
+            {!iconOnly && <ChevronDown size={14} className={`shrink-0 transition-transform duration-150 ${modelMenuOpen ? "rotate-180" : ""}`} />}
           </button>
           {modelMenuOpen && (
             <div
@@ -770,12 +787,12 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
           type="button"
           onClick={() => void handleKimiStatusClick()}
           className={`kimix-contextbar-action kimix-kimi-status-text is-${kimiStatus.tone} hidden min-w-0 items-center rounded-lg md:flex`}
-          style={{ gap: 7, height: 36, lineHeight: "20px", paddingLeft: 10, paddingRight: 10 }}
+          style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
           title={kimiStatus.detail}
           aria-label={`Kimi Code 状态：${kimiStatus.label}`}
         >
           <KimiStatusIcon size={16} className={`shrink-0 ${isSessionRunning ? "animate-spin" : ""}`} />
-          <span className="truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{kimiStatus.label}</span>
+          {!iconOnly && <span className="truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{kimiStatus.label}</span>}
         </button>
       </div>
 
@@ -783,12 +800,12 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
         <button
           onClick={() => void handleExport()}
           className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
-          style={{ height: 36 }}
+          style={{ height: 36, paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
           title="导出 Markdown"
           aria-label="导出 Markdown"
         >
           <Download size={16} />
-          <span>导出</span>
+          {!iconOnly && <span>导出</span>}
         </button>
       )}
     </div>

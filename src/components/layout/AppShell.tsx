@@ -869,6 +869,7 @@ export function AppShell() {
     }
     if (action === "toggle-diff-panel") {
       setLongTaskInspectorOpen(false);
+      setGitDetailsOpenSignal(0);
       setDiffPanelOpen(!diffPanelOpen);
     }
     if (action === "reload-browser-page") {
@@ -1816,11 +1817,13 @@ ${isFinalStep
               diffPanelOpen={diffPanelOpen}
               onToggleDiffPanel={() => {
                 setLongTaskInspectorOpen(false);
+                setGitDetailsOpenSignal(0);
                 setDiffPanelOpen(!diffPanelOpen);
               }}
               longTaskInspectorOpen={longTaskInspectorOpen}
               onToggleLongTaskInspector={() => {
                 setDiffPanelOpen(false);
+                if (longTaskInspectorOpen) setGitDetailsOpenSignal(0);
                 setLongTaskInspectorOpen(!longTaskInspectorOpen);
               }}
               showToast={showToast}
@@ -1900,7 +1903,10 @@ ${isFinalStep
             defaultPlanMode={defaultPlanMode}
             officialGoal={liveCurrentSession?.officialGoal}
             gitDetailsOpenSignal={gitDetailsOpenSignal}
-            onClose={() => setLongTaskInspectorOpen(false)}
+            onClose={() => {
+              setGitDetailsOpenSignal(0);
+              setLongTaskInspectorOpen(false);
+            }}
             onPatchLongTaskMeta={patchLongTaskMeta}
             onApplyTargetStep={applyTargetStep}
             onSetReviewItemChecked={setReviewItemChecked}
