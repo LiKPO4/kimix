@@ -3187,10 +3187,14 @@ async function searchProjectFiles(
       return;
     }
 
-    let processed = 0;
+    let scanned = 0;
     for (const entry of entries) {
       if (signal?.aborted || results.length >= maxResults) return;
       if (Date.now() - startedAt > TIME_BUDGET_MS) return;
+      scanned++;
+      if (scanned % YIELD_EVERY === 0) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
       if (entry.name.startsWith(".") && entry.name !== ".env") continue;
       if (FILE_SEARCH_IGNORES.has(entry.name)) continue;
 
@@ -3204,10 +3208,6 @@ async function searchProjectFiles(
       if (!entry.isFile()) continue;
       if (normalizedQuery && !relativePath.toLowerCase().includes(normalizedQuery) && !candidatePath.toLowerCase().includes(normalizedQuery)) continue;
       results.push({ path: candidatePath, name: entry.name, rootPath: root, sourceLabel });
-      processed++;
-      if (processed % YIELD_EVERY === 0) {
-        await new Promise<void>((resolve) => setImmediate(resolve));
-      }
     }
   }
 
