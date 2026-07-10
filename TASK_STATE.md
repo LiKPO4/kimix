@@ -4762,3 +4762,25 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/layout/LongTaskInspectorPanel.tsx`
 ## 下一步
 - 用户确认三项及更多引用在一行或自动换行后的视觉密度。
+# 2026-07-10 v2.14.120 Kimi Web 工具行 hover 铺满卡片
+## 当前目标
+- 修复展开工具组内单条命令 hover 背景左右缩进、与卡片边界不一致的问题，并检查其他同类展开列表。
+## 根因
+- 工具列表外层承担 12px 水平 padding，导致子行的全宽 hover 和分隔线只能覆盖 padding 以内的内容宽度。
+## 已完成
+- 将工具列表外层改为仅保留上下留白，命令行本身铺满卡片可用宽度。
+- 将原有 12px 水平留白移动到可交互行内部，图标、文字和右侧状态位置保持不变。
+- 展开后的命令详情同步补偿左右 padding，保持原有内容起点并补齐右侧留白。
+- 核查同文件的子代理、审批和旧版 ToolCard：子代理与 ToolCard 已是全宽交互行；审批子行不可交互且无 hover，不做无关改动。
+- 版本号三处同步到 v2.14.120。
+## 未完成
+- 等待用户用 v2.14.120 复验工具行 hover 与分隔线是否自然贴合卡片边界。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、390 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-DoRPRvqJ.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、122 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/chat/MessageBubble.tsx`
+## 下一步
+- 用户分别悬停折叠和展开状态下的工具命令行，确认内容对齐不变且 hover 横向铺满。

@@ -1079,20 +1079,20 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
           type="button"
           onClick={() => setExpanded((value) => !value)}
           className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42 }}
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42, paddingLeft: 12, paddingRight: 12 }}
         >
           {rowContent}
         </button>
       ) : (
         <div
           className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)]"
-          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42 }}
+          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 42, paddingLeft: 12, paddingRight: 12 }}
         >
           {rowContent}
         </div>
       )}
       {expanded && (
-        <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 0 8px 26px" }}>
+        <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 12px 8px 38px" }}>
           {detailText}
         </pre>
       )}
@@ -1127,7 +1127,7 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
         </span>
       </button>
       {expanded && (
-        <div style={{ padding: "5px 12px" }}>
+        <div style={{ paddingTop: 5, paddingBottom: 5 }}>
           {tools.map((tool, index) => <KimiWebToolRow key={tool.id} tool={tool} isLast={index === tools.length - 1} />)}
         </div>
       )}
