@@ -3036,11 +3036,20 @@ function readZipJson(zip: AdmZip, name: string) {
 async function readSessionBackupSnapshot(filePath: string): Promise<SessionBackupSnapshot> {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".json") {
+    const stat = await fs.promises.stat(filePath);
+    if (stat.size > 50 * 1024 * 1024) {
+      throw new Error(`JSON 快照文件过大（${stat.size} 字节），超过 50 MB 限制`);
+    }
     const text = await fs.promises.readFile(filePath, "utf8");
     return normalizeSessionBackupSnapshot(parseBackupJsonText(text, path.basename(filePath)));
   }
   if (ext !== ".zip") throw new Error("请选择 .zip 或 .json 会话快照文件");
-  const zip = new AdmZip(await fs.promises.readFile(filePath));
+  const stat = await fs.promises.stat(filePath);
+  const MAX_ZIP_FILE_SIZE = 512 * 1024 * 1024;
+  if (stat.size > MAX_ZIP_FILE_SIZE) {
+    throw new Error(`ZIP 快照文件过大（${stat.size} 字节），超过 ${MAX_ZIP_FILE_SIZE} 字节限制`);
+  }
+  const zip = new AdmZip(filePath);
   validateZipArchive(zip, {
     maxEntries: 2000,
     maxTotalBytes: 200 * 1024 * 1024,
@@ -3446,6 +3455,11 @@ function validateZipArchive(
 }
 
 function extractArchiveSafe(archivePath: string, targetDir: string) {
+  const archiveStat = fs.statSync(archivePath);
+  const MAX_ARCHIVE_FILE_SIZE = 512 * 1024 * 1024;
+  if (archiveStat.size > MAX_ARCHIVE_FILE_SIZE) {
+    throw new Error(`压缩包文件过大（${archiveStat.size} 字节），超过 ${MAX_ARCHIVE_FILE_SIZE} 字节限制`);
+  }
   const zip = new AdmZip(archivePath);
   validateZipArchive(zip, {
     maxEntries: 500,
