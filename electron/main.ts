@@ -2826,10 +2826,8 @@ function pickUpdateAsset(assets: ReleaseAssetInfo[]) {
   }
   if (process.platform === "darwin") {
     const arch = process.arch === "arm64" ? "arm64" : "x64";
-    return names.find((asset) => asset.lowerName.includes(arch) && asset.lowerName.endsWith(".dmg")) ??
-      names.find((asset) => asset.lowerName.includes(arch) && asset.lowerName.endsWith(".zip")) ??
-      names.find((asset) => asset.lowerName.endsWith(".dmg")) ??
-      names.find((asset) => asset.lowerName.endsWith(".zip")) ??
+    return names.find((asset) => asset.lowerName.includes(arch) && (asset.lowerName.endsWith(".dmg") || asset.lowerName.endsWith(".zip"))) ??
+      names.find((asset) => asset.lowerName.includes("universal") && (asset.lowerName.endsWith(".dmg") || asset.lowerName.endsWith(".zip"))) ??
       null;
   }
   return names.find((asset) => asset.lowerName.endsWith(".appimage")) ??
@@ -3143,8 +3141,11 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
     if (asset.size && actualSize !== asset.size) {
       throw new Error(`下载完整性校验失败：大小不匹配（期望 ${asset.size}，实际 ${actualSize}）`);
     }
+    if (!asset.sha256) {
+      throw new Error("缺少 SHA256 校验值，拒绝自动安装");
+    }
     const actualSha256 = createHash("sha256").update(await fs.promises.readFile(tempPath)).digest("hex");
-    if (asset.sha256 && actualSha256 !== asset.sha256) {
+    if (actualSha256 !== asset.sha256) {
       throw new Error(`下载完整性校验失败：SHA256 不匹配（期望 ${asset.sha256}，实际 ${actualSha256}）`);
     }
     await fs.promises.rename(tempPath, targetPath);
