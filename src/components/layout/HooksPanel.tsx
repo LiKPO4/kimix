@@ -147,6 +147,11 @@ function completeHookRuleForDisplay(rule: HookRule, description: string): HookRu
     const message = (rule.reason || "该操作被 Hook 规则阻断。").replace(/"/g, "'");
     patch.command = shellErrorExitCommand(message);
   }
+  // 只有 UserPromptSubmit 事件支持项目作用域；其他事件强制回退到全局。
+  if (rule.scope === "project" && rule.event !== "UserPromptSubmit") {
+    patch.scope = "global";
+    patch.projectPath = undefined;
+  }
   return cloneRuleWithUpdate(rule, patch);
 }
 
@@ -170,7 +175,13 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
         setMessage(`读取失败：${res.error}`);
         return;
       }
-      const loadedRules = res.data.hookRules ?? [];
+      const loadedRules = (res.data.hookRules ?? []).map((rule) => {
+        const shouldBeProject = rule.scope === "project" && rule.event === "UserPromptSubmit";
+        if (!shouldBeProject && (rule.scope === "project" || rule.projectPath !== undefined)) {
+          return { ...rule, scope: "global" as const, projectPath: undefined, updatedAt: Date.now() };
+        }
+        return rule;
+      });
       const loadedLog = (res.data.hookRunLog ?? []).slice(0, 12);
       setRules(loadedRules);
       setRunLog(loadedLog);
@@ -246,11 +257,13 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
       return;
     }
     const completedDraft = completeHookRuleForDisplay(draftRule, naturalLanguage);
+    const isProjectScope = completedDraft.scope === "project" && completedDraft.event === "UserPromptSubmit";
     const normalized = cloneRuleWithUpdate(completedDraft, {
       name: completedDraft.name.trim() || "未命名 Hook 规则",
       matcher: completedDraft.matcher.trim() || ".*",
       timeout: Math.max(1, Math.min(600, completedDraft.timeout ?? 30)),
-      projectPath: completedDraft.scope === "project" ? currentProject?.path : undefined,
+      scope: isProjectScope ? "project" : "global",
+      projectPath: isProjectScope ? currentProject?.path : undefined,
     });
     const nextRules = [normalized, ...rules];
     const ok = await persistRules(nextRules, `已创建规则：${normalized.name}`);
@@ -281,13 +294,15 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
   const saveSelectedRule = async () => {
     if (!selectedRule) return;
     const completedSelected = completeHookRuleForDisplay(selectedRule, `${selectedRule.name} ${selectedRule.reason ?? ""}`);
+    const selectedIsProjectScope = completedSelected.scope === "project" && completedSelected.event === "UserPromptSubmit";
     const nextRules = rules.map((rule) => (
       rule.id === selectedRule.id
         ? cloneRuleWithUpdate(completedSelected, {
             name: completedSelected.name.trim() || "未命名 Hook 规则",
             matcher: completedSelected.matcher.trim() || ".*",
             timeout: Math.max(1, Math.min(600, completedSelected.timeout ?? 30)),
-            projectPath: completedSelected.scope === "project" ? currentProject?.path : undefined,
+            scope: selectedIsProjectScope ? "project" : "global",
+            projectPath: selectedIsProjectScope ? currentProject?.path : undefined,
           })
         : rule
     ));
@@ -325,7 +340,14 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
       <div className="grid grid-cols-2" style={{ gap: 12 }}>
         <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
           事件
-          <select value={rule.event} onChange={(event) => onPatch({ event: event.target.value as HookRule["event"] })} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 10, paddingRight: 10 }}>
+          <select value={rule.event} onChange={(event) => {
+            const nextEvent = event.target.value as HookRule["event"];
+            if (nextEvent !== "UserPromptSubmit" && rule.scope === "project") {
+              onPatch({ event: nextEvent, scope: "global", projectPath: undefined });
+            } else {
+              onPatch({ event: nextEvent });
+            }
+          }} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 10, paddingRight: 10 }}>
             {hookEvents.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
@@ -374,8 +396,11 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
           范围
           <select value={rule.scope} onChange={scopeHandler} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 10, paddingRight: 10 }}>
             <option value="global">全局</option>
-            <option value="project">当前项目</option>
+            <option value="project" disabled={rule.event !== "UserPromptSubmit"}>当前项目</option>
           </select>
+          {rule.event !== "UserPromptSubmit" && (
+            <span className="text-[12px] text-text-muted">仅 UserPromptSubmit 事件支持项目作用域</span>
+          )}
         </label>
       </div>
 
