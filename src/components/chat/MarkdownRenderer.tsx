@@ -53,18 +53,38 @@ function estimateMarkdownHeight(content: string) {
 
 const DEFAULT_COLLAPSIBLE_THRESHOLD = 50_000;
 
+function isInsideFencedCodeBlock(content: string, index: number): boolean {
+  const before = content.slice(0, index);
+  const fences = before.match(/^```[a-zA-Z0-9]*\s*$/gm);
+  return fences ? fences.length % 2 === 1 : false;
+}
+
 function truncateMarkdownForPreview(content: string, maxLength: number): string {
   if (content.length <= maxLength) return content;
-  // Prefer paragraph boundaries to avoid breaking fenced blocks mid-way.
+  const minPos = Math.floor(maxLength * 0.75);
+
+  // Prefer paragraph boundaries that are not inside fenced code blocks.
   const paragraphBoundary = content.lastIndexOf("\n\n", maxLength);
-  if (paragraphBoundary >= Math.floor(maxLength * 0.75)) {
+  if (paragraphBoundary >= minPos && !isInsideFencedCodeBlock(content, paragraphBoundary)) {
     return content.slice(0, paragraphBoundary);
   }
-  // Fall back to line boundaries.
-  const lineBoundary = content.lastIndexOf("\n", maxLength);
-  if (lineBoundary >= Math.floor(maxLength * 0.75)) {
-    return content.slice(0, lineBoundary);
+
+  // Fall back to line boundaries outside fenced code blocks.
+  let lineBoundary = content.lastIndexOf("\n", maxLength);
+  while (lineBoundary >= minPos) {
+    if (!isInsideFencedCodeBlock(content, lineBoundary)) {
+      return content.slice(0, lineBoundary);
+    }
+    lineBoundary = content.lastIndexOf("\n", lineBoundary - 1);
   }
+
+  // If every boundary is inside a fenced block, extend to the end of that block.
+  const after = content.slice(maxLength);
+  const nextFenceEnd = after.search(/\n```/);
+  if (nextFenceEnd !== -1) {
+    return content.slice(0, maxLength + nextFenceEnd + 4);
+  }
+
   return content.slice(0, maxLength);
 }
 
@@ -188,9 +208,13 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     return truncateMarkdownForPreview(normalizedContent, collapsibleThreshold);
   }, [isCollapsible, isExpanded, normalizedContent, collapsibleThreshold]);
 
+  // 只在内容首次超过阈值、从可折叠变为不可折叠时重置折叠状态；
+  // 避免流式输出每次更新都重新折叠已展开内容。
   useEffect(() => {
-    setIsExpanded(false);
-  }, [normalizedContent]);
+    if (isCollapsible) {
+      setIsExpanded(false);
+    }
+  }, [isCollapsible]);
 
   useLayoutEffect(() => {
     if (!deferOffscreen) {
