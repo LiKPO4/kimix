@@ -2453,28 +2453,30 @@ export function LongTaskInspectorPanel({
                             {commit.graph || "*"}
                           </div>
                           <div className="min-w-0">
-                            <div className="flex min-w-0 items-center" style={{ gap: 6 }}>
-                              {compactRefs.visible.map((ref) => (
-                                <span
-                                  key={`${commit.hash}-${ref}`}
-                                  className="shrink-0 rounded-md border border-accent-primary-soft bg-accent-primary-light text-[12px] leading-5 text-accent-primary"
-                                  style={{ maxWidth: 92, paddingLeft: 7, paddingRight: 7 }}
-                                  title={compactRefs.title}
-                                >
-                                  <span className="block truncate">{ref}</span>
-                                </span>
-                              ))}
-                              {compactRefs.hidden > 0 && (
-                                <span
-                                  className="shrink-0 rounded-md bg-surface-elevated text-[12px] leading-5 text-text-muted"
-                                  style={{ minWidth: 30, paddingLeft: 7, paddingRight: 7, textAlign: "center" }}
-                                  title={compactRefs.title}
-                                >
-                                  +{compactRefs.hidden}
-                                </span>
-                              )}
-                              <span className="min-w-0 truncate text-text-primary" title={commit.subject}>{commit.subject || "(无提交说明)"}</span>
-                            </div>
+                            <div className="truncate text-text-primary" title={commit.subject}>{commit.subject || "(无提交说明)"}</div>
+                            {(compactRefs.visible.length > 0 || compactRefs.hidden > 0) && (
+                              <div className="flex min-w-0 flex-wrap items-center" style={{ gap: 6, marginTop: 4 }}>
+                                {compactRefs.visible.map((ref) => (
+                                  <span
+                                    key={`${commit.hash}-${ref}`}
+                                    className="inline-flex min-w-0 rounded-md border border-accent-primary-soft bg-accent-primary-light text-[12px] leading-5 text-accent-primary"
+                                    style={{ maxWidth: "100%", paddingLeft: 7, paddingRight: 7 }}
+                                    title={ref}
+                                  >
+                                    <span className="block truncate">{ref}</span>
+                                  </span>
+                                ))}
+                                {compactRefs.hidden > 0 && (
+                                  <span
+                                    className="shrink-0 rounded-md bg-surface-elevated text-[12px] leading-5 text-text-muted"
+                                    style={{ minWidth: 30, paddingLeft: 7, paddingRight: 7, textAlign: "center" }}
+                                    title={compactRefs.title}
+                                  >
+                                    +{compactRefs.hidden}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             {commit.parents.length > 1 && (
                               <div className="text-[12px] leading-5 text-text-muted" style={{ marginTop: 3 }}>
                                 merge · {commit.parents.length} parents

@@ -4722,3 +4722,24 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/layout/LongTaskInspectorPanel.tsx`
 ## 下一步
 - 用户点击底部 `master`，确认图谱提交列表正常出现且关闭后可再次打开。
+# 2026-07-10 v2.14.118 Git 图谱标签与提交描述布局优化
+## 当前目标
+- 避免 Git 分支/Tag 标签挤压提交描述，并解决常规标签自身被固定宽度截断的问题。
+## 根因
+- 引用标签与提交描述共用一个横向 flex 行，同时标签被硬限制为 92px；两者会竞争描述列宽度，标签和正文同时过早截断。
+## 已完成
+- 提交描述改为独占主信息行，保持单行截断和完整 tooltip。
+- 引用标签移至独立的次要信息行，支持换行且取消 92px 固定上限；普通分支和版本标签可完整展示。
+- 极端超长单个引用仍受描述列宽约束并提供自身 tooltip，避免撑破表格。
+- 版本号三处同步到 v2.14.118。
+## 未完成
+- 等待用户用 v2.14.118 截图复验无标签、双标签和带隐藏计数的提交行。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、390 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-Dczy1CDV.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、120 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/layout/LongTaskInspectorPanel.tsx`
+## 下一步
+- 用户确认两行信息层级和装饰提交行高度是否合适，再决定是否微调 4px 行间距。
