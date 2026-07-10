@@ -171,7 +171,7 @@
 - **影响**：直接 `writeFileSync` 覆盖；磁盘满、进程退出或杀毒软件介入时可能损坏整个用户配置。
 - **证据**：`electron/settingsService.ts:153`
 - **验证状态**：已抽查代码确认
-- **修复状态**：已修复（commit `PENDING_HASH`）
+- **修复状态**：已修复（commit `ec7602c`）
 - **说明**：在 `electron/settingsService.ts` 新增 `writeFileAtomic` 辅助函数：先写 `.tmp` 临时文件并 `fsyncSync`，存在旧文件时先复制一份 `.bak` 备份，再通过 `renameSync` 原子替换目标文件；失败时清理临时文件。`saveSettings`、`loadSettings` 的迁移写回以及 `syncKimiHookConfig` 写入 `config.toml` 均改用该原子写入函数。
 - **建议**：临时文件写入、`fsync`、原子 rename、保留最近备份。
 
