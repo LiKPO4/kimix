@@ -16,7 +16,7 @@ const CLARIFICATION_ORIGINAL_MARKER = "\n\n用户原始需求：\n";
 
 function isPathInside(parent: string, child: string): boolean {
   const rel = require("node:path").relative(parent, child);
-  return Boolean(rel) && !rel.startsWith("..") && !require("node:path").isAbsolute(rel);
+  return rel === "" || (!rel.startsWith("..") && !require("node:path").isAbsolute(rel));
 }
 
 function decodeHookOutput(value: string | Buffer): string {
