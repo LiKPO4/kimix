@@ -92,6 +92,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const [scope, setScope] = useState<SearchScope>("project");
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyLoadMessage, setHistoryLoadMessage] = useState("");
+  const [historyListError, setHistoryListError] = useState("");
   const [searchOnlySessions, setSearchOnlySessions] = useState<Session[]>([]);
   const attemptedHistoryLoadIdsRef = useRef<Set<string>>(new Set());
   const [loadingGlobalSessions, setLoadingGlobalSessions] = useState(false);
@@ -105,6 +106,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     setScope("all");
     setCopyMessage("");
     setHistoryLoadMessage("");
+    setHistoryListError("");
     setSelectedIndex(0);
     attemptedHistoryLoadIdsRef.current.clear();
     window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -116,6 +118,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   useEffect(() => {
     setSearchOnlySessions([]);
+    setHistoryListError("");
     attemptedHistoryLoadIdsRef.current.clear();
   }, [currentProject?.path]);
 
@@ -124,7 +127,11 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     if (scope !== "project") return;
     let cancelled = false;
     void window.api.listKimiCodeHistorySessions({ workDir: currentProject.path }).then((res) => {
-      if (cancelled || !res.success) return;
+      if (cancelled) return;
+      if (!res.success) {
+        setHistoryListError(`读取历史会话失败：${res.error || "未知错误"}`);
+        return;
+      }
       setSearchOnlySessions((current) => {
         const knownIds = new Set([
           ...useSessionStore.getState().sessions.map((session) => session.id),
@@ -423,7 +430,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           <div className="px-2 pb-2 text-[13px] text-text-muted">
             {scope === "all"
               ? loadingGlobalSessions ? "正在读取官方全会话..." : query.trim() ? `${globalMatches.length} 条匹配` : "官方全会话"
-              : loadingHistory ? "正在补充加载最近历史..." : historyLoadMessage || (query.trim() ? `${matches.length} 条匹配` : "最近对话")}
+              : loadingHistory ? "正在补充加载最近历史..." : historyListError || historyLoadMessage || (query.trim() ? `${matches.length} 条匹配` : "最近对话")}
           </div>
           {scope === "all" ? (
             globalMatches.length > 0 ? globalMatches.map((match, index) => (
