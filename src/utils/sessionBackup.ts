@@ -198,12 +198,63 @@ function createImportedSessionCopy(imported: Session, existingIds: Set<string>) 
   };
 }
 
+function hasString(record: Record<string, unknown>, key: string) {
+  return typeof record[key] === "string";
+}
+
+function hasArray(record: Record<string, unknown>, key: string) {
+  return Array.isArray(record[key]);
+}
+
+function isValidTimelineEvent(event: Record<string, unknown>): boolean {
+  if (!hasString(event, "id") || typeof event.timestamp !== "number") return false;
+  const type = event.type;
+  if (typeof type !== "string") return false;
+  switch (type) {
+    case "user_message":
+      return hasString(event, "content");
+    case "steer_message":
+      return hasString(event, "content") && ["sending", "accepted", "sent", "failed"].includes(event.status as string);
+    case "assistant_message":
+      return hasString(event, "content") && typeof event.isThinking === "boolean" && typeof event.isComplete === "boolean";
+    case "tool_call":
+      return hasString(event, "toolCallId") && hasString(event, "toolName") && ["running", "success", "error"].includes(event.status as string) && isRecord(event.arguments);
+    case "tool_result":
+      return hasString(event, "toolCallId") && hasString(event, "toolName") && "result" in event;
+    case "approval_request":
+      return hasString(event, "requestId") && hasString(event, "toolName") && hasString(event, "description") && hasString(event, "details") && ["low", "medium", "high"].includes(event.riskLevel as string) && ["pending", "approved", "rejected"].includes(event.status as string);
+    case "question_request":
+      return hasString(event, "requestId") && hasString(event, "rpcRequestId") && hasString(event, "toolCallId") && hasArray(event, "questions");
+    case "file_artifact":
+      return hasString(event, "filePath");
+    case "change_summary":
+      return hasArray(event, "files") && typeof event.additions === "number" && typeof event.deletions === "number";
+    case "session_recommendation":
+      return hasString(event, "reason") && typeof event.turnCount === "number" && typeof event.turnLimit === "number";
+    case "subagent":
+      return hasString(event, "agentName") && ["queued", "running", "suspended", "completed", "error"].includes(event.status as string) && hasArray(event, "events");
+    case "compaction":
+      return ["begin", "end"].includes(event.phase as string);
+    case "error":
+      return hasString(event, "message");
+    case "diff":
+      return hasString(event, "filePath") && hasString(event, "oldText") && hasString(event, "newText");
+    case "todo":
+      return hasArray(event, "items");
+    case "hook":
+      return ["triggered", "resolved"].includes(event.phase as string) && hasString(event, "eventName") && hasString(event, "target");
+    case "status_update":
+      return true;
+    default:
+      // 未知事件类型：保留，但要求有 id 和 timestamp 这一层最基础字段
+      return true;
+  }
+}
+
 function normalizeTimelineEvents(value: unknown): TimelineEvent[] {
   if (!Array.isArray(value)) return [];
   return value.filter((event): event is TimelineEvent => (
-    isRecord(event) &&
-    typeof event.type === "string" &&
-    typeof event.timestamp === "number"
+    isRecord(event) && isValidTimelineEvent(event)
   ));
 }
 
