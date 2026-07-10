@@ -29,6 +29,7 @@
   - `src/components/chat/ChangeCard.tsx:197`：`handleRevert` 直接调用 `window.api.revertFiles`，无确认、无内容快照、无哈希校验。
   - `electron/projectService.ts:548`：`revertGitGroup` 对未跟踪文件直接 `fs.rmSync(..., { recursive: true })`，对已跟踪文件直接 `git checkout --`；`revertGitFiles` 按 `findGitRoot(target.absolutePath)` 分组，可跨项目操作。
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `b7761d5`）
 - **建议修复方向**：
   1. 限制撤销目标只能位于主工作区及明确授权的附加目录内
   2. 撤销前计算并比对内容哈希，或生成反向补丁
@@ -44,6 +45,7 @@
 - **影响**：工作目录恰好等于项目根目录时，`path.relative()` 返回空字符串，`isPathInside` 返回 false，导致项目级 Hook 被跳过。
 - **证据**：`electron/hookRunner.ts:17`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `8bf46df`）
 - **建议**：当 `rel === ""` 时应视为在目录内部。
 
 ### 3. 部分“项目级 Hook”实际上会变成全局 Hook
@@ -51,6 +53,7 @@
 - **影响**：同步到 Kimi Code `config.toml` 时只写入 `event/matcher/command/timeout`，未写入 `scope/projectPath`，导致 A 项目的 Hook 可能影响所有项目。
 - **证据**：`electron/settingsService.ts:131`（`hookRuleToToml`）
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `1c1eeac`）
 - **建议**：若官方 TOML 不支持项目作用域，应由 Kimix 自己代理执行项目级 Hook，或在 UI 中明确禁用“项目级”选项。
 
 ### 4. 定时关机脱离 UI 生命周期，关闭窗口后仍可能继续执行
@@ -58,6 +61,7 @@
 - **影响**：倒计时和取消入口仅存于 React 内存；刷新、崩溃或关闭 Kimix 后，系统仍会按原计划关机。
 - **证据**：`src/components/layout/AppShell.tsx:1495`、`electron/main.ts:6554`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `d60a690`）
 - **建议**：主进程持有关机截止时间并持久化；应用重启后恢复提示；退出前明确告知用户；倒计时按绝对时间计算。
 
 ### 5. 会话、图片和待发送队列整体写入 localStorage，存在静默丢数据风险
