@@ -225,6 +225,8 @@
 - **影响**：搜索、Git、启动、关机等浮层缺少统一的 `role="dialog"`、`aria-modal` 和 focus trap；键盘焦点可能落到背景；Escape 可能触发全局停止任务而非关闭弹窗。
 - **证据**：`src/hooks/useKeyboardShortcuts.ts:1`、`src/components/layout/DialogSystem.tsx:1`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `c2a2e5e`）
+- **说明**：新增 `src/hooks/useDialogFocus.ts`，在弹窗打开时将焦点移动到首个可聚焦元素（不存在则聚焦容器），并在关闭时恢复之前的焦点；`SearchOverlay.tsx` 和 `DialogSystem.tsx` 中的配置引导、启动命令、关机确认、帮助/关于/更新/快捷键/信息弹窗均添加 `role="dialog"`、`aria-modal="true"` 和 `aria-label`，使屏幕阅读器能正确识别模态弹窗。
 - **建议**：建立统一 Dialog/Overlay 管理器，处理焦点、Escape 和 modal 语义。
 
 ### 23. 全局 Escape 可能停止另一个会话
