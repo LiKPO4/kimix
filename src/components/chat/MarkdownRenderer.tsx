@@ -17,6 +17,7 @@ interface MarkdownRendererProps {
   content: string;
   wrapLongLines?: boolean;
   deferOffscreen?: boolean;
+  collapsibleThreshold?: number;
 }
 
 // Module-level ref-counted theme link
@@ -48,6 +49,23 @@ function estimateMarkdownHeight(content: string) {
   const lineCount = content.split(/\r?\n/).length;
   const textRows = Math.ceil(content.length / 88);
   return Math.max(72, Math.min(560, Math.max(lineCount, textRows) * 24));
+}
+
+const DEFAULT_COLLAPSIBLE_THRESHOLD = 50_000;
+
+function truncateMarkdownForPreview(content: string, maxLength: number): string {
+  if (content.length <= maxLength) return content;
+  // Prefer paragraph boundaries to avoid breaking fenced blocks mid-way.
+  const paragraphBoundary = content.lastIndexOf("\n\n", maxLength);
+  if (paragraphBoundary >= Math.floor(maxLength * 0.75)) {
+    return content.slice(0, paragraphBoundary);
+  }
+  // Fall back to line boundaries.
+  const lineBoundary = content.lastIndexOf("\n", maxLength);
+  if (lineBoundary >= Math.floor(maxLength * 0.75)) {
+    return content.slice(0, lineBoundary);
+  }
+  return content.slice(0, maxLength);
 }
 
 const DEFERRED_RENDER_MARGIN = 1800;
@@ -155,14 +173,24 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   );
 }
 
-export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false, collapsibleThreshold = DEFAULT_COLLAPSIBLE_THRESHOLD }: MarkdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(!deferOffscreen);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const normalizedContent = useMemo(
     () => restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content)))),
     [content],
   );
+  const isCollapsible = collapsibleThreshold > 0 && normalizedContent.length > collapsibleThreshold;
+  const displayContent = useMemo(() => {
+    if (!isCollapsible || isExpanded) return normalizedContent;
+    return truncateMarkdownForPreview(normalizedContent, collapsibleThreshold);
+  }, [isCollapsible, isExpanded, normalizedContent, collapsibleThreshold]);
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [normalizedContent]);
 
   useLayoutEffect(() => {
     if (!deferOffscreen) {
@@ -351,7 +379,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
 
   const remarkPlugins = useMemo(() => [remarkGfm, remarkMath], []);
   const rehypePlugins = useMemo(() => [rehypeKatex, rehypeHighlight], []);
-  const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(normalizedContent);
+  const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(displayContent);
 
   useLayoutEffect(() => {
     if (!shouldRender) return;
@@ -359,7 +387,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     if (!node) return;
     const height = node.getBoundingClientRect().height;
     if (height > 0) setMeasuredHeight(height);
-  }, [shouldRender, normalizedContent]);
+  }, [shouldRender, displayContent]);
 
   if (!shouldRender) {
     return (
@@ -378,8 +406,21 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
     >
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-        {normalizedContent}
+        {displayContent}
       </ReactMarkdown>
+      {isCollapsible && !isExpanded && (
+        <div className="flex justify-center" style={{ paddingTop: 12, paddingBottom: 8 }}>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="kimix-icon-text-button kimix-muted-action"
+            style={{ minHeight: 34, paddingLeft: 16, paddingRight: 16 }}
+          >
+            <ChevronDown size={15} />
+            <span>内容较长，点击展开剩余 {normalizedContent.length - displayContent.length} 字符</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
