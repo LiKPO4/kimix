@@ -449,8 +449,6 @@ export function Composer() {
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
-  const clarificationLockedByYolo = permissionMode === "yolo";
-  const effectiveClarificationToolMode = clarificationLockedByYolo ? "off" : clarificationToolMode;
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const addSession = useSessionStore((s) => s.addSession);
@@ -948,7 +946,7 @@ export function Composer() {
     const contentWithAttachments = buildAttachmentPromptContent(content, images);
     const outboundContent = options?.outboundContent ?? (targetSession.longTask || options?.skipClarification
       ? contentWithAttachments
-      : withClarificationBehavior(contentWithAttachments, effectiveClarificationToolMode));
+      : withClarificationBehavior(contentWithAttachments, clarificationToolMode));
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = toPromptImages(images);
@@ -2081,13 +2079,6 @@ export function Composer() {
   };
 
   const handleSetClarificationToolMode = (mode: ClarificationToolMode) => {
-    if (clarificationLockedByYolo) {
-      if (clarificationToolMode !== "off") setClarificationToolMode("off");
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "官方 yolo 模式不支持开启需求澄清工具",
-      }));
-      return;
-    }
     setClarificationToolMode(mode);
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: `需求澄清工具：${CLARIFICATION_OPTIONS.find((option) => option.value === mode)?.label ?? mode}`,
@@ -2200,17 +2191,11 @@ export function Composer() {
       currentSessionId: useAppStore.getState().currentSession?.id,
       runningSessionId: useAppStore.getState().runningSessionId,
     });
-    if (mode === "yolo" && clarificationToolMode !== "off") {
-      setClarificationToolMode("off");
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "已关闭需求澄清工具：官方 yolo 模式不支持开启",
-      }));
-    }
     if (!appliedRuntimeSessionId) return;
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: "权限模式已切换",
     }));
-  }, [clarificationToolMode, setClarificationToolMode, setPermissionMode, updateSession]);
+  }, [setPermissionMode, updateSession]);
 
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     const traceId = genId();
@@ -2983,16 +2968,15 @@ export function Composer() {
                         </div>
                         <div
                           className="flex w-[132px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]"
-                          style={{ gap: 4, padding: 4, opacity: clarificationLockedByYolo ? 0.72 : 1 }}
-                          title={clarificationLockedByYolo ? "官方 yolo 模式不支持开启需求澄清工具" : undefined}
+                          style={{ gap: 4, padding: 4 }}
                         >
                           {CLARIFICATION_OPTIONS.map((option) => {
-                            const active = effectiveClarificationToolMode === option.value;
+                            const active = clarificationToolMode === option.value;
                             return (
                               <button
                                 key={option.value}
                                 type="button"
-                                title={clarificationLockedByYolo ? "官方 yolo 模式不支持开启需求澄清工具" : option.desc}
+                                title={option.desc}
                                 onClick={() => handleSetClarificationToolMode(option.value)}
                                 className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
                               >
