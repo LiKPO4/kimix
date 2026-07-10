@@ -101,6 +101,7 @@ import type {
   RendererHeartbeatPayload,
   RendererStartupMark,
   ScheduleShutdownRequest,
+  GetScheduledShutdownResponse,
   GenerateHookRuleRequest,
   GenerateHookRuleResponse,
   SettingsResponse,
@@ -496,6 +497,8 @@ const api = {
     ipcRenderer.invoke("app:scheduleShutdown", req),
   cancelShutdown: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:cancelShutdown"),
+  getScheduledShutdown: (): Promise<GetScheduledShutdownResponse> =>
+    ipcRenderer.invoke("app:getScheduledShutdown"),
 
   // Bootstrap
   onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {

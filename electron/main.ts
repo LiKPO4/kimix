@@ -6554,6 +6554,77 @@ ipcMain.handle("app:clearTaskbarAttention", async () => {
   return { success: true, data: undefined };
 });
 
+const SCHEDULED_SHUTDOWN_FILE = path.join(app.getPath("userData"), "scheduled-shutdown.json");
+
+function cleanupStaleScheduledShutdown(): void {
+  try {
+    if (!fs.existsSync(SCHEDULED_SHUTDOWN_FILE)) return;
+    const raw = fs.readFileSync(SCHEDULED_SHUTDOWN_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.deadline !== "number") {
+      fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE);
+      return;
+    }
+    if (parsed.deadline <= Date.now()) {
+      fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE);
+    }
+  } catch {
+    try { fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE); } catch {}
+  }
+}
+
+function readScheduledShutdown(): { deadline: number; reason: string; taskId: string } | null {
+  try {
+    if (!fs.existsSync(SCHEDULED_SHUTDOWN_FILE)) return null;
+    const raw = fs.readFileSync(SCHEDULED_SHUTDOWN_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.deadline !== "number") {
+      fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE);
+      return null;
+    }
+    if (parsed.deadline <= Date.now()) {
+      fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE);
+      return null;
+    }
+    return {
+      deadline: parsed.deadline,
+      reason: typeof parsed.reason === "string" ? parsed.reason : "Kimix 长程任务执行完成",
+      taskId: typeof parsed.taskId === "string" ? parsed.taskId : "manual",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeScheduledShutdown(state: { deadline: number; reason: string; taskId: string } | null): void {
+  try {
+    if (!state) {
+      if (fs.existsSync(SCHEDULED_SHUTDOWN_FILE)) {
+        fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE);
+      }
+      return;
+    }
+    const dir = path.dirname(SCHEDULED_SHUTDOWN_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const tmpPath = `${SCHEDULED_SHUTDOWN_FILE}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(state), "utf8");
+    fs.renameSync(tmpPath, SCHEDULED_SHUTDOWN_FILE);
+  } catch (error) {
+    console.warn("[scheduled-shutdown] failed to persist state:", error);
+  }
+}
+
+ipcMain.handle("app:getScheduledShutdown", async () => {
+  try {
+    const state = readScheduledShutdown();
+    return { success: true, data: state };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("app:scheduleShutdown", async (_, request: unknown) => {
   try {
     if (process.platform !== "win32") {
@@ -6565,7 +6636,12 @@ ipcMain.handle("app:scheduleShutdown", async (_, request: unknown) => {
     const reason = request && typeof request === "object" && typeof (request as { reason?: unknown }).reason === "string"
       ? (request as { reason: string }).reason.slice(0, 120)
       : "Kimix 长程任务执行完成";
+    const taskId = request && typeof request === "object" && typeof (request as { taskId?: unknown }).taskId === "string"
+      ? (request as { taskId: string }).taskId
+      : "manual";
     await runLongCommand("shutdown.exe", ["/s", "/t", String(delaySeconds), "/c", reason], 5000);
+    const deadline = Date.now() + delaySeconds * 1000;
+    writeScheduledShutdown({ deadline, reason, taskId });
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -6578,6 +6654,7 @@ ipcMain.handle("app:cancelShutdown", async () => {
       return { success: false, error: "当前仅支持 Windows 取消关机" };
     }
     await runLongCommand("shutdown.exe", ["/a"], 5000);
+    writeScheduledShutdown(null);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -6714,6 +6791,27 @@ ipcMain.handle("window:close", () => {
 
 app.on("before-quit", (event) => {
   if (isQuitting) return;
+  if (process.platform === "win32") {
+    const shutdownState = readScheduledShutdown();
+    if (shutdownState) {
+      const remainingSeconds = Math.max(0, Math.round((shutdownState.deadline - Date.now()) / 1000));
+      const response = dialog.showMessageBoxSync(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined, {
+        type: "warning",
+        buttons: ["退出并取消关机", "返回 Kimix"],
+        defaultId: 1,
+        cancelId: 1,
+        title: "系统即将关机",
+        message: `系统将在 ${remainingSeconds} 秒后关机（${shutdownState.reason}）。`,
+        detail: "若现在退出 Kimix，关机计划将被取消。",
+      });
+      if (response === 1) {
+        event.preventDefault();
+        return;
+      }
+      runLongCommand("shutdown.exe", ["/a"], 5000).catch(() => {});
+      writeScheduledShutdown(null);
+    }
+  }
   const ids = kimiCodeHost.getActiveSessionIds();
   const serverStatus = kimiCodeServerHost.getStatus();
   if (ids.length === 0 && !serverStatus.managed) return;

@@ -1306,7 +1306,22 @@ export type RendererHeartbeatPayload = {
 export type ScheduleShutdownRequest = {
   delaySeconds: number;
   reason?: string;
+  taskId?: string;
 }
+
+export type ScheduledShutdownState = {
+  deadline: number;
+  reason: string;
+  taskId: string;
+};
+
+export type GetScheduledShutdownResponse = {
+  success: true;
+  data: ScheduledShutdownState | null;
+} | {
+  success: false;
+  error: string;
+};
 
 export type LaunchCommandRequest = {
   command?: string;

@@ -527,6 +527,7 @@ function installBrowserPreviewApi() {
     clearTaskbarAttention: () => okVoid(),
     scheduleShutdown: () => fail("延迟关机"),
     cancelShutdown: () => fail("取消关机"),
+    getScheduledShutdown: () => Promise.resolve({ success: true as const, data: null }),
 
     onBootstrap: () => () => {},
 

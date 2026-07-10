@@ -346,6 +346,7 @@ export function AppShell() {
   const [shutdownAfterLongTaskId, setShutdownAfterLongTaskId] = useState<string | null>(null);
   const [shutdownDialog, setShutdownDialog] = useState<{ taskId: string; taskTitle: string; remainingSeconds: number } | null>(null);
   const scheduledShutdownTaskRef = useRef<string | null>(null);
+  const shutdownDeadlineRef = useRef<number | null>(null);
   const [kimiOnboarding, setKimiOnboarding] = useState<KimiCliOnboardingState>({
     loading: true,
     available: null,
@@ -1498,14 +1499,17 @@ ${isFinalStep
     if (task.stage !== "completed") return;
     if (scheduledShutdownTaskRef.current === task.taskId) return;
     scheduledShutdownTaskRef.current = task.taskId;
+    shutdownDeadlineRef.current = Date.now() + 180 * 1000;
     setShutdownDialog({ taskId: task.taskId, taskTitle: task.title, remainingSeconds: 180 });
     void window.api.scheduleShutdown({
       delaySeconds: 180,
       reason: `Kimix 长程任务「${task.title}」执行完成`,
+      taskId: task.taskId,
     }).then((res) => {
       if (!res.success) {
         setShutdownDialog(null);
         scheduledShutdownTaskRef.current = null;
+        shutdownDeadlineRef.current = null;
         showToast(res.error);
       }
     });
@@ -1516,11 +1520,26 @@ ${isFinalStep
     const timer = window.setInterval(() => {
       setShutdownDialog((current) => {
         if (!current) return current;
-        return { ...current, remainingSeconds: Math.max(0, current.remainingSeconds - 1) };
+        const remainingSeconds = shutdownDeadlineRef.current
+          ? Math.max(0, Math.round((shutdownDeadlineRef.current - Date.now()) / 1000))
+          : Math.max(0, current.remainingSeconds - 1);
+        return { ...current, remainingSeconds };
       });
     }, 1000);
     return () => window.clearInterval(timer);
   }, [shutdownDialog?.taskId]);
+
+  useEffect(() => {
+    void window.api.getScheduledShutdown().then((res) => {
+      if (!res.success || !res.data) return;
+      const { deadline, reason, taskId } = res.data;
+      const remainingSeconds = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      if (remainingSeconds <= 0) return;
+      shutdownDeadlineRef.current = deadline;
+      scheduledShutdownTaskRef.current = taskId;
+      setShutdownDialog({ taskId, taskTitle: reason || "长程任务", remainingSeconds });
+    });
+  }, []);
 
   const cancelScheduledShutdown = async () => {
     const res = await window.api.cancelShutdown();
@@ -1530,6 +1549,7 @@ ${isFinalStep
     }
     setShutdownDialog(null);
     scheduledShutdownTaskRef.current = null;
+    shutdownDeadlineRef.current = null;
     setShutdownAfterLongTaskId(null);
     showToast("已取消关机");
   };
