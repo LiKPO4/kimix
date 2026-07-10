@@ -1093,6 +1093,7 @@ export type SearchProjectFilesResponse = {
 };
 
 export type SkillInfo = {
+  id: string;
   name: string;
   description: string;
   path: string;
@@ -1106,7 +1107,7 @@ export type ListSkillsResponse = {
   success: true;
   data: {
     skills: SkillInfo[];
-    enabledNames: string[];
+    enabledIds: string[];
     enabledDir: string;
   };
 } | {
@@ -1115,13 +1116,13 @@ export type ListSkillsResponse = {
 };
 
 export type SaveEnabledSkillsRequest = {
-  names: string[];
+  ids: string[];
 };
 
 export type SaveEnabledSkillsResponse = {
   success: true;
   data: {
-    enabledNames: string[];
+    enabledIds: string[];
     enabledDir: string;
   };
 } | {

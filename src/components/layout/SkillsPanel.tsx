@@ -5,6 +5,7 @@ import { useAppStore } from "@/stores/appStore";
 import type { KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
 
 type SkillInfo = {
+  id: string;
   name: string;
   description: string;
   path: string;
@@ -38,7 +39,7 @@ export function SkillsPanel({
   const currentSession = useAppStore((s) => s.currentSession);
   const [localActiveTab, setLocalActiveTab] = useState<PluginPanelTab>(activeTab);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
-  const [enabledNames, setEnabledNames] = useState<string[]>([]);
+  const [enabledIds, setEnabledIds] = useState<string[]>([]);
   const [enabledDir, setEnabledDir] = useState("");
   const [message, setMessage] = useState("正在扫描本地 Skills...");
   const [saving, setSaving] = useState(false);
@@ -135,7 +136,7 @@ export function SkillsPanel({
     }
     const nextSkills = asArray(res.data.skills);
     setSkills(nextSkills);
-    setEnabledNames(asArray(res.data.enabledNames));
+    setEnabledIds(asArray(res.data.enabledIds));
     setEnabledDir(res.data.enabledDir);
     setMessage(nextMessage ?? (nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill"));
   };
@@ -152,7 +153,7 @@ export function SkillsPanel({
       }
       const nextSkills = asArray(res.data.skills);
       setSkills(nextSkills);
-      setEnabledNames(asArray(res.data.enabledNames));
+      setEnabledIds(asArray(res.data.enabledIds));
       setEnabledDir(res.data.enabledDir);
       setMessage(nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill");
     });
@@ -161,21 +162,21 @@ export function SkillsPanel({
     };
   }, [open]);
 
-  const toggleSkill = async (name: string) => {
-    const next = enabledNames.includes(name)
-      ? enabledNames.filter((item) => item !== name)
-      : [...enabledNames, name];
-    setEnabledNames(next);
+  const toggleSkill = async (id: string) => {
+    const next = enabledIds.includes(id)
+      ? enabledIds.filter((item) => item !== id)
+      : [...enabledIds, id];
+    setEnabledIds(next);
     setSaving(true);
-    const res = await window.api.saveEnabledSkills({ names: next });
+    const res = await window.api.saveEnabledSkills({ ids: next });
     setSaving(false);
     if (!res.success) {
       setMessage(`保存失败：${res.error}`);
       return;
     }
-    setEnabledNames(res.data.enabledNames);
+    setEnabledIds(res.data.enabledIds);
     setEnabledDir(res.data.enabledDir);
-    setMessage(`已启用 ${res.data.enabledNames.length} 个 Skill。新会话将通过 --skills-dir 使用这些 Skill。`);
+    setMessage(`已启用 ${res.data.enabledIds.length} 个 Skill。新会话将通过 --skills-dir 使用这些 Skill。`);
   };
 
   const importArchive = async (archivePath?: string) => {
@@ -611,13 +612,13 @@ export function SkillsPanel({
                 (() => {
                   const trust = trustMeta(skill);
                   const officialPlugin = skill.trustLevel === "kimi-official" && skill.sourceLabel === "Kimi Plugin";
-                  const enabled = officialPlugin || enabledNames.includes(skill.name);
+                  const enabled = officialPlugin || enabledIds.includes(skill.id);
                   return (
                 <button
-                  key={skill.path}
+                  key={skill.id}
                   type="button"
                   onClick={() => {
-                    if (!officialPlugin) void toggleSkill(skill.name);
+                    if (!officialPlugin) void toggleSkill(skill.id);
                   }}
                   className={`kimix-skill-card h-full w-full overflow-hidden rounded-xl border text-left hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
                   style={{

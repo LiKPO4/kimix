@@ -3237,7 +3237,7 @@ function listLocalSkills() {
   ];
   const settings = settingsService.loadSettings();
   const enabled = new Set(settings.enabledSkillNames ?? []);
-  const results: { name: string; description: string; path: string; source: string; sourceLabel: string; trustLevel: "kimi-official" | "curated" | "third-party" | "local"; enabled: boolean }[] = [];
+  const results: { id: string; name: string; description: string; path: string; source: string; sourceLabel: string; trustLevel: "kimi-official" | "curated" | "third-party" | "local"; enabled: boolean }[] = [];
   const seen = new Set<string>();
 
   function classifySkillSource(root: string, skillPath: string) {
@@ -3313,6 +3313,7 @@ function listLocalSkills() {
             ? raw.description.trim()
             : "Kimi Plugin";
           results.push({
+            id: manifestPath,
             name: displayName,
             description,
             path: manifestPath,
@@ -3337,14 +3338,16 @@ function listLocalSkills() {
         const skillDir = path.dirname(skillPath);
         const fallbackName = path.basename(skillDir);
         const sourceInfo = classifySkillSource(root, skillPath);
+        const skillName = meta.name || fallbackName;
         results.push({
-          name: meta.name || fallbackName,
+          id: skillPath,
+          name: skillName,
           description: meta.description || "本地 Skill",
           path: skillPath,
           source: root,
           sourceLabel: sourceInfo.sourceLabel,
           trustLevel: sourceInfo.trustLevel,
-          enabled: enabled.has(meta.name || fallbackName),
+          enabled: enabled.has(skillPath) || enabled.has(skillName),
         });
         seen.add(normalizedSkillPath);
       } catch {
@@ -3498,22 +3501,26 @@ function importSkillArchive(archivePath: string) {
   }
 }
 
-function syncEnabledSkills(names: string[]) {
-  const uniqueNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+function syncEnabledSkills(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
   const allSkills = listLocalSkills();
+  const byId = new Map(allSkills.map((skill) => [skill.id, skill]));
   const byName = new Map(allSkills.map((skill) => [skill.name, skill]));
   const targetDir = enabledSkillsDir();
   fs.rmSync(targetDir, { recursive: true, force: true });
   fs.mkdirSync(targetDir, { recursive: true });
-  for (const name of uniqueNames) {
-    const skill = byName.get(name);
+  const enabledNames: string[] = [];
+  for (const id of uniqueIds) {
+    const skill = byId.get(id) ?? byName.get(id);
     if (!skill) continue;
     const sourceDir = path.dirname(skill.path);
-    const targetSkillDir = path.join(targetDir, name.replace(/[<>:"/\\|?*]+/g, "_"));
+    const safeName = skill.name.replace(/[<>:"/\\|?*]+/g, "_");
+    const targetSkillDir = path.join(targetDir, safeName);
     fs.cpSync(sourceDir, targetSkillDir, { recursive: true });
+    enabledNames.push(skill.name);
   }
-  settingsService.saveSettings({ enabledSkillNames: uniqueNames, enabledSkillsDir: targetDir });
-  return { enabledNames: uniqueNames, enabledDir: targetDir };
+  settingsService.saveSettings({ enabledSkillNames: uniqueIds, enabledSkillsDir: targetDir });
+  return { enabledIds: uniqueIds, enabledNames, enabledDir: targetDir };
 }
 
 function prepareLocalSkillForKimi(name: string) {
@@ -4484,7 +4491,7 @@ ipcMain.handle("project:listSkills", async () => {
       success: true,
       data: {
         skills: listLocalSkills(),
-        enabledNames: settings.enabledSkillNames ?? [],
+        enabledIds: settings.enabledSkillNames ?? [],
         enabledDir: settings.enabledSkillsDir || enabledSkillsDir(),
       },
     };
@@ -4495,10 +4502,10 @@ ipcMain.handle("project:listSkills", async () => {
 
 ipcMain.handle("project:saveEnabledSkills", async (_, request: unknown) => {
   try {
-    const names = request && typeof request === "object" && Array.isArray((request as { names?: unknown }).names)
-      ? (request as { names: unknown[] }).names.filter((item): item is string => typeof item === "string")
+    const ids = request && typeof request === "object" && Array.isArray((request as { ids?: unknown }).ids)
+      ? (request as { ids: unknown[] }).ids.filter((item): item is string => typeof item === "string")
       : [];
-    return { success: true, data: syncEnabledSkills(names) };
+    return { success: true, data: syncEnabledSkills(ids) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
