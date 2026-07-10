@@ -146,6 +146,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   });
   const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
   const compactDisplayModel = compactModelDisplayName(displayModel);
+  const modelDisplayFontSize = compactDisplayModel.length > 28 ? 11 : compactDisplayModel.length > 20 ? 12 : 13;
   const modelTitle = sessionModel
     ? `当前对话模型：${displayModel}`
     : `当前默认模型：${displayModel}`;
@@ -509,9 +510,9 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   }, [usageOpen, workDirsOpen, modelMenuOpen]);
 
   return (
-    <div className="flex w-full items-center justify-between gap-3 px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ height: 36, lineHeight: "20px" }}>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div ref={workDirsRef} className="relative min-w-0">
+    <div className="flex w-full items-center justify-between gap-2 px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ height: 36, lineHeight: "20px" }}>
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        <div ref={workDirsRef} className="relative min-w-0 shrink-0">
           <button
             type="button"
             onClick={() => setWorkDirsOpen((value) => !value)}
@@ -521,7 +522,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             aria-label={project ? `当前项目：${projectDisplayName}` : "当前项目"}
           >
             <FolderOpen size={16} className="shrink-0" />
-            <span className="max-w-[220px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{projectDisplayName}</span>
+            <span style={{ lineHeight: "20px", paddingBottom: 1 }}>工作空间</span>
           </button>
           {workDirsOpen && (
             <div className="kimix-floating-panel absolute bottom-9 left-0 z-40 w-[360px] rounded-xl" style={{ padding: "16px 18px 18px" }}>
@@ -575,7 +576,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             </div>
           )}
         </div>
-        <div ref={usageMenuRef} className="relative hidden min-w-0 sm:block">
+        <div ref={usageMenuRef} className="relative hidden shrink-0 sm:block">
           <button
             type="button"
             onClick={toggleUsage}
@@ -644,7 +645,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>
           </button>
         )}
-        <div ref={modelMenuRef} className="relative hidden min-w-0 lg:block">
+        <div ref={modelMenuRef} className="relative hidden min-w-0 max-w-[280px] flex-1 lg:block">
           <button
             type="button"
             onClick={toggleModelMenu}
@@ -657,7 +658,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
           >
             <Bot size={16} className="shrink-0" />
             <span className="shrink-0" style={{ lineHeight: "20px", paddingBottom: 1 }}>模型</span>
-            <span className="max-w-[190px] truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1 }}>{compactDisplayModel}</span>
+            <span className="min-w-0 flex-1 truncate font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px", paddingBottom: 1, fontSize: modelDisplayFontSize }}>{compactDisplayModel}</span>
             <ChevronDown size={14} className={`shrink-0 transition-transform duration-150 ${modelMenuOpen ? "rotate-180" : ""}`} />
           </button>
           {modelMenuOpen && (
