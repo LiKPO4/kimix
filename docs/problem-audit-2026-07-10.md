@@ -180,6 +180,8 @@
 - **影响**：`state.json` 非原子写入，读取异常后返回 null；任务 Markdown 可能仍在，但调度、恢复位置和运行状态无法自动恢复。
 - **证据**：`electron/longTaskService.ts:181`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `d189a2f`）
+- **说明**：`electron/longTaskService.ts` 新增 `writeFileAtomic` 辅助函数，为 `state.json` 提供临时文件 + `fsync` + 备份 `.bak` + 原子 rename 的写入流程；`createLongTask` 和 `updateLongTaskState` 均改用该函数。`readStateFile` 在解析失败或字段校验不通过时，会自动尝试读取同目录 `state.json.bak` 并恢复，同时在控制台输出警告。
 - **建议**：原子写入 + 备份；解析失败时尝试读取 `.bak`。
 
 ### 18. 文件预览设置允许填写任意扩展名，后端却只支持固定白名单
