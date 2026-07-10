@@ -198,6 +198,8 @@
 - **影响**：`listKimiCodeHistorySessions` 失败时直接返回，界面显示“没有找到匹配内容”，用户可能误以为历史丢失。
 - **证据**：`src/components/layout/SearchOverlay.tsx:124`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `9e9bc6d`）
+- **说明**：`SearchOverlay.tsx` 新增 `historyListError` 状态；`listKimiCodeHistorySessions` 返回 `success === false` 时写入具体错误信息，并在搜索面板上方的状态行优先展示；切换项目或重新打开搜索时清除错误状态，避免与正常空结果混淆。
 - **建议**：区分加载失败与空结果，展示错误提示。
 
 ### 20. 搜索结果中存在按钮嵌套按钮
