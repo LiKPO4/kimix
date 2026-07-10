@@ -6699,13 +6699,13 @@ function readScheduledShutdown(): { deadline: number; reason: string; taskId: st
   }
 }
 
-function writeScheduledShutdown(state: { deadline: number; reason: string; taskId: string } | null): void {
+function writeScheduledShutdown(state: { deadline: number; reason: string; taskId: string } | null): boolean {
   try {
     if (!state) {
       if (fs.existsSync(SCHEDULED_SHUTDOWN_FILE)) {
         fs.unlinkSync(SCHEDULED_SHUTDOWN_FILE);
       }
-      return;
+      return true;
     }
     const dir = path.dirname(SCHEDULED_SHUTDOWN_FILE);
     if (!fs.existsSync(dir)) {
@@ -6714,8 +6714,10 @@ function writeScheduledShutdown(state: { deadline: number; reason: string; taskI
     const tmpPath = `${SCHEDULED_SHUTDOWN_FILE}.tmp`;
     fs.writeFileSync(tmpPath, JSON.stringify(state), "utf8");
     fs.renameSync(tmpPath, SCHEDULED_SHUTDOWN_FILE);
+    return true;
   } catch (error) {
     console.warn("[scheduled-shutdown] failed to persist state:", error);
+    return false;
   }
 }
 
@@ -6744,7 +6746,11 @@ ipcMain.handle("app:scheduleShutdown", async (_, request: unknown) => {
       : "manual";
     await runLongCommand("shutdown.exe", ["/s", "/t", String(delaySeconds), "/c", reason], 5000);
     const deadline = Date.now() + delaySeconds * 1000;
-    writeScheduledShutdown({ deadline, reason, taskId });
+    const persisted = writeScheduledShutdown({ deadline, reason, taskId });
+    if (!persisted) {
+      await runLongCommand("shutdown.exe", ["/a"], 5000).catch(() => {});
+      return { success: false, error: "关机状态持久化失败，已取消关机计划" };
+    }
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -6911,8 +6917,32 @@ app.on("before-quit", (event) => {
         event.preventDefault();
         return;
       }
-      runLongCommand("shutdown.exe", ["/a"], 5000).catch(() => {});
-      writeScheduledShutdown(null);
+      event.preventDefault();
+      isQuitting = true;
+      runLongCommand("shutdown.exe", ["/a"], 5000)
+        .then(() => {
+          writeScheduledShutdown(null);
+          app.quit();
+        })
+        .catch((err) => {
+          console.error("[scheduled-shutdown] failed to cancel before quit:", err);
+          const forceResponse = dialog.showMessageBoxSync(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined, {
+            type: "error",
+            buttons: ["仍要退出", "返回 Kimix"],
+            defaultId: 1,
+            cancelId: 1,
+            title: "取消关机失败",
+            message: "无法取消已调度的系统关机。",
+            detail: "现在退出 Kimix 可能导致系统仍按计划关机。是否仍要退出？",
+          });
+          if (forceResponse === 1) {
+            isQuitting = false;
+            return;
+          }
+          writeScheduledShutdown(null);
+          app.quit();
+        });
+      return;
     }
   }
   const ids = kimiCodeHost.getActiveSessionIds();
