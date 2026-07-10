@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
 import type { KimiCodeSessionSummary } from "../../../electron/types/ipc";
 import { mapHistoryEvents } from "@/utils/eventMapper";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { deriveSessionTitle, isDefaultSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -80,6 +81,7 @@ function loadWithTimeout(session: Session, timeoutMs = 8000) {
 export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useDialogFocus<HTMLDivElement>(open);
   const currentProject = useAppStore((s) => s.currentProject);
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -387,7 +389,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <div className="kimix-modal-overlay fixed inset-0 z-[85] flex items-start justify-center px-5" style={{ paddingTop: 86 }} onMouseDown={onClose}>
-      <div className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token" onMouseDown={(event) => event.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="搜索会话"
+        className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
           <Search size={18} className="shrink-0 text-text-muted" />
           <input

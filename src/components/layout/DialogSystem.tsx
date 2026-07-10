@@ -15,6 +15,7 @@ import type { DownloadUpdateProgress, KimiCliUpdateInfo } from "@electron/types/
 import { formatDownloadPercent, formatDownloadDetail, formatReleaseDate, type DownloadProgressInfo } from "@/utils/format";
 import { useRef } from "react";
 import { usePresence } from "@/hooks/usePresence";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { isWindows } from "@/utils/platform";
 
@@ -72,11 +73,19 @@ function KimiOnboardingDialog({
   copyToClipboard,
 }: KimiOnboardingProps) {
   const presence = usePresence(show || installBusy);
+  const dialogRef = useDialogFocus<HTMLDivElement>(show || installBusy);
   if (!presence.mounted) return null;
   const showDownloadPercent = installPhase === "binary" && installPercent > 0;
   return (
     <div className={`kimix-onboarding-overlay kimix-presence-overlay fixed inset-0 z-[118] flex items-center justify-center ${presence.visible ? "is-visible" : ""}`} style={{ padding: 24 }}>
-      <div className={`kimix-onboarding-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`} style={{ padding: "22px 24px" }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Kimi Code 配置引导"
+        className={`kimix-onboarding-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        style={{ padding: "22px 24px" }}
+      >
         <div className="flex items-start justify-between" style={{ gap: 16 }}>
           <div className="flex min-w-0 items-start" style={{ gap: 14 }}>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-primary-light text-accent-primary">
@@ -201,10 +210,15 @@ interface LaunchCommandDialogProps {
 
 function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchCommandDialogProps) {
   const presence = usePresence(open);
+  const dialogRef = useDialogFocus<HTMLDivElement>(open);
   if (!presence.mounted) return null;
   return (
     <div className={`kimix-presence-overlay fixed inset-0 z-[95] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`} onMouseDown={onClose}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="设置启动命令"
         className={`kimix-modal-card kimix-presence-content w-full max-w-[520px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
         style={{ padding: "22px 24px 24px" }}
         onMouseDown={(e) => e.stopPropagation()}
@@ -259,13 +273,21 @@ interface ShutdownDialogProps {
 
 function ShutdownDialog({ dialog, onCancel }: ShutdownDialogProps) {
   const presence = usePresence(Boolean(dialog));
+  const dialogRef = useDialogFocus<HTMLDivElement>(Boolean(dialog));
   const retainedDialog = useRef(dialog);
   if (dialog) retainedDialog.current = dialog;
   if (!presence.mounted || !retainedDialog.current) return null;
   const visibleDialog = retainedDialog.current;
   return (
     <div className={`kimix-presence-overlay fixed inset-0 z-[130] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`}>
-      <div className={`kimix-modal-card kimix-presence-content w-full max-w-[460px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`} style={{ padding: "22px 24px" }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="关机确认"
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[460px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        style={{ padding: "22px 24px" }}
+      >
         <div className="text-[18px] font-semibold leading-6 text-text-primary">长程任务已完成</div>
         <div className="mt-3 text-[14px] leading-6 text-text-secondary">
           「{visibleDialog.taskTitle}」已执行完成。已按你的设置安排关机。
@@ -340,6 +362,7 @@ function HelpDialogPanel({
   kimiInstallBusy,
 }: HelpDialogProps) {
   const presence = usePresence(Boolean(dialog));
+  const dialogRef = useDialogFocus<HTMLDivElement>(Boolean(dialog));
   const retainedDialog = useRef(dialog);
   const retainedInfoTopic = useRef(infoTopic);
   if (dialog) retainedDialog.current = dialog;
@@ -348,9 +371,22 @@ function HelpDialogPanel({
   const visibleDialog = retainedDialog.current;
   const visibleInfoTopic = infoTopic ?? retainedInfoTopic.current;
   const showCliDownloadPercent = cliUpdateState.progressPhase === "binary" && cliUpdateState.progressPercent > 0;
+  const helpDialogTitles: Record<HelpDialog, string> = {
+    about: "关于",
+    updates: "更新",
+    shortcuts: "快捷键",
+    info: "信息",
+  };
   return (
     <div className={`kimix-presence-overlay fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`} onMouseDown={onClose}>
-      <div className={`kimix-modal-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`} onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={helpDialogTitles[visibleDialog]}
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "16px 20px" }}>
           <div className="flex items-center gap-2.5 text-[18px] font-semibold text-text-primary">
             {visibleDialog === "about" && <Info size={18} />}
