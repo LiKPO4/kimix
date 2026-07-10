@@ -261,6 +261,57 @@ function CompactionLabel({
   );
 }
 
+function CompactionNotice({
+  event,
+  isSessionRunning,
+}: {
+  event: Extract<TimelineEvent, { type: "compaction" }>;
+  isSessionRunning?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (event.phase === "end" && event.summary) {
+    return (
+      <div className="flex justify-center" style={{ paddingTop: 4, paddingBottom: 4 }}>
+        <div className="kimix-soft-card w-full max-w-[680px] overflow-hidden rounded-xl text-text-muted">
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+            style={{ gridTemplateColumns: "minmax(0, 1fr) 18px", gap: 10, minHeight: 40, paddingLeft: 16, paddingRight: 14 }}
+            aria-expanded={expanded}
+          >
+            <span className="truncate" style={{ fontSize: 13, lineHeight: "18px" }}>
+              <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
+            </span>
+            <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
+              {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            </span>
+          </button>
+          {expanded && (
+            <div
+              className="border-t border-[var(--kimix-panel-divider)] text-text-secondary"
+              style={{ fontSize: 13, lineHeight: "21px", paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 14 }}
+            >
+              <MarkdownRenderer content={event.summary} wrapLongLines />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
+      <div
+        className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-text-muted"
+        style={{ gap: 8, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6, fontSize: 13, lineHeight: "18px" }}
+      >
+        <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
+      </div>
+    </div>
+  );
+}
+
 function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
   const [expanded, setExpanded] = useState(false);
   const completed = tools.filter((tool) => tool.status === "success").length;
@@ -397,30 +448,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
         </div>
       );
     case "compaction":
-      return event.phase === "end" && event.summary ? (
-        <div className="flex justify-center" style={{ paddingTop: 4, paddingBottom: 4 }}>
-          <div
-            className="w-full max-w-[680px] rounded-xl bg-surface-hover text-text-muted"
-            style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 10, paddingBottom: 12 }}
-          >
-            <div className="text-center" style={{ fontSize: 13, lineHeight: "18px", marginBottom: 8 }}>
-              <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
-            </div>
-            <div className="text-text-secondary" style={{ fontSize: 13, lineHeight: "21px" }}>
-              <MarkdownRenderer content={event.summary} wrapLongLines />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex justify-center" style={{ paddingTop: 2, paddingBottom: 2 }}>
-          <div
-            className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-text-muted"
-            style={{ gap: 8, paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 6, fontSize: 13, lineHeight: "18px" }}
-          >
-            <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
-          </div>
-        </div>
-      );
+      return <CompactionNotice event={event} isSessionRunning={isSessionRunning} />;
     default:
       return null;
   }
@@ -452,7 +480,7 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
-function buildRenderItems(
+export function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
   attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
@@ -492,6 +520,9 @@ function buildRenderItems(
   };
 
   const renderTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number) => {
+    turnEvents
+      .filter((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction")
+      .forEach((event) => items.push({ type: "event", event }));
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
     const steerEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "steer_message" }> => event.type === "steer_message");
     const assistantEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
@@ -550,6 +581,7 @@ function buildRenderItems(
       steerAttached = true;
     };
     for (const [eventIndex, event] of turnEvents.entries()) {
+      if (event.type === "compaction") continue;
       if (event.type === "steer_message") continue;
       if (event.type === "tool_call" || event.type === "tool_result") continue;
       if (event.type === "subagent") continue;

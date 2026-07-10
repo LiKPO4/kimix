@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildRenderItems } from "@/components/chat/ChatThread";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "../chatRenderItems";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
 
@@ -83,5 +84,34 @@ describe("createSubagentOnlyAssistantEvent", () => {
     ]);
 
     expect(event.isComplete).toBe(true);
+  });
+});
+
+describe("buildRenderItems compaction placement", () => {
+  it("places a completed pre-turn compaction between the user and assistant even when it arrived after assistant output", () => {
+    const events: TimelineEvent[] = [{
+      id: "user",
+      type: "user_message",
+      timestamp: 1,
+      content: "继续处理",
+    }, {
+      id: "assistant",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "开始回复",
+      isThinking: false,
+      isComplete: true,
+    }, {
+      id: "compaction",
+      type: "compaction",
+      timestamp: 2,
+      phase: "end",
+      summary: "保留用户目标。",
+    }];
+
+    const renderedTypes = buildRenderItems(events, "kimi-code").map((item) => (
+      item.type === "event" ? item.event.type : item.type
+    ));
+    expect(renderedTypes).toEqual(["user_message", "compaction", "assistant_message"]);
   });
 });

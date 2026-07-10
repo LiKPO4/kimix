@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+* **Pre-turn compaction summaries have a stable collapsed boundary**: A completed compaction renders immediately after its user message and before all Agent process/output even when events arrive out of order; summary Markdown remains unmounted until explicit expansion. See [/project/kimix.md](/project/kimix.md).
 * **Canonical thinking repair now covers every history entry point**: Background migration, active-session hydration, and running snapshot reconciliation share one replacement predicate, while cache version 3 rechecks stale mirrors whose bodies/tool counts match but thinking whitespace differs. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Expanded tool rows own their full hover surface**: Kimi Web tool-list horizontal inset moved from the list wrapper into each row, allowing hover backgrounds and dividers to reach both card edges while preserving content alignment. See [/project/kimix.md](/project/kimix.md).
 * **Git graph shows every bounded ref decoration**: The wrapping metadata row now renders all refs returned by the existing eight-item data cap instead of collapsing refs after the first two into a `+N` summary. See [/project/kimix.md](/project/kimix.md).
