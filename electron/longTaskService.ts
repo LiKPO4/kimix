@@ -22,6 +22,32 @@ function ensureDirectory(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+function writeFileAtomic(filePath: string, data: string) {
+  const dir = path.dirname(filePath);
+  ensureDirectory(dir);
+  const tempPath = `${filePath}.tmp`;
+  try {
+    const fd = fs.openSync(tempPath, "w");
+    try {
+      fs.writeSync(fd, data, "utf-8");
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.copyFileSync(filePath, `${filePath}.bak`);
+      } catch (backupErr) {
+        console.warn("[longTaskService] 备份旧状态失败:", backupErr);
+      }
+    }
+    fs.renameSync(tempPath, filePath);
+  } catch (err) {
+    try { fs.rmSync(tempPath, { force: true }); } catch {}
+    throw err;
+  }
+}
+
 function safeSegment(value: string) {
   return (value || "long-task")
     .replace(/[<>:"/\\|?*\x00-\x1f]+/g, "-")
@@ -179,20 +205,29 @@ function writeTextIfMissing(filePath: string, content: string) {
 }
 
 function readStateFile(statePath: string): LongTaskSummary | null {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(statePath, "utf-8")) as Partial<LongTaskState>;
-    if (!parsed.id || !parsed.projectPath || !parsed.taskDir || !parsed.title) return null;
-    if (parsed.activeAgent === "reviewer") {
-      return {
-        ...(parsed as LongTaskSummary),
-        activeAgent: "executor",
-        stage: parsed.stage === "reviewing" ? "paused" : parsed.stage,
-      };
+  function tryParse(targetPath: string): LongTaskSummary | null {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(targetPath, "utf-8")) as Partial<LongTaskState>;
+      if (!parsed.id || !parsed.projectPath || !parsed.taskDir || !parsed.title) return null;
+      if (parsed.activeAgent === "reviewer") {
+        return {
+          ...(parsed as LongTaskSummary),
+          activeAgent: "executor",
+          stage: parsed.stage === "reviewing" ? "paused" : parsed.stage,
+        };
+      }
+      return parsed as LongTaskSummary;
+    } catch {
+      return null;
     }
-    return parsed as LongTaskSummary;
-  } catch {
-    return null;
   }
+  const current = tryParse(statePath);
+  if (current) return current;
+  const backup = tryParse(`${statePath}.bak`);
+  if (backup) {
+    console.warn("[longTaskService] state.json 已损坏或无效，从 .bak 备份恢复");
+  }
+  return backup;
 }
 
 export function listLongTasks(projectPath: string): LongTaskSummary[] {
@@ -287,7 +322,7 @@ export function updateLongTaskState(
     updatedAt: Date.now(),
     schemaVersion: 1,
   };
-  fs.writeFileSync(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf-8");
+  writeFileAtomic(statePath, `${JSON.stringify(updated, null, 2)}\n`);
   return updated;
 }
 
@@ -394,7 +429,7 @@ export function createLongTask(data: CreateLongTaskData): LongTaskSummary {
   writeTextIfMissing(path.join(roundsDir, "000-bootstrap.md"), buildRoundNote(task.title));
 
   const state: LongTaskState = { ...task, schemaVersion: 1 };
-  fs.writeFileSync(path.join(taskDir, STATE_FILE), `${JSON.stringify(state, null, 2)}\n`, "utf-8");
+  writeFileAtomic(path.join(taskDir, STATE_FILE), `${JSON.stringify(state, null, 2)}\n`);
 
   return task;
 }
