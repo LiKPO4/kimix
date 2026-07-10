@@ -6973,6 +6973,29 @@ ipcMain.handle("window:close", () => {
   return { success: true };
 });
 
+function performGracefulQuit(): void {
+  if (isQuitting) return;
+  const ids = kimiCodeHost.getActiveSessionIds();
+  const serverStatus = kimiCodeServerHost.getStatus();
+  if (ids.length === 0 && !serverStatus.managed) {
+    isQuitting = true;
+    app.quit();
+    return;
+  }
+  isQuitting = true;
+  Promise.race([
+    Promise.all([
+      ...ids.map((id) => kimiCodeHost.closeSession(id).catch(() => {})),
+      kimiCodeServerHost.stop().catch(() => {}),
+    ]),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 10000)),
+  ]).then(() => {
+    app.quit();
+  }).catch(() => {
+    app.quit();
+  });
+}
+
 app.on("before-quit", (event) => {
   if (isQuitting) return;
   if (process.platform === "win32") {
@@ -6993,11 +7016,10 @@ app.on("before-quit", (event) => {
         return;
       }
       event.preventDefault();
-      isQuitting = true;
       runLongCommand("shutdown.exe", ["/a"], 5000)
         .then(() => {
           writeScheduledShutdown(null);
-          app.quit();
+          performGracefulQuit();
         })
         .catch((err) => {
           console.error("[scheduled-shutdown] failed to cancel before quit:", err);
@@ -7011,31 +7033,15 @@ app.on("before-quit", (event) => {
             detail: "现在退出 Kimix 可能导致系统仍按计划关机。是否仍要退出？",
           });
           if (forceResponse === 1) {
-            isQuitting = false;
             return;
           }
           writeScheduledShutdown(null);
-          app.quit();
+          performGracefulQuit();
         });
       return;
     }
   }
-  const ids = kimiCodeHost.getActiveSessionIds();
-  const serverStatus = kimiCodeServerHost.getStatus();
-  if (ids.length === 0 && !serverStatus.managed) return;
-  event.preventDefault();
-  isQuitting = true;
-  Promise.race([
-    Promise.all([
-      ...ids.map((id) => kimiCodeHost.closeSession(id).catch(() => {})),
-      kimiCodeServerHost.stop().catch(() => {}),
-    ]),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 10000)),
-  ]).then(() => {
-    app.quit();
-  }).catch(() => {
-    app.quit();
-  });
+  performGracefulQuit();
 });
 
 app.on("window-all-closed", () => {
@@ -7052,6 +7058,7 @@ app.on("activate", () => {
 
 app.whenReady().then(() => {
   logMainStartup("app-ready");
+  cleanupStaleScheduledShutdown();
   createWindow();
 });
 
