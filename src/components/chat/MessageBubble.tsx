@@ -35,6 +35,7 @@ interface MessageBubbleProps {
   changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>;
   trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[];
   hideProcessSummary?: boolean;
+  expandProcessByDefault?: boolean;
   eagerMarkdown?: boolean;
   onDeleteUserMessage?: (eventId: string) => void;
 }
@@ -163,6 +164,7 @@ function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubblePr
     prev.onDeleteUserMessage === next.onDeleteUserMessage &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.hideProcessSummary === next.hideProcessSummary &&
+    prev.expandProcessByDefault === next.expandProcessByDefault &&
     prev.eagerMarkdown === next.eagerMarkdown &&
     eventArrayMemoEqual(prev.leadingTools, next.leadingTools) &&
     eventArrayMemoEqual(prev.leadingSubagents, next.leadingSubagents) &&
@@ -1505,8 +1507,10 @@ function KimiWebProcessList({ items }: { items: ProcessItem[] }) {
   );
 }
 
-function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix" }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode }) {
-  const [expanded, setExpanded] = useState(() => displayMode === "kimi-web");
+function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean }) {
+  const defaultExpanded = displayMode === "kimi-web" && expandByDefault;
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const previousDefaultExpandedRef = useRef(defaultExpanded);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
   const pendingToggleAnchorRef = useRef<{
@@ -1534,6 +1538,12 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
     subagents.length > 0 ? `${subagents.length} 个子代理` : "",
     approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
+
+  useLayoutEffect(() => {
+    if (previousDefaultExpandedRef.current === defaultExpanded) return;
+    previousDefaultExpandedRef.current = defaultExpanded;
+    setExpanded(defaultExpanded);
+  }, [defaultExpanded]);
 
   const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
     const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
@@ -1727,7 +1737,7 @@ function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "ass
   return event.isComplete ? "已完成" : "消息处理中";
 }
 
-function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; turnStartedAt?: number; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; eagerMarkdown?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; turnStartedAt?: number; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
@@ -1782,6 +1792,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             subagents={leadingSubagents}
             approvals={leadingApprovals}
             displayMode={processDisplayMode}
+            expandByDefault={expandProcessByDefault}
             label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />}
           />
         )}
@@ -1830,12 +1841,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, eagerMarkdown, onDeleteUserMessage }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, eagerMarkdown, onDeleteUserMessage }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} onDelete={onDeleteUserMessage} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} eagerMarkdown={eagerMarkdown} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} />;
 }, messageBubblePropsEqual);

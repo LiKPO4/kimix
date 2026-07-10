@@ -41,7 +41,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.14.113";
+const KIMIX_VERSION = "2.14.114";
 const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
 
 type SettingsSectionId =
@@ -1360,7 +1360,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   ];
   const processDisplayModes: { value: ProcessDisplayMode; label: string; desc: string }[] = [
     { value: "kimix", label: "Kimix 模式", desc: "默认折叠本轮思考/命令过程，点击后再展开" },
-    { value: "kimi-web", label: "Kimi Web 模式", desc: "直接展示过程总结列表，点击单条展开详情" },
+    { value: "kimi-web", label: "Kimi Web 模式", desc: "最新一轮展开过程，历史轮次默认折叠，可点击查看" },
   ];
   const archivedSessions = [...archivedSessionSummaries]
     .sort((a, b) => b.archivedAt - a.archivedAt);

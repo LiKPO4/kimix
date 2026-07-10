@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+* **Kimi Web long histories mount only the latest process details**: Historical turns keep final Markdown visible but leave thinking/tool/subagent lists collapsed and unmounted until the user expands them. See [/project/kimix.md](/project/kimix.md).
 * **Sidebar project hierarchy uses compact spacing**: Project sections, project-to-session transitions, and session siblings now use a 6/4/2px rhythm while preserving existing row heights. See [/project/kimix.md](/project/kimix.md).
 * **ContextBar overlays no longer depend on clipped layout or inspector visibility**: Workspace, usage, and model panels use viewport-clamped body portals; Git details can mount its existing host without opening the right inspector. See [/project/kimix.md](/project/kimix.md).
 * **Footer width and inspector signals follow component lifecycle**: The chat footer switches all status actions to icon-only mode from its measured width, keeps floating panels unclipped, and a remounted inspector no longer replays an already-consumed Git-details request. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

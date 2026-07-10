@@ -4638,3 +4638,23 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/layout/Sidebar.tsx`
 ## 下一步
 - 用户用 v2.14.113 截图确认后，再决定是否需要 1-2px 微调。
+# 2026-07-10 v2.14.114 Kimi Web 长会话历史过程默认折叠
+## 当前目标
+- 降低长会话上下滚动卡顿，让 Web 模式只默认展开最新一轮过程，历史轮次保留正文但折叠过程。
+## 已完成
+- `ChatThread` 从完整轮次渲染结果中识别最后一个可展示过程的 Assistant，只向该轮传递默认展开信号。
+- Kimi Web 历史轮次的思考、工具、子代理和审批过程列表保持未挂载，正文继续显示；用户点击过程摘要后仍可单独展开。
+- 新一轮出现时，上一轮在布局提交前自动转为历史折叠态；用户手动展开稳定历史轮次后，普通流式重渲染不会强制关闭。
+- Kimix 模式保持原有默认折叠行为；版本号三处同步到 v2.14.114。
+## 未完成
+- 等待用户用 v2.14.114 打开真实长会话，复验初始展开范围和滚动流畅度。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、389 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-C6TLWwfs.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、116 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/chat/ChatThread.tsx`
+- `src/components/chat/MessageBubble.tsx`
+## 下一步
+- 用户用 v2.14.114 实机复验后，再判断是否需要进一步虚拟化历史正文。
