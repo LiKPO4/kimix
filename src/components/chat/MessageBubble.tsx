@@ -212,23 +212,38 @@ function useCopyTimeout() {
 }
 
 function useElapsed(start: number, active: boolean) {
-  const [now, setNow] = useState(() => Date.now());
+  const [elapsed, setElapsed] = useState(() => Math.max(0, Date.now() - start));
 
   useEffect(() => {
     if (!active) return;
-    const tick = () => setNow(Date.now());
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    window.addEventListener("focus", tick);
-    document.addEventListener("visibilitychange", tick);
+    let raf = 0;
+    let lastSecond = -1;
+    const update = () => {
+      const nextElapsed = Math.max(0, Date.now() - start);
+      const nextSecond = Math.floor(nextElapsed / 1000);
+      if (nextSecond !== lastSecond) {
+        lastSecond = nextSecond;
+        setElapsed(nextElapsed);
+      }
+      raf = requestAnimationFrame(update);
+    };
+    const forceUpdate = () => {
+      const nextElapsed = Math.max(0, Date.now() - start);
+      lastSecond = Math.floor(nextElapsed / 1000);
+      setElapsed(nextElapsed);
+    };
+    forceUpdate();
+    raf = requestAnimationFrame(update);
+    window.addEventListener("focus", forceUpdate);
+    document.addEventListener("visibilitychange", forceUpdate);
     return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", tick);
-      document.removeEventListener("visibilitychange", tick);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("focus", forceUpdate);
+      document.removeEventListener("visibilitychange", forceUpdate);
     };
   }, [active, start]);
 
-  return Math.max(0, now - start);
+  return elapsed;
 }
 
 function isInterruptedStatus(event: Extract<TimelineEvent, { type: "status_update" }>) {
