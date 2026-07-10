@@ -3039,6 +3039,11 @@ async function readSessionBackupSnapshot(filePath: string): Promise<SessionBacku
   }
   if (ext !== ".zip") throw new Error("请选择 .zip 或 .json 会话快照文件");
   const zip = new AdmZip(await fs.promises.readFile(filePath));
+  validateZipArchive(zip, {
+    maxEntries: 2000,
+    maxTotalBytes: 200 * 1024 * 1024,
+    maxEntryBytes: 50 * 1024 * 1024,
+  });
   const snapshot = readZipJson(zip, "snapshot.json");
   if (snapshot) return normalizeSessionBackupSnapshot(snapshot);
   return normalizeSessionBackupSnapshot({
@@ -3414,8 +3419,34 @@ function copyDirectorySafe(sourceDir: string, targetDir: string) {
   walk(resolvedSource);
 }
 
+function validateZipArchive(
+  zip: AdmZip,
+  options: { maxEntries?: number; maxTotalBytes?: number; maxEntryBytes?: number },
+) {
+  const entries = zip.getEntries();
+  if (options.maxEntries && entries.length > options.maxEntries) {
+    throw new Error(`压缩包条目过多（${entries.length}），超过 ${options.maxEntries} 条限制`);
+  }
+  let total = 0;
+  for (const entry of entries) {
+    const size = entry.header.size;
+    if (options.maxEntryBytes && size > options.maxEntryBytes) {
+      throw new Error(`压缩包条目 ${entry.entryName} 过大（${size} 字节），超过 ${options.maxEntryBytes} 字节限制`);
+    }
+    total += size;
+    if (options.maxTotalBytes && total > options.maxTotalBytes) {
+      throw new Error(`压缩包解压后总体积超过 ${options.maxTotalBytes} 字节限制`);
+    }
+  }
+}
+
 function extractArchiveSafe(archivePath: string, targetDir: string) {
   const zip = new AdmZip(archivePath);
+  validateZipArchive(zip, {
+    maxEntries: 500,
+    maxTotalBytes: 100 * 1024 * 1024,
+    maxEntryBytes: 20 * 1024 * 1024,
+  });
   const resolvedTarget = path.resolve(targetDir);
   fs.mkdirSync(resolvedTarget, { recursive: true });
 
