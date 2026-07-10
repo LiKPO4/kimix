@@ -26,6 +26,11 @@ function genId(): string {
   return Math.random().toString(36).substring(2, 11);
 }
 
+const MAX_IMAGE_ATTACHMENTS = 20;
+const MAX_SINGLE_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_CONCURRENT_IMAGE_READS = 3;
+
 function hasDraggedFiles(event: React.DragEvent): boolean {
   return Array.from(event.dataTransfer.types).includes("Files");
 }
@@ -732,21 +737,54 @@ export function Composer() {
   const addImageFiles = async (files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
     if (imageFiles.length === 0) return;
-    const attachments = await Promise.all(
-      imageFiles.map((file) => new Promise<ImageAttachment>((resolve, reject) => {
-        const filePath = getDraggedFilePath(file);
-        const reader = new FileReader();
-        reader.onload = () => resolve({
-          id: genId(),
-          kind: "image",
-          name: file.name || filePath.split(/[\\/]/).pop() || "粘贴图片",
-          dataUrl: String(reader.result),
-          filePath,
-        });
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      })),
-    );
+
+    const currentImages = imageAttachments.filter(isImageAttachment);
+    const currentCount = currentImages.length;
+    const currentSize = currentImages.reduce((sum, image) => sum + (image.dataUrl?.length ?? 0) * 0.75, 0);
+
+    if (currentCount + imageFiles.length > MAX_IMAGE_ATTACHMENTS) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `最多只能附加 ${MAX_IMAGE_ATTACHMENTS} 张图片，当前已有 ${currentCount} 张。`,
+      }));
+      return;
+    }
+
+    const oversized = imageFiles.filter((file) => file.size > MAX_SINGLE_IMAGE_SIZE_BYTES);
+    if (oversized.length > 0) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `单张图片不能超过 ${MAX_SINGLE_IMAGE_SIZE_BYTES / 1024 / 1024}MB，有 ${oversized.length} 张图片超出限制。`,
+      }));
+      return;
+    }
+
+    const batchTotal = imageFiles.reduce((sum, file) => sum + file.size, 0);
+    if (currentSize + batchTotal > MAX_TOTAL_IMAGE_SIZE_BYTES) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `图片总大小不能超过 ${MAX_TOTAL_IMAGE_SIZE_BYTES / 1024 / 1024}MB。`,
+      }));
+      return;
+    }
+
+    const attachments: ImageAttachment[] = [];
+    for (let i = 0; i < imageFiles.length; i += MAX_CONCURRENT_IMAGE_READS) {
+      const batch = imageFiles.slice(i, i + MAX_CONCURRENT_IMAGE_READS);
+      const batchAttachments = await Promise.all(
+        batch.map((file) => new Promise<ImageAttachment>((resolve, reject) => {
+          const filePath = getDraggedFilePath(file);
+          const reader = new FileReader();
+          reader.onload = () => resolve({
+            id: genId(),
+            kind: "image",
+            name: file.name || filePath.split(/[\/]/).pop() || "粘贴图片",
+            dataUrl: String(reader.result),
+            filePath,
+          });
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        })),
+      );
+      attachments.push(...batchAttachments);
+    }
     setImageAttachments((prev) => [...prev, ...attachments]);
   };
 
