@@ -189,6 +189,8 @@
 - **影响**：用户保存 `js/ts/py` 后界面显示设置成功，但预览结果为空。
 - **证据**：`src/components/settings/SettingsPanel.tsx:1650`、`electron/main.ts:1`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `ff4e454`）
+- **说明**：新增 `src/utils/previewExtensions.ts`，统一维护可预览文本扩展名白名单（md/txt/json/log/yaml/yml/toml/ini/csv/tsv）和标准化函数；`electron/main.ts` 移除本地重复定义，扫描与读取逻辑均改用该共享白名单；`SettingsPanel.tsx` 的快捷选项和手动输入均基于同一份白名单校验，输入不支持的扩展名时自动移除并通过 `kimix:toast` 提示用户。
 - **建议**：设置界面使用与后端同一份能力定义并即时校验。
 
 ### 19. 搜索失败会被伪装成“没有会话”
