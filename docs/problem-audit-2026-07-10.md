@@ -162,6 +162,8 @@
 - **影响**：IPC 常以 `{ success: false }` 正常 resolve，但调用方未检查返回值，导致保存失败 UI 仍显示成功。
 - **证据**：`src/hooks/useSettingsSync.ts:1`
 - **验证状态**：已抽查代码确认
+- **修复状态**：已修复（commit `8a507e3`）
+- **说明**：`useSettingsSync.ts` 中 `window.api.saveSettings(...)` 原来只 `.catch()` 捕获 Promise reject；现在增加 `.then()` 检查返回值的 `success === false` 分支，并通过 `kimix:toast` 提示用户具体错误；`.catch()` 分支也补充了 toast 提示，确保调用异常时同样可见。
 - **建议**：处理 `success === false` 分支，给出提示并回滚或重试。
 
 ### 16. 设置文件和 Kimi 配置文件采用非原子覆盖

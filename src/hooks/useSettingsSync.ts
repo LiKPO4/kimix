@@ -48,8 +48,17 @@ export function useSettingsSync() {
           notificationMode: state.notificationMode,
           clarificationToolMode: state.clarificationToolMode,
           filePreviewExtensions: state.filePreviewExtensions,
+        }).then((res) => {
+          if (res && typeof res === "object" && (res as { success?: unknown }).success === false) {
+            window.dispatchEvent(new CustomEvent("kimix:toast", {
+              detail: `设置保存失败：${(res as { error?: string }).error || "未知错误"}`,
+            }));
+          }
         }).catch((err) => {
           console.warn("[SettingsSync] 设置保存失败，UI 状态与磁盘可能不一致:", err);
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `设置保存失败：${err instanceof Error ? err.message : String(err)}`,
+          }));
         });
       }
     });
