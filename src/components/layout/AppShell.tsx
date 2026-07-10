@@ -907,6 +907,42 @@ export function AppShell() {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const target = event.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      const isMod = event.ctrlKey || event.metaKey;
+      const isShift = event.shiftKey;
+      const isAlt = event.altKey;
+      let action: MenuAction | null = null;
+      if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "n") action = "new-chat";
+      else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "o") action = "open-project";
+      else if (isMod && !isShift && !isAlt && event.key === ",") action = "settings";
+      else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "j") action = "toggle-terminal";
+      else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "t") action = "open-web-server";
+      else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "r") action = "reload-browser-page";
+      else if (isMod && isAlt && event.key.toLowerCase() === "b") action = "toggle-diff-panel";
+      else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "f") action = "find";
+      else if (isMod && isShift && event.key === "{") action = "previous-chat";
+      else if (isMod && isShift && event.key === "}") action = "next-chat";
+      else if (isMod && !isShift && event.key === "[") action = "back";
+      else if (isMod && !isShift && event.key === "]") action = "forward";
+      else if (isMod && !isShift && event.key === "+") action = "zoom-in";
+      else if (isMod && !isShift && event.key === "-") action = "zoom-out";
+      else if (isMod && !isShift && event.key === "0") action = "actual-size";
+      else if (event.key === "F11") action = "toggle-fullscreen";
+      else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "m") action = "minimize";
+      else if (isMod && !isShift && !isAlt && event.key === "/") action = "keyboard-shortcuts";
+      if (action) {
+        event.preventDefault();
+        handleMenuAction({ action, label: "" });
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleMenuAction]);
+
   const liveCurrentSession = useMemo(
     () => selectSessionById(currentSession?.id)(useSessionStore.getState()) ?? currentSession,
     [sessions, currentSession],
