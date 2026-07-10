@@ -46,13 +46,18 @@ function hookRuleApplies(rule: HookRule, workDir: string): boolean {
   return Boolean(rule.projectPath && isPathInside(rule.projectPath, workDir));
 }
 
+const MAX_HOOK_MATCHER_LENGTH = 500;
+const MAX_HOOK_TARGET_LENGTH = 4096;
+
 function matchesHookTarget(rule: HookRule, target: string): boolean {
   const matcher = rule.matcher?.trim();
   if (!matcher || matcher === ".*") return true;
+  if (matcher.length > MAX_HOOK_MATCHER_LENGTH) return false;
+  const input = target.length > MAX_HOOK_TARGET_LENGTH ? target.slice(0, MAX_HOOK_TARGET_LENGTH) : target;
   try {
-    return new RegExp(matcher, "i").test(target);
+    return new RegExp(matcher, "i").test(input);
   } catch {
-    return target.toLowerCase().includes(matcher.toLowerCase());
+    return input.toLowerCase().includes(matcher.toLowerCase());
   }
 }
 
