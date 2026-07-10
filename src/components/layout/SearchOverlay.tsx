@@ -399,6 +399,17 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               else if (event.key === "ArrowDown") { event.preventDefault(); moveSelection(1); }
               else if (event.key === "ArrowUp") { event.preventDefault(); moveSelection(-1); }
               else if (event.key === "Enter") { event.preventDefault(); openSelected(); }
+              else if (event.ctrlKey && /^Digit[1-9]$/.test(event.code)) {
+                event.preventDefault();
+                const index = Number(event.code.slice(-1)) - 1;
+                if (scope === "all") {
+                  const match = globalMatches[index];
+                  if (match) void openGlobalSession(match.session);
+                } else {
+                  const match = matches[index];
+                  if (match) openSession(match.session, match.eventId, match.searchText);
+                }
+              }
             }}
             className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none placeholder:text-text-muted"
             placeholder="搜索标题、项目、最近提示词或会话内容"
@@ -479,7 +490,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 <span className="block truncate text-[14.5px] text-text-primary">{match.session.title}</span>
                 <span className="mt-1 block truncate text-[13px] text-text-muted">{match.kind} · {match.text}</span>
               </span>
-              <span className="shrink-0 text-[12px] text-text-muted">Ctrl+{Math.min(index + 1, 9)}</span>
+              {index < 9 && <span className="shrink-0 text-[12px] text-text-muted">Ctrl+{index + 1}</span>}
             </button>
           )) : (
             <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
