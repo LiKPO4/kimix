@@ -341,6 +341,8 @@
 - **影响**：灾难性回溯正则可能卡住主进程。
 - **证据**：`electron/hookRunner.ts:1`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `07b08e7`）
+- **说明**：`matchesHookTarget` 增加 `MAX_HOOK_MATCHER_LENGTH = 500` 与 `MAX_HOOK_TARGET_LENGTH = 4096`；超长 matcher 直接拒绝匹配，超长 target 截断后匹配，降低灾难性正则/长输入在主进程同步执行的风险。
 - **建议**：限制表达式复杂度、输入长度或执行时间。
 
 ### 36. 展开旧历史时一次挂载全部消息
