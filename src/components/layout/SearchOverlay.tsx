@@ -434,9 +434,11 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           </div>
           {scope === "all" ? (
             globalMatches.length > 0 ? globalMatches.map((match, index) => (
-              <button
+              <div
                 key={match.session.id}
                 data-search-index={index}
+                role="button"
+                tabIndex={0}
                 className={`grid min-h-14 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
                 style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "10px 14px" }}
                 onClick={() => void openGlobalSession(match.session)}
@@ -455,7 +457,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                   <ClipboardCopy size={14} />
                   复制命令
                 </button>
-              </button>
+              </div>
             )) : (
               <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
                 没有找到官方会话
