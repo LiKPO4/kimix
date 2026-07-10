@@ -43,6 +43,34 @@ describe("truncateMarkdownForPreview", () => {
     expect(result.endsWith("```")).toBe(true);
   });
 
+  it("extends to the end of a math block when the limit falls inside", () => {
+    const lines = [
+      "intro text",
+      "",
+      "$$",
+      "E = mc^2",
+      "\\\\int_0^1 f(x) \\, dx",
+      "$$",
+      "",
+      "outro text",
+    ];
+    const content = lines.join("\n");
+    const maxLength = content.indexOf("E = mc");
+    const result = truncateMarkdownForPreview(content, maxLength);
+    expect(result).toContain("E = mc^2");
+    expect(result).toContain("\\\\int_0^1");
+    expect(result.endsWith("$$")).toBe(true);
+    expect(result).not.toContain("outro text");
+  });
+
+  it("does not truncate inside a math block without extending past its end", () => {
+    const content = "prefix text\n\n$$\nlong math line that exceeds the max length significantly\n$$\n\nsuffix text";
+    const maxLength = content.indexOf("exceeds");
+    const result = truncateMarkdownForPreview(content, maxLength);
+    expect(result).not.toContain("suffix text");
+    expect(result.endsWith("$$")).toBe(true);
+  });
+
   it("falls back to max length when no safe boundary exists", () => {
     const content = "a".repeat(200);
     const maxLength = 100;
