@@ -142,9 +142,9 @@ function gitStatusLabel(status: string) {
   return status || "改动";
 }
 
-function getCompactGitRefs(refs: string[], branch?: string) {
+function getOrderedGitRefs(refs: string[], branch?: string) {
   const uniqueRefs = Array.from(new Set(refs.filter(Boolean)));
-  const priorityRefs = uniqueRefs
+  return uniqueRefs
     .map((ref) => ({
       ref,
       priority:
@@ -157,11 +157,6 @@ function getCompactGitRefs(refs: string[], branch?: string) {
     }))
     .sort((a, b) => a.priority - b.priority)
     .map((item) => item.ref);
-  return {
-    visible: priorityRefs.slice(0, 2),
-    hidden: Math.max(priorityRefs.length - 2, 0),
-    title: priorityRefs.join(", "),
-  };
 }
 
 function formatGitErrorForUser(error: string) {
@@ -2442,7 +2437,7 @@ export function LongTaskInspectorPanel({
                 ) : gitGraphCommits.length > 0 ? (
                   <div className="flex flex-col">
                     {gitGraphCommits.map((commit, index) => {
-                      const compactRefs = getCompactGitRefs(commit.refs, gitBranch);
+                      const orderedRefs = getOrderedGitRefs(commit.refs, gitBranch);
                       return (
                         <div
                           key={commit.hash}
@@ -2454,9 +2449,9 @@ export function LongTaskInspectorPanel({
                           </div>
                           <div className="min-w-0">
                             <div className="truncate text-text-primary" title={commit.subject}>{commit.subject || "(无提交说明)"}</div>
-                            {(compactRefs.visible.length > 0 || compactRefs.hidden > 0) && (
+                            {orderedRefs.length > 0 && (
                               <div className="flex min-w-0 flex-wrap items-center" style={{ gap: 6, marginTop: 4 }}>
-                                {compactRefs.visible.map((ref) => (
+                                {orderedRefs.map((ref) => (
                                   <span
                                     key={`${commit.hash}-${ref}`}
                                     className="inline-flex min-w-0 rounded-md border border-accent-primary-soft bg-accent-primary-light text-[12px] leading-5 text-accent-primary"
@@ -2466,15 +2461,6 @@ export function LongTaskInspectorPanel({
                                     <span className="block truncate">{ref}</span>
                                   </span>
                                 ))}
-                                {compactRefs.hidden > 0 && (
-                                  <span
-                                    className="shrink-0 rounded-md bg-surface-elevated text-[12px] leading-5 text-text-muted"
-                                    style={{ minWidth: 30, paddingLeft: 7, paddingRight: 7, textAlign: "center" }}
-                                    title={compactRefs.title}
-                                  >
-                                    +{compactRefs.hidden}
-                                  </span>
-                                )}
                               </div>
                             )}
                             {commit.parents.length > 1 && (

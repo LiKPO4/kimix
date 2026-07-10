@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+* **Git graph shows every bounded ref decoration**: The wrapping metadata row now renders all refs returned by the existing eight-item data cap instead of collapsing refs after the first two into a `+N` summary. See [/project/kimix.md](/project/kimix.md).
 * **Git graph refs no longer compete with commit subjects**: Commit descriptions use their own primary line, while branch and tag decorations move to a separate wrapping metadata row with full-width-aware badges. See [/project/kimix.md](/project/kimix.md).
 * **Overlay-only Git hosts initialize before consuming open signals**: Project-path reset and request invalidation now precede external Git graph/details signals, preventing the first request from being discarded as stale with a permanent loading indicator. See [/project/kimix.md](/project/kimix.md).
 * **Footer branch control opens Git graph directly**: The ContextBar branch action uses an independent overlay signal to reuse the inspector's existing graph implementation without opening the inspector or routing through commit details. See [/project/kimix.md](/project/kimix.md).

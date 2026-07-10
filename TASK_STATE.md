@@ -4743,3 +4743,22 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/components/layout/LongTaskInspectorPanel.tsx`
 ## 下一步
 - 用户确认两行信息层级和装饰提交行高度是否合适，再决定是否微调 4px 行间距。
+# 2026-07-10 v2.14.119 Git 图谱引用标签全部展开
+## 当前目标
+- 利用独立可换行的标签行，取消 `+N` 汇总，直接展示提交的全部分支和 Tag 引用。
+## 已完成
+- 保留 HEAD、当前分支、远端分支、Tag 的既有优先级排序。
+- 移除仅显示前两个标签及 `+N` 的前端压缩逻辑，完整渲染数据层返回的全部引用。
+- 继续依赖数据层每个提交最多 8 个引用的上限，防止异常仓库产生无限标签行。
+- 版本号三处同步到 v2.14.119。
+## 未完成
+- 等待用户用 v2.14.119 复验原 `+1` 位置已显示真实引用标签。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、390 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-DGSWbbmg.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、121 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 关键文件
+- `src/components/layout/LongTaskInspectorPanel.tsx`
+## 下一步
+- 用户确认三项及更多引用在一行或自动换行后的视觉密度。
