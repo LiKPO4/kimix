@@ -3125,7 +3125,13 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
   return targetPath;
 }
 
-function searchProjectFiles(projectPath: string, query = "", limit = 40, additionalWorkDirs: string[] = []) {
+async function searchProjectFiles(
+  projectPath: string,
+  query = "",
+  limit = 40,
+  additionalWorkDirs: string[] = [],
+  signal?: AbortSignal,
+) {
   const normalizedQuery = query.trim().toLowerCase();
   const maxResults = Math.max(1, Math.min(limit, 80));
   const results: { path: string; name: string; rootPath?: string; sourceLabel?: string }[] = [];
@@ -3137,17 +3143,24 @@ function searchProjectFiles(projectPath: string, query = "", limit = 40, additio
     entries.findIndex((candidate) => candidate.root.toLowerCase() === entry.root.toLowerCase()) === index
   ));
 
-  function walk(root: string, dir: string, depth: number, sourceLabel: string, useAbsolutePath: boolean) {
-    if (results.length >= maxResults || depth > 32) return;
+  const startedAt = Date.now();
+  const TIME_BUDGET_MS = 600;
+  const YIELD_EVERY = 64;
+
+  async function walk(root: string, dir: string, depth: number, sourceLabel: string, useAbsolutePath: boolean) {
+    if (signal?.aborted || results.length >= maxResults || depth > 32) return;
+    if (Date.now() - startedAt > TIME_BUDGET_MS) return;
     let entries: fs.Dirent[];
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
 
+    let processed = 0;
     for (const entry of entries) {
-      if (results.length >= maxResults) return;
+      if (signal?.aborted || results.length >= maxResults) return;
+      if (Date.now() - startedAt > TIME_BUDGET_MS) return;
       if (entry.name.startsWith(".") && entry.name !== ".env") continue;
       if (FILE_SEARCH_IGNORES.has(entry.name)) continue;
 
@@ -3155,18 +3168,23 @@ function searchProjectFiles(projectPath: string, query = "", limit = 40, additio
       const relativePath = path.relative(root, fullPath).replace(/\\/g, "/");
       const candidatePath = useAbsolutePath ? fullPath.replace(/\\/g, "/") : relativePath;
       if (entry.isDirectory()) {
-        walk(root, fullPath, depth + 1, sourceLabel, useAbsolutePath);
+        await walk(root, fullPath, depth + 1, sourceLabel, useAbsolutePath);
         continue;
       }
       if (!entry.isFile()) continue;
       if (normalizedQuery && !relativePath.toLowerCase().includes(normalizedQuery) && !candidatePath.toLowerCase().includes(normalizedQuery)) continue;
       results.push({ path: candidatePath, name: entry.name, rootPath: root, sourceLabel });
+      processed++;
+      if (processed % YIELD_EVERY === 0) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
     }
   }
 
   for (const root of roots) {
-    if (results.length >= maxResults) break;
-    walk(root.root, root.root, 0, root.sourceLabel, root.useAbsolutePath);
+    if (signal?.aborted || results.length >= maxResults) break;
+    if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+    await walk(root.root, root.root, 0, root.sourceLabel, root.useAbsolutePath);
   }
   return results;
 }
@@ -4377,6 +4395,8 @@ ipcMain.handle("app:copyImage", async (_, request: unknown) => {
   }
 });
 
+const activeSearchControllers = new Map<string, AbortController>();
+
 ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
   try {
     if (!request || typeof request !== "object") {
@@ -4395,15 +4415,27 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     const additionalWorkDirs = Array.isArray(req.additionalWorkDirs)
       ? req.additionalWorkDirs.filter((dir): dir is string => typeof dir === "string" && dir.trim().length > 0)
       : [];
-    if (sessionId && query.trim()) {
-      try {
-        const official = await kimiCodeHost.searchServerSessionFiles(sessionId, req.projectPath, query, limit);
-        if (official && official.length > 0) return { success: true, data: official };
-      } catch (error) {
-        console.warn("[KimiCodeServerHost] official file search failed; using local fallback:", error);
+    const searchKey = sessionId || req.projectPath;
+    const previous = activeSearchControllers.get(searchKey);
+    previous?.abort();
+    const controller = new AbortController();
+    activeSearchControllers.set(searchKey, controller);
+    try {
+      if (sessionId && query.trim()) {
+        try {
+          const official = await kimiCodeHost.searchServerSessionFiles(sessionId, req.projectPath, query, limit);
+          if (official && official.length > 0) return { success: true, data: official };
+        } catch (error) {
+          console.warn("[KimiCodeServerHost] official file search failed; using local fallback:", error);
+        }
+      }
+      const data = await searchProjectFiles(req.projectPath, query, limit, additionalWorkDirs, controller.signal);
+      return { success: true, data };
+    } finally {
+      if (activeSearchControllers.get(searchKey) === controller) {
+        activeSearchControllers.delete(searchKey);
       }
     }
-    return { success: true, data: searchProjectFiles(req.projectPath, query, limit, additionalWorkDirs) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
