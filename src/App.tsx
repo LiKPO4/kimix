@@ -1123,11 +1123,13 @@ function App() {
   const { enqueueStreamEvent, flushStreamEvents } = useEventStream();
 
   const handleEscape = useCallback(() => {
-    const sessionId = useAppStore.getState().runningSessionId ?? useAppStore.getState().currentSession?.id;
-    if (sessionId) {
+    const state = useAppStore.getState();
+    const currentSessionId = state.currentSession?.id;
+    const activeRunningSessionId = state.runningSessionId;
+    // Escape 只应停止当前可见会话，不能静默停止后台运行的其他会话。
+    if (currentSessionId && activeRunningSessionId === currentSessionId) {
       setRunningSessionId(null);
-      const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId || item.runtimeSessionId === sessionId);
-      const runtimeSessionId = resolveRuntimeSessionId(sessionId);
+      const runtimeSessionId = resolveRuntimeSessionId(currentSessionId);
       window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(logError("cancelKimiCodeTurn"));
     }
   }, [setRunningSessionId]);
