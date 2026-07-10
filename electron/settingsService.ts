@@ -133,6 +133,10 @@ function hookRuleToToml(rule: NonNullable<AppSettings["hookRules"]>[number]) {
   const command = rule.command?.trim();
   if (rule.event === "UserPromptSubmit") return null;
   if (!rule.enabled || !command) return null;
+  if (rule.scope === "project") {
+    // 项目级 Hook 由 Kimix 自行代理执行，避免未带 projectPath 写入全局 Kimi 配置后影响所有项目。
+    return null;
+  }
   return [
     "[[hooks]]",
     `event = "${escapeTomlString(rule.event)}"`,
