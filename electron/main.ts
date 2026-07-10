@@ -4783,6 +4783,34 @@ function buildHookRulePrompt(description: string) {
 ${description}`;
 }
 
+function escapeShellSingleQuote(value: string): string {
+  // POSIX shell: close the single quote, insert an escaped single quote, reopen.
+  return value.replace(/'/g, "'\\''");
+}
+
+function buildGeneratedNotifyCommand(message: string): string {
+  const safe = message.replace(/"/g, "'");
+  if (process.platform === "win32") {
+    return `powershell -NoProfile -Command "Write-Output '${safe}'"`;
+  }
+  return `printf '%s\\n' '${escapeShellSingleQuote(safe)}'`;
+}
+
+function buildGeneratedBlockCommand(message: string): string {
+  const safe = message.replace(/"/g, "'");
+  if (process.platform === "win32") {
+    return `powershell -NoProfile -Command "Write-Error '${safe}'; exit 2"`;
+  }
+  return `printf '%s\\n' '${escapeShellSingleQuote(safe)}' >&2; exit 2`;
+}
+
+function buildGeneratedTimeCommand(): string {
+  if (process.platform === "win32") {
+    return `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
+  }
+  return `printf '%s\\n' "当前时间：$(date '+%Y-%m-%d %H:%M:%S')"`;
+}
+
 function completeGeneratedHookRule(rule: z.infer<typeof GeneratedHookRuleSchema>, description: string) {
   const text = description.toLowerCase();
   const next = { ...rule };
@@ -4793,16 +4821,14 @@ function completeGeneratedHookRule(rule: z.infer<typeof GeneratedHookRuleSchema>
     next.event = "UserPromptSubmit";
     next.action = "notify";
     next.matcher = next.matcher?.trim() || ".*";
-    next.command = `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
+    next.command = buildGeneratedTimeCommand();
     next.reason = next.reason?.trim() || "每轮开始时把当前时间作为 hook 上下文提供给 agent。";
   }
   if (next.action === "notify" && !next.command?.trim()) {
-    const message = (next.reason || description).replace(/"/g, "'");
-    next.command = `powershell -NoProfile -Command "Write-Output '${message}'"`;
+    next.command = buildGeneratedNotifyCommand(next.reason || description);
   }
   if (next.action === "block" && !next.command?.trim()) {
-    const message = (next.reason || "该操作被 Hook 规则阻断。").replace(/"/g, "'");
-    next.command = `powershell -NoProfile -Command "Write-Error '${message}'; exit 2"`;
+    next.command = buildGeneratedBlockCommand(next.reason || "该操作被 Hook 规则阻断。");
   }
   return next;
 }
