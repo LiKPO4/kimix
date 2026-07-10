@@ -24,6 +24,7 @@ import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
 import { normalizePathForComparison } from "../src/utils/pathCase";
+import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
@@ -2154,32 +2155,6 @@ function resolveProjectFile(projectPath: string, filePath: string) {
   return resolvedFile;
 }
 
-function normalizePreviewExtensions(input: unknown, fallback = ["md", "txt"]) {
-  const raw = Array.isArray(input) ? input : fallback;
-  const normalized = raw
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
-    .filter((item) => /^[a-z0-9]{1,12}$/.test(item));
-  return Array.from(new Set(normalized)).slice(0, 20);
-}
-
-function previewExtensionSet(input?: unknown) {
-  return new Set(normalizePreviewExtensions(input).map((item) => `.${item}`));
-}
-
-const READABLE_TEXT_EXTENSIONS = new Set([
-  ".md",
-  ".txt",
-  ".json",
-  ".log",
-  ".yaml",
-  ".yml",
-  ".toml",
-  ".ini",
-  ".csv",
-  ".tsv",
-]);
-
 function isPathInside(parent: string, child: string) {
   const relative = path.relative(path.resolve(parent), path.resolve(child));
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -2221,7 +2196,7 @@ function resolveReadableTextFile(requestPath: string, projectPath?: string) {
   }
 
   const ext = path.extname(resolvedFile).toLowerCase();
-  if (!READABLE_TEXT_EXTENSIONS.has(ext)) {
+  if (!isPreviewReadableExtension(ext)) {
     throw new Error("Only text files can be read");
   }
 

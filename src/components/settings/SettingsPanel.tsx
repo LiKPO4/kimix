@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isWindows } from "@/utils/platform";
+import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
@@ -43,7 +44,7 @@ const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
 const KIMIX_VERSION = "2.14.122";
-const FILE_PREVIEW_EXTENSION_OPTIONS = ["md", "txt", "log", "json", "yaml", "yml"];
+const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
   | "connection"
@@ -383,10 +384,16 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
 
 function normalizeFilePreviewExtensions(value: string | string[]) {
   const parts = Array.isArray(value) ? value : value.split(/[\s,，;；]+/);
-  return Array.from(new Set(parts
+  const candidates = parts
     .map((item) => item.trim().toLowerCase().replace(/^\.+/, ""))
-    .filter((item) => /^[a-z0-9]{1,12}$/.test(item))))
-    .slice(0, 20);
+    .filter((item) => /^[a-z0-9]{1,12}$/.test(item));
+  const rejected = candidates.filter((item) => !isPreviewReadableExtension(item));
+  if (rejected.length > 0) {
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: `以下扩展名不在支持列表中，已自动移除：${rejected.join(", ")}`,
+    }));
+  }
+  return normalizePreviewExtensions(candidates);
 }
 
 export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "modal" | "workspace"; onBackToChat?: () => void }) {
