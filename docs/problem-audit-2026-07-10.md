@@ -314,6 +314,8 @@
 - **影响**：只检查对象、字符串 type 和数字 timestamp，随后强制转换成 `TimelineEvent`；缺少正文或工具字段的事件可能在渲染组件中报错。
 - **证据**：`src/utils/sessionBackup.ts:1`
 - **验证状态**：已抽查代码确认存在浅验证结构
+- **修复状态**：已修复（commit `1e5d94b`）
+- **说明**：`sessionBackup.ts` 新增 `isValidTimelineEvent`，对已知事件类型按 `ui.ts` 定义校验必填字段；常见类型缺失关键字段时丢弃，未知类型保留但要求有 `id`/`timestamp`。
 - **建议**：区分“未知但结构完整”与“已知类型字段缺失”。
 
 ### 33. Hook 命令失败或超时可能仍被记录为成功
