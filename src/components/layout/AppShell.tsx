@@ -1765,7 +1765,6 @@ ${isFinalStep
   };
   const openGitDetailsFromContextBar = () => {
     setDiffPanelOpen(false);
-    setLongTaskInspectorOpen(true);
     setGitDetailsOpenSignal((value) => value + 1);
   };
   const mainGridRows = chatWorkspaceActive
@@ -1868,8 +1867,9 @@ ${isFinalStep
         {chatWorkspaceActive && (longTaskInspectorOpen || diffPanelOpen) && (
           <ResizeHandle ariaLabel="调整右侧栏宽度" onPointerDown={startRightPanelResize} />
         )}
-        {chatWorkspaceActive && longTaskInspectorOpen && (
+        {chatWorkspaceActive && (longTaskInspectorOpen || gitDetailsOpenSignal > 0) && (
           <LongTaskInspectorPanel
+            panelOpen={longTaskInspectorOpen}
             width={rightPanelWidth}
             title={rightPanelTitle}
             subtitle={rightPanelSubtitle}
@@ -1903,6 +1903,9 @@ ${isFinalStep
             defaultPlanMode={defaultPlanMode}
             officialGoal={liveCurrentSession?.officialGoal}
             gitDetailsOpenSignal={gitDetailsOpenSignal}
+            onGitDetailsOpenChange={(open) => {
+              if (!open) setGitDetailsOpenSignal(0);
+            }}
             onClose={() => {
               setGitDetailsOpenSignal(0);
               setLongTaskInspectorOpen(false);

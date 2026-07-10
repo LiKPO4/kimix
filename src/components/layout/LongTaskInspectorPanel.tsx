@@ -210,6 +210,7 @@ function projectNameFromPath(projectPath: string) {
 }
 
 interface LongTaskInspectorPanelProps {
+  panelOpen: boolean;
   width: number;
   title: string;
   subtitle: string;
@@ -243,6 +244,7 @@ interface LongTaskInspectorPanelProps {
   defaultPlanMode: boolean;
   officialGoal: Session["officialGoal"] | null | undefined;
   gitDetailsOpenSignal?: number;
+  onGitDetailsOpenChange?: (open: boolean) => void;
   onClose: () => void;
   onPatchLongTaskMeta: (
     patch: Partial<NonNullable<Session["longTask"]>>,
@@ -273,6 +275,7 @@ interface LongTaskInspectorPanelProps {
 }
 
 export function LongTaskInspectorPanel({
+  panelOpen,
   width,
   title,
   subtitle,
@@ -305,6 +308,7 @@ export function LongTaskInspectorPanel({
   defaultPlanMode,
   officialGoal,
   gitDetailsOpenSignal,
+  onGitDetailsOpenChange,
   onClose,
   onPatchLongTaskMeta,
   onApplyTargetStep,
@@ -586,7 +590,12 @@ export function LongTaskInspectorPanel({
   };
   const openGitDetails = () => {
     setGitDetailsOpen(true);
+    onGitDetailsOpenChange?.(true);
     void loadGitDetails();
+  };
+  const closeGitDetails = () => {
+    setGitDetailsOpen(false);
+    onGitDetailsOpenChange?.(false);
   };
   const loadGitGraph = async (limit = gitGraphLimit, mode: "replace" | "more" = "replace") => {
     const requestId = ++gitGraphRequestIdRef.current;
@@ -1042,6 +1051,7 @@ export function LongTaskInspectorPanel({
 
   return (
     <>
+    {panelOpen && (
     <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] border border-border-subtle shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle" style={{ paddingLeft: 18, paddingRight: 14 }}>
         <div className="min-w-0">
@@ -2160,8 +2170,9 @@ export function LongTaskInspectorPanel({
         )}
       </div>
     </aside>
+    )}
     {gitDetailsOpen && (
-      <div className="fixed inset-0 z-[86] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={() => setGitDetailsOpen(false)}>
+      <div className="fixed inset-0 z-[86] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={closeGitDetails}>
         <div
           className="w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
           onMouseDown={(event) => event.stopPropagation()}
@@ -2192,7 +2203,7 @@ export function LongTaskInspectorPanel({
               {gitDetailsLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               刷新
             </button>
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={() => setGitDetailsOpen(false)} aria-label="关闭 Git 详情">
+            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={closeGitDetails} aria-label="关闭 Git 详情">
               <X size={16} />
             </button>
           </div>
@@ -2343,7 +2354,7 @@ export function LongTaskInspectorPanel({
               <div className="flex items-center justify-end" style={{ gap: 10, marginTop: 14 }}>
                 <button
                   type="button"
-                  onClick={() => setGitDetailsOpen(false)}
+                  onClick={closeGitDetails}
                   className="kimix-icon-text-button is-compact bg-surface-elevated text-text-muted hover:bg-surface-hover"
                 >
                   关闭

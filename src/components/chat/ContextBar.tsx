@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, Search, Settings2, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -18,6 +19,73 @@ type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
+const CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN = 12;
+const CONTEXT_BAR_POPOVER_GAP = 8;
+
+function ContextBarPopover({
+  anchorRef,
+  panelRef,
+  width,
+  align,
+  className,
+  style,
+  role,
+  ariaLabel,
+  children,
+}: {
+  anchorRef: RefObject<HTMLElement | null>;
+  panelRef: RefObject<HTMLDivElement | null>;
+  width: number;
+  align: "left" | "right";
+  className: string;
+  style?: CSSProperties;
+  role?: string;
+  ariaLabel?: string;
+  children: ReactNode;
+}) {
+  const [position, setPosition] = useState<{ left: number; bottom: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const updatePosition = () => {
+      const rect = anchor.getBoundingClientRect();
+      const availableWidth = Math.max(0, window.innerWidth - CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN * 2);
+      const panelWidth = Math.min(width, availableWidth);
+      const preferredLeft = align === "right" ? rect.right - panelWidth : rect.left;
+      const maxLeft = Math.max(CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN, window.innerWidth - panelWidth - CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN);
+      setPosition({
+        left: Math.min(Math.max(preferredLeft, CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN), maxLeft),
+        bottom: Math.max(CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN, window.innerHeight - rect.top + CONTEXT_BAR_POPOVER_GAP),
+        width: panelWidth,
+      });
+    };
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePosition);
+    observer?.observe(anchor);
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [align, anchorRef, width]);
+
+  if (!position) return null;
+  return createPortal(
+    <div
+      ref={panelRef}
+      role={role}
+      aria-label={ariaLabel}
+      className={className}
+      style={{ ...style, position: "fixed", left: position.left, bottom: position.bottom, width: position.width }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 function formatUsage(period: UsagePeriod) {
   if (!period.available || period.used === undefined || period.limit === undefined) {
@@ -134,9 +202,12 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
   const [modelSearch, setModelSearch] = useState("");
   const [switchingModel, setSwitchingModel] = useState<string | null>(null);
   const usageMenuRef = useRef<HTMLDivElement>(null);
+  const usagePanelRef = useRef<HTMLDivElement>(null);
   const usageRequestIdRef = useRef(0);
   const workDirsRef = useRef<HTMLDivElement>(null);
+  const workDirsPanelRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+  const modelPanelRef = useRef<HTMLDivElement>(null);
   const contextBarRef = useRef<HTMLDivElement>(null);
   const [iconOnly, setIconOnly] = useState(false);
   const activeSession = session ?? currentSession;
@@ -504,13 +575,13 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     const handlePointerDown = (event: PointerEvent) => {
-      if (!usageMenuRef.current?.contains(event.target as Node)) {
+      if (!usageMenuRef.current?.contains(event.target as Node) && !usagePanelRef.current?.contains(event.target as Node)) {
         setUsageOpen(false);
       }
-      if (!workDirsRef.current?.contains(event.target as Node)) {
+      if (!workDirsRef.current?.contains(event.target as Node) && !workDirsPanelRef.current?.contains(event.target as Node)) {
         setWorkDirsOpen(false);
       }
-      if (!modelMenuRef.current?.contains(event.target as Node)) {
+      if (!modelMenuRef.current?.contains(event.target as Node) && !modelPanelRef.current?.contains(event.target as Node)) {
         setModelMenuOpen(false);
       }
     };
@@ -542,7 +613,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             {!iconOnly && <span style={{ lineHeight: "20px", paddingBottom: 1 }}>工作空间</span>}
           </button>
           {workDirsOpen && (
-            <div className="kimix-floating-panel absolute bottom-9 left-0 z-40 w-[360px] rounded-xl" style={{ padding: "16px 18px 18px" }}>
+            <ContextBarPopover anchorRef={workDirsRef} panelRef={workDirsPanelRef} width={360} align="left" className="kimix-floating-panel z-40 rounded-xl" style={{ padding: "16px 18px 18px" }}>
               <div className="grid items-center" style={{ columnGap: 16, gridTemplateColumns: "minmax(0, 1fr) auto" }}>
                 <div className="min-w-0 self-center">
                   <div className="text-[14px] font-semibold leading-5 text-[var(--kimix-panel-text)]">工作目录</div>
@@ -590,7 +661,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                   </div>
                 )}
               </div>
-            </div>
+            </ContextBarPopover>
           )}
         </div>
         <div ref={usageMenuRef} className="relative hidden shrink-0 sm:block">
@@ -606,8 +677,12 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             {!iconOnly && <span className="truncate">套餐用量</span>}
           </button>
           {usageOpen && (
-            <div
-              className="kimix-floating-panel absolute bottom-10 left-0 z-40 w-[330px] rounded-xl"
+            <ContextBarPopover
+              anchorRef={usageMenuRef}
+              panelRef={usagePanelRef}
+              width={330}
+              align="left"
+              className="kimix-floating-panel z-40 rounded-xl"
               style={{ paddingLeft: 22, paddingRight: 22, paddingTop: 20, paddingBottom: 21 }}
             >
               <div className="flex items-center justify-between gap-4" style={{ marginBottom: 18 }}>
@@ -646,7 +721,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                   {usageData.message}
                 </div>
               )}
-            </div>
+            </ContextBarPopover>
           )}
         </div>
         {gitBranch && (
@@ -662,7 +737,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             {!iconOnly && <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>}
           </button>
         )}
-        <div ref={modelMenuRef} className={`relative hidden min-w-0 max-w-[280px] lg:block ${iconOnly ? "shrink-0" : "flex-1"}`}>
+        <div ref={modelMenuRef} className="relative hidden min-w-0 max-w-[280px] shrink lg:block" style={{ flexBasis: "auto" }}>
           <button
             type="button"
             onClick={toggleModelMenu}
@@ -679,10 +754,14 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
             {!iconOnly && <ChevronDown size={14} className={`shrink-0 transition-transform duration-150 ${modelMenuOpen ? "rotate-180" : ""}`} />}
           </button>
           {modelMenuOpen && (
-            <div
+            <ContextBarPopover
+              anchorRef={modelMenuRef}
+              panelRef={modelPanelRef}
+              width={330}
+              align="right"
               role="menu"
-              aria-label="选择会话模型"
-              className="kimix-floating-panel absolute bottom-10 right-0 z-50 w-[330px] overflow-hidden rounded-xl"
+              ariaLabel="选择会话模型"
+              className="kimix-floating-panel z-50 overflow-hidden rounded-xl"
               style={{ padding: 12 }}
             >
               <div className="grid items-center" style={{ columnGap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 4, paddingRight: 4 }}>
@@ -780,7 +859,7 @@ export function ContextBar({ onOpenGitDetails }: { onOpenGitDetails?: () => void
                   <span>管理模型</span>
                 </button>
               </div>
-            </div>
+            </ContextBarPopover>
           )}
         </div>
         <button

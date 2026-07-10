@@ -4598,3 +4598,24 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 现场：运行工具/命令时 `diag.log` 高频写入 `contentVersion effect`、`restoreManualScrollAnchor`、`processResize`，同一运行会话多次生成 renderer freeze 报告；计时器不更新说明 renderer 主线程被阻塞。
 - 修复：移除正常流式路径的 contentVersion/resize 诊断写入；手动滚动锚点恢复 350ms 节流且只记录真实位移/失败；普通滚动诊断从 50ms 放宽到 500ms。
 - 下一步：实机在工具调用和全屏切换期间观察计时器是否持续更新、窗口是否不再卡住。
+# 2026-07-10 v2.14.112 ContextBar 浮层与 Git 详情解耦
+## 当前目标
+- 修复底栏模型按钮异常空隙、右侧栏展开时浮层被裁切，以及分支按钮强制打开右侧栏的问题。
+## 已完成
+- 模型容器取消无条件 `flex-1`，按内容宽度收缩并保留最大宽度，恢复与“已连接”之间的真实 8px sibling gap。
+- 工作空间、套餐用量和模型浮层统一通过 `document.body` Portal 渲染，以触发按钮计算 fixed 坐标，并在 resize、滚动和触发器尺寸变化时重新定位及限制视口边界。
+- Git 详情继续复用 `LongTaskInspectorPanel` 的单套数据和操作逻辑，但允许只挂载弹窗宿主而隐藏右侧栏主体；底部分支按钮不再修改右侧栏开关。
+- 版本号三处同步到 v2.14.112。
+## 验证
+- `pnpm test:run` 通过：54 个测试文件、389 个测试全部通过。
+- `pnpm build` 通过，renderer hash：`assets/index-jpASRLHj.js`。
+- `pnpm knowledge:validate` 通过：7 个概念、15 个 Markdown、114 条链接。
+- `git diff --check` 通过，仅有 LF/CRLF warning。
+## 未完成
+- 等待用户用 v2.14.112 截图复验普通宽度与右侧栏展开态下的按钮间距、三个浮层边界，以及分支按钮交互。
+## 关键文件
+- `src/components/chat/ContextBar.tsx`
+- `src/components/layout/AppShell.tsx`
+- `src/components/layout/LongTaskInspectorPanel.tsx`
+## 下一步
+- 用户实机截图确认普通宽度和右侧栏展开态；版本号须为 v2.14.112，再决定是否需要视觉微调。

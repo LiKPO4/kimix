@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+* **ContextBar overlays no longer depend on clipped layout or inspector visibility**: Workspace, usage, and model panels use viewport-clamped body portals; Git details can mount its existing host without opening the right inspector. See [/project/kimix.md](/project/kimix.md).
 * **Footer width and inspector signals follow component lifecycle**: The chat footer switches all status actions to icon-only mode from its measured width, keeps floating panels unclipped, and a remounted inspector no longer replays an already-consumed Git-details request. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Footer controls resist compression**: Workspace uses a stable label, usage remains shrink-protected, and long model names use a smaller font within a flexible truncated column so connection/export controls remain visible. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **GitHub update traffic honors local proxy settings**: Release metadata, Atom fallback, and installer assets now use a dedicated Electron Session configured from `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`, without changing Kimi's default network session. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
