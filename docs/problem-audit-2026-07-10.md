@@ -296,6 +296,8 @@
 
 - **影响**：没有诊断入口，用户只能看到技能莫名消失。
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `d917cc2`）
+- **说明**：`electron/main.ts` 新增 `scanSkillsWithDiagnostics`，扫描 `SKILL.md` / 插件清单时收集解析失败路径与原因；`listSkills` 响应增加 `scanErrors`；`SkillsPanel` 在侧边栏展示异常文件列表（最多 5 条）。
 - **建议**：提供扫描日志或错误提示入口。
 
 ### 31. ZIP 导入缺少总体积和条目数量限制
