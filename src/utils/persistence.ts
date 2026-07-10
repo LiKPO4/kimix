@@ -5,10 +5,11 @@ import type { PendingMessage } from "@/stores/sessionStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
 import {
+  commitState,
+  deleteImages,
+  getAllImageIds,
   getStateItem,
   loadImages,
-  setStateItem,
-  storeImages,
   type StoredImage,
 } from "./stateStorage";
 
@@ -342,38 +343,74 @@ function hydratePending(raw: unknown[], dataUrlById: Map<string, string>): Pendi
   });
 }
 
-export async function persistLocalConversationState(): Promise<PersistResult> {
-  try {
-    const state = useSessionStore.getState();
-    const runningSessionId = useAppStore.getState().runningSessionId;
-    const preparedSessions = state.sessions.map((session) => ({
-      ...session,
-      events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events))),
-      isLoading: false,
-    }));
+type PersistSnapshot = {
+  sessions: Session[];
+  pendingMessages: PendingMessage[];
+};
 
+let persistQueue: PersistSnapshot | null = null;
+let isPersisting = false;
+
+async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
+  isPersisting = true;
+  try {
     const images: StoredImage[] = [];
     const [strippedSessions, strippedPending] = await Promise.all([
-      stripImagesFromSessions(preparedSessions, images),
-      stripImagesFromPending(state.pendingMessages, images),
+      stripImagesFromSessions(snapshot.sessions, images),
+      stripImagesFromPending(snapshot.pendingMessages, images),
     ]);
 
-    await Promise.all([
-      setStateItem(LOCAL_SESSIONS_KEY, strippedSessions),
-      setStateItem(LOCAL_PENDING_KEY, strippedPending),
-      storeImages(images),
-    ]);
+    await commitState([
+      { key: LOCAL_SESSIONS_KEY, value: strippedSessions },
+      { key: LOCAL_PENDING_KEY, value: strippedPending },
+    ], images);
 
-    // Clean up image records that are no longer referenced by the current state.
     const referencedRefs = new Set<string>();
     collectImageRefs(strippedSessions, referencedRefs);
     collectImageRefs(strippedPending, referencedRefs);
 
+    const allIds = await getAllImageIds();
+    const toDelete = allIds.filter((id) => !referencedRefs.has(id));
+    if (toDelete.length > 0) {
+      await deleteImages(toDelete);
+    }
+
+    if (persistQueue) {
+      const next = persistQueue;
+      persistQueue = null;
+      return runPersist(next);
+    }
+
     return { success: true };
   } catch (err) {
+    persistQueue = null;
     reportPersistError("persistLocalConversationState", err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    isPersisting = false;
   }
+}
+
+export async function persistLocalConversationState(): Promise<PersistResult> {
+  const state = useSessionStore.getState();
+  const runningSessionId = useAppStore.getState().runningSessionId;
+  const preparedSessions = state.sessions.map((session) => ({
+    ...session,
+    events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events))),
+    isLoading: false,
+  }));
+
+  const snapshot: PersistSnapshot = {
+    sessions: preparedSessions,
+    pendingMessages: state.pendingMessages,
+  };
+
+  if (isPersisting) {
+    persistQueue = snapshot;
+    return { success: true };
+  }
+
+  return runPersist(snapshot);
 }
 
 export async function loadLocalSessions(): Promise<Session[]> {

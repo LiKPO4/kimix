@@ -81,15 +81,24 @@ export function useStatePersistence() {
     const handleBeforeUnload = () => {
       isUnloadingRef.current = true;
       clearConversationPersistTimer();
+      // beforeunload 是同步事件，无法等待异步 IndexedDB 写入完成。
+      // 串行化队列在平时已尽量保证最新状态落地，此处仅作最后尝试。
       void persistLocalConversationState();
       persistLocalActiveContext();
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void flushLocalConversationState();
+      }
+    };
     window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       unsubscribeSessionPersistence();
       unsubscribeActiveContextPersistence();
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearConversationPersistTimer();
       if (!isUnloadingRef.current) void flushLocalConversationState();
     };

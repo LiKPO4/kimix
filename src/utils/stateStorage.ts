@@ -172,6 +172,36 @@ export async function storeImages(images: StoredImage[]): Promise<void> {
   await transactionComplete(tx);
 }
 
+export async function commitState(stateEntries: { key: string; value: unknown }[], images: StoredImage[]): Promise<void> {
+  if (stateEntries.length === 0 && images.length === 0) return;
+
+  if (!isIndexedDBAvailable()) {
+    for (const entry of stateEntries) {
+      localStorage.setItem(entry.key, JSON.stringify(entry.value));
+    }
+    for (const image of images) {
+      localStorage.setItem(FALLBACK_IMAGE_PREFIX + image.id, JSON.stringify(image));
+    }
+    return;
+  }
+
+  const db = await openDb();
+  const tx = db.transaction([STATE_STORE, IMAGES_STORE], "readwrite");
+  const stateStore = tx.objectStore(STATE_STORE);
+  const imageStore = tx.objectStore(IMAGES_STORE);
+  for (const entry of stateEntries) {
+    stateStore.put({ key: entry.key, value: JSON.stringify(entry.value) });
+  }
+  for (const image of images) {
+    imageStore.put(image);
+  }
+  await transactionComplete(tx);
+
+  for (const entry of stateEntries) {
+    try { localStorage.removeItem(entry.key); } catch {}
+  }
+}
+
 export async function loadImages(ids: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const uniqueIds = Array.from(new Set(ids));
@@ -233,4 +263,27 @@ export async function deleteImages(ids: string[]): Promise<void> {
     store.delete(id);
   }
   await transactionComplete(tx);
+}
+
+export async function getAllImageIds(): Promise<string[]> {
+  if (!isIndexedDBAvailable()) {
+    const ids: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(FALLBACK_IMAGE_PREFIX)) {
+        ids.push(key.slice(FALLBACK_IMAGE_PREFIX.length));
+      }
+    }
+    return ids;
+  }
+
+  const db = await openDb();
+  const tx = db.transaction(IMAGES_STORE, "readonly");
+  const store = tx.objectStore(IMAGES_STORE);
+  const request = store.getAllKeys();
+  const keys = await new Promise<unknown[]>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB getAllKeys failed"));
+  });
+  return keys.filter((key): key is string => typeof key === "string");
 }
