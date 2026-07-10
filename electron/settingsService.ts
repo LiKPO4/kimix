@@ -50,6 +50,34 @@ function ensureDir() {
   }
 }
 
+function writeFileAtomic(filePath: string, data: string): void {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const tempPath = `${filePath}.tmp`;
+  try {
+    const fd = fs.openSync(tempPath, "w");
+    try {
+      fs.writeSync(fd, data, "utf-8");
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.copyFileSync(filePath, `${filePath}.bak`);
+      } catch (backupErr) {
+        console.warn("[settingsService] 备份旧配置失败:", backupErr);
+      }
+    }
+    fs.renameSync(tempPath, filePath);
+  } catch (err) {
+    try { fs.rmSync(tempPath, { force: true }); } catch {}
+    throw err;
+  }
+}
+
 export function loadSettings(): AppSettings {
   ensureDir();
   if (!fs.existsSync(SETTINGS_FILE)) {
@@ -75,7 +103,7 @@ export function loadSettings(): AppSettings {
       clarificationToolMode,
     };
     if (shouldMigrateLegacyFontSize || rawSettings.fontSizeBaselineVersion !== 1) {
-      fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ ...rawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2), "utf-8");
+      writeFileAtomic(SETTINGS_FILE, JSON.stringify({ ...rawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2));
     }
     const legacyKimiThemePalette = (rawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;
     if ((!settings.kimiThemePalettes || settings.kimiThemePalettes.length === 0) && legacyKimiThemePalette) {
@@ -116,7 +144,7 @@ export function saveSettings(settings: Partial<AppSettings>): void {
     if (merged.hookRules) {
       merged.hookRules = merged.hookRules.map(normalizeHookRule);
     }
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), "utf-8");
+    writeFileAtomic(SETTINGS_FILE, JSON.stringify(merged, null, 2));
     if (settings.hookRules) syncKimiHookConfig(merged.hookRules ?? []);
   } catch (err) {
     console.error("Failed to save settings:", err);
@@ -172,7 +200,7 @@ function syncKimiHookConfig(rules: NonNullable<AppSettings["hookRules"]>) {
   const next = pattern.test(current)
     ? current.replace(pattern, block)
     : `${current.trimEnd()}${current.trim() ? "\n\n" : ""}${block}\n`;
-  fs.writeFileSync(configPath, next, "utf-8");
+  writeFileAtomic(configPath, next);
 }
 
 export function getDefaultWorkDir(): string {
