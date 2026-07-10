@@ -102,6 +102,33 @@ function cloneRuleWithUpdate(rule: HookRule, patch: Partial<HookRule>): HookRule
   return { ...rule, ...patch, updatedAt: Date.now() };
 }
 
+const currentPlatform =
+  typeof window !== "undefined" &&
+  (window as unknown as { api?: { platform?: string } }).api?.platform === "win32"
+    ? "win32"
+    : "unix";
+
+function shellEchoCommand(message: string): string {
+  if (currentPlatform === "win32") {
+    return `powershell -NoProfile -Command "Write-Output '${message.replace(/"/g, "'")}'"`;
+  }
+  return `printf '%s\n' "${message}"`;
+}
+
+function shellErrorExitCommand(message: string): string {
+  if (currentPlatform === "win32") {
+    return `powershell -NoProfile -Command "Write-Error '${message.replace(/"/g, "'")}'; exit 2"`;
+  }
+  return `printf '%s\n' "${message}" >&2; exit 2`;
+}
+
+function currentTimeHookCommand(): string {
+  if (currentPlatform === "win32") {
+    return `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
+  }
+  return `date +'当前时间：%Y-%m-%d %H:%M:%S'`;
+}
+
 function completeHookRuleForDisplay(rule: HookRule, description: string): HookRule {
   const text = description.toLowerCase();
   const patch: Partial<HookRule> = {
@@ -111,14 +138,14 @@ function completeHookRuleForDisplay(rule: HookRule, description: string): HookRu
     patch.event = "UserPromptSubmit";
     patch.action = "notify";
     patch.matcher = rule.matcher.trim() || ".*";
-    patch.command = rule.command?.trim() || `powershell -NoProfile -Command "Write-Output ('当前时间：' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"`;
+    patch.command = rule.command?.trim() || currentTimeHookCommand();
     patch.reason = rule.reason?.trim() || "每轮开始时把当前时间作为 hook 上下文提供给 agent。";
   } else if (rule.action === "notify" && !rule.command?.trim()) {
     const message = (rule.reason || description || "Hook 规则已触发。").replace(/"/g, "'");
-    patch.command = `powershell -NoProfile -Command "Write-Output '${message}'"`;
+    patch.command = shellEchoCommand(message);
   } else if (rule.action === "block" && !rule.command?.trim()) {
     const message = (rule.reason || "该操作被 Hook 规则阻断。").replace(/"/g, "'");
-    patch.command = `powershell -NoProfile -Command "Write-Error '${message}'; exit 2"`;
+    patch.command = shellErrorExitCommand(message);
   }
   return cloneRuleWithUpdate(rule, patch);
 }
