@@ -458,6 +458,8 @@ export function Composer() {
   const allPendingMessages = useSessionStore((s) => s.pendingMessages);
   const removePendingMessage = useSessionStore((s) => s.removePendingMessage);
   const reorderPendingMessage = useSessionStore((s) => s.reorderPendingMessage);
+  const movePendingMessage = useSessionStore((s) => s.movePendingMessage);
+  const promotePendingMessage = useSessionStore((s) => s.promotePendingMessage);
   const liveSession = useLiveSession(currentSession?.id);
 
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
@@ -465,9 +467,11 @@ export function Composer() {
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
+  const [pendingMoreId, setPendingMoreId] = useState<string | null>(null);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
+  const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
   const pendingMessages = currentSession
@@ -495,6 +499,10 @@ export function Composer() {
       if (addBtnRef.current && !addBtnRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
+      const insideMore = Object.values(pendingMoreRefs.current).some(
+        (el) => el && el.contains(e.target as Node)
+      );
+      if (!insideMore) setPendingMoreId(null);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -2531,7 +2539,7 @@ export function Composer() {
             </button>
           </div>
           <div className="max-h-40 overflow-y-auto">
-            {pendingMessages.map((msg) => (
+            {pendingMessages.map((msg, index) => (
               <div
                 key={msg.id}
                 draggable
@@ -2584,9 +2592,49 @@ export function Composer() {
                   <button onClick={() => removePendingMessage(msg.id)} className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-accent-red/10 hover:text-accent-red" title="删除" aria-label="删除">
                     <Trash2 size={13} />
                   </button>
-                  <button className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="更多" aria-label="更多">
-                    <MoreHorizontal size={14} />
-                  </button>
+                  <div className="relative" ref={(el) => { pendingMoreRefs.current[msg.id] = el; }}>
+                    <button
+                      type="button"
+                      onClick={() => setPendingMoreId((prev) => (prev === msg.id ? null : msg.id))}
+                      className={`kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${pendingMoreId === msg.id ? "bg-[var(--kimix-panel-hover)]" : ""}`}
+                      title="更多"
+                      aria-label="更多"
+                      aria-expanded={pendingMoreId === msg.id}
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                    {pendingMoreId === msg.id && (
+                      <div className="absolute right-0 top-full z-10 mt-1 flex min-w-[120px] flex-col rounded-lg border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)] py-1 shadow-lg" role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={index === 0}
+                          onClick={() => { promotePendingMessage(msg.id); setPendingMoreId(null); }}
+                          className="px-3 py-1.5 text-left text-[13px] text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                        >
+                          移到最前
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={index === 0}
+                          onClick={() => { movePendingMessage(msg.id, "up"); setPendingMoreId(null); }}
+                          className="px-3 py-1.5 text-left text-[13px] text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                        >
+                          上移
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={index === pendingMessages.length - 1}
+                          onClick={() => { movePendingMessage(msg.id, "down"); setPendingMoreId(null); }}
+                          className="px-3 py-1.5 text-left text-[13px] text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                        >
+                          下移
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
