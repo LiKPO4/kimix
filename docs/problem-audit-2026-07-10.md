@@ -243,6 +243,8 @@
 - **影响**：Ctrl+N、Ctrl+O、F11、设置快捷键等被展示，但全局快捷键逻辑主要只有 Ctrl+K、Ctrl+B、Escape。
 - **证据**：`src/components/layout/TopMenuBar.tsx:1`、`src/hooks/useKeyboardShortcuts.ts:1`
 - **验证状态**：未抽查，基于审查结论纳入
+- **修复状态**：已修复（commit `fbcb389`）
+- **说明**：`AppShell.tsx` 在 `handleMenuAction` 后新增全局键盘监听，补全菜单中展示的大部分快捷键：Ctrl+N 新对话、Ctrl+O 打开项目、Ctrl+, 设置、Ctrl+J 终端、Ctrl+T Web Server、Ctrl+R 重载、Alt+Ctrl+B 文件预览、Ctrl+F 搜索、Ctrl+Shift+[ / ] 切换对话、Ctrl+[ / ] 前进后退、Ctrl++/- /0 缩放、F11 全屏、Ctrl+M 最小化、Ctrl+/ 快捷键帮助；输入框内不触发，弹窗打开时不触发。
 - **建议**：实现对应命令或从菜单/帮助中移除。
 
 ### 25. “快速对话”和“新对话”执行完全相同的逻辑
