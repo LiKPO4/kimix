@@ -350,6 +350,8 @@
 - **影响**：初始只渲染尾部约 28 项，但点击“展开旧历史”后会一次渲染所有事件；长会话性能最差。
 - **证据**：`src/components/chat/ChatThread.tsx:1807`
 - **验证状态**：已抽查代码确认存在 `showOlderItems` 切换逻辑
+- **修复状态**：已修复（commit `eb7bff4`）
+- **说明**：将 `showOlderItems` 布尔状态改为 `olderItemsPage` 计数器，每页大小为 `CHAT_FULL_RENDER_ITEM_LIMIT`（28）。手动点击“展开”时每次只多加载一页；搜索定位事件时调用 `expandOlderItemsToEnd()` 一次性展开到目标可见，保留原有跳转行为。
 - **建议**：每次向前加载固定轮次，并对 Markdown、工具过程和图片做虚拟化。
 
 ### 37. 单条超长 Markdown 仍可绕过历史折叠的性能保护
