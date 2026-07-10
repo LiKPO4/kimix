@@ -66,7 +66,7 @@ function runHookCommand(
   rule: HookRule,
   request: HookRequest,
   workDir: string,
-): Promise<{ stdout: string; stderr: string; code: number }> {
+): Promise<{ stdout: string; stderr: string; code: number | null; killed: boolean }> {
   return new Promise((resolve) => {
     const child = exec(
       rule.command!,
@@ -78,14 +78,16 @@ function runHookCommand(
         maxBuffer: 1024 * 1024,
       },
       (error, stdout, stderr) => {
+        const execError = error as { code?: unknown; killed?: boolean } | null;
         const code =
-          typeof (error as { code?: unknown } | null)?.code === "number"
-            ? (error as { code: number }).code
-            : 0;
+          typeof execError?.code === "number"
+            ? (execError as { code: number }).code
+            : null;
         resolve({
           stdout: decodeHookOutput(stdout).trim(),
           stderr: decodeHookOutput(stderr).trim(),
           code,
+          killed: execError?.killed === true,
         });
       },
     );
@@ -213,6 +215,11 @@ export async function applyPromptSubmitHooks(
         blocked = true;
         appendHookLog(rule, request, "block", message);
         throw new Error(message || "用户输入被 Hook 规则阻断");
+      }
+      if (ran.killed || ran.code !== 0) {
+        const reason = ran.killed ? "Hook 命令执行超时" : `Hook 命令退出码 ${ran.code}`;
+        appendHookLog(rule, request, "error", `${reason}: ${message}`);
+        continue;
       }
       appendHookLog(rule, request, rule.action, message);
       if (ran.stdout) outputs.push(`Hook「${rule.name}」输出：\n${ran.stdout}`);
