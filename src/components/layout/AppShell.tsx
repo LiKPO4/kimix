@@ -907,11 +907,11 @@ export function AppShell() {
     }
   };
 
+  const EDIT_ACTIONS = useMemo(() => new Set<MenuAction>(["zoom-in", "zoom-out", "actual-size"]), []);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (document.querySelector('[aria-modal="true"]')) return;
-      const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
       const isMod = event.ctrlKey || event.metaKey;
       const isShift = event.shiftKey;
       const isAlt = event.altKey;
@@ -934,14 +934,17 @@ export function AppShell() {
       else if (event.key === "F11") action = "toggle-fullscreen";
       else if (isMod && !isShift && !isAlt && event.key.toLowerCase() === "m") action = "minimize";
       else if (isMod && !isShift && !isAlt && event.key === "/") action = "keyboard-shortcuts";
-      if (action) {
-        event.preventDefault();
-        handleMenuAction({ action, label: "" });
-      }
+      if (!action) return;
+      const target = event.target as HTMLElement;
+      const isInputTarget = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      if (isInputTarget && EDIT_ACTIONS.has(action)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleMenuAction({ action, label: "" });
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleMenuAction]);
+  }, [handleMenuAction, EDIT_ACTIONS]);
 
   const liveCurrentSession = useMemo(
     () => selectSessionById(currentSession?.id)(useSessionStore.getState()) ?? currentSession,

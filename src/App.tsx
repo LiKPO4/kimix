@@ -18,7 +18,7 @@ import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError,
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
-import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
@@ -1127,12 +1127,14 @@ function App() {
 
   const handleEscape = useCallback(() => {
     const state = useAppStore.getState();
-    const currentSessionId = state.currentSession?.id;
+    const currentSession = state.currentSession;
     const activeRunningSessionId = state.runningSessionId;
     // Escape 只应停止当前可见会话，不能静默停止后台运行的其他会话。
-    if (currentSessionId && activeRunningSessionId === currentSessionId) {
-      setRunningSessionId(null);
-      const runtimeSessionId = resolveRuntimeSessionId(currentSessionId);
+    if (!currentSession) return;
+    if (!isSessionRuntimeRunning(currentSession, activeRunningSessionId)) return;
+    setRunningSessionId(null);
+    const runtimeSessionId = resolveRuntimeSessionId(currentSession.id);
+    if (runtimeSessionId) {
       window.api.cancelKimiCodeTurn({ sessionId: runtimeSessionId }).catch(logError("cancelKimiCodeTurn"));
     }
   }, [setRunningSessionId]);
