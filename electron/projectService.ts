@@ -109,8 +109,22 @@ export async function addRecentProject(project: Project): Promise<void> {
       writeProjects(sortProjects([...filtered, merged]).slice(0, 20));
       return;
     }
-    const maxOrder = existing.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
-    const added = normalizeProject({ ...project, pinned: project.pinned === true, sortOrder: maxOrder + 1 });
+    // New projects are placed at the top of the unpinned region, right below
+    // any pinned projects, so the user sees them immediately.
+    const isPinned = project.pinned === true;
+    let addedSortOrder: number;
+    if (isPinned) {
+      const pinnedMaxOrder = filtered
+        .filter((p) => p.pinned)
+        .reduce((max, p) => Math.max(max, p.sortOrder ?? 0), -1);
+      addedSortOrder = pinnedMaxOrder + 1;
+    } else {
+      const unpinnedMinOrder = filtered
+        .filter((p) => !p.pinned)
+        .reduce((min, p) => Math.min(min, p.sortOrder ?? Infinity), Infinity);
+      addedSortOrder = unpinnedMinOrder === Infinity ? 0 : unpinnedMinOrder - 1;
+    }
+    const added = normalizeProject({ ...project, pinned: isPinned, sortOrder: addedSortOrder });
     writeProjects(sortProjects([...filtered, added]).slice(0, 20));
   });
 }
