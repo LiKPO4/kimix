@@ -88,6 +88,7 @@ function SessionHistoryLoadingState() {
 const COMPACTION_STALE_MS = 15 * 60 * 1000;
 const COMPACTION_LONG_RUNNING_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
+const OLDER_ITEMS_BATCH_SIZE = CHAT_FULL_RENDER_ITEM_LIMIT;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
 const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 3_500;
 const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
@@ -850,7 +851,7 @@ export const ChatThread = memo(function ChatThread() {
   const lastManualAnchorRestoreAtRef = useRef(0);
   const bottomTrackerFrameRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
-  const [showOlderItems, setShowOlderItems] = useState(false);
+  const [olderItemsPage, setOlderItemsPage] = useState(0);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
@@ -1274,8 +1275,9 @@ export const ChatThread = memo(function ChatThread() {
     cancelSessionAutoBottom();
     const target = findRenderedEventNode(eventId);
     if (!target) {
-      if (!showOlderItems) {
-        setShowOlderItems(true);
+      const hasMoreOlderItems = renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT + olderItemsPage * OLDER_ITEMS_BATCH_SIZE;
+      if (hasMoreOlderItems) {
+        expandOlderItemsToEnd();
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText));
         });
@@ -1328,7 +1330,7 @@ export const ChatThread = memo(function ChatThread() {
     };
     window.addEventListener("kimix:focus-timeline-event", handler);
     return () => window.removeEventListener("kimix:focus-timeline-event", handler);
-  }, [session?.id, showOlderItems]);
+  }, [session?.id, olderItemsPage]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -1345,7 +1347,7 @@ export const ChatThread = memo(function ChatThread() {
     cancelSessionAutoBottom();
     autoFollowRef.current = true;
     userScrollRef.current = false;
-    setShowOlderItems(false);
+    setOlderItemsPage(0);
     setExpandedInitialTailSessionId(null);
     setUserHasScrolled(false);
     pendingOlderItemsScrollAnchorRef.current = null;
@@ -1507,7 +1509,7 @@ export const ChatThread = memo(function ChatThread() {
       window.removeEventListener("resize", scheduleResizeProcess);
       if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     };
-  }, [session?.id, showOlderItems]);
+  }, [session?.id, olderItemsPage]);
 
   useLayoutEffect(() => {
     const node = scrollRef.current;
@@ -1767,7 +1769,7 @@ export const ChatThread = memo(function ChatThread() {
           isAutoFollow: isAutoFollowRef.current,
           ignoreScrollRemaining: Math.max(0, ignoreScrollUntilRef.current - now),
           sessionAutoBottomRemaining: Math.max(0, sessionAutoBottomUntilRef.current - now),
-          showOlderItems,
+          olderItemsPage,
           primedSessionId,
           expandedInitialTailSessionId,
           userHasScrolled,
@@ -1805,9 +1807,11 @@ export const ChatThread = memo(function ChatThread() {
       ))
       .map((event) => event.id));
   }, [hasActiveTurn, session]);
-  const shouldFoldOlderItems = !showOlderItems && renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT;
-  const foldedItemCount = shouldFoldOlderItems ? renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT : 0;
-  const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-CHAT_FULL_RENDER_ITEM_LIMIT) : renderItems;
+  const visibleOlderItemCount = olderItemsPage * OLDER_ITEMS_BATCH_SIZE;
+  const visibleItemLimit = CHAT_FULL_RENDER_ITEM_LIMIT + visibleOlderItemCount;
+  const shouldFoldOlderItems = renderItems.length > visibleItemLimit;
+  const foldedItemCount = shouldFoldOlderItems ? renderItems.length - visibleItemLimit : 0;
+  const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-visibleItemLimit) : renderItems;
   const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id && !userHasScrolled);
   const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
     isCompletedAssistant: (item) => item.type === "event" &&
@@ -1856,7 +1860,7 @@ export const ChatThread = memo(function ChatThread() {
       renderItemsLength: renderItems.length,
       visibleRenderItemsLength: visibleRenderItems.length,
       visibleEventsLength: visibleEvents.length,
-      showOlderItems,
+      olderItemsPage,
       shouldFoldOlderItems,
       isInitialTailOnly,
       initialTailHiddenCount,
@@ -1915,7 +1919,7 @@ export const ChatThread = memo(function ChatThread() {
     runtimeSessionId,
     session?.id,
     shouldFoldOlderItems,
-    showOlderItems,
+    olderItemsPage,
     userHasScrolled,
     visibleEvents.length,
     visibleRenderItems.length,
@@ -1968,7 +1972,7 @@ export const ChatThread = memo(function ChatThread() {
   useLayoutEffect(() => {
     const anchor = pendingOlderItemsScrollAnchorRef.current;
     const node = scrollRef.current;
-    if (!anchor || !node || !showOlderItems) return;
+    if (!anchor || !node || olderItemsPage === 0) return;
     pendingOlderItemsScrollAnchorRef.current = null;
     const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
     const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
@@ -1982,7 +1986,7 @@ export const ChatThread = memo(function ChatThread() {
     updateAutoFollow(false);
     const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
     updateShowScrollToBottom(distance > 80);
-  }, [showOlderItems, visibleRenderItems.length]);
+  }, [olderItemsPage, visibleRenderItems.length]);
 
   if (isRestoringOfficialHistory) {
     return <SessionHistoryLoadingState />;
@@ -2006,7 +2010,29 @@ export const ChatThread = memo(function ChatThread() {
       ignoreScrollUntilRef.current = Date.now() + 240;
       intentionalResizeRestoreUntilRef.current = Date.now() + 240;
     }
-    setShowOlderItems(true);
+    setOlderItemsPage((prev) => prev + 1);
+  };
+
+  const expandOlderItemsToEnd = () => {
+    const maxPage = Math.max(
+      0,
+      Math.ceil((renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT) / OLDER_ITEMS_BATCH_SIZE)
+    );
+    if (olderItemsPage >= maxPage) return;
+    const node = scrollRef.current;
+    if (node) {
+      const containerRect = node.getBoundingClientRect();
+      const items = Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-render-key]"));
+      const anchor = items.find((item) => item.getBoundingClientRect().bottom >= containerRect.top + 1) ?? items[0];
+      pendingOlderItemsScrollAnchorRef.current = anchor ? {
+        key: anchor.dataset.kimixRenderKey ?? "",
+        offsetTop: anchor.getBoundingClientRect().top - containerRect.top,
+      } : null;
+      scrollTokenRef.current += 1;
+      ignoreScrollUntilRef.current = Date.now() + 240;
+      intentionalResizeRestoreUntilRef.current = Date.now() + 240;
+    }
+    setOlderItemsPage(maxPage);
   };
 
   const expandInitialTail = () => {
