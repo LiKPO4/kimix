@@ -143,6 +143,7 @@ function renderDiffColumn(lines: DiffLine[], side: "old" | "new") {
 export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const project = useAppStore((s) => s.currentProject);
+  const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const updateSession = useSessionStore((s) => s.updateSession);
   const [reverting, setReverting] = useState(false);
   const [error, setError] = useState("");
@@ -196,10 +197,22 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
 
   const handleRevert = async (targetFiles = files) => {
     if (!projectPath || targetFiles.length === 0 || reverting) return;
+    const maxListedFiles = 8;
+    const listedFiles = targetFiles.slice(0, maxListedFiles).map((file) => file.path);
+    const omittedCount = Math.max(0, targetFiles.length - listedFiles.length);
+    const fileList = [
+      ...listedFiles,
+      omittedCount > 0 ? `…以及另外 ${omittedCount} 个文件` : "",
+    ].filter(Boolean).join("\n");
+    const confirmMessage = targetFiles.length === 1
+      ? `确定要撤销以下文件吗？\n\n${fileList}\n\n此操作不可恢复。如果该文件在 Agent 修改后又被你手动编辑过，这些新修改也会被一并丢弃。`
+      : `确定要撤销以下 ${targetFiles.length} 个文件吗？\n\n${fileList}\n\n此操作不可恢复。如果这些文件在 Agent 修改后又被你手动编辑过，这些新修改也会被一并丢弃。`;
+    if (!window.confirm(confirmMessage)) return;
     setReverting(true);
     setError("");
     const res = await window.api.revertFiles({
       projectPath,
+      additionalWorkDirs,
       files: targetFiles.map((file) => ({
         path: file.path,
         additions: file.additions,

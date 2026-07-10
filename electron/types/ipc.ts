@@ -1048,6 +1048,7 @@ export type OpenFileRequest = {
 
 export type RevertFilesRequest = {
   projectPath: string;
+  additionalWorkDirs?: string[];
   files: Array<string | {
     path: string;
     additions?: number;

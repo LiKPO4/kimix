@@ -4347,7 +4347,10 @@ ipcMain.handle("project:revertFiles", async (_, request: unknown) => {
       })
       .filter((file): file is projectService.RevertFileTarget => file !== null);
     files.forEach((file) => resolveProjectFile(req.projectPath as string, file.path));
-    await projectService.revertGitFiles(req.projectPath, files);
+    const additionalWorkDirs = Array.isArray(req.additionalWorkDirs)
+      ? req.additionalWorkDirs.filter((item): item is string => typeof item === "string")
+      : [];
+    await projectService.revertGitFiles(req.projectPath, files, additionalWorkDirs);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

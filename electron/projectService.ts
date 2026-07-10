@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { exec, execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { shell } from "electron";
 import type { GitGraphEntry, Project } from "./types/ipc";
 
 /** 串行 mutex — 确保并发读写不相互覆盖。 */
@@ -554,6 +555,18 @@ function resolveRevertTarget(projectPath: string, target: RevertFileTarget) {
   return { ...target, absolutePath };
 }
 
+function isInsideAllowedRoots(absolutePath: string, roots: string[]): boolean {
+  const normalizedTarget = path.resolve(absolutePath);
+  return roots.some((root) => {
+    const normalizedRoot = path.resolve(root);
+    const relative = path.relative(normalizedRoot, normalizedTarget).replace(/\\/g, "/");
+    return (
+      normalizedTarget.toLowerCase() === normalizedRoot.toLowerCase() ||
+      (!relative.startsWith("../") && !path.isAbsolute(relative))
+    );
+  });
+}
+
 function isInsideLongTaskGeneratedArea(projectPath: string, absolutePath: string) {
   const relative = path.relative(path.resolve(projectPath), absolutePath).replace(/\\/g, "/");
   return !relative.startsWith("../") && !path.isAbsolute(relative) && relative.startsWith(".kimix-long-tasks/");
@@ -570,7 +583,7 @@ async function revertGitGroup(gitRoot: string, targets: Array<RevertFileTarget &
     });
     if (stdout.trimStart().startsWith("??")) {
       if (fs.existsSync(target.absolutePath)) {
-        fs.rmSync(target.absolutePath, { force: true, recursive: true });
+        await shell.trashItem(target.absolutePath);
       }
       continue;
     }
@@ -585,7 +598,7 @@ async function revertGitGroup(gitRoot: string, targets: Array<RevertFileTarget &
   }
 }
 
-function revertNonGitGeneratedFile(projectPath: string, target: RevertFileTarget & { absolutePath: string }) {
+async function revertNonGitGeneratedFile(projectPath: string, target: RevertFileTarget & { absolutePath: string }) {
   const additions = target.additions ?? 0;
   const deletions = target.deletions ?? 0;
   if (!isInsideLongTaskGeneratedArea(projectPath, target.absolutePath)) {
@@ -594,16 +607,29 @@ function revertNonGitGeneratedFile(projectPath: string, target: RevertFileTarget
   if (additions === 0 && deletions === 0) return;
   if (additions > 0 && deletions === 0) {
     if (fs.existsSync(target.absolutePath)) {
-      fs.rmSync(target.absolutePath, { force: true, recursive: true });
+      await shell.trashItem(target.absolutePath);
     }
     return;
   }
   throw new Error("当前项目不是 Git 仓库，无法恢复已有文件的旧内容");
 }
 
-export async function revertGitFiles(projectPath: string, targets: RevertFileTarget[]): Promise<void> {
+export async function revertGitFiles(
+  projectPath: string,
+  targets: RevertFileTarget[],
+  additionalWorkDirs: string[] = [],
+): Promise<void> {
   if (targets.length === 0) return;
+  const allowedRoots = [projectPath, ...additionalWorkDirs].filter(Boolean);
+  if (allowedRoots.length === 0) {
+    throw new Error("缺少有效的项目路径");
+  }
   const resolvedTargets = targets.map((target) => resolveRevertTarget(projectPath, target));
+  for (const target of resolvedTargets) {
+    if (!isInsideAllowedRoots(target.absolutePath, allowedRoots)) {
+      throw new Error(`撤销目标不在允许的工作区内：${target.path}`);
+    }
+  }
   const gitGroups = new Map<string, Array<RevertFileTarget & { absolutePath: string }>>();
   const nonGitTargets: Array<RevertFileTarget & { absolutePath: string }> = [];
 
@@ -622,6 +648,6 @@ export async function revertGitFiles(projectPath: string, targets: RevertFileTar
     await revertGitGroup(gitRoot, group);
   }
   for (const target of nonGitTargets) {
-    revertNonGitGeneratedFile(projectPath, target);
+    await revertNonGitGeneratedFile(projectPath, target);
   }
 }
