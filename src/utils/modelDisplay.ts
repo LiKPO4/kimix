@@ -33,6 +33,26 @@ export function getLastUsedModelFromEvents(events: { type: string; message?: str
   return null;
 }
 
+export function getLastUsedModelFromEventsAfter(
+  events: { type: string; timestamp?: number; message?: string | null; model?: string | null }[],
+  after?: number,
+): string | null {
+  if (after === undefined) return getLastUsedModelFromEvents(events);
+  return getLastUsedModelFromEvents(events.filter((event) => (
+    typeof event.timestamp === "number" && event.timestamp > after
+  )));
+}
+
+export function resolveResumedSessionModel(input: {
+  resumedModel?: string | null;
+  sessionModel?: string | null;
+  switchedToModel?: string | null;
+  modelSwitchedAt?: number;
+}): string | null {
+  const pendingModel = input.switchedToModel?.trim() || (input.modelSwitchedAt ? input.sessionModel?.trim() : "");
+  return pendingModel || input.resumedModel?.trim() || input.sessionModel?.trim() || null;
+}
+
 export function getSessionModelForDisplay(input: {
   events: Array<{ type: string; timestamp?: number; message?: string | null; model?: string | null }>;
   sessionModel?: string | null;

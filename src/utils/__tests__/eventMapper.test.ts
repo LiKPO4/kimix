@@ -313,10 +313,11 @@ describe("mergeEvents", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Hel", isThinking: false, isComplete: false },
     ];
-    const incoming: TimelineEvent = { id: "2", type: "assistant_message", timestamp: 2, content: "lo", isThinking: false, isComplete: false };
+    const incoming: TimelineEvent = { id: "2", type: "assistant_message", timestamp: 2, content: "lo", model: "new-model", isThinking: false, isComplete: false };
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(1);
     expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("Hello");
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).model).toBe("new-model");
   });
 
   it("preserves exact assistant delta concatenation across a tool boundary", () => {

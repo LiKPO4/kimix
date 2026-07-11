@@ -23,6 +23,7 @@ import { logError } from "@/utils/reportError";
 import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/utils/pendingPermissionChange";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
+import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -997,7 +998,12 @@ export function Composer() {
           // otherwise make the assistant run against the wrong directory; drop it
           // and fall through to create a fresh session at projectPath.
           if (resumeRes.success && (!targetSession.projectPath || sameWorkDir(resumeRes.data.workDir, targetSession.projectPath))) {
-            const model = resumeRes.data.model ?? targetSession.model ?? await getDefaultKimiModel();
+            const model = resolveResumedSessionModel({
+              resumedModel: resumeRes.data.model,
+              sessionModel: targetSession.model,
+              switchedToModel: targetSession.switchedToModel,
+              modelSwitchedAt: targetSession.modelSwitchedAt,
+            }) ?? await getDefaultKimiModel();
             targetSession = {
               ...targetSession,
               engine: "kimi-code",
@@ -1035,6 +1041,7 @@ export function Composer() {
 
         const createRes = await window.api.createKimiCodeSession({
           workDir: targetSession.projectPath,
+          model: targetSession.switchedToModel ?? targetSession.model ?? undefined,
           permission: permissionMode,
           planMode: defaultPlanMode,
           additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),

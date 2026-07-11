@@ -2,6 +2,7 @@
 
 ## 2026-07-11
 
+* **Manual model switches survive resume and history replay**: Resume metadata and stream batches ignore model evidence older than the switch boundary, new Assistant deltas retain their model when merged into local placeholders, and historical replayed turn ends cannot temporarily close a newly dispatched turn. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Latest-snapshot persistence and architecture-safe updates**: Renderer persistence keeps only the newest queued snapshot across write failures, commits conversation state and image references atomically, and prunes images from the committed reference set. macOS update selection distinguishes arm64, x64, universal, and legacy unmarked x64 assets; future artifacts include architecture suffixes and automatic installation requires Release SHA-256 metadata. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-10

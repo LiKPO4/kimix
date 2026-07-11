@@ -50,4 +50,33 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
       toolCallId: "call-1",
     }, events)).toBe(true);
   });
+
+  it("does not let a historical turn end close a new local assistant placeholder", () => {
+    const events: TimelineEvent[] = [{
+      id: "user-new",
+      type: "user_message",
+      timestamp: 8,
+      content: "新问题",
+    }, {
+      id: "status-new",
+      type: "status_update",
+      timestamp: 9,
+      message: "消息发送中",
+      source: "ipc",
+      parentEventId: "user-new",
+    }, {
+      id: "assistant-pending",
+      type: "assistant_message",
+      timestamp: 10,
+      content: "",
+      isThinking: false,
+      isComplete: false,
+    }];
+
+    expect(shouldSkipKimiCodeSnapshotReplay({
+      type: "turn.ended",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+    }, events)).toBe(true);
+  });
 });

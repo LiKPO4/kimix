@@ -1317,6 +1317,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const updated: typeof last = {
         ...last,
         agentRole: incoming.agentRole ?? last.agentRole,
+        model: incoming.model ?? last.model,
         content: appendAssistantContent(last.content, incoming.content),
         thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
         thinkingParts: incoming.thinkingParts

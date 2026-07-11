@@ -1,12 +1,12 @@
 # Kimix 长程任务状态
 
-## 2026-07-11 v2.15.5 Web 工具长内容按需展开
+## 2026-07-11 v2.15.6 模型切换后的新轮次稳定性
 
-- 当前目标：工具长参数/结果不应只显示不可恢复的“已省略”文案，用户应能按需展开完整内容。
-- 已完成：保留默认轻量预览；Web 工具明细移除旧省略标记，改为可点击的“已折叠 N 字，点击展开查看”，展开后使用事件原始完整内容，支持再次收起。
-- 验证：定向 `toolDisplay` 测试 2 项通过；`pnpm build` 通过；待完成知识库和 diff 校验。
-- 关键文件：`src/components/chat/MessageBubble.tsx`、`src/utils/toolDisplay.ts`。
-- 下一步：以 v2.15.5 截图确认长工具内容的折叠提示、展开和收起行为。
+- 当前目标：修复切换模型后发送消息时 Agent 过程头短暂消失、底栏回退旧模型的问题。
+- 已完成：历史回放的 `turn.ended` 不再关闭本地新轮占位消息；恢复会话和流批处理均遵守模型切换时间边界；Assistant 增量合并会保留实际模型；重建运行时显式携带当前模型。
+- 验证：定向模型、快照回放和事件合并测试 91 项通过；`pnpm build` 通过；待完成知识库和 diff 校验。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/hooks/useEventStream.ts`、`src/utils/kimiCodeSnapshotReplay.ts`、`src/utils/modelDisplay.ts`、`src/utils/eventMapper.ts`。
+- 下一步：以 v2.15.6 切换模型后立即发送消息，确认 Agent 过程头连续显示且底栏保持新模型。
 
 ## 2026-07-11 v2.15.1 审查回归修复
 

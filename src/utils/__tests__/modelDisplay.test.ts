@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getSessionModelForDisplay } from "../modelDisplay";
+import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getLastUsedModelFromEventsAfter, getSessionModelForDisplay, resolveResumedSessionModel } from "../modelDisplay";
 
 describe("modelDisplay", () => {
   it("shows only the segment after the final slash", () => {
@@ -58,5 +58,22 @@ describe("modelDisplay", () => {
       modelSwitchedAt: 200,
       events: [...events, { type: "assistant_message", timestamp: 300, model: "kimi-for-coding" }],
     })).toBe("kimi-for-coding");
+  });
+
+  it("ignores model evidence from before a manual switch", () => {
+    const events = [
+      { type: "assistant_message", timestamp: 100, model: "old-model" },
+      { type: "assistant_message", timestamp: 300, model: "new-model" },
+    ];
+    expect(getLastUsedModelFromEventsAfter(events, 200)).toBe("new-model");
+    expect(getLastUsedModelFromEventsAfter(events.slice(0, 1), 200)).toBeNull();
+  });
+
+  it("does not let stale resume metadata override a manual model switch", () => {
+    expect(resolveResumedSessionModel({
+      resumedModel: "old-model",
+      sessionModel: "new-model",
+      modelSwitchedAt: 200,
+    })).toBe("new-model");
   });
 });
