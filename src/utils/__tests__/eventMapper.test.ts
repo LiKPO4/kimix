@@ -1119,6 +1119,34 @@ describe("mergeEvents", () => {
     expect(change.additions).toBe(2);
   });
 
+  it("only records quoted deletion paths before shell chaining", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "tool_call",
+        timestamp: 1,
+        toolCallId: "tc-delete",
+        toolName: "Bash",
+        status: "running",
+        arguments: { command: 'del "release-notes-v2.1.15.md" && git status' },
+        display: { cwd: "D:/WORKS/Android Project/WorkHub/clipstash" },
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-delete",
+      toolName: "Bash",
+      result: "deleted",
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files).toEqual([{ path: "release-notes-v2.1.15.md", additions: 0, deletions: 1 }]);
+    expect(change.projectPath).toBe("D:/WORKS/Android Project/WorkHub/clipstash");
+  });
+
   it("does not add change summary for successful Read tool with a path", () => {
     const existing: TimelineEvent[] = [
       {

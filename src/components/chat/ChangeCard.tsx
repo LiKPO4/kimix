@@ -33,14 +33,34 @@ function countLines(value?: string) {
   return value.split("\n").filter(Boolean).length;
 }
 
-function normalizePath(value: string) {
-  return normalizePathForComparison(value);
+function stripOuterQuotes(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2 && ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
 }
 
-function mergeChangeRows(rows: ChangeRow[]) {
+function normalizePath(value: string, projectPath?: string) {
+  const path = stripOuterQuotes(value).replace(/\\/g, "/");
+  if (!projectPath || /^(?:[a-z]:\/|\/)/i.test(path)) return normalizePathForComparison(path);
+  return normalizePathForComparison(`${projectPath.replace(/[\\/]+$/, "")}/${path}`);
+}
+
+function formatPathForDisplay(value: string, projectPath?: string) {
+  const path = stripOuterQuotes(value).replace(/\\/g, "/");
+  const root = projectPath ? normalizePathForComparison(projectPath).replace(/\/+$/, "") : "";
+  const normalized = normalizePathForComparison(path);
+  if (root && (normalized === root || normalized.startsWith(`${root}/`))) {
+    return path.slice(root.length + 1);
+  }
+  return path;
+}
+
+function mergeChangeRows(rows: ChangeRow[], projectPath?: string) {
   const byPath = new Map<string, ChangeRow>();
   rows.forEach((row) => {
-    const key = normalizePath(row.path);
+    const key = normalizePath(row.path, projectPath);
     const existing = byPath.get(key);
     byPath.set(key, {
       path: existing?.path ?? row.path,
@@ -53,12 +73,12 @@ function mergeChangeRows(rows: ChangeRow[]) {
   return Array.from(byPath.values());
 }
 
-function findDiffForPath(events: TimelineEvent[], filePath: string) {
-  const normalizedFile = normalizePath(filePath);
+function findDiffForPath(events: TimelineEvent[], filePath: string, projectPath?: string) {
+  const normalizedFile = normalizePath(filePath, projectPath);
   const diffs = events.filter((item): item is Extract<TimelineEvent, { type: "diff" }> => item.type === "diff");
   for (let index = diffs.length - 1; index >= 0; index -= 1) {
     const diff = diffs[index];
-    const normalizedDiff = normalizePath(diff.filePath);
+    const normalizedDiff = normalizePath(diff.filePath, projectPath);
     if (
       normalizedDiff === normalizedFile ||
       normalizedDiff.endsWith(`/${normalizedFile}`) ||
@@ -153,16 +173,16 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
   const [expanded, setExpanded] = useState(false);
   const [expandedDiffs, setExpandedDiffs] = useState<Record<string, boolean>>({});
   const [headerToggleActive, setHeaderToggleActive] = useState(false);
+  const projectPath = event?.projectPath ?? project?.path;
   const files = useMemo(() => mergeChangeRows(event?.files ?? (changes ?? []).map((change) => ({
     path: change.path,
     oldText: change.oldText,
     newText: change.newText,
     additions: change.additions ?? Math.max(0, countLines(change.newText) - countLines(change.oldText)),
     deletions: change.deletions ?? Math.max(0, countLines(change.oldText) - countLines(change.newText)),
-  }))), [changes, event?.files]);
+  })), projectPath), [changes, event?.files, projectPath]);
   const additions = files.reduce((sum, file) => sum + (file.additions ?? 0), 0);
   const deletions = files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
-  const projectPath = event?.projectPath ?? project?.path;
   const canExpand = files.length > 3;
   const visibleFiles = expanded ? files : files.slice(0, 3);
   const hiddenFileCount = Math.max(0, files.length - visibleFiles.length);
@@ -171,22 +191,22 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     const map = new Map<string, Change>();
     files.forEach((change) => {
       if (change.oldText !== undefined || change.newText !== undefined) {
-        map.set(normalizePath(change.path), change);
+        map.set(normalizePath(change.path, projectPath), change);
       }
     });
     return map;
-  }, [files]);
+  }, [files, projectPath]);
 
   const removeRevertedFiles = (paths: string[]) => {
     if (!currentSession || !event) return;
-    const reverted = new Set(paths.map((path) => normalizePath(path)));
+    const reverted = new Set(paths.map((path) => normalizePath(path, projectPath)));
     updateSession(currentSession.id, (session) => ({
       ...session,
       events: session.events.flatMap((item) => {
         if (item.type !== "change_summary") return [item];
         const eventIds = event.id.split(":");
         if (!eventIds.includes(item.id)) return [item];
-        const nextFiles = item.files.filter((file) => !reverted.has(normalizePath(file.path)));
+        const nextFiles = item.files.filter((file) => !reverted.has(normalizePath(file.path, projectPath)));
         if (nextFiles.length === 0) return [];
         return [{
           ...item,
@@ -216,8 +236,8 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     setError("");
     try {
       const filesWithSnapshot = await Promise.all(targetFiles.map(async (file) => {
-        const key = normalizePath(file.path);
-        const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path) : null;
+        const key = normalizePath(file.path, projectPath);
+        const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path, projectPath) : null;
         const change = changesByPath.get(key);
         const newText = change?.newText ?? diffEvent?.newText;
         const snapshotHash = newText ? await sha256Hex(newText) : undefined;
@@ -272,8 +292,8 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
   };
 
   const renderFileRow = (file: { path: string; additions?: number; deletions?: number }) => {
-    const key = normalizePath(file.path);
-    const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path) : null;
+    const key = normalizePath(file.path, projectPath);
+    const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path, projectPath) : null;
     const change = changesByPath.get(key);
     const oldText = change?.oldText ?? diffEvent?.oldText;
     const newText = change?.newText ?? diffEvent?.newText;
@@ -306,7 +326,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
                 ? <ChevronDown size={14} className="shrink-0 text-text-muted" />
                 : <ChevronRight size={14} className="shrink-0 text-text-muted" />
               : <FileText size={14} className="shrink-0 text-text-muted" />}
-            <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{file.path}</span>
+            <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{formatPathForDisplay(file.path, projectPath)}</span>
           </button>
           <div className="kimix-tabular-nums flex items-center justify-self-end text-[13.5px]" style={{ gap: 8, minWidth: 72 }}>
             <span className="text-accent-success">+{file.additions ?? 0}</span>

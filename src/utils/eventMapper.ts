@@ -434,14 +434,50 @@ function isShellLikeTool(toolName: string): boolean {
 
 function parseShellDeletionPaths(command: string): string[] {
   const trimmed = command.trim();
-  if (!/^\s*(rm|del|rmdir|Remove-Item|unlink)\b/i.test(trimmed)) return [];
-  const tokens = trimmed.split(/\s+/);
+  const match = trimmed.match(/^\s*(rm|del|rmdir|Remove-Item|unlink)\b\s*([\s\S]*)$/i);
+  if (!match) return [];
+
+  const tokens: string[] = [];
+  let token = "";
+  let quote: "'" | '"' | null = null;
+  const flush = () => {
+    if (token) tokens.push(token);
+    token = "";
+  };
+  const rest = match[2] ?? "";
+  for (let index = 0; index < rest.length; index += 1) {
+    const char = rest[index];
+    if (quote) {
+      if (char === quote) quote = null;
+      else token += char;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      flush();
+      continue;
+    }
+    if (char === ";" || char === "|") {
+      flush();
+      break;
+    }
+    if (char === "&" && rest[index + 1] === "&") {
+      flush();
+      break;
+    }
+    token += char;
+  }
+  flush();
+
   const paths: string[] = [];
-  for (let i = 1; i < tokens.length; i += 1) {
-    const token = tokens[i];
-    if (!token) continue;
-    if (token.startsWith("-") || token.startsWith("/")) continue;
-    paths.push(token);
+  for (const value of tokens) {
+    if (!value || value.startsWith("-")) continue;
+    if (/^\/(?:q|s|f|a|p)$/i.test(value)) continue;
+    if (value === ".") continue;
+    paths.push(value);
   }
   return paths;
 }
@@ -477,6 +513,7 @@ function createChangeSummaryFromToolCall(
       id: generateId(),
       type: "change_summary",
       timestamp,
+      projectPath: call.display?.cwd,
       files: [{ path, additions, deletions }],
       additions,
       deletions,
@@ -489,6 +526,7 @@ function createChangeSummaryFromToolCall(
       id: generateId(),
       type: "change_summary",
       timestamp,
+      projectPath: call.display?.cwd,
       files: deletedPaths.map((path) => ({ path, additions: 0, deletions: 1 })),
       additions: 0,
       deletions: deletedPaths.length,

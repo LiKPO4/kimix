@@ -1,12 +1,12 @@
 # Kimix 长程任务状态
 
-## 2026-07-11 v2.15.2 ChangeCard 头部 hover 层级修正
+## 2026-07-11 v2.15.3 文件变更路径解析与展示统一
 
-- 当前目标：消除文件变更头部 hover 的局部灰色胶囊，使其与“再显示文件”行保持一致的整行反馈。
-- 已完成：hover/focus 背景提升到 44px 头部网格行；左侧展开按钮自身保持透明且移除圆角 hover，右侧“全部撤销”保持独立操作反馈。
-- 验证：`pnpm test:run` 59 个文件、417 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过；等待用户截图复验。
-- 关键文件：`src/components/chat/ChangeCard.tsx`。
-- 下一步：以 v2.15.2 截图确认顶部整行反馈与撤销按钮 hover 的视觉关系。
+- 当前目标：修复文件变更卡将命令链片段误显示为文件、同一文件混用绝对/相对路径的问题。
+- 已完成：Shell 删除命令仅解析第一个命令段并保留带空格的引号路径；变更卡按项目路径规范化去重，统一显示项目内相对路径；新增回归测试。
+- 验证：定向 `eventMapper` 测试 77 项通过；`pnpm build` 通过；待完成知识库和 diff 校验。
+- 关键文件：`src/utils/eventMapper.ts`、`src/components/chat/ChangeCard.tsx`、`src/utils/__tests__/eventMapper.test.ts`。
+- 下一步：检查历史会话重载后的卡片是否只保留真实文件，且路径格式一致。
 
 ## 2026-07-11 v2.15.1 审查回归修复
 
