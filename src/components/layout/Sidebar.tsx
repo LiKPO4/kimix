@@ -137,6 +137,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
   const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; left: number } | null>(null);
+  const [projectActionFocusId, setProjectActionFocusId] = useState<string | null>(null);
   const [sessionActionFocusId, setSessionActionFocusId] = useState<string | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
   const projectCatalogRefreshInFlightRef = useRef<Set<string>>(new Set());
@@ -321,6 +322,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const pinProject = async (project: Project) => {
+    setProjectActionFocusId(null);
     setOpenProjectMenu(null);
     const res = await window.api.setProjectPinned({ id: project.id, pinned: true });
     if (res.success) setRecentProjects(res.data);
@@ -328,6 +330,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   const unpinProject = async (project: Project) => {
+    setProjectActionFocusId(null);
     setOpenProjectMenu(null);
     const res = await window.api.setProjectPinned({ id: project.id, pinned: false });
     if (res.success) setRecentProjects(res.data);
@@ -731,6 +734,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         >
                           <button
                             onClick={() => {
+                              setProjectActionFocusId(null);
                               if (isExpanded) lastAutoExpandedProjectId.current = project.id;
                               setExpandedProjectIds((current) => {
                                 const next = new Set(current);
@@ -745,7 +749,29 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
                             {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                           </button>
-                          <div className="kimix-sidebar-project-row-actions flex shrink-0 items-center opacity-0 transition-opacity group-hover/project:opacity-100 group-focus-within/project:opacity-100">
+                          <div
+                            className={`kimix-sidebar-project-row-actions flex shrink-0 items-center transition-opacity ${
+                              projectActionFocusId === project.id ? "opacity-100" : "opacity-0 group-hover/project:opacity-100"
+                            }`}
+                            style={{ gap: 1 }}
+                            onFocusCapture={() => setProjectActionFocusId(project.id)}
+                            onBlurCapture={(e) => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setProjectActionFocusId(null);
+                            }}
+                          >
+                            {!isPinned && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void pinProject(project);
+                                }}
+                                className="kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                title="置顶项目"
+                                aria-label="置顶项目"
+                              >
+                                <Pin size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -958,7 +984,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.13</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.14</span>
         </button>
       </div>
     </aside>
