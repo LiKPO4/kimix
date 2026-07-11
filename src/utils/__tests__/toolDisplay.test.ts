@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatToolArgumentsForDisplay, toolArgumentPreview } from "../toolDisplay";
+import { formatFullToolArgumentsForDisplay, formatToolArgumentsForDisplay, toolArgumentPreview } from "../toolDisplay";
 
 describe("toolDisplay", () => {
   it("summarizes large Write content instead of rendering the full body", () => {
@@ -28,6 +28,7 @@ describe("toolDisplay", () => {
     expect(detail).toContain("120 行");
     expect(detail).toContain("已省略");
     expect(detail.length).toBeLessThan(1200);
+    expect(formatFullToolArgumentsForDisplay(event)).toContain("line 120");
   });
 
   it("uses structured arguments for preview instead of duplicated raw json", () => {

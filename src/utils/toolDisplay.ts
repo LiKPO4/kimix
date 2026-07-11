@@ -80,6 +80,16 @@ function stringifyCompact(value: unknown): string {
   }
 }
 
+function stringifyFull(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 export function getStructuredToolArguments(event: ToolLikeEvent): Record<string, unknown> | null {
   if (event.type === "tool_result") return null;
   if (event.arguments && Object.keys(event.arguments).length > 0) return event.arguments;
@@ -114,6 +124,17 @@ export function formatToolArgumentsForDisplay(event: ToolLikeEvent): string {
   return stringifyCompact(event.rawArguments ?? "");
 }
 
+/** 完整内容仅在用户主动展开长工具明细时使用，避免默认渲染拖慢长会话。 */
+export function formatFullToolArgumentsForDisplay(event: ToolLikeEvent): string {
+  if (event.type === "tool_result") return "";
+  const args = getStructuredToolArguments(event);
+  return args ? stringifyFull(args) : (event.rawArguments ?? "");
+}
+
 export function formatToolResultForDisplay(value: unknown): string {
   return stringifyCompact(value).trim();
+}
+
+export function formatFullToolResultForDisplay(value: unknown): string {
+  return stringifyFull(value).trim();
 }

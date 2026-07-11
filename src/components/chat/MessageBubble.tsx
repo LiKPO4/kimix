@@ -13,7 +13,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs } from "@/utils/duration";
 import { hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents } from "@/utils/sessionActivity";
-import { formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
+import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
@@ -893,6 +893,10 @@ type ProcessGroup =
   | { type: "subagent"; subagents: SubagentEvent[] }
   | { type: "approval"; approvals: ApprovalEvent[] };
 
+function removeToolOmissionMarkers(value: string) {
+  return value.replace(/\n?\.\.\.（已省略[^）]*）/g, "");
+}
+
 function groupProcessItems(items: ProcessItem[]): ProcessGroup[] {
   const groups: ProcessGroup[] = [];
   for (const item of items) {
@@ -1034,10 +1038,13 @@ function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
 
 function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [showFullDetails, setShowFullDetails] = useState(false);
   const {
     displayTarget,
     lineCount,
     detailText,
+    fullDetailText,
+    omittedCharacters,
     hasDetail,
   } = useMemo(() => {
     const argumentPreview = toolArgumentPreview(tool) || tool.toolName || "工具调用";
@@ -1066,8 +1073,24 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
       argumentText ? `参数：\n${argumentText}` : "",
       resultText ? `结果：\n${resultText}` : "",
     ].filter(Boolean).join("\n\n");
-    const hasDetail = detailText.trim().length > 0;
-    return { displayTarget, lineCount, detailText, hasDetail };
+    const fullArgumentText = formatFullToolArgumentsForDisplay(tool).trim();
+    const fullResultText = formatFullToolResultForDisplay(tool.result);
+    const fullDetailText = [
+      `工具：${tool.toolName || "未知工具"}`,
+      officialDescription ? `展示：${officialDescription}` : "",
+      fullArgumentText ? `参数：\n${fullArgumentText}` : "",
+      fullResultText ? `结果：\n${fullResultText}` : "",
+    ].filter(Boolean).join("\n\n");
+    const previewDetailText = removeToolOmissionMarkers(detailText);
+    const hasDetail = previewDetailText.trim().length > 0;
+    return {
+      displayTarget,
+      lineCount,
+      detailText: previewDetailText,
+      fullDetailText,
+      omittedCharacters: Math.max(0, fullDetailText.length - previewDetailText.length),
+      hasDetail,
+    };
   }, [tool]);
   const rowContent = (
     <>
@@ -1112,9 +1135,22 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         </div>
       )}
       {expanded && (
-        <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 12px 6px 38px" }}>
-          {detailText}
-        </pre>
+        <div>
+          <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "0 12px 6px 38px" }}>
+            {showFullDetails ? fullDetailText : detailText}
+          </pre>
+          {omittedCharacters > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowFullDetails((value) => !value)}
+              className="kimix-icon-text-button ml-[38px] text-[12px] text-[var(--kimix-panel-text-muted)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"
+              style={{ marginBottom: 8 }}
+            >
+              {showFullDetails ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              <span>{showFullDetails ? "收起工具完整内容" : `已折叠 ${omittedCharacters.toLocaleString()} 字，点击展开查看`}</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
