@@ -492,6 +492,11 @@ const api = {
     ipcRenderer.invoke("app:triggerShortcut", req),
   notifyTurnComplete: (req: TurnCompleteNotificationRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:notifyTurnComplete", req),
+  onNotificationClick: (callback: (payload: { sessionId: string }) => void) => {
+    const handler = (_: unknown, payload: { sessionId: string }) => callback(payload);
+    ipcRenderer.on("app:notification-clicked", handler);
+    return () => ipcRenderer.off("app:notification-clicked", handler);
+  },
   getDraggedFilePath: (file: File): string => webUtils.getPathForFile(file),
   reportRendererHeartbeat: (payload: RendererHeartbeatPayload): void =>
     ipcRenderer.send("app:rendererHeartbeat", payload),

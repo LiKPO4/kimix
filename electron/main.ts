@@ -2392,7 +2392,7 @@ function clearTaskbarAttention() {
   app.setBadgeCount(0);
 }
 
-function showTurnCompleteNotification(title: string, body: string, rendererWindowFocused = false, rendererPageVisible = false) {
+function showTurnCompleteNotification(title: string, body: string, sessionId = "", rendererWindowFocused = false, rendererPageVisible = false) {
   const settings = settingsService.loadSettings();
   const notificationMode = settings.notificationMode ?? "unfocused";
   const notificationShowContent = settings.notificationShowContent ?? false;
@@ -2415,6 +2415,7 @@ function showTurnCompleteNotification(title: string, body: string, rendererWindo
     mainWindow.show();
     mainWindow.focus();
     clearTaskbarAttention();
+    if (sessionId) mainWindow.webContents.send("app:notification-clicked", { sessionId });
   });
   notification.show();
 }
@@ -6712,9 +6713,10 @@ ipcMain.handle("app:notifyTurnComplete", async (_, request: unknown) => {
     const payload = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const title = typeof payload.title === "string" ? payload.title.slice(0, 80) : "Kimix 本轮已完成";
     const body = typeof payload.body === "string" ? payload.body.slice(0, 180) : "当前轮次处理已完成，可以回来查看结果。";
+    const sessionId = typeof payload.sessionId === "string" ? payload.sessionId.slice(0, 160) : "";
     const windowFocused = payload.windowFocused === true;
     const pageVisible = payload.pageVisible === true;
-    showTurnCompleteNotification(title, body, windowFocused, pageVisible);
+    showTurnCompleteNotification(title, body, sessionId, windowFocused, pageVisible);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

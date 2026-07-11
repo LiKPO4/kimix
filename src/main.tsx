@@ -524,6 +524,7 @@ function installBrowserPreviewApi() {
     launchCommand: () => fail("启动命令"),
     triggerShortcut: () => okVoid(),
     notifyTurnComplete: () => okVoid(),
+    onNotificationClick: () => () => {},
     getDraggedFilePath: () => "",
     reportRendererHeartbeat: () => {},
     reportRendererStartup: () => {},

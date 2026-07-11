@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-07-11T14:32:00+08:00"
+timestamp: "2026-07-11T15:47:00+08:00"
 ---
 
 # Kimix
@@ -15,6 +15,7 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 
 * The renderer lives under `src/` and communicates with privileged capabilities through the preload bridge.
 * The Electron main process lives under `electron/` and owns filesystem, settings, session, runtime, and IPC integration.
+* Desktop notifications cover completed turns, pending clarification questions, and pending tool approvals under one user-selected visibility policy. Notification bodies remain generic unless the user enables content previews. Every notification carries the Kimix UI session identity; clicking it restores and focuses the window, resolves local, runtime, or official session aliases, switches to the corresponding project when known, and opens that chat. Pending request notifications deduplicate by runtime session plus stable request identity so replayed event snapshots cannot repeatedly alert the user.
 * Update history is sourced from the latest three GitHub Releases, never from a bundled historical timeline. The dialog renders each complete Release body as Markdown instead of truncating it to a summary. The main process prefers the GitHub Releases list API and falls back to the repository Releases Atom feed on anonymous API rate-limit responses (403/429); both sources remain GitHub-owned. Atom enclosure links are accepted when present, malformed percent-encoded tags cannot abort parsing, and an asset-less Atom result opens its GitHub Release page instead of offering an impossible in-app package download.
 * Kimi Code is the authoritative agent runtime. Kimix presents and adapts its APIs; it does not define a second agent protocol.
 * The chat shell owns the viewport height. Its outer height is fixed directly to the Electron viewport with `height/max-height: 100dvh`; ancestor percentage heights and Tailwind `h-full` are not a definite-size boundary for this Grid. The shell uses `48px minmax(0, 1fr)` tracks and the chat panel uses `toolbar + minmax(0, 1fr) + Composer`; every nested viewport remains shrinkable with `min-height: 0`, and only the inner chat scroll area owns message overflow.

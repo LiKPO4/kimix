@@ -43,7 +43,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.15.10";
+const KIMIX_VERSION = "2.15.11";
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -1350,7 +1350,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [
     { value: "never", label: "永不弹出", desc: "不显示系统通知，也不显示任务栏红点" },
     { value: "unfocused", label: "无焦点时", desc: "仅 Kimix 窗口没有焦点时提醒" },
-    { value: "always", label: "任何时候", desc: "每轮完成都弹出系统通知；红点仍只在无焦点时显示" },
+    { value: "always", label: "任何时候", desc: "完成、澄清和工具审批都弹出系统通知；红点仍只在无焦点时显示" },
   ];
   const processDisplayModes: { value: ProcessDisplayMode; label: string; desc: string }[] = [
     { value: "kimix", label: "Kimix 模式", desc: "默认折叠本轮思考/命令过程，点击后再展开" },
@@ -2499,8 +2499,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
               <div className="kimix-settings-section" {...settingsSectionProps("notification", 9)}>
                 <div className="kimix-settings-section-title">
                   <Bell size={16} className="text-text-muted" />
-                  <span>完成通知</span>
-                  {settingsDragHandle("notification", "完成通知")}
+                  <span>桌面通知</span>
+                  {settingsDragHandle("notification", "桌面通知")}
                 </div>
                 <div className="kimix-settings-permissions">
                   {notificationModes.map((mode) => (
@@ -2525,7 +2525,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <SelectionIndicator selected={notificationShowContent} />
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">通知中显示对话内容</div>
-                      <div className="kimix-settings-permission-desc">默认关闭，开启后通知正文会展示 Agent 回复或澄清问题的摘要</div>
+                      <div className="kimix-settings-permission-desc">默认关闭，开启后通知正文会展示 Agent 回复、澄清问题或待审批操作的摘要</div>
                     </div>
                   </button>
                 </div>

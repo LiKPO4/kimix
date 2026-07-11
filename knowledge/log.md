@@ -2,6 +2,7 @@
 
 ## 2026-07-11
 
+* **Pending tool approvals use the shared desktop-notification route**: Approval events deduplicate by stable request identity, honor notification privacy and visibility settings, and notification clicks restore the matching chat through local/runtime/official session aliases. See [/project/kimix.md](/project/kimix.md).
 * **Vendored fallback aligns with Kimi Code 0.23.5**: Node SDK 0.13.2 is regenerated from official commit `352a449`, retains Kimix's bounded MCP startup timeout, and validates the factory constructor, media gates, managed usage, Prompt/Steer/Cancel, and session export contracts. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **New sessions use automatic Server-first routing**: Ordinary settings no longer control Server startup or new-session routing; capability checks and SDK fallback remain automatic, environment overrides remain diagnostic escape hatches, and experimental `select_tools` stays opt-in. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Canonical history replacement preserves renderer-local attachments**: Background repair, session hydration, and live snapshot polling reconcile pasted image bytes and OS drag paths into matching canonical user messages before replacing the timeline. See [/project/kimix.md](/project/kimix.md).

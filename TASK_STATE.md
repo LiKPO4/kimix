@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-11 v2.15.11 工具审批桌面通知
+
+- 当前目标：补齐 Kimi Code 0.23.4 起支持的工具审批桌面提醒，并让通知可直接返回对应会话。
+- 根因：Kimix 只在轮次完成和需求澄清时触发通知；pending `approval_request` 虽已渲染审批卡片，但窗口失焦时没有系统提醒，现有通知点击也只聚焦窗口而不会定位来源会话。
+- 已完成：pending 工具审批按 runtime session + request id 去重通知；复用通知模式和正文隐私开关；通知携带 Kimix 会话身份，点击后恢复窗口并按 local/runtime/official id 定位会话和项目；完成与澄清通知同步获得回跳能力；设置项统一更名为“桌面通知”。
+- 验证：新增通知会话解析和审批摘要单元测试；`pnpm test:run` 60 个文件、428 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 关键文件：`src/App.tsx`、`src/utils/notificationRouting.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`。
+- 下一步：在真实失焦窗口触发一次工具审批，验收通知正文与点击回跳；下一独立增量评估并实现 Extra Usage。
+
 ## 2026-07-11 v2.15.10 Kimi Code 0.23.5 SDK 兜底对齐
 
 - 当前目标：将 vendored SDK 兜底从 Kimi Code 0.22.0 / Node SDK 0.12.0 对齐到官方 0.23.5 / Node SDK 0.13.2，缩小 Server 与兼容路由行为差异。

@@ -1288,6 +1288,7 @@ export type TriggerShortcutRequest = {
 export type TurnCompleteNotificationRequest = {
   title?: string;
   body?: string;
+  sessionId?: string;
   windowFocused?: boolean;
   pageVisible?: boolean;
 }

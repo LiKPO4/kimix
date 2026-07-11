@@ -23,6 +23,7 @@ import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeli
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
+import { approvalRequestNotificationKey, findNotificationSession, summarizeApprovalRequest } from "@/utils/notificationRouting";
 import {
   settleInactiveEvents,
   settleFailedEvents,
@@ -404,6 +405,7 @@ function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label
   void window.api.notifyTurnComplete({
     title: `Kimix 本轮已完成${suffix}`,
     body: summary || `「${sessionTitle}」已处理完成，可以回来查看结果。`,
+    sessionId: uiSessionId,
     windowFocused: document.hasFocus() || rendererWindowFocusedHint,
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
@@ -419,10 +421,27 @@ function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string
   void window.api.notifyTurnComplete({
     title: "Kimix 需要你回复需求澄清",
     body: summary || `「${sessionTitle}」正在等待你的澄清回复。`,
+    sessionId: uiSessionId,
     windowFocused: document.hasFocus() || rendererWindowFocusedHint,
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
     console.warn("Notify clarification needed failed:", err, { uiSessionId, runtimeSessionId });
+  });
+}
+
+function notifyApprovalNeeded(uiSessionId: string, runtimeSessionId: string, event: Extract<TimelineEvent, { type: "approval_request" }>) {
+  const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+  const sessionTitle = session?.title?.trim() || "当前会话";
+  const showContent = useAppStore.getState().notificationShowContent ?? false;
+  const summary = showContent ? summarizeNotificationBody(summarizeApprovalRequest(event)) : "";
+  void window.api.notifyTurnComplete({
+    title: "Kimix 工具操作等待审批",
+    body: summary || `「${sessionTitle}」需要你确认后才能继续。`,
+    sessionId: uiSessionId,
+    windowFocused: document.hasFocus() || rendererWindowFocusedHint,
+    pageVisible: document.visibilityState === "visible",
+  }).catch((err) => {
+    console.warn("Notify approval needed failed:", err, { uiSessionId, runtimeSessionId, requestId: event.requestId });
   });
 }
 
@@ -1119,9 +1138,22 @@ function App() {
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
+  const notifiedApprovalRequestRef = useRef<Set<string>>(new Set());
   const runtimeTerminalPollRef = useRef<Map<string, number>>(new Map());
   const runtimeLastStreamEventAtRef = useRef<Map<string, number>>(new Map());
   const runtimeHistoryRefreshAtRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => window.api.onNotificationClick(({ sessionId }) => {
+    const sessionState = useSessionStore.getState();
+    const session = findNotificationSession(sessionState.sessions, sessionId);
+    if (!session) return;
+    const appState = useAppStore.getState();
+    const project = sessionState.recentProjects.find((item) => isSamePath(item.path, session.projectPath));
+    if (project) appState.setCurrentProject(project);
+    appState.setWorkspaceView("chat");
+    appState.setSettingsOpen(false);
+    appState.setCurrentSession(session);
+  }), []);
 
   useRendererLagDetector();
   useSettingsSync();
@@ -2432,6 +2464,13 @@ function App() {
         if (!notifiedQuestionRequestRef.current.has(notifyKey)) {
           notifiedQuestionRequestRef.current.add(notifyKey);
           notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedWithRole));
+        }
+      }
+      if (mappedWithRole.type === "approval_request" && mappedWithRole.status === "pending") {
+        const notifyKey = `${payload.sessionId}:${approvalRequestNotificationKey(mappedWithRole)}`;
+        if (!notifiedApprovalRequestRef.current.has(notifyKey)) {
+          notifiedApprovalRequestRef.current.add(notifyKey);
+          notifyApprovalNeeded(uiSessionId, payload.sessionId, mappedWithRole);
         }
       }
       if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
