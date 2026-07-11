@@ -748,21 +748,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             <FolderOpen size={16} className="shrink-0 text-text-muted" />
                             <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
                           </button>
-                          <div className="kimix-sidebar-project-row-controls flex shrink-0 items-center" style={{ gap: 0 }}>
-                            {isPinned && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void unpinProject(project);
-                              }}
-                              className="kimix-sidebar-icon-action kimix-sidebar-project-pin-action flex shrink-0 items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                              title="取消置顶项目"
-                              aria-label="取消置顶项目"
-                            >
-                              <Pin size={14} fill="currentColor" />
-                            </button>
-                            )}
-                            <div
+                          <div
                             className={`kimix-sidebar-project-row-actions flex shrink-0 items-center transition-opacity ${
                               projectActionFocusId === project.id ? "opacity-100" : "opacity-0 group-hover/project:opacity-100"
                             }`}
@@ -772,19 +758,17 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setProjectActionFocusId(null);
                             }}
                           >
-                            {!isPinned && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void pinProject(project);
-                                }}
-                                className="kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                                title="置顶项目"
-                                aria-label="置顶项目"
-                              >
-                                <Pin size={14} />
-                              </button>
-                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void (isPinned ? unpinProject(project) : pinProject(project));
+                              }}
+                              className="kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                              title={isPinned ? "取消置顶项目" : "置顶项目"}
+                              aria-label={isPinned ? "取消置顶项目" : "置顶项目"}
+                            >
+                              <Pin size={14} fill={isPinned ? "currentColor" : "none"} />
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -816,7 +800,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             >
                               {creatingSessionProjectPath === project.path ? <Loader2 size={15} className="kimix-spin" /> : <SquarePen size={15} />}
                             </button>
-                            </div>
                           </div>
                           {openProjectMenu?.projectId === project.id && createPortal(
                             (() => {
@@ -998,7 +981,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.15</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.16</span>
         </button>
       </div>
     </aside>

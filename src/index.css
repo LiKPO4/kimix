@@ -889,12 +889,7 @@ button.bg-accent-primary:disabled:hover,
   gap: 0;
 }
 
-.kimix-sidebar-project-row-controls {
-  gap: 0;
-}
-
-.kimix-sidebar-project-row-actions .kimix-sidebar-icon-action,
-.kimix-sidebar-project-pin-action {
+.kimix-sidebar-project-row-actions .kimix-sidebar-icon-action {
   width: 28px;
   height: 28px;
   min-width: 28px;
