@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-11 v2.15.9 自动 Server 路由与工具加载设置收口
+
+- 当前目标：移除普通用户无需理解的 Server 路由开关，并明确实验性 `select_tools` 的作用和默认策略。
+- 根因：官方 Server 已是 REST/WebSocket/Web UI 的主集成边界，Kimix 也已具备能力门禁和 SDK 自动回退；继续暴露“启用 Server”和“新会话使用 Server”会产生无意义组合，并让用户承担内部路由决策。`select_tools` 仍是官方默认关闭的实验能力，不适合随路由一起默认开启。
+- 已完成：新会话和 Server Host 固定自动 Server 优先，能力不足或请求失败仍走现有 SDK 兜底；历史设置字段继续兼容但不再控制路由；环境变量保留为诊断逃生口；设置页删除两个路由开关，将 `select_tools` 独立为默认关闭的“工具加载”实验项并重写说明。
+- 验证：`pnpm test:run` 59 个文件、426 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 关键文件：`electron/kimiCodeServerHost.ts`、`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：以 v2.15.9 检查设置页仅保留工具加载项，并验证 Server 正常和 Server 不可用时的新会话创建。
+
 ## 2026-07-11 v2.15.8 官方历史替换保留本地附件
 
 - 当前目标：修复刚粘贴发送的图片在 Agent 运行过程中降级为 `image.png / 未读取到绝对路径` 占位卡的问题。

@@ -42,13 +42,11 @@ class FailingWebSocket {
 }
 
 describe("KimiCodeServerClient protocol adapters", () => {
-  it("defaults to server session routing with explicit opt-out", () => {
+  it("defaults to server session routing and reserves the environment override for diagnostics", () => {
     expect(isKimiCodeServerSessionRoutingEnabled({})).toBe(true);
     expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
     expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "1" })).toBe(true);
-    expect(isKimiCodeServerSessionRoutingEnabled({}, { experimentalKimiServerSessions: true })).toBe(true);
-    expect(isKimiCodeServerSessionRoutingEnabled({}, { experimentalKimiServerSessions: false })).toBe(false);
-    expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "0" }, { experimentalKimiServerSessions: true })).toBe(false);
+    expect(isKimiCodeServerSessionRoutingEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS: "0" })).toBe(false);
   });
 
   it("maps SDK prompt parts to the official server content shape", async () => {

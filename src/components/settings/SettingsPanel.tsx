@@ -43,7 +43,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.15.8";
+const KIMIX_VERSION = "2.15.9";
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -481,8 +481,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelAliasesExpanded, setModelAliasesExpanded] = useState(false);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
-  const [experimentalKimiServer, setExperimentalKimiServer] = useState(true);
-  const [experimentalKimiServerSessions, setExperimentalKimiServerSessions] = useState(true);
   const [experimentalKimiToolSelect, setExperimentalKimiToolSelect] = useState(false);
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
@@ -1202,30 +1200,20 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     const res = await window.api.getSettings();
     setExperimentalSettingsLoading(false);
     if (!res.success) {
-      setExperimentalSettingsMessage(`读取 Server 路由失败：${res.error}`);
+      setExperimentalSettingsMessage(`读取工具加载设置失败：${res.error}`);
       return;
     }
-    setExperimentalKimiServer(Boolean(res.data.experimentalKimiServer));
-    setExperimentalKimiServerSessions(Boolean(res.data.experimentalKimiServerSessions));
     setExperimentalKimiToolSelect(Boolean(res.data.experimentalKimiToolSelect));
-    setExperimentalSettingsMessage("Server 路由修改后需要完全重启 Kimix；工具按需加载会同步写入官方配置。");
+    setExperimentalSettingsMessage("实验功能默认关闭；仅在模型声明支持 select_tools 时生效。");
   };
 
-  const saveExperimentalSettings = async (next: { server?: boolean; sessions?: boolean; toolSelect?: boolean }) => {
-    const serverEnabled = next.server ?? experimentalKimiServer;
-    const sessionsEnabled = next.sessions ?? experimentalKimiServerSessions;
-    const normalizedSessionsEnabled = serverEnabled ? sessionsEnabled : false;
-    const toolSelectEnabled = next.toolSelect ?? experimentalKimiToolSelect;
-    setExperimentalKimiServer(serverEnabled);
-    setExperimentalKimiServerSessions(normalizedSessionsEnabled);
+  const saveExperimentalToolSelect = async (toolSelectEnabled: boolean) => {
     setExperimentalKimiToolSelect(toolSelectEnabled);
     setExperimentalSettingsSaving(true);
     const res = await window.api.saveSettings({
-      experimentalKimiServer: serverEnabled,
-      experimentalKimiServerSessions: normalizedSessionsEnabled,
       experimentalKimiToolSelect: toolSelectEnabled,
     });
-    if (res.success && next.toolSelect !== undefined) {
+    if (res.success) {
       const featureRes = await window.api.setKimiCodeExperimentalFeature({
         id: "tool-select",
         enabled: toolSelectEnabled,
@@ -1241,11 +1229,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     setExperimentalSettingsSaving(false);
-    if (res.success) {
-      setExperimentalSettingsMessage("已保存；完全关闭并重新打开 Kimix 后生效。");
-      return;
-    }
-    setExperimentalSettingsMessage(`保存 Server 路由失败：${res.error}`);
+    setExperimentalSettingsMessage(`保存工具加载设置失败：${res.error}`);
     void refreshExperimentalSettings();
   };
 
@@ -2043,7 +2027,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Zap size={16} className="text-text-muted" />
-                    <span>Kimi Server 路由</span>
+                    <span>工具加载</span>
                   </div>
                   <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                     <button
@@ -2055,59 +2039,23 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <RefreshCw size={15} className={experimentalSettingsLoading ? "kimix-spin" : ""} />
                       <span>刷新</span>
                     </button>
-                    {settingsDragHandle("experiment", "Kimi Server 路由")}
+                    {settingsDragHandle("experiment", "工具加载")}
                   </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
                   <div className="flex items-start" style={{ gap: 12 }}>
                     <Zap size={18} className="mt-0.5 shrink-0 text-text-muted" />
                     <div className="kimix-settings-permission-copy">
-                      <div className="kimix-settings-permission-label">Kimi Code Server 默认路由</div>
+                      <div className="kimix-settings-permission-label">MCP 工具按需加载</div>
                       <div className="kimix-settings-permission-desc">
-                        新安装默认使用官方 Server；不可用时自动回退兼容链路。保存后需要完全重启 Kimix 才会影响新会话。
+                        新会话会自动优先使用官方 Server，并在不可用时回退兼容链路，无需手动选择路由。
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                  <div style={{ marginTop: 14 }}>
                     <button
                       type="button"
-                      onClick={() => void saveExperimentalSettings({ server: !experimentalKimiServer })}
-                      disabled={experimentalSettingsLoading || experimentalSettingsSaving}
-                      className={`kimix-settings-permission ${experimentalKimiServer ? "is-active" : ""}`}
-                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
-                    >
-                      <SelectionIndicator selected={experimentalKimiServer} />
-                      <div className="kimix-settings-permission-copy">
-                        <div className="kimix-settings-permission-label">启用官方 Kimi Code Server</div>
-                        <div className="kimix-settings-permission-desc">
-                          允许 Kimix 启动或连接官方本地 Server；关闭后使用兼容链路，不再启动 Server。
-                        </div>
-                      </div>
-                      <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServer ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
-                        {experimentalKimiServer ? "已开启" : "关闭"}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void saveExperimentalSettings({ sessions: !experimentalKimiServerSessions })}
-                      disabled={experimentalSettingsLoading || experimentalSettingsSaving || !experimentalKimiServer}
-                      className={`kimix-settings-permission ${experimentalKimiServerSessions ? "is-active" : ""}`}
-                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto", opacity: experimentalKimiServer ? 1 : 0.62 }}
-                    >
-                      <SelectionIndicator selected={experimentalKimiServerSessions} />
-                      <div className="kimix-settings-permission-copy">
-                        <div className="kimix-settings-permission-label">新会话使用 Server 路由</div>
-                        <div className="kimix-settings-permission-desc">
-                          新会话优先使用官方 Server；异常时自动使用兼容链路，对话里只显示简洁发送状态。
-                        </div>
-                      </div>
-                      <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiServerSessions ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
-                        {experimentalKimiServerSessions ? "已开启" : "关闭"}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void saveExperimentalSettings({ toolSelect: !experimentalKimiToolSelect })}
+                      onClick={() => void saveExperimentalToolSelect(!experimentalKimiToolSelect)}
                       disabled={experimentalSettingsLoading || experimentalSettingsSaving}
                       className={`kimix-settings-permission ${experimentalKimiToolSelect ? "is-active" : ""}`}
                       style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
@@ -2116,7 +2064,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label">工具按需加载（select_tools）</div>
                         <div className="kimix-settings-permission-desc">
-                          同步开启官方 tool-select 实验 flag；只有模型同时支持工具调用和 select_tools 时才会减少 MCP 工具注入。
+                          实验功能。支持的模型只在需要时加载 MCP 工具定义，可减少上下文占用并改善提示词缓存；默认关闭。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
@@ -2125,7 +2073,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </button>
                   </div>
                   <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
-                    {experimentalSettingsMessage || "读取 Server 路由状态中..."}
+                    {experimentalSettingsMessage || "读取工具加载设置中..."}
                   </div>
                 </div>
               </div>

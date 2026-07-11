@@ -2345,7 +2345,7 @@ async function registerServerSession(
 }
 
 function shouldRouteNewSessionToServer() {
-  return isKimiCodeServerSessionRoutingEnabled(process.env, settingsService.loadSettings()) && kimiCodeServerHost.isReady();
+  return isKimiCodeServerSessionRoutingEnabled(process.env) && kimiCodeServerHost.isReady();
 }
 
 export function isListingSessionsFromServer() {

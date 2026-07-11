@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-11T10:28:00+08:00"
+timestamp: "2026-07-11T14:52:00+08:00"
 ---
 
 # Runtime Routing
@@ -15,9 +15,9 @@ Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `K
 
 1. A visible Kimix session maps to an official Kimi Code runtime session identifier when one is available.
 2. Prompt, steer, cancel, approval, question, usage, Skill, MCP, session-tree, and diagnostic events come from official Server or SDK contracts rather than terminal-screen inference.
-3. Server failure must degrade to the SDK path without discarding Kimix-local conversation history.
+3. Server failure must degrade to the SDK path without discarding Kimix-local conversation history. New sessions always prefer a capability-checked Server when it is ready; ordinary persisted settings do not select the transport. Environment overrides remain available for diagnostics and emergency compatibility routing.
 4. SDK refreshes must be regenerated from an identified upstream tag and commit, with provenance recorded under `vendor/kimi-code-sdk/README.md`.
-5. Experimental or incomplete upstream capabilities remain behind capability checks or explicit settings.
+5. Experimental or incomplete upstream capabilities remain behind capability checks or explicit settings. Official Server routing itself is no longer presented as an experiment, while upstream `select_tools` remains an opt-in experiment until its default and stability change upstream.
 6. A transient Server failure schedules a bounded background recovery attempt. When Server becomes ready again, an idle SDK session may return to the Server route only if the Server can resolve the same official session ID; otherwise the SDK session remains authoritative.
 7. App startup must not await Kimi Server startup, official history restore, or stale runtime recovery before showing the main window. The renderer should paint first; Server startup and official history recovery run afterward in the background. Merely opening or selecting an old session must not resume its runtime: history viewing is read-only, and runtime recovery is deferred until a real operation such as sending a prompt requires it. This prevents stale in-flight turns from being revived by navigation.
 8. Kimix permission modes mirror official Kimi Code permission modes: `manual`, `auto`, and `yolo`. Server approval events in `yolo` mode are resolved through the official approval API without surfacing a user approval card.

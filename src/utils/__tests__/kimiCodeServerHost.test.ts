@@ -8,12 +8,11 @@ import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerC
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
 describe("kimiCodeServerHost", () => {
-  it("defaults to server host with explicit opt-out", () => {
+  it("defaults to server host and reserves the environment override for diagnostics", () => {
     expect(isKimiCodeServerExperimentEnabled({})).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "true" })).toBe(false);
-    expect(isKimiCodeServerExperimentEnabled({}, { experimentalKimiServer: true })).toBe(true);
-    expect(isKimiCodeServerExperimentEnabled({}, { experimentalKimiServer: false })).toBe(false);
+    expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "0" })).toBe(false);
   });
 
   it("detects capabilities without trusting the reported version", () => {

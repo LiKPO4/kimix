@@ -239,11 +239,10 @@ const UPLOAD_TIMEOUT_MS = 300_000;
 
 export function isKimiCodeServerSessionRoutingEnabled(
   env: NodeJS.ProcessEnv = process.env,
-  settings?: { experimentalKimiServerSessions?: boolean },
 ) {
   const override = env.KIMIX_EXPERIMENTAL_KIMI_SERVER_SESSIONS?.trim();
   if (override !== undefined) return override === "1";
-  return settings?.experimentalKimiServerSessions !== false;
+  return true;
 }
 
 /** HTTP 状态码或协议级别的 "not found" 错误识别。
