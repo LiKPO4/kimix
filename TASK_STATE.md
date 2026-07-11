@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-11 v2.15.10 Kimi Code 0.23.5 SDK 兜底对齐
+
+- 当前目标：将 vendored SDK 兜底从 Kimi Code 0.22.0 / Node SDK 0.12.0 对齐到官方 0.23.5 / Node SDK 0.13.2，缩小 Server 与兼容路由行为差异。
+- 已完成：从官方 tag `@moonshot-ai/kimi-code@0.23.5` 的提交 `352a449` 重新构建并生成自包含 bundle；再生成脚本成功保留 Kimix 4 秒 MCP 启动超时补丁；更新两个旧探针以兼容官方 `createKimiHarness` 工厂接口。
+- 验证：真实宿主 Prompt/Steer/Cancel、会话导出、reload、插件命令与运行时能力探针通过；`pnpm test:run` 59 个文件、426 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 关键文件：`vendor/kimi-code-sdk/index.mjs`、`vendor/kimi-code-sdk/README.md`、`scripts/probe-kimi-code-export.mjs`、`scripts/probe-kimi-code-runtime-capabilities.mjs`。
+- 下一步：完成全量验证并提交；下一独立增量实现审批请求桌面通知。
+
 ## 2026-07-11 v2.15.9 自动 Server 路由与工具加载设置收口
 
 - 当前目标：移除普通用户无需理解的 Server 路由开关，并明确实验性 `select_tools` 的作用和默认策略。

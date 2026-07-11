@@ -15,15 +15,18 @@ const outputPath = path.join(probeRoot, `kimix-sdk-export-${Date.now()}.zip`);
 
 async function main() {
   await mkdir(workDir, { recursive: true });
-  const { KimiHarness } = await import(pathToFileURL(sdkEntry).href);
-  const harness = new KimiHarness({
+  const sdk = await import(pathToFileURL(sdkEntry).href);
+  const options = {
     homeDir: process.env.KIMI_CODE_HOME,
     identity: {
       userAgentProduct: "kimi-code-cli",
       version: process.env.KIMI_CODE_SMOKE_VERSION ?? "0.6.0",
     },
     uiMode: "kimix-export-probe",
-  });
+  };
+  const harness = typeof sdk.createKimiHarness === "function"
+    ? sdk.createKimiHarness(options)
+    : new sdk.KimiHarness(options);
 
   try {
     const session = await harness.createSession({
