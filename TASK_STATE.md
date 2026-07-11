@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-11 v2.15.12 Extra Usage 只读展示
+
+- 当前目标：评估并补齐 Kimi Code 0.23.5 新增的 Extra Usage 展示能力。
+- 评估结论：官方能力来自 `/usages` 的 BOOSTER 钱包，只读返回本月已用、月度扣费上限、可用余额和币种；它不是客户端功能开关，也没有官方本地充值或修改限额接口，因此只应并入现有套餐用量浮层，不新增设置项或伪操作入口。
+- 根因：vendored SDK 已把 `boosterWallet` 解析为 `extraUsage`，但 Kimix 的 `parseManagedUsagePayload` 只保留 5 小时和每周窗口，导致官方数据在 IPC 前被丢弃。
+- 已完成：IPC 增加 Extra Usage 结构；SDK 标准结果和直接接口原始钱包都能解析；仅在有效 BOOSTER 钱包存在时展示本月已用、月度上限、余额及上限进度，无上限时明确显示“不限额”；浮层增加视口高度约束和内部滚动。
+- 验证：新增标准 SDK 数据、原始钱包、无效钱包测试；`pnpm test:run` 60 个文件、431 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 关键文件：`electron/kimiUsage.ts`、`electron/types/ipc.ts`、`src/components/chat/ContextBar.tsx`、`src/utils/__tests__/kimiUsage.test.ts`。
+- 下一步：由具备 Extra Usage 的账号验收真实金额、无限额文案与月度进度显示。
+
 ## 2026-07-11 v2.15.11 工具审批桌面通知
 
 - 当前目标：补齐 Kimi Code 0.23.4 起支持的工具审批桌面提醒，并让通知可直接返回对应会话。

@@ -981,6 +981,15 @@ export type UsagePeriod = {
   message?: string;
 };
 
+export type ExtraUsageInfo = {
+  balanceCents: number;
+  totalCents: number;
+  monthlyChargeLimitEnabled: boolean;
+  monthlyChargeLimitCents: number;
+  monthlyUsedCents: number;
+  currency: string;
+};
+
 export type KimiUsageResponse = {
   success: true;
   data: {
@@ -988,6 +997,7 @@ export type KimiUsageResponse = {
     updatedAt: number;
     source: string;
     totalQuota?: number;
+    extraUsage?: ExtraUsageInfo;
     periods: UsagePeriod[];
     message?: string;
   };

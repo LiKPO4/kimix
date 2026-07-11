@@ -4,7 +4,7 @@ import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
+import type { ExtraUsageInfo, KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 import type { Session } from "@/types/ui";
 import { compactModelDisplayName, getSessionModelForDisplay } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
@@ -110,6 +110,14 @@ function formatTotalQuota(value: number) {
   return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
 }
 
+function formatExtraUsageMoney(cents: number, currency: string) {
+  const value = (Math.max(0, cents) / 100).toFixed(2);
+  const normalized = currency.toUpperCase();
+  if (normalized === "CNY") return `¥${value}`;
+  if (normalized === "USD") return `$${value}`;
+  return `${value} ${normalized}`;
+}
+
 function formatRefreshTime(value: number | undefined, now: number) {
   if (!value) return "刷新时间未知";
   const date = new Date(value);
@@ -174,6 +182,47 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
         <span className="kimix-tabular-nums min-w-0 truncate">{formatUsage(period)}</span>
       </div>
     </div>
+  );
+}
+
+function ExtraUsageSection({ usage }: { usage: ExtraUsageInfo }) {
+  const hasMonthlyLimit = usage.monthlyChargeLimitEnabled && usage.monthlyChargeLimitCents > 0;
+  const monthlyPercent = hasMonthlyLimit
+    ? Math.max(0, Math.min(100, (usage.monthlyUsedCents / usage.monthlyChargeLimitCents) * 100))
+    : 0;
+  const rows = [
+    { label: "本月已用", value: formatExtraUsageMoney(usage.monthlyUsedCents, usage.currency) },
+    { label: "月度上限", value: hasMonthlyLimit ? formatExtraUsageMoney(usage.monthlyChargeLimitCents, usage.currency) : "不限额" },
+    { label: "可用余额", value: formatExtraUsageMoney(usage.balanceCents, usage.currency) },
+  ];
+  return (
+    <section
+      className="border-t border-[var(--kimix-panel-border-soft)]"
+      style={{ marginTop: 16, padding: "14px 2px 0" }}
+      aria-label="额外用量"
+    >
+      <div className="flex items-center justify-between" style={{ marginBottom: hasMonthlyLimit ? 10 : 8 }}>
+        <span className="text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text-secondary)]">额外用量</span>
+        {hasMonthlyLimit && (
+          <span className="kimix-tabular-nums text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">
+            已用 {monthlyPercent.toFixed(0)}%
+          </span>
+        )}
+      </div>
+      {hasMonthlyLimit && (
+        <div className="kimix-progress-track h-2 overflow-hidden" style={{ borderRadius: 0, marginBottom: 10 }}>
+          <div className="kimix-progress-fill h-full" style={{ width: `${monthlyPercent}%`, borderRadius: 0 }} />
+        </div>
+      )}
+      <div className="flex flex-col" style={{ gap: 8 }}>
+        {rows.map((row) => (
+          <div key={row.label} className="grid items-center text-[12.5px] leading-5" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 16 }}>
+            <span className="text-[var(--kimix-panel-text-muted)]">{row.label}</span>
+            <span className="kimix-tabular-nums shrink-0 text-[var(--kimix-panel-text-secondary)]">{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -684,7 +733,14 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
               width={330}
               align="left"
               className="kimix-floating-panel z-40 rounded-xl"
-              style={{ paddingLeft: 22, paddingRight: 22, paddingTop: 20, paddingBottom: 21 }}
+              style={{
+                paddingLeft: 22,
+                paddingRight: 22,
+                paddingTop: 20,
+                paddingBottom: 21,
+                maxHeight: "calc(100vh - 96px)",
+                overflowY: "auto",
+              }}
             >
               <div className="flex items-center justify-between gap-4" style={{ marginBottom: 18 }}>
                 <div className="min-w-0">
@@ -717,6 +773,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                   <span className="kimix-tabular-nums shrink-0">{formatTotalQuota(usageData.totalQuota)}</span>
                 </div>
               )}
+              {usageData?.extraUsage && <ExtraUsageSection usage={usageData.extraUsage} />}
               {usageData?.message && (
                 <div className="kimix-soft-card mt-5 rounded-lg text-[12.5px] leading-relaxed" style={{ padding: "13px 12px" }}>
                   {usageData.message}

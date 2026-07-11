@@ -50,6 +50,38 @@ describe("Kimi managed usage parser", () => {
     expect(usage.periods[0].refreshAt).toBe(now + 3 * 60 * 60 * 1000);
     expect(usage.periods[1].refreshAt).toBe(now + (4 * 24 + 8) * 60 * 60 * 1000);
   });
+
+  it("preserves normalized Extra Usage returned by the official SDK", () => {
+    const usage = parseManagedUsagePayload({
+      kind: "ok",
+      summary: null,
+      limits: [],
+      extraUsage: {
+        balanceCents: 10000,
+        totalCents: 20000,
+        monthlyChargeLimitEnabled: true,
+        monthlyChargeLimitCents: 20000,
+        monthlyUsedCents: 5000,
+        currency: "usd",
+      },
+    });
+
+    expect(usage.available).toBe(true);
+    expect(usage.extraUsage).toEqual({
+      balanceCents: 10000,
+      totalCents: 20000,
+      monthlyChargeLimitEnabled: true,
+      monthlyChargeLimitCents: 20000,
+      monthlyUsedCents: 5000,
+      currency: "USD",
+    });
+  });
+
+  it("ignores invalid normalized Extra Usage", () => {
+    const usage = parseManagedUsagePayload({ kind: "ok", summary: null, limits: [], extraUsage: { totalCents: 0 } });
+    expect(usage.extraUsage).toBeUndefined();
+    expect(usage.available).toBe(false);
+  });
 });
 
 describe("Kimi direct usage parser", () => {
@@ -73,6 +105,25 @@ describe("Kimi direct usage parser", () => {
     expect(usage.periods[1]).toMatchObject({
       label: "本周",
       refreshAt: now + 345600 * 1000,
+    });
+  });
+
+  it("parses the raw booster wallet when the SDK fallback is unavailable", () => {
+    const usage = parseKimiUsagePayload({
+      boosterWallet: {
+        balance: { type: "BOOSTER", amount: "20000000000", amountLeft: "10000000000" },
+        monthlyChargeLimitEnabled: false,
+        monthlyUsed: { currency: "CNY", priceInCents: "1250" },
+      },
+    });
+
+    expect(usage.extraUsage).toEqual({
+      balanceCents: 10000,
+      totalCents: 20000,
+      monthlyChargeLimitEnabled: false,
+      monthlyChargeLimitCents: 0,
+      monthlyUsedCents: 1250,
+      currency: "CNY",
     });
   });
 });

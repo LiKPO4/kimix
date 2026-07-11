@@ -1,6 +1,7 @@
-import type { KimiUsageResponse, UsagePeriod } from "./types/ipc";
+import type { ExtraUsageInfo, KimiUsageResponse, UsagePeriod } from "./types/ipc";
 
 type KimiUsageData = Extract<KimiUsageResponse, { success: true }>["data"];
+const BOOSTER_FIXED_POINT_CENTS = 1_000_000;
 
 export function toNumber(value: unknown): number | undefined {
   if (value === null || value === undefined || value === "") return undefined;
@@ -10,6 +11,59 @@ export function toNumber(value: unknown): number | undefined {
 
 export function getRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function nonNegativeNumber(value: unknown): number {
+  const parsed = toNumber(value);
+  return parsed === undefined ? 0 : Math.max(0, Math.round(parsed));
+}
+
+function parseNormalizedExtraUsage(raw: unknown): ExtraUsageInfo | undefined {
+  const record = getRecord(raw);
+  if (!record) return undefined;
+  const totalCents = nonNegativeNumber(record.totalCents);
+  if (totalCents <= 0) return undefined;
+  return {
+    balanceCents: nonNegativeNumber(record.balanceCents),
+    totalCents,
+    monthlyChargeLimitEnabled: record.monthlyChargeLimitEnabled === true,
+    monthlyChargeLimitCents: nonNegativeNumber(record.monthlyChargeLimitCents),
+    monthlyUsedCents: nonNegativeNumber(record.monthlyUsedCents),
+    currency: typeof record.currency === "string" && record.currency.trim() ? record.currency.trim().toUpperCase() : "USD",
+  };
+}
+
+function parseMoney(raw: unknown): { cents: number; currency: string } | undefined {
+  const record = getRecord(raw);
+  const cents = toNumber(record?.priceInCents);
+  if (cents === undefined) return undefined;
+  return {
+    cents: Math.max(0, Math.round(cents)),
+    currency: typeof record?.currency === "string" ? record.currency.trim().toUpperCase() : "",
+  };
+}
+
+function parseBoosterWallet(raw: unknown): ExtraUsageInfo | undefined {
+  const wallet = getRecord(raw);
+  const balance = getRecord(wallet?.balance);
+  if (!wallet || !balance || balance.type !== "BOOSTER") return undefined;
+  const totalRaw = toNumber(balance.amount);
+  if (totalRaw === undefined || totalRaw <= 0) return undefined;
+  const monthlyLimit = parseMoney(wallet.monthlyChargeLimit);
+  const monthlyUsed = parseMoney(wallet.monthlyUsed);
+  const amountLeftRaw = toNumber(balance.amountLeft);
+  return {
+    balanceCents: amountLeftRaw === undefined ? 0 : Math.max(0, Math.round(amountLeftRaw / BOOSTER_FIXED_POINT_CENTS)),
+    totalCents: Math.max(1, Math.round(totalRaw / BOOSTER_FIXED_POINT_CENTS)),
+    monthlyChargeLimitEnabled: wallet.monthlyChargeLimitEnabled === true,
+    monthlyChargeLimitCents: monthlyLimit?.cents ?? 0,
+    monthlyUsedCents: monthlyUsed?.cents ?? 0,
+    currency: monthlyLimit?.currency || monthlyUsed?.currency || "USD",
+  };
+}
+
+function extraUsageFromPayload(payload: Record<string, unknown>): ExtraUsageInfo | undefined {
+  return parseNormalizedExtraUsage(payload.extraUsage) ?? parseBoosterWallet(payload.boosterWallet);
 }
 
 function toTimestamp(value: unknown): number | undefined {
@@ -199,11 +253,13 @@ export function parseKimiUsagePayload(payload: Record<string, unknown>, now = Da
     windowMsFromWindow(weeklyWindow),
   );
   const totalQuota = toNumber(payload.totalQuota);
+  const extraUsage = extraUsageFromPayload(payload);
   return {
-    available: [fiveHour, weekly].some((period) => period.available),
+    available: [fiveHour, weekly].some((period) => period.available) || Boolean(extraUsage),
     updatedAt: now,
     source: "Kimi Code 官方用量接口",
     ...(totalQuota !== undefined ? { totalQuota } : {}),
+    ...(extraUsage ? { extraUsage } : {}),
     periods: [fiveHour, weekly],
   };
 }
@@ -258,10 +314,12 @@ export function parseManagedUsagePayload(payload: unknown, now = Date.now()): Ki
   const weeklyRow = getRecord(record.summary) ?? findManagedUsageLimit(limits, /week|weekly|本周|每周|一周/i);
   const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000, now);
   const weekly = usagePeriodFromManagedRow("本周", weeklyRow, nextWeekRefreshAt(now), now);
+  const extraUsage = extraUsageFromPayload(record);
   return {
-    available: [fiveHour, weekly].some((period) => period.available),
+    available: [fiveHour, weekly].some((period) => period.available) || Boolean(extraUsage),
     updatedAt: now,
     source: "Kimi Code 官方用量接口",
+    ...(extraUsage ? { extraUsage } : {}),
     periods: [fiveHour, weekly],
   };
 }
