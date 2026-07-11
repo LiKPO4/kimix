@@ -411,6 +411,11 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
     return { success: true };
   }
 
+  // A previous write may have failed after a newer snapshot was queued. The
+  // current snapshot is always at least as new as that queued copy, so discard
+  // it before starting a fresh write; otherwise it could be written after this
+  // successful state and roll the persisted conversation backwards.
+  persistQueue = null;
   return runPersist(snapshot);
 }
 

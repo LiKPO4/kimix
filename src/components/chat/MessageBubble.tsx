@@ -216,28 +216,24 @@ function useElapsed(start: number, active: boolean) {
 
   useEffect(() => {
     if (!active) return;
-    let raf = 0;
-    let lastSecond = -1;
+    let timer: number | null = null;
     const update = () => {
       const nextElapsed = Math.max(0, Date.now() - start);
-      const nextSecond = Math.floor(nextElapsed / 1000);
-      if (nextSecond !== lastSecond) {
-        lastSecond = nextSecond;
-        setElapsed(nextElapsed);
-      }
-      raf = requestAnimationFrame(update);
+      setElapsed(nextElapsed);
+      // The UI only displays second-level precision. Align the next refresh to
+      // the following second instead of keeping a 60fps animation loop alive.
+      const delay = Math.max(16, 1000 - (Date.now() % 1000) + 4);
+      timer = window.setTimeout(update, delay);
     };
     const forceUpdate = () => {
       const nextElapsed = Math.max(0, Date.now() - start);
-      lastSecond = Math.floor(nextElapsed / 1000);
       setElapsed(nextElapsed);
     };
-    forceUpdate();
-    raf = requestAnimationFrame(update);
+    update();
     window.addEventListener("focus", forceUpdate);
     document.addEventListener("visibilitychange", forceUpdate);
     return () => {
-      cancelAnimationFrame(raf);
+      if (timer !== null) window.clearTimeout(timer);
       window.removeEventListener("focus", forceUpdate);
       document.removeEventListener("visibilitychange", forceUpdate);
     };

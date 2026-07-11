@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-11 v2.15.1 审查回归修复
+
+- 当前目标：修复 v2.15.0 代码审查中确认的持久化旧快照覆盖、Intel Mac 更新资产识别和运行计时高频刷新问题。
+- 已完成：持久化在新保存开始时丢弃失败写入遗留的旧排队快照；新增 A 失败、B 排队、C 重试的顺序回归测试。更新资产选择抽为纯函数，兼容旧版无 `x64` 后缀的 Intel Mac 产物，后续 macOS 构建统一带架构后缀；新增 arm64/x64/拒绝错误架构测试。运行耗时改为按秒对齐的 `setTimeout` 调度。
+- 验证：`pnpm test:run` 59 个文件、417 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 关键文件：`src/utils/persistence.ts`、`src/utils/updateAsset.ts`、`electron/main.ts`、`src/components/chat/MessageBubble.tsx`。
+- 下一步：完成验证并提交 v2.15.1 代码；发布由 tag 触发 GitHub Actions。
+
 ## 2026-07-10 v2.14.122 上下文压缩摘要轮次定位
 
 - 当前目标：把本轮开始前生成的上下文压缩摘要放在用户消息与 Agent 过程/正文之间，并默认折叠。

@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-11
+
+* **Latest-snapshot persistence and architecture-safe updates**: Renderer persistence keeps only the newest queued snapshot across write failures, commits conversation state and image references atomically, and prunes images from the committed reference set. macOS update selection distinguishes arm64, x64, universal, and legacy unmarked x64 assets; future artifacts include architecture suffixes and automatic installation requires Release SHA-256 metadata. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-10
 
 * **Pre-turn compaction summaries have a stable collapsed boundary**: A completed compaction renders immediately after its user message and before all Agent process/output even when events arrive out of order; summary Markdown remains unmounted until explicit expansion. See [/project/kimix.md](/project/kimix.md).

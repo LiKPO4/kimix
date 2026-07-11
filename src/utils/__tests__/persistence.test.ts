@@ -73,4 +73,47 @@ describe("persistLocalConversationState", () => {
     expect(second.success).toBe(true);
     expect(calls).toBe(2);
   });
+
+  it("never writes an older queued snapshot after a failed save and newer retry", async () => {
+    let releaseFirstWrite: (() => void) | undefined;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const persistedTitles: string[] = [];
+    let calls = 0;
+    commitStateMock.mockImplementation(async (entries: Array<{ key: string; value: unknown }>) => {
+      calls++;
+      const sessionsEntry = entries.find((entry) => entry.key === "kimix_sessions");
+      const title = Array.isArray(sessionsEntry?.value)
+        ? (sessionsEntry.value[0] as { title?: string } | undefined)?.title
+        : undefined;
+      if (title) persistedTitles.push(title);
+      if (calls === 1) {
+        await firstWriteStarted;
+        throw new Error("IndexedDB simulated failure");
+      }
+    });
+
+    const { persistLocalConversationState } = await import("@/utils/persistence");
+    const withTitle = (title: string): Session => ({ ...session, title });
+
+    useAppStore.setState({ currentProject: project, currentSession: withTitle("A") });
+    useSessionStore.setState({ sessions: [withTitle("A")], pendingMessages: [] });
+    const first = persistLocalConversationState();
+    await vi.waitFor(() => expect(commitStateMock).toHaveBeenCalledTimes(1));
+
+    useAppStore.setState({ currentSession: withTitle("B") });
+    useSessionStore.setState({ sessions: [withTitle("B")] });
+    await persistLocalConversationState();
+
+    releaseFirstWrite?.();
+    expect((await first).success).toBe(false);
+
+    useAppStore.setState({ currentSession: withTitle("C") });
+    useSessionStore.setState({ sessions: [withTitle("C")] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+
+    expect(persistedTitles).toEqual(["A", "C"]);
+    expect(calls).toBe(2);
+  });
 });

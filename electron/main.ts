@@ -25,6 +25,7 @@ import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
+import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
@@ -2816,23 +2817,7 @@ function isPortableRuntime() {
 }
 
 function pickUpdateAsset(assets: ReleaseAssetInfo[]) {
-  const names = assets.map((asset) => ({ ...asset, lowerName: asset.name.toLowerCase() }));
-  if (process.platform === "win32") {
-    const portable = isPortableRuntime();
-    const preferred = portable
-      ? names.find((asset) => asset.lowerName.endsWith(".exe") && !asset.lowerName.includes("setup"))
-      : names.find((asset) => asset.lowerName.includes("setup") && asset.lowerName.endsWith(".exe"));
-    return preferred ?? names.find((asset) => asset.lowerName.endsWith(".exe")) ?? null;
-  }
-  if (process.platform === "darwin") {
-    const arch = process.arch === "arm64" ? "arm64" : "x64";
-    return names.find((asset) => asset.lowerName.includes(arch) && (asset.lowerName.endsWith(".dmg") || asset.lowerName.endsWith(".zip"))) ??
-      names.find((asset) => asset.lowerName.includes("universal") && (asset.lowerName.endsWith(".dmg") || asset.lowerName.endsWith(".zip"))) ??
-      null;
-  }
-  return names.find((asset) => asset.lowerName.endsWith(".appimage")) ??
-    names.find((asset) => asset.lowerName.endsWith(".deb")) ??
-    null;
+  return pickUpdateAssetForPlatform(assets, process.platform, process.arch, isPortableRuntime());
 }
 
 function sanitizeDownloadName(name: string) {
