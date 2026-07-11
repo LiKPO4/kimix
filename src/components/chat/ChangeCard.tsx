@@ -152,6 +152,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [expandedDiffs, setExpandedDiffs] = useState<Record<string, boolean>>({});
+  const [headerToggleActive, setHeaderToggleActive] = useState(false);
   const files = useMemo(() => mergeChangeRows(event?.files ?? (changes ?? []).map((change) => ({
     path: change.path,
     oldText: change.oldText,
@@ -359,14 +360,27 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     <div className="w-full overflow-hidden rounded-[14px] border border-border-subtle bg-surface-elevated">
       <div
         className="grid items-center border-b border-border-subtle"
-        style={{ gridTemplateColumns: "minmax(0, 1fr) auto", minHeight: 44, paddingLeft: 18, paddingRight: 18, columnGap: 14 }}
+        style={{
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          minHeight: 44,
+          paddingLeft: 18,
+          paddingRight: 18,
+          columnGap: 14,
+          backgroundColor: headerToggleActive ? "var(--surface-hover)" : "transparent",
+          transition: "background-color var(--duration-base) var(--ease-hover)",
+        }}
       >
         <button
           type="button"
           onClick={() => canExpand && setExpanded((value) => !value)}
+          onMouseEnter={() => canExpand && setHeaderToggleActive(true)}
+          onMouseLeave={() => setHeaderToggleActive(false)}
+          onFocus={() => canExpand && setHeaderToggleActive(true)}
+          onBlur={() => setHeaderToggleActive(false)}
           disabled={!canExpand}
-          className="flex min-w-0 items-center rounded-lg text-[14px] leading-5 text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-default disabled:hover:bg-transparent"
+          className="flex min-w-0 items-center text-[14px] leading-5 text-text-primary disabled:cursor-default"
           style={{ gap: 8, height: 30, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
+          aria-expanded={canExpand ? expanded : undefined}
         >
           {canExpand && (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
           <span className="truncate">文件变更</span>

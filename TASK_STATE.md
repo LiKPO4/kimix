@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-11 v2.15.2 ChangeCard 头部 hover 层级修正
+
+- 当前目标：消除文件变更头部 hover 的局部灰色胶囊，使其与“再显示文件”行保持一致的整行反馈。
+- 已完成：hover/focus 背景提升到 44px 头部网格行；左侧展开按钮自身保持透明且移除圆角 hover，右侧“全部撤销”保持独立操作反馈。
+- 验证：`pnpm test:run` 59 个文件、417 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过；等待用户截图复验。
+- 关键文件：`src/components/chat/ChangeCard.tsx`。
+- 下一步：以 v2.15.2 截图确认顶部整行反馈与撤销按钮 hover 的视觉关系。
+
 ## 2026-07-11 v2.15.1 审查回归修复
 
 - 当前目标：修复 v2.15.0 代码审查中确认的持久化旧快照覆盖、Intel Mac 更新资产识别和运行计时高频刷新问题。
