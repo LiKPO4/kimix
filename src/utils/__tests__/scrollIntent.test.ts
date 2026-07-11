@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scrollTopPreservingBottomDistance, shouldPauseAutoFollowForScroll } from "../scrollIntent";
+import { bottomScrollTop, distanceFromBottom, scrollTopPreservingBottomDistance, shouldPauseAutoFollowForScroll, shouldResumeAutoFollowAtBottom } from "../scrollIntent";
 
 describe("scroll intent", () => {
   it("preserves the viewport when streaming content shrinks", () => {
@@ -52,6 +52,33 @@ describe("scroll intent", () => {
       currentScrollTop: 120,
       autoFollow: true,
       intentUntil: 2500,
+      now: 2000,
+    })).toBe(false);
+  });
+
+  it("keeps a following viewport pinned through content growth and footer growth", () => {
+    expect(bottomScrollTop({ scrollHeight: 2200, clientHeight: 600 })).toBe(1600);
+    expect(bottomScrollTop({ scrollHeight: 2000, clientHeight: 500 })).toBe(1500);
+  });
+
+  it("measures the geometric distance from the canonical bottom", () => {
+    expect(distanceFromBottom({ scrollHeight: 2000, scrollTop: 1368, clientHeight: 600 })).toBe(32);
+    expect(distanceFromBottom({ scrollHeight: 2000, scrollTop: 1500, clientHeight: 600 })).toBe(0);
+  });
+
+  it("rejoins auto-follow only when explicit downward intent reaches the bottom", () => {
+    expect(shouldResumeAutoFollowAtBottom({
+      distance: 20,
+      autoFollow: false,
+      userScroll: true,
+      bottomIntentUntil: 2500,
+      now: 2000,
+    })).toBe(true);
+    expect(shouldResumeAutoFollowAtBottom({
+      distance: 0,
+      autoFollow: false,
+      userScroll: true,
+      bottomIntentUntil: 1500,
       now: 2000,
     })).toBe(false);
   });

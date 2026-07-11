@@ -21,7 +21,7 @@ import { reliableAssistantDurationMs } from "@/utils/duration";
 import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError } from "@/utils/reportError";
-import { scrollTopPreservingBottomDistance } from "@/utils/scrollIntent";
+import { bottomScrollTop, distanceFromBottom, scrollTopPreservingBottomDistance, shouldResumeAutoFollowAtBottom, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
@@ -834,7 +834,6 @@ export const ChatThread = memo(function ChatThread() {
   const lastScrollTopRef = useRef<number | null>(null);
   const lastScrollHeightRef = useRef<number | null>(null);
   const contentVersionRef = useRef("");
-  const resizeContentVersionRef = useRef("");
   const contentResizeSnapshotRef = useRef<{
     sessionId?: string;
     contentVersion: string;
@@ -846,6 +845,7 @@ export const ChatThread = memo(function ChatThread() {
   } | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const userInputLockUntilRef = useRef(0);
+  const userBottomIntentUntilRef = useRef(0);
   const lastUserScrollAtRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
   const lastManualAnchorRestoreAtRef = useRef(0);
@@ -923,36 +923,7 @@ export const ChatThread = memo(function ChatThread() {
     const locked = Date.now() < userInputLockUntilRef.current;
     const beforeScrollTop = node.scrollTop;
     const beforeScrollHeight = node.scrollHeight;
-    const contentNode = streamContentRef.current;
-    const items = Array.from(contentNode?.querySelectorAll<HTMLElement>("[data-kimix-render-key]") ?? []);
-    const lastItem = items.at(-1) ?? null;
-    let targetTop: number;
-    let delta: number | undefined;
-    let candidate: number | undefined;
-    if (lastItem) {
-      // Compute a scroll-position-INDEPENDENT delta: how far the last item's
-      // bottom (plus the bottom spacer) currently sits below the viewport
-      // bottom, then add it to the current scrollTop. Using getBoundingClientRect
-      // values directly as an absolute scrollTop is wrong because they are
-      // measured relative to the current scroll offset — that produced the
-      // v2.12.69 "opens at top" regression (measurement ran after an initial
-      // jump-to-bottom, so the rect-derived target collapsed to ~0).
-      const nodeRect = node.getBoundingClientRect();
-      const lastItemBottom = lastItem.getBoundingClientRect().bottom;
-      const viewportBottom = nodeRect.top + node.clientHeight;
-      delta = lastItemBottom + CHAT_BOTTOM_SPACER_HEIGHT - viewportBottom;
-      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
-      candidate = node.scrollTop + delta;
-      // When content shrinks (e.g. a multi-line thinking block collapses to its
-      // one-line teaser), delta becomes negative. Preserve the current viewport
-      // position as long as the resulting scroll position is still valid; only
-      // snap to the new bottom when even scrolling to the top would leave the
-      // last item above its target. This avoids the jarring jump caused by the
-      // previous "always snap to maxScrollTop when delta < 0" behavior.
-      targetTop = candidate < 0 ? maxScrollTop : Math.min(maxScrollTop, candidate);
-    } else {
-      targetTop = Math.max(0, node.scrollHeight - node.clientHeight);
-    }
+    const targetTop = bottomScrollTop(node);
     window.api.writeDiag?.({
       message: "[ChatThread] scrollToBottom",
       data: {
@@ -963,12 +934,6 @@ export const ChatThread = memo(function ChatThread() {
         beforeScrollTop,
         beforeScrollHeight,
         targetTop,
-        delta,
-        candidate,
-        itemCount: items.length,
-        lastItemOffsetTop: lastItem?.offsetTop,
-        lastItemOffsetHeight: lastItem?.offsetHeight,
-        contentNodeOffsetTop: contentNode?.offsetTop,
       },
     }).catch(logError("writeDiag"));
     if (locked) return;
@@ -1043,6 +1008,9 @@ export const ChatThread = memo(function ChatThread() {
   };
 
   const enableAutoFollow = () => {
+    cancelPendingAnchorCapture();
+    resizeScrollAnchorRef.current = null;
+    userBottomIntentUntilRef.current = 0;
     autoFollowRef.current = true;
     userScrollRef.current = false;
     updateAutoFollow(true);
@@ -1067,6 +1035,7 @@ export const ChatThread = memo(function ChatThread() {
   const pauseAutoFollowForUser = () => {
     cancelSessionAutoBottom();
     lastUserScrollAtRef.current = Date.now();
+    userBottomIntentUntilRef.current = 0;
     userScrollRef.current = true;
     scrollTokenRef.current += 1;
     if (!userHasScrolled) {
@@ -1087,6 +1056,7 @@ export const ChatThread = memo(function ChatThread() {
     if (event.button === 1 || event.clientX >= rect.right - 20) {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
+      userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
 
@@ -1095,6 +1065,8 @@ export const ChatThread = memo(function ChatThread() {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
       if (isInitialTailOnly) expandInitialTail();
+    } else if (event.deltaY > 0) {
+      userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
 
@@ -1106,9 +1078,11 @@ export const ChatThread = memo(function ChatThread() {
     const startY = touchStartYRef.current;
     if (startY === null) return;
     const currentY = event.touches[0]?.clientY ?? startY;
-    if (startY - currentY > 10) {
+    if (currentY - startY > 10) {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
+    } else if (startY - currentY > 10) {
+      userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
 
@@ -1116,6 +1090,8 @@ export const ChatThread = memo(function ChatThread() {
     if (["PageUp", "ArrowUp", "Home"].includes(event.key)) {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
+    } else if (["PageDown", "ArrowDown", "End"].includes(event.key)) {
+      userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
 
@@ -1358,6 +1334,7 @@ export const ChatThread = memo(function ChatThread() {
     lastScrollHeightRef.current = null;
     touchStartYRef.current = null;
     userInputLockUntilRef.current = 0;
+    userBottomIntentUntilRef.current = 0;
     lastUserScrollAtRef.current = 0;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
@@ -1421,7 +1398,6 @@ export const ChatThread = memo(function ChatThread() {
     if (!node || typeof ResizeObserver === "undefined") return;
     let resizeFrame = 0;
     lastScrollSizeRef.current = readScrollSize(node);
-    resizeContentVersionRef.current = contentVersionRef.current;
     scheduleAnchorCapture();
 
     const processResize = () => {
@@ -1441,9 +1417,9 @@ export const ChatThread = memo(function ChatThread() {
       ) {
         return;
       }
-      const hasConversationContentChanged = contentVersionRef.current !== resizeContentVersionRef.current;
-      resizeContentVersionRef.current = contentVersionRef.current;
+      const shouldStickToBottom = autoFollowRef.current && !userScrollRef.current;
       if (Date.now() < intentionalResizeRestoreUntilRef.current) {
+        if (shouldStickToBottom) scrollToBottom("auto");
         scheduleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {
@@ -1452,39 +1428,27 @@ export const ChatThread = memo(function ChatThread() {
         }
         return;
       }
-      // Permission menus and footer controls can resize the chat viewport without
-      // changing any conversation item. Treat those as layout-only changes:
-      // keep the visible anchor instead of running the bottom-follow algorithm,
-      // whose last-item measurement can be transiently stale during popover
-      // open/close and produce a jump to scrollTop=0.
-      if (!hasConversationContentChanged) {
-        restoreResizeScrollAnchor();
-        scheduleAnchorCapture();
-        const activeNode = scrollRef.current;
-        if (activeNode) {
-          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
-          updateShowScrollToBottom(distance > 80);
-        }
+      // Follow mode owns the bottom invariant. Content and viewport height
+      // changes are equivalent here, so an incomplete content signature must
+      // never route a live tool resize through an older viewport anchor.
+      if (shouldStickToBottom) {
+        scrollToBottom("auto");
         return;
       }
-      // Once the user has taken manual control, never pull the viewport back to bottom.
+      // Detached mode owns the visible anchor. Avoid fighting an active wheel or
+      // touch gesture, then restore the same rendered item after layout settles.
       if (userScrollRef.current) {
-        scheduleIdleAnchorCapture();
+        const isRecentUserScroll = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
+        if (isRecentUserScroll) scheduleIdleAnchorCapture();
+        else {
+          restoreResizeScrollAnchor();
+          scheduleAnchorCapture();
+        }
         const activeNode = scrollRef.current;
         if (activeNode) {
           const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
           updateShowScrollToBottom(distance > 80);
         }
-        return;
-      }
-      if (Date.now() < sessionAutoBottomUntilRef.current) {
-        autoFollowRef.current = true;
-        updateAutoFollow(true);
-        scrollToBottom("auto");
-        return;
-      }
-      if (autoFollowRef.current) {
-        scrollToBottom("auto");
         return;
       }
       restoreResizeScrollAnchor();
@@ -1502,7 +1466,8 @@ export const ChatThread = memo(function ChatThread() {
 
     const observer = new ResizeObserver(scheduleResizeProcess);
     const contentNode = streamContentRef.current;
-    observer.observe(contentNode ?? node);
+    observer.observe(node);
+    if (contentNode && contentNode !== node) observer.observe(contentNode);
     window.addEventListener("resize", scheduleResizeProcess);
     return () => {
       observer.disconnect();
@@ -1740,9 +1705,24 @@ export const ChatThread = memo(function ChatThread() {
     const previousScrollHeight = lastScrollHeightRef.current;
     lastScrollTopRef.current = node.scrollTop;
     lastScrollHeightRef.current = node.scrollHeight;
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
-    updateShowScrollToBottom(distance > 80);
+    const distance = distanceFromBottom(node);
     const now = Date.now();
+    if (shouldResumeAutoFollowAtBottom({
+      distance,
+      autoFollow: autoFollowRef.current,
+      userScroll: userScrollRef.current,
+      bottomIntentUntil: userBottomIntentUntilRef.current,
+      now,
+    })) {
+      userScrollRef.current = false;
+      autoFollowRef.current = true;
+      userBottomIntentUntilRef.current = 0;
+      lastUserScrollAtRef.current = 0;
+      cancelPendingAnchorCapture();
+      resizeScrollAnchorRef.current = null;
+      updateAutoFollow(true);
+    }
+    updateShowScrollToBottom(distance > 80);
     if (userScrollRef.current) {
       lastUserScrollAtRef.current = now;
       scheduleIdleAnchorCapture();
@@ -1874,7 +1854,6 @@ export const ChatThread = memo(function ChatThread() {
       ignoreScrollRemaining: Math.max(0, ignoreScrollUntilRef.current - Date.now()),
       sessionAutoBottomRemaining: Math.max(0, sessionAutoBottomUntilRef.current - Date.now()),
       contentVersionLength: contentVersionRef.current.length,
-      resizeContentVersionLength: resizeContentVersionRef.current.length,
       lastScrollTop: lastScrollTopRef.current,
       lastScrollHeight: lastScrollHeightRef.current,
     };

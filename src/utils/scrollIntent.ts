@@ -1,4 +1,41 @@
 export const USER_SCROLL_INTENT_MS = 1_500;
+export const BOTTOM_FOLLOW_THRESHOLD_PX = 32;
+
+export function distanceFromBottom({
+  scrollHeight,
+  scrollTop,
+  clientHeight,
+}: {
+  scrollHeight: number;
+  scrollTop: number;
+  clientHeight: number;
+}) {
+  return Math.max(0, scrollHeight - scrollTop - clientHeight);
+}
+
+export function bottomScrollTop({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+  return Math.max(0, scrollHeight - clientHeight);
+}
+
+export function shouldResumeAutoFollowAtBottom({
+  distance,
+  autoFollow,
+  userScroll,
+  bottomIntentUntil,
+  now,
+  threshold = BOTTOM_FOLLOW_THRESHOLD_PX,
+}: {
+  distance: number;
+  autoFollow: boolean;
+  userScroll: boolean;
+  bottomIntentUntil: number;
+  now: number;
+  threshold?: number;
+}) {
+  if (distance > threshold) return false;
+  if (autoFollow && !userScroll) return true;
+  return bottomIntentUntil >= now;
+}
 
 export function scrollTopPreservingBottomDistance({
   previousScrollHeight,
