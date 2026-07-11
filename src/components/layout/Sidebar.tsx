@@ -747,13 +747,26 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           >
                             <FolderOpen size={16} className="shrink-0 text-text-muted" />
                             <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
-                            {isPinned && <Pin size={12} className="shrink-0 text-text-muted" fill="currentColor" />}
                           </button>
-                          <div
+                          <div className="kimix-sidebar-project-row-controls flex shrink-0 items-center" style={{ gap: 0 }}>
+                            {isPinned && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void unpinProject(project);
+                              }}
+                              className="kimix-sidebar-icon-action kimix-sidebar-project-pin-action flex shrink-0 items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                              title="取消置顶项目"
+                              aria-label="取消置顶项目"
+                            >
+                              <Pin size={14} fill="currentColor" />
+                            </button>
+                            )}
+                            <div
                             className={`kimix-sidebar-project-row-actions flex shrink-0 items-center transition-opacity ${
                               projectActionFocusId === project.id ? "opacity-100" : "opacity-0 group-hover/project:opacity-100"
                             }`}
-                            style={{ gap: 1 }}
+                            style={{ gap: 0 }}
                             onFocusCapture={() => setProjectActionFocusId(project.id)}
                             onBlurCapture={(e) => {
                               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setProjectActionFocusId(null);
@@ -797,12 +810,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 await createSessionForProject(project);
                               }}
                               disabled={Boolean(creatingSessionProjectPath)}
-                              className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
+                              className="kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
                               title="在该项目下新对话"
                               aria-label="在该项目下新对话"
                             >
                               {creatingSessionProjectPath === project.path ? <Loader2 size={15} className="kimix-spin" /> : <SquarePen size={15} />}
                             </button>
+                            </div>
                           </div>
                           {openProjectMenu?.projectId === project.id && createPortal(
                             (() => {
@@ -984,7 +998,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.14</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.15</span>
         </button>
       </div>
     </aside>
