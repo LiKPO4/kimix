@@ -6,7 +6,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
 import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
-import { mapHistoryEvents, mapStreamEvent, mergeEvents } from "@/utils/eventMapper";
+import { mapHistoryEvents, mapStreamEvent, mergeEvents, preserveLocalUserMediaInCanonicalHistory } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
@@ -243,7 +243,10 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
         loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
           ? loaded.data.events
           : [];
-      const historyEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
+      const historyEvents = preserveLocalUserMediaInCanonicalHistory(
+        session.events,
+        settleInactiveEvents(mapHistoryEvents(eventsSource)),
+      );
       if (!shouldReplaceWithCanonicalKimiHistory(session.events, historyEvents)) continue;
       const updatedAt = Date.now();
       useSessionStore.setState((state) => ({
@@ -2130,9 +2133,10 @@ function App() {
               );
               const runtimeSwarmMode = runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined;
               const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
-              const events = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
+              const canonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
 
               if (runtimeOwner) {
+                const events = preserveLocalUserMediaInCanonicalHistory(runtimeOwner.events, canonicalEvents);
                 const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(runtimeOwner.events, events);
                 const hydratedEvents = runtimeOwner.events.length > 0 && !shouldUseCanonicalHistory
                   ? (runtimeIsActive ? runtimeOwner.events : settleInactiveEvents(runtimeOwner.events))
@@ -2162,6 +2166,7 @@ function App() {
                 ))
                 : undefined;
 
+              const events = preserveLocalUserMediaInCanonicalHistory(activeLocalSession?.events ?? [], canonicalEvents);
               const session = hydrateLongTaskProgressFromHistory({
                 id: historySessionId,
                 model: getLastUsedModelFromEvents(events) ?? activeLocalSession?.model ?? null,
@@ -2855,8 +2860,9 @@ function App() {
               sessionId: runtimeSessionId,
             }).catch(() => null);
             if (disposed || !loaded?.success) return;
-            const snapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+            const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
             const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
+            const snapshotEvents = preserveLocalUserMediaInCanonicalHistory(latestSession.events, canonicalSnapshotEvents);
             if (shouldReplaceWithCanonicalKimiHistory(latestSession.events, snapshotEvents)) {
               updateSession(session.id, (item) => ({
                 ...item,

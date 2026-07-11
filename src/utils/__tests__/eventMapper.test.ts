@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapStreamEvent, mergeEvents, mapHistoryEvents } from "../eventMapper";
+import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory } from "../eventMapper";
 import type { TimelineEvent } from "@/types/ui";
 
 describe("mapStreamEvent", () => {
@@ -1365,5 +1365,58 @@ describe("mapHistoryEvents", () => {
     expect(result).toHaveLength(2);
     expect(result[0]).toMatchObject({ type: "user_message", content: "用户历史问题" });
     expect(result[1]).toMatchObject({ type: "assistant_message", content: "官方历史回答", isComplete: true });
+  });
+});
+
+describe("preserveLocalUserMediaInCanonicalHistory", () => {
+  it("keeps pasted image bytes when richer official history only retains the image name", () => {
+    const local = [{
+      id: "local-user",
+      type: "user_message" as const,
+      timestamp: 1_000,
+      content: "请看图片",
+      images: [{ id: "local-image", kind: "image" as const, name: "image.png", dataUrl: "data:image/png;base64,AA==" }],
+    }];
+    const canonical = [{
+      id: "official-user",
+      type: "user_message" as const,
+      timestamp: 1_010,
+      content: "请看图片",
+      images: [{ name: "image.png" }],
+    }, {
+      id: "tool",
+      type: "tool_call" as const,
+      timestamp: 1_020,
+      toolCallId: "tool-1",
+      toolName: "read_file",
+      status: "completed" as const,
+      arguments: {},
+    }];
+
+    expect(preserveLocalUserMediaInCanonicalHistory(local, canonical)).toMatchObject([{
+      id: "official-user",
+      images: [{ id: "local-image", name: "image.png", dataUrl: "data:image/png;base64,AA==" }],
+    }, { id: "tool" }]);
+  });
+
+  it("matches repeated prompts by nearest timestamp and preserves dragged file paths", () => {
+    const local = [1_000, 2_000].map((timestamp, index) => ({
+      id: `local-${index}`,
+      type: "user_message" as const,
+      timestamp,
+      content: "同一段文字",
+      images: [{ name: "file.txt", kind: "file" as const, filePath: `C:\\tmp\\${index}.txt` }],
+    }));
+    const canonical = [1_990, 1_010].map((timestamp, index) => ({
+      id: `official-${index}`,
+      type: "user_message" as const,
+      timestamp,
+      content: "同一段文字",
+      images: [{ name: "file.txt" }],
+    }));
+
+    const result = preserveLocalUserMediaInCanonicalHistory(local, canonical);
+    expect(result[0]).toMatchObject({ images: [{ filePath: "C:\\tmp\\1.txt" }] });
+    expect(result[1]).toMatchObject({ images: [{ filePath: "C:\\tmp\\0.txt" }] });
   });
 });

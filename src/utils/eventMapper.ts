@@ -716,6 +716,65 @@ function hasDisplayableImages(images?: { dataUrl?: string }[]) {
   return Boolean(images?.some((image) => typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")));
 }
 
+function hasLocalUserMedia(images?: { dataUrl?: string; filePath?: string }[]) {
+  return Boolean(images?.some((image) => Boolean(image.dataUrl || image.filePath)));
+}
+
+function mergeUserMedia(
+  localImages: Extract<TimelineEvent, { type: "user_message" | "steer_message" }>["images"],
+  canonicalImages: Extract<TimelineEvent, { type: "user_message" | "steer_message" }>["images"],
+) {
+  if (!hasLocalUserMedia(localImages)) return canonicalImages;
+  if (!canonicalImages || canonicalImages.length === 0) return localImages;
+  return canonicalImages.map((image, index) => {
+    const local = localImages?.[index] ?? localImages?.find((candidate) => candidate.name === image.name);
+    if (!local) return image;
+    return {
+      ...image,
+      id: image.id ?? local.id,
+      kind: image.kind ?? local.kind,
+      dataUrl: image.dataUrl ?? local.dataUrl,
+      filePath: image.filePath ?? local.filePath,
+    };
+  });
+}
+
+/**
+ * Official history is authoritative for the timeline, but pasted image bytes and
+ * OS drag paths are renderer-local metadata. Reattach that metadata before a
+ * canonical snapshot replaces the local timeline.
+ */
+export function preserveLocalUserMediaInCanonicalHistory(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): TimelineEvent[] {
+  const localMessages = localEvents.filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
+    event.type === "user_message" || event.type === "steer_message"
+  ));
+  const usedLocalIndexes = new Set<number>();
+
+  return canonicalEvents.map((event) => {
+    if (event.type !== "user_message" && event.type !== "steer_message") return event;
+    const content = normalizeUserContent(event.content);
+    let bestIndex = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    localMessages.forEach((candidate, index) => {
+      if (usedLocalIndexes.has(index) || candidate.type !== event.type) return;
+      if (normalizeUserContent(candidate.content) !== content) return;
+      const distance = Math.abs(candidate.timestamp - event.timestamp);
+      if (distance < bestDistance) {
+        bestIndex = index;
+        bestDistance = distance;
+      }
+    });
+    if (bestIndex < 0) return event;
+    usedLocalIndexes.add(bestIndex);
+    const local = localMessages[bestIndex];
+    const images = mergeUserMedia(local.images, event.images);
+    return images === event.images ? event : { ...event, images };
+  });
+}
+
 function shouldPreserveLocalUserImages(
   local: Extract<TimelineEvent, { type: "user_message" }>,
   incoming: Extract<TimelineEvent, { type: "user_message" }>,
