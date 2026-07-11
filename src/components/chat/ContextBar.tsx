@@ -88,14 +88,6 @@ function ContextBarPopover({
   );
 }
 
-function formatUsage(period: UsagePeriod) {
-  if (!period.available || period.used === undefined || period.limit === undefined) {
-    return period.message ?? "暂无官方数据";
-  }
-  const remaining = Math.max(0, period.limit - period.used);
-  return `剩余 ${remaining}/${period.limit}`;
-}
-
 function formatDuration(ms: number) {
   const totalMinutes = Math.max(1, Math.ceil(ms / 60000));
   const days = Math.floor(totalMinutes / 1440);
@@ -179,7 +171,9 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
       )}
       <div className="mt-2 flex items-center justify-between gap-3 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]">
         <span className="kimix-tabular-nums shrink-0">{formatRefreshTime(period.refreshAt, now)}</span>
-        <span className="kimix-tabular-nums min-w-0 truncate">{formatUsage(period)}</span>
+        <span className="kimix-tabular-nums min-w-0 truncate">
+          {timePercent !== null ? `已过 ${timePercent.toFixed(0)}%` : "时间进度未知"}
+        </span>
       </div>
     </div>
   );
