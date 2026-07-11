@@ -137,6 +137,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
   const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; left: number } | null>(null);
+  const [sessionActionFocusId, setSessionActionFocusId] = useState<string | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
   const projectCatalogRefreshInFlightRef = useRef<Set<string>>(new Set());
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
@@ -856,6 +857,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 >
                                   <button
                                     onClick={() => {
+                                      setSessionActionFocusId(null);
                                       setWorkspaceView("chat");
                                       void selectSession(s.id);
                                     }}
@@ -863,21 +865,29 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                   >
                                     {s.title}
                                   </button>
-                                  <div className="relative h-7 w-[84px] shrink-0">
-                                    <span className="absolute inset-0 flex items-center justify-end text-[12px] text-text-muted transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+                                  <div className="relative h-7 w-[80px] shrink-0">
+                                    <span className={`absolute inset-0 flex items-center justify-end text-[12px] text-text-muted transition-opacity ${sessionActionFocusId === s.id ? "opacity-0" : "group-hover:opacity-0"}`}>
                                       {isSessionBusy ? (
                                         <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
                                       ) : (
                                         formatRelativeTime(getSessionConversationActivityAt(s))
                                       )}
                                     </span>
-                                    <div className="absolute inset-0 flex items-center justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                    <div
+                                      className={`absolute inset-0 flex items-center justify-end transition-opacity ${sessionActionFocusId === s.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                                      style={{ gap: 1 }}
+                                      onFocusCapture={() => setSessionActionFocusId(s.id)}
+                                      onBlurCapture={(e) => {
+                                        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSessionActionFocusId(null);
+                                      }}
+                                    >
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           void exportSessionMarkdown(s.id);
                                         }}
                                         className="kimix-inline-icon-action text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                        style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="导出 Markdown"
                                         aria-label="导出 Markdown"
                                       >
@@ -889,6 +899,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                           void exportSessionArchive(s.id, s.title);
                                         }}
                                         className="kimix-inline-icon-action text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                        style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="导出 Kimi 调试包"
                                         aria-label="导出 Kimi 调试包"
                                       >
@@ -913,6 +924,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                           });
                                         }}
                                         className="kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
+                                        style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="归档会话"
                                         aria-label="归档会话"
                                       >
@@ -946,7 +958,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.3</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.4</span>
         </button>
       </div>
     </aside>
