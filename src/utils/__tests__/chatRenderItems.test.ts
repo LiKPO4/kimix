@@ -143,3 +143,81 @@ describe("buildRenderItems usage footer", () => {
     expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
   });
 });
+
+describe("buildRenderItems room Agent turns", () => {
+  const events: TimelineEvent[] = [{
+    id: "room-message",
+    type: "user_message",
+    timestamp: 1,
+    content: "分别检查",
+    recipientAgentIds: ["agent-a", "agent-b"],
+  }, {
+    id: "assistant-a-part",
+    type: "assistant_message",
+    timestamp: 2,
+    content: "A result",
+    isThinking: false,
+    isComplete: true,
+    roomAgentId: "agent-a",
+    roomMessageId: "room-message",
+    agentTurnId: "turn-a",
+  }, {
+    id: "usage-a",
+    type: "status_update",
+    timestamp: 3,
+    inputTokenCount: 10,
+    tokenCount: 5,
+    roomAgentId: "agent-a",
+    roomMessageId: "room-message",
+    agentTurnId: "turn-a",
+  }, {
+    id: "assistant-b-part",
+    type: "assistant_message",
+    timestamp: 4,
+    content: "B result",
+    isThinking: false,
+    isComplete: true,
+    roomAgentId: "agent-b",
+    roomMessageId: "room-message",
+    agentTurnId: "turn-b",
+  }, {
+    id: "usage-b",
+    type: "status_update",
+    timestamp: 5,
+    inputTokenCount: 12,
+    tokenCount: 6,
+    roomAgentId: "agent-b",
+    roomMessageId: "room-message",
+    agentTurnId: "turn-b",
+  }];
+
+  it("keeps two Agent responses as separate stable render blocks", () => {
+    const rendered = buildRenderItems(events, "kimi-code");
+    const assistants = rendered.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    expect(assistants.map((item) => item.type === "event" ? item.event.id : "")).toEqual([
+      "assistant:turn-a",
+      "assistant:turn-b",
+    ]);
+    expect(assistants.map((item) => item.type === "event" && item.event.type === "assistant_message" ? item.event.content : "")).toEqual([
+      "A result",
+      "B result",
+    ]);
+  });
+
+  it("uses the Agent activity set instead of treating only the last response as running", () => {
+    const rendered = buildRenderItems(events, "kimi-code", undefined, false, new Set(["agent-a"]));
+    const assistantA = rendered.find((item) => item.type === "event" && item.event.id === "assistant:turn-a");
+    expect(assistantA?.type).toBe("event");
+    if (assistantA?.type !== "event") return;
+    expect(assistantA.trailingStatuses).toEqual([]);
+  });
+
+  it("settles one Agent footer while another Agent in the room is still running", () => {
+    const rendered = buildRenderItems(events, "kimi-code", undefined, true, new Set(["agent-a"]));
+    const assistantB = rendered.find((item) => item.type === "event" && item.event.id === "assistant:turn-b");
+    expect(assistantB?.type).toBe("event");
+    if (assistantB?.type !== "event") return;
+    expect(assistantB.trailingStatuses?.map((status) => status.id)).toEqual(["usage-b"]);
+  });
+});

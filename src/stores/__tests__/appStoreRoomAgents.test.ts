@@ -41,4 +41,30 @@ describe("appStore room Agent activity", () => {
     expect(activities[roomAgentActivityKey("room-1", "agent-a")]).toBeUndefined();
     expect(activities[roomAgentActivityKey("room-1", "agent-b")]?.status).toBe("running");
   });
+
+  it("preserves the active room turn when a status-only update arrives", () => {
+    const store = useAppStore.getState();
+    store.setRoomAgentActivity({
+      roomId: "room-1",
+      roomAgentId: "agent-a",
+      runtimeSessionId: "runtime-a",
+      status: "sending",
+      roomMessageId: "message-1",
+      activeTurnId: "turn-1",
+      updatedAt: 10,
+    });
+    store.setRoomAgentActivity({
+      roomId: "room-1",
+      roomAgentId: "agent-a",
+      runtimeSessionId: "runtime-a",
+      status: "waiting_approval",
+      updatedAt: 20,
+    });
+
+    expect(useAppStore.getState().roomAgentActivities[roomAgentActivityKey("room-1", "agent-a")]).toMatchObject({
+      status: "waiting_approval",
+      roomMessageId: "message-1",
+      activeTurnId: "turn-1",
+    });
+  });
 });

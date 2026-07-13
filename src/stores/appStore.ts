@@ -152,7 +152,10 @@ export const useAppStore = create<AppStore>((set) => ({
   setRoomAgentActivity: (activity) => set((state) => ({
     roomAgentActivities: {
       ...state.roomAgentActivities,
-      [roomAgentActivityKey(activity.roomId, activity.roomAgentId)]: activity,
+      [roomAgentActivityKey(activity.roomId, activity.roomAgentId)]: {
+        ...state.roomAgentActivities[roomAgentActivityKey(activity.roomId, activity.roomAgentId)],
+        ...activity,
+      },
     },
   })),
   removeRoomAgentActivity: (roomId, roomAgentId) => set((state) => {

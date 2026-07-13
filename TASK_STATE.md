@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；新增 CollaborationState、RoomAgent、房间消息/delivery 和事件归属字段；旧 Session 可无损映射为 synthetic primary；新增 `roomId + roomAgentId` 活动表，流事件按 Agent 分批，事件、状态、终态、quiet snapshot、轮询和 Server -> SDK 迁移均先解析 runtime owner；补充添加 Agent 与 delivery 的可恢复事务、幂等找回、发送状态不确定时禁止自动重试、官方身份关联和 Agent 级结算门禁；阶段 3 定向 4 个文件、95 项测试通过，当前工作树全量 66 个文件、459 项测试、生产构建、知识校验和 diff 检查通过。
-- 未完成：阶段 3 的统一 canonical reconcile 接入、纯 Agent 级结算门禁、歧义历史保留；官方目录与持久化恢复；添加 Agent UI；精确路由与并行队列；Agent scoped 操作；搜索/导出/归档以及视觉和真实流程验收。
+- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；新增 CollaborationState、RoomAgent、房间消息/delivery 和事件归属字段；旧 Session 可无损映射为 synthetic primary；新增 `roomId + roomAgentId` 活动表，流事件按 Agent 分批，事件、状态、终态、quiet snapshot、轮询和 Server -> SDK 迁移均先解析 runtime owner；完成阶段 3，startup/running-sample/repair/消息撤回和 `/undo` 统一使用 Agent-scoped canonical reconcile，稳定 snapshot/turn ID、歧义历史独立保留、逐 Agent footer 结算和流事件 turn 归属已落地；当前工作树全量 66 个文件、465 项测试、生产构建和 diff 检查通过。
+- 未完成：阶段 4 官方目录与持久化恢复、备份迁移和生命周期；添加 Agent UI；精确路由与并行队列；Agent scoped 操作；搜索/导出/归档以及视觉和真实流程验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
 - 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/utils/eventMapper.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/ChatThread.tsx`。
-- 下一步：保留当前阶段 3 未提交代码，先把 startup、running-sample、repair、official undo 全部接入统一 Agent-scoped reconcile，并补齐“某 Agent 完成、另一 Agent 仍运行”的结算回归测试；通过全量验证后再独立提交阶段 3。
+- 下一步：独立提交阶段 3；随后实现阶段 4 的 collaboration 持久化规范化、官方 metadata/catalog 折叠、逐 Agent 重启恢复和备份 schema 2。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
 

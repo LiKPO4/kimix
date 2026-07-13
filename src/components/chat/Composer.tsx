@@ -24,6 +24,9 @@ import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/ut
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
+import { mapHistoryEvents } from "@/utils/eventMapper";
+import { getPrimaryRoomAgent, hasMultipleRoomAgents } from "@/utils/collaborationRooms";
+import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -1684,13 +1687,44 @@ export function Composer() {
       return true;
     }
     if (name === "undo") {
-      await appendSlashUserMessage(commandNotice);
+      const roomSession = await ensureSession();
+      if (roomSession && hasMultipleRoomAgents(roomSession)) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: "多 Agent 房间的撤回必须指定唯一目标 Agent；当前版本不会猜测或整组撤回。",
+        }));
+        return true;
+      }
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
+      const targetSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
       const rawCount = Number(args || "1");
       const count = Number.isFinite(rawCount) ? Math.max(1, Math.min(Math.floor(rawCount), 10)) : 1;
       const res = await window.api.undoKimiCodeHistory({ sessionId: runtime.runtimeSessionId, count });
-      await appendStatusMessage(res.success ? `已撤回最近 ${count} 次官方历史。` : `撤回失败：${res.error}`);
+      let message = res.success ? `已撤回最近 ${count} 次官方历史。` : `撤回失败：${res.error}`;
+      if (res.success && targetSession) {
+        const loaded = await window.api.loadKimiCodeSession({
+          workDir: targetSession.projectPath,
+          sessionId: runtime.runtimeSessionId,
+        });
+        if (!loaded.success) {
+          message = `官方撤回成功，但刷新官方历史失败：${loaded.error}`;
+        } else {
+          const roomAgentId = getPrimaryRoomAgent(targetSession).id;
+          updateSession(runtime.uiSessionId, (session) => {
+            const reconciliation = reconcileAgentCanonicalHistory({
+              session,
+              roomAgentId,
+              expectedRuntimeSessionId: runtime.runtimeSessionId,
+              canonicalEvents: mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []),
+              reason: "undo",
+            });
+            return reconciliation.applied ? reconciliation.session : session;
+          });
+          syncCurrentSessionFromStore(runtime.uiSessionId);
+        }
+      }
+      await appendSlashUserMessage(commandNotice);
+      await appendStatusMessage(message);
       return true;
     }
     return false;

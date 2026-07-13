@@ -1565,10 +1565,49 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   return appendAroundTrailingSteer(existing, [incoming]);
 }
 
+function stableSnapshotEvent(
+  rawEvent: unknown,
+  mapped: TimelineEvent,
+  counters: Map<string, number>,
+): TimelineEvent {
+  if (!isRecord(rawEvent)) return mapped;
+  const source = isRecord(rawEvent.message) ? rawEvent.message : rawEvent;
+  const payload = isRecord(source.payload) ? source.payload : {};
+  const replay = payload.snapshotReplay;
+  const messageId = payload.snapshotMessageId;
+  if ((replay !== "history" && replay !== "in_flight") || !isString(messageId) || !messageId) return mapped;
+  const kind = mapped.type === "assistant_message"
+    ? "assistant"
+    : mapped.type === "user_message"
+      ? "user"
+      : mapped.type === "tool_call" || mapped.type === "tool_result"
+        ? `tool:${mapped.toolCallId || "unknown"}`
+        : mapped.type === "approval_request" || mapped.type === "question_request"
+          ? `${mapped.type}:${mapped.requestId || "unknown"}`
+          : mapped.type;
+  const counterKey = `${messageId}\u0000${kind}`;
+  const partIndex = counters.get(counterKey) ?? 0;
+  counters.set(counterKey, partIndex + 1);
+  const prefix = `snapshot:${encodeURIComponent(messageId)}:${encodeURIComponent(kind)}`;
+  const id = `${prefix}:${partIndex}`;
+  if (mapped.type !== "assistant_message" || !mapped.thinkingParts?.length) {
+    return { ...mapped, id };
+  }
+  return {
+    ...mapped,
+    id,
+    thinkingParts: mapped.thinkingParts.map((part, index) => ({
+      ...part,
+      id: `${id}:thinking:${index}`,
+    })),
+  };
+}
+
 export function mapHistoryEvents(events: unknown[]): TimelineEvent[] {
+  const stableCounters = new Map<string, number>();
   return events.reduce<TimelineEvent[]>((items, event) => {
     const mapped = mapStreamEvent(event);
-    return mapped ? mergeEvents(items, mapped) : items;
+    return mapped ? mergeEvents(items, stableSnapshotEvent(event, mapped, stableCounters)) : items;
   }, []);
 }
 

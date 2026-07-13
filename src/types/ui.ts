@@ -57,6 +57,7 @@ export interface RoomAgentActivity {
   roomAgentId: string;
   runtimeSessionId?: string;
   status: RoomAgentActivityStatus;
+  roomMessageId?: string;
   activeTurnId?: string;
   startedAt?: number;
   updatedAt: number;

@@ -24,6 +24,7 @@ import { logError } from "@/utils/reportError";
 import { bottomScrollTop, distanceFromBottom, scrollTopPreservingBottomDistance, shouldResumeAutoFollowAtBottom, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
+import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 
 type RenderItem =
   | { type: "event"; event: TimelineEvent; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
@@ -487,6 +488,7 @@ export function buildRenderItems(
   sessionEngine?: "prompt" | "kimi-code",
   attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
   isSessionRunning = false,
+  activeRoomAgentIds?: ReadonlySet<string>,
 ): RenderItem[] {
   const items: RenderItem[] = [];
 
@@ -511,7 +513,7 @@ export function buildRenderItems(
     const last = visible[visible.length - 1];
     return {
       ...first,
-      id: visible.map((event) => event.id).join(":"),
+      id: first.agentTurnId ? `assistant:${first.agentTurnId}` : visible.map((event) => event.id).join(":"),
       timestamp: first.timestamp,
       content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
       thinking: visible.map((event) => event.thinking ?? "").filter((thinking) => thinking.trim()).join(""),
@@ -550,8 +552,11 @@ export function buildRenderItems(
         event.type === "approval_request" && event.status !== "pending"
     );
     const foldApprovals = Boolean(mergedAssistantEvent) && resolvedApprovals.length > 0;
+    const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
+    const isRoomAgentRunning = Boolean(roomAgentId && activeRoomAgentIds?.has(roomAgentId));
     const turnSettled = (
-      !(isLatestTurn && isSessionRunning) &&
+      !isRoomAgentRunning &&
+      !(!roomAgentId && isLatestTurn && isSessionRunning) &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
@@ -712,9 +717,11 @@ export function buildRenderItems(
 
   let turnBody: TimelineEvent[] = [];
   let currentTurnStartedAt: number | undefined;
+  let currentAgentTurnId: string | undefined;
   const flushTurn = (isLatestTurn = false) => {
     renderTurnBody(turnBody, currentTurnStartedAt, isLatestTurn);
     turnBody = [];
+    currentAgentTurnId = undefined;
   };
 
   for (const event of events) {
@@ -729,6 +736,11 @@ export function buildRenderItems(
       items.push({ type: "event", event });
       continue;
     }
+
+    if (event.agentTurnId && currentAgentTurnId && event.agentTurnId !== currentAgentTurnId) {
+      flushTurn(false);
+    }
+    if (event.agentTurnId) currentAgentTurnId = event.agentTurnId;
 
     turnBody.push(event);
   }
@@ -765,10 +777,11 @@ function collapseCompletedCompactions(events: TimelineEvent[]): TimelineEvent[] 
   });
 }
 
-function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string, runtimeSessionId?: string): boolean {
+function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string, runtimeSessionId?: string, isRoomRunning = false): boolean {
   const isRunningThisSession = Boolean(sessionId && (
     runningSessionId === sessionId ||
-    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId) ||
+    isRoomRunning
   ));
   return events.some((event) => {
     if (event.type === "user_message") {
@@ -809,6 +822,7 @@ function hasVisibleConversation(events: TimelineEvent[], runningSessionId: strin
 export const ChatThread = memo(function ChatThread() {
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -859,23 +873,27 @@ export const ChatThread = memo(function ChatThread() {
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
 
+  const roomTimeline = useMemo(() => session ? projectCollaborationTimeline(session) : [], [session]);
   const splitEvents = useMemo(
-    () => splitUserAttachedStatuses(collapseCompletedCompactions(session?.events ?? [])),
-    [session?.events]
+    () => splitUserAttachedStatuses(collapseCompletedCompactions(roomTimeline)),
+    [roomTimeline]
   );
   const visibleEvents = useMemo(
     () => filterStatusUpdates(splitEvents.events, statusUpdateDisplay),
     [splitEvents.events, statusUpdateDisplay]
   );
   const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
-  const hasActiveTurn = Boolean(session && (
+  const activeRoomAgentIds = useMemo(() => new Set(Object.values(roomAgentActivities)
+    .filter((activity) => activity.roomId === session?.id && ["running", "waiting_approval", "waiting_question"].includes(activity.status))
+    .map((activity) => activity.roomAgentId)), [roomAgentActivities, session?.id]);
+  const hasActiveTurn = Boolean(session && (activeRoomAgentIds.size > 0 || (
     runningSessionId === session.id ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
-  ));
+  )));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(
-    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn),
-    [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn]
+    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds),
+    [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds]
   );
   const latestProcessAssistantEventId = useMemo(() => {
     const item = renderItems.findLast((candidate) => (
@@ -886,13 +904,13 @@ export const ChatThread = memo(function ChatThread() {
     return item?.type === "event" ? item.event.id : undefined;
   }, [renderItems]);
   const contentVersion = useMemo(() => {
-    return (session?.events ?? []).map((event) => {
+    return roomTimeline.map((event) => {
       if (event.type === "assistant_message") {
-        return `${event.id}:${event.content.length}:${event.thinking?.length ?? 0}:${event.isComplete ? 1 : 0}`;
+        return `${event.id}:${event.roomAgentId ?? ""}:${event.agentTurnId ?? ""}:${event.content.length}:${event.thinking?.length ?? 0}:${event.isComplete ? 1 : 0}`;
       }
-      return `${event.id}:${event.type}`;
+      return `${event.id}:${event.type}:${event.roomAgentId ?? ""}:${event.agentTurnId ?? ""}`;
     }).join("|");
-  }, [session?.events]);
+  }, [roomTimeline]);
   contentVersionRef.current = contentVersion;
 
   const updateAutoFollow = (value: boolean) => {
@@ -1803,8 +1821,8 @@ export const ChatThread = memo(function ChatThread() {
   }), [fullVisibleRenderItems]);
   const visibleRenderItems = isInitialTailOnly ? initialTailRenderItems : fullVisibleRenderItems;
   const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
-  const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId));
-  const isRestoringOfficialHistory = Boolean(session?.isLoading && session.events.length > 0);
+  const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId, hasActiveTurn));
+  const isRestoringOfficialHistory = Boolean(session?.isLoading && roomTimeline.length > 0);
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
   const eagerMarkdown = Boolean(session?.id && (
     Date.now() < sessionAutoBottomUntilRef.current || userHasScrolled

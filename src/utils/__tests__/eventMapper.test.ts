@@ -1366,6 +1366,49 @@ describe("mapHistoryEvents", () => {
     expect(result[0]).toMatchObject({ type: "user_message", content: "用户历史问题" });
     expect(result[1]).toMatchObject({ type: "assistant_message", content: "官方历史回答", isComplete: true });
   });
+
+  it("keeps official snapshot event identities stable across repeated loads", () => {
+    const history = [
+      {
+        type: "TurnBegin",
+        payload: {
+          snapshotReplay: "history",
+          snapshotMessageId: "msg-user-1",
+          user_input: [{ type: "text", text: "用户历史问题" }],
+        },
+      },
+      {
+        type: "content.part",
+        payload: {
+          snapshotReplay: "history",
+          snapshotMessageId: "msg-assistant-1",
+          part: { type: "think", think: "先分析" },
+        },
+      },
+      {
+        type: "content.part",
+        payload: {
+          snapshotReplay: "history",
+          snapshotMessageId: "msg-assistant-1",
+          part: { type: "text", text: "官方历史回答" },
+        },
+      },
+      {
+        type: "turn.ended",
+        payload: {
+          snapshotReplay: "history",
+          snapshotMessageId: "msg-assistant-1",
+        },
+      },
+    ];
+
+    const first = mapHistoryEvents(history);
+    const second = mapHistoryEvents(history);
+    expect(second.map((event) => event.id)).toEqual(first.map((event) => event.id));
+    expect(first[0].id).toContain("msg-user-1");
+    expect(first[1].id).toContain("msg-assistant-1");
+    expect(first[1]).toMatchObject({ type: "assistant_message", content: "官方历史回答", isComplete: true });
+  });
 });
 
 describe("preserveLocalUserMediaInCanonicalHistory", () => {

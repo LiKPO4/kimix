@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-2 已完成，阶段 3 正在实现且仍处于内部开发 gate；在事件归属、运行状态、历史分区、可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-3 已完成，下一步进入阶段 4，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -274,14 +274,14 @@ interface AgentDelivery {
 
 ### 阶段 3：历史分区和稳定渲染投影
 
-- [ ] 每个 Agent 拥有独立 canonical history 分区。
-- [ ] merge、settle、snapshot、undo 和媒体回填限定 Agent/turn。
-- [ ] 历史映射使用稳定 source identity。
-- [ ] ChatThread 投影房间用户消息和多个 Agent turn。
-- [ ] 展开状态与滚动锚点绑定永久 `agentTurnId`。
-- [ ] startup、running-sample、repair、undo 全部收口到同一个 Agent-scoped canonical reconcile 入口。
-- [ ] 结算门禁完全 Agent/turn 化，移除房间级运行状态对单个响应块的干扰。
-- [ ] 新房间消息不再使用文本+时间作为权威关联；歧义历史保留但不误绑。
+- [x] 每个 Agent 拥有独立 canonical history 分区。
+- [x] merge、settle、snapshot、undo 和媒体回填限定 Agent/turn。
+- [x] 历史映射使用稳定 source identity。
+- [x] ChatThread 投影房间用户消息和多个 Agent turn。
+- [x] 展开状态与滚动锚点绑定永久 `agentTurnId`。
+- [x] startup、running-sample、repair、undo 全部收口到同一个 Agent-scoped canonical reconcile 入口。
+- [x] 结算门禁完全 Agent/turn 化，移除房间级运行状态对单个响应块的干扰。
+- [x] 新房间消息不再使用文本+时间作为权威关联；歧义历史保留但不误绑。
 
 退出门禁：两 Agent 事件交错、ID 相同、同时运行和迟到 snapshot 均不串线、不重挂载。
 
@@ -406,13 +406,13 @@ git diff --check
 
 ## 10. 当前实现审计与开放条件
 
-截至 2026-07-13，阶段 0-2 已独立提交；阶段 3 存在未提交实现，定向测试 4 个文件、95 项通过，但仍不得开放 UI。已知阻断项：
+截至 2026-07-13，阶段 0-3 已完成。阶段 3 已实现并验证：
 
-1. `startup`、quiet running snapshot、后台 repair、official undo 还没有全部改用统一的 Agent-scoped canonical reconcile。
-2. ChatThread 的结算判断仍保留房间级 `isSessionRunning` 兼容门禁，必须验证某个 Agent 完成时不被另一个运行中的 Agent 延迟或污染最终 usage。
-3. 时间线投影对尚未显式绑定 delivery 的历史仍有“文本 + 30 秒窗口”回退；它只能服务旧数据迁移，不能成为新消息权威路径。
-4. compaction、session meta、迟到工具结果等无法关联 room message 的事件，需要定义保留和诊断呈现，不能静默丢失。
-5. 当前工作树已通过 66 个测试文件、459 项测试、生产构建、知识校验和 diff 检查；这些结果证明现有回归门禁未破坏，但不能替代前四项架构阻断条件。
+1. `startup`、quiet running snapshot、后台 repair、消息撤回重写和 `/undo` 全部使用统一的 Agent-scoped canonical reconcile。
+2. ChatThread 的响应块、展开/滚动身份和最终 usage 只由对应 `roomAgentId + agentTurnId` 控制。
+3. 新房间消息只接受 delivery/room/官方事件身份绑定；文本+时间仅用于已有官方 ID 的唯一旧数据迁移，歧义时不绑定。
+4. 未关联的 compaction、session meta、用户、Assistant 或工具事件保留在所属 Agent 的独立时间线段，不再静默丢失或挂到最近一轮。
+5. 当前工作树已通过 66 个测试文件、465 项测试、生产构建和 diff 检查；添加 Agent UI 仍必须等待阶段 4 的持久化、目录和崩溃恢复门禁。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

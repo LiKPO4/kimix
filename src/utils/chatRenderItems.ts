@@ -7,13 +7,16 @@ export function createToolOnlyAssistantEvent(tools: ToolCallEvent[]): Extract<Ti
   const last = tools[tools.length - 1] ?? first;
   const hasRunningTool = tools.some((tool) => tool.status === "running");
   return {
-    id: `assistant-tools-${tools.map((tool) => tool.id).join(":")}`,
+    id: first?.agentTurnId ? `assistant:${first.agentTurnId}:tools` : `assistant-tools-${tools.map((tool) => tool.id).join(":")}`,
     type: "assistant_message",
     timestamp: first?.timestamp ?? Date.now(),
     content: "",
     isThinking: false,
     isComplete: !hasRunningTool,
     durationMs: last?.durationMs ?? Math.max(0, (last?.timestamp ?? first?.timestamp ?? 0) - (first?.timestamp ?? 0)),
+    roomAgentId: first?.roomAgentId,
+    roomMessageId: first?.roomMessageId,
+    agentTurnId: first?.agentTurnId,
   };
 }
 
@@ -26,12 +29,15 @@ export function createSubagentOnlyAssistantEvent(subagents: SubagentEvent[]): Ex
     subagent.status === "suspended"
   ));
   return {
-    id: `assistant-subagents-${subagents.map((subagent) => subagent.id).join(":")}`,
+    id: first?.agentTurnId ? `assistant:${first.agentTurnId}:subagents` : `assistant-subagents-${subagents.map((subagent) => subagent.id).join(":")}`,
     type: "assistant_message",
     timestamp: first?.timestamp ?? Date.now(),
     content: "",
     isThinking: false,
     isComplete: !hasActiveSubagent,
     durationMs: Math.max(0, (last?.timestamp ?? first?.timestamp ?? 0) - (first?.timestamp ?? 0)),
+    roomAgentId: first?.roomAgentId,
+    roomMessageId: first?.roomMessageId,
+    agentTurnId: first?.agentTurnId,
   };
 }

@@ -15,7 +15,7 @@ import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetric
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
-import { reconcileRunningKimiSnapshot, shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
+import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
@@ -54,6 +54,8 @@ import { useBootstrap } from "@/hooks/useBootstrap";
 import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { logError } from "@/utils/reportError";
 import {
+  getRoomAgent,
+  getRoomAgents,
   getPrimaryRoomAgent,
   getRoomAgentRuntimeId,
   getRoomAgentEvents,
@@ -65,6 +67,7 @@ import {
   updateRoomAgent,
   updateRoomAgentEvents,
 } from "@/utils/collaborationRooms";
+import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -214,28 +217,42 @@ function shouldReplaceWithCanonicalKimiHistory(cachedEvents: TimelineEvent[], ca
     hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
 }
 
+function roomAgentNeedsKimiCodeHistoryRepair(session: Session, roomAgentId: string) {
+  const agent = getRoomAgent(session, roomAgentId);
+  const events = getRoomAgentEvents(session, roomAgentId);
+  const cacheVersion = session.collaboration ? agent?.kimiHistoryCacheVersion : session.kimiHistoryCacheVersion;
+  return cacheVersion !== KIMI_HISTORY_CACHE_VERSION ||
+    events.some((event) => (
+      event.type === "assistant_message" &&
+      (event.content.trim().length > 0 || (event.isComplete && event.content.trim().length === 0))
+    )) ||
+    hasMalformedAssistantMarkdown(events) ||
+    hasPossiblyLostUserImages(events);
+}
+
 function needsKimiCodeHistoryRepair(session: Session) {
   return session.engine === "kimi-code" &&
     !session.longTask &&
     !session.archivedAt &&
     Boolean(session.projectPath) &&
-    (
-      session.kimiHistoryCacheVersion !== KIMI_HISTORY_CACHE_VERSION ||
-      session.events.some((event) => (
-        event.type === "assistant_message" &&
-        (event.content.trim().length > 0 || (event.isComplete && event.content.trim().length === 0))
-      )) ||
-      hasMalformedAssistantMarkdown(session.events) ||
-      hasPossiblyLostUserImages(session.events)
-    );
+    getRoomAgents(session).some((agent) => roomAgentNeedsKimiCodeHistoryRepair(session, agent.id));
 }
 
-function getKimiHistorySessionIds(session: Session) {
-  return Array.from(new Set([
-    session.runtimeSessionId,
-    session.officialSessionId,
-    session.id.startsWith("local-") ? undefined : session.id,
-  ].filter((id): id is string => Boolean(id))));
+function getKimiHistoryTargets(session: Session) {
+  const primary = getPrimaryRoomAgent(session);
+  return getRoomAgents(session).flatMap((agent) => {
+    if (!roomAgentNeedsKimiCodeHistoryRepair(session, agent.id)) return [];
+    return [{
+      roomAgentId: agent.id,
+      sessionIds: Array.from(new Set([
+        agent.runtimeSessionId,
+        agent.officialSessionId,
+        primary.id === agent.id ? session.runtimeSessionId : undefined,
+        primary.id === agent.id ? session.officialSessionId : undefined,
+        primary.id === agent.id && !session.id.startsWith("local-") ? session.id : undefined,
+      ].filter((id): id is string => Boolean(id)))),
+    }];
+  });
 }
 
 function extractOfficialSessionTitle(event: unknown): string | null {
@@ -252,51 +269,48 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
     .filter((session) => session.id !== activeSessionId && needsKimiCodeHistoryRepair(session))
     .slice(0, 12);
   for (const session of candidates) {
-    const sessionIds = getKimiHistorySessionIds(session);
-    if (sessionIds.length === 0 || !session.projectPath) continue;
-    for (const sessionId of sessionIds) {
-      const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
-      if (!loaded?.success) continue;
-      const eventsSource =
-        loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
-          ? loaded.data.events
-          : [];
-      const historyEvents = preserveLocalUserMediaInCanonicalHistory(
-        session.events,
-        settleInactiveEvents(mapHistoryEvents(eventsSource)),
-      );
-      if (!shouldReplaceWithCanonicalKimiHistory(session.events, historyEvents)) continue;
-      const updatedAt = Date.now();
-      useSessionStore.setState((state) => ({
-        sessions: state.sessions.map((item) => item.id === session.id
-          ? {
-              ...item,
-              events: historyEvents,
-              kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-              title: item.titleLocked ? item.title : deriveSessionTitle(historyEvents, item.title),
-              model: getLastUsedModelFromEvents(historyEvents) ?? item.model,
-              isLoading: false,
-              updatedAt,
+    if (!session.projectPath) continue;
+    for (const target of getKimiHistoryTargets(session)) {
+      for (const sessionId of target.sessionIds) {
+        const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
+        if (!loaded?.success) continue;
+        const eventsSource =
+          loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
+            ? loaded.data.events
+            : [];
+        let applied = false;
+        useSessionStore.setState((state) => ({
+          sessions: state.sessions.map((item) => {
+            if (item.id !== session.id) return item;
+            const localEvents = getRoomAgentEvents(item, target.roomAgentId);
+            const reconciliation = reconcileAgentCanonicalHistory({
+              session: item,
+              roomAgentId: target.roomAgentId,
+              expectedRuntimeSessionId: sessionId,
+              canonicalEvents: settleInactiveEvents(mapHistoryEvents(eventsSource)),
+              reason: "repair",
+            });
+            if (!reconciliation.applied || !shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events)) {
+              return item;
             }
-          : item
-        ),
-      }));
-      const current = useAppStore.getState().currentSession;
-      if (current?.id === session.id) {
-        useAppStore.setState({
-          currentSession: {
-            ...current,
-            events: historyEvents,
-            kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-            title: current.titleLocked ? current.title : deriveSessionTitle(historyEvents, current.title),
-            model: getLastUsedModelFromEvents(historyEvents) ?? current.model,
-            isLoading: false,
-            updatedAt,
-          },
-        });
+            applied = true;
+            return {
+              ...reconciliation.session,
+              title: isPrimaryRoomAgent(item, target.roomAgentId) && !item.titleLocked
+                ? deriveSessionTitle(reconciliation.events, item.title)
+                : item.title,
+              isLoading: false,
+            };
+          }),
+        }));
+        if (!applied) continue;
+        const latest = useSessionStore.getState().sessions.find((item) => item.id === session.id);
+        if (latest && useAppStore.getState().currentSession?.id === session.id) {
+          useAppStore.setState({ currentSession: latest });
+        }
+        void persistLocalConversationState();
+        break;
       }
-      void persistLocalConversationState();
-      break;
     }
   }
 }
@@ -2159,12 +2173,20 @@ function App() {
                 setRunningSessionId(null);
                 return;
               }
-              const runtimeOwner = findLocalSessionForRuntime(historySessionId, undefined, latest?.id);
+              const roomRuntimeOwner = resolveRoomRuntimeOwner(
+                useSessionStore.getState().sessions,
+                historySessionId,
+                latest?.id,
+              );
+              const runtimeOwner = roomRuntimeOwner?.session
+                ?? findLocalSessionForRuntime(historySessionId, undefined, latest?.id);
               let loaded = await window.api.loadKimiCodeSession({
                 workDir: activeProject.path,
                 sessionId: historySessionId,
               });
-              const skillForkParentSessionId = runtimeOwner?.skillForkParentSessionId ?? activeLocalSession?.skillForkParentSessionId;
+              const skillForkParentSessionId = roomRuntimeOwner?.agent.skillForkParentSessionId
+                ?? runtimeOwner?.skillForkParentSessionId
+                ?? activeLocalSession?.skillForkParentSessionId;
               if (
                 loaded.success &&
                 Array.isArray(loaded.data.events) &&
@@ -2181,21 +2203,23 @@ function App() {
                 }
               }
               if (!loaded.success) {
-                if (activeLocalSession) {
+                const errorOwner = runtimeOwner ?? activeLocalSession;
+                if (errorOwner) {
+                  const ownerAgentId = roomRuntimeOwner?.roomAgentId ?? getPrimaryRoomAgent(errorOwner).id;
+                  const failedAt = Date.now();
                   const errorSession = {
-                    ...activeLocalSession,
-                    events: [
-                      ...activeLocalSession.events,
-                      {
+                    ...updateRoomAgentEvents(errorOwner, ownerAgentId, (events) => [
+                      ...events,
+                      scopeEventToRoomAgent({
                         id: crypto.randomUUID(),
                         type: "error" as const,
-                        timestamp: Date.now(),
+                        timestamp: failedAt,
                         message: `读取上次 Kimi Code 历史失败：${loaded.error}`,
                         canDismiss: false,
-                      },
-                    ],
+                      }, ownerAgentId),
+                    ]),
                     isLoading: false,
-                    updatedAt: Date.now(),
+                    updatedAt: failedAt,
                   };
                   useSessionStore.setState((state) => ({
                     sessions: state.sessions.map((item) => (item.id === errorSession.id ? errorSession : item)),
@@ -2214,25 +2238,60 @@ function App() {
               const canonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
 
               if (runtimeOwner) {
-                const events = preserveLocalUserMediaInCanonicalHistory(runtimeOwner.events, canonicalEvents);
-                const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(runtimeOwner.events, events);
-                const hydratedEvents = runtimeOwner.events.length > 0 && !shouldUseCanonicalHistory
-                  ? (runtimeIsActive ? runtimeOwner.events : settleInactiveEvents(runtimeOwner.events))
-                  : events;
+                const latestOwner = useSessionStore.getState().sessions.find((item) => item.id === runtimeOwner.id) ?? runtimeOwner;
+                const ownerAgentId = roomRuntimeOwner?.roomAgentId ?? getPrimaryRoomAgent(latestOwner).id;
+                const localAgentEvents = getRoomAgentEvents(latestOwner, ownerAgentId);
+                const reconciliation = reconcileAgentCanonicalHistory({
+                  session: latestOwner,
+                  roomAgentId: ownerAgentId,
+                  expectedRuntimeSessionId: historySessionId,
+                  canonicalEvents,
+                  reason: "startup",
+                });
+                const shouldUseCanonicalHistory = reconciliation.applied &&
+                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events);
+                const hydratedEvents = localAgentEvents.length > 0 && !shouldUseCanonicalHistory
+                  ? (runtimeIsActive ? localAgentEvents : settleInactiveEvents(localAgentEvents))
+                  : reconciliation.events;
+                let hydrated = reconciliation.applied ? reconciliation.session : latestOwner;
+                hydrated = updateRoomAgentEvents(hydrated, ownerAgentId, () => hydratedEvents);
+                if (hydrated.collaboration) {
+                  hydrated = updateRoomAgent(hydrated, ownerAgentId, (agent) => ({
+                    ...agent,
+                    runtimeSessionId: agent.runtimeSessionId ?? historySessionId,
+                    officialSessionId: agent.officialSessionId ?? historySessionId,
+                    modelAlias: getLastUsedModelFromEvents(hydratedEvents) ?? agent.modelAlias,
+                    swarmMode: runtimeSwarmMode ?? agent.swarmMode,
+                    kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                  }));
+                } else {
+                  hydrated = {
+                    ...hydrated,
+                    runtimeSessionId: hydrated.runtimeSessionId ?? historySessionId,
+                    officialSessionId: hydrated.officialSessionId ?? historySessionId,
+                    model: getLastUsedModelFromEvents(hydratedEvents) ?? hydrated.model ?? null,
+                    swarmMode: runtimeSwarmMode ?? hydrated.swarmMode,
+                    kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                  };
+                }
                 const session = hydrateLongTaskProgressFromHistory({
-                  ...runtimeOwner,
-                  officialSessionId: runtimeOwner.officialSessionId ?? historySessionId,
-                  model: getLastUsedModelFromEvents(hydratedEvents) ?? runtimeOwner.model ?? null,
-                  swarmMode: runtimeSwarmMode ?? runtimeOwner.swarmMode,
-                  events: hydratedEvents,
-                  kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                  ...hydrated,
                   isLoading: false,
                 });
                 useSessionStore.setState((state) => ({
                   sessions: state.sessions.map((item) => (item.id === session.id ? session : item)),
                 }));
                 useAppStore.setState({ currentSession: session });
-                setRunningSessionId(runtimeIsActive ? session.id : null);
+                if (runtimeIsActive) {
+                  setRoomAgentActivity({
+                    roomId: session.id,
+                    roomAgentId: ownerAgentId,
+                    runtimeSessionId: historySessionId,
+                    status: runtimeStatus?.success ? runtimeStatus.data.engineStatus : "running",
+                    updatedAt: Date.now(),
+                  });
+                }
+                setRunningSessionId(runtimeIsActive && isPrimaryRoomAgent(session, ownerAgentId) ? session.id : null);
                 return;
               }
 
@@ -2493,9 +2552,19 @@ function App() {
       if (!mapped) return;
       const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
       const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
-      const mappedForRoom = targetSession?.longTask || !roomAgentId
+      const roomActivity = targetSession && roomAgentId
+        ? useAppStore.getState().roomAgentActivities[roomAgentActivityKey(targetSession.id, roomAgentId)]
+        : undefined;
+      const roomScopedEvent = targetSession?.longTask || !roomAgentId
         ? mappedWithRole
         : scopeEventToRoomAgent(mappedWithRole, roomAgentId);
+      const mappedForRoom = targetSession?.longTask || !roomAgentId
+        ? roomScopedEvent
+        : {
+            ...roomScopedEvent,
+            roomMessageId: roomScopedEvent.roomMessageId ?? roomActivity?.roomMessageId,
+            agentTurnId: roomScopedEvent.agentTurnId ?? roomActivity?.activeTurnId,
+          };
       if (mappedForRoom.type !== "status_update") {
         runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
       }
@@ -2524,6 +2593,8 @@ function App() {
             roomAgentId,
             runtimeSessionId: payload.sessionId,
             status: "waiting_question",
+            roomMessageId: roomActivity?.roomMessageId,
+            activeTurnId: roomActivity?.activeTurnId,
             updatedAt: Date.now(),
           });
         }
@@ -2540,6 +2611,8 @@ function App() {
             roomAgentId,
             runtimeSessionId: payload.sessionId,
             status: "waiting_approval",
+            roomMessageId: roomActivity?.roomMessageId,
+            activeTurnId: roomActivity?.activeTurnId,
             updatedAt: Date.now(),
           });
         }
@@ -2683,6 +2756,7 @@ function App() {
             roomAgentId,
             runtimeSessionId: payload.sessionId,
             status: payload.status,
+            roomMessageId: previous?.roomMessageId,
             activeTurnId: previous?.activeTurnId,
             startedAt: previous?.startedAt ?? Date.now(),
             updatedAt: Date.now(),
@@ -3058,32 +3132,24 @@ function App() {
               sessionId: runtimeSessionId,
             }).catch(() => null);
             if (disposed || !loaded?.success) return;
-            const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : [])
-              .map((event) => scopeEventToRoomAgent(event, roomAgentId));
-            const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
-            const localAgentEvents = getRoomAgentEvents(latestSession, roomAgentId);
-            const snapshotEvents = reconcileRunningKimiSnapshot(localAgentEvents, canonicalSnapshotEvents);
-            if (shouldReplaceWithCanonicalKimiHistory(localAgentEvents, snapshotEvents)) {
-              updateSession(session.id, (item) => {
-                let next = updateRoomAgentEvents(item, roomAgentId, () => snapshotEvents);
-                const model = getLastUsedModelFromEvents(snapshotEvents);
-                if (item.collaboration) {
-                  next = updateRoomAgent(next, roomAgentId, (agent) => ({
-                    ...agent,
-                    modelAlias: model ?? agent.modelAlias,
-                    kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-                  }));
-                } else {
-                  next = {
-                    ...next,
-                    model: model ?? next.model,
-                    kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-                  };
-                }
-                return { ...next, updatedAt: Date.now() };
+            const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+            let applied = false;
+            updateSession(session.id, (item) => {
+              const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
+              const reconciliation = reconcileAgentCanonicalHistory({
+                session: item,
+                roomAgentId,
+                expectedRuntimeSessionId: runtimeSessionId,
+                canonicalEvents: canonicalSnapshotEvents,
+                reason: "running-sample",
               });
-              syncCurrentSessionFromStore(session.id);
-            }
+              if (!reconciliation.applied || !shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events)) {
+                return item;
+              }
+              applied = true;
+              return reconciliation.session;
+            });
+            if (applied) syncCurrentSessionFromStore(session.id);
           }
           return;
         }

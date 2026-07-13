@@ -21,7 +21,16 @@ import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks"
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { applyCanonicalUndoHistory } from "@/utils/undoHistory";
+import {
+  getPrimaryRoomAgent,
+  getRoomAgentEvents,
+  getRoomAgentRuntimeId,
+  roomAgentActivityKey,
+  scopeEventToRoomAgent,
+  updateRoomAgentEvents,
+} from "@/utils/collaborationRooms";
+import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
+import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -335,11 +344,33 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
     const activeSession = appState.currentSession
       ? useSessionStore.getState().sessions.find((session) => session.id === appState.currentSession?.id) ?? appState.currentSession
       : null;
-    if (!activeSession || !isLatestUserInputEvent(activeSession.events, event.id)) return;
-    const runtimeSessionId = getRuntimeSessionId(activeSession);
-    const isSessionRunning = appState.runningSessionId === activeSession.id ||
-      Boolean(runtimeSessionId && appState.runningSessionId === runtimeSessionId);
+    if (!activeSession || !isLatestUserInputEvent(projectCollaborationTimeline(activeSession), event.id)) return;
+    const roomMessage = activeSession.collaboration?.messages.find((message) => (
+      message.id === (event.roomMessageId ?? event.id)
+    ));
+    if (activeSession.collaboration && (!roomMessage || roomMessage.recipientAgentIds.length !== 1)) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "多 Agent 消息暂不支持整组撤回，请先对单个 Agent 发送后再撤回。",
+      }));
+      return;
+    }
+    const roomAgentId = roomMessage?.recipientAgentIds[0] ?? getPrimaryRoomAgent(activeSession).id;
+    const delivery = roomMessage?.deliveries[roomAgentId];
+    const runtimeSessionId = getRoomAgentRuntimeId(activeSession, roomAgentId);
+    const activity = appState.roomAgentActivities[roomAgentActivityKey(activeSession.id, roomAgentId)];
+    const isPrimaryAgent = getPrimaryRoomAgent(activeSession).id === roomAgentId;
+    const isSessionRunning = Boolean(activity && ["creating", "queued", "sending", "running", "waiting_approval", "waiting_question"].includes(activity.status)) ||
+      (isPrimaryAgent && (
+        appState.runningSessionId === activeSession.id ||
+        Boolean(runtimeSessionId && appState.runningSessionId === runtimeSessionId)
+      ));
     if (isSessionRunning) return;
+    const agentEvents = getRoomAgentEvents(activeSession, roomAgentId);
+    const targetUserEventId = delivery?.officialUserEventId
+      ?? agentEvents.find((candidate) => (
+        candidate.type === "user_message" && candidate.roomMessageId === (event.roomMessageId ?? event.id)
+      ))?.id
+      ?? event.id;
 
     const syncCurrentSession = () => {
       const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id);
@@ -349,20 +380,19 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
     };
     const appendError = (message: string) => {
       const failedAt = Date.now();
-      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-        ...session,
-        events: [
-          ...session.events,
-          {
+      useSessionStore.getState().updateSession(activeSession.id, (session) => {
+        const next = updateRoomAgentEvents(session, roomAgentId, (events) => [
+          ...events,
+          scopeEventToRoomAgent({
             id: crypto.randomUUID(),
             type: "error",
             timestamp: failedAt,
             message,
             source: "ipc",
-          },
-        ],
-        updatedAt: failedAt,
-      }));
+          }, roomAgentId),
+        ]);
+        return { ...next, updatedAt: failedAt };
+      });
       syncCurrentSession();
     };
     if (!runtimeSessionId) {
@@ -372,7 +402,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
 
     setResending(true);
     try {
-      const needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(activeSession.events, event.id);
+      const needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(agentEvents, targetUserEventId);
       if (needsOfficialUndo) {
         const undoRes = await window.api.undoKimiCodeHistory({ sessionId: runtimeSessionId, count: 1 });
         if (!undoRes.success) throw new Error(`撤回上一轮官方历史失败：${undoRes.error}`);
@@ -380,19 +410,36 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
         const loaded = await window.api.loadKimiCodeSession({ workDir: activeSession.projectPath, sessionId: runtimeSessionId });
         if (!loaded.success) throw new Error(`官方撤回成功，但刷新官方历史失败：${loaded.error}`);
         const canonicalEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
-        const withdrawnAt = Date.now();
-        useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-          ...session,
-          events: applyCanonicalUndoHistory(session.events, canonicalEvents),
-          updatedAt: withdrawnAt,
-        }));
+        useSessionStore.getState().updateSession(activeSession.id, (session) => {
+          const reconciliation = reconcileAgentCanonicalHistory({
+            session,
+            roomAgentId,
+            expectedRuntimeSessionId: runtimeSessionId,
+            canonicalEvents,
+            reason: "undo",
+          });
+          if (!reconciliation.applied) {
+            throw new Error("官方撤回完成后会话运行时已变化，请重新打开会话确认历史。");
+          }
+          return reconciliation.session;
+        });
       } else {
         const withdrawnAt = Date.now();
-        useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-          ...session,
-          events: truncateLatestUserTurn(session.events, event.id),
-          updatedAt: withdrawnAt,
-        }));
+        useSessionStore.getState().updateSession(activeSession.id, (session) => {
+          let next = updateRoomAgentEvents(session, roomAgentId, (events) => (
+            truncateLatestUserTurn(events, targetUserEventId)
+          ));
+          if (next.collaboration && roomMessage) {
+            next = {
+              ...next,
+              collaboration: {
+                ...next.collaboration,
+                messages: next.collaboration.messages.filter((message) => message.id !== roomMessage.id),
+              },
+            };
+          }
+          return { ...next, updatedAt: withdrawnAt };
+        });
       }
       syncCurrentSession();
       window.dispatchEvent(new CustomEvent("kimix:restore-composer-draft", {
