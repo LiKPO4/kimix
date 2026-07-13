@@ -392,7 +392,7 @@ interface AgentDelivery {
 ### 阶段 7：Agent 级高级操作
 
 - [x] ApprovalCard、QuestionCard 绑定事件 owner，并只结算所属 Agent 分区。
-- [ ] Stop、Steer 绑定明确运行中的 Agent owner。
+- [x] Stop、Steer 绑定明确运行中的 Agent owner；多运行 Agent 必须选择目标，Stop 支持停止全部。
 - [ ] 模型、权限、Plan、Goal、Swarm 绑定明确 Agent。
 - [ ] session mutation 命令要求唯一目标。
 - [ ] 单接收者 undo 使用 Agent scoped canonical snapshot。
@@ -528,6 +528,8 @@ git diff --check
 16. 阶段 6 已通过 71 个测试文件、520 项测试、生产构建、OKF 校验和 diff check；真实双 Provider 并发与重启续发留到阶段 9 统一验收。
 17. 阶段 7A 已把 ApprovalCard 和 QuestionCard 绑定到事件所属 Agent runtime；房间事件缺 owner、Agent 不可用或 runtime 未就绪时明确拒绝，交互结算只更新对应 `agentEvents` 分区，并在卡片中显示来源 Agent。
 18. 阶段 7A 已通过 72 个测试文件、524 项测试、生产构建、OKF 校验和 diff check；下一增量处理多运行 Agent 下不得猜测 owner 的 Stop/Steer。
+19. 阶段 7B 已把 Stop、输入区 Steer 和排队消息 Steer 绑定到明确 Agent runtime；多运行 Agent 先显示目标列表，Stop 可逐 Agent 停止全部，Steer 事件保留 `roomAgentId + roomMessageId + agentTurnId`，停止结算只更新目标 Agent 分区与 delivery/activity。
+20. 阶段 7B 已通过 73 个测试文件、529 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CR4MdBRT.js`。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

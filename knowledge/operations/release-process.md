@@ -4,7 +4,7 @@ title: Release Process
 description: Kimix releases are built and published only by the tag-triggered GitHub Actions workflow with version-specific release notes.
 resource: https://github.com/LiKPO4/kimix/blob/master/.github/workflows/release.yml
 tags: [release, github-actions, versioning, operations]
-timestamp: "2026-06-19T00:00:00+08:00"
+timestamp: "2026-07-13T21:58:00+08:00"
 ---
 
 # Release Process
@@ -17,6 +17,8 @@ Kimix release artifacts are produced by GitHub Actions, not by manual local pack
 2. Add `docs/release-notes/vX.Y.Z.md` with content specific to that version.
 3. Run `pnpm knowledge:validate`, tests, production build, and `git diff --check`.
 4. Commit and push the reviewed code to `master`.
+
+After changing `package.json`, `pnpm-lock.yaml`, or dependency state, run the `pnpm` validation commands serially. Multiple fresh `pnpm` processes may simultaneously enter dependency-status repair and race on `node_modules/.bin` or native rebuild output; that infrastructure failure does not provide valid test evidence. Non-`pnpm` read-only checks such as `git diff --check` may still run alongside a single package-manager command.
 
 # Publish
 

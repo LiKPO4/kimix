@@ -28,8 +28,15 @@ import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents, roomAgentActivityKey } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
+import {
+  appendRoomAgentSteerEvent,
+  getRoomAgentControlTargets,
+  resolveRoomAgentControlTarget,
+  settleStoppedRoomAgent,
+  type RoomAgentControlTarget,
+} from "@/utils/roomAgentControl";
 import {
   bindRecoveredRoomAgentRuntime,
   getPrimaryRecoveryTarget,
@@ -283,6 +290,13 @@ async function getDefaultKimiModel() {
 const iconButtonClass =
   "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35";
 
+function roomControlStatusLabel(status: RoomAgentControlTarget["status"]) {
+  if (status === "waiting_approval") return "等待审批";
+  if (status === "waiting_question") return "等待回答";
+  if (status === "accepted") return "已接收";
+  return "运行中";
+}
+
 type ImageAttachment = {
   id: string;
   kind?: "image" | "file";
@@ -290,6 +304,11 @@ type ImageAttachment = {
   dataUrl?: string;
   filePath?: string;
 };
+
+type RoomControlRequest =
+  | { action: "stop" }
+  | { action: "steer-input" }
+  | { action: "steer-pending"; pendingId: string };
 
 function isImageAttachment(attachment: ImageAttachment): attachment is ImageAttachment & { dataUrl: string } {
   return Boolean(attachment.dataUrl);
@@ -511,9 +530,11 @@ export function Composer() {
   const [editingRoomAgentId, setEditingRoomAgentId] = useState<string | null>(null);
   const [editRoomAgentBusy, setEditRoomAgentBusy] = useState(false);
   const [editRoomAgentError, setEditRoomAgentError] = useState("");
+  const [roomControlRequest, setRoomControlRequest] = useState<RoomControlRequest | null>(null);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
+  const roomControlMenuRef = useRef<HTMLDivElement>(null);
   const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
@@ -534,6 +555,12 @@ export function Composer() {
     activeSession,
     Object.values(roomAgentActivities),
   ));
+  const roomStopTargets = activeSession?.collaboration
+    ? getRoomAgentControlTargets(activeSession, Object.values(roomAgentActivities), "stop")
+    : [];
+  const roomSteerTargets = activeSession?.collaboration
+    ? getRoomAgentControlTargets(activeSession, Object.values(roomAgentActivities), "steer")
+    : [];
   const activeRoomDispatchSignature = activeSession?.collaboration
     ? activeSession.collaboration.messages.flatMap((message) => message.recipientAgentIds.map((agentId) => (
         `${message.id}:${agentId}:${message.deliveries[agentId]?.status ?? "missing"}`
@@ -557,14 +584,15 @@ export function Composer() {
   const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
   const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
-  const hasActiveAssistantTurn = isCurrentSessionRunning;
+  const hasActiveAssistantTurn = activeSession?.collaboration ? activeRoomBusy : isCurrentSessionRunning;
   const swarmModeEnabled = displayedSwarmMode(activeSession ?? undefined);
   const swarmModePending = hasPendingSwarmMode(activeSession ?? undefined);
   const canSteerActiveTurn = Boolean(
-    activeRuntimeSessionId &&
-    isCurrentSessionRunning
+    activeSession?.collaboration
+      ? roomSteerTargets.length > 0
+      : activeRuntimeSessionId && isCurrentSessionRunning
   );
-  const shouldShowStopButton = isCurrentSessionRunning;
+  const shouldShowStopButton = activeSession?.collaboration ? roomStopTargets.length > 0 : isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
   const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn && !selectedSecondaryRoomAgent;
 
@@ -576,6 +604,9 @@ export function Composer() {
       if (addBtnRef.current && !addBtnRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
+      if (roomControlMenuRef.current && !roomControlMenuRef.current.contains(e.target as Node)) {
+        setRoomControlRequest(null);
+      }
       const insideMore = Object.values(pendingMoreRefs.current).some(
         (el) => el && el.contains(e.target as Node)
       );
@@ -584,6 +615,16 @@ export function Composer() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  useEffect(() => {
+    setRoomControlRequest(null);
+  }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (!roomControlRequest) return;
+    const targetCount = roomControlRequest.action === "stop" ? roomStopTargets.length : roomSteerTargets.length;
+    if (targetCount === 0) setRoomControlRequest(null);
+  }, [roomControlRequest, roomSteerTargets.length, roomStopTargets.length]);
 
   useEffect(() => {
     if (focusInputTrigger > 0) inputRef.current?.focus();
@@ -2623,53 +2664,91 @@ export function Composer() {
   };
 
   // steer：把输入框内容立即注入当前运行中的 turn，与普通 Enter 排队严格区分。
-  const updateSteerStatus = (sessionId: string, steerId: string, status: "accepted" | "sent" | "failed", error?: string) => {
-    updateSession(sessionId, (session) => ({
-      ...session,
-      events: session.events.map((event) => event.id === steerId && event.type === "steer_message"
+  const updateSteerStatus = (
+    sessionId: string,
+    steerId: string,
+    status: "accepted" | "sent" | "failed",
+    error?: string,
+    roomTarget?: Pick<RoomAgentControlTarget, "roomAgentId">,
+  ) => {
+    updateSession(sessionId, (session) => {
+      const updateEvents = (events: TimelineEvent[]) => events.map((event) => event.id === steerId && event.type === "steer_message"
         ? event.status === "sent" && status === "accepted"
           ? event
           : { ...event, status, error: status === "failed" ? error : undefined }
         : event
-      ),
-      updatedAt: Date.now(),
-    }));
+      );
+      const next = roomTarget
+        ? updateRoomAgentEvents(session, roomTarget.roomAgentId, updateEvents)
+        : { ...session, events: updateEvents(session.events) };
+      return { ...next, updatedAt: Date.now() };
+    });
     const updated = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
-    if (updated) setCurrentSession(updated);
+    if (updated && useAppStore.getState().currentSession?.id === sessionId) setCurrentSession(updated);
   };
 
-  const insertLocalSteerMessage = (sessionId: string, content: string, images: ImageAttachment[] = []): string => {
+  const insertLocalSteerMessage = (
+    sessionId: string,
+    content: string,
+    images: ImageAttachment[] = [],
+    roomTarget?: Pick<RoomAgentControlTarget, "roomAgentId" | "roomMessageId" | "activeTurnId">,
+  ): string => {
     const steerId = genId();
-    updateSession(sessionId, (session) => ({
-      ...session,
-      events: [
-        ...session.events,
-        {
-          id: steerId,
-          type: "steer_message" as const,
-          timestamp: Date.now(),
-          content,
-          images: toUserAttachments(images),
-          status: "sending" as const,
-        },
-      ],
-      updatedAt: Date.now(),
-    }));
+    const event: Extract<TimelineEvent, { type: "steer_message" }> = {
+      id: steerId,
+      type: "steer_message",
+      timestamp: Date.now(),
+      content,
+      images: toUserAttachments(images),
+      status: "sending",
+    };
+    updateSession(sessionId, (session) => {
+      const next = roomTarget
+        ? appendRoomAgentSteerEvent(session, roomTarget, event)
+        : { ...session, events: [...session.events, event] };
+      return { ...next, updatedAt: Date.now() };
+    });
     const updated = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
-    if (updated) setCurrentSession(updated);
+    if (updated && useAppStore.getState().currentSession?.id === sessionId) setCurrentSession(updated);
     return steerId;
   };
 
-  const handleSteer = async () => {
+  const handleSteer = async (roomAgentId?: string) => {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
-    const runtimeSessionId = getRuntimeSessionId(activeSession);
-    if (!activeSession || !canSteerActiveTurn || !runtimeSessionId) {
+    if (!activeSession || !canSteerActiveTurn) {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "当前没有可引导的运行轮次，消息会留在队列里等待本轮结束。" }));
       return;
     }
-    const steerId = insertLocalSteerMessage(activeSession.id, trimmed || (imagesToSend.length > 0 ? "[附件]" : ""), imagesToSend);
+    if (activeSession.collaboration && !roomAgentId && roomSteerTargets.length > 1) {
+      setRoomControlRequest({ action: "steer-input" });
+      return;
+    }
+    let roomTarget: RoomAgentControlTarget | undefined;
+    let runtimeSessionId = getRuntimeSessionId(activeSession);
+    if (activeSession.collaboration) {
+      try {
+        const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession;
+        roomTarget = resolveRoomAgentControlTarget(
+          latest,
+          Object.values(useAppStore.getState().roomAgentActivities),
+          "steer",
+          roomAgentId,
+        );
+        runtimeSessionId = roomTarget.runtimeSessionId;
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: error instanceof Error ? error.message : String(error) }));
+        return;
+      }
+    }
+    if (!runtimeSessionId) return;
+    const steerId = insertLocalSteerMessage(
+      activeSession.id,
+      trimmed || (imagesToSend.length > 0 ? "[附件]" : ""),
+      imagesToSend,
+      roomTarget,
+    );
     setInput("");
     setImageAttachments([]);
     inputRef.current?.reset();
@@ -2679,17 +2758,91 @@ export function Composer() {
       images: toPromptImages(imagesToSend),
     });
     if (!res.success) {
-      updateSteerStatus(activeSession.id, steerId, "failed", res.error);
+      updateSteerStatus(activeSession.id, steerId, "failed", res.error, roomTarget);
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
-    updateSteerStatus(activeSession.id, steerId, "accepted");
+    updateSteerStatus(activeSession.id, steerId, "accepted", undefined, roomTarget);
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: "已发送引导请求",
+      detail: roomTarget ? `已向 ${roomTarget.displayName} 发送引导请求` : "已发送引导请求",
     }));
   };
 
-  const handleStop = async () => {
+  const stopRoomAgentTarget = async (target: RoomAgentControlTarget, persist = true): Promise<string | null> => {
+    if (!activeSession?.collaboration || !target.runtimeSessionId) {
+      return `Agent“${target.displayName}”的运行会话尚未就绪。`;
+    }
+    try {
+      const res = await window.api.cancelKimiCodeTurn({ sessionId: target.runtimeSessionId });
+      if (!res.success) return res.error;
+      const stoppedAt = Date.now();
+      updateSession(activeSession.id, (session) => settleStoppedRoomAgent(session, target, stoppedAt));
+      setRoomAgentActivity({
+        roomId: activeSession.id,
+        roomAgentId: target.roomAgentId,
+        runtimeSessionId: target.runtimeSessionId,
+        status: "interrupted",
+        roomMessageId: target.roomMessageId,
+        activeTurnId: target.activeTurnId,
+        updatedAt: stoppedAt,
+      });
+      if (activeSession.collaboration.primaryAgentId === target.roomAgentId) setRunningSessionId(null);
+      syncCurrentSessionFromStore(activeSession.id);
+      if (!persist) return null;
+      const persisted = await persistLocalConversationState();
+      return persisted.success ? null : `停止已生效，但保存本地状态失败：${persisted.error}`;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
+
+  const handleStopAllRoomAgents = async () => {
+    if (!activeSession?.collaboration) return;
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession;
+    const targets = getRoomAgentControlTargets(latest, Object.values(useAppStore.getState().roomAgentActivities), "stop");
+    setRoomControlRequest(null);
+    const outcomes = await Promise.all(targets.map(async (target) => ({
+      target,
+      error: await stopRoomAgentTarget(target, false),
+    })));
+    const persisted = await persistLocalConversationState();
+    const failed = outcomes.filter((outcome) => outcome.error);
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: !persisted.success
+        ? `停止请求已完成，但保存本地状态失败：${persisted.error}`
+        : failed.length === 0
+        ? `已停止 ${outcomes.length} 个 Agent`
+        : `已停止 ${outcomes.length - failed.length} 个，${failed.length} 个失败：${failed.map((outcome) => outcome.target.displayName).join("、")}`,
+    }));
+  };
+
+  const handleStop = async (roomAgentId?: string) => {
+    if (activeSession?.collaboration) {
+      if (!roomAgentId && roomStopTargets.length > 1) {
+        setRoomControlRequest({ action: "stop" });
+        return;
+      }
+      try {
+        const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession;
+        const target = resolveRoomAgentControlTarget(
+          latest,
+          Object.values(useAppStore.getState().roomAgentActivities),
+          "stop",
+          roomAgentId,
+        );
+        const error = await stopRoomAgentTarget(target);
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: error
+            ? error.startsWith("停止已生效")
+              ? `${target.displayName}：${error}`
+              : `停止 ${target.displayName} 失败：${error}`
+            : `已停止 ${target.displayName}`,
+        }));
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: error instanceof Error ? error.message : String(error) }));
+      }
+      return;
+    }
     const stateRunningSessionId = useAppStore.getState().runningSessionId;
     const stateRunningMatchesActive = Boolean(activeSession && (
       stateRunningSessionId === activeSession.id ||
@@ -3035,16 +3188,37 @@ export function Composer() {
     });
   };
 
-  const handleSteerPending = async (id: string) => {
+  const handleSteerPending = async (id: string, roomAgentId?: string) => {
     const pending = pendingMessages.find((msg) => msg.id === id);
     if (!pending || !canUseComposer) return;
-    const runtimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
-    if (!runtimeSessionId || !activeSession || !canSteerActiveTurn) {
+    if (!activeSession || !canSteerActiveTurn) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: "当前没有可引导的运行轮次，这条消息会继续排队等待本轮结束。",
       }));
       return;
     }
+    if (activeSession.collaboration && !roomAgentId && roomSteerTargets.length > 1) {
+      setRoomControlRequest({ action: "steer-pending", pendingId: id });
+      return;
+    }
+    let roomTarget: RoomAgentControlTarget | undefined;
+    let runtimeSessionId = getRuntimeSessionId(activeSession);
+    if (activeSession.collaboration) {
+      try {
+        const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession;
+        roomTarget = resolveRoomAgentControlTarget(
+          latest,
+          Object.values(useAppStore.getState().roomAgentActivities),
+          "steer",
+          roomAgentId,
+        );
+        runtimeSessionId = roomTarget.runtimeSessionId;
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: error instanceof Error ? error.message : String(error) }));
+        return;
+      }
+    }
+    if (!runtimeSessionId) return;
     const steerId = insertLocalSteerMessage(
       activeSession.id,
       pending.content || "[附件]",
@@ -3056,6 +3230,7 @@ export function Composer() {
           dataUrl: image.dataUrl,
           filePath: image.filePath,
         })),
+      roomTarget,
     );
     removePendingMessage(id);
     const res = await window.api.steerKimiCode({
@@ -3073,15 +3248,40 @@ export function Composer() {
     });
     if (!res.success) {
       if (/not active|not found|session/i.test(res.error) && activeSession) {
-        updateSession(activeSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
+        if (roomTarget) {
+          updateSession(activeSession.id, (session) => updateRoomAgent(
+            session,
+            roomTarget!.roomAgentId,
+            (agent) => ({ ...agent, runtimeSessionId: undefined }),
+          ));
+        } else {
+          updateSession(activeSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
+        }
       }
-      updateSteerStatus(activeSession.id, steerId, "failed", res.error);
+      updateSteerStatus(activeSession.id, steerId, "failed", res.error, roomTarget);
       addPendingMessage(activeSession.id, pending.content, pending.images);
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }
-    updateSteerStatus(activeSession.id, steerId, "accepted");
-    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已发送引导请求" }));
+    updateSteerStatus(activeSession.id, steerId, "accepted", undefined, roomTarget);
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: roomTarget ? `已向 ${roomTarget.displayName} 发送引导请求` : "已发送引导请求",
+    }));
+  };
+
+  const handleRoomControlSelection = async (roomAgentId: string) => {
+    const request = roomControlRequest;
+    setRoomControlRequest(null);
+    if (!request) return;
+    if (request.action === "stop") {
+      await handleStop(roomAgentId);
+      return;
+    }
+    if (request.action === "steer-pending") {
+      await handleSteerPending(request.pendingId, roomAgentId);
+      return;
+    }
+    await handleSteer(roomAgentId);
   };
 
   const handleEditPending = (id: string) => {
@@ -3164,6 +3364,8 @@ export function Composer() {
       ? "text-accent-warning"
       : "text-accent-primary";
   const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
+  const visibleRoomControlTargets = roomControlRequest?.action === "stop" ? roomStopTargets : roomSteerTargets;
+  const roomControlTitle = roomControlRequest?.action === "stop" ? "选择要停止的 Agent" : "选择要引导的 Agent";
   const hideComposerCard = (card: ComposerDockCard, label: string) => {
     setComposerCardHidden(composerCardSessionId, card, true);
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
@@ -3850,29 +4052,90 @@ export function Composer() {
               </button>
             )}
 
-            {shouldShowStopButton ? (
-              <>
-                {canSteerActiveTurn && canSendNow && (
-                  <button
-                    onClick={() => void handleSteer()}
-                    className="flex h-8 shrink-0 items-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark"
-                    style={{ gap: 6, paddingLeft: 12, paddingRight: 14 }}
-                    title="立即引导当前任务：把输入插入运行中的对话（官方 Ctrl+S steer），不进排队"
-                    aria-label="引导当前任务"
+            <div ref={roomControlMenuRef} className="relative flex shrink-0 items-center" style={{ gap: 8 }}>
+              {roomControlRequest && activeSession?.collaboration && (
+                <div
+                  className="kimix-floating-panel absolute right-0 z-30 rounded-[14px]"
+                  style={{ bottom: 42, width: 268, padding: 10 }}
+                >
+                  <div
+                    className="grid items-center"
+                    style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, paddingLeft: 8, paddingRight: 4, paddingTop: 4, paddingBottom: 8 }}
                   >
-                    <Zap size={14} strokeWidth={2.5} className="shrink-0" />
-                    <span className="text-[13px]">引导</span>
+                    <span className="truncate text-[13px] font-medium text-[var(--kimix-panel-text)]">{roomControlTitle}</span>
+                    <button
+                      type="button"
+                      onClick={() => setRoomControlRequest(null)}
+                      className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg"
+                      title="关闭"
+                      aria-label="关闭 Agent 控制菜单"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <div className="flex flex-col" style={{ gap: 8 }}>
+                    {visibleRoomControlTargets.map((target) => (
+                      <button
+                        key={target.roomAgentId}
+                        type="button"
+                        onClick={() => void handleRoomControlSelection(target.roomAgentId)}
+                        className="grid w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                        style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, minHeight: 42, paddingLeft: 13, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+                        title={`${roomControlRequest.action === "stop" ? "停止" : "引导"} ${target.displayName}`}
+                      >
+                        <span className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                          <Bot size={14} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
+                          <span className="truncate text-[13px] text-[var(--kimix-panel-text)]">{target.displayName}</span>
+                        </span>
+                        <span className="shrink-0 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">
+                          {target.runtimeSessionId ? roomControlStatusLabel(target.status) : "运行会话未就绪"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {roomControlRequest.action === "stop" && visibleRoomControlTargets.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleStopAllRoomAgents()}
+                      className="kimix-icon-text-button w-full justify-center text-accent-red hover:bg-accent-red/10"
+                      style={{ minHeight: 34, marginTop: 10, paddingLeft: 12, paddingRight: 12 }}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
+                      <span>停止全部运行 Agent</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {shouldShowStopButton ? (
+                <>
+                  {canSteerActiveTurn && canSendNow && (
+                    <button
+                      onClick={() => void handleSteer()}
+                      className="flex h-8 shrink-0 items-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark"
+                      style={{ gap: 6, paddingLeft: 12, paddingRight: 14 }}
+                      title={roomSteerTargets.length > 1 ? "选择一个运行中的 Agent 并发送引导" : "立即引导当前任务：把输入插入运行中的对话（官方 Ctrl+S steer），不进排队"}
+                      aria-label="引导当前任务"
+                    >
+                      <Zap size={14} strokeWidth={2.5} className="shrink-0" />
+                      <span className="text-[13px]">引导</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => void handleStop()}
+                    className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors"
+                    title={roomStopTargets.length > 1 ? "选择要停止的 Agent" : "停止"}
+                    aria-label="停止"
+                  >
+                    <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
                   </button>
-                )}
-                <button onClick={handleStop} className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" title="停止" aria-label="停止">
-                  <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
+                </>
+              ) : (
+                <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title="发送" aria-label="发送">
+                  <ArrowUp size={17} strokeWidth={2.5} />
                 </button>
-              </>
-            ) : (
-              <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title="发送" aria-label="发送">
-                <ArrowUp size={17} strokeWidth={2.5} />
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
