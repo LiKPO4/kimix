@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Running snapshots preserve the active Assistant row**: Quiet-stream history reconciliation treats an active snapshot as a progress sample and retains the renderer-created prompt/status/Assistant placeholder until an official incomplete Assistant row can take ownership. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Canonical undo history**: Official undo now reloads and replaces the local timeline with the resulting Server snapshot or SDK history even when history becomes shorter or empty; only media metadata for surviving messages is preserved. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-11

@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-13 v2.15.20 运行中消息头连续性
+
+- 当前目标：修复发送消息后 Assistant 计时消息头短暂出现、消失、再重新出现的问题。
+- 根因：runtime 运行期间连续 4 秒没有流事件时，Kimix 会加载官方历史 snapshot 补偿漏帧；中间 snapshot 尚未落盘当前 Assistant 行，却可能因其他历史更丰富而整体替换本地时间线，删除渲染器已创建的未完成占位行，首个后续 delta 又会重新创建该行。
+- 已完成：运行中 snapshot 合并时保留当前用户消息、关联发送状态和未完成 Assistant 占位行；只有 snapshot 已包含官方未完成 Assistant 时才由官方行接管；版本号三处同步到 v2.15.20。
+- 关键文件：`src/App.tsx`、`src/utils/kimiCodeSnapshotReplay.ts`。
+- 验证：snapshot 与事件归并局部测试 85 项通过；`pnpm test:run` 62 个文件、440 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 下一步：提交本轮改动；用户用 v2.15.20 在首个回复事件延迟的场景确认消息头保持连续。
+
 ## 2026-07-13 v2.15.19 撤回重写服从官方历史
 
 - 当前目标：修复撤回重写后旧用户消息重新出现在对话流中的问题。
@@ -7,7 +16,7 @@
 - 已完成：官方 undo 成功后立即加载 canonical snapshot 并无条件替换本地时间线，允许历史变短或为空；仅保留 canonical 消息对应的本地媒体元数据；版本号三处同步到 v2.15.19。
 - 关键文件：`src/components/chat/MessageBubble.tsx`、`src/utils/undoHistory.ts`。
 - 验证：官方历史缩短、清空、媒体回填与事件映射局部测试 98 项通过；`pnpm test:run` 62 个文件、438 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
-- 下一步：提交本轮改动；用户用 v2.15.19 撤回一条已完成消息并重写，确认旧消息不会再次出现。
+- 下一步：用户用 v2.15.19 撤回一条已完成消息并重写，确认旧消息不会再次出现。
 
 ## 2026-07-13 v2.15.18 回复用量气泡终态门禁
 

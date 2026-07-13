@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "../../types/ui";
-import { shouldSkipKimiCodeSnapshotReplay } from "../kimiCodeSnapshotReplay";
+import { preservePendingTurnInRunningSnapshot, shouldSkipKimiCodeSnapshotReplay } from "../kimiCodeSnapshotReplay";
 
 describe("shouldSkipKimiCodeSnapshotReplay", () => {
   it("skips historical assistant snapshot chunks already present in the local timeline", () => {
@@ -78,5 +78,31 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
       snapshotReplay: "history",
       snapshotRole: "assistant",
     }, events)).toBe(true);
+  });
+});
+
+describe("preservePendingTurnInRunningSnapshot", () => {
+  const pendingTurn: TimelineEvent[] = [{
+    id: "user-new", type: "user_message", timestamp: 8, content: "新问题",
+  }, {
+    id: "status-new", type: "status_update", timestamp: 9, message: "消息发送中", source: "ipc", parentEventId: "user-new",
+  }, {
+    id: "assistant-pending", type: "assistant_message", timestamp: 10, content: "", isThinking: false, isComplete: false,
+  }];
+
+  it("keeps the local assistant header when a running snapshot has not recorded it yet", () => {
+    const snapshot: TimelineEvent[] = [{
+      id: "official-user", type: "user_message", timestamp: 8, content: "新问题",
+    }];
+    const result = preservePendingTurnInRunningSnapshot(pendingTurn, snapshot);
+    expect(result.filter((event) => event.type === "user_message")).toHaveLength(1);
+    expect(result.at(-1)).toMatchObject({ id: "assistant-pending", isComplete: false });
+  });
+
+  it("lets an in-flight official assistant row take ownership", () => {
+    const snapshot: TimelineEvent[] = [{
+      id: "official-assistant", type: "assistant_message", timestamp: 11, content: "处理中", isThinking: false, isComplete: false,
+    }];
+    expect(preservePendingTurnInRunningSnapshot(pendingTurn, snapshot)).toEqual(snapshot);
   });
 });

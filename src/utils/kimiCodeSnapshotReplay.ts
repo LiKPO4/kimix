@@ -56,3 +56,34 @@ export function shouldSkipKimiCodeSnapshotReplay(
     return content.includes(text);
   });
 }
+
+function sameUserPrompt(a: TimelineEvent, b: TimelineEvent): boolean {
+  if (a.type !== "user_message" || b.type !== "user_message") return false;
+  return normalizeText(a.content) === normalizeText(b.content);
+}
+
+/** Running history is a progress sample, so it must not erase the active local row. */
+export function preservePendingTurnInRunningSnapshot(
+  localEvents: readonly TimelineEvent[],
+  snapshotEvents: TimelineEvent[],
+): TimelineEvent[] {
+  const assistantIndex = localEvents.findLastIndex((event) => (
+    event.type === "assistant_message" && !event.isComplete
+  ));
+  if (assistantIndex < 0 || snapshotEvents.some((event) => (
+    event.type === "assistant_message" && !event.isComplete
+  ))) return snapshotEvents;
+
+  const assistant = localEvents[assistantIndex];
+  const status = localEvents.slice(0, assistantIndex).findLast((event) => (
+    event.type === "status_update" && event.source === "ipc" && Boolean(event.parentEventId)
+  ));
+  if (status?.type !== "status_update" || !status.parentEventId) return snapshotEvents;
+  const user = localEvents.find((event) => event.type === "user_message" && event.id === status.parentEventId);
+  if (!user || user.type !== "user_message") return snapshotEvents;
+
+  const result = [...snapshotEvents];
+  if (!result.some((event) => sameUserPrompt(event, user))) result.push(user);
+  result.push(status, assistant);
+  return result;
+}
