@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileText,
   FolderOpen,
-  GitBranch,
   Globe2,
   History,
   Laptop,
@@ -287,18 +286,27 @@ export function SessionToolbar({
     setSessionMenuOpen(false);
   };
 
-  const openProjectPath = () => {
-    if (projectPath) void window.api.openProjectPath({ path: projectPath });
+  const openProjectPath = async () => {
+    if (projectPath) {
+      const res = await window.api.openProjectPath({ path: projectPath });
+      if (!res.success) showToast(`打开文件资源管理器失败：${res.error}`);
+    }
     setProjectMenuOpen(false);
   };
 
-  const openProjectEditor = (editor: "vscode" | "trae" | "coder") => {
-    if (projectPath) void window.api.openProjectEditor({ path: projectPath, editor });
+  const openProjectEditor = async () => {
+    if (projectPath) {
+      const res = await window.api.openProjectEditor({ path: projectPath, editor: "vscode" });
+      if (!res.success) showToast(`打开编辑器失败：${res.error}`);
+    }
     setProjectMenuOpen(false);
   };
 
-  const openProjectTerminal = () => {
-    if (projectPath) void window.api.openProjectTerminal({ path: projectPath });
+  const openProjectTerminal = async () => {
+    if (projectPath) {
+      const res = await window.api.openProjectTerminal({ path: projectPath });
+      if (!res.success) showToast(`打开终端失败：${res.error}`);
+    }
     setProjectMenuOpen(false);
   };
 
@@ -543,25 +551,17 @@ export function SessionToolbar({
           </div>
           {projectMenuOpen && (
             <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[236px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
-              <button onClick={() => openProjectEditor("vscode")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                <Code2 size={15} className="w-6 shrink-0 text-accent-primary" />
-                <span className="min-w-0 flex-1 truncate">使用 VS Code 打开</span>
-              </button>
               <button onClick={openProjectPath} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
                 <FolderOpen size={15} className="w-6 shrink-0 text-accent-warning" />
                 <span className="min-w-0 flex-1 truncate">在文件资源管理器中打开</span>
               </button>
+              <button onClick={() => void openProjectEditor()} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+                <Code2 size={15} className="w-6 shrink-0 text-accent-primary" />
+                <span className="min-w-0 flex-1 truncate">使用 VS Code 打开</span>
+              </button>
               <button onClick={openProjectTerminal} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
                 <SquareTerminal size={15} className="w-6 shrink-0 text-text-muted" />
                 <span className="min-w-0 flex-1 truncate">打开终端</span>
-              </button>
-              <button onClick={() => openProjectEditor("trae")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                <GitBranch size={15} className="w-6 shrink-0 text-text-muted" />
-                <span className="min-w-0 flex-1 truncate">使用 Trae 打开</span>
-              </button>
-              <button onClick={() => openProjectEditor("coder")} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
-                <Code2 size={15} className="w-6 shrink-0 text-text-muted" />
-                <span className="min-w-0 flex-1 truncate">使用 Coder 打开</span>
               </button>
             </div>
           )}

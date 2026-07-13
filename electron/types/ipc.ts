@@ -1095,7 +1095,7 @@ export type CheckRevertConflictsResponse = {
 
 export type OpenEditorRequest = {
   path: string;
-  editor: "vscode" | "trae" | "coder";
+  editor: "vscode";
 }
 
 export type OpenTerminalRequest = {

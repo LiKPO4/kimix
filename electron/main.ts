@@ -26,6 +26,7 @@ import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skill
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
 import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
+import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
@@ -2088,12 +2089,19 @@ async function openTerminalAt(dir: string) {
   throw new Error("未找到可用终端");
 }
 
-async function openEditorAt(target: "vscode" | "trae" | "coder", dir: string) {
-  const command = target === "vscode" ? "code" : target;
-  const commandPath = await checkCommand(command);
+async function resolveVsCodeCommand() {
+  if (process.platform === "win32") {
+    const installed = getWindowsVsCodeCandidates(process.env)
+      .find((candidate) => fs.existsSync(candidate));
+    if (installed) return installed;
+  }
+  return checkCommand("code");
+}
+
+async function openEditorAt(dir: string) {
+  const commandPath = await resolveVsCodeCommand();
   if (!commandPath) {
-    const label = target === "vscode" ? "VS Code" : target;
-    throw new Error(`未找到 ${label} 命令`);
+    throw new Error("未找到 VS Code，请先安装或将 code 命令加入 PATH");
   }
   await spawnDetached(commandPath, [dir], dir);
 }
@@ -4275,13 +4283,13 @@ ipcMain.handle("project:openEditor", async (_, request: unknown) => {
     }
     const dir = (request as { path?: unknown }).path;
     const editor = (request as { editor?: unknown }).editor;
-    if (typeof dir !== "string" || !dir || !["vscode", "trae", "coder"].includes(String(editor))) {
+    if (typeof dir !== "string" || !dir || editor !== "vscode") {
       return { success: false, error: "Invalid editor request" };
     }
     if (!fs.existsSync(dir)) {
       return { success: false, error: "Path does not exist" };
     }
-    await openEditorAt(editor as "vscode" | "trae" | "coder", dir);
+    await openEditorAt(dir);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
