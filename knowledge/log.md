@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-13
+
+* **Canonical undo history**: Official undo now reloads and replaces the local timeline with the resulting Server snapshot or SDK history even when history becomes shorter or empty; only media metadata for surviving messages is preserved. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-11
 
 * **Official Extra Usage remains a read-only BOOSTER wallet projection**: Managed and direct usage routes preserve monthly spend, optional charge limit, balance, and currency; invalid wallets remain hidden and no unsupported account-management controls are introduced. See [/project/kimix.md](/project/kimix.md).

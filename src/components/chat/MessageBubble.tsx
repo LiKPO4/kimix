@@ -20,6 +20,8 @@ import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
+import { mapHistoryEvents } from "@/utils/eventMapper";
+import { applyCanonicalUndoHistory } from "@/utils/undoHistory";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -374,14 +376,24 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
       if (needsOfficialUndo) {
         const undoRes = await window.api.undoKimiCodeHistory({ sessionId: runtimeSessionId, count: 1 });
         if (!undoRes.success) throw new Error(`撤回上一轮官方历史失败：${undoRes.error}`);
-      }
 
-      const withdrawnAt = Date.now();
-      useSessionStore.getState().updateSession(activeSession.id, (session) => ({
-        ...session,
-        events: truncateLatestUserTurn(session.events, event.id),
-        updatedAt: withdrawnAt,
-      }));
+        const loaded = await window.api.loadKimiCodeSession({ workDir: activeSession.projectPath, sessionId: runtimeSessionId });
+        if (!loaded.success) throw new Error(`官方撤回成功，但刷新官方历史失败：${loaded.error}`);
+        const canonicalEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+        const withdrawnAt = Date.now();
+        useSessionStore.getState().updateSession(activeSession.id, (session) => ({
+          ...session,
+          events: applyCanonicalUndoHistory(session.events, canonicalEvents),
+          updatedAt: withdrawnAt,
+        }));
+      } else {
+        const withdrawnAt = Date.now();
+        useSessionStore.getState().updateSession(activeSession.id, (session) => ({
+          ...session,
+          events: truncateLatestUserTurn(session.events, event.id),
+          updatedAt: withdrawnAt,
+        }));
+      }
       syncCurrentSession();
       window.dispatchEvent(new CustomEvent("kimix:restore-composer-draft", {
         detail: {
