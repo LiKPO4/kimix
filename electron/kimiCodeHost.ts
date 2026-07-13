@@ -8,6 +8,7 @@ import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as settingsService from "./settingsService";
 import { normalizePathForComparison } from "../src/utils/pathCase";
+import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import {
   flattenServerEvent,
   getKimiCodeSessionAlreadyExistsId,
@@ -541,6 +542,7 @@ type ManagedSession = {
   permission: KimiCodePermissionMode;
   planMode?: boolean;
   additionalDirs: readonly string[];
+  metadata?: JsonObject;
   unsubscribe: () => void;
   hiddenAgentIds: Set<string>;
   btwRuns: Map<string, BtwRun>;
@@ -556,6 +558,7 @@ type ServerManagedSession = {
   planMode: boolean;
   swarmMode: boolean;
   additionalDirs: readonly string[];
+  metadata?: JsonObject;
   btwRuns: Map<string, BtwRun>;
 };
 
@@ -628,6 +631,13 @@ export { isKimiCodeSessionMissingError };
 export { isKimiCodeSessionAlreadyExistsError };
 
 export async function createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
+  const roomMetadata = parseOfficialRoomMetadata(options.metadata);
+  if (roomMetadata) {
+    const existing = await findExistingRoomSession(options.workDir, roomMetadata);
+    if (existing) {
+      return resumeSession(existing.id, { additionalDirs: options.additionalDirs });
+    }
+  }
   if (shouldRouteNewSessionToServer()) {
     try {
       const client = getServerClient();
@@ -687,6 +697,7 @@ export async function resumeSession(sessionId: string, options: { additionalDirs
     thinking: resumedStatus?.thinkingEffort ?? resumedStatus?.thinkingLevel,
     permission: resumedPermission,
     planMode: resumedStatus?.planMode,
+    metadata: session.summary?.metadata,
   });
 }
 
@@ -705,6 +716,7 @@ async function createSdkSession(options: CreateKimiCodeSessionOptions): Promise<
     thinking: options.thinking,
     permission: options.permission ?? "manual",
     planMode: options.planMode ?? false,
+    metadata: options.metadata ?? session.summary?.metadata,
   });
 }
 
@@ -722,6 +734,7 @@ async function createSdkFallbackSession(
       permission: serverManaged.permission,
       planMode: serverManaged.planMode,
       additionalDirs: serverManaged.additionalDirs,
+      metadata: serverManaged.metadata,
     });
   } catch (error) {
     const existingSessionId = getKimiCodeSessionAlreadyExistsId(error);
@@ -733,6 +746,7 @@ async function createSdkFallbackSession(
     thinking: serverManaged.thinking,
     permission: serverManaged.permission,
     planMode: serverManaged.planMode,
+    metadata: serverManaged.metadata ?? session.summary?.metadata,
   });
 }
 
@@ -890,6 +904,7 @@ async function migrateServerSessionToSdk(
     thinking: status?.thinkingEffort ?? status?.thinkingLevel ?? serverManaged.thinking,
     permission,
     planMode: status?.planMode ?? serverManaged.planMode,
+    metadata: serverManaged.metadata ?? session.summary?.metadata,
   });
   return getManagedSession(sessionId);
 }
@@ -1043,6 +1058,7 @@ async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManag
       thinking: sdkManaged.thinking,
       permission: sdkManaged.permission,
       planMode: sdkManaged.planMode,
+      metadata: sdkManaged.metadata,
     });
     sessions.delete(sessionId);
     sdkManaged.unsubscribe();
@@ -1928,18 +1944,13 @@ export async function setPluginMcpServerEnabled(id: string, server: string, enab
   await session.setPluginMcpServerEnabled(id, server, enabled);
 }
 
-export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
-  if (shouldRouteNewSessionToServer()) {
-    const normalizedWorkDir = workDir ? normalizePathForComparison(path.resolve(workDir)) : undefined;
-    return (await getServerClient().listSessions())
-      .filter((session) => !normalizedWorkDir || (
-        typeof session.metadata?.cwd === "string" && normalizePathForComparison(path.resolve(session.metadata.cwd)) === normalizedWorkDir
-      ))
-      .map(serverSessionSummary);
-  }
+async function listSdkSessionSummaries(
+  workDir: string | undefined,
+  options: { includeBrief: boolean },
+): Promise<KimiCodeSessionSummary[]> {
   const sdkHarness = await getHarness();
   const sessions = [...await sdkHarness.listSessions({ ...(workDir ? { workDir } : {}), includeArchive: true })];
-  // SDK may return empty title/lastPrompt; backfill from state.json if available.
+  // SDK may return empty metadata/title/lastPrompt; backfill from state.json if available.
   for (const session of sessions) {
     session.source = "sdk";
     session.title = sanitizeSkillActivationTitle(session.title);
@@ -1964,7 +1975,7 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
       if (!session.lastPrompt?.trim() && metadata?.lastPrompt?.trim()) {
         session.lastPrompt = metadata.lastPrompt.trim();
       }
-      if (session.archived !== true && session.isCustomTitle !== true) {
+      if (options.includeBrief && session.archived !== true && session.isCustomTitle !== true) {
         const firstPrompt = await getFirstUserMessage(path.join(session.sessionDir, "agents", "main", "wire.jsonl"));
         if (firstPrompt.trim()) session.brief = firstPrompt.trim();
       }
@@ -1972,6 +1983,29 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
       // ignore unreadable metadata
     }
   }
+  return sessions;
+}
+
+async function findExistingRoomSession(
+  workDir: string,
+  roomMetadata: NonNullable<ReturnType<typeof parseOfficialRoomMetadata>>,
+): Promise<KimiCodeSessionSummary | null> {
+  const candidates = shouldRouteNewSessionToServer()
+    ? (await getServerClient().listSessions()).map(serverSessionSummary)
+    : await listSdkSessionSummaries(workDir, { includeBrief: false });
+  return selectExistingRoomSession(candidates, roomMetadata, workDir);
+}
+
+export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
+  if (shouldRouteNewSessionToServer()) {
+    const normalizedWorkDir = workDir ? normalizePathForComparison(path.resolve(workDir)) : undefined;
+    return (await getServerClient().listSessions())
+      .filter((session) => !normalizedWorkDir || (
+        typeof session.metadata?.cwd === "string" && normalizePathForComparison(path.resolve(session.metadata.cwd)) === normalizedWorkDir
+      ))
+      .map(serverSessionSummary);
+  }
+  const sessions = await listSdkSessionSummaries(workDir, { includeBrief: true });
   return sessions.filter((session) => session.archived === true || Boolean(session.lastPrompt?.trim()));
 }
 
@@ -2276,6 +2310,7 @@ function registerSession(
     thinking?: string;
     permission: KimiCodePermissionMode;
     planMode?: boolean;
+    metadata?: JsonObject;
   },
 ): KimiCodeEngineSession {
   sessions.get(session.id)?.unsubscribe();
@@ -2300,6 +2335,7 @@ function registerSession(
     permission: profile.permission,
     planMode: profile.planMode,
     additionalDirs: session.summary?.additionalDirs ?? [],
+    metadata: profile.metadata ?? session.summary?.metadata,
     unsubscribe,
     hiddenAgentIds,
     btwRuns,
@@ -2327,6 +2363,7 @@ async function registerServerSession(
     planMode: typeof config.plan_mode === "boolean" ? config.plan_mode : options.planMode ?? false,
     swarmMode: typeof config.swarm_mode === "boolean" ? config.swarm_mode : false,
     additionalDirs: options.additionalDirs ?? [],
+    metadata: session.metadata ?? options.metadata,
     btwRuns: new Map(),
   };
   serverSessions.set(session.id, managed);

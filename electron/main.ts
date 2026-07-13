@@ -27,6 +27,7 @@ import { normalizePathForComparison } from "../src/utils/pathCase";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
 import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
+import { buildOfficialRoomMetadata, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
@@ -5269,15 +5270,18 @@ ipcMain.handle("kimi-code:createSession", async (_, request: unknown) => {
     if (!workDir) return { success: false, error: "Missing workDir" };
     const permission = req.permission === "manual" || req.permission === "auto" || req.permission === "yolo" ? req.permission : undefined;
     const additionalDirs = normalizeAdditionalDirs(req.additionalDirs ?? req.additionalWorkDirs);
+    const roomMetadata = parseRoomMetadataRequest(req.roomMetadata);
     const data = await kimiCodeHost.createSession({
       workDir,
-      id: typeof req.id === "string" ? req.id : undefined,
+      id: roomMetadata?.roomAgentId ?? (typeof req.id === "string" ? req.id : undefined),
       model: typeof req.model === "string" ? req.model : undefined,
       thinking: typeof req.thinking === "string" ? req.thinking : undefined,
       permission,
       planMode: typeof req.planMode === "boolean" ? req.planMode : undefined,
       additionalDirs,
-      metadata: { source: "kimix-p1", additionalDirs },
+      metadata: roomMetadata
+        ? { ...buildOfficialRoomMetadata(roomMetadata), additionalDirs }
+        : { source: "kimix-p1", additionalDirs },
     });
     return { success: true, data };
   } catch (err) {

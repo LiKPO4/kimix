@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-3、4A 已完成，下一步进入 4B，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-3、4A-4B 已完成，下一步进入 4C，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -313,11 +313,11 @@ interface AgentDelivery {
 
 #### 4B：受控 metadata 与幂等创建
 
-- [ ] IPC 只增加专用 `roomMetadata`，主进程逐字段校验 schema、roomId、roomAgentId 和 primarySessionId，拒绝任意 metadata 注入。
-- [ ] 创建次要 Agent 时先持久化本地身份，再调用官方创建；重试前先按固定 room/Agent metadata 查询 catalog。
-- [ ] 在官方允许的情况下同时使用稳定请求 session ID；不支持时仍以 metadata 查询作为幂等恢复依据。
-- [ ] `ServerManagedSession` 保存创建 metadata，Server -> SDK fallback 创建时原样透传受控字段。
-- [ ] Server 和 SDK 的 session summary 都必须能返回同一组 room metadata。
+- [x] IPC 只增加专用 `roomMetadata`，主进程逐字段校验 schema、roomId、roomAgentId 和 primarySessionId，拒绝任意 metadata 注入。
+- [x] 创建次要 Agent 时先持久化本地身份，再调用官方创建；重试前先按固定 room/Agent metadata 查询 catalog。
+- [x] 在官方允许的情况下同时使用稳定请求 session ID；不支持时仍以 metadata 查询作为幂等恢复依据。
+- [x] `ServerManagedSession` 保存创建 metadata，Server -> SDK fallback 创建时原样透传受控字段。
+- [x] Server 和 SDK 的 session summary 都必须能返回同一组 room metadata。
 
 退出门禁：在“官方创建前、创建成功后、绑定写入前、fallback 迁移中”四个位置强制中断，重启后都不会重复创建或失去可见性。
 
@@ -507,14 +507,15 @@ git diff --check
 
 ## 11. 当前实现审计与开放条件
 
-截至 2026-07-13，阶段 0-3 和 4A 已完成。阶段 3 已实现并验证：
+截至 2026-07-13，阶段 0-3 和 4A-4B 已完成。阶段 3 已实现并验证：
 
 1. `startup`、quiet running snapshot、后台 repair、消息撤回重写和 `/undo` 全部使用统一的 Agent-scoped canonical reconcile。
 2. ChatThread 的响应块、展开/滚动身份和最终 usage 只由对应 `roomAgentId + agentTurnId` 控制。
 3. 新房间消息只接受 delivery/room/官方事件身份绑定；文本+时间仅用于已有官方 ID 的唯一旧数据迁移，歧义时不绑定。
 4. 未关联的 compaction、session meta、用户、Assistant 或工具事件保留在所属 Agent 的独立时间线段，不再静默丢失或挂到最近一轮。
 5. 阶段 4A 已实现 collaboration 防御性规范化、旧版本 primary 镜像恢复、逐 Agent 活动态结算、房间消息和全部事件分区的图片抽取/恢复，以及未知 schema 原样回写保护。
-6. 当前工作树已通过 66 个测试文件、470 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的目录、创建、崩溃恢复、备份和生命周期门禁。
+6. 阶段 4B 已实现严格 roomMetadata IPC、稳定 Agent session ID、包含空 session 的创建前查找、重复/归档停止条件，以及 Server、SDK、fallback metadata 贯通。
+7. 当前工作树已通过 67 个测试文件、473 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的目录折叠、逐 Agent 恢复、delivery、备份和生命周期门禁。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

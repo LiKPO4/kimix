@@ -380,8 +380,16 @@ describe("KimiCodeServerClient protocol adapters", () => {
     const client = new KimiCodeServerClient("http://127.0.0.1:58627");
     await expect(client.createSession({
       workDir: "D:\\repo",
+      id: "agent-2",
       model: "kimi-code/kimi-for-coding",
       permission: "auto",
+      metadata: {
+        source: "kimix-room-agent",
+        kimixRoomSchemaVersion: 1,
+        kimixRoomId: "room-1",
+        kimixRoomAgentId: "agent-2",
+        kimixPrimarySessionId: "session-primary",
+      },
     })).resolves.toMatchObject({ workspace_id: "wd_repo_123456789abc" });
 
     expect(calls).toEqual([
@@ -394,8 +402,16 @@ describe("KimiCodeServerClient protocol adapters", () => {
         url: "http://127.0.0.1:58627/api/v1/sessions",
         method: "POST",
         body: JSON.stringify({
+          id: "agent-2",
           workspace_id: "wd_repo_123456789abc",
-          metadata: { cwd: "D:/repo" },
+          metadata: {
+            source: "kimix-room-agent",
+            kimixRoomSchemaVersion: 1,
+            kimixRoomId: "room-1",
+            kimixRoomAgentId: "agent-2",
+            kimixPrimarySessionId: "session-primary",
+            cwd: "D:/repo",
+          },
           agent_config: {
             model: "kimi-code/kimi-for-coding",
             permission_mode: "auto",

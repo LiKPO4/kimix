@@ -1690,6 +1690,14 @@ export type KimiCodeCreateSessionRequest = {
   planMode?: boolean;
   additionalDirs?: string[];
   additionalWorkDirs?: string[];
+  roomMetadata?: KimiCodeRoomMetadataRequest;
+};
+
+export type KimiCodeRoomMetadataRequest = {
+  schemaVersion: 1;
+  roomId: string;
+  roomAgentId: string;
+  primarySessionId: string;
 };
 
 export type KimiCodeResumeSessionRequest = {

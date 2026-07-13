@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T14:43:16+08:00"
+timestamp: "2026-07-13T15:13:19+08:00"
 ---
 
 # Collaboration Room Routing
@@ -46,6 +46,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Secondary official sessions carry Kimix room metadata so catalog reconciliation groups them under the room.
 * Room metadata is a controlled main-process contract and must survive Server creation, SDK creation, and Server-to-SDK fallback. Renderer callers cannot inject arbitrary session metadata.
 * Agent provisioning persists the local participant before official creation. Fixed room and Agent metadata allows an official session created immediately before a crash to be rebound idempotently instead of duplicated or hidden.
+* Secondary provisioning requests the stable room Agent ID as the official session ID and also searches metadata across empty, active, and archived catalog entries before creation. One active match resumes, while duplicate or archived matches stop automatic creation instead of guessing.
 * A bound secondary session is hidden as a duplicate sidebar row only after an exact supported metadata, project, room, and Agent match. Missing or ambiguous bindings keep the official session discoverable as an independent conversation rather than making it invisible.
 * Persistence records when a collaboration-aware writer last synchronized the legacy primary mirror. If a legacy version later changes the top-level Session, the next compatible version merges those changes into the primary Agent only and preserves every secondary partition.
 * Unknown future collaboration schemas are read-only and retained verbatim; current code must not downgrade or overwrite them.
