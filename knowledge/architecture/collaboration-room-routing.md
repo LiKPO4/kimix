@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T15:39:15+08:00"
+timestamp: "2026-07-13T16:11:48+08:00"
 ---
 
 # Collaboration Room Routing
@@ -38,6 +38,8 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Room messages and stable delivery attempts are persisted before network dispatch. An attempt whose official acceptance is unknown becomes indeterminate and is never automatically resent.
 * Cancel, steer, approval, question response, permission mutation, model mutation, Plan, Goal, Swarm, and slash session mutation require an explicit Agent/runtime owner.
 * A terminal event or Server-to-SDK migration for one Agent cannot clear or replace another Agent's activity or runtime binding.
+* Startup, background repair, running snapshots, and resume all derive an ordered runtime/official candidate list per Agent. A stale runtime may fall back only to another identity owned by the same Agent; recovery never borrows another participant's session.
+* Server-to-SDK migration moves the target Agent's binding, activity, turn anchor, and polling ownership to the migrated runtime while leaving every other Agent unchanged.
 
 # Persistence and Catalog Authority
 
@@ -50,6 +52,8 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * A bound secondary session is hidden as a duplicate sidebar row only after an exact supported metadata schema, project path, room ID, primary identity, and Agent ID match. The same room and Agent must have exactly one active candidate; missing, unknown, or ambiguous bindings keep every candidate discoverable as an independent conversation rather than making history invisible.
 * Folding a secondary catalog row never claims the whole room from the primary catalog row. A catalog containing the primary and several uniquely bound secondary sessions still reconciles to one local room mirror, and secondary titles never replace the room title.
 * A Server-authoritative catalog marks only a bound secondary Agent whose active session is absent or archived as missing; it never archives the room because one participant disappeared. SDK fallback catalogs and failed catalog requests are non-authoritative and cannot infer deletion from absence.
+* Recovery failures are Agent-scoped durable issues. The failed Agent keeps its canonical history and can remain unavailable while successfully recovered participants continue to load and run.
+* Model availability is checked against the existing Kimi model and Server catalogs. A missing persisted alias is marked unavailable and blocks resume/create paths from silently substituting the default model.
 * Persistence records when a collaboration-aware writer last synchronized the legacy primary mirror. If a legacy version later changes the top-level Session, the next compatible version merges those changes into the primary Agent only and preserves every secondary partition.
 * Unknown future collaboration schemas are read-only and retained verbatim; current code must not downgrade or overwrite them.
 * Removing an Agent preserves its history. Room archive and restore operate per Agent and expose partial failure because official sessions have no cross-session transaction.

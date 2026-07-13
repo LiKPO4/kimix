@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-3、4A-4C 已完成，下一步进入 4D，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-3、4A-4D 已完成，下一步进入 4E，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -333,10 +333,10 @@ interface AgentDelivery {
 
 #### 4D：逐 Agent 历史与 runtime 恢复
 
-- [ ] startup、后台 repair、running snapshot 和 resume 对每个 Agent 独立选择 runtime/official session。
-- [ ] 一个 Agent 恢复失败时保留其 canonical history 和错误状态，其他 Agent 继续恢复和使用。
-- [ ] Server -> SDK 迁移更新对应 Agent 绑定和 activity，不改变房间或其他 Agent。
-- [ ] Provider/model alias 缺失时标记 unavailable，不静默切换模型。
+- [x] startup、后台 repair、running snapshot 和 resume 对每个 Agent 独立选择 runtime/official session。
+- [x] 一个 Agent 恢复失败时保留其 canonical history 和错误状态，其他 Agent 继续恢复和使用。
+- [x] Server -> SDK 迁移更新对应 Agent 绑定和 activity，不改变房间或其他 Agent。
+- [x] Provider/model alias 缺失时标记 unavailable，不静默切换模型。
 
 退出门禁：冷启动、热重载和部分 runtime 缺失时，各 Agent 历史、模型和状态均不串线。
 
@@ -507,7 +507,7 @@ git diff --check
 
 ## 11. 当前实现审计与开放条件
 
-截至 2026-07-13，阶段 0-3 和 4A-4C 已完成。阶段 3 已实现并验证：
+截至 2026-07-13，阶段 0-3 和 4A-4D 已完成。阶段 3 已实现并验证：
 
 1. `startup`、quiet running snapshot、后台 repair、消息撤回重写和 `/undo` 全部使用统一的 Agent-scoped canonical reconcile。
 2. ChatThread 的响应块、展开/滚动身份和最终 usage 只由对应 `roomAgentId + agentTurnId` 控制。
@@ -516,7 +516,8 @@ git diff --check
 5. 阶段 4A 已实现 collaboration 防御性规范化、旧版本 primary 镜像恢复、逐 Agent 活动态结算、房间消息和全部事件分区的图片抽取/恢复，以及未知 schema 原样回写保护。
 6. 阶段 4B 已实现严格 roomMetadata IPC、稳定 Agent session ID、包含空 session 的创建前查找、重复/归档停止条件，以及 Server、SDK、fallback metadata 贯通。
 7. 阶段 4C 已实现受控 metadata 的精确目录折叠与重绑；主、次 Agent 同批目录只保留一个房间镜像，歧义或孤儿 session 保持独立可见，Server 缺失只标记对应 Agent，SDK 非权威目录不下删除结论。
-8. 当前工作树已通过 67 个测试文件、479 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的逐 Agent 恢复、delivery、备份和生命周期门禁。
+8. 阶段 4D 已把 startup、后台 repair、running snapshot 和 resume 收口到逐 Agent runtime/official 候选；部分失败保留 canonical history 与恢复错误，Server -> SDK 迁移同步目标 Agent activity，模型目录缺失标记 unavailable 并阻止静默切换。
+9. 当前工作树已通过 68 个测试文件、485 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的 delivery、备份和生命周期门禁。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

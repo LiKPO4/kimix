@@ -169,6 +169,11 @@ export interface RoomAgent {
   createdAt: number;
   removedAt?: number;
   missingSince?: number;
+  recoveryIssue?: {
+    status: "error" | "unavailable";
+    message: string;
+    updatedAt: number;
+  };
 }
 
 export interface CollaborationState {

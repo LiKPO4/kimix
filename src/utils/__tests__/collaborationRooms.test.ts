@@ -166,6 +166,20 @@ describe("collaborationRooms", () => {
       schemaVersion: 1,
       raw: invalidRaw,
     });
+
+    const collaboration = createCollaborationStateFromSession(session);
+    const invalidRecovery = normalizeLoadedSessionCollaboration({
+      ...session,
+      collaboration: {
+        ...collaboration,
+        agents: collaboration.agents.map((agent) => ({
+          ...agent,
+          recoveryIssue: { status: "unknown", message: "", updatedAt: "bad" },
+        })) as unknown as RoomAgent[],
+      },
+    });
+    expect(invalidRecovery.collaboration).toBeUndefined();
+    expect(invalidRecovery.unsupportedCollaboration?.reason).toBe("invalid-schema");
   });
 
   it("resolves two runtime identities to different owners in the same room", () => {

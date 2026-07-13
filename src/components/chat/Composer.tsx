@@ -27,6 +27,12 @@ import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { getPrimaryRoomAgent, hasMultipleRoomAgents } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
+import {
+  bindRecoveredRoomAgentRuntime,
+  getPrimaryRecoveryTarget,
+  resumeRoomAgentRuntime,
+  roomAgentCanResume,
+} from "@/utils/roomAgentRecovery";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -989,12 +995,19 @@ export function Composer() {
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
-        const knownOfficialSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
-        if (knownOfficialSessionId) {
+        const primaryAgentId = getPrimaryRoomAgent(targetSession).id;
+        const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
+        if (!roomAgentCanResume(targetSession, primaryAgentId)) {
+          const issue = getPrimaryRoomAgent(targetSession).recoveryIssue;
+          throw new Error(issue?.message ?? "当前 Agent 暂时不可恢复");
+        }
+        if (recoveryTarget.sessionIds.length > 0) {
           updateLinkStatus("消息发送中", "info");
-          const resumeRes = await window.api.resumeKimiCodeSession({
-            sessionId: knownOfficialSessionId,
+          const resumeRes = await resumeRoomAgentRuntime({
+            session: targetSession,
+            roomAgentId: primaryAgentId,
             additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+            resume: (request) => window.api.resumeKimiCodeSession(request),
           });
           // Only adopt the resumed runtime when it points at this project's
           // workDir. A stale binding to the plugin-management temp session would
@@ -1003,25 +1016,19 @@ export function Composer() {
           if (resumeRes.success && (!targetSession.projectPath || sameWorkDir(resumeRes.data.workDir, targetSession.projectPath))) {
             const model = resolveResumedSessionModel({
               resumedModel: resumeRes.data.model,
-              sessionModel: targetSession.model,
-              switchedToModel: targetSession.switchedToModel,
-              modelSwitchedAt: targetSession.modelSwitchedAt,
+              sessionModel: getPrimaryRoomAgent(targetSession).modelAlias,
+              switchedToModel: getPrimaryRoomAgent(targetSession).switchedToModel,
+              modelSwitchedAt: getPrimaryRoomAgent(targetSession).modelSwitchedAt,
             }) ?? await getDefaultKimiModel();
+            targetSession = bindRecoveredRoomAgentRuntime(targetSession, primaryAgentId, {
+              sessionId: resumeRes.data.sessionId,
+              model,
+            });
             targetSession = {
               ...targetSession,
               engine: "kimi-code",
-              runtimeSessionId: resumeRes.data.sessionId,
-              officialSessionId: resumeRes.data.sessionId,
-              model,
             };
-            updateSession(targetSession.id, (session) => ({
-              ...session,
-              engine: "kimi-code",
-              runtimeSessionId: resumeRes.data.sessionId,
-              officialSessionId: resumeRes.data.sessionId,
-              model,
-              updatedAt: Date.now(),
-            }));
+            updateSession(targetSession.id, () => targetSession);
             targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
             // Re-apply the current UI permission mode so a resumed session honours
             // full-access (yolo) instead of keeping its persisted permission.
@@ -1050,22 +1057,16 @@ export function Composer() {
           additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         });
         if (!createRes.success) throw new Error(createRes.error);
-        const model = createRes.data.model ?? targetSession.model ?? await getDefaultKimiModel();
+        const model = createRes.data.model ?? getPrimaryRoomAgent(targetSession).modelAlias ?? await getDefaultKimiModel();
+        targetSession = bindRecoveredRoomAgentRuntime(targetSession, primaryAgentId, {
+          sessionId: createRes.data.sessionId,
+          model,
+        });
         targetSession = {
           ...targetSession,
           engine: "kimi-code",
-          runtimeSessionId: createRes.data.sessionId,
-          officialSessionId: createRes.data.sessionId,
-          model,
         };
-        updateSession(targetSession.id, (session) => ({
-          ...session,
-          engine: "kimi-code",
-          runtimeSessionId: createRes.data.sessionId,
-          officialSessionId: createRes.data.sessionId,
-          model,
-          updatedAt: Date.now(),
-        }));
+        updateSession(targetSession.id, () => targetSession);
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         updateLinkStatus("消息发送中", "info");
         await applyDesiredSwarmMode(createRes.data.sessionId);
@@ -1230,19 +1231,25 @@ export function Composer() {
   const ensureOfficialRuntimeForSession = async () => {
     const targetSession = await ensureSession();
     if (!targetSession) return null;
-    const knownSessionId = targetSession.runtimeSessionId ?? targetSession.officialSessionId;
-    if (knownSessionId) {
-      const resumeRes = await window.api.resumeKimiCodeSession({
-        sessionId: knownSessionId,
+    const primaryAgentId = getPrimaryRoomAgent(targetSession).id;
+    if (!roomAgentCanResume(targetSession, primaryAgentId)) {
+      throw new Error(getPrimaryRoomAgent(targetSession).recoveryIssue?.message ?? "当前 Agent 暂时不可恢复");
+    }
+    const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
+    if (recoveryTarget.sessionIds.length > 0) {
+      const resumeRes = await resumeRoomAgentRuntime({
+        session: targetSession,
+        roomAgentId: primaryAgentId,
         additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+        resume: (request) => window.api.resumeKimiCodeSession(request),
       });
       if (resumeRes.success) {
         updateSession(targetSession.id, (session) => ({
-          ...session,
+          ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+            sessionId: resumeRes.data.sessionId,
+            model: resumeRes.data.model,
+          }),
           engine: "kimi-code",
-          runtimeSessionId: resumeRes.data.sessionId,
-          officialSessionId: resumeRes.data.sessionId,
-          updatedAt: Date.now(),
         }));
         const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
         if (updated) setCurrentSession(updated);
@@ -1251,17 +1258,18 @@ export function Composer() {
     }
     const createRes = await window.api.createKimiCodeSession({
       workDir: targetSession.projectPath,
+      model: getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
       permission: permissionMode,
       planMode: defaultPlanMode,
       additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
     });
     if (!createRes.success) throw new Error(createRes.error);
     updateSession(targetSession.id, (session) => ({
-      ...session,
+      ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+        sessionId: createRes.data.sessionId,
+        model: createRes.data.model,
+      }),
       engine: "kimi-code",
-      runtimeSessionId: createRes.data.sessionId,
-      officialSessionId: createRes.data.sessionId,
-      updatedAt: Date.now(),
     }));
     const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
     if (updated) setCurrentSession(updated);

@@ -46,6 +46,13 @@ import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
+import { getPrimaryRoomAgent } from "@/utils/collaborationRooms";
+import {
+  bindRecoveredRoomAgentRuntime,
+  getPrimaryRecoveryTarget,
+  resumeRoomAgentRuntime,
+  roomAgentCanResume,
+} from "@/utils/roomAgentRecovery";
 
 function isBackgroundTaskTerminalStatus(status: string) {
   return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
@@ -1614,35 +1621,42 @@ ${isFinalStep
       showToast("请先选择一个会话");
       return null;
     }
-    const existing = getRuntimeSessionId(liveCurrentSession);
-    if (existing) {
-      const res = await window.api.resumeKimiCodeSession({
-        sessionId: existing,
+    const primaryAgentId = getPrimaryRoomAgent(liveCurrentSession).id;
+    if (!roomAgentCanResume(liveCurrentSession, primaryAgentId)) {
+      throw new Error(getPrimaryRoomAgent(liveCurrentSession).recoveryIssue?.message ?? "当前 Agent 暂时不可恢复");
+    }
+    const recoveryTarget = getPrimaryRecoveryTarget(liveCurrentSession);
+    if (recoveryTarget.sessionIds.length > 0) {
+      const res = await resumeRoomAgentRuntime({
+        session: liveCurrentSession,
+        roomAgentId: primaryAgentId,
         additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+        resume: (request) => window.api.resumeKimiCodeSession(request),
       });
       if (!res.success) throw new Error(res.error);
       updateSession(liveCurrentSession.id, (session) => ({
-        ...session,
+        ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+          sessionId: res.data.sessionId,
+          model: res.data.model,
+        }),
         engine: "kimi-code",
-        runtimeSessionId: res.data.sessionId,
-        officialSessionId: res.data.sessionId,
-        updatedAt: Date.now(),
       }));
       return { uiSessionId: liveCurrentSession.id, runtimeSessionId: res.data.sessionId };
     }
     const res = await window.api.createKimiCodeSession({
       workDir: liveCurrentSession.projectPath,
+      model: getPrimaryRoomAgent(liveCurrentSession).modelAlias ?? undefined,
       permission: permissionMode,
       planMode: defaultPlanMode,
       additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
     });
     if (!res.success) throw new Error(res.error);
     updateSession(liveCurrentSession.id, (session) => ({
-      ...session,
+      ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+        sessionId: res.data.sessionId,
+        model: res.data.model,
+      }),
       engine: "kimi-code",
-      runtimeSessionId: res.data.sessionId,
-      officialSessionId: res.data.sessionId,
-      updatedAt: Date.now(),
     }));
     return { uiSessionId: liveCurrentSession.id, runtimeSessionId: res.data.sessionId };
   };

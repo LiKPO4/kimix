@@ -68,6 +68,15 @@ import {
   updateRoomAgentEvents,
 } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
+import {
+  bindRecoveredRoomAgentRuntime,
+  getRoomAgentRecoveryTargets,
+  reconcileRoomAgentModelAvailability,
+  resumeRoomAgentRuntime,
+  roomAgentCanResume,
+  setRoomAgentRecoveryIssue,
+  type RoomAgentRecoveryTarget,
+} from "@/utils/roomAgentRecovery";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -239,20 +248,9 @@ function needsKimiCodeHistoryRepair(session: Session) {
 }
 
 function getKimiHistoryTargets(session: Session) {
-  const primary = getPrimaryRoomAgent(session);
-  return getRoomAgents(session).flatMap((agent) => {
-    if (!roomAgentNeedsKimiCodeHistoryRepair(session, agent.id)) return [];
-    return [{
-      roomAgentId: agent.id,
-      sessionIds: Array.from(new Set([
-        agent.runtimeSessionId,
-        agent.officialSessionId,
-        primary.id === agent.id ? session.runtimeSessionId : undefined,
-        primary.id === agent.id ? session.officialSessionId : undefined,
-        primary.id === agent.id && !session.id.startsWith("local-") ? session.id : undefined,
-      ].filter((id): id is string => Boolean(id)))),
-    }];
-  });
+  return getRoomAgentRecoveryTargets(session).filter((target) => (
+    roomAgentNeedsKimiCodeHistoryRepair(session, target.roomAgentId)
+  ));
 }
 
 function extractOfficialSessionTitle(event: unknown): string | null {
@@ -271,9 +269,12 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
   for (const session of candidates) {
     if (!session.projectPath) continue;
     for (const target of getKimiHistoryTargets(session)) {
+      let historyReachable = false;
+      let recoveryAccepted = false;
       for (const sessionId of target.sessionIds) {
         const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
         if (!loaded?.success) continue;
+        historyReachable = true;
         const eventsSource =
           loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
             ? loaded.data.events
@@ -290,9 +291,11 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               canonicalEvents: settleInactiveEvents(mapHistoryEvents(eventsSource)),
               reason: "repair",
             });
-            if (!reconciliation.applied || !shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events)) {
+            if (!reconciliation.applied) {
               return item;
             }
+            recoveryAccepted = true;
+            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events)) return item;
             applied = true;
             return {
               ...reconciliation.session,
@@ -311,8 +314,230 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
         void persistLocalConversationState();
         break;
       }
+      if (recoveryAccepted && session.collaboration) {
+        useSessionStore.setState((state) => ({
+          sessions: state.sessions.map((item) => {
+            if (item.id !== session.id) return item;
+            const agent = getRoomAgent(item, target.roomAgentId);
+            return agent?.recoveryIssue?.status === "error"
+              ? setRoomAgentRecoveryIssue(item, target.roomAgentId, undefined)
+              : item;
+          }),
+        }));
+        void persistLocalConversationState();
+      }
+      if (historyReachable && !recoveryAccepted && session.collaboration) {
+        useSessionStore.setState((state) => ({
+          sessions: state.sessions.map((item) => (
+            item.id === session.id
+              ? setRoomAgentRecoveryIssue(item, target.roomAgentId, {
+                status: "error",
+                message: "后台修复结果到达时该 Agent 的 runtime 身份已变化，已保留现有 canonical history。",
+                updatedAt: Date.now(),
+              })
+              : item
+          )),
+        }));
+        void persistLocalConversationState();
+      }
+      if (!historyReachable && session.collaboration) {
+        useSessionStore.setState((state) => ({
+          sessions: state.sessions.map((item) => (
+            item.id === session.id
+              ? setRoomAgentRecoveryIssue(item, target.roomAgentId, {
+                status: "error",
+                message: "后台修复无法读取该 Agent 的官方历史，已保留本地 canonical history。",
+                updatedAt: Date.now(),
+              })
+              : item
+          )),
+        }));
+        void persistLocalConversationState();
+      }
     }
   }
+}
+
+async function readAvailableRoomModelAliases(): Promise<ReadonlySet<string> | null> {
+  const [configResult, serverResult] = await Promise.all([
+    window.api.getKimiModelConfig().catch(() => null),
+    window.api.getKimiCodeServerModelCatalog().catch(() => null),
+  ]);
+  if (!configResult?.success && !serverResult?.success) return null;
+  const aliases = new Set<string>();
+  if (configResult?.success) {
+    for (const model of configResult.data.models) {
+      if (model.alias.trim()) aliases.add(model.alias.trim());
+    }
+    if (configResult.data.defaultModel?.trim()) aliases.add(configResult.data.defaultModel.trim());
+  }
+  if (serverResult?.success) {
+    if (serverResult.data.auth.defaultModel?.trim()) aliases.add(serverResult.data.auth.defaultModel.trim());
+    for (const model of serverResult.data.models) {
+      const rawModel = model.model.trim();
+      const provider = model.provider.trim();
+      if (!rawModel) continue;
+      aliases.add(rawModel);
+      if (provider && !rawModel.includes("/")) {
+        aliases.add(`${provider}/${rawModel}`);
+        if (provider.startsWith("managed:")) aliases.add(`${provider.slice("managed:".length)}/${rawModel}`);
+      }
+    }
+  }
+  return aliases;
+}
+
+type StartupRoomAgentRecoveryResult = {
+  target: RoomAgentRecoveryTarget;
+  success: boolean;
+  sessionId?: string;
+  canonicalEvents?: TimelineEvent[];
+  runtimeIsActive?: boolean;
+  engineStatus?: string;
+  swarmMode?: boolean;
+  error?: string;
+};
+
+async function loadStartupRoomAgentHistory(
+  room: Session,
+  target: RoomAgentRecoveryTarget,
+): Promise<StartupRoomAgentRecoveryResult> {
+  if (target.sessionIds.length === 0) {
+    return {
+      target,
+      success: false,
+      error: "当前 Agent 尚未绑定可恢复的 Kimi Code session",
+    };
+  }
+  let lastError = "未找到可读取的 Kimi Code 历史";
+  for (const sessionId of target.sessionIds) {
+    let loaded = await window.api.loadKimiCodeSession({
+      workDir: room.projectPath,
+      sessionId,
+    }).catch((error) => ({
+      success: false as const,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    if (!loaded.success) {
+      lastError = loaded.error;
+      continue;
+    }
+    if (
+      Array.isArray(loaded.data.events) &&
+      loaded.data.events.length === 0 &&
+      target.skillForkParentSessionId &&
+      sessionId.startsWith("skill-")
+    ) {
+      const fallbackLoaded = await window.api.loadKimiCodeSession({
+        workDir: room.projectPath,
+        sessionId: target.skillForkParentSessionId,
+      }).catch(() => null);
+      if (fallbackLoaded?.success && Array.isArray(fallbackLoaded.data.events) && fallbackLoaded.data.events.length > 0) {
+        loaded = fallbackLoaded;
+      }
+    }
+    const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId }).catch(() => null);
+    const runtimeIsActive = Boolean(
+      runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
+    );
+    const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+    return {
+      target,
+      success: true,
+      sessionId,
+      canonicalEvents: runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents),
+      runtimeIsActive,
+      engineStatus: runtimeStatus?.success ? runtimeStatus.data.engineStatus : undefined,
+      swarmMode: runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined,
+    };
+  }
+  return { target, success: false, error: lastError };
+}
+
+async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> {
+  const snapshot = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+  if (!snapshot?.collaboration || snapshot.longTask) return;
+  const [availableModelAliases, results] = await Promise.all([
+    readAvailableRoomModelAliases(),
+    Promise.all(getRoomAgentRecoveryTargets(snapshot).map((target) => loadStartupRoomAgentHistory(snapshot, target))),
+  ]);
+  let primaryActive = false;
+  const activeResults: StartupRoomAgentRecoveryResult[] = [];
+  useSessionStore.setState((state) => ({
+    sessions: state.sessions.map((session) => {
+      if (!session.collaboration) return session;
+      if (session.id !== roomId) return reconcileRoomAgentModelAvailability(session, availableModelAliases);
+      let next = session;
+      for (const result of results) {
+        if (!result.success || !result.sessionId || !result.canonicalEvents) {
+          next = setRoomAgentRecoveryIssue(next, result.target.roomAgentId, {
+            status: "error",
+            message: `恢复 Agent 历史失败：${result.error ?? "未知错误"}`,
+            updatedAt: Date.now(),
+          });
+          continue;
+        }
+        const localEvents = getRoomAgentEvents(next, result.target.roomAgentId);
+        const reconciliation = reconcileAgentCanonicalHistory({
+          session: next,
+          roomAgentId: result.target.roomAgentId,
+          expectedRuntimeSessionId: result.sessionId,
+          canonicalEvents: result.canonicalEvents,
+          reason: "startup",
+        });
+        if (!reconciliation.applied) {
+          next = setRoomAgentRecoveryIssue(next, result.target.roomAgentId, {
+            status: "error",
+            message: "恢复结果到达时该 Agent 的 runtime 身份已变化，已保留现有 canonical history。",
+            updatedAt: Date.now(),
+          });
+          continue;
+        }
+        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events);
+        const hydratedEvents = localEvents.length > 0 && !shouldUseCanonicalHistory
+          ? (result.runtimeIsActive ? localEvents : settleInactiveEvents(localEvents))
+          : reconciliation.events;
+        next = updateRoomAgentEvents(reconciliation.session, result.target.roomAgentId, () => hydratedEvents);
+        next = updateRoomAgent(next, result.target.roomAgentId, (agent) => ({
+          ...agent,
+          runtimeSessionId: result.sessionId,
+          officialSessionId: agent.officialSessionId ?? result.sessionId,
+          modelAlias: agent.modelAlias ?? getLastUsedModelFromEvents(hydratedEvents) ?? null,
+          swarmMode: result.swarmMode ?? agent.swarmMode,
+          kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+          missingSince: undefined,
+          recoveryIssue: undefined,
+        }));
+        if (isPrimaryRoomAgent(next, result.target.roomAgentId) && !next.titleLocked) {
+          next = { ...next, title: deriveSessionTitle(hydratedEvents, next.title) };
+        }
+        if (result.runtimeIsActive) {
+          activeResults.push(result);
+          if (isPrimaryRoomAgent(next, result.target.roomAgentId)) primaryActive = true;
+        }
+      }
+      next = reconcileRoomAgentModelAvailability(next, availableModelAliases);
+      return { ...next, isLoading: false };
+    }),
+  }));
+  const recovered = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+  if (!recovered) return;
+  for (const result of activeResults) {
+    useAppStore.getState().setRoomAgentActivity({
+      roomId,
+      roomAgentId: result.target.roomAgentId,
+      runtimeSessionId: result.sessionId,
+      status: result.engineStatus === "waiting_approval" || result.engineStatus === "waiting_question"
+        ? result.engineStatus
+        : "running",
+      updatedAt: Date.now(),
+    });
+  }
+  if (useAppStore.getState().currentSession?.id === roomId) {
+    useAppStore.setState({ currentSession: recovered });
+  }
+  useAppStore.getState().setRunningSessionId(primaryActive ? roomId : null);
+  void persistLocalConversationState();
 }
 
 function appendSessionRecommendationIfNeeded(events: TimelineEvent[], enabled: boolean, turnLimit: number): TimelineEvent[] {
@@ -1860,32 +2085,37 @@ function App() {
           isKimiCodeSessionMissingError(message);
         if (shouldRecoverRuntime) {
           const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-          let recoveryRes = await window.api.resumeKimiCodeSession({
-            sessionId: alreadyExistingRuntimeId ?? runtimeSessionId,
-            additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
-          });
-          if (
-            recoveryRes.success &&
-            latestSession?.projectPath &&
-            !isSameLocalProjectPath(recoveryRes.data.workDir, latestSession.projectPath)
-          ) {
-            recoveryRes = { success: false, error: "Recovered session belongs to another project" };
-          }
-          if (!recoveryRes.success && latestSession?.projectPath) {
+          const primaryAgentId = latestSession ? getPrimaryRoomAgent(latestSession).id : undefined;
+          let recoveryRes = latestSession && primaryAgentId && roomAgentCanResume(latestSession, primaryAgentId)
+            ? await resumeRoomAgentRuntime({
+              session: latestSession,
+              roomAgentId: primaryAgentId,
+              preferredSessionIds: [alreadyExistingRuntimeId ?? runtimeSessionId],
+              additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+              resume: (request) => window.api.resumeKimiCodeSession(request),
+            })
+            : {
+              success: false as const,
+              error: latestSession && primaryAgentId
+                ? getRoomAgent(latestSession, primaryAgentId)?.recoveryIssue?.message ?? "当前 Agent 暂时不可恢复"
+                : "当前会话不存在",
+            };
+          if (!recoveryRes.success && latestSession?.projectPath && (!latestSession.collaboration || roomAgentCanResume(latestSession, primaryAgentId!))) {
             recoveryRes = await window.api.createKimiCodeSession({
               workDir: latestSession.projectPath,
+              model: getPrimaryRoomAgent(latestSession).modelAlias ?? undefined,
               permission: useAppStore.getState().permissionMode,
               planMode: useAppStore.getState().defaultPlanMode,
               additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
             });
           }
-          if (recoveryRes.success) {
+          if (recoveryRes.success && primaryAgentId) {
             updateSession(uiSessionId, (session) => ({
-              ...session,
+              ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+                sessionId: recoveryRes.data.sessionId,
+                model: recoveryRes.data.model,
+              }),
               engine: "kimi-code" as const,
-              runtimeSessionId: recoveryRes.data.sessionId,
-              officialSessionId: recoveryRes.data.sessionId,
-              updatedAt: Date.now(),
             }));
             syncCurrentSessionFromStore(uiSessionId);
             const retryRes = await sendKimiCodePromptWithRetry({
@@ -2166,6 +2396,23 @@ function App() {
               useSessionStore.setState((state) => ({
                 sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSummaries, activeProject.path, { source: res.source }),
               }));
+              const startupRoom = activeLocalSession
+                ? useSessionStore.getState().sessions.find((session) => session.id === activeLocalSession.id)
+                : undefined;
+              if (startupRoom?.collaboration) {
+                await recoverCollaborationRoomAtStartup(startupRoom.id);
+                return;
+              }
+              if (useSessionStore.getState().sessions.some((session) => Boolean(session.collaboration))) {
+                void readAvailableRoomModelAliases().then((availableModelAliases) => {
+                  useSessionStore.setState((state) => ({
+                    sessions: state.sessions.map((session) => (
+                      reconcileRoomAgentModelAvailability(session, availableModelAliases)
+                    )),
+                  }));
+                  void persistLocalConversationState();
+                });
+              }
               const latest = selectStartupOfficialSession(activeSummaries, activeRuntimeIds);
               const historySessionId = latest?.id ?? activeLocalSession?.officialSessionId ?? activeLocalSession?.runtimeSessionId;
               if (!historySessionId) return;
@@ -2681,9 +2928,20 @@ function App() {
           const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
           return session ? getPrimaryRoomAgent(session).id : undefined;
         })();
+      const statusRuntimeSessionId = payload.migratedTo ?? payload.sessionId;
 
       // Server 会话 mid-turn 失败后已迁移到新的 SDK 会话：更新本地 runtime id。
       if (payload.migratedTo) {
+        const turnStart = runtimeTurnStartRef.current.get(payload.sessionId);
+        if (turnStart) {
+          runtimeTurnStartRef.current.set(payload.migratedTo, turnStart);
+          runtimeTurnStartRef.current.delete(payload.sessionId);
+        }
+        const lastStreamEventAt = runtimeLastStreamEventAtRef.current.get(payload.sessionId);
+        if (lastStreamEventAt) {
+          runtimeLastStreamEventAtRef.current.set(payload.migratedTo, lastStreamEventAt);
+          runtimeLastStreamEventAtRef.current.delete(payload.sessionId);
+        }
         updateSession(uiSessionId, (session) => {
           if (session.collaboration && roomAgentId) {
             return {
@@ -2736,13 +2994,13 @@ function App() {
       if (targetSession?.longTask) return;
 
       if (["running", "waiting_approval", "waiting_question"].includes(payload.status)) {
-        runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
+        runtimeLastStreamEventAtRef.current.set(statusRuntimeSessionId, Date.now());
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         const runningEvents = runningSession && roomAgentId
           ? getRoomAgentEvents(runningSession, roomAgentId)
           : runningSession?.events ?? [];
-        if (payload.status === "running" && !runtimeTurnStartRef.current.has(payload.sessionId)) {
-          runtimeTurnStartRef.current.set(payload.sessionId, {
+        if (payload.status === "running" && !runtimeTurnStartRef.current.has(statusRuntimeSessionId)) {
+          runtimeTurnStartRef.current.set(statusRuntimeSessionId, {
             eventStartIndex: runningEvents.length,
             openAssistantIds: new Set(runningEvents.flatMap((event) => (
               event.type === "assistant_message" && !event.isComplete ? [event.id] : []
@@ -2754,7 +3012,7 @@ function App() {
           setRoomAgentActivity({
             roomId: uiSessionId,
             roomAgentId,
-            runtimeSessionId: payload.sessionId,
+            runtimeSessionId: statusRuntimeSessionId,
             status: payload.status,
             roomMessageId: previous?.roomMessageId,
             activeTurnId: previous?.activeTurnId,
@@ -2770,22 +3028,29 @@ function App() {
 
       if (!["completed", "error", "interrupted"].includes(payload.status)) return;
 
-      cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
+      if (payload.migratedTo) {
+        cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
+          notifiedQuestionRequest: notifiedQuestionRequestRef.current,
+          hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
+          longTaskReviewDispatch: longTaskReviewDispatchRef.current,
+        });
+      }
+      cleanupRuntimeRefs(statusRuntimeSessionId, payload.status as "completed" | "error" | "interrupted", {
         notifiedQuestionRequest: notifiedQuestionRequestRef.current,
         hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
         longTaskReviewDispatch: longTaskReviewDispatchRef.current,
       });
-      runtimeLastStreamEventAtRef.current.delete(payload.sessionId);
-      runtimeHistoryRefreshAtRef.current.delete(payload.sessionId);
+      runtimeLastStreamEventAtRef.current.delete(statusRuntimeSessionId);
+      runtimeHistoryRefreshAtRef.current.delete(statusRuntimeSessionId);
 
       flushStreamEvents();
-      void refreshOfficialGoalState(uiSessionId, payload.sessionId, roomAgentId);
-      goalLastRefreshRef.current.set(`${uiSessionId}:${roomAgentId ?? "primary"}:${payload.sessionId}`, Date.now());
+      void refreshOfficialGoalState(uiSessionId, statusRuntimeSessionId, roomAgentId);
+      goalLastRefreshRef.current.set(`${uiSessionId}:${roomAgentId ?? "primary"}:${statusRuntimeSessionId}`, Date.now());
       if (roomAgentId) {
         setRoomAgentActivity({
           roomId: uiSessionId,
           roomAgentId,
-          runtimeSessionId: payload.sessionId,
+          runtimeSessionId: statusRuntimeSessionId,
           status: payload.status,
           updatedAt: Date.now(),
         });
@@ -2794,13 +3059,13 @@ function App() {
       const latestRoom = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (
         (!roomAgentId || !latestRoom || isPrimaryRoomAgent(latestRoom, roomAgentId)) &&
-        (activeRunningSessionId === uiSessionId || activeRunningSessionId === payload.sessionId)
+        (activeRunningSessionId === uiSessionId || activeRunningSessionId === statusRuntimeSessionId)
       ) {
         setRunningSessionId(null);
       }
 
       if (payload.status === "error" || payload.status === "interrupted") {
-        runtimeTurnStartRef.current.delete(payload.sessionId);
+        runtimeTurnStartRef.current.delete(statusRuntimeSessionId);
         const failureMessage = payload.status === "interrupted" ? "当前轮已中断。" : "当前轮执行失败。";
         updateSession(uiSessionId, (session) => {
           const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
@@ -2816,7 +3081,7 @@ function App() {
         return;
       }
 
-      const turnStart = runtimeTurnStartRef.current.get(payload.sessionId);
+      const turnStart = runtimeTurnStartRef.current.get(statusRuntimeSessionId);
       updateSession(uiSessionId, (session) => {
         const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
         const next = updateRoomAgentEvents(session, ownerAgentId, (events) => {
@@ -2836,11 +3101,11 @@ function App() {
         ? getRoomAgentEvents(completedSession, roomAgentId)
         : completedSession?.events ?? [];
       const assistantContent = extractAssistantContentForTurn(completedEvents, turnStart);
-      notifyTurnComplete(uiSessionId, payload.sessionId, undefined, assistantContent);
-      runtimeTurnStartRef.current.delete(payload.sessionId);
+      notifyTurnComplete(uiSessionId, statusRuntimeSessionId, undefined, assistantContent);
+      runtimeTurnStartRef.current.delete(statusRuntimeSessionId);
 
       if (!roomAgentId || !completedSession || isPrimaryRoomAgent(completedSession, roomAgentId)) {
-        void dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
+        void dispatchNextPendingKimiMessage(uiSessionId, statusRuntimeSessionId);
       }
     });
 
@@ -3105,8 +3370,28 @@ function App() {
       if (!session || session.longTask) return;
       checkingRuntimeIds.add(runtimeSessionId);
       try {
-        const response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
+        const runtimeCandidates = Array.from(new Set([
+          runtimeSessionId,
+          ...(getRoomAgentRecoveryTargets(session).find((target) => target.roomAgentId === roomAgentId)?.sessionIds ?? []),
+        ]));
+        let resolvedRuntimeSessionId = runtimeSessionId;
+        let response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
+        for (const candidate of runtimeCandidates.slice(1)) {
+          if (response.success) break;
+          const candidateResponse = await window.api.getKimiCodeStatus({ sessionId: candidate });
+          if (!candidateResponse.success) continue;
+          response = candidateResponse;
+          resolvedRuntimeSessionId = candidate;
+        }
         if (disposed || !response.success) return;
+        if (resolvedRuntimeSessionId !== runtimeSessionId) {
+          updateSession(session.id, (item) => bindRecoveredRoomAgentRuntime(item, roomAgentId, {
+            sessionId: resolvedRuntimeSessionId,
+            model: response.success ? response.data.model : undefined,
+          }));
+          syncCurrentSessionFromStore(session.id);
+        }
+        runtimeSessionId = resolvedRuntimeSessionId;
         syncSessionSwarmMode(session.id, response.data, roomAgentId);
         if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
           setRoomAgentActivity({

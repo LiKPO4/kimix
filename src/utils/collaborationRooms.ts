@@ -56,6 +56,14 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     return null;
   }
   if (value.modelAlias !== null && typeof value.modelAlias !== "string") return null;
+  const recoveryIssue = value.recoveryIssue;
+  if (recoveryIssue !== undefined && (
+    !isRecord(recoveryIssue) ||
+    (recoveryIssue.status !== "error" && recoveryIssue.status !== "unavailable") ||
+    typeof recoveryIssue.message !== "string" ||
+    !recoveryIssue.message.trim() ||
+    !isFiniteNumber(recoveryIssue.updatedAt)
+  )) return null;
   return {
     ...(value as unknown as RoomAgent),
     id,
@@ -64,6 +72,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     modelAlias: value.modelAlias as string | null,
     permissionMode: value.permissionMode,
     createdAt: value.createdAt,
+    recoveryIssue: recoveryIssue as RoomAgent["recoveryIssue"],
   };
 }
 
