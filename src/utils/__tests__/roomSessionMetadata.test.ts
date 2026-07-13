@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOfficialRoomMetadata,
+  deriveRoomAgentSessionId,
   officialRoomMetadataMatches,
   parseOfficialRoomMetadata,
   parseRoomMetadataRequest,
@@ -15,6 +16,15 @@ const request = {
 };
 
 describe("roomSessionMetadata", () => {
+  it("derives a deterministic filesystem-safe official session id from the stable Agent id", () => {
+    const unsafeAgentId = "room-agent:550e8400-e29b-41d4-a716-446655440000";
+    const sessionId = deriveRoomAgentSessionId(unsafeAgentId);
+    expect(sessionId).toMatch(/^kimix-room-[a-f0-9]{24}$/);
+    expect(sessionId).toBe(deriveRoomAgentSessionId(unsafeAgentId));
+    expect(sessionId).not.toBe(deriveRoomAgentSessionId(`${unsafeAgentId}-other`));
+    expect(sessionId).not.toContain(":");
+  });
+
   it("accepts only the dedicated renderer contract and maps controlled official fields", () => {
     expect(parseRoomMetadataRequest(request)).toEqual(request);
     const official = buildOfficialRoomMetadata(request);

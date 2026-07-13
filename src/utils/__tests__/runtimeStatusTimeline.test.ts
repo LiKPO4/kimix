@@ -60,4 +60,24 @@ describe("shouldAppendRuntimeStatusToTimeline", () => {
       runningSessionId: null,
     })).toBe(true);
   });
+
+  it("does not let another running room Agent keep an inactive Agent snapshot alive", () => {
+    expect(shouldAppendRuntimeStatusToTimeline({
+      rawType: "agent.status.updated",
+      mappedEvent: status,
+      session: {
+        ...baseSession,
+        events: [{
+          id: "assistant-reviewer",
+          type: "assistant_message",
+          timestamp: 1,
+          content: "REVIEWER_OK",
+          isComplete: true,
+        }],
+      },
+      runtimeSessionId: "reviewer-runtime",
+      runningSessionId: "ui-1",
+      runtimeActive: false,
+    })).toBe(false);
+  });
 });

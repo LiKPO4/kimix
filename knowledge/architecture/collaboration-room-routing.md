@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T23:12:43+08:00"
+timestamp: "2026-07-14T00:18:49+08:00"
 ---
 
 # Collaboration Room Routing
@@ -28,7 +28,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 5. Deterministic source identities keep `agentTurnId`, React keys, search anchors, expansion state, and scroll anchors stable across snapshot replay and restart.
 6. Agent output is visible in the room but does not enter another Agent's official context unless the user explicitly routes or quotes it.
 7. New deliveries bind through persisted official prompt or message identities. Text-and-time matching is only a legacy recovery hint; ambiguous history stays in the owning Agent partition without being attached to an arbitrary turn.
-8. Usage and terminal presentation settle by `roomAgentId + agentTurnId`; another Agent's running state cannot keep a completed response open or close it early.
+8. Usage and terminal presentation settle by `roomAgentId + agentTurnId`; turn-end status filtering keeps the last status inside each Agent turn rather than the whole room, and a generic late snapshot cannot erase concrete token/context values. Another Agent's running or later-completing state cannot keep a completed response open, close it early, or hide its final usage.
 
 # Runtime and Queue Authority
 
@@ -62,7 +62,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Secondary official sessions carry Kimix room metadata so catalog reconciliation groups them under the room.
 * Room metadata is a controlled main-process contract and must survive Server creation, SDK creation, and Server-to-SDK fallback. Renderer callers cannot inject arbitrary session metadata.
 * Agent provisioning persists the local participant before official creation. Fixed room and Agent metadata allows an official session created immediately before a crash to be rebound idempotently instead of duplicated or hidden.
-* Secondary provisioning requests the stable room Agent ID as the official session ID and also searches metadata across empty, active, and archived catalog entries before creation. One active match resumes, while duplicate or archived matches stop automatic creation instead of guessing.
+* Secondary provisioning requests a deterministic filesystem-safe official session ID derived from the stable room Agent ID; the controlled metadata retains the original Agent identity. Recovery also searches metadata across empty, active, and archived catalog entries before creation. One active match resumes, while duplicate or archived matches stop automatic creation instead of guessing.
 * A bound secondary session is hidden as a duplicate sidebar row only after an exact supported metadata schema, project path, room ID, primary identity, and Agent ID match. The same room and Agent must have exactly one active candidate; missing, unknown, or ambiguous bindings keep every candidate discoverable as an independent conversation rather than making history invisible.
 * Global search exposes an explicit orphan filter for official sessions whose Kimix room source is present but no collaboration room owns the runtime identity. Valid metadata shows the original room and Agent IDs; invalid schemas remain recoverable as independent sessions. Opening an orphan never guesses or mutates a room binding.
 * Folding a secondary catalog row never claims the whole room from the primary catalog row. A catalog containing the primary and several uniquely bound secondary sessions still reconciles to one local room mirror, and secondary titles never replace the room title.

@@ -1546,6 +1546,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         ...last,
         ...incoming,
         message: incoming.message ?? last.message,
+        tokenCount: incoming.tokenCount ?? last.tokenCount,
+        inputTokenCount: incoming.inputTokenCount ?? last.inputTokenCount,
+        contextSize: incoming.contextSize ?? last.contextSize,
+        contextLimit: incoming.contextLimit ?? last.contextLimit,
       };
       return [...existing.slice(0, -1), merged];
     }

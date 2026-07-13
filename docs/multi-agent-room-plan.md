@@ -549,6 +549,8 @@ git diff --check
 37. 阶段 9A 已通过 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BN08iKjZ.js`。视觉验收按项目规则等待用户回传 2/4 Agent 与窄窗口截图。
 38. 阶段 9B 在设置“实验功能”中加入本机内部验收开关，通过 `localStorage + window event` 即时开放/关闭 Composer 添加 Agent 入口；默认仍关闭且关闭不删除房间数据。新增四 Agent 验收场景，覆盖同 Provider 不同模型、跨 Provider、长名称、四目标顺序、单 Provider 失败与其他 Agent 继续调度。
 39. 阶段 9B 运行冒烟确认 v2.15.35 设置开关、Composer `+` 入口和添加 Agent 弹层可见，模型列表复用本机 Kimi Code/opencode-go Provider，Kimi Server 超时时自动回退 SDK；未提交创建操作。用户验收步骤固定在 `docs/multi-agent-room-user-acceptance.md`。
+40. 阶段 9C 完成真实双 Agent 路由：Reviewer 单目标、主 Agent mention 覆盖和 Reviewer → deepseek-v4-pro 双目标并行均只触发预期参与者，并保持用户冻结的显示顺序。
+41. 阶段 9C 修复 Windows 次要 Agent session ID 与并行终态 usage：官方 session 使用确定性文件系统安全 ID，原始 roomAgent 身份继续由 metadata 持有；`turn_end` 状态按 Agent turn 分区，连续状态合并保留最终 token/context，真实 `MULTI8_OK` 回归中两个 Agent 的最终 usage 同时稳定可见。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

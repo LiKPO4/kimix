@@ -578,8 +578,12 @@ export function buildRenderItems(
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
+    const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
+    const finalUsageStatus = settledStatusEvents.findLast((status) => (
+      status.inputTokenCount !== undefined || status.tokenCount !== undefined
+    ));
     const trailingStatusEvents = turnSettled
-      ? statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId)).slice(-1)
+      ? (finalUsageStatus ? [finalUsageStatus] : settledStatusEvents.slice(-1))
       : [];
     const activeStatusEvent = turnSettled
       ? undefined
@@ -765,7 +769,7 @@ export function buildRenderItems(
   return items;
 }
 
-function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end" | "never"): TimelineEvent[] {
+export function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end" | "never"): TimelineEvent[] {
   return events.filter((event, index) => {
     if (event.type !== "status_update") return true;
     if (event.source === "slash") return true;
@@ -780,7 +784,12 @@ function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_en
       (candidate.type === "user_message" || candidate.type === "steer_message")
     ));
     const turnEnd = nextTurnIndex === -1 ? events.length : nextTurnIndex;
-    return !events.slice(index + 1, turnEnd).some((candidate) => candidate.type === "status_update");
+    return !events.slice(index + 1, turnEnd).some((candidate) => {
+      if (candidate.type !== "status_update") return false;
+      if (event.agentTurnId) return candidate.agentTurnId === event.agentTurnId;
+      if (event.roomAgentId) return candidate.roomAgentId === event.roomAgentId && !candidate.agentTurnId;
+      return !candidate.agentTurnId && !candidate.roomAgentId;
+    });
   });
 }
 

@@ -1,5 +1,10 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-14
+
+* **Room terminal usage is isolated per Agent turn**: Turn-end filtering retains one final status for each `agentTurnId`, concrete token/context values survive generic late snapshots, and successful SDK terminal status waits briefly for final usage without blocking providers that omit it. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+* **Room Agent official IDs are Windows-safe without losing identity**: Secondary sessions use a deterministic filesystem-safe ID derived from the stable room Agent ID, while controlled metadata remains the source of the original room/Agent ownership. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 ## 2026-07-13
 
 * **Internal room acceptance has a safe local switch**: Settings can enable the default-off multi-Agent UI gate on one device, mounted Composers update immediately, and disabling access preserves all room data. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

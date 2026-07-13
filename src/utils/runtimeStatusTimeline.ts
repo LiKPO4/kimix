@@ -16,15 +16,16 @@ export function shouldAppendRuntimeStatusToTimeline(input: {
   session?: Session;
   runtimeSessionId: string;
   runningSessionId: string | null;
+  runtimeActive?: boolean;
 }): boolean {
   if (input.mappedEvent.type !== "status_update") return true;
   if (input.rawType !== "agent.status.updated") return true;
   if (!input.session) return true;
   const sessionRuntimeId = getRuntimeSessionId(input.session);
-  const isActiveRuntime = Boolean(input.runningSessionId && (
-    input.runningSessionId === input.session.id ||
-    input.runningSessionId === input.runtimeSessionId ||
-    Boolean(sessionRuntimeId && input.runningSessionId === sessionRuntimeId)
-  ));
+  const isActiveRuntime = input.runtimeActive ?? Boolean(input.runningSessionId && (
+      input.runningSessionId === input.session.id ||
+      input.runningSessionId === input.runtimeSessionId ||
+      Boolean(sessionRuntimeId && input.runningSessionId === sessionRuntimeId)
+    ));
   return isActiveRuntime || hasOpenRuntimeWork(input.session);
 }

@@ -2917,6 +2917,9 @@ function App() {
         session: targetAgentSession,
         runtimeSessionId: payload.sessionId,
         runningSessionId: useAppStore.getState().runningSessionId,
+        runtimeActive: targetSession?.collaboration && roomAgentId
+          ? Boolean(roomActivity && ["sending", "running", "waiting_approval", "waiting_question"].includes(roomActivity.status))
+          : undefined,
       })) {
         return;
       }

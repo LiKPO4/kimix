@@ -9,6 +9,7 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import * as settingsService from "./settingsService";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
+import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
 import {
   flattenServerEvent,
   getKimiCodeSessionAlreadyExistsId,
@@ -609,6 +610,7 @@ const pendingApprovals = new Map<string, PendingApproval>();
 const pendingQuestions = new Map<string, PendingQuestion>();
 let eventSink: EventSink | null = null;
 let statusSink: StatusSink | null = null;
+const statusSequencer = new KimiCodeStatusSequencer((sessionId, status) => setStatus(sessionId, status));
 
 const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
 const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
@@ -2854,31 +2856,7 @@ function settlePendingForSession(sessionId: string, reason: "cancelled" | "close
 }
 
 function updateStatusFromEvent(sessionId: string, event: unknown) {
-  const type = event && typeof event === "object" ? (event as { type?: unknown }).type : undefined;
-  if (type === "turn.started") {
-    setStatus(sessionId, "running");
-    return;
-  }
-  if (type === "turn.ended") {
-    const reason = (event as { reason?: unknown }).reason;
-    setStatus(
-      sessionId,
-      reason === "cancelled"
-        ? "interrupted"
-        : reason === "failed" || reason === "error"
-          ? "error"
-          : "completed",
-    );
-    return;
-  }
-  const loopEvent = getLoopEvent(event);
-  if (loopEvent?.type === "step.end" && loopEvent.finishReason === "end_turn") {
-    setStatus(sessionId, "completed");
-    return;
-  }
-  if (type === "error") {
-    setStatus(sessionId, "error");
-  }
+  statusSequencer.handle(sessionId, event);
 }
 
 function setStatus(sessionId: string, status: KimiCodeEngineStatus) {

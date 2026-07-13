@@ -27,7 +27,7 @@ import { normalizePathForComparison } from "../src/utils/pathCase";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
 import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
-import { buildOfficialRoomMetadata, parseRoomMetadataRequest } from "./roomSessionMetadata";
+import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
@@ -5320,7 +5320,7 @@ ipcMain.handle("kimi-code:createSession", async (_, request: unknown) => {
     const roomMetadata = parseRoomMetadataRequest(req.roomMetadata);
     const data = await kimiCodeHost.createSession({
       workDir,
-      id: roomMetadata?.roomAgentId ?? (typeof req.id === "string" ? req.id : undefined),
+      id: roomMetadata ? deriveRoomAgentSessionId(roomMetadata.roomAgentId) : (typeof req.id === "string" ? req.id : undefined),
       model: typeof req.model === "string" ? req.model : undefined,
       thinking: typeof req.thinking === "string" ? req.thinking : undefined,
       permission,

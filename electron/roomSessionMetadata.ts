@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import {
   officialRoomMetadataMatches,
@@ -19,6 +20,11 @@ export interface RoomSessionMetadataCandidate {
   workDir: string;
   archived?: boolean;
   metadata?: Record<string, unknown>;
+}
+
+export function deriveRoomAgentSessionId(roomAgentId: string): string {
+  const digest = createHash("sha256").update(roomAgentId, "utf8").digest("hex").slice(0, 24);
+  return `kimix-room-${digest}`;
 }
 
 function normalizedWorkDir(value: string): string {

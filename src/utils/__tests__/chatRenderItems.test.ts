@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderItems } from "@/components/chat/ChatThread";
+import { buildRenderItems, filterStatusUpdates } from "@/components/chat/ChatThread";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "../chatRenderItems";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
 
@@ -141,6 +141,66 @@ describe("buildRenderItems usage footer", () => {
     expect(assistant?.type).toBe("event");
     if (assistant?.type !== "event") return;
     expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
+  });
+
+  it("keeps final usage when a generic completed status arrives afterwards", () => {
+    const items = buildRenderItems([...events, {
+      id: "completed-late",
+      type: "status_update",
+      timestamp: 5,
+      message: "已完成",
+    }], "kimi-code", undefined, false);
+    const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event") return;
+    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
+  });
+});
+
+describe("filterStatusUpdates room isolation", () => {
+  it("keeps the final status for every Agent turn in turn-end mode", () => {
+    const statuses: TimelineEvent[] = [{
+      id: "reviewer-usage",
+      type: "status_update",
+      timestamp: 1,
+      tokenCount: 22,
+      inputTokenCount: 22036,
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }, {
+      id: "primary-usage",
+      type: "status_update",
+      timestamp: 2,
+      tokenCount: 40,
+      inputTokenCount: 23741,
+      roomAgentId: "primary",
+      agentTurnId: "primary-turn",
+    }];
+
+    expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual([
+      "reviewer-usage",
+      "primary-usage",
+    ]);
+  });
+
+  it("still keeps only the latest status inside one Agent turn", () => {
+    const statuses: TimelineEvent[] = [{
+      id: "reviewer-interim",
+      type: "status_update",
+      timestamp: 1,
+      tokenCount: 12,
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }, {
+      id: "reviewer-final",
+      type: "status_update",
+      timestamp: 2,
+      tokenCount: 22,
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }];
+
+    expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual(["reviewer-final"]);
   });
 });
 
