@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成阶段 0-6 与阶段 7A/7B；阶段 7C1 已建立唯一 mutation owner 和 Agent session view，补齐 permission/Plan 持久状态，并将 Composer 权限、Plan、Goal、Swarm、Skill、Plugin、compact、reload、status、usage、BTW、undo 全部绑定到唯一 Agent runtime/事件分区；零选与多选目标均明确拒绝，旧会话权限 fallback 不会被无关操作覆盖，自定义主题 Skill 兜底不再重复显示命令；版本三处同步到 v2.15.27；全量 74 个测试文件、535 项测试、生产构建、OKF 校验和 diff check 通过。
-- 未完成：阶段 7C2 ContextBar 模型、AppShell Goal/BTW/Plan、SessionToolbar 等外部入口；阶段 7 通知；阶段 8 搜索/导出/孤儿找回；阶段 9 真实跨 Provider、并发、视觉和性能验收。
+- 已完成：完成阶段 0-6 与阶段 7A/7B/7C1；阶段 7C2 已将 ContextBar 模型、AppShell Goal/BTW/Plan，以及 SessionToolbar 官方重命名、派生、可视化和 Kimi Web 全部绑定当前唯一 Agent；共享 busy helper 使用 Agent 活动态阻止运行中切模、派生和侧问；右侧栏显示当前 Agent；版本三处同步到 v2.15.28；全量 74 个测试文件、536 项测试、生产构建、OKF 校验和 diff check 通过，renderer 为 `assets/index-CcZ7ADVd.js`。
+- 未完成：阶段 7 通知包含 Agent 并定位 turn；阶段 8 搜索/导出/孤儿找回；阶段 9 真实跨 Provider、并发、视觉和性能验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
 - 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：提交 v2.15.27；随后进入阶段 7C2，把 ContextBar、AppShell 和 SessionToolbar 的 session mutation 接入同一 owner helper。
+- 下一步：完成阶段 7 的 Agent 通知正文与点击定位，然后进入阶段 8 搜索、导出、恢复和孤儿找回。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
 

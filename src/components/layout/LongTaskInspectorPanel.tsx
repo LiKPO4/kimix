@@ -239,6 +239,7 @@ interface LongTaskInspectorPanelProps {
   btwDisabled: boolean;
   defaultPlanMode: boolean;
   officialGoal: Session["officialGoal"] | null | undefined;
+  sessionAgentLabel?: string;
   gitDetailsOpenSignal?: number;
   gitGraphOpenSignal?: number;
   onGitDetailsOpenChange?: (open: boolean) => void;
@@ -305,6 +306,7 @@ export function LongTaskInspectorPanel({
   btwDisabled,
   defaultPlanMode,
   officialGoal,
+  sessionAgentLabel,
   gitDetailsOpenSignal,
   gitGraphOpenSignal,
   onGitDetailsOpenChange,
@@ -1803,6 +1805,7 @@ export function LongTaskInspectorPanel({
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <Target size={15} className="shrink-0 text-accent-primary" />
                   <div className="text-[13px] font-medium leading-5 text-text-muted">官方 Goal</div>
+                  {sessionAgentLabel && <div className="min-w-0 truncate text-[12px] leading-5 text-text-faint">· {sessionAgentLabel}</div>}
                 </div>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                   <button
@@ -1906,6 +1909,7 @@ export function LongTaskInspectorPanel({
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <MessageCircleQuestion size={15} className="shrink-0 text-accent-primary" />
                   <div className="text-[13px] font-medium leading-5 text-text-muted">BTW</div>
+                  {sessionAgentLabel && <div className="min-w-0 truncate text-[12px] leading-5 text-text-faint">· {sessionAgentLabel}</div>}
                 </div>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                   {btwState.rounds.length > 0 && (
@@ -2133,6 +2137,12 @@ export function LongTaskInspectorPanel({
                 {rightCardDragHandle("session", "会话信息")}
               </div>
               <div className="mt-3 flex flex-col text-[13px] leading-5 text-text-muted" style={{ gap: 10 }}>
+                {sessionAgentLabel && (
+                  <div className="rounded-lg bg-surface-elevated" style={{ padding: "11px 12px" }}>
+                    <div className="font-medium text-accent-primary">当前 Agent</div>
+                    <div className="mt-1 break-all">{sessionAgentLabel}</div>
+                  </div>
+                )}
                 <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "11px 12px" }}>
                   <div className="font-medium text-accent-primary">Session</div>
                   <div className="mt-1 break-all">{liveCurrentSession?.id ?? "未选择会话"}</div>

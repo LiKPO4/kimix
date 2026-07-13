@@ -46,13 +46,13 @@ import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
-import { getPrimaryRoomAgent } from "@/utils/collaborationRooms";
 import {
   bindRecoveredRoomAgentRuntime,
-  getPrimaryRecoveryTarget,
   resumeRoomAgentRuntime,
   roomAgentCanResume,
 } from "@/utils/roomAgentRecovery";
+import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
+import { roomHasActiveAgentWork } from "@/utils/sessionArchive";
 
 function isBackgroundTaskTerminalStatus(status: string) {
   return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
@@ -285,6 +285,7 @@ export function AppShell() {
   const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
@@ -957,6 +958,23 @@ export function AppShell() {
     () => selectSessionById(currentSession?.id)(useSessionStore.getState()) ?? currentSession,
     [sessions, currentSession],
   );
+  let activeMutationOwner: RoomMutationOwner | null = null;
+  let mutationOwnerError = "";
+  if (liveCurrentSession) {
+    try {
+      activeMutationOwner = resolveRoomMutationOwner(
+        liveCurrentSession,
+        liveCurrentSession.collaboration?.defaultRecipientIds,
+        permissionMode,
+      );
+    } catch (error) {
+      mutationOwnerError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const mutationSessionView = activeMutationOwner?.sessionView ?? (liveCurrentSession?.collaboration ? null : liveCurrentSession);
+  const isMutationOwnerRunning = liveCurrentSession
+    ? isRoomMutationOwnerRunning(liveCurrentSession.id, activeMutationOwner, roomAgentActivities, runningSessionId)
+    : false;
   const longTaskMeta = liveCurrentSession?.longTask;
   const hasLongTaskMeta = Boolean(longTaskMeta);
   const liveCurrentSessionProjectPath = liveCurrentSession?.projectPath;
@@ -975,7 +993,11 @@ export function AppShell() {
   const sessionTitle = liveCurrentSession?.title || "新对话";
   const projectPath = currentProject?.path;
   const previewProjectPath = liveCurrentSession?.projectPath ?? currentProject?.path;
-  const isCurrentSessionRunning = Boolean(liveCurrentSession && runningSessionId === liveCurrentSession.id);
+  const isCurrentSessionRunning = Boolean(liveCurrentSession && (
+    liveCurrentSession.collaboration
+      ? roomHasActiveAgentWork(liveCurrentSession, Object.values(roomAgentActivities))
+      : runningSessionId === liveCurrentSession.id
+  ));
   const longTaskStatusTone = "executor";
   const sessionDiffs = useMemo(
     () => collectSessionDiffs(liveCurrentSession?.events ?? []),
@@ -983,7 +1005,9 @@ export function AppShell() {
   );
   const latestTodos = useMemo(() => getVisibleTodos(liveCurrentSession?.events ?? []), [liveCurrentSession?.events]);
   const composerCardSessionId = liveCurrentSession?.id ?? "__global__";
-  const btwSessionId = liveCurrentSession?.id ?? "__global__";
+  const btwSessionId = liveCurrentSession
+    ? `${liveCurrentSession.id}:${activeMutationOwner?.roomAgentId ?? "unselected"}`
+    : "__global__";
 
   useEffect(() => {
     setPreviewFile(null);
@@ -1032,11 +1056,11 @@ export function AppShell() {
   }, [liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, liveCurrentSession?.officialSessionId, previewProjectPath, previewFile?.path]);
 
   const btwTransientState = btwTransientBySessionId[btwSessionId] ?? EMPTY_BTW_TRANSIENT_STATE;
-  const btwState: BtwPanelState = liveCurrentSession
-    ? { ...btwTransientState, rounds: liveCurrentSession.btwRounds ?? [] }
+  const btwState: BtwPanelState = mutationSessionView
+    ? { ...btwTransientState, rounds: mutationSessionView.btwRounds ?? [] }
     : EMPTY_BTW_PANEL_STATE;
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
-  const rawCurrentGoal = liveCurrentSession?.officialGoal?.goal ?? null;
+  const rawCurrentGoal = mutationSessionView?.officialGoal?.goal ?? null;
   const currentGoal = rawCurrentGoal && !isTerminalGoalStatus(rawCurrentGoal.status) ? rawCurrentGoal : null;
   const currentGoalStatus = currentGoal?.status ?? "";
   const hasVisibleGoalModeCard = Boolean(currentGoal && !["complete", "cancelled", "canceled"].includes(currentGoalStatus));
@@ -1077,10 +1101,10 @@ export function AppShell() {
   }, [sessionLongTasks, sessions]);
   const sessionPlanPath = useMemo(
     () => {
-      const events = liveCurrentSession?.events ?? [];
+      const events = mutationSessionView?.events ?? [];
       return findSessionPlanPath(events) ?? (hasSessionPlanSignal(events) ? "__latest_kimi_plan__" : null);
     },
-    [liveCurrentSession?.events],
+    [mutationSessionView?.events],
   );
   const rightPanelTitle = longTaskMeta ? "长程任务" : "会话侧栏";
   const rightPanelSubtitle = longTaskMeta
@@ -1436,8 +1460,15 @@ ${isFinalStep
   };
 
   const refreshSessionPlan = useCallback((options?: { silent?: boolean }) => {
-    if (!longTaskInspectorOpen || hasLongTaskMeta || !liveCurrentSessionProjectPath) {
-      setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null, message: undefined });
+    if (!longTaskInspectorOpen || hasLongTaskMeta || !liveCurrentSessionProjectPath || !mutationSessionView) {
+      setSessionPlanState({
+        loading: false,
+        path: null,
+        content: "",
+        updatedAt: null,
+        error: liveCurrentSession?.collaboration && !mutationSessionView ? mutationOwnerError || "请先选择一个 Agent。" : null,
+        message: undefined,
+      });
       return;
     }
     const pathToRead = sessionPlanPath ?? "__latest_kimi_plan__";
@@ -1446,7 +1477,7 @@ ${isFinalStep
     }
     void window.api.readTextFile({
       projectPath: liveCurrentSessionProjectPath,
-      sessionId: liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : undefined,
+      sessionId: mutationSessionView ? getRuntimeSessionId(mutationSessionView) : undefined,
       path: pathToRead,
     }).then((res) => {
       if (res.success) {
@@ -1473,11 +1504,13 @@ ${isFinalStep
     });
   }, [
     hasLongTaskMeta,
-    liveCurrentSession?.id,
-    liveCurrentSession?.officialSessionId,
-    liveCurrentSession?.runtimeSessionId,
+    mutationSessionView?.id,
+    mutationSessionView?.officialSessionId,
+    mutationSessionView?.runtimeSessionId,
     liveCurrentSessionProjectPath,
+    liveCurrentSession?.collaboration,
     longTaskInspectorOpen,
+    mutationOwnerError,
     sessionPlanPath,
   ]);
 
@@ -1603,136 +1636,143 @@ ${isFinalStep
     await navigator.clipboard.writeText(text);
     showToast(successMessage);
   };
-  const syncOfficialGoalState = (sessionId: string, goal: NonNullable<Session["officialGoal"]>["goal"], error?: string | null) => {
+  const syncOfficialGoalState = (sessionId: string, roomAgentId: string, goal: NonNullable<Session["officialGoal"]>["goal"], error?: string | null) => {
     updateSession(sessionId, (session) => ({
-      ...session,
-      officialGoal: {
-        goal: reconcileOfficialGoalSnapshot(goal, session.officialGoal?.goal),
-        error: error ?? null,
-        updatedAt: Date.now(),
-      },
+      ...updateRoomMutationOwner(session, roomAgentId, (agent) => ({
+        ...agent,
+        officialGoal: {
+          goal: reconcileOfficialGoalSnapshot(goal, agent.officialGoal?.goal),
+          error: error ?? null,
+          updatedAt: Date.now(),
+        },
+      }), permissionMode),
       updatedAt: Date.now(),
     }));
     const latest = useSessionStore.getState().sessions.find((session) => session.id === sessionId);
     if (latest && currentSession?.id === sessionId) setCurrentSession(latest);
   };
-  const ensureOfficialGoalRuntime = async () => {
+  const ensureInspectorMutationRuntime = async () => {
     if (!liveCurrentSession) {
       showToast("请先选择一个会话");
       return null;
     }
-    const primaryAgentId = getPrimaryRoomAgent(liveCurrentSession).id;
-    if (!roomAgentCanResume(liveCurrentSession, primaryAgentId)) {
-      throw new Error(getPrimaryRoomAgent(liveCurrentSession).recoveryIssue?.message ?? "当前 Agent 暂时不可恢复");
+    const targetSession = useSessionStore.getState().sessions.find((session) => session.id === liveCurrentSession.id) ?? liveCurrentSession;
+    const owner = resolveRoomMutationOwner(
+      targetSession,
+      targetSession.collaboration?.defaultRecipientIds,
+      permissionMode,
+    );
+    if (!roomAgentCanResume(targetSession, owner.roomAgentId)) {
+      throw new Error(owner.agent.recoveryIssue?.message ?? `Agent“${owner.displayName}”暂时不可恢复`);
     }
-    const recoveryTarget = getPrimaryRecoveryTarget(liveCurrentSession);
-    if (recoveryTarget.sessionIds.length > 0) {
+    if (owner.agent.runtimeSessionId || owner.agent.officialSessionId) {
       const res = await resumeRoomAgentRuntime({
-        session: liveCurrentSession,
-        roomAgentId: primaryAgentId,
+        session: targetSession,
+        roomAgentId: owner.roomAgentId,
         additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
         resume: (request) => window.api.resumeKimiCodeSession(request),
       });
       if (!res.success) throw new Error(res.error);
-      updateSession(liveCurrentSession.id, (session) => ({
-        ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+      updateSession(targetSession.id, (session) => ({
+        ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
           sessionId: res.data.sessionId,
           model: res.data.model,
         }),
         engine: "kimi-code",
       }));
-      return { uiSessionId: liveCurrentSession.id, runtimeSessionId: res.data.sessionId };
+      return { uiSessionId: targetSession.id, roomAgentId: owner.roomAgentId, displayName: owner.displayName, runtimeSessionId: res.data.sessionId };
     }
+    if (targetSession.collaboration) throw new Error(`Agent“${owner.displayName}”尚未绑定官方运行会话。`);
     const res = await window.api.createKimiCodeSession({
-      workDir: liveCurrentSession.projectPath,
-      model: getPrimaryRoomAgent(liveCurrentSession).modelAlias ?? undefined,
-      permission: permissionMode,
-      planMode: defaultPlanMode,
+      workDir: targetSession.projectPath,
+      model: owner.agent.modelAlias ?? undefined,
+      permission: owner.agent.permissionMode,
+      planMode: owner.agent.planMode ?? defaultPlanMode,
       additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
     });
     if (!res.success) throw new Error(res.error);
-    updateSession(liveCurrentSession.id, (session) => ({
-      ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+    updateSession(targetSession.id, (session) => ({
+      ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
         sessionId: res.data.sessionId,
         model: res.data.model,
       }),
       engine: "kimi-code",
     }));
-    return { uiSessionId: liveCurrentSession.id, runtimeSessionId: res.data.sessionId };
+    return { uiSessionId: targetSession.id, roomAgentId: owner.roomAgentId, displayName: owner.displayName, runtimeSessionId: res.data.sessionId };
   };
   const refreshOfficialGoal = async () => {
     try {
-      const runtime = await ensureOfficialGoalRuntime();
+      const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
       const res = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
       if (!res.success) {
-        syncOfficialGoalState(runtime.uiSessionId, null, res.error);
+        syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, null, res.error);
         showToast(`官方 Goal 读取失败：${res.error}`);
         return;
       }
-      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
-      showToast(res.data.goal ? "已刷新官方 Goal" : "当前没有官方 Goal");
+      syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
+      showToast(res.data.goal ? `${runtime.displayName} · 已刷新官方 Goal` : `${runtime.displayName} · 当前没有官方 Goal`);
     } catch (err) {
       showToast(`官方 Goal 读取失败：${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const createOfficialGoal = async (objective: string, replace?: boolean) => {
     try {
-      const runtime = await ensureOfficialGoalRuntime();
+      const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
       const res = await window.api.createKimiCodeGoal({ sessionId: runtime.runtimeSessionId, objective, replace });
       if (!res.success) {
-        syncOfficialGoalState(runtime.uiSessionId, null, res.error);
+        syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, null, res.error);
         showToast(`官方 Goal 启动失败：${res.error}`);
         return;
       }
-      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
-      showToast(replace ? "已替换官方 Goal" : "已启动官方 Goal");
+      syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
+      showToast(`${runtime.displayName} · ${replace ? "已替换官方 Goal" : "已启动官方 Goal"}`);
     } catch (err) {
       showToast(`官方 Goal 启动失败：${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const pauseOfficialGoal = async () => {
     try {
-      const runtime = await ensureOfficialGoalRuntime();
+      const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
       const res = await window.api.pauseKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Paused from Kimix sidebar" });
       if (!res.success) {
         showToast(`官方 Goal 暂停失败：${res.error}`);
         return;
       }
-      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
-      showToast("已暂停官方 Goal");
+      syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
+      showToast(`${runtime.displayName} · 已暂停官方 Goal`);
     } catch (err) {
       showToast(`官方 Goal 暂停失败：${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const resumeOfficialGoal = async () => {
     try {
-      const runtime = await ensureOfficialGoalRuntime();
+      const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
       const res = await window.api.resumeKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Resumed from Kimix sidebar" });
       if (!res.success) {
         showToast(`官方 Goal 继续失败：${res.error}`);
         return;
       }
-      syncOfficialGoalState(runtime.uiSessionId, res.data.goal);
-      showToast("已继续官方 Goal");
+      syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
+      showToast(`${runtime.displayName} · 已继续官方 Goal`);
     } catch (err) {
       showToast(`官方 Goal 继续失败：${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const cancelOfficialGoal = async () => {
     try {
-      const runtime = await ensureOfficialGoalRuntime();
+      const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
       const res = await window.api.cancelKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Cancelled from Kimix sidebar" });
       if (!res.success) {
         showToast(`官方 Goal 取消失败：${res.error}`);
         return;
       }
-      syncOfficialGoalState(runtime.uiSessionId, null);
-      showToast("已取消官方 Goal");
+      syncOfficialGoalState(runtime.uiSessionId, runtime.roomAgentId, null);
+      showToast(`${runtime.displayName} · 已取消官方 Goal`);
     } catch (err) {
       showToast(`官方 Goal 取消失败：${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1743,10 +1783,12 @@ ${isFinalStep
       [sessionId]: { ...(current[sessionId] ?? EMPTY_BTW_TRANSIENT_STATE), ...patch },
     }));
   };
-  const updateSessionBtwRounds = (sessionId: string, updater: (rounds: NonNullable<Session["btwRounds"]>) => NonNullable<Session["btwRounds"]>) => {
+  const updateSessionBtwRounds = (sessionId: string, roomAgentId: string, updater: (rounds: NonNullable<Session["btwRounds"]>) => NonNullable<Session["btwRounds"]>) => {
     updateSession(sessionId, (session) => ({
-      ...session,
-      btwRounds: updater(session.btwRounds ?? []),
+      ...updateRoomMutationOwner(session, roomAgentId, (agent) => ({
+        ...agent,
+        btwRounds: updater(agent.btwRounds ?? []),
+      }), permissionMode),
       updatedAt: Date.now(),
     }));
     window.setTimeout(() => persistLocalConversationState(), 0);
@@ -1755,34 +1797,45 @@ ${isFinalStep
     updateBtwTransientState(btwSessionId, { input: value, error: null });
   };
   const clearBtw = () => {
-    if (!liveCurrentSession) return;
-    updateSessionBtwRounds(liveCurrentSession.id, () => []);
-    updateBtwTransientState(liveCurrentSession.id, { error: null });
-  };
-  const askBtw = async () => {
-    if (!liveCurrentSession) {
-      showToast("请先选择一个会话");
+    if (!liveCurrentSession || !activeMutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
       return;
     }
-    if (isCurrentSessionRunning) {
-      showToast("当前轮次结束后再侧问");
+    updateSessionBtwRounds(liveCurrentSession.id, activeMutationOwner.roomAgentId, () => []);
+    updateBtwTransientState(btwSessionId, { error: null });
+  };
+  const askBtw = async () => {
+    if (!liveCurrentSession || !activeMutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
+    if (isMutationOwnerRunning) {
+      showToast(`${activeMutationOwner.displayName} 当前轮次结束后再侧问`);
       return;
     }
     const content = btwState.input.trim();
     if (!content) return;
-    const sessionId = getRuntimeSessionId(liveCurrentSession) ?? liveCurrentSession.id;
-    const clientSessionId = liveCurrentSession.id;
+    let runtime;
+    try {
+      runtime = await ensureInspectorMutationRuntime();
+    } catch (error) {
+      showToast(`BTW 侧问失败：${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    if (!runtime) return;
+    const clientSessionId = runtime.uiSessionId;
+    const transientId = `${runtime.uiSessionId}:${runtime.roomAgentId}`;
     const roundId = `btw-round-${Date.now()}`;
-    updateBtwTransientState(clientSessionId, { input: "", loading: true, error: null });
-    updateSessionBtwRounds(clientSessionId, (rounds) => [...rounds, { id: roundId, userContent: content, timestamp: Date.now() }]);
-    const res = await window.api.askKimiCodeBtw({ sessionId, content });
+    updateBtwTransientState(transientId, { input: "", loading: true, error: null });
+    updateSessionBtwRounds(clientSessionId, runtime.roomAgentId, (rounds) => [...rounds, { id: roundId, userContent: content, timestamp: Date.now() }]);
+    const res = await window.api.askKimiCodeBtw({ sessionId: runtime.runtimeSessionId, content });
     if (!res.success) {
-      updateBtwTransientState(clientSessionId, { loading: false, error: res.error });
+      updateBtwTransientState(transientId, { loading: false, error: res.error });
       showToast(`BTW 侧问失败：${res.error}`);
       return;
     }
-    updateBtwTransientState(clientSessionId, { loading: false, error: null });
-    updateSessionBtwRounds(clientSessionId, (rounds) => rounds.map((round) => round.id === roundId
+    updateBtwTransientState(transientId, { loading: false, error: null });
+    updateSessionBtwRounds(clientSessionId, runtime.roomAgentId, (rounds) => rounds.map((round) => round.id === roundId
       ? {
           ...round,
           assistantContent: res.data.content || "没有返回正文。",
@@ -1973,9 +2026,10 @@ ${isFinalStep
             backgroundTasksError={longTaskBackgroundTasksError}
             sessionDiffs={sessionDiffs}
             btwState={btwState}
-            btwDisabled={!liveCurrentSession || isCurrentSessionRunning}
-            defaultPlanMode={defaultPlanMode}
-            officialGoal={liveCurrentSession?.officialGoal}
+            btwDisabled={!liveCurrentSession || !activeMutationOwner || isMutationOwnerRunning}
+            defaultPlanMode={mutationSessionView?.planMode ?? defaultPlanMode}
+            officialGoal={mutationSessionView?.officialGoal}
+            sessionAgentLabel={liveCurrentSession?.collaboration ? activeMutationOwner?.displayName : undefined}
             gitDetailsOpenSignal={gitDetailsOpenSignal}
             gitGraphOpenSignal={gitGraphOpenSignal}
             onGitDetailsOpenChange={(open) => {

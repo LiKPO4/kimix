@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-6 代码已完成，功能仍处于内部开发 gate；下一步进入阶段 7 的 Agent scoped 高级操作，再统一完成真实跨 Provider 与视觉验收。
+状态：已批准实施。阶段 0-6 与阶段 7 高级操作主体已完成，功能仍处于内部开发 gate；下一步完成 Agent 通知定位，再进入搜索、导出、恢复和真实跨 Provider/视觉验收。
 
 ## 1. 产品目标
 
@@ -393,7 +393,7 @@ interface AgentDelivery {
 
 - [x] ApprovalCard、QuestionCard 绑定事件 owner，并只结算所属 Agent 分区。
 - [x] Stop、Steer 绑定明确运行中的 Agent owner；多运行 Agent 必须选择目标，Stop 支持停止全部。
-- [ ] 模型、权限、Plan、Goal、Swarm 绑定明确 Agent（Composer 权限/Plan/Goal/Swarm 已完成；ContextBar/AppShell 待迁移）。
+- [x] 模型、权限、Plan、Goal、Swarm 绑定明确 Agent；ContextBar、Composer、AppShell 与 SessionToolbar 共用唯一 mutation owner。
 - [x] Composer 内 Skill、Plugin、compact、reload、status、usage、BTW 等 session mutation 命令要求唯一目标。
 - [x] 单接收者 undo 使用 Agent scoped canonical snapshot。
 - [ ] 通知包含 Agent 并定位对应 turn。
@@ -532,6 +532,8 @@ git diff --check
 20. 阶段 7B 已通过 73 个测试文件、529 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CR4MdBRT.js`。
 21. 阶段 7C1 已建立统一 mutation owner/session view：Agent 级保存 permission/Plan，Composer 权限、Plan、Goal、Swarm、Skill、Plugin 和直接 Slash 均要求唯一接收者；本地命令事件、Goal/BTW/Swarm 状态和 undo canonical snapshot 只更新目标 Agent。
 22. 阶段 7C1 已通过 74 个测试文件、535 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-B5Q8DEyj.js`。零接收者和多接收者均在 IPC 前拒绝；旧会话权限 fallback 保持当前应用值；官方 Skill 失败转房间兼容兜底时只保留一条可见命令。
+23. 阶段 7C2 已将 ContextBar 模型、AppShell Goal/BTW/Plan、SessionToolbar 官方重命名/派生/Kimi Web/可视化绑定唯一 Agent；运行门禁同时读取 Agent 活动态，右侧栏明确显示当前 Agent。
+24. 阶段 7C2 已通过 74 个测试文件、536 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CcZ7ADVd.js`。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

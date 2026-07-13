@@ -32,10 +32,10 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import type { Session } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { settleInactiveEvents } from "@/utils/eventHelpers";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { persistLocalActiveContext, persistLocalConversationState } from "@/utils/persistence";
+import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
 
 export type SessionMenuEntry =
   | { type: "separator" }
@@ -116,8 +116,28 @@ export function SessionToolbar({
   const archiveSession = useArchiveSession();
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const currentSession = useAppStore((s) => s.currentSession);
+  const permissionMode = useAppStore((s) => s.permissionMode);
+  const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const liveCurrentSessionFromHook = useLiveSession(currentSession?.id);
   const liveCurrentSession = liveCurrentSessionFromHook ?? currentSession;
+  let mutationOwner: RoomMutationOwner | null = null;
+  let mutationOwnerError = "";
+  if (liveCurrentSession) {
+    try {
+      mutationOwner = resolveRoomMutationOwner(
+        liveCurrentSession,
+        liveCurrentSession.collaboration?.defaultRecipientIds,
+        permissionMode,
+      );
+    } catch (error) {
+      mutationOwnerError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const mutationSessionView = mutationOwner?.sessionView;
+  const isMutationOwnerRunning = liveCurrentSession
+    ? isRoomMutationOwnerRunning(liveCurrentSession.id, mutationOwner, roomAgentActivities, runningSessionId)
+    : false;
 
   useEffect(() => {
     if (!sessionMenuOpen && !launchMenuOpen && !projectMenuOpen) return;
@@ -136,6 +156,10 @@ export function SessionToolbar({
       showToast("当前没有对话");
       return;
     }
+    if (liveCurrentSession.collaboration && !mutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
     setRenameDraft(liveCurrentSession.title);
     setRenameError(null);
     setRenameDialogOpen(true);
@@ -152,7 +176,12 @@ export function SessionToolbar({
     setRenameBusy(true);
     setRenameError(null);
     if (liveCurrentSession.engine === "kimi-code") {
-      const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+      if (!mutationOwner) {
+        setRenameBusy(false);
+        setRenameError(mutationOwnerError || "请先选择一个 Agent。");
+        return;
+      }
+      const runtimeSessionId = mutationOwner.runtimeSessionId;
       if (!runtimeSessionId) {
         setRenameBusy(false);
         setRenameError("没有可重命名的官方会话");
@@ -170,7 +199,7 @@ export function SessionToolbar({
     setCurrentSession({ ...liveCurrentSession, title: nextTitle, titleLocked: true, updatedAt });
     setRenameBusy(false);
     setRenameDialogOpen(false);
-    showToast("已重命名");
+    showToast(liveCurrentSession.collaboration && mutationOwner ? `${mutationOwner.displayName} · 已同步官方标题和房间标题` : "已重命名");
   };
 
   const archiveCurrentSession = async () => {
@@ -192,15 +221,19 @@ export function SessionToolbar({
       showToast("当前不是 Kimi Code 会话");
       return;
     }
-    if (isCurrentSessionRunning) {
-      showToast("会话运行中，稍后再派生");
+    if (!mutationOwner || !mutationSessionView) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
+    if (isMutationOwnerRunning) {
+      showToast(`${mutationOwner.displayName} 正在运行，稍后再派生`);
       return;
     }
     if (liveCurrentSession.longTask) {
       showToast("长程任务会话暂不支持直接派生");
       return;
     }
-    const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+    const runtimeSessionId = mutationOwner.runtimeSessionId;
     if (!runtimeSessionId) {
       showToast("没有可派生的官方会话");
       return;
@@ -234,14 +267,16 @@ export function SessionToolbar({
     const loaded = await window.api.loadKimiCodeSession({ workDir: forkWorkDir, sessionId: forkSessionId });
     const events = loaded.success
       ? settleInactiveEvents(mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []))
-      : settleInactiveEvents(liveCurrentSession.events);
+      : settleInactiveEvents(mutationSessionView.events);
     const updatedAt = Date.now();
     const nextSession: Session = {
       id: forkUiSessionId,
       engine: "kimi-code",
       runtimeSessionId: forkSessionId,
       officialSessionId: forkSessionId,
-      model: liveCurrentSession.model,
+      model: mutationSessionView.model,
+      permissionMode: mutationSessionView.permissionMode,
+      planMode: mutationSessionView.planMode,
       title: forkTitle,
       titleLocked: true,
       projectPath: forkProjectPath,
@@ -252,14 +287,15 @@ export function SessionToolbar({
     };
     addSession(nextSession);
     setCurrentSession(nextSession);
-    showToast(loaded.success ? `已派生并切换到：${forkTitle}，原对话仍保留在左侧列表` : `已派生，但刷新历史失败：${loaded.error}`);
+    showToast(loaded.success ? `已从 ${mutationOwner.displayName} 派生并切换到：${forkTitle}` : `已从 ${mutationOwner.displayName} 派生，但刷新历史失败：${loaded.error}`);
   };
 
   const canForkKimiSession = Boolean(
     liveCurrentSession?.engine === "kimi-code" &&
     !liveCurrentSession.longTask &&
-    !isCurrentSessionRunning &&
-    getRuntimeSessionId(liveCurrentSession)
+    Boolean(mutationOwner) &&
+    !isMutationOwnerRunning &&
+    Boolean(mutationOwner?.runtimeSessionId)
   );
 
   const sessionMenuItems: SessionMenuEntry[] = [
@@ -274,7 +310,7 @@ export function SessionToolbar({
     { type: "separator" },
     { label: "打开侧边聊天", icon: MessageSquarePlus, disabled: true, action: () => undefined },
     { label: "派生到本地", icon: Laptop, disabled: !canForkKimiSession, action: forkCurrentSession },
-    { label: "会话可视化", icon: History, disabled: !liveCurrentSession || liveCurrentSession.engine !== "kimi-code" || !getRuntimeSessionId(liveCurrentSession), action: openKimiVis },
+    { label: "会话可视化", icon: History, disabled: !liveCurrentSession || liveCurrentSession.engine !== "kimi-code" || !mutationOwner?.runtimeSessionId, action: openKimiVis },
     { label: "添加自动化...", icon: History, disabled: true, action: () => undefined },
     { type: "separator" },
     { label: "在新窗口中打开", icon: ExternalLink, disabled: true, action: () => undefined },
@@ -311,15 +347,21 @@ export function SessionToolbar({
   };
 
   const openCurrentSessionInKimiWeb = async () => {
-    const runtimeSessionId = liveCurrentSession?.engine === "kimi-code"
-      ? getRuntimeSessionId(liveCurrentSession)
-      : undefined;
+    if (liveCurrentSession?.collaboration && !mutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
+    const runtimeSessionId = liveCurrentSession?.engine === "kimi-code" ? mutationOwner?.runtimeSessionId : undefined;
+    if (liveCurrentSession?.collaboration && !runtimeSessionId) {
+      showToast(`${mutationOwner?.displayName ?? "当前 Agent"} 尚未绑定可打开的官方会话`);
+      return;
+    }
     const res = await window.api.openKimiCodeWebServer(runtimeSessionId ? { sessionId: runtimeSessionId } : undefined);
     if (!res.success) {
       showToast(`打开 Kimi Web 失败：${res.error}`);
       return;
     }
-    showToast(runtimeSessionId ? "已在 Kimi Web 打开当前会话" : "已打开 Kimi Web");
+    showToast(runtimeSessionId && mutationOwner ? `已在 Kimi Web 打开 ${mutationOwner.displayName}` : "已打开 Kimi Web");
   };
 
   const launchExecutable = async () => {
@@ -347,7 +389,11 @@ export function SessionToolbar({
       showToast("当前不是 Kimi Code 会话");
       return;
     }
-    const runtimeSessionId = getRuntimeSessionId(liveCurrentSession);
+    if (!mutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
+    const runtimeSessionId = mutationOwner.runtimeSessionId;
     if (!runtimeSessionId) {
       showToast("当前会话没有可视化的官方 session");
       return;
@@ -356,7 +402,7 @@ export function SessionToolbar({
     if (!res.success) {
       showToast(`打开可视化失败：${res.error}`);
     } else {
-      showToast("已打开 Kimi vis");
+      showToast(`已打开 ${mutationOwner.displayName} 的 Kimi vis`);
     }
   }
 

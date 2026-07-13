@@ -1,14 +1,25 @@
-import type { PermissionMode, RoomAgent, Session, TimelineEvent } from "@/types/ui";
+import type { PermissionMode, RoomAgent, RoomAgentActivity, Session, TimelineEvent } from "@/types/ui";
 import {
   getPrimaryRoomAgent,
   getRoomAgent,
   getRoomAgentRuntimeId,
   getRoomAgentSessionView,
   isPrimaryRoomAgent,
+  roomAgentActivityKey,
   scopeEventToRoomAgent,
   updateRoomAgent,
   updateRoomAgentEvents,
 } from "@/utils/collaborationRooms";
+import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+
+const ROOM_MUTATION_BUSY_STATUSES = new Set<RoomAgentActivity["status"]>([
+  "creating",
+  "queued",
+  "sending",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+]);
 
 export interface RoomMutationOwner {
   roomAgentId: string;
@@ -90,4 +101,16 @@ export function appendRoomMutationEvent(
     ...events,
     scopeEventToRoomAgent(event, roomAgentId),
   ]);
+}
+
+export function isRoomMutationOwnerRunning(
+  roomId: string,
+  owner: RoomMutationOwner | null | undefined,
+  activities: Readonly<Record<string, RoomAgentActivity>>,
+  runningSessionId: string | null,
+): boolean {
+  if (!owner) return false;
+  const activity = activities[roomAgentActivityKey(roomId, owner.roomAgentId)];
+  return Boolean(activity && ROOM_MUTATION_BUSY_STATUSES.has(activity.status)) ||
+    isSessionRuntimeRunning(owner.sessionView, runningSessionId);
 }

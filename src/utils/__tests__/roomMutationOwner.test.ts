@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { createCollaborationStateFromSession } from "../collaborationRooms";
+import { createCollaborationStateFromSession, roomAgentActivityKey } from "../collaborationRooms";
 import {
   appendRoomMutationEvent,
+  isRoomMutationOwnerRunning,
   resolveRoomMutationOwner,
   updateRoomMutationOwner,
 } from "../roomMutationOwner";
@@ -126,5 +127,20 @@ describe("roomMutationOwner", () => {
     expect(appended.collaboration?.agentEvents[owner.roomAgentId]).toEqual([
       expect.objectContaining({ id: "secondary-status", roomAgentId: owner.roomAgentId }),
     ]);
+  });
+
+  it("uses the selected Agent activity as the mutation running authority", () => {
+    const room = roomFixture();
+    const owner = resolveRoomMutationOwner(room);
+    expect(isRoomMutationOwnerRunning(room.id, owner, {
+      [roomAgentActivityKey(room.id, owner.roomAgentId)]: {
+        roomId: room.id,
+        roomAgentId: owner.roomAgentId,
+        runtimeSessionId: owner.runtimeSessionId,
+        status: "running",
+        updatedAt: 20,
+      },
+    }, null)).toBe(true);
+    expect(isRoomMutationOwnerRunning(room.id, owner, {}, null)).toBe(false);
   });
 });

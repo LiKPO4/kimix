@@ -10,11 +10,12 @@ import { compactModelDisplayName, getSessionModelForDisplay } from "@/utils/mode
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
+import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
+import { roomHasActiveAgentWork } from "@/utils/sessionArchive";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -224,6 +225,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
+  const permissionMode = useAppStore((s) => s.permissionMode);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
@@ -255,18 +258,34 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const contextBarRef = useRef<HTMLDivElement>(null);
   const [iconOnly, setIconOnly] = useState(false);
   const activeSession = session ?? currentSession;
+  let mutationOwner: RoomMutationOwner | null = null;
+  let mutationOwnerError = "";
+  if (activeSession) {
+    try {
+      mutationOwner = resolveRoomMutationOwner(
+        activeSession,
+        activeSession.collaboration?.defaultRecipientIds,
+        permissionMode,
+      );
+    } catch (error) {
+      mutationOwnerError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const displaySession = mutationOwner?.sessionView ?? (activeSession?.collaboration ? null : activeSession);
   const projectDisplayName = displayProjectName(project);
   const sessionModel = getSessionModelForDisplay({
-    events: activeSession?.events ?? [],
-    sessionModel: activeSession?.switchedToModel || (activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null),
-    modelSwitchedAt: activeSession?.modelSwitchedAt,
+    events: displaySession?.events ?? [],
+    sessionModel: displaySession?.switchedToModel || (displaySession?.model && displaySession.model !== "Kimi Code SDK" ? displaySession.model : null),
+    modelSwitchedAt: displaySession?.modelSwitchedAt,
   });
-  const displayModel = sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL;
+  const displayModel = displaySession ? sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL : "选择一个 Agent";
   const compactDisplayModel = compactModelDisplayName(displayModel);
   const modelDisplayFontSize = compactDisplayModel.length > 28 ? 11 : compactDisplayModel.length > 20 ? 12 : 13;
-  const modelTitle = sessionModel
-    ? `当前对话模型：${displayModel}`
-    : `当前默认模型：${displayModel}`;
+  const modelTitle = mutationOwnerError
+    ? mutationOwnerError
+    : sessionModel
+      ? `${mutationOwner?.displayName ?? "当前对话"}模型：${displayModel}`
+      : `当前默认模型：${displayModel}`;
   const modelOptions = useMemo(
     () => buildSessionModelOptions(modelConfig, serverModelCatalog),
     [modelConfig, serverModelCatalog],
@@ -281,22 +300,25 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     ));
   }, [modelOptions, modelSearch]);
   const modelGroups = useMemo(() => groupSessionModelOptions(filteredModelOptions), [filteredModelOptions]);
-  const pendingApprovalCount = activeSession?.events.filter((event) => event.type === "approval_request" && event.status === "pending").length ?? 0;
-  const pendingQuestionCount = activeSession?.events.filter((event) => event.type === "question_request" && event.status === "pending").length ?? 0;
-  const firstPendingApproval = activeSession?.events.find((event) => event.type === "approval_request" && event.status === "pending");
-  const firstPendingQuestion = activeSession?.events.find((event) => event.type === "question_request" && event.status === "pending");
-  const latestError = [...(activeSession?.events ?? [])].reverse().find((event) => event.type === "error");
-  const isSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
-  const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : null;
+  const statusEvents = activeSession?.collaboration
+    ? activeSession.collaboration.agents
+        .filter((agent) => !agent.removedAt)
+        .flatMap((agent) => activeSession.collaboration?.agentEvents[agent.id] ?? [])
+    : activeSession?.events ?? [];
+  const pendingApprovalCount = statusEvents.filter((event) => event.type === "approval_request" && event.status === "pending").length;
+  const pendingQuestionCount = statusEvents.filter((event) => event.type === "question_request" && event.status === "pending").length;
+  const firstPendingApproval = statusEvents.find((event) => event.type === "approval_request" && event.status === "pending");
+  const firstPendingQuestion = statusEvents.find((event) => event.type === "question_request" && event.status === "pending");
+  const latestError = [...statusEvents].sort((left, right) => right.timestamp - left.timestamp).find((event) => event.type === "error");
+  const isSessionRunning = Boolean(activeSession?.collaboration
+    ? roomHasActiveAgentWork(activeSession, Object.values(roomAgentActivities))
+    : isSessionRuntimeRunning(activeSession ?? undefined, runningSessionId));
   // Only block model switching when the active session is the one currently
   // tracked as running. A session with stale open timeline work should not
   // prevent the user from switching models in a different session.
-  const isActiveRuntimeSessionRunning = Boolean(
-    runningSessionId && activeSession && (
-      runningSessionId === activeSession.id ||
-      Boolean(activeRuntimeSessionId && runningSessionId === activeRuntimeSessionId)
-    )
-  );
+  const isActiveRuntimeSessionRunning = activeSession
+    ? isRoomMutationOwnerRunning(activeSession.id, mutationOwner, roomAgentActivities, runningSessionId)
+    : false;
 
   useEffect(() => {
     const node = contextBarRef.current;
@@ -320,11 +342,19 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
         ? { label: "运行中", tone: "active" as const, icon: Loader2, detail: `Kimi Code 正在执行当前轮次` }
         : latestError
           ? { label: "有错误", tone: "danger" as const, icon: AlertCircle, detail: latestError.message }
-          : activeSession?.engine === "kimi-code" || activeSession?.runtimeSessionId
+          : activeSession?.collaboration
             ? (() => {
-                const displayId = getDisplaySessionId(activeSession);
-                const isRuntimeId = displayId === activeSession?.runtimeSessionId;
-                return { label: "已连接", tone: "success" as const, icon: CheckCircle2, detail: `${isRuntimeId ? "runtime" : "会话"}: ${displayId ?? activeSession?.id}` };
+                const activeAgents = activeSession.collaboration.agents.filter((agent) => !agent.removedAt && !agent.archivedAt);
+                const connected = activeAgents.filter((agent) => agent.runtimeSessionId || agent.officialSessionId).length;
+                return connected > 0
+                  ? { label: "已连接", tone: "success" as const, icon: CheckCircle2, detail: `${connected}/${activeAgents.length} 个 Agent 已连接` }
+                  : { label: "未连接", tone: "muted" as const, icon: Radio, detail: "房间 Agent 尚未连接 Kimi Code" };
+              })()
+            : displaySession?.engine === "kimi-code" || displaySession?.runtimeSessionId
+            ? (() => {
+                const displayId = getDisplaySessionId(displaySession);
+                const isRuntimeId = displayId === displaySession?.runtimeSessionId;
+                return { label: "已连接", tone: "success" as const, icon: CheckCircle2, detail: `${mutationOwner?.displayName ? `${mutationOwner.displayName} · ` : ""}${isRuntimeId ? "runtime" : "会话"}: ${displayId ?? displaySession?.id}` };
               })()
             : { label: "未连接", tone: "muted" as const, icon: Radio, detail: "当前没有 Kimi Code 运行会话" };
   const KimiStatusIcon = kimiStatus.icon;
@@ -459,6 +489,10 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   };
 
   const toggleModelMenu = () => {
+    if (!mutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
     const next = !modelMenuOpen;
     setUsageOpen(false);
     setWorkDirsOpen(false);
@@ -471,6 +505,10 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
 
   const handleSelectModel = async (model: string) => {
     if (!activeSession || activeSession.isLoading || switchingModel) return;
+    if (!mutationOwner) {
+      showToast(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
     if (isActiveRuntimeSessionRunning) {
       showToast("本轮结束后可切换模型");
       return;
@@ -479,14 +517,23 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       setModelMenuOpen(false);
       return;
     }
-    const runtimeSessionId = getRuntimeSessionId(activeSession);
+    const runtimeSessionId = mutationOwner.runtimeSessionId;
     if (!runtimeSessionId) {
       showToast("当前会话尚未就绪");
       return;
     }
     setSwitchingModel(model);
     const switchedAt = Date.now();
-    updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: switchedAt, switchedToModel: model, updatedAt: switchedAt }));
+    const previousModelSwitchedAt = mutationOwner.agent.modelSwitchedAt;
+    const previousSwitchedToModel = mutationOwner.agent.switchedToModel;
+    updateSession(activeSession.id, (current) => ({
+      ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
+        ...agent,
+        modelSwitchedAt: switchedAt,
+        switchedToModel: model,
+      }), permissionMode),
+      updatedAt: switchedAt,
+    }));
     let result;
     try {
       result = await runKimiCodeSessionMutationWithRecovery({
@@ -499,28 +546,44 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       });
     } catch (error) {
       setSwitchingModel(null);
-      updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: undefined, switchedToModel: undefined, updatedAt: Date.now() }));
+      updateSession(activeSession.id, (current) => ({
+        ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
+          ...agent,
+          modelSwitchedAt: previousModelSwitchedAt,
+          switchedToModel: previousSwitchedToModel,
+        }), permissionMode),
+        updatedAt: Date.now(),
+      }));
       showToast(`切换模型失败：${error instanceof Error ? error.message : String(error)}`);
       return;
     }
     setSwitchingModel(null);
     if (!result.success) {
-      updateSession(activeSession.id, (current) => ({ ...current, modelSwitchedAt: undefined, switchedToModel: undefined, updatedAt: Date.now() }));
+      updateSession(activeSession.id, (current) => ({
+        ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
+          ...agent,
+          modelSwitchedAt: previousModelSwitchedAt,
+          switchedToModel: previousSwitchedToModel,
+        }), permissionMode),
+        updatedAt: Date.now(),
+      }));
       showToast(`切换模型失败：${result.error}`);
       return;
     }
     updateSession(activeSession.id, (current) => ({
-      ...current,
-      model,
-      runtimeSessionId: result.sessionId,
-      officialSessionId: result.sessionId,
-      switchedToModel: undefined,
+      ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
+        ...agent,
+        modelAlias: model,
+        runtimeSessionId: result.sessionId,
+        officialSessionId: result.sessionId,
+        switchedToModel: undefined,
+      }), permissionMode),
       updatedAt: switchedAt,
     }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
     if (updated && currentSession?.id === updated.id) setCurrentSession(updated);
     setModelMenuOpen(false);
-    showToast(`已切换为 ${compactModelDisplayName(model)}`);
+    showToast(`${mutationOwner.displayName} · 已切换为 ${compactModelDisplayName(model)}`);
   };
 
   const openModelSettings = async () => {

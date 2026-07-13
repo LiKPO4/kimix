@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **All session-mutation surfaces share one Agent owner**: ContextBar model switching, AppShell Goal/BTW/Plan, and SessionToolbar official rename/fork/visualization/Kimi Web use the uniquely selected Agent and its activity authority. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Composer session mutations require one Agent owner**: Agent permission and Plan state are durable, direct Slash/Skill/Goal/Swarm/BTW operations use the selected Agent runtime and event partition, and single-target undo replaces only that Agent's canonical history. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Manifest-changing validation runs pnpm commands serially**: Concurrent fresh pnpm processes can race while repairing dependency state and native bins, so tests, build, and knowledge validation run one at a time after manifest changes; read-only Git checks may still overlap. See [/operations/release-process.md](/operations/release-process.md).
 * **Room Stop and Steer require an explicit running Agent owner**: Activity state outranks stale delivery evidence, multi-running rooms present a target list, stop-all aggregates independent cancellations, and Steer/stop settlement remains scoped to the selected Agent turn and delivery. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
