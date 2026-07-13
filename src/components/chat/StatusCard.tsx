@@ -35,17 +35,17 @@ function formatContext(event: Extract<TimelineEvent, { type: "status_update" }>,
   return `${percent.toFixed(2)}%`;
 }
 
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  const pad = (value: number) => String(value).padStart(2, "0");
+export function getStatusCardDetailTexts(
+  event: Extract<TimelineEvent, { type: "status_update" }>,
+  detailedContext: boolean,
+): string[] {
   return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-    pad(date.getHours()),
-    pad(date.getMinutes()),
-    pad(date.getSeconds()),
-  ].join("-");
+    event.planMode === true ? "Plan" : "",
+    event.message ? compactModelText(event.message) : "",
+    event.inputTokenCount !== undefined ? `输入: ${formatK(event.inputTokenCount)}` : "",
+    event.tokenCount !== undefined ? `输出: ${formatK(event.tokenCount)}` : "",
+    shouldDisplayStatusContext(event) ? `Context: ${formatContext(event, detailedContext)}` : "",
+  ].filter(Boolean);
 }
 
 export const StatusCard = memo(function StatusCard({ event, inline = false, allowModelOnly = false }: StatusCardProps) {
@@ -60,13 +60,10 @@ export const StatusCard = memo(function StatusCard({ event, inline = false, allo
         : event.tone === "danger"
           ? "bg-accent-danger-light text-accent-danger"
           : "bg-surface-hover text-text-muted";
-  const details = [
-    { text: event.planMode === true ? "Plan" : "", tabular: false },
-    { text: event.message ? compactModelText(event.message) : "", tabular: false },
-    { text: formatTimestamp(event.timestamp), tabular: true },
-    { text: event.tokenCount !== undefined ? `Tokens: ${formatK(event.tokenCount)}` : "", tabular: true },
-    { text: shouldDisplayStatusContext(event) ? `Context: ${formatContext(event, detailedContext)}` : "", tabular: true },
-  ].filter((detail) => Boolean(detail.text));
+  const details = getStatusCardDetailTexts(event, detailedContext).map((text) => ({
+    text,
+    tabular: text.startsWith("输入:") || text.startsWith("输出:") || text.startsWith("Context:"),
+  }));
 
   const pill = (
       <div

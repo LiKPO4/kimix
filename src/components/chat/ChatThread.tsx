@@ -486,6 +486,7 @@ export function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
   attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
+  isSessionRunning = false,
 ): RenderItem[] {
   const items: RenderItem[] = [];
 
@@ -521,7 +522,7 @@ export function buildRenderItems(
     } satisfies Extract<TimelineEvent, { type: "assistant_message" }>;
   };
 
-  const renderTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number) => {
+  const renderTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false) => {
     turnEvents
       .filter((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction")
       .forEach((event) => items.push({ type: "event", event }));
@@ -550,12 +551,13 @@ export function buildRenderItems(
     );
     const foldApprovals = Boolean(mergedAssistantEvent) && resolvedApprovals.length > 0;
     const turnSettled = (
+      !(isLatestTurn && isSessionRunning) &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
     const trailingStatusEvents = turnSettled
-      ? statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId))
+      ? statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId)).slice(-1)
       : [];
     const activeStatusEvent = turnSettled
       ? undefined
@@ -710,14 +712,14 @@ export function buildRenderItems(
 
   let turnBody: TimelineEvent[] = [];
   let currentTurnStartedAt: number | undefined;
-  const flushTurn = () => {
-    renderTurnBody(turnBody, currentTurnStartedAt);
+  const flushTurn = (isLatestTurn = false) => {
+    renderTurnBody(turnBody, currentTurnStartedAt, isLatestTurn);
     turnBody = [];
   };
 
   for (const event of events) {
     if (event.type === "user_message") {
-      flushTurn();
+      flushTurn(false);
       items.push({ type: "event", event, attachedUserStatuses: attachedUserStatuses?.get(event.id) });
       currentTurnStartedAt = event.timestamp;
       continue;
@@ -730,7 +732,7 @@ export function buildRenderItems(
 
     turnBody.push(event);
   }
-  flushTurn();
+  flushTurn(true);
   return items;
 }
 
@@ -865,10 +867,15 @@ export const ChatThread = memo(function ChatThread() {
     () => filterStatusUpdates(splitEvents.events, statusUpdateDisplay),
     [splitEvents.events, statusUpdateDisplay]
   );
+  const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
+  const hasActiveTurn = Boolean(session && (
+    runningSessionId === session.id ||
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
+  ));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(
-    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId),
-    [visibleEvents, session?.engine, splitEvents.attachedByUserId]
+    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn),
+    [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn]
   );
   const latestProcessAssistantEventId = useMemo(() => {
     const item = renderItems.findLast((candidate) => (
@@ -1773,11 +1780,6 @@ export const ChatThread = memo(function ChatThread() {
     }
   };
 
-  const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
-  const hasActiveTurn = Boolean(session && (
-    runningSessionId === session.id ||
-    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
-  ));
   const deletableUserMessageIds = useMemo(() => {
     if (!session) return new Set<string>();
     return new Set(session.events

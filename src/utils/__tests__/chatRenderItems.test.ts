@@ -115,3 +115,31 @@ describe("buildRenderItems compaction placement", () => {
     expect(renderedTypes).toEqual(["user_message", "compaction", "assistant_message"]);
   });
 });
+
+describe("buildRenderItems usage footer", () => {
+  const events: TimelineEvent[] = [{
+    id: "user", type: "user_message", timestamp: 1, content: "继续处理",
+  }, {
+    id: "assistant", type: "assistant_message", timestamp: 2, content: "阶段性回复", isThinking: false, isComplete: true,
+  }, {
+    id: "usage-1", type: "status_update", timestamp: 3, inputTokenCount: 100, tokenCount: 20,
+  }, {
+    id: "usage-2", type: "status_update", timestamp: 4, inputTokenCount: 120, tokenCount: 30,
+  }];
+
+  it("hides interim usage while the latest runtime turn is still active", () => {
+    const assistant = buildRenderItems(events, "kimi-code", undefined, true)
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event") return;
+    expect(assistant.trailingStatuses).toEqual([]);
+  });
+
+  it("shows only the final usage after the runtime turn settles", () => {
+    const assistant = buildRenderItems(events, "kimi-code", undefined, false)
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event") return;
+    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
+  });
+});
