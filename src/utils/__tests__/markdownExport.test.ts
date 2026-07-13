@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sessionToMarkdown } from "../markdownExport";
 import type { Session } from "@/types/ui";
+import { createCollaborationStateFromSession } from "../collaborationRooms";
 
 describe("sessionToMarkdown", () => {
   it("restores paragraphs for flattened assistant progress summaries", () => {
@@ -153,5 +154,82 @@ describe("sessionToMarkdown", () => {
     const markdown = sessionToMarkdown(session);
     expect(markdown).toContain("| lib/features/run/presentation/run_page.dart:410 | Navigator.pushNamed | _TutorialCoachCopy.setState | PageRoute 全屏页面跳转 |");
     expect(markdown).not.toContain("| lib\n\n/features/run/p");
+  });
+
+  it("exports a collaboration room with recipients and Agent model ownership", () => {
+    const base: Session = {
+      id: "room-1",
+      title: "交叉审查",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 5,
+      isLoading: false,
+      events: [],
+      model: "kimi-code/k2.5",
+    };
+    const collaboration = createCollaborationStateFromSession(base);
+    const primaryId = collaboration.primaryAgentId;
+    const reviewerId = "agent-reviewer";
+    const room: Session = {
+      ...base,
+      collaboration: {
+        ...collaboration,
+        agents: [
+          { ...collaboration.agents[0], displayName: "Implementer", modelLabelSnapshot: "K2.5", providerLabelSnapshot: "Kimi" },
+          {
+            id: reviewerId,
+            displayName: "Reviewer",
+            mentionName: "reviewer",
+            modelAlias: "openai/gpt-5",
+            modelLabelSnapshot: "GPT-5",
+            providerLabelSnapshot: "OpenAI",
+            permissionMode: "manual",
+            createdAt: 2,
+          },
+        ],
+        messages: [{
+          id: "message-1",
+          content: "请分别实施和审查",
+          timestamp: 3,
+          recipientAgentIds: [primaryId, reviewerId],
+          deliveries: {
+            [primaryId]: { status: "completed", agentTurnId: "turn-primary" },
+            [reviewerId]: { status: "completed", agentTurnId: "turn-reviewer" },
+          },
+        }],
+        agentEvents: {
+          [primaryId]: [{
+            id: "assistant-primary",
+            type: "assistant_message",
+            timestamp: 4,
+            content: "实施完成",
+            isThinking: false,
+            isComplete: true,
+            roomAgentId: primaryId,
+            roomMessageId: "message-1",
+            agentTurnId: "turn-primary",
+          }],
+          [reviewerId]: [{
+            id: "assistant-reviewer",
+            type: "assistant_message",
+            timestamp: 5,
+            content: "审查通过",
+            isThinking: false,
+            isComplete: true,
+            roomAgentId: reviewerId,
+            roomMessageId: "message-1",
+            agentTurnId: "turn-reviewer",
+          }],
+        },
+      },
+    };
+
+    const markdown = sessionToMarkdown(room);
+    expect(markdown).toContain("| Implementer | @k2.5 | Kimi | K2.5 | 活跃 |");
+    expect(markdown).toContain("| Reviewer | @reviewer | OpenAI | GPT-5 | 活跃 |");
+    expect(markdown).toContain("## 用户 → Implementer、Reviewer");
+    expect(markdown).toContain("## Implementer · K2.5\n\n实施完成");
+    expect(markdown).toContain("## Reviewer · GPT-5\n\n审查通过");
+    expect(markdown.indexOf("实施完成")).toBeLessThan(markdown.indexOf("审查通过"));
   });
 });

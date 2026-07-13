@@ -1,5 +1,7 @@
 import type { Session, TimelineEvent } from "@/types/ui";
 import { restoreAssistantProgressParagraphs } from "./assistantParagraphs";
+import { getRoomAgent } from "@/utils/collaborationRooms";
+import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 
 export function formatEventAsMarkdown(event: TimelineEvent): string {
   if (event.type === "user_message") {
@@ -32,7 +34,66 @@ export function formatEventAsMarkdown(event: TimelineEvent): string {
 }
 
 export function sessionToMarkdown(session: Session): string {
+  if (session.collaboration) return collaborationRoomToMarkdown(session);
   const header = `# ${session.title}\n\n- 会话 ID：${session.id}\n- 工作目录：${session.projectPath}\n`;
   const body = session.events.map(formatEventAsMarkdown).filter(Boolean).join("\n\n---\n\n");
   return `${header}\n${body}\n`;
+}
+
+function markdownTableCell(value: string | null | undefined) {
+  return (value?.trim() || "—").replace(/\|/g, "\\|").replace(/\s+/g, " ");
+}
+
+function roomAgentLabel(session: Session, roomAgentId?: string) {
+  const agent = roomAgentId ? getRoomAgent(session, roomAgentId) : undefined;
+  if (!agent) return { name: "未知 Agent", model: "模型未知" };
+  return {
+    name: agent.displayName,
+    model: agent.modelLabelSnapshot || agent.modelAlias || "模型未知",
+  };
+}
+
+function formatRoomEventAsMarkdown(session: Session, event: TimelineEvent): string {
+  if (event.type === "user_message") {
+    const recipients = (event.recipientAgentIds ?? [])
+      .map((roomAgentId) => roomAgentLabel(session, roomAgentId).name)
+      .join("、") || "未标注接收者";
+    const imageLines = event.images?.length
+      ? `\n\n${event.images.map((image) => `![${image.name}](${image.dataUrl ?? image.name})`).join("\n")}`
+      : "";
+    return `## 用户 → ${recipients}\n\n${event.content || "[图片]"}${imageLines}`;
+  }
+  const actor = roomAgentLabel(session, event.roomAgentId);
+  if (event.type === "assistant_message") {
+    const thinking = event.thinking ? `\n\n<details>\n<summary>思考</summary>\n\n${event.thinking}\n\n</details>` : "";
+    return `## ${actor.name} · ${actor.model}\n\n${restoreAssistantProgressParagraphs(event.content || "")}${thinking}`;
+  }
+  const markdown = formatEventAsMarkdown(event);
+  return markdown ? markdown.replace(/^> /, `> ${actor.name} · `) : "";
+}
+
+export function collaborationRoomToMarkdown(session: Session): string {
+  if (!session.collaboration) return sessionToMarkdown({ ...session, collaboration: undefined });
+  const agents = session.collaboration.agents;
+  const agentRows = agents.map((agent) => (
+    `| ${markdownTableCell(agent.displayName)} | @${markdownTableCell(agent.mentionName)} | ${markdownTableCell(agent.providerLabelSnapshot)} | ${markdownTableCell(agent.modelLabelSnapshot || agent.modelAlias)} | ${agent.removedAt ? "已移出" : agent.archivedAt ? "已归档" : "活跃"} |`
+  ));
+  const header = [
+    `# ${session.title}`,
+    "",
+    `- 房间 ID：${session.id}`,
+    `- 工作目录：${session.projectPath}`,
+    `- Agent 数量：${agents.length}`,
+    "",
+    "## 参与 Agent",
+    "",
+    "| Agent | Mention | Provider | 模型 | 状态 |",
+    "| --- | --- | --- | --- | --- |",
+    ...agentRows,
+  ].join("\n");
+  const body = projectCollaborationTimeline(session)
+    .map((event) => formatRoomEventAsMarkdown(session, event))
+    .filter(Boolean)
+    .join("\n\n---\n\n");
+  return `${header}\n\n${body}\n`;
 }

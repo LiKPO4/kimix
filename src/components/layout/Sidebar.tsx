@@ -19,6 +19,7 @@ import { reportError } from "@/utils/reportError";
 import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { getHiddenHandoffSessionIds } from "@/utils/persistence";
+import { getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -395,6 +396,29 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
   const exportSessionArchive = async (sessionId: string, title: string) => {
     const target = sessions.find((session) => session.id === sessionId);
+    if (target?.collaboration) {
+      const agents = target.collaboration.agents
+        .filter((agent) => !agent.removedAt)
+        .map((agent) => ({
+          roomAgentId: agent.id,
+          displayName: agent.displayName,
+          sessionId: getRoomAgentRuntimeId(target, agent.id),
+        }))
+        .filter((agent): agent is typeof agent & { sessionId: string } => Boolean(agent.sessionId));
+      if (agents.length === 0) {
+        toast("房间中没有可导出的官方 Agent 会话");
+        return;
+      }
+      const res = await window.api.exportKimiCodeSession({ title, agents });
+      if (!res.success) {
+        toast(`导出失败：${res.error}`);
+        return;
+      }
+      toast(res.data.path
+        ? `已导出 ${res.data.selectedAgentName || "所选 Agent"} 的 Kimi 调试包`
+        : "已取消导出");
+      return;
+    }
     const exportSessionId = target ? getRuntimeSessionId(target) : sessionId;
     if (!exportSessionId) {
       toast("没有找到可导出的官方会话");
@@ -981,7 +1005,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.30</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.31</span>
         </button>
       </div>
     </aside>

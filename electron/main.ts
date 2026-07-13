@@ -30,7 +30,7 @@ import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
-import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
+import type { ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -2862,18 +2862,45 @@ async function exportMarkdownDocument(request: unknown) {
   await shell.showItemInFolder(result.filePath);
   return { path: result.filePath, output: "Markdown 导出完成" };
 }
-async function exportKimiSessionArchive(request: { sessionId?: string; title?: string }) {
-  const defaultName = `${sanitizeDownloadName(request.title || "Kimi 会话")}-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
+async function exportKimiSessionArchive(request: ExportSessionRequest) {
+  let selectedAgent: NonNullable<ExportSessionRequest["agents"]>[number] | undefined;
+  if (request.agents?.length) {
+    const cancelId = request.agents.length;
+    const selection = await dialog.showMessageBox(mainWindow ?? undefined, {
+      type: "question",
+      title: "选择导出 Agent",
+      message: `要导出“${request.title || "协同房间"}”中的哪个 Agent？`,
+      detail: "Kimi 调试包只包含所选 Agent 对应的官方会话。",
+      buttons: [...request.agents.map((agent) => agent.displayName), "取消"],
+      defaultId: 0,
+      cancelId,
+      noLink: true,
+    });
+    if (selection.response === cancelId) {
+      return { path: "", output: "用户取消导出" };
+    }
+    selectedAgent = request.agents[selection.response];
+    if (!selectedAgent) throw new Error("没有找到所选 Agent 的官方会话");
+  }
+  const exportTitle = selectedAgent
+    ? `${request.title || "协同房间"}-${selectedAgent.displayName}`
+    : request.title || "Kimi 会话";
+  const defaultName = `${sanitizeDownloadName(exportTitle)}-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
   const result = await dialog.showSaveDialog({
     title: "导出 Kimi Debug ZIP",
     defaultPath: path.join(app.getPath("downloads"), defaultName),
     filters: [{ name: "ZIP 归档", extensions: ["zip"] }],
   });
   if (result.canceled || !result.filePath) {
-    return { path: "", output: "用户取消导出" };
+    return {
+      path: "",
+      output: "用户取消导出",
+      selectedAgentId: selectedAgent?.roomAgentId,
+      selectedAgentName: selectedAgent?.displayName,
+    };
   }
   ensureDirectoryExists(path.dirname(result.filePath));
-  const exportSessionId = normalizeKimiExportSessionId(request.sessionId);
+  const exportSessionId = normalizeKimiExportSessionId(selectedAgent?.sessionId ?? request.sessionId);
   if (!exportSessionId) throw new Error("缺少可导出的官方 Kimi Code sessionId");
   let fallbackKimiPath: string | null = null;
   try {
@@ -2886,6 +2913,8 @@ async function exportKimiSessionArchive(request: { sessionId?: string; title?: s
     return {
       path: sdkResult.zipPath || result.filePath,
       output: `SDK export completed: ${sdkResult.entries.length} entries`,
+      selectedAgentId: selectedAgent?.roomAgentId,
+      selectedAgentName: selectedAgent?.displayName,
     };
   } catch (sdkError) {
     fallbackKimiPath = await resolveKimiCommand();
@@ -2897,7 +2926,12 @@ async function exportKimiSessionArchive(request: { sessionId?: string; title?: s
   const args = ["export", ...(exportSessionId ? [exportSessionId] : []), "-o", result.filePath, "-y"];
   const output = await runLongCommand(fallbackKimiPath, args, 2 * 60 * 1000);
   await shell.showItemInFolder(result.filePath);
-  return { path: result.filePath, output: `Kimi Code fallback export completed\n${output}` };
+  return {
+    path: result.filePath,
+    output: `Kimi Code fallback export completed\n${output}`,
+    selectedAgentId: selectedAgent?.roomAgentId,
+    selectedAgentName: selectedAgent?.displayName,
+  };
 }
 
 const LEGACY_SESSION_BACKUP_SCHEMA_VERSION = 1;
@@ -6475,13 +6509,18 @@ ipcMain.handle("project:exportMarkdown", async (_, request: unknown) => {
 
 ipcMain.handle("kimi-code:exportSession", async (_, request: unknown) => {
   try {
-    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const req = z.object({
+      sessionId: z.string().trim().optional(),
+      title: z.string().trim().optional(),
+      agents: z.array(z.object({
+        roomAgentId: z.string().trim().min(1),
+        displayName: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+      })).max(20).optional(),
+    }).parse(request ?? {});
     return {
       success: true,
-      data: await exportKimiSessionArchive({
-        sessionId: typeof req.sessionId === "string" ? req.sessionId : undefined,
-        title: typeof req.title === "string" ? req.title : undefined,
-      }),
+      data: await exportKimiSessionArchive(req),
     };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

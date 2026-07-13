@@ -792,6 +792,11 @@ export type LoadSessionResponse = {
 export type ExportSessionRequest = {
   sessionId?: string;
   title?: string;
+  agents?: Array<{
+    roomAgentId: string;
+    displayName: string;
+    sessionId: string;
+  }>;
 }
 
 export type SessionBackupSnapshot = {
@@ -838,6 +843,8 @@ export type ExportSessionResponse = {
   data: {
     path: string;
     output?: string;
+    selectedAgentId?: string;
+    selectedAgentName?: string;
   };
 } | {
   success: false;
