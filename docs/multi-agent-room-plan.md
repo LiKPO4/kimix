@@ -205,10 +205,10 @@ interface RoomUserMessage {
 
 ### 阶段 2：Agent 级运行状态和事件隔离
 
-- [ ] 新增 `roomId + roomAgentId` 活动表。
-- [ ] `runningSessionId` 降级为单 Agent 兼容派生值。
-- [ ] 事件监听、终态、轮询和 Server -> SDK 迁移使用 runtime owner。
-- [ ] useEventStream 按房间 Agent 分批。
+- [x] 新增 `roomId + roomAgentId` 活动表。
+- [x] `runningSessionId` 降级为单 Agent 兼容派生值。
+- [x] 事件监听、终态、轮询和 Server -> SDK 迁移使用 runtime owner。
+- [x] useEventStream 按房间 Agent 分批。
 
 退出门禁：A 完成、取消、迁移或失败均不改变 B。
 

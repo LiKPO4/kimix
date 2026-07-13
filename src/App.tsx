@@ -53,7 +53,18 @@ import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
 import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { logError } from "@/utils/reportError";
-import { resolveRoomRuntimeOwner } from "@/utils/collaborationRooms";
+import {
+  getPrimaryRoomAgent,
+  getRoomAgentRuntimeId,
+  getRoomAgentEvents,
+  getRoomAgentSessionView,
+  isPrimaryRoomAgent,
+  resolveRoomRuntimeOwner,
+  roomAgentActivityKey,
+  scopeEventToRoomAgent,
+  updateRoomAgent,
+  updateRoomAgentEvents,
+} from "@/utils/collaborationRooms";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -1125,8 +1136,15 @@ function App() {
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
+  const setRoomAgentActivity = useAppStore((s) => s.setRoomAgentActivity);
   const fontSize = useAppStore((s) => s.fontSize);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
+  const activeRoomAgentActivitySignature = Object.values(roomAgentActivities)
+    .filter((activity) => ["running", "waiting_approval", "waiting_question"].includes(activity.status))
+    .map((activity) => `${activity.roomId}:${activity.roomAgentId}:${activity.runtimeSessionId ?? ""}:${activity.status}`)
+    .sort()
+    .join("|");
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -1250,57 +1268,77 @@ function App() {
     }
   };
 
-  const syncSessionSwarmMode = useCallback((uiSessionId: string, source: unknown) => {
+  const syncSessionSwarmMode = useCallback((uiSessionId: string, source: unknown, roomAgentId?: string) => {
     const swarmMode = extractSwarmModeStatus(source);
     if (swarmMode === undefined) return;
-    updateSession(uiSessionId, (session) => (
-      session.swarmMode === swarmMode
-        ? session
-        : { ...session, swarmMode }
-    ));
+    updateSession(uiSessionId, (session) => {
+      if (session.collaboration && roomAgentId) {
+        return updateRoomAgent(session, roomAgentId, (agent) => (
+          agent.swarmMode === swarmMode ? agent : { ...agent, swarmMode }
+        ));
+      }
+      return session.swarmMode === swarmMode ? session : { ...session, swarmMode };
+    });
     syncCurrentSessionFromStore(uiSessionId);
   }, [updateSession]);
 
-  const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string) => {
+  const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string, roomAgentId?: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (!target?.officialGoal) return;
+    if (!target) return;
+    const ownerAgentId = roomAgentId ?? resolveRoomRuntimeOwner([target], runtimeSessionId)?.roomAgentId ?? getPrimaryRoomAgent(target).id;
+    const targetView = getRoomAgentSessionView(target, ownerAgentId);
+    if (!targetView.officialGoal) return;
     try {
       const res = await window.api.getKimiCodeGoal({ sessionId: runtimeSessionId });
-      useSessionStore.getState().updateSession(uiSessionId, (session) => ({
-        ...session,
-        officialGoal: {
-          goal: res.success ? reconcileOfficialGoalSnapshot(res.data.goal, session.officialGoal?.goal) : session.officialGoal?.goal ?? null,
+      useSessionStore.getState().updateSession(uiSessionId, (session) => {
+        const view = getRoomAgentSessionView(session, ownerAgentId);
+        const officialGoal = {
+          goal: res.success ? reconcileOfficialGoalSnapshot(res.data.goal, view.officialGoal?.goal) : view.officialGoal?.goal ?? null,
           error: res.success ? null : res.error,
           updatedAt: Date.now(),
-        },
-        updatedAt: Date.now(),
-      }));
+        };
+        if (session.collaboration) {
+          return {
+            ...updateRoomAgent(session, ownerAgentId, (agent) => ({ ...agent, officialGoal })),
+            updatedAt: Date.now(),
+          };
+        }
+        return { ...session, officialGoal, updatedAt: Date.now() };
+      });
       syncCurrentSessionFromStore(uiSessionId);
     } catch (err) {
-      useSessionStore.getState().updateSession(uiSessionId, (session) => ({
-        ...session,
-        officialGoal: {
-          goal: session.officialGoal?.goal ?? null,
+      useSessionStore.getState().updateSession(uiSessionId, (session) => {
+        const view = getRoomAgentSessionView(session, ownerAgentId);
+        const officialGoal = {
+          goal: view.officialGoal?.goal ?? null,
           error: err instanceof Error ? err.message : String(err),
           updatedAt: Date.now(),
-        },
-        updatedAt: Date.now(),
-      }));
+        };
+        if (session.collaboration) {
+          return {
+            ...updateRoomAgent(session, ownerAgentId, (agent) => ({ ...agent, officialGoal })),
+            updatedAt: Date.now(),
+          };
+        }
+        return { ...session, officialGoal, updatedAt: Date.now() };
+      });
       syncCurrentSessionFromStore(uiSessionId);
     }
   };
 
-  const scheduleOfficialGoalRefresh = (uiSessionId: string, runtimeSessionId: string) => {
+  const scheduleOfficialGoalRefresh = (uiSessionId: string, runtimeSessionId: string, roomAgentId?: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (!target?.officialGoal?.goal) return;
-    const key = `${uiSessionId}:${runtimeSessionId}`;
+    if (!target) return;
+    const ownerAgentId = roomAgentId ?? resolveRoomRuntimeOwner([target], runtimeSessionId)?.roomAgentId ?? getPrimaryRoomAgent(target).id;
+    if (!getRoomAgentSessionView(target, ownerAgentId).officialGoal?.goal) return;
+    const key = `${uiSessionId}:${ownerAgentId}:${runtimeSessionId}`;
     if (goalRefreshTimersRef.current.has(key)) return;
     const elapsed = Date.now() - (goalLastRefreshRef.current.get(key) ?? 0);
     const delay = Math.max(0, 1200 - elapsed);
     const timer = window.setTimeout(() => {
       goalRefreshTimersRef.current.delete(key);
       goalLastRefreshRef.current.set(key, Date.now());
-      void refreshOfficialGoalState(uiSessionId, runtimeSessionId);
+      void refreshOfficialGoalState(uiSessionId, runtimeSessionId, ownerAgentId);
     }, delay);
     goalRefreshTimersRef.current.set(key, timer);
   };
@@ -2413,17 +2451,26 @@ function App() {
         if (terminalStatus) void finishHandoffJob(currentHandoffJob, terminalStatus);
         return;
       }
-      const uiSessionId = resolveUiSessionId(payload.sessionId);
+      const roomOwner = resolveRoomRuntimeOwner(useSessionStore.getState().sessions, payload.sessionId);
+      const uiSessionId = roomOwner?.roomId ?? resolveUiSessionId(payload.sessionId);
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
+      const roomAgentId = roomOwner?.roomAgentId ?? (targetSession ? getPrimaryRoomAgent(targetSession).id : undefined);
+      const targetAgentSession = targetSession && roomAgentId
+        ? getRoomAgentSessionView(targetSession, roomAgentId)
+        : targetSession;
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
       if (rawEvent?.type === "agent.status.updated") {
-        syncSessionSwarmMode(uiSessionId, rawEvent);
+        syncSessionSwarmMode(uiSessionId, rawEvent, roomAgentId);
       }
       const officialTitle = extractOfficialSessionTitle(rawEvent);
-      if (officialTitle && !targetSession?.titleLocked) {
+      if (
+        officialTitle &&
+        !targetSession?.titleLocked &&
+        (!roomAgentId || !targetSession || isPrimaryRoomAgent(targetSession, roomAgentId))
+      ) {
         updateSession(uiSessionId, (session) => ({
           ...session,
           title: officialTitle,
@@ -2431,7 +2478,7 @@ function App() {
         }));
         syncCurrentSessionFromStore(uiSessionId);
       }
-      if (shouldSkipKimiCodeSnapshotReplay(rawEvent, targetSession?.events)) return;
+      if (shouldSkipKimiCodeSnapshotReplay(rawEvent, targetAgentSession?.events)) return;
       const mapped = rawEvent?.type === "kimix.approval.request"
         ? mapKimiCodeApprovalRequest({
             ...(rawEvent.request && typeof rawEvent.request === "object" && !Array.isArray(rawEvent.request) ? rawEvent.request as Record<string, unknown> : {}),
@@ -2446,71 +2493,96 @@ function App() {
       if (!mapped) return;
       const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
       const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
-      if (mappedWithRole.type !== "status_update") {
+      const mappedForRoom = targetSession?.longTask || !roomAgentId
+        ? mappedWithRole
+        : scopeEventToRoomAgent(mappedWithRole, roomAgentId);
+      if (mappedForRoom.type !== "status_update") {
         runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
       }
       if (!shouldAppendRuntimeStatusToTimeline({
         rawType: typeof rawEvent?.type === "string" ? rawEvent.type : undefined,
-        mappedEvent: mappedWithRole,
-        session: targetSession,
+        mappedEvent: mappedForRoom,
+        session: targetAgentSession,
         runtimeSessionId: payload.sessionId,
         runningSessionId: useAppStore.getState().runningSessionId,
       })) {
         return;
       }
       if (
-        mappedWithRole.type === "status_update" &&
-        targetSession?.modelSwitchedAt &&
-        !targetSession.events.some((event) => event.type === "assistant_message" && event.timestamp > targetSession.modelSwitchedAt)
+        mappedForRoom.type === "status_update" &&
+        targetAgentSession?.modelSwitchedAt &&
+        !targetAgentSession.events.some((event) => event.type === "assistant_message" && event.timestamp > targetAgentSession.modelSwitchedAt)
       ) {
         return;
       }
 
       markLongTaskRuntimeActivity(uiSessionId, payload.sessionId);
-      if (mappedWithRole.type === "question_request" && mappedWithRole.status === "pending") {
-        const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedWithRole)}`;
+      if (mappedForRoom.type === "question_request" && mappedForRoom.status === "pending") {
+        if (roomAgentId) {
+          setRoomAgentActivity({
+            roomId: uiSessionId,
+            roomAgentId,
+            runtimeSessionId: payload.sessionId,
+            status: "waiting_question",
+            updatedAt: Date.now(),
+          });
+        }
+        const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedForRoom)}`;
         if (!notifiedQuestionRequestRef.current.has(notifyKey)) {
           notifiedQuestionRequestRef.current.add(notifyKey);
-          notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedWithRole));
+          notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedForRoom));
         }
       }
-      if (mappedWithRole.type === "approval_request" && mappedWithRole.status === "pending") {
-        const notifyKey = `${payload.sessionId}:${approvalRequestNotificationKey(mappedWithRole)}`;
+      if (mappedForRoom.type === "approval_request" && mappedForRoom.status === "pending") {
+        if (roomAgentId) {
+          setRoomAgentActivity({
+            roomId: uiSessionId,
+            roomAgentId,
+            runtimeSessionId: payload.sessionId,
+            status: "waiting_approval",
+            updatedAt: Date.now(),
+          });
+        }
+        const notifyKey = `${payload.sessionId}:${approvalRequestNotificationKey(mappedForRoom)}`;
         if (!notifiedApprovalRequestRef.current.has(notifyKey)) {
           notifiedApprovalRequestRef.current.add(notifyKey);
-          notifyApprovalNeeded(uiSessionId, payload.sessionId, mappedWithRole);
+          notifyApprovalNeeded(uiSessionId, payload.sessionId, mappedForRoom);
         }
       }
       if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
-        mergeHiddenLongTaskEvent(payload.sessionId, mappedWithRole);
-        if (shouldMirrorHiddenLongTaskEvent(mappedWithRole)) {
-          enqueueStreamEvent(uiSessionId, mappedWithRole);
+        mergeHiddenLongTaskEvent(payload.sessionId, mappedForRoom);
+        if (shouldMirrorHiddenLongTaskEvent(mappedForRoom)) {
+          enqueueStreamEvent(uiSessionId, mappedForRoom);
         }
-        if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
+        if (mappedForRoom.type === "question_request" || mappedForRoom.type === "approval_request" || mappedForRoom.type === "error") {
           flushStreamEvents();
           void persistLocalConversationState();
         }
         return;
       }
-      enqueueStreamEvent(uiSessionId, mappedWithRole);
-      scheduleOfficialGoalRefresh(uiSessionId, payload.sessionId);
-      if (mappedWithRole.type === "tool_call" || mappedWithRole.type === "tool_result") {
+      enqueueStreamEvent(uiSessionId, mappedForRoom);
+      scheduleOfficialGoalRefresh(uiSessionId, payload.sessionId, roomAgentId);
+      if ((mappedForRoom.type === "tool_call" || mappedForRoom.type === "tool_result") && roomAgentId) {
         updateSession(uiSessionId, (session) => {
-          const terminalGoal = inferTerminalGoalFromEvent(mappedWithRole, session.officialGoal?.goal);
+          const agentView = getRoomAgentSessionView(session, roomAgentId);
+          const terminalGoal = inferTerminalGoalFromEvent(mappedForRoom, agentView.officialGoal?.goal);
           if (!terminalGoal) return session;
-          return {
-            ...session,
-            officialGoal: {
+          const officialGoal = {
               goal: terminalGoal,
               error: null,
               updatedAt: Date.now(),
-            },
-            updatedAt: Date.now(),
           };
+          if (session.collaboration) {
+            return {
+              ...updateRoomAgent(session, roomAgentId, (agent) => ({ ...agent, officialGoal })),
+              updatedAt: Date.now(),
+            };
+          }
+          return { ...session, officialGoal, updatedAt: Date.now() };
         });
         syncCurrentSessionFromStore(uiSessionId);
       }
-      if (mappedWithRole.type === "question_request" || mappedWithRole.type === "approval_request" || mappedWithRole.type === "error") {
+      if (mappedForRoom.type === "question_request" || mappedForRoom.type === "approval_request" || mappedForRoom.type === "error") {
         flushStreamEvents();
         void persistLocalConversationState();
       }
@@ -2529,28 +2601,58 @@ function App() {
         }
       }
 
-      const uiSessionId = resolveUiSessionId(payload.sessionId);
+      const statusOwner = resolveRoomRuntimeOwner(useSessionStore.getState().sessions, payload.sessionId);
+      const uiSessionId = statusOwner?.roomId ?? resolveUiSessionId(payload.sessionId);
+      const roomAgentId = statusOwner?.roomAgentId
+        ?? (() => {
+          const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+          return session ? getPrimaryRoomAgent(session).id : undefined;
+        })();
 
       // Server 会话 mid-turn 失败后已迁移到新的 SDK 会话：更新本地 runtime id。
       if (payload.migratedTo) {
-        updateSession(uiSessionId, (session) => ({
-          ...session,
-          runtimeSessionId: payload.migratedTo,
-          officialSessionId: undefined,
-          updatedAt: Date.now(),
-        }));
+        updateSession(uiSessionId, (session) => {
+          if (session.collaboration && roomAgentId) {
+            return {
+              ...updateRoomAgent(session, roomAgentId, (agent) => ({
+                ...agent,
+                runtimeSessionId: payload.migratedTo,
+                officialSessionId: undefined,
+              })),
+              updatedAt: Date.now(),
+            };
+          }
+          return {
+            ...session,
+            runtimeSessionId: payload.migratedTo,
+            officialSessionId: undefined,
+            updatedAt: Date.now(),
+          };
+        });
         if (useAppStore.getState().currentSession?.id === uiSessionId) {
           const latest = useSessionStore.getState().sessions.find((s) => s.id === uiSessionId);
           if (latest) useAppStore.getState().setCurrentSession(latest);
         }
         void window.api.getKimiCodeStatus({ sessionId: payload.migratedTo }).then((response) => {
           if (!response.success) return;
-          updateSession(uiSessionId, (session) => ({
-            ...session,
-            model: response.data.model ?? session.model,
-            swarmMode: extractSwarmModeStatus(response.data) ?? session.swarmMode,
-            updatedAt: Date.now(),
-          }));
+          updateSession(uiSessionId, (session) => {
+            if (session.collaboration && roomAgentId) {
+              return {
+                ...updateRoomAgent(session, roomAgentId, (agent) => ({
+                  ...agent,
+                  modelAlias: response.data.model ?? agent.modelAlias,
+                  swarmMode: extractSwarmModeStatus(response.data) ?? agent.swarmMode,
+                })),
+                updatedAt: Date.now(),
+              };
+            }
+            return {
+              ...session,
+              model: response.data.model ?? session.model,
+              swarmMode: extractSwarmModeStatus(response.data) ?? session.swarmMode,
+              updatedAt: Date.now(),
+            };
+          });
           syncCurrentSessionFromStore(uiSessionId);
         }).catch(logError("refreshMigratedSessionModel"));
       }
@@ -2560,16 +2662,35 @@ function App() {
       // longTask 会话由专属监听器 (unsubscribeLongTaskStatus) 单独处理，通用监听器跳过避免重复执行
       if (targetSession?.longTask) return;
 
-      if (payload.status === "running") {
+      if (["running", "waiting_approval", "waiting_question"].includes(payload.status)) {
         runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-        runtimeTurnStartRef.current.set(payload.sessionId, {
-          eventStartIndex: runningSession?.events.length ?? 0,
-          openAssistantIds: new Set((runningSession?.events ?? []).flatMap((event) => (
-            event.type === "assistant_message" && !event.isComplete ? [event.id] : []
-          ))),
-        });
-        setRunningSessionId(uiSessionId);
+        const runningEvents = runningSession && roomAgentId
+          ? getRoomAgentEvents(runningSession, roomAgentId)
+          : runningSession?.events ?? [];
+        if (payload.status === "running" && !runtimeTurnStartRef.current.has(payload.sessionId)) {
+          runtimeTurnStartRef.current.set(payload.sessionId, {
+            eventStartIndex: runningEvents.length,
+            openAssistantIds: new Set(runningEvents.flatMap((event) => (
+              event.type === "assistant_message" && !event.isComplete ? [event.id] : []
+            ))),
+          });
+        }
+        if (roomAgentId) {
+          const previous = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(uiSessionId, roomAgentId)];
+          setRoomAgentActivity({
+            roomId: uiSessionId,
+            roomAgentId,
+            runtimeSessionId: payload.sessionId,
+            status: payload.status,
+            activeTurnId: previous?.activeTurnId,
+            startedAt: previous?.startedAt ?? Date.now(),
+            updatedAt: Date.now(),
+          });
+          if (runningSession && isPrimaryRoomAgent(runningSession, roomAgentId)) {
+            setRunningSessionId(uiSessionId);
+          }
+        }
         return;
       }
 
@@ -2584,44 +2705,69 @@ function App() {
       runtimeHistoryRefreshAtRef.current.delete(payload.sessionId);
 
       flushStreamEvents();
-      void refreshOfficialGoalState(uiSessionId, payload.sessionId);
-      goalLastRefreshRef.current.set(`${uiSessionId}:${payload.sessionId}`, Date.now());
+      void refreshOfficialGoalState(uiSessionId, payload.sessionId, roomAgentId);
+      goalLastRefreshRef.current.set(`${uiSessionId}:${roomAgentId ?? "primary"}:${payload.sessionId}`, Date.now());
+      if (roomAgentId) {
+        setRoomAgentActivity({
+          roomId: uiSessionId,
+          roomAgentId,
+          runtimeSessionId: payload.sessionId,
+          status: payload.status,
+          updatedAt: Date.now(),
+        });
+      }
       const activeRunningSessionId = useAppStore.getState().runningSessionId;
-      if (activeRunningSessionId === uiSessionId || activeRunningSessionId === payload.sessionId) {
+      const latestRoom = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+      if (
+        (!roomAgentId || !latestRoom || isPrimaryRoomAgent(latestRoom, roomAgentId)) &&
+        (activeRunningSessionId === uiSessionId || activeRunningSessionId === payload.sessionId)
+      ) {
         setRunningSessionId(null);
       }
 
       if (payload.status === "error" || payload.status === "interrupted") {
         runtimeTurnStartRef.current.delete(payload.sessionId);
         const failureMessage = payload.status === "interrupted" ? "当前轮已中断。" : "当前轮执行失败。";
-        updateSession(uiSessionId, (session) => ({
-          ...session,
-          events: settlePendingSteerMessages(
-            settlePendingQuestions(settleFailedEvents(session.events, failureMessage)),
-            "failed",
-            payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
-          ),
-          updatedAt: Date.now(),
-        }));
+        updateSession(uiSessionId, (session) => {
+          const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
+          const next = updateRoomAgentEvents(session, ownerAgentId, (events) => (
+            settlePendingSteerMessages(
+              settlePendingQuestions(settleFailedEvents(events, failureMessage)),
+              "failed",
+              payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
+            )
+          ));
+          return { ...next, updatedAt: Date.now() };
+        });
         return;
       }
 
       const turnStart = runtimeTurnStartRef.current.get(payload.sessionId);
-      updateSession(uiSessionId, (session) => ({
-        ...session,
-        events: appendSessionRecommendationIfNeeded(
-          settleInactiveEvents(session.events),
-          useAppStore.getState().sessionRecommendationEnabled,
-          useAppStore.getState().sessionRecommendationTurnLimit,
-        ),
-        updatedAt: Date.now(),
-      }));
+      updateSession(uiSessionId, (session) => {
+        const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
+        const next = updateRoomAgentEvents(session, ownerAgentId, (events) => {
+          const settled = settleInactiveEvents(events);
+          return isPrimaryRoomAgent(session, ownerAgentId)
+            ? appendSessionRecommendationIfNeeded(
+                settled,
+                useAppStore.getState().sessionRecommendationEnabled,
+                useAppStore.getState().sessionRecommendationTurnLimit,
+              )
+            : settled;
+        });
+        return { ...next, updatedAt: Date.now() };
+      });
       const completedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-      const assistantContent = extractAssistantContentForTurn(completedSession?.events ?? [], turnStart);
+      const completedEvents = completedSession && roomAgentId
+        ? getRoomAgentEvents(completedSession, roomAgentId)
+        : completedSession?.events ?? [];
+      const assistantContent = extractAssistantContentForTurn(completedEvents, turnStart);
       notifyTurnComplete(uiSessionId, payload.sessionId, undefined, assistantContent);
       runtimeTurnStartRef.current.delete(payload.sessionId);
 
-      void dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
+      if (!roomAgentId || !completedSession || isPrimaryRoomAgent(completedSession, roomAgentId)) {
+        void dispatchNextPendingKimiMessage(uiSessionId, payload.sessionId);
+      }
     });
 
     const unsubscribeLongTaskStatus = window.api.onKimiCodeStatus((payload) => {
@@ -2867,31 +3013,36 @@ function App() {
     };
   // Runtime listeners own session continuity. Preference changes are read from
   // useAppStore at operation time and must never restart bootstrap or history recovery.
-  }, [setHandoffSessionId, setRunningSessionId, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
+  }, [setHandoffSessionId, setRunningSessionId, setRoomAgentActivity, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
-    if (!runningSessionId) return;
+    if (!runningSessionId && !activeRoomAgentActivitySignature) return;
     let disposed = false;
-    let checking = false;
+    const checkingRuntimeIds = new Set<string>();
     const reconciliationStartedAt = Date.now();
 
-    const reconcileRuntimeStatus = async () => {
-      if (disposed || checking) return;
-      const activeRunningId = useAppStore.getState().runningSessionId;
-      if (!activeRunningId || activeRunningId !== runningSessionId) return;
-      const session = useSessionStore.getState().sessions.find((item) => (
-        item.id === activeRunningId || item.runtimeSessionId === activeRunningId || item.officialSessionId === activeRunningId
-      ));
+    const reconcileAgentRuntime = async (
+      roomId: string,
+      roomAgentId: string,
+      runtimeSessionId: string,
+    ) => {
+      if (disposed || checkingRuntimeIds.has(runtimeSessionId)) return;
+      const session = useSessionStore.getState().sessions.find((item) => item.id === roomId);
       if (!session || session.longTask) return;
-      const runtimeSessionId = getRuntimeSessionId(session);
-      if (!runtimeSessionId) return;
-
-      checking = true;
+      checkingRuntimeIds.add(runtimeSessionId);
       try {
         const response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
         if (disposed || !response.success) return;
-        syncSessionSwarmMode(session.id, response.data);
+        syncSessionSwarmMode(session.id, response.data, roomAgentId);
         if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
+          setRoomAgentActivity({
+            roomId: session.id,
+            roomAgentId,
+            runtimeSessionId,
+            status: response.data.engineStatus,
+            startedAt: useAppStore.getState().roomAgentActivities[roomAgentActivityKey(session.id, roomAgentId)]?.startedAt ?? reconciliationStartedAt,
+            updatedAt: Date.now(),
+          });
           runtimeTerminalPollRef.current.delete(runtimeSessionId);
           const now = Date.now();
           const lastStreamEventAt = runtimeLastStreamEventAtRef.current.get(runtimeSessionId) ?? reconciliationStartedAt;
@@ -2907,17 +3058,30 @@ function App() {
               sessionId: runtimeSessionId,
             }).catch(() => null);
             if (disposed || !loaded?.success) return;
-            const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+            const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : [])
+              .map((event) => scopeEventToRoomAgent(event, roomAgentId));
             const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
-            const snapshotEvents = reconcileRunningKimiSnapshot(latestSession.events, canonicalSnapshotEvents);
-            if (shouldReplaceWithCanonicalKimiHistory(latestSession.events, snapshotEvents)) {
-              updateSession(session.id, (item) => ({
-                ...item,
-                events: snapshotEvents,
-                model: getLastUsedModelFromEvents(snapshotEvents) ?? item.model,
-                kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
-                updatedAt: Date.now(),
-              }));
+            const localAgentEvents = getRoomAgentEvents(latestSession, roomAgentId);
+            const snapshotEvents = reconcileRunningKimiSnapshot(localAgentEvents, canonicalSnapshotEvents);
+            if (shouldReplaceWithCanonicalKimiHistory(localAgentEvents, snapshotEvents)) {
+              updateSession(session.id, (item) => {
+                let next = updateRoomAgentEvents(item, roomAgentId, () => snapshotEvents);
+                const model = getLastUsedModelFromEvents(snapshotEvents);
+                if (item.collaboration) {
+                  next = updateRoomAgent(next, roomAgentId, (agent) => ({
+                    ...agent,
+                    modelAlias: model ?? agent.modelAlias,
+                    kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                  }));
+                } else {
+                  next = {
+                    ...next,
+                    model: model ?? next.model,
+                    kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+                  };
+                }
+                return { ...next, updatedAt: Date.now() };
+              });
               syncCurrentSessionFromStore(session.id);
             }
           }
@@ -2932,22 +3096,65 @@ function App() {
         runtimeLastStreamEventAtRef.current.delete(runtimeSessionId);
         runtimeHistoryRefreshAtRef.current.delete(runtimeSessionId);
 
+        const active = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(session.id, roomAgentId)];
         const latestRunningId = useAppStore.getState().runningSessionId;
-        if (latestRunningId !== session.id && latestRunningId !== runtimeSessionId) return;
+        if (
+          !active &&
+          latestRunningId !== session.id &&
+          latestRunningId !== runtimeSessionId
+        ) return;
         flushStreamEvents();
-        updateSession(session.id, (item) => ({
-          ...item,
-          events: settleInactiveEvents(item.events),
-          updatedAt: Date.now(),
-        }));
+        updateSession(session.id, (item) => {
+          const next = updateRoomAgentEvents(item, roomAgentId, settleInactiveEvents);
+          return { ...next, updatedAt: Date.now() };
+        });
         syncCurrentSessionFromStore(session.id);
-        setRunningSessionId(null);
-        if (response.data.engineStatus === "completed" || response.data.engineStatus === "idle") {
+        setRoomAgentActivity({
+          roomId: session.id,
+          roomAgentId,
+          runtimeSessionId,
+          status: response.data.engineStatus,
+          updatedAt: Date.now(),
+        });
+        if (isPrimaryRoomAgent(session, roomAgentId)) setRunningSessionId(null);
+        if (
+          isPrimaryRoomAgent(session, roomAgentId) &&
+          (response.data.engineStatus === "completed" || response.data.engineStatus === "idle")
+        ) {
           dispatchNextPendingKimiMessage(session.id, runtimeSessionId);
         }
       } finally {
-        checking = false;
+        checkingRuntimeIds.delete(runtimeSessionId);
       }
+    };
+
+    const reconcileRuntimeStatus = async () => {
+      if (disposed) return;
+      const state = useAppStore.getState();
+      const activeActivities = Object.values(state.roomAgentActivities).filter((activity) => (
+        ["running", "waiting_approval", "waiting_question"].includes(activity.status)
+      ));
+      if (activeActivities.length > 0) {
+        await Promise.all(activeActivities.map(async (activity) => {
+          const session = useSessionStore.getState().sessions.find((item) => item.id === activity.roomId);
+          if (!session) return;
+          const runtimeId = activity.runtimeSessionId ?? getRoomAgentRuntimeId(session, activity.roomAgentId);
+          if (!runtimeId) return;
+          await reconcileAgentRuntime(activity.roomId, activity.roomAgentId, runtimeId);
+        }));
+        return;
+      }
+
+      const activeRunningId = state.runningSessionId;
+      if (!activeRunningId) return;
+      const session = useSessionStore.getState().sessions.find((item) => (
+        item.id === activeRunningId || item.runtimeSessionId === activeRunningId || item.officialSessionId === activeRunningId
+      ));
+      if (!session || session.longTask) return;
+      const primary = getPrimaryRoomAgent(session);
+      const runtimeId = getRoomAgentRuntimeId(session, primary.id) ?? getRuntimeSessionId(session);
+      if (!runtimeId) return;
+      await reconcileAgentRuntime(session.id, primary.id, runtimeId);
     };
 
     const firstCheck = window.setTimeout(() => void reconcileRuntimeStatus(), 1200);
@@ -2962,7 +3169,7 @@ function App() {
       window.removeEventListener("focus", syncNow);
       document.removeEventListener("visibilitychange", syncNow);
     };
-  }, [runningSessionId, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode]);
+  }, [activeRoomAgentActivitySignature, runningSessionId, setRoomAgentActivity, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

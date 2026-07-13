@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；新增 CollaborationState、RoomAgent、房间消息/delivery 和事件归属字段；旧 Session 可无损映射为 synthetic primary，runtime owner 已能解析房间内不同 runtime，primary 兼容镜像 helper 已建立；63 个文件、446 项测试通过，`pnpm build` 通过。
-- 未完成：Agent 级活动表、事件/历史分区、官方目录与恢复、添加 Agent UI、精确路由与并行队列、Agent scoped 操作、搜索/导出/归档以及视觉和真实流程验收。
+- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；新增 CollaborationState、RoomAgent、房间消息/delivery 和事件归属字段；旧 Session 可无损映射为 synthetic primary；新增 `roomId + roomAgentId` 活动表，流事件按 Agent 分批，事件、状态、终态、quiet snapshot、轮询和 Server -> SDK 迁移均先解析 runtime owner；64 个文件、450 项测试通过，`pnpm build` 通过。
+- 未完成：完整房间时间线投影、官方目录与恢复、添加 Agent UI、精确路由与并行队列、Agent scoped 操作、搜索/导出/归档以及视觉和真实流程验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
 - 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/utils/eventMapper.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/ChatThread.tsx`。
-- 下一步：实现 `roomId + roomAgentId` 活动表，让事件、终态和轮询先解析 owner，再进入 Agent scoped 合并。
+- 下一步：实现房间用户消息和 Agent turn 的稳定时间线投影，并把 canonical snapshot/undo 收口为 Agent scoped reconcile 入口。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
 

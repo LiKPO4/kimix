@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity } from "@/types/ui";
 import { DEFAULT_CUSTOM_THEME_PALETTE, DEFAULT_KIMI_THEME_PRESETS, DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
+import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
 const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
@@ -62,6 +63,9 @@ export interface AppStore extends AppState {
   setPermissionMode: (mode: PermissionMode) => void;
   setIsRunning: (running: boolean) => void;
   setRunningSessionId: (sessionId: string | null) => void;
+  setRoomAgentActivity: (activity: RoomAgentActivity) => void;
+  removeRoomAgentActivity: (roomId: string, roomAgentId: string) => void;
+  clearRoomAgentActivities: (roomId?: string) => void;
   setCreatingSessionProjectPath: (projectPath: string | null) => void;
   setDefaultThinking: (thinking: boolean) => void;
   setDefaultPlanMode: (enabled: boolean) => void;
@@ -107,6 +111,7 @@ export const useAppStore = create<AppStore>((set) => ({
   permissionMode: "manual",
   isRunning: false,
   runningSessionId: null,
+  roomAgentActivities: {},
   creatingSessionProjectPath: null,
   defaultThinking: true,
   defaultPlanMode: false,
@@ -144,6 +149,24 @@ export const useAppStore = create<AppStore>((set) => ({
   setPermissionMode: (mode) => set({ permissionMode: mode }),
   setIsRunning: (running) => set({ isRunning: running }),
   setRunningSessionId: (sessionId) => set({ runningSessionId: sessionId, isRunning: Boolean(sessionId) }),
+  setRoomAgentActivity: (activity) => set((state) => ({
+    roomAgentActivities: {
+      ...state.roomAgentActivities,
+      [roomAgentActivityKey(activity.roomId, activity.roomAgentId)]: activity,
+    },
+  })),
+  removeRoomAgentActivity: (roomId, roomAgentId) => set((state) => {
+    const key = roomAgentActivityKey(roomId, roomAgentId);
+    if (!state.roomAgentActivities[key]) return state;
+    const roomAgentActivities = { ...state.roomAgentActivities };
+    delete roomAgentActivities[key];
+    return { roomAgentActivities };
+  }),
+  clearRoomAgentActivities: (roomId) => set((state) => ({
+    roomAgentActivities: roomId
+      ? Object.fromEntries(Object.entries(state.roomAgentActivities).filter(([, activity]) => activity.roomId !== roomId))
+      : {},
+  })),
   setCreatingSessionProjectPath: (projectPath) => set({ creatingSessionProjectPath: projectPath }),
   setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
   setDefaultPlanMode: (enabled) => set({ defaultPlanMode: enabled }),

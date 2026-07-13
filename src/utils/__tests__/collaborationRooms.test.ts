@@ -5,13 +5,16 @@ import {
   getEventRoomAgentId,
   getPrimaryRoomAgent,
   getRoomAgentRuntimeId,
+  getRoomAgentSessionView,
   getRoomAgents,
   getSyntheticPrimaryAgentId,
   mirrorPrimaryAgentToLegacySession,
+  replaceRoomAgentEvents,
   resolveRoomRuntimeOwner,
   scopeEventToRoomAgent,
 } from "../collaborationRooms";
 import { getRuntimeSessionId } from "../runtimeSession";
+import { mergeEvents } from "../eventMapper";
 
 function legacySession(events: TimelineEvent[] = []): Session {
   return {
@@ -139,5 +142,96 @@ describe("collaborationRooms", () => {
     expect(mirrored.runtimeSessionId).toBe("runtime-primary-next");
     expect(mirrored.model).toBe("kimi-code/k2.5");
     expect(mirrored.events.map((event) => event.id)).toEqual(["user-next"]);
+  });
+
+  it("replaces only the selected Agent event partition", () => {
+    const session = legacySession([{ id: "primary-old", type: "user_message", timestamp: 1, content: "Primary" }]);
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        agents: [primary, secondaryAgent()],
+        agentEvents: {
+          ...collaboration.agentEvents,
+          "agent-secondary": [{ id: "secondary-old", type: "user_message", timestamp: 2, content: "Secondary", roomAgentId: "agent-secondary" }],
+        },
+      },
+    };
+    const nextSecondaryEvents: TimelineEvent[] = [
+      { id: "secondary-next", type: "user_message", timestamp: 3, content: "Next", roomAgentId: "agent-secondary" },
+    ];
+
+    const next = replaceRoomAgentEvents(room, "agent-secondary", nextSecondaryEvents);
+    expect(next.events.map((event) => event.id)).toEqual(["primary-old"]);
+    expect(next.collaboration?.agentEvents[primary.id].map((event) => event.id)).toEqual(["primary-old"]);
+    expect(next.collaboration?.agentEvents["agent-secondary"]).toBe(nextSecondaryEvents);
+    expect(getRoomAgentSessionView(next, "agent-secondary")).toMatchObject({
+      runtimeSessionId: "runtime-secondary",
+      model: "openai/gpt-5",
+      events: nextSecondaryEvents,
+    });
+  });
+
+  it("keeps identical tool and Assistant identities isolated by Agent partition", () => {
+    const session = legacySession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const secondary = secondaryAgent();
+    let room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        agents: [primary, secondary],
+        agentEvents: { [primary.id]: [], [secondary.id]: [] },
+      },
+    };
+    const primaryAssistant: TimelineEvent = {
+      id: "assistant-shared",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "A",
+      isThinking: false,
+      isComplete: false,
+      roomAgentId: primary.id,
+    };
+    const secondaryAssistant: TimelineEvent = {
+      ...primaryAssistant,
+      content: "B",
+      roomAgentId: secondary.id,
+    };
+    const primaryTool: TimelineEvent = {
+      id: "tool-a",
+      type: "tool_call",
+      timestamp: 2,
+      toolCallId: "call-shared",
+      toolName: "Read",
+      status: "running",
+      arguments: {},
+      roomAgentId: primary.id,
+    };
+    const secondaryTool: TimelineEvent = { ...primaryTool, id: "tool-b", roomAgentId: secondary.id };
+
+    room = replaceRoomAgentEvents(room, primary.id, mergeEvents([], primaryAssistant));
+    room = replaceRoomAgentEvents(room, secondary.id, mergeEvents([], secondaryAssistant));
+    room = replaceRoomAgentEvents(room, primary.id, mergeEvents(room.collaboration?.agentEvents[primary.id] ?? [], primaryTool));
+    room = replaceRoomAgentEvents(room, secondary.id, mergeEvents(room.collaboration?.agentEvents[secondary.id] ?? [], secondaryTool));
+    room = replaceRoomAgentEvents(room, primary.id, mergeEvents(room.collaboration?.agentEvents[primary.id] ?? [], {
+      id: "result-a",
+      type: "tool_result",
+      timestamp: 3,
+      toolCallId: "call-shared",
+      toolName: "Read",
+      result: "A done",
+      roomAgentId: primary.id,
+    }));
+
+    const primaryEvents = room.collaboration?.agentEvents[primary.id] ?? [];
+    const secondaryEvents = room.collaboration?.agentEvents[secondary.id] ?? [];
+    expect(primaryEvents.find((event) => event.type === "assistant_message")).toMatchObject({ content: "A" });
+    expect(secondaryEvents.find((event) => event.type === "assistant_message")).toMatchObject({ content: "B" });
+    expect(primaryEvents.find((event) => event.type === "tool_call")).toMatchObject({ status: "success", result: "A done" });
+    expect(secondaryEvents.find((event) => event.type === "tool_call")).toMatchObject({ status: "running" });
   });
 });

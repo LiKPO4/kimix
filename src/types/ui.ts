@@ -40,6 +40,28 @@ export interface KimiThemePreset {
 }
 
 export type PermissionMode = "manual" | "auto" | "yolo";
+export type RoomAgentActivityStatus =
+  | "idle"
+  | "creating"
+  | "queued"
+  | "sending"
+  | "running"
+  | "waiting_approval"
+  | "waiting_question"
+  | "completed"
+  | "interrupted"
+  | "error";
+
+export interface RoomAgentActivity {
+  roomId: string;
+  roomAgentId: string;
+  runtimeSessionId?: string;
+  status: RoomAgentActivityStatus;
+  activeTurnId?: string;
+  startedAt?: number;
+  updatedAt: number;
+}
+
 export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm";
@@ -52,6 +74,7 @@ export interface AppState {
   permissionMode: PermissionMode;
   isRunning: boolean;
   runningSessionId: string | null;
+  roomAgentActivities: Record<string, RoomAgentActivity>;
   creatingSessionProjectPath: string | null;
   defaultThinking: boolean;
   defaultPlanMode: boolean;

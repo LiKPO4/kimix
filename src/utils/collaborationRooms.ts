@@ -19,6 +19,10 @@ export interface RoomRuntimeOwner {
   agent: RoomAgent;
 }
 
+export function roomAgentActivityKey(roomId: string, roomAgentId: string): string {
+  return JSON.stringify([roomId, roomAgentId]);
+}
+
 export function getSyntheticPrimaryAgentId(sessionId: string): string {
   return `room-agent:${sessionId}`;
 }
@@ -98,6 +102,84 @@ export function getRoomAgentRuntimeId(session: Session, roomAgentId: string): st
 
 export function getEventRoomAgentId(session: Session, event: TimelineEvent): string {
   return event.roomAgentId ?? getPrimaryRoomAgent(session).id;
+}
+
+export function isPrimaryRoomAgent(session: Session, roomAgentId: string): boolean {
+  return getPrimaryRoomAgent(session).id === roomAgentId;
+}
+
+export function getRoomAgentEvents(session: Session, roomAgentId: string): TimelineEvent[] {
+  if (!session.collaboration) return session.events;
+  return session.collaboration.agentEvents[roomAgentId] ?? [];
+}
+
+export function updateRoomAgent(
+  session: Session,
+  roomAgentId: string,
+  updater: (agent: RoomAgent) => RoomAgent,
+): Session {
+  if (!session.collaboration) return session;
+  const next: Session = {
+    ...session,
+    collaboration: {
+      ...session.collaboration,
+      agents: session.collaboration.agents.map((agent) => (
+        agent.id === roomAgentId ? updater(agent) : agent
+      )),
+    },
+  };
+  return isPrimaryRoomAgent(next, roomAgentId) ? mirrorPrimaryAgentToLegacySession(next) : next;
+}
+
+export function replaceRoomAgentEvents(
+  session: Session,
+  roomAgentId: string,
+  events: TimelineEvent[],
+): Session {
+  if (!session.collaboration) return { ...session, events };
+  const next: Session = {
+    ...session,
+    collaboration: {
+      ...session.collaboration,
+      agentEvents: {
+        ...session.collaboration.agentEvents,
+        [roomAgentId]: events,
+      },
+    },
+  };
+  return isPrimaryRoomAgent(next, roomAgentId) ? mirrorPrimaryAgentToLegacySession(next) : next;
+}
+
+export function updateRoomAgentEvents(
+  session: Session,
+  roomAgentId: string,
+  updater: (events: TimelineEvent[]) => TimelineEvent[],
+): Session {
+  return replaceRoomAgentEvents(session, roomAgentId, updater(getRoomAgentEvents(session, roomAgentId)));
+}
+
+export function getRoomAgentSessionView(session: Session, roomAgentId: string): Session {
+  if (!session.collaboration) return session;
+  const agent = getRoomAgent(session, roomAgentId);
+  if (!agent) return session;
+  return {
+    ...session,
+    runtimeSessionId: agent.runtimeSessionId,
+    officialSessionId: agent.officialSessionId,
+    skillRegistrySyncedAt: agent.skillRegistrySyncedAt,
+    skillForkParentSessionId: agent.skillForkParentSessionId,
+    kimiHistoryCacheVersion: agent.kimiHistoryCacheVersion,
+    officialCatalogConfirmedAt: agent.officialCatalogConfirmedAt,
+    swarmModeLockedAt: agent.swarmModeLockedAt,
+    swarmMode: agent.swarmMode,
+    swarmModeDesired: agent.swarmModeDesired,
+    model: agent.modelAlias,
+    modelSwitchedAt: agent.modelSwitchedAt,
+    switchedToModel: agent.switchedToModel,
+    officialGoal: agent.officialGoal,
+    btwRounds: agent.btwRounds,
+    events: getRoomAgentEvents(session, roomAgentId),
+  };
 }
 
 export function scopeEventToRoomAgent<T extends TimelineEvent>(
