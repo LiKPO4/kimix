@@ -10,6 +10,9 @@ import { TodoPanel, getVisibleTodos } from "./TodoPanel";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
+import { AddRoomAgentDialog } from "./AddRoomAgentDialog";
+import { EditRoomAgentDialog } from "./EditRoomAgentDialog";
+import { RoomAgentPicker } from "./RoomAgentPicker";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isWindows } from "@/utils/platform";
@@ -25,7 +28,7 @@ import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { getPrimaryRoomAgent, hasMultipleRoomAgents } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import {
   bindRecoveredRoomAgentRuntime,
@@ -33,6 +36,18 @@ import {
   resumeRoomAgentRuntime,
   roomAgentCanResume,
 } from "@/utils/roomAgentRecovery";
+import { persistLocalConversationState } from "@/utils/persistence";
+import {
+  bindProvisionedRoomAgent,
+  failRoomAgentProvisioning,
+  getRoomPrimaryMetadataIdentity,
+  isMultiAgentRoomUiEnabled,
+  prepareRoomAgentProvisioning,
+  renameRoomAgent,
+  type RoomAgentDraft,
+} from "@/utils/roomAgentProvisioning";
+import { createRoomMessageDispatch, dispatchQueuedRoomDelivery } from "@/utils/roomDelivery";
+import { detachRoomAgentAsSession, roomHasActiveAgentWork } from "@/utils/sessionArchive";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -459,9 +474,13 @@ export function Composer() {
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
   const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
+  const setRoomAgentActivity = useAppStore((s) => s.setRoomAgentActivity);
+  const removeRoomAgentActivity = useAppStore((s) => s.removeRoomAgentActivity);
 
   const updateSession = useSessionStore((s) => s.updateSession);
   const addSession = useSessionStore((s) => s.addSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
   const addPendingMessage = useSessionStore((s) => s.addPendingMessage);
   const allPendingMessages = useSessionStore((s) => s.pendingMessages);
   const removePendingMessage = useSessionStore((s) => s.removePendingMessage);
@@ -476,28 +495,59 @@ export function Composer() {
   const [isFocused, setIsFocused] = useState(false);
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
   const [pendingMoreId, setPendingMoreId] = useState<string | null>(null);
+  const [showAddRoomAgentDialog, setShowAddRoomAgentDialog] = useState(false);
+  const [addRoomAgentTargetId, setAddRoomAgentTargetId] = useState<string | null>(null);
+  const [addRoomAgentBusy, setAddRoomAgentBusy] = useState(false);
+  const [addRoomAgentError, setAddRoomAgentError] = useState("");
+  const [roomAgentMutationId, setRoomAgentMutationId] = useState<string | null>(null);
+  const [editingRoomAgentId, setEditingRoomAgentId] = useState<string | null>(null);
+  const [editRoomAgentBusy, setEditRoomAgentBusy] = useState(false);
+  const [editRoomAgentError, setEditRoomAgentError] = useState("");
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
   const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
+  const multiAgentRoomUiEnabled = isMultiAgentRoomUiEnabled();
+  const activeRoomAgents = activeSession?.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
+  const activeRoomPrimary = activeSession ? getPrimaryRoomAgent(activeSession) : null;
+  const selectedRoomAgent = activeSession?.collaboration
+    ? activeRoomAgents.find((agent) => agent.id === activeSession.collaboration?.focusedAgentId)
+      ?? activeRoomAgents.find((agent) => activeSession.collaboration?.defaultRecipientIds.includes(agent.id))
+      ?? activeRoomPrimary
+    : null;
+  const selectedRoomAgentId = selectedRoomAgent?.id ?? activeRoomPrimary?.id;
+  const activeRoomBusy = Boolean(activeSession?.collaboration && roomHasActiveAgentWork(
+    activeSession,
+    Object.values(roomAgentActivities),
+  ));
+  const roomReadOnly = Boolean(activeSession?.collaboration && !multiAgentRoomUiEnabled);
+  const selectedSecondaryRoomAgent = Boolean(
+    activeSession?.collaboration && selectedRoomAgentId && selectedRoomAgentId !== activeSession.collaboration.primaryAgentId,
+  );
+  const selectedRoomAgentUnavailable = Boolean(
+    selectedRoomAgent?.archivedAt || selectedRoomAgent?.provisioningError || selectedRoomAgent?.recoveryIssue,
+  );
+  const editingRoomAgent = activeSession && editingRoomAgentId
+    ? getRoomAgent(activeSession, editingRoomAgentId)
+    : undefined;
   const pendingMessages = currentSession
     ? allPendingMessages.filter((msg) => msg.sessionId === currentSession.id)
     : [];
   const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
   const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
-  const hasActiveAssistantTurn = isCurrentSessionRunning;
-  const swarmModeEnabled = displayedSwarmMode(activeSession);
-  const swarmModePending = hasPendingSwarmMode(activeSession);
+  const hasActiveAssistantTurn = isCurrentSessionRunning || activeRoomBusy;
+  const swarmModeEnabled = displayedSwarmMode(activeSession ?? undefined);
+  const swarmModePending = hasPendingSwarmMode(activeSession ?? undefined);
   const canSteerActiveTurn = Boolean(
     activeRuntimeSessionId &&
     isCurrentSessionRunning
   );
   const shouldShowStopButton = isCurrentSessionRunning;
-  const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff;
-  const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn;
+  const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
+  const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn && !selectedSecondaryRoomAgent;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -519,6 +569,16 @@ export function Composer() {
   useEffect(() => {
     if (focusInputTrigger > 0) inputRef.current?.focus();
   }, [focusInputTrigger]);
+
+  useEffect(() => {
+    if (showAddRoomAgentDialog && addRoomAgentTargetId && activeSession?.id !== addRoomAgentTargetId) {
+      setShowAddRoomAgentDialog(false);
+      setAddRoomAgentTargetId(null);
+    }
+    if (editingRoomAgentId && activeSession && !getRoomAgent(activeSession, editingRoomAgentId)) {
+      setEditingRoomAgentId(null);
+    }
+  }, [activeSession, addRoomAgentTargetId, editingRoomAgentId, showAddRoomAgentDialog]);
 
   useEffect(() => {
     const handleAddDrawingImage = (event: Event) => {
@@ -638,8 +698,11 @@ export function Composer() {
         return commandText.includes(`${rootCommand} ${subcommandQuery}`) || detail.includes(subcommandQuery);
       })
     : [];
+  const roomAwareMentionBaseItems = activeSession?.collaboration
+    ? mentionBaseItems.filter((item) => item.kind !== "agent")
+    : mentionBaseItems;
   const filteredMentionBaseItems = activeCompletion?.mode === "mention"
-    ? mentionBaseItems.filter((item) => {
+    ? roomAwareMentionBaseItems.filter((item) => {
         const query = activeCompletion.query.toLowerCase();
         return item.label.toLowerCase().includes(query) || item.detail?.toLowerCase().includes(query);
       })
@@ -867,14 +930,14 @@ export function Composer() {
     return latest;
   };
 
-  const ensureSession = async () => {
+  const ensureSession = async (): Promise<Session | null> => {
     if (currentSession) {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
     }
     if (!currentProject) return null;
     const model = await getDefaultKimiModel();
     // Kimi Code 主链路：仅创建本地会话对象，真实官方 session 延迟到首条消息发送时再创建。
-    const session = {
+    const session: Session = {
       id: genId(),
       engine: "kimi-code" as const,
       model,
@@ -890,11 +953,194 @@ export function Composer() {
     return session;
   };
 
+  const resumeRoomAgentForPrompt = async (roomId: string, roomAgentId: string) => {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+    if (!latest) throw new Error("房间会话不存在");
+    const agent = getRoomAgent(latest, roomAgentId);
+    if (!agent) throw new Error("目标 Agent 不存在");
+    if (!roomAgentCanResume(latest, roomAgentId)) {
+      throw new Error(agent.recoveryIssue?.message ?? "目标 Agent 当前不可用");
+    }
+    const resumed = await resumeRoomAgentRuntime({
+      session: latest,
+      roomAgentId,
+      additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+      resume: (request) => window.api.resumeKimiCodeSession(request),
+    });
+    if (!resumed.success) throw new Error(resumed.error);
+    updateSession(roomId, (session) => bindRecoveredRoomAgentRuntime(session, roomAgentId, {
+      sessionId: resumed.data.sessionId,
+      model: resumed.data.model,
+    }));
+    syncCurrentSessionFromStore(roomId);
+    const persisted = await persistLocalConversationState();
+    if (!persisted.success) throw new Error(`保存 Agent runtime 绑定失败：${persisted.error}`);
+    return resumed.data.sessionId;
+  };
+
+  const sendSingleRoomPrompt = async (
+    session: Session,
+    roomAgentId: string,
+    content: string,
+    options?: { images?: ImageAttachment[]; manualSubmitAutoScroll?: boolean; skipClarification?: boolean },
+  ) => {
+    const agent = getRoomAgent(session, roomAgentId);
+    if (!agent || agent.removedAt || agent.archivedAt) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "目标 Agent 不存在、已移出或已归档。" }));
+      return false;
+    }
+    if (agent.provisioningError || agent.recoveryIssue) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: agent.provisioningError || agent.recoveryIssue?.message || "目标 Agent 当前不可用。",
+      }));
+      return false;
+    }
+    const images = options?.images ?? [];
+    const contentWithAttachments = buildAttachmentPromptContent(content, images);
+    const outboundContent = session.longTask || options?.skipClarification
+      ? contentWithAttachments
+      : withClarificationBehavior(contentWithAttachments, clarificationToolMode);
+    const created = createRoomMessageDispatch(session, {
+      content,
+      images: toUserAttachments(images),
+      recipientAgentIds: [roomAgentId],
+    });
+    const baseSession = session;
+    const roomMessageId = created.message.id;
+    const delivery = created.message.deliveries[roomAgentId];
+    updateSession(session.id, () => created.session);
+    syncCurrentSessionFromStore(session.id);
+    setRoomAgentActivity({
+      roomId: session.id,
+      roomAgentId,
+      runtimeSessionId: agent.runtimeSessionId ?? agent.officialSessionId,
+      status: "queued",
+      roomMessageId,
+      activeTurnId: delivery.agentTurnId,
+      updatedAt: Date.now(),
+    });
+    if (options?.manualSubmitAutoScroll !== false) {
+      window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
+        detail: { sessionId: session.id },
+      }));
+    }
+
+    let runtimeSessionId = agent.runtimeSessionId ?? agent.officialSessionId;
+    const result = await dispatchQueuedRoomDelivery({
+      roomMessageId,
+      roomAgentId,
+      getSession: () => useSessionStore.getState().sessions.find((candidate) => candidate.id === session.id) ?? created.session,
+      setSession: (next) => {
+        updateSession(session.id, () => next);
+        syncCurrentSessionFromStore(session.id);
+      },
+      persist: async () => persistLocalConversationState(),
+      send: async ({ delivery: currentDelivery }) => {
+        if (!runtimeSessionId) {
+          try {
+            runtimeSessionId = await resumeRoomAgentForPrompt(session.id, roomAgentId);
+          } catch (error) {
+            return {
+              success: false as const,
+              certainty: "not-sent" as const,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        }
+        setRoomAgentActivity({
+          roomId: session.id,
+          roomAgentId,
+          runtimeSessionId,
+          status: "sending",
+          roomMessageId,
+          activeTurnId: currentDelivery.agentTurnId,
+          startedAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        let response = await sendKimiCodePromptWithRetry({
+          sessionId: runtimeSessionId,
+          content: outboundContent,
+          images: toPromptImages(images),
+        });
+        if (!response.success && /not active|not found|session/i.test(response.error)) {
+          try {
+            runtimeSessionId = await resumeRoomAgentForPrompt(session.id, roomAgentId);
+          } catch (error) {
+            return {
+              success: false as const,
+              certainty: "not-sent" as const,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+          setRoomAgentActivity({
+            roomId: session.id,
+            roomAgentId,
+            runtimeSessionId,
+            status: "sending",
+            roomMessageId,
+            activeTurnId: currentDelivery.agentTurnId,
+            startedAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          response = await sendKimiCodePromptWithRetry({
+            sessionId: runtimeSessionId,
+            content: outboundContent,
+            images: toPromptImages(images),
+          });
+        }
+        if (!response.success) {
+          return {
+            success: false as const,
+            certainty: isKimiActiveTurnError(response.error) || /not active|not found/i.test(response.error)
+              ? "not-sent" as const
+              : "unknown" as const,
+            error: response.error,
+          };
+        }
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route)}`,
+        }));
+        return { success: true as const };
+      },
+    });
+
+    if (!result.success) {
+      if (result.error.startsWith("queued 状态保存失败")) {
+        updateSession(session.id, () => baseSession);
+        syncCurrentSessionFromStore(session.id);
+        removeRoomAgentActivity(session.id, roomAgentId);
+      } else {
+        setRoomAgentActivity({
+          roomId: session.id,
+          roomAgentId,
+          runtimeSessionId,
+          status: "error",
+          roomMessageId,
+          activeTurnId: delivery.agentTurnId,
+          updatedAt: Date.now(),
+        });
+      }
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `发送给 ${agent.displayName} 失败：${result.error}` }));
+      return false;
+    }
+    return true;
+  };
+
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
     const images = options?.images ?? [];
+    if (multiAgentRoomUiEnabled && targetSession.collaboration) {
+      const targetAgentId = targetSession.collaboration.focusedAgentId
+        ?? targetSession.collaboration.defaultRecipientIds[0]
+        ?? targetSession.collaboration.primaryAgentId;
+      return sendSingleRoomPrompt(targetSession, targetAgentId, content, {
+        images,
+        manualSubmitAutoScroll: options?.manualSubmitAutoScroll,
+        skipClarification: options?.skipClarification,
+      });
+    }
 
     const userEvent: TimelineEvent = {
       id: genId(),
@@ -1274,6 +1520,274 @@ export function Composer() {
     const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
     if (updated) setCurrentSession(updated);
     return { uiSessionId: targetSession.id, runtimeSessionId: createRes.data.sessionId };
+  };
+
+  const provisionRoomAgent = async (roomId: string, roomAgentId: string) => {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+    if (!latest?.collaboration) return { success: false as const, error: "房间会话不存在" };
+    const agent = getRoomAgent(latest, roomAgentId);
+    if (!agent || agent.removedAt) return { success: false as const, error: "Agent 不存在或已移出" };
+    const primarySessionId = getRoomPrimaryMetadataIdentity(latest);
+    if (!primarySessionId) return { success: false as const, error: "原会话尚未建立官方身份" };
+    setRoomAgentActivity({
+      roomId,
+      roomAgentId,
+      status: "creating",
+      updatedAt: Date.now(),
+    });
+    let response: Awaited<ReturnType<Window["api"]["createKimiCodeSession"]>>;
+    try {
+      response = await window.api.createKimiCodeSession({
+        id: agent.id,
+        workDir: latest.projectPath,
+        model: agent.modelAlias ?? undefined,
+        permission: agent.permissionMode,
+        planMode: defaultPlanMode,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
+        roomMetadata: {
+          schemaVersion: 1,
+          roomId,
+          roomAgentId: agent.id,
+          primarySessionId,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      updateSession(roomId, (session) => failRoomAgentProvisioning(session, roomAgentId, message));
+      syncCurrentSessionFromStore(roomId);
+      setRoomAgentActivity({
+        roomId,
+        roomAgentId,
+        status: "error",
+        updatedAt: Date.now(),
+      });
+      await persistLocalConversationState();
+      return { success: false as const, error: message };
+    }
+    if (!response.success) {
+      updateSession(roomId, (session) => failRoomAgentProvisioning(session, roomAgentId, response.error));
+      syncCurrentSessionFromStore(roomId);
+      setRoomAgentActivity({
+        roomId,
+        roomAgentId,
+        status: "error",
+        updatedAt: Date.now(),
+      });
+      await persistLocalConversationState();
+      return { success: false as const, error: response.error };
+    }
+    updateSession(roomId, (session) => bindProvisionedRoomAgent(
+      session,
+      roomAgentId,
+      response.data.sessionId,
+      agent.modelAlias,
+    ));
+    syncCurrentSessionFromStore(roomId);
+    setRoomAgentActivity({
+      roomId,
+      roomAgentId,
+      runtimeSessionId: response.data.sessionId,
+      status: "idle",
+      updatedAt: Date.now(),
+    });
+    const persisted = await persistLocalConversationState();
+    if (!persisted.success) {
+      const message = `官方 Agent 已创建，但本地绑定保存失败：${persisted.error}`;
+      updateSession(roomId, (session) => failRoomAgentProvisioning(session, roomAgentId, message));
+      syncCurrentSessionFromStore(roomId);
+      setRoomAgentActivity({
+        roomId,
+        roomAgentId,
+        runtimeSessionId: response.data.sessionId,
+        status: "error",
+        updatedAt: Date.now(),
+      });
+      await persistLocalConversationState();
+      return { success: false as const, error: message };
+    }
+    return { success: true as const };
+  };
+
+  const handleOpenAddRoomAgent = async () => {
+    if (!multiAgentRoomUiEnabled || !canUseComposer || activeRoomBusy) return;
+    const target = await ensureSession();
+    if (!target) return;
+    setShowAddMenu(false);
+    setAddRoomAgentError("");
+    setAddRoomAgentTargetId(target.id);
+    setShowAddRoomAgentDialog(true);
+  };
+
+  const handleAddRoomAgent = async (draft: RoomAgentDraft) => {
+    setAddRoomAgentBusy(true);
+    setAddRoomAgentError("");
+    try {
+      const primaryRuntime = await ensureOfficialRuntimeForSession();
+      if (!primaryRuntime) throw new Error("无法建立原会话 runtime");
+      const baseSession = useSessionStore.getState().sessions.find((session) => session.id === primaryRuntime.uiSessionId);
+      if (!baseSession) throw new Error("会话不存在");
+      const prepared = prepareRoomAgentProvisioning(
+        baseSession,
+        draft,
+        Object.values(useAppStore.getState().roomAgentActivities),
+      );
+      updateSession(baseSession.id, () => prepared.session);
+      syncCurrentSessionFromStore(baseSession.id);
+      setRoomAgentActivity({
+        roomId: baseSession.id,
+        roomAgentId: prepared.agent.id,
+        status: "creating",
+        updatedAt: Date.now(),
+      });
+      const intentPersisted = await persistLocalConversationState();
+      if (!intentPersisted.success) {
+        updateSession(baseSession.id, () => baseSession);
+        syncCurrentSessionFromStore(baseSession.id);
+        removeRoomAgentActivity(baseSession.id, prepared.agent.id);
+        await persistLocalConversationState();
+        throw new Error(`保存添加意图失败：${intentPersisted.error}`);
+      }
+      const result = await provisionRoomAgent(baseSession.id, prepared.agent.id);
+      setShowAddRoomAgentDialog(false);
+      setAddRoomAgentTargetId(null);
+      if (!result.success) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `Agent 已保留在房间中，可稍后重试：${result.error}`,
+        }));
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `已添加 ${prepared.agent.displayName}，下一条消息将只发送给它。`,
+      }));
+    } catch (error) {
+      setAddRoomAgentError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAddRoomAgentBusy(false);
+    }
+  };
+
+  const handleRetryRoomAgent = async (roomAgentId: string) => {
+    if (!activeSession?.collaboration || roomAgentMutationId) return;
+    setRoomAgentMutationId(roomAgentId);
+    const agent = getRoomAgent(activeSession, roomAgentId);
+    try {
+      const result = await provisionRoomAgent(activeSession.id, roomAgentId);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: result.success
+          ? `${agent?.displayName ?? "Agent"} 已恢复。`
+          : `${agent?.displayName ?? "Agent"} 重试失败：${result.error}`,
+      }));
+    } finally {
+      setRoomAgentMutationId(null);
+    }
+  };
+
+  const handleSelectRoomAgent = async (roomAgentId: string) => {
+    if (!activeSession?.collaboration || activeRoomBusy) return;
+    const previous = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id);
+    if (!previous?.collaboration) return;
+    const agent = getRoomAgent(previous, roomAgentId);
+    if (!agent || agent.removedAt || agent.archivedAt || agent.provisioningError || agent.recoveryIssue) return;
+    updateSession(previous.id, (session) => ({
+      ...session,
+      collaboration: session.collaboration ? {
+        ...session.collaboration,
+        focusedAgentId: roomAgentId,
+        defaultRecipientIds: [roomAgentId],
+      } : session.collaboration,
+      updatedAt: Date.now(),
+    }));
+    syncCurrentSessionFromStore(previous.id);
+    const persisted = await persistLocalConversationState();
+    if (!persisted.success) {
+      updateSession(previous.id, () => previous);
+      syncCurrentSessionFromStore(previous.id);
+      await persistLocalConversationState();
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `切换接收者失败：${persisted.error}` }));
+    }
+  };
+
+  const handleEditRoomAgent = (roomAgentId: string) => {
+    if (!activeSession?.collaboration || activeRoomBusy || roomAgentMutationId) return;
+    setEditRoomAgentError("");
+    setEditingRoomAgentId(roomAgentId);
+  };
+
+  const handleRenameRoomAgent = async (input: { displayName: string; mentionName: string }) => {
+    if (!activeSession?.collaboration || !editingRoomAgentId) return;
+    const previous = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id);
+    if (!previous) return;
+    setEditRoomAgentBusy(true);
+    setEditRoomAgentError("");
+    try {
+      const renamed = renameRoomAgent(
+        previous,
+        editingRoomAgentId,
+        input,
+        Object.values(useAppStore.getState().roomAgentActivities),
+      );
+      updateSession(previous.id, () => renamed);
+      syncCurrentSessionFromStore(previous.id);
+      const persisted = await persistLocalConversationState();
+      if (!persisted.success) {
+        updateSession(previous.id, () => previous);
+        syncCurrentSessionFromStore(previous.id);
+        await persistLocalConversationState();
+        throw new Error(persisted.error);
+      }
+      setEditingRoomAgentId(null);
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Agent 名称已更新。" }));
+    } catch (error) {
+      setEditRoomAgentError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setEditRoomAgentBusy(false);
+    }
+  };
+
+  const handleRemoveRoomAgent = async (roomAgentId: string) => {
+    if (!activeSession?.collaboration || roomAgentMutationId) return;
+    const previous = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id);
+    const agent = previous ? getRoomAgent(previous, roomAgentId) : undefined;
+    if (!previous || !agent) return;
+    if (!window.confirm(`将 ${agent.displayName} 移出房间？它的历史和官方会话会保留为独立会话。`)) return;
+    setRoomAgentMutationId(roomAgentId);
+    try {
+      const detached = detachRoomAgentAsSession(
+        previous,
+        roomAgentId,
+        new Set(useSessionStore.getState().sessions.map((session) => session.id)),
+        Date.now(),
+        Object.values(useAppStore.getState().roomAgentActivities),
+      );
+      updateSession(previous.id, () => detached.room);
+      addSession(detached.detached);
+      removeRoomAgentActivity(previous.id, roomAgentId);
+      syncCurrentSessionFromStore(previous.id);
+      const persisted = await persistLocalConversationState();
+      if (!persisted.success) {
+        updateSession(previous.id, () => previous);
+        deleteSession(detached.detached.id);
+        syncCurrentSessionFromStore(previous.id);
+        await persistLocalConversationState();
+        throw new Error(persisted.error);
+      }
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `${agent.displayName} 已移出房间，并保留为独立会话。`,
+      }));
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `移出 Agent 失败：${error instanceof Error ? error.message : String(error)}`,
+      }));
+    } finally {
+      setRoomAgentMutationId(null);
+    }
+  };
+
+  const openRoomAgentModelSettings = () => {
+    setShowAddRoomAgentDialog(false);
+    setAddRoomAgentTargetId(null);
+    setWorkspaceView("settings");
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-model-settings")), 80);
   };
 
   const setSwarmModeForCurrentSession = async (enabled: boolean, options?: { feedback?: "toast" | "status" }) => {
@@ -1864,6 +2378,24 @@ export function Composer() {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
+    if (activeSession?.collaboration && activeRoomBusy) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "当前房间仍有 Agent 在工作；单目标阶段暂不创建跨 Agent 队列。",
+      }));
+      return;
+    }
+    if (activeSession?.collaboration && selectedRoomAgentUnavailable) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: selectedRoomAgent?.provisioningError || selectedRoomAgent?.recoveryIssue?.message || "当前接收者不可用，请先恢复或切换 Agent。",
+      }));
+      return;
+    }
+    if (activeSession?.collaboration && trimmed.startsWith("/")) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "房间内的 Slash / Skill / Goal 等会话操作需要明确 Agent owner，当前阶段暂不执行。",
+      }));
+      return;
+    }
     if (hasActiveAssistantTurn && currentSession) {
       setInput("");
       setImageAttachments([]);
@@ -2514,8 +3046,16 @@ export function Composer() {
     yolo: "完全访问权限",
   }[permissionMode];
 
-  const placeholder = canUseComposer
-    ? "向 Agent 询问任何事。输入 @ 使用插件或提及文件"
+  const placeholder = roomReadOnly
+    ? "多 Agent 房间功能当前处于只读 gate"
+    : activeRoomBusy && activeSession?.collaboration
+      ? "当前房间 Agent 正在工作"
+      : selectedRoomAgentUnavailable && selectedRoomAgent
+        ? `${selectedRoomAgent.displayName} 当前不可用，请从接收者菜单恢复或切换`
+      : selectedRoomAgent && activeSession?.collaboration
+        ? `发送给 ${selectedRoomAgent.displayName}`
+        : canUseComposer
+          ? "向 Agent 询问任何事。输入 @ 使用插件或提及文件"
     : isCurrentSessionHandoff
       ? "正在生成交接内容..."
       : "请先选择项目";
@@ -2533,7 +3073,7 @@ export function Composer() {
     : goalStatus === "paused"
       ? "text-accent-warning"
       : "text-accent-primary";
-  const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
+  const canSendNow = canUseComposer && !activeRoomBusy && !selectedRoomAgentUnavailable && (input.trim().length > 0 || imageAttachments.length > 0);
   const hideComposerCard = (card: ComposerDockCard, label: string) => {
     setComposerCardHidden(composerCardSessionId, card, true);
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
@@ -2822,24 +3362,28 @@ export function Composer() {
           >
             {activeCompletion.mode === "mention" ? (
               <>
-                <div className="px-2 pb-1.5 text-[13px] text-[var(--kimix-panel-text-muted)]">智能体</div>
-                {filteredMentionBaseItems.filter((item) => item.kind === "agent").map((item) => {
-                  const index = completionItems.findIndex((candidate) => candidate.id === item.id);
-                  return (
-                    <button
-                      ref={(node) => { completionItemRefs.current[item.id] = node; }}
-                      key={item.id}
-                      type="button"
-                      onClick={() => applyCompletion(item)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
-                      style={{ paddingLeft: 10, paddingRight: 12 }}
-                    >
-                      <Bot size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
-                      <span className="shrink-0">{item.label}</span>
-                      {item.detail && <span className="min-w-0 truncate text-[var(--kimix-panel-text-muted)]">{item.detail}</span>}
-                    </button>
-                  );
-                })}
+                {filteredMentionBaseItems.some((item) => item.kind === "agent") && (
+                  <>
+                    <div className="px-2 pb-1.5 text-[13px] text-[var(--kimix-panel-text-muted)]">智能体</div>
+                    {filteredMentionBaseItems.filter((item) => item.kind === "agent").map((item) => {
+                      const index = completionItems.findIndex((candidate) => candidate.id === item.id);
+                      return (
+                        <button
+                          ref={(node) => { completionItemRefs.current[item.id] = node; }}
+                          key={item.id}
+                          type="button"
+                          onClick={() => applyCompletion(item)}
+                          className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                          style={{ paddingLeft: 10, paddingRight: 12 }}
+                        >
+                          <Bot size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
+                          <span className="shrink-0">{item.label}</span>
+                          {item.detail && <span className="min-w-0 truncate text-[var(--kimix-panel-text-muted)]">{item.detail}</span>}
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
                 <div className="px-2 pb-1.5 pt-2 text-[13px] text-[var(--kimix-panel-text-muted)]">插件</div>
                 {filteredMentionBaseItems.filter((item) => item.kind === "plugin").map((item) => {
                   const index = completionItems.findIndex((candidate) => candidate.id === item.id);
@@ -2986,7 +3530,31 @@ export function Composer() {
               {showAddMenu && (
                 <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[260px] rounded-xl" style={{ padding: "14px 14px 14px" }}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
-                    <section>
+                    {multiAgentRoomUiEnabled && (
+                      <section>
+                        <button
+                          type="button"
+                          disabled={!canUseComposer || activeRoomBusy || activeRoomAgents.length >= 4}
+                          onClick={() => void handleOpenAddRoomAgent()}
+                          className="grid w-full items-center rounded-xl text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                          style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto", gap: 10, minHeight: 48, paddingLeft: 8, paddingRight: 8 }}
+                          title={activeRoomAgents.length >= 4 ? "一个房间最多 4 个 Agent" : "添加使用独立上下文的 Agent"}
+                        >
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text-secondary)]">
+                            <Bot size={15} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[13.5px] font-medium text-[var(--kimix-panel-text)]">添加 Agent</span>
+                            <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">独立上下文与模型</span>
+                          </span>
+                          <span className="shrink-0 text-[12px] text-[var(--kimix-panel-text-muted)]">
+                            {activeRoomAgents.length || 1}/4
+                          </span>
+                        </button>
+                      </section>
+                    )}
+
+                    <section className={multiAgentRoomUiEnabled ? "border-t border-[var(--kimix-panel-divider)]" : undefined} style={multiAgentRoomUiEnabled ? { paddingTop: 14 } : undefined}>
                       <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <Palette size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
@@ -3050,7 +3618,7 @@ export function Composer() {
                         </div>
                         <button
                           type="button"
-                          disabled={!canUseComposer}
+                          disabled={!canUseComposer || selectedSecondaryRoomAgent}
                           onClick={() => {
                             setShowAddMenu(false);
                             void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" });
@@ -3072,8 +3640,27 @@ export function Composer() {
               )}
             </div>
 
+            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentId && (
+              <RoomAgentPicker
+                session={activeSession}
+                activities={roomAgentActivities}
+                selectedAgentId={selectedRoomAgentId}
+                busyAgentId={roomAgentMutationId}
+                disabled={!canUseComposer}
+                onSelect={(roomAgentId) => void handleSelectRoomAgent(roomAgentId)}
+                onEdit={handleEditRoomAgent}
+                onRetry={(roomAgentId) => void handleRetryRoomAgent(roomAgentId)}
+                onRemove={(roomAgentId) => void handleRemoveRoomAgent(roomAgentId)}
+              />
+            )}
+
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
-              <button disabled={!canUseComposer} onClick={() => setShowPermissionMenu((v) => !v)} className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35">
+              <button
+                disabled={!canUseComposer || selectedSecondaryRoomAgent}
+                onClick={() => setShowPermissionMenu((v) => !v)}
+                className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35"
+                title={selectedSecondaryRoomAgent ? "次要 Agent 的权限在添加时固定；Agent scoped 修改将在后续阶段开放" : undefined}
+              >
                 {(() => {
                   const PermissionIcon = permissionMenuIcons[permissionMode];
                   return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
@@ -3102,7 +3689,7 @@ export function Composer() {
             {activeSession && (
               <button
                 type="button"
-                disabled={!canUseComposer}
+                disabled={!canUseComposer || selectedSecondaryRoomAgent}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
                 className="kimix-icon-text-button kimix-muted-action is-compact min-w-[104px] border disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
@@ -3215,6 +3802,35 @@ export function Composer() {
           request={drawingBoardRequest}
           onClose={() => setDrawingBoardRequest(null)}
           onSave={handleSaveDrawingBoard}
+        />
+      )}
+
+      {showAddRoomAgentDialog && activeSession && activeSession.id === addRoomAgentTargetId && (
+        <AddRoomAgentDialog
+          open
+          session={activeSession}
+          busy={addRoomAgentBusy}
+          error={addRoomAgentError}
+          onClose={() => {
+            if (!addRoomAgentBusy) {
+              setShowAddRoomAgentDialog(false);
+              setAddRoomAgentTargetId(null);
+            }
+          }}
+          onSubmit={(draft) => void handleAddRoomAgent(draft)}
+          onOpenModelSettings={openRoomAgentModelSettings}
+        />
+      )}
+
+      {editingRoomAgent && (
+        <EditRoomAgentDialog
+          agent={editingRoomAgent}
+          busy={editRoomAgentBusy}
+          error={editRoomAgentError}
+          onClose={() => {
+            if (!editRoomAgentBusy) setEditingRoomAgentId(null);
+          }}
+          onSubmit={(input) => void handleRenameRoomAgent(input)}
         />
       )}
     </div>

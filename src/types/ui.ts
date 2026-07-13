@@ -45,6 +45,7 @@ export type RoomAgentActivityStatus =
   | "creating"
   | "queued"
   | "sending"
+  | "accepted"
   | "running"
   | "waiting_approval"
   | "waiting_question"

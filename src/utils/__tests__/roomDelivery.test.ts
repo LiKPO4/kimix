@@ -118,6 +118,33 @@ describe("roomDelivery", () => {
     });
   });
 
+  it("runtime 先进入 running 时，官方确认只补身份且不把 delivery 回退到 accepted", async () => {
+    const primary = getPrimaryRoomAgent(room());
+    let state = createRoomMessageDispatch(room(), {
+      content: "执行",
+      recipientAgentIds: [primary.id],
+      createId: deterministicIds(),
+    }).session;
+    const messageId = state.collaboration!.messages[0].id;
+    const result = await dispatchQueuedRoomDelivery({
+      roomMessageId: messageId,
+      roomAgentId: primary.id,
+      getSession: () => state,
+      setSession: (next) => { state = next; },
+      persist: async () => ({ success: true }),
+      send: async () => {
+        state = applyRoomDeliveryRuntimeStatus(state, messageId, primary.id, "running", 120);
+        return { success: true, officialPromptId: "prompt-fast" };
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(state.collaboration!.messages[0].deliveries[primary.id]).toMatchObject({
+      status: "running",
+      officialPromptId: "prompt-fast",
+    });
+  });
+
   it("sending 持久化失败时禁止调用网络并退回 queued", async () => {
     const primary = getPrimaryRoomAgent(room());
     let state = createRoomMessageDispatch(room(), {

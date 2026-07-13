@@ -84,11 +84,39 @@ export function prepareRoomAgentProvisioning(
       collaboration: {
         ...collaboration,
         focusedAgentId: agent.id,
+        defaultRecipientIds: [agent.id],
         agents: [...collaboration.agents, agent],
         agentEvents: { ...collaboration.agentEvents, [agent.id]: [] },
       },
       updatedAt: now,
     },
+  };
+}
+
+export function renameRoomAgent(
+  session: Session,
+  roomAgentId: string,
+  input: Pick<RoomAgentDraft, "displayName" | "mentionName">,
+  activities: Iterable<RoomAgentActivity> = [],
+  now = Date.now(),
+) {
+  if (!session.collaboration) throw new Error("当前会话不是多 Agent 房间");
+  if (roomHasActiveAgentWork(session, activities)) throw new Error("房间仍有 Agent 在运行，暂时不能修改成员身份");
+  const current = session.collaboration.agents.find((agent) => agent.id === roomAgentId);
+  if (!current || current.removedAt) throw new Error("Agent 不存在或已移出房间");
+  if (current.archivedAt) throw new Error("请先恢复该 Agent，再修改名称");
+  const displayName = normalizeDisplayName(input.displayName);
+  const mentionName = normalizeMentionName(input.mentionName);
+  const peers = session.collaboration.agents.filter((agent) => !agent.removedAt && agent.id !== roomAgentId);
+  if (peers.some((agent) => agent.displayName.toLocaleLowerCase() === displayName.toLocaleLowerCase())) {
+    throw new Error("Agent 名称已存在");
+  }
+  if (peers.some((agent) => agent.mentionName.toLocaleLowerCase() === mentionName.toLocaleLowerCase())) {
+    throw new Error("@名称已存在");
+  }
+  return {
+    ...updateRoomAgent(session, roomAgentId, (agent) => ({ ...agent, displayName, mentionName })),
+    updatedAt: now,
   };
 }
 

@@ -328,7 +328,14 @@ export async function dispatchQueuedRoomDelivery(input: {
     };
   }
   if (result.success) {
-    input.setSession(setRoomDeliveryStatus(input.getSession(), input.roomMessageId, input.roomAgentId, "accepted", {
+    const latestDelivery = input.getSession().collaboration?.messages
+      .find((candidate) => candidate.id === input.roomMessageId)
+      ?.deliveries[input.roomAgentId];
+    if (!latestDelivery) {
+      return { success: false, certainty: "unknown", error: "官方已接收，但本地投递记录已丢失" };
+    }
+    const confirmedStatus = latestDelivery.status === "sending" ? "accepted" : latestDelivery.status;
+    input.setSession(setRoomDeliveryStatus(input.getSession(), input.roomMessageId, input.roomAgentId, confirmedStatus, {
       officialPromptId: result.officialPromptId,
       officialUserEventId: result.officialUserEventId,
       error: undefined,

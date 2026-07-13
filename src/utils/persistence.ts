@@ -448,7 +448,7 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
 export async function persistLocalConversationState(): Promise<PersistResult> {
   const state = useSessionStore.getState();
   const appState = useAppStore.getState();
-  const activeStatuses = new Set(["creating", "queued", "sending", "running", "waiting_approval", "waiting_question"]);
+  const activeStatuses = new Set(["creating", "queued", "sending", "accepted", "running", "waiting_approval", "waiting_question"]);
   const prepareEvents = (session: Session, roomAgentId: string | null, events: TimelineEvent[]) => {
     const activity = roomAgentId
       ? appState.roomAgentActivities[roomAgentActivityKey(session.id, roomAgentId)]

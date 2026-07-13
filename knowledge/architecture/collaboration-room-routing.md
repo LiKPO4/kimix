@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T17:50:00+08:00"
+timestamp: "2026-07-13T18:56:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -69,6 +69,9 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 # UI Stability
 
 * Single-Agent conversations do not show room controls.
+* The add-Agent and room-recipient controls are protected by a local development gate. With the gate closed, existing room data remains visible but read-only; ordinary sessions retain their existing composer and send path.
+* The first UI increment freezes exactly one recipient per room message. Busy rooms do not create an unowned shared queue, and Agent-scoped slash, Skill, Goal, permission, Plan, and Swarm mutations remain unavailable unless the selected owner is explicitly supported.
+* Display name and mention edits change only the local room identity. They do not recreate the official session, replace the model, or inject a preset role into Agent context.
 * Multi-recipient response blocks are created in user-selected order and never reordered by later timestamps.
 * `agentTurnId` is the permanent render identity. New stream events, snapshots, and runtime migration may update content but may not remount an existing block.
 * Manual history browsing and expansion state remain owned by the user while any Agent continues streaming.

@@ -7,6 +7,7 @@ import {
   isMultiAgentRoomUiEnabled,
   MULTI_AGENT_ROOM_UI_GATE_KEY,
   prepareRoomAgentProvisioning,
+  renameRoomAgent,
 } from "../roomAgentProvisioning";
 
 function session(): Session {
@@ -52,6 +53,7 @@ describe("roomAgentProvisioning", () => {
     });
     expect(prepared.session.collaboration?.agents).toHaveLength(2);
     expect(prepared.session.collaboration?.focusedAgentId).toBe("agent-reviewer");
+    expect(prepared.session.collaboration?.defaultRecipientIds).toEqual(["agent-reviewer"]);
     expect(prepared.session.collaboration?.agentEvents["agent-reviewer"]).toEqual([]);
     expect(getRoomPrimaryMetadataIdentity(prepared.session)).toBe("official-primary");
   });
@@ -117,5 +119,26 @@ describe("roomAgentProvisioning", () => {
     });
     expect(agent?.provisioningError).toBeUndefined();
     expect(bound.collaboration?.agentEvents[prepared.agent.id]).toEqual([]);
+  });
+
+  it("renames one Agent without changing its official binding and rejects duplicate identity", () => {
+    const prepared = prepareRoomAgentProvisioning(session(), {
+      displayName: "Reviewer",
+      mentionName: "reviewer",
+      modelAlias: "openai/gpt-5",
+      permissionMode: "manual",
+    }, [], 100, () => "agent-2");
+    const renamed = renameRoomAgent(prepared.session, prepared.agent.id, {
+      displayName: "Independent Auditor",
+      mentionName: "auditor",
+    }, [], 120);
+    expect(renamed.collaboration?.agents.find((agent) => agent.id === prepared.agent.id)).toMatchObject({
+      displayName: "Independent Auditor",
+      mentionName: "auditor",
+    });
+    expect(() => renameRoomAgent(renamed, prepared.agent.id, {
+      displayName: renamed.collaboration!.agents[0].displayName,
+      mentionName: "auditor",
+    })).toThrow("Agent 名称已存在");
   });
 });
