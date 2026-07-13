@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardCopy, FileText, Globe2, MessageSquare, Search, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { Session, TimelineEvent } from "@/types/ui";
+import type { Session } from "@/types/ui";
 import type { KimiCodeSessionSummary } from "../../../electron/types/ipc";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -11,15 +11,9 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { isSamePath } from "@/utils/pathCase";
-
-type SearchMatch = {
-  session: Session;
-  kind: string;
-  text: string;
-  timestamp: number;
-  eventId?: string;
-  searchText?: string;
-};
+import { getRoomAgent, resolveRoomRuntimeOwner, selectRoomAgent } from "@/utils/collaborationRooms";
+import { buildLocalSessionSearchMatches, type LocalSessionSearchMatch as SearchMatch } from "@/utils/sessionSearch";
+import { persistLocalConversationState } from "@/utils/persistence";
 
 type SearchScope = "project" | "all";
 
@@ -28,24 +22,10 @@ type GlobalSessionMatch = {
   kind: string;
   text: string;
   timestamp: number;
+  roomAgentId?: string;
+  agentName?: string;
+  modelLabel?: string;
 };
-
-function eventText(event: TimelineEvent): { kind: string; text: string }[] {
-  if (event.type === "user_message") return [{ kind: "用户消息", text: event.content }];
-  if (event.type === "steer_message") return [{ kind: "引导消息", text: event.content }];
-  if (event.type === "assistant_message") {
-    return [
-      { kind: "回复", text: event.content },
-      { kind: "思考", text: event.thinking ?? "" },
-    ];
-  }
-  if (event.type === "tool_call") return [{ kind: "工具", text: `${event.toolName} ${event.rawArguments ?? JSON.stringify(event.arguments)}` }];
-  if (event.type === "status_update") return [{ kind: "状态", text: event.message ?? "" }];
-  if (event.type === "error") return [{ kind: "错误", text: event.message }];
-  if (event.type === "todo") return [{ kind: "Todo", text: event.items.map((item) => item.content).join("\n") }];
-  if (event.type === "diff") return [{ kind: "变更", text: `${event.filePath}\n${event.oldText}\n${event.newText}` }];
-  return [];
-}
 
 function compact(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -249,47 +229,37 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [searchableSessions, currentProject]);
 
-  const openSession = (session: Session, targetEventId?: string, searchText?: string) => {
-    const current = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-    if (!current) addSession(session);
-    setCurrentSession(current ?? session);
+  const openSession = (match: SearchMatch) => {
+    const current = useSessionStore.getState().sessions.find((item) => item.id === match.session.id);
+    const baseSession = current ?? match.session;
+    const focusedSession = selectRoomAgent(baseSession, match.roomAgentId);
+    if (!current) addSession(focusedSession);
+    else if (focusedSession !== current) {
+      updateSession(current.id, () => focusedSession);
+      void persistLocalConversationState();
+    }
+    setCurrentSession(focusedSession);
     onClose();
-    if (targetEventId) {
+    if (match.eventId) {
       window.setTimeout(() => {
         window.dispatchEvent(new CustomEvent("kimix:focus-timeline-event", {
-          detail: { sessionId: session.id, eventId: targetEventId, searchText },
+          detail: { sessionId: match.session.id, eventId: match.eventId, searchText: match.searchText },
         }));
       }, 160);
     }
   };
 
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const all: SearchMatch[] = [];
-    for (const session of projectSessions) {
-      if (!q) {
-        all.push({ session, kind: "最近对话", text: session.title, timestamp: session.updatedAt });
-        continue;
-      }
-      if (session.title.toLowerCase().includes(q)) {
-        all.push({ session, kind: "标题", text: session.title, timestamp: session.updatedAt });
-      }
-      for (const event of session.events) {
-        for (const item of eventText(event)) {
-          const text = compact(item.text);
-          if (text && text.toLowerCase().includes(q)) {
-            all.push({ session, kind: item.kind, text, timestamp: event.timestamp, eventId: event.id, searchText: query.trim() });
-          }
-        }
-      }
-    }
-    return all.slice(0, 24);
+    return buildLocalSessionSearchMatches(projectSessions, query, 24);
   }, [projectSessions, query]);
 
   const globalMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const all: GlobalSessionMatch[] = [];
     for (const session of globalSessions) {
+      const owner = resolveRoomRuntimeOwner(sessions, session.id);
+      const room = owner ? sessions.find((item) => item.id === owner.roomId) : undefined;
+      const agent = room && owner ? getRoomAgent(room, owner.roomAgentId) : undefined;
       const title = session.title || session.lastPrompt || "历史对话";
       const text = compact([session.lastPrompt, session.workDir].filter(Boolean).join(" · "));
       const haystack = `${title}\n${text}\n${session.id}`.toLowerCase();
@@ -299,11 +269,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           kind: q ? "官方会话" : "最近官方会话",
           text: text || session.workDir,
           timestamp: session.updatedAt,
+          roomAgentId: owner?.roomAgentId,
+          agentName: agent?.displayName,
+          modelLabel: agent?.modelLabelSnapshot || agent?.modelAlias || undefined,
         });
       }
     }
     return all.slice(0, 40);
-  }, [globalSessions, query]);
+  }, [globalSessions, query, sessions]);
 
   const copyResumeCommand = async (session: KimiCodeSessionSummary) => {
     await navigator.clipboard?.writeText(formatResumeCommand(session));
@@ -312,7 +285,28 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const openGlobalSession = async (summary: KimiCodeSessionSummary) => {
-    const existing = useSessionStore.getState().sessions.find((item) => (
+    const sessionState = useSessionStore.getState();
+    const roomOwner = resolveRoomRuntimeOwner(sessionState.sessions, summary.id);
+    const room = roomOwner ? sessionState.sessions.find((item) => item.id === roomOwner.roomId) : undefined;
+    if (room && roomOwner) {
+      const focusedRoom = selectRoomAgent(room, roomOwner.roomAgentId);
+      if (focusedRoom !== room) {
+        updateSession(room.id, () => focusedRoom);
+        void persistLocalConversationState();
+      }
+      const project = recentProjects.find((item) => isSamePath(item.path, room.projectPath)) ?? {
+        id: room.projectPath,
+        name: room.projectPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || room.projectPath,
+        path: room.projectPath,
+        lastOpenedAt: Date.now(),
+      };
+      setCurrentProject(project);
+      setWorkspaceView("chat");
+      setCurrentSession(focusedRoom);
+      onClose();
+      return;
+    }
+    const existing = sessionState.sessions.find((item) => (
       item.id === summary.id || getRuntimeSessionId(item) === summary.id
     ));
     const session: Session = existing ?? {
@@ -382,7 +376,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       return;
     }
     const match = matches[selectedIndex];
-    if (match) openSession(match.session, match.eventId, match.searchText);
+    if (match) openSession(match);
   };
 
   if (!open) return null;
@@ -416,7 +410,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                   if (match) void openGlobalSession(match.session);
                 } else {
                   const match = matches[index];
-                  if (match) openSession(match.session, match.eventId, match.searchText);
+                  if (match) openSession(match);
                 }
               }
             }}
@@ -466,7 +460,9 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[14.5px] text-text-primary">{match.session.title || match.session.lastPrompt || "历史对话"}</span>
-                  <span className="mt-1 block truncate text-[13px] text-text-muted">{match.kind} · {match.text}</span>
+                  <span className="mt-1 block truncate text-[13px] text-text-muted">
+                    {[match.kind, match.agentName, match.modelLabel, match.text].filter(Boolean).join(" · ")}
+                  </span>
                 </span>
                 <button
                   className="kimix-icon-text-button text-text-muted hover:bg-surface-hover"
@@ -488,7 +484,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               key={`${match.session.id}-${match.kind}-${match.timestamp}-${index}`}
               data-search-index={index}
               onClick={() => {
-                openSession(match.session, match.eventId, match.searchText);
+                openSession(match);
               }}
               onMouseMove={() => setSelectedIndex(index)}
               className={`flex min-h-12 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
@@ -497,7 +493,9 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               {match.kind === "最近对话" || match.kind === "标题" ? <MessageSquare size={16} className="shrink-0 text-text-muted" /> : <FileText size={16} className="shrink-0 text-text-muted" />}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14.5px] text-text-primary">{match.session.title}</span>
-                <span className="mt-1 block truncate text-[13px] text-text-muted">{match.kind} · {match.text}</span>
+                <span className="mt-1 block truncate text-[13px] text-text-muted" title={[match.kind, match.agentName, match.modelLabel, match.text].filter(Boolean).join(" · ")}>
+                  {[match.kind, match.agentName ?? (match.roomAgentCount ? `${match.roomAgentCount} Agents` : undefined), match.modelLabel, match.text].filter(Boolean).join(" · ")}
+                </span>
               </span>
               {index < 9 && <span className="shrink-0 text-[12px] text-text-muted">Ctrl+{index + 1}</span>}
             </button>

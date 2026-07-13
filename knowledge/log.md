@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Room search indexes Agent partitions and folds runtime results**: Local matches expose Agent/model ownership and exact event focus, while global secondary runtime rows open their existing room instead of duplicating a session. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room notifications preserve Agent and turn identity**: Completion, question, and approval notifications include the Agent even with content preview disabled, and clicks select the owner Agent before focusing the exact timeline event/turn. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **All session-mutation surfaces share one Agent owner**: ContextBar model switching, AppShell Goal/BTW/Plan, and SessionToolbar official rename/fork/visualization/Kimi Web use the uniquely selected Agent and its activity authority. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Composer session mutations require one Agent owner**: Agent permission and Plan state are durable, direct Slash/Skill/Goal/Swarm/BTW operations use the selected Agent runtime and event partition, and single-target undo replaces only that Agent's canonical history. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

@@ -209,6 +209,25 @@ export function roomAgentActivityKey(roomId: string, roomAgentId: string): strin
   return JSON.stringify([roomId, roomAgentId]);
 }
 
+export function selectRoomAgent(session: Session, roomAgentId?: string): Session {
+  if (!session.collaboration || !roomAgentId) return session;
+  const agent = getRoomAgent(session, roomAgentId);
+  if (!agent || agent.removedAt || agent.archivedAt) return session;
+  if (
+    session.collaboration.focusedAgentId === roomAgentId &&
+    session.collaboration.defaultRecipientIds.length === 1 &&
+    session.collaboration.defaultRecipientIds[0] === roomAgentId
+  ) return session;
+  return {
+    ...session,
+    collaboration: {
+      ...session.collaboration,
+      defaultRecipientIds: [roomAgentId],
+      focusedAgentId: roomAgentId,
+    },
+  };
+}
+
 export function getSyntheticPrimaryAgentId(sessionId: string): string {
   return `room-agent:${sessionId}`;
 }

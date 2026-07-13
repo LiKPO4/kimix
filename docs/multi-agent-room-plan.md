@@ -402,7 +402,7 @@ interface AgentDelivery {
 
 ### 阶段 8：搜索、导出、归档和恢复
 
-- [ ] 搜索结果显示 Agent 名称/模型并稳定定位。
+- [x] 搜索结果显示 Agent 名称/模型，点击选择来源 Agent 并稳定定位事件；全局次要 session 反向折叠到现有房间。
 - [ ] Markdown 导出整个房间并标注接收者/说话者。
 - [ ] 官方 ZIP 导出选择具体 Agent。
 - [ ] 归档/恢复逐 Agent 报告结果。
@@ -536,6 +536,8 @@ git diff --check
 24. 阶段 7C2 已通过 74 个测试文件、536 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CcZ7ADVd.js`。
 25. 阶段 7D 已扩展桌面通知 IPC：完成、提问和审批通知包含 Agent 名称，关闭内容预览时仍保留非敏感 Agent fallback；点击选择对应 Agent 并复用 `kimix:focus-timeline-event` 定位 event/turn。
 26. 阶段 7D 已通过 74 个测试文件、538 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BVqfw5y3.js`。
+27. 阶段 8A 已新增逐 Agent 搜索索引：次要事件不再漏搜，结果包含 Agent/模型，点击同步接收者并定位 event；官方全会话命中次要 runtime 时打开房间而非创建重复会话。
+28. 阶段 8A 已通过 75 个测试文件、540 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-DlBfSW1u.js`。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

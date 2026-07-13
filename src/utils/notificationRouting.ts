@@ -1,5 +1,5 @@
 import type { Session, TimelineEvent } from "@/types/ui";
-import { getRoomAgent, getRoomAgentEvents, resolveRoomRuntimeOwner } from "@/utils/collaborationRooms";
+import { getRoomAgentEvents, resolveRoomRuntimeOwner, selectRoomAgent } from "@/utils/collaborationRooms";
 
 type ApprovalRequest = Extract<TimelineEvent, { type: "approval_request" }>;
 
@@ -41,22 +41,7 @@ export function resolveNotificationClickTarget(sessions: Session[], payload: Not
 }
 
 export function focusNotificationRoomAgent(session: Session, roomAgentId?: string): Session {
-  if (!session.collaboration || !roomAgentId) return session;
-  const agent = getRoomAgent(session, roomAgentId);
-  if (!agent || agent.removedAt || agent.archivedAt) return session;
-  if (
-    session.collaboration.focusedAgentId === roomAgentId &&
-    session.collaboration.defaultRecipientIds.length === 1 &&
-    session.collaboration.defaultRecipientIds[0] === roomAgentId
-  ) return session;
-  return {
-    ...session,
-    collaboration: {
-      ...session.collaboration,
-      defaultRecipientIds: [roomAgentId],
-      focusedAgentId: roomAgentId,
-    },
-  };
+  return selectRoomAgent(session, roomAgentId);
 }
 
 export function approvalRequestNotificationKey(event: ApprovalRequest) {
