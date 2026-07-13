@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T22:46:54+08:00"
+timestamp: "2026-07-13T22:57:07+08:00"
 ---
 
 # Collaboration Room Routing
@@ -64,6 +64,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Agent provisioning persists the local participant before official creation. Fixed room and Agent metadata allows an official session created immediately before a crash to be rebound idempotently instead of duplicated or hidden.
 * Secondary provisioning requests the stable room Agent ID as the official session ID and also searches metadata across empty, active, and archived catalog entries before creation. One active match resumes, while duplicate or archived matches stop automatic creation instead of guessing.
 * A bound secondary session is hidden as a duplicate sidebar row only after an exact supported metadata schema, project path, room ID, primary identity, and Agent ID match. The same room and Agent must have exactly one active candidate; missing, unknown, or ambiguous bindings keep every candidate discoverable as an independent conversation rather than making history invisible.
+* Global search exposes an explicit orphan filter for official sessions whose Kimix room source is present but no collaboration room owns the runtime identity. Valid metadata shows the original room and Agent IDs; invalid schemas remain recoverable as independent sessions. Opening an orphan never guesses or mutates a room binding.
 * Folding a secondary catalog row never claims the whole room from the primary catalog row. A catalog containing the primary and several uniquely bound secondary sessions still reconciles to one local room mirror, and secondary titles never replace the room title.
 * A Server-authoritative catalog marks only a bound secondary Agent whose active session is absent or archived as missing; it never archives the room because one participant disappeared. SDK fallback catalogs and failed catalog requests are non-authoritative and cannot infer deletion from absence.
 * Recovery failures are Agent-scoped durable issues. The failed Agent keeps its canonical history and can remain unavailable while successfully recovered participants continue to load and run.

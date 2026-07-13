@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-7、阶段 8 搜索与导出已完成，功能仍处于内部开发 gate；下一步完成逐 Agent 恢复报告、孤儿找回和真实跨 Provider/视觉验收。
+状态：已批准实施。阶段 0-8 已完成，功能仍处于内部开发 gate；下一步进入真实跨 Provider、并发、视觉和性能验收。
 
 ## 1. 产品目标
 
@@ -406,7 +406,7 @@ interface AgentDelivery {
 - [x] Markdown 导出整个房间并标注接收者/说话者。
 - [x] 官方 ZIP 导出选择具体 Agent。
 - [x] 归档/恢复逐 Agent 报告结果。
-- [ ] 提供孤儿 session 找回路径。
+- [x] 提供孤儿 session 找回路径。
 
 退出门禁：备份、重启、搜索、导出和部分失败路径全部通过。
 
@@ -543,6 +543,8 @@ git diff --check
 31. 阶段 8B 已通过 75 个测试文件、541 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-De8bjFy-.js`。额外 `tsc` 检查仍受仓库既有类型基线错误阻塞，本阶段新增类型错误已清理。
 32. 阶段 8C 将既有逐 Agent lifecycle outcome 贯通到侧栏、顶部会话菜单和设置归档恢复区；成功与失败 Agent 同时报告，部分失败继续保留可重试状态，Agent 选择器显示具体“归档失败/恢复失败”及错误提示。
 33. 阶段 8C 已通过 75 个测试文件、542 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CDdEAMyJ.js`。
+34. 阶段 8D 在搜索弹窗新增“待找回 Agent”筛选：带 Kimix 房间来源但未绑定本地 collaboration 房间的官方 session（包括异常 schema）保持可见，可明确作为独立会话打开，不对歧义房间执行自动重绑。
+35. 阶段 8D 已通过 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BfAVTea0.js`。阶段 8 全部退出项完成。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

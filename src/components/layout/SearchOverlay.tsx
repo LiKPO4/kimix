@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardCopy, FileText, Globe2, MessageSquare, Search, X } from "lucide-react";
+import { ClipboardCopy, FileText, Globe2, MessageSquare, MessageSquarePlus, Search, Unlink, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session } from "@/types/ui";
@@ -14,8 +14,9 @@ import { isSamePath } from "@/utils/pathCase";
 import { getRoomAgent, resolveRoomRuntimeOwner, selectRoomAgent } from "@/utils/collaborationRooms";
 import { buildLocalSessionSearchMatches, type LocalSessionSearchMatch as SearchMatch } from "@/utils/sessionSearch";
 import { persistLocalConversationState } from "@/utils/persistence";
+import { getOrphanRoomSessionInfo, type OrphanRoomSessionInfo } from "@/utils/orphanRoomSessions";
 
-type SearchScope = "project" | "all";
+type SearchScope = "project" | "all" | "orphan";
 
 type GlobalSessionMatch = {
   session: KimiCodeSessionSummary;
@@ -25,6 +26,8 @@ type GlobalSessionMatch = {
   roomAgentId?: string;
   agentName?: string;
   modelLabel?: string;
+  orphanInfo?: OrphanRoomSessionInfo;
+  orphanLabel?: string;
 };
 
 function compact(text: string): string {
@@ -139,7 +142,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   }, [open, currentProject?.path, scope]);
 
   useEffect(() => {
-    if (!open || scope !== "all" || globalSessions.length > 0) return;
+    if (!open || scope === "project" || globalSessions.length > 0) return;
     let cancelled = false;
     setLoadingGlobalSessions(true);
     void window.api.listKimiCodeSessions({}).then((res) => {
@@ -257,26 +260,37 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     const q = query.trim().toLowerCase();
     const all: GlobalSessionMatch[] = [];
     for (const session of globalSessions) {
+      const orphanInfo = getOrphanRoomSessionInfo(session, sessions);
+      if (scope === "orphan" && !orphanInfo) continue;
       const owner = resolveRoomRuntimeOwner(sessions, session.id);
       const room = owner ? sessions.find((item) => item.id === owner.roomId) : undefined;
       const agent = room && owner ? getRoomAgent(room, owner.roomAgentId) : undefined;
       const title = session.title || session.lastPrompt || "历史对话";
       const text = compact([session.lastPrompt, session.workDir].filter(Boolean).join(" · "));
-      const haystack = `${title}\n${text}\n${session.id}`.toLowerCase();
+      const orphanIdentity = orphanInfo
+        ? [orphanInfo.roomId, orphanInfo.roomAgentId].filter(Boolean).join(" · ")
+        : "";
+      const haystack = `${title}\n${text}\n${session.id}\n${orphanIdentity}`.toLowerCase();
       if (!q || haystack.includes(q)) {
         all.push({
           session,
-          kind: q ? "官方会话" : "最近官方会话",
+          kind: orphanInfo
+            ? orphanInfo.reason === "invalid_metadata" ? "房间元数据异常" : "待找回 Agent 会话"
+            : q ? "官方会话" : "最近官方会话",
           text: text || session.workDir,
           timestamp: session.updatedAt,
           roomAgentId: owner?.roomAgentId,
-          agentName: agent?.displayName,
+          agentName: orphanInfo?.roomAgentId ? `Agent ${orphanInfo.roomAgentId}` : agent?.displayName,
           modelLabel: agent?.modelLabelSnapshot || agent?.modelAlias || undefined,
+          orphanInfo: orphanInfo ?? undefined,
+          orphanLabel: orphanInfo
+            ? orphanInfo.reason === "invalid_metadata" ? "元数据无法解析" : `原房间 ${orphanInfo.roomId}`
+            : undefined,
         });
       }
     }
     return all.slice(0, 40);
-  }, [globalSessions, query, sessions]);
+  }, [globalSessions, query, scope, sessions]);
 
   const copyResumeCommand = async (session: KimiCodeSessionSummary) => {
     await navigator.clipboard?.writeText(formatResumeCommand(session));
@@ -361,7 +375,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     });
   };
 
-  const resultCount = scope === "all" ? globalMatches.length : matches.length;
+  const resultCount = scope === "project" ? matches.length : globalMatches.length;
   const moveSelection = (delta: number) => {
     if (resultCount === 0) return;
     const next = (selectedIndex + delta + resultCount) % resultCount;
@@ -370,7 +384,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const openSelected = () => {
-    if (scope === "all") {
+    if (scope !== "project") {
       const match = globalMatches[selectedIndex];
       if (match) void openGlobalSession(match.session);
       return;
@@ -405,7 +419,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               else if (event.ctrlKey && /^Digit[1-9]$/.test(event.code)) {
                 event.preventDefault();
                 const index = Number(event.code.slice(-1)) - 1;
-                if (scope === "all") {
+                if (scope !== "project") {
                   const match = globalMatches[index];
                   if (match) void openGlobalSession(match.session);
                 } else {
@@ -422,7 +436,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           </button>
         </div>
         <div ref={listRef} className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
-          <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
+          <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10, flexWrap: "wrap" }}>
             <button
               className={`kimix-icon-text-button ${scope === "project" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
               style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
@@ -439,14 +453,26 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               <Globe2 size={14} />
               全部工作目录
             </button>
+            <button
+              className={`kimix-icon-text-button ${scope === "orphan" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
+              style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+              onClick={() => setScope("orphan")}
+            >
+              <Unlink size={14} />
+              待找回 Agent
+            </button>
             {copyMessage && <span className="ml-auto text-[12px] text-text-muted">{copyMessage}</span>}
           </div>
           <div className="px-2 pb-2 text-[13px] text-text-muted">
-            {scope === "all"
-              ? loadingGlobalSessions ? "正在读取官方全会话..." : query.trim() ? `${globalMatches.length} 条匹配` : "官方全会话"
-              : loadingHistory ? "正在补充加载最近历史..." : historyListError || historyLoadMessage || (query.trim() ? `${matches.length} 条匹配` : "最近对话")}
+            {scope === "project"
+              ? loadingHistory ? "正在补充加载最近历史..." : historyListError || historyLoadMessage || (query.trim() ? `${matches.length} 条匹配` : "最近对话")
+              : loadingGlobalSessions
+                ? "正在读取官方全会话..."
+                : scope === "orphan"
+                  ? `${globalMatches.length} 条待找回 Agent 会话`
+                  : query.trim() ? `${globalMatches.length} 条匹配` : "官方全会话"}
           </div>
-          {scope === "all" ? (
+          {scope !== "project" ? (
             globalMatches.length > 0 ? globalMatches.map((match, index) => (
               <div
                 key={match.session.id}
@@ -461,22 +487,34 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 <span className="min-w-0">
                   <span className="block truncate text-[14.5px] text-text-primary">{match.session.title || match.session.lastPrompt || "历史对话"}</span>
                   <span className="mt-1 block truncate text-[13px] text-text-muted">
-                    {[match.kind, match.agentName, match.modelLabel, match.text].filter(Boolean).join(" · ")}
+                    {[match.kind, match.agentName, match.orphanLabel, match.modelLabel, match.text].filter(Boolean).join(" · ")}
                   </span>
                 </span>
-                <button
-                  className="kimix-icon-text-button text-text-muted hover:bg-surface-hover"
-                  style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
-                  onClick={(event) => { event.stopPropagation(); void copyResumeCommand(match.session); }}
-                  title={formatResumeCommand(match.session)}
-                >
-                  <ClipboardCopy size={14} />
-                  复制命令
-                </button>
+                {match.orphanInfo ? (
+                  <button
+                    className="kimix-icon-text-button text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                    style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                    onClick={(event) => { event.stopPropagation(); void openGlobalSession(match.session); }}
+                    title="作为独立会话打开；不会自动重绑到存在歧义的房间"
+                  >
+                    <MessageSquarePlus size={14} />
+                    独立打开
+                  </button>
+                ) : (
+                  <button
+                    className="kimix-icon-text-button text-text-muted hover:bg-surface-hover"
+                    style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                    onClick={(event) => { event.stopPropagation(); void copyResumeCommand(match.session); }}
+                    title={formatResumeCommand(match.session)}
+                  >
+                    <ClipboardCopy size={14} />
+                    复制命令
+                  </button>
+                )}
               </div>
             )) : (
               <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
-                没有找到官方会话
+                {scope === "orphan" ? "没有待找回的 Agent 会话" : "没有找到官方会话"}
               </div>
             )
           ) : matches.length > 0 ? matches.map((match, index) => (
