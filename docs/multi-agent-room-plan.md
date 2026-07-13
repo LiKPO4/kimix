@@ -49,6 +49,8 @@ Electron 主进程现有 Host 已按真实 session ID 使用 Map 管理 Server/S
 ```ts
 interface CollaborationState {
   schemaVersion: 1;
+  /** 最近一次由支持房间结构的版本同步 primary 顶层镜像的时间。 */
+  primaryMirrorUpdatedAt: number;
   primaryAgentId: string;
   defaultRecipientIds: string[];
   focusedAgentId?: string;
@@ -150,6 +152,16 @@ interface AgentDelivery {
 - `agentTurnId` 必须在网络发送前生成并持久化，不能由时间戳、数组位置或 snapshot 回放顺序临时生成。
 - snapshot 产生的稳定 source ID 只解决事件自身身份；它不能替代 room message、delivery 和 Agent turn 的关联。
 
+### 3.6 兼容写入与降级保护
+
+- `Session.collaboration` 只在真正添加第二个 Agent 后持久化，普通单 Agent 会话继续使用现有存储形态。
+- 支持房间结构的版本每次持久化时同时更新 primary 顶层镜像和 `primaryMirrorUpdatedAt`。若重新加载时发现顶层 Session 更新晚于该标记，说明可能被旧版本写过，只把顶层 runtime/model/events 重新并入 primary Agent，不覆盖次要 Agent 分区。
+- 读取未知的未来 collaboration schema 时进入只读保护，保留原始数据并提示升级；不得用当前 schema 重新保存或删除未知字段。
+- 旧版本无法操作多 Agent 房间是允许的兼容限制，但重新回到新版本后必须做到：primary 修改可恢复、次要 Agent 历史仍在、丢失本地房间时官方次要 session 仍可单独找回。
+- 目录折叠必须保守：只有 metadata 字段完整、schema 受支持、项目路径一致且本地房间/Agent 身份精确匹配时才隐藏次要官方 session；任何歧义都保持独立可见。
+- room metadata 只能由主进程根据专用结构生成并校验，renderer 不得传入任意 metadata 对象。
+- room metadata 必须贯穿 Server 创建、SDK 创建、Server -> SDK fallback 和 catalog summary；任何一次 runtime 迁移都不能丢失房间身份。
+
 ## 4. 强制运行不变量
 
 1. runtime 事件进入归并器前必须解析出 `{ roomId, roomAgentId }`。
@@ -249,7 +261,7 @@ interface AgentDelivery {
 - [x] 持久化本计划。
 - [x] 记录产品与架构决策。
 - [x] 记录当前 62 个文件、441 项测试基线。
-- [x] 增加内部开发 gate；不作为用户产品模式。
+- [x] 保持添加 Agent 用户入口不可达；阶段 5 前再加入显式 feature gate，不作为独立产品模式。
 - [x] 建立第一组兼容数据测试。
 
 退出门禁：现有单 Agent 行为无变化。
@@ -287,15 +299,74 @@ interface AgentDelivery {
 
 ### 阶段 4：持久化、目录和恢复
 
-- [ ] IndexedDB 规范化与懒升级。
-- [ ] metadata 与官方 catalog 折叠。
-- [ ] 重启分别恢复每个 Agent 历史。
-- [ ] 图片引用、备份 schema 2、导入 ID 重映射和 tombstone。
-- [ ] 移出、归档、恢复和部分失败状态。
-- [ ] 添加 Agent 两阶段持久化、metadata 幂等找回和创建中崩溃恢复。
-- [ ] delivery 的 dispatch attempt、官方 prompt/message 绑定和 `indeterminate` 恢复。
+阶段 4 不做一个大提交，严格按 4A-4G 顺序推进。每个子阶段只修改自己的边界、补局部测试、运行全量验证并单独提交；前一子阶段未通过，不进入下一项。
 
-退出门禁：重启后侧栏仍只有一个房间，全部 Agent 绑定正确且孤儿历史可见。
+#### 4A：本地持久化规范化
+
+- [ ] 为 collaboration 增加防御性 normalizer、schema gate 和 primary 镜像版本标记。
+- [ ] `sanitizePersistedEvents`、`settleInactiveEvents` 和 stale recommendation 清理按 Agent 活动态分别处理，运行中的 Agent 不被提前结算。
+- [ ] 图片抽取/恢复覆盖顶层事件、`collaboration.messages[].images` 和全部 `agentEvents` 分区。
+- [ ] 老 Session 保持懒升级；普通会话序列化前后不凭空出现 collaboration。
+- [ ] 未知未来 schema 保留原始值并只读，不降级覆盖。
+
+退出门禁：单 Agent 存储快照兼容；2/4 Agent 重启后消息、图片、事件分区和 primary 镜像无损。
+
+#### 4B：受控 metadata 与幂等创建
+
+- [ ] IPC 只增加专用 `roomMetadata`，主进程逐字段校验 schema、roomId、roomAgentId 和 primarySessionId，拒绝任意 metadata 注入。
+- [ ] 创建次要 Agent 时先持久化本地身份，再调用官方创建；重试前先按固定 room/Agent metadata 查询 catalog。
+- [ ] 在官方允许的情况下同时使用稳定请求 session ID；不支持时仍以 metadata 查询作为幂等恢复依据。
+- [ ] `ServerManagedSession` 保存创建 metadata，Server -> SDK fallback 创建时原样透传受控字段。
+- [ ] Server 和 SDK 的 session summary 都必须能返回同一组 room metadata。
+
+退出门禁：在“官方创建前、创建成功后、绑定写入前、fallback 迁移中”四个位置强制中断，重启后都不会重复创建或失去可见性。
+
+#### 4C：官方 catalog 分组与保守找回
+
+- [ ] 解析受控 `kimix-room-agent` metadata，并把已绑定次要 session 折叠到对应房间 Agent。
+- [ ] metadata 完整且本地 Agent 仍在但绑定缺失时自动重绑；次要标题不覆盖房间标题。
+- [ ] 本地房间不存在、metadata 歧义、schema 未知或路径不一致时，官方 session 作为独立可找回会话显示。
+- [ ] 单个次要 Agent 缺失只标记该 Agent `missing`，不得把整个房间归档。
+- [ ] Server authoritative 空目录、SDK 非权威目录和暂时网络失败必须使用不同语义，不能把“未列出”都解释成已删除。
+
+退出门禁：侧栏不会同时出现房间和已绑定次要镜像，也不会隐藏任何无法精确归属的官方历史。
+
+#### 4D：逐 Agent 历史与 runtime 恢复
+
+- [ ] startup、后台 repair、running snapshot 和 resume 对每个 Agent 独立选择 runtime/official session。
+- [ ] 一个 Agent 恢复失败时保留其 canonical history 和错误状态，其他 Agent 继续恢复和使用。
+- [ ] Server -> SDK 迁移更新对应 Agent 绑定和 activity，不改变房间或其他 Agent。
+- [ ] Provider/model alias 缺失时标记 unavailable，不静默切换模型。
+
+退出门禁：冷启动、热重载和部分 runtime 缺失时，各 Agent 历史、模型和状态均不串线。
+
+#### 4E：delivery 崩溃恢复
+
+- [ ] 网络调用前持久化 room message、接收者顺序、`agentTurnId`、`dispatchAttemptId` 和 `queued` 状态。
+- [ ] 官方接受后记录 prompt/message 身份；事件只按 runtime owner + 官方身份关联。
+- [ ] 在发送后、确认前退出时先查官方 snapshot；无法确认则进入 `indeterminate`，禁止自动重发。
+- [ ] 用户明确重试才创建新的 attempt 和 turn，并保留原失败/不确定尝试的审计记录。
+
+退出门禁：对每个持久化/网络边界做故障注入，不出现重复提示、重复工具执行或错误 turn 绑定。
+
+#### 4F：备份 schema 2 与身份重映射
+
+- [ ] schema 2 完整保存 collaboration；schema 1 继续导入为单 Agent。
+- [ ] normalizer 校验 agents、messages、deliveries、agentEvents 和全部引用关系。
+- [ ] 创建导入副本时重映射 room Agent ID、recipient、delivery key、roomMessageId、agentTurnId、activity 和队列引用。
+- [ ] 导入副本清空全部 Agent 的 runtime/official/catalog/missing 绑定，不连接导出来源的官方会话。
+- [ ] tombstone 收集全部 Agent runtime/official ID；未知未来 schema 不允许写回。
+
+退出门禁：v1/v2 导入、冲突分叉、重复导入、损坏引用和导入副本解绑全部通过。
+
+#### 4G：生命周期与部分失败
+
+- [ ] 移出 Agent 不删除历史，默认转换为独立会话并保留原官方 session。
+- [ ] 归档/恢复逐 Agent `Promise.allSettled`，记录每个 Agent 的成功、失败和可重试状态。
+- [ ] 部分失败时房间保持可见，不写“已全部归档/恢复”。
+- [ ] 房间任一 Agent 活跃时禁止添加、移出、归档和会改变身份归属的操作。
+
+退出门禁：重启后侧栏仍只有一个房间，全部可绑定 Agent 绑定正确，missing/失败状态真实，孤儿历史始终可见。
 
 ### 阶段 5：添加 Agent 和单目标 UI
 
@@ -381,6 +452,20 @@ interface AgentDelivery {
 - Provider 配置删除、Agent session missing、房间归档部分失败。
 - 多 Agent 输出期间历史展开和滚动稳定。
 
+### 故障注入检查点
+
+| 操作 | 强制中断位置 | 必须得到的恢复结果 |
+| --- | --- | --- |
+| 添加 Agent | 本地意图保存前 | 房间无变化，无官方 session |
+| 添加 Agent | 本地意图保存后、官方创建前 | 显示可重试 provisioning Agent |
+| 添加 Agent | 官方创建后、本地绑定前 | 按 metadata 重绑，不创建第二个 session |
+| 发送消息 | delivery 保存前 | 不显示已发送，不调用官方接口 |
+| 发送消息 | delivery 保存后、网络前 | 恢复为 queued，可由用户继续 |
+| 发送消息 | 网络后、确认前 | 官方核验；不明确时标记 indeterminate，绝不自动重发 |
+| 历史恢复 | 只恢复部分 Agent | 已恢复 Agent 可用，失败 Agent 保留历史与错误状态 |
+| 归档房间 | 部分 Agent 成功 | 房间保持可见，逐 Agent 展示结果并允许重试 |
+| 导入副本 | ID 重映射中发现坏引用 | 拒绝该房间副本，不生成半有效 collaboration |
+
 ### 每阶段通用命令
 
 ```powershell
@@ -393,7 +478,23 @@ git diff --check
 
 不在本地执行 `pnpm dist`，不手动上传 Release 资产。
 
-## 9. 回滚策略
+## 9. 风险登记与停止条件
+
+| 风险 | 主要防线 | 必须停止实施的信号 |
+| --- | --- | --- |
+| Agent 事件串线 | runtime owner + Agent 分区 + stable turn ID | 任一测试出现跨 Agent terminal、审批、usage 或 snapshot 更新 |
+| 重复创建官方 session | 先保存本地身份 + 固定 metadata + catalog 重绑 | 崩溃恢复生成第二个相同 roomAgent metadata session |
+| 重复投递提示 | 先保存 attempt + indeterminate 不自动重试 | 无法证明未发送时仍自动调用 prompt |
+| 隐藏孤儿历史 | 精确 metadata 才折叠，歧义时独立显示 | catalog 中存在 session，但侧栏和房间内都不可见 |
+| 旧版本回写破坏房间 | primary 镜像标记 + 次要分区保留 + metadata 找回 | 旧版本写入后新版本覆盖或丢失次要 Agent 数据 |
+| Server/SDK 行为不一致 | metadata、ID、状态和 catalog 双路契约测试 | fallback 后房间身份、模型或 session 绑定丢失 |
+| 共享目录写冲突 | 用户显式选择接收者 + 风险提示，不伪造隔离 | 产品文案暗示自动锁、worktree 或原子回滚 |
+| 备份导入误连原会话 | 全量 ID 重映射 + 全部 runtime/official 解绑 | 导入副本能操作导出来源的任何官方 session |
+| 单 Agent 回归 | 懒升级 + 兼容投影 + 全量回归 | 普通会话 UI、发送、撤回、恢复或侧栏行为变化 |
+
+任何一项停止信号出现时：保持开发 gate 关闭，回退当前最小提交，先补复现测试和根因说明；不得通过 UI 特判隐藏数据层错误。
+
+## 10. 回滚策略
 
 - 使用独立功能分支和阶段性窄提交。
 - 数据模型先上线、UI 最后开放；失败时可以回滚当前阶段，不删除已保存数据。
@@ -404,7 +505,7 @@ git diff --check
 - 网络状态不确定时回滚只改变本地可操作性，不自动取消、重发或删除官方 session。
 - UI 改动开始后，每轮同步版本号三处；最终发布只推 tag 触发 GitHub Actions。
 
-## 10. 当前实现审计与开放条件
+## 11. 当前实现审计与开放条件
 
 截至 2026-07-13，阶段 0-3 已完成。阶段 3 已实现并验证：
 
@@ -423,3 +524,5 @@ UI 开放必须同时满足以下 go/no-go gate：
 - schema 1/2 备份、导入副本解绑、Provider 缺失和部分归档失败均可恢复。
 - 内部 gate 关闭后，现有房间数据仍可只读展示，普通会话完全不出现协同 UI。
 - 用户完成空态、1/2/4 Agent、窄窗口、长名称和真实跨 Provider 审查验收。
+
+开放顺序固定为：开发者内部只读观察 -> 单目标添加/发送 -> 重启与恢复实测 -> 多目标并行 -> 用户截图和真实跨 Provider 审查验收。任何一步失败都只关闭后续能力，不删除已保存房间数据。
