@@ -77,6 +77,11 @@ import {
   setRoomAgentRecoveryIssue,
   type RoomAgentRecoveryTarget,
 } from "@/utils/roomAgentRecovery";
+import {
+  collectRoomDeliveryEvidenceFromHistory,
+  recoverInterruptedRoomDeliveries,
+  type RoomDeliveryOfficialEvidence,
+} from "@/utils/roomDelivery";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -295,10 +300,29 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               return item;
             }
             recoveryAccepted = true;
-            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events)) return item;
+            const evidence = collectRoomDeliveryEvidenceFromHistory(
+              reconciliation.session,
+              target.roomAgentId,
+            );
+            const recoveredDeliveries = recoverInterruptedRoomDeliveries(
+              item,
+              evidence,
+              Date.now(),
+              new Set([target.roomAgentId]),
+            );
+            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events)) {
+              applied = recoveredDeliveries !== item;
+              return recoveredDeliveries;
+            }
             applied = true;
+            const recovered = recoverInterruptedRoomDeliveries(
+              reconciliation.session,
+              evidence,
+              Date.now(),
+              new Set([target.roomAgentId]),
+            );
             return {
-              ...reconciliation.session,
+              ...recovered,
               title: isPrimaryRoomAgent(item, target.roomAgentId) && !item.titleLocked
                 ? deriveSessionTitle(reconciliation.events, item.title)
                 : item.title,
@@ -463,6 +487,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
   ]);
   let primaryActive = false;
   const activeResults: StartupRoomAgentRecoveryResult[] = [];
+  const deliveryEvidence = new Map<string, RoomDeliveryOfficialEvidence>();
   useSessionStore.setState((state) => ({
     sessions: state.sessions.map((session) => {
       if (!session.collaboration) return session;
@@ -493,6 +518,12 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
           });
           continue;
         }
+        for (const [attemptId, evidence] of collectRoomDeliveryEvidenceFromHistory(
+          reconciliation.session,
+          result.target.roomAgentId,
+        )) {
+          deliveryEvidence.set(attemptId, evidence);
+        }
         const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events);
         const hydratedEvents = localEvents.length > 0 && !shouldUseCanonicalHistory
           ? (result.runtimeIsActive ? localEvents : settleInactiveEvents(localEvents))
@@ -516,6 +547,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
           if (isPrimaryRoomAgent(next, result.target.roomAgentId)) primaryActive = true;
         }
       }
+      next = recoverInterruptedRoomDeliveries(next, deliveryEvidence);
       next = reconcileRoomAgentModelAvailability(next, availableModelAliases);
       return { ...next, isLoading: false };
     }),

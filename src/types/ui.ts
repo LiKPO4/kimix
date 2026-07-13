@@ -127,13 +127,30 @@ export type RoomAgentDeliveryStatus =
   | "waiting_question"
   | "completed"
   | "failed"
+  | "indeterminate"
   | "cancelled";
+
+export interface RoomAgentDeliveryAttempt {
+  dispatchAttemptId: string;
+  agentTurnId: string;
+  status: RoomAgentDeliveryStatus;
+  officialPromptId?: string;
+  officialUserEventId?: string;
+  error?: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface RoomAgentDelivery {
   status: RoomAgentDeliveryStatus;
   agentTurnId: string;
+  dispatchAttemptId?: string;
+  officialPromptId?: string;
   officialUserEventId?: string;
   error?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  previousAttempts?: RoomAgentDeliveryAttempt[];
 }
 
 export interface RoomUserMessage {

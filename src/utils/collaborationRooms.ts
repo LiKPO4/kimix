@@ -21,6 +21,7 @@ const ROOM_AGENT_DELIVERY_STATUSES = new Set<RoomAgentDeliveryStatus>([
   "waiting_question",
   "completed",
   "failed",
+  "indeterminate",
   "cancelled",
 ]);
 
@@ -97,10 +98,27 @@ function normalizeRoomMessage(
     const status = rawDelivery.status;
     const agentTurnId = typeof rawDelivery.agentTurnId === "string" ? rawDelivery.agentTurnId.trim() : "";
     if (!ROOM_AGENT_DELIVERY_STATUSES.has(status as RoomAgentDeliveryStatus) || !agentTurnId) continue;
+    const dispatchAttemptId = rawDelivery.dispatchAttemptId === undefined
+      ? undefined
+      : typeof rawDelivery.dispatchAttemptId === "string" && rawDelivery.dispatchAttemptId.trim()
+        ? rawDelivery.dispatchAttemptId.trim()
+        : null;
+    if (dispatchAttemptId === null) continue;
+    const previousAttempts = rawDelivery.previousAttempts;
+    if (previousAttempts !== undefined && (!Array.isArray(previousAttempts) || previousAttempts.some((attempt) => (
+      !isRecord(attempt) ||
+      typeof attempt.dispatchAttemptId !== "string" || !attempt.dispatchAttemptId.trim() ||
+      typeof attempt.agentTurnId !== "string" || !attempt.agentTurnId.trim() ||
+      !ROOM_AGENT_DELIVERY_STATUSES.has(attempt.status as RoomAgentDeliveryStatus) ||
+      !isFiniteNumber(attempt.createdAt) ||
+      !isFiniteNumber(attempt.updatedAt)
+    )))) continue;
     deliveries[agentId] = {
       ...(rawDelivery as unknown as RoomUserMessage["deliveries"][string]),
       status: status as RoomAgentDeliveryStatus,
       agentTurnId,
+      dispatchAttemptId,
+      previousAttempts: previousAttempts as RoomUserMessage["deliveries"][string]["previousAttempts"],
     };
   }
   if (recipientAgentIds.some((agentId) => !deliveries[agentId])) return null;

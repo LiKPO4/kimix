@@ -58,12 +58,14 @@ function deliveryFallbackEvents(
   roomAgentId: string,
   delivery: RoomAgentDelivery,
 ): TimelineEvent[] {
-  if (delivery.status === "failed") {
+  if (delivery.status === "failed" || delivery.status === "indeterminate") {
     return [{
       id: `${delivery.agentTurnId}:error`,
       type: "error",
       timestamp: message.timestamp,
-      message: delivery.error || "该 Agent 未能接收这条消息。",
+      message: delivery.error || (delivery.status === "indeterminate"
+        ? "无法确认该 Agent 是否已接收消息，Kimix 未自动重发。"
+        : "该 Agent 未能接收这条消息。"),
       source: "ui",
       roomAgentId,
       roomMessageId: message.id,
