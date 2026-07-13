@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Live history reconciliation preserves interaction identity**: Running snapshots merge additively into mounted Assistant/tool history, while process defaults apply only on first mount, preventing background Agent activity from collapsing inspected history or invalidating viewport anchors. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Running snapshots preserve the active Assistant row**: Quiet-stream history reconciliation treats an active snapshot as a progress sample and retains the renderer-created prompt/status/Assistant placeholder until an official incomplete Assistant row can take ownership. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 * **Canonical undo history**: Official undo now reloads and replaces the local timeline with the resulting Server snapshot or SDK history even when history becomes shorter or empty; only media metadata for surviving messages is preserved. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 

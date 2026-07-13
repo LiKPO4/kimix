@@ -1,4 +1,5 @@
 import type { TimelineEvent } from "@/types/ui";
+import { mergeEvents, preserveLocalUserMediaInCanonicalHistory } from "./eventMapper";
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
@@ -57,33 +58,28 @@ export function shouldSkipKimiCodeSnapshotReplay(
   });
 }
 
-function sameUserPrompt(a: TimelineEvent, b: TimelineEvent): boolean {
-  if (a.type !== "user_message" || b.type !== "user_message") return false;
-  return normalizeText(a.content) === normalizeText(b.content);
-}
-
-/** Running history is a progress sample, so it must not erase the active local row. */
-export function preservePendingTurnInRunningSnapshot(
-  localEvents: readonly TimelineEvent[],
-  snapshotEvents: TimelineEvent[],
+/**
+ * Running history is an additive progress sample. Merge it into the live
+ * timeline so mounted rows keep their local identities and interaction state.
+ */
+export function reconcileRunningKimiSnapshot(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
 ): TimelineEvent[] {
-  const assistantIndex = localEvents.findLastIndex((event) => (
-    event.type === "assistant_message" && !event.isComplete
-  ));
-  if (assistantIndex < 0 || snapshotEvents.some((event) => (
-    event.type === "assistant_message" && !event.isComplete
-  ))) return snapshotEvents;
-
-  const assistant = localEvents[assistantIndex];
-  const status = localEvents.slice(0, assistantIndex).findLast((event) => (
-    event.type === "status_update" && event.source === "ipc" && Boolean(event.parentEventId)
-  ));
-  if (status?.type !== "status_update" || !status.parentEventId) return snapshotEvents;
-  const user = localEvents.find((event) => event.type === "user_message" && event.id === status.parentEventId);
-  if (!user || user.type !== "user_message") return snapshotEvents;
-
-  const result = [...snapshotEvents];
-  if (!result.some((event) => sameUserPrompt(event, user))) result.push(user);
-  result.push(status, assistant);
-  return result;
+  const snapshotEvents = preserveLocalUserMediaInCanonicalHistory(localEvents, canonicalEvents);
+  return snapshotEvents.reduce((events, event) => {
+    const alreadyMounted = events.some((local) => {
+      if (local.type !== event.type) return false;
+      if (local.type === "assistant_message" && event.type === "assistant_message") {
+        return local.isComplete === event.isComplete &&
+          local.content === event.content &&
+          (local.thinking ?? "") === (event.thinking ?? "");
+      }
+      if (local.type === "tool_call" && event.type === "tool_call") {
+        return Boolean(local.toolCallId) && local.toolCallId === event.toolCallId && local.status === event.status;
+      }
+      return false;
+    });
+    return alreadyMounted ? events : mergeEvents(events, event);
+  }, [...localEvents]);
 }

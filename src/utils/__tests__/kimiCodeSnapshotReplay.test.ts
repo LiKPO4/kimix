@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "../../types/ui";
-import { preservePendingTurnInRunningSnapshot, shouldSkipKimiCodeSnapshotReplay } from "../kimiCodeSnapshotReplay";
+import { reconcileRunningKimiSnapshot, shouldSkipKimiCodeSnapshotReplay } from "../kimiCodeSnapshotReplay";
 
 describe("shouldSkipKimiCodeSnapshotReplay", () => {
   it("skips historical assistant snapshot chunks already present in the local timeline", () => {
@@ -81,7 +81,7 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
   });
 });
 
-describe("preservePendingTurnInRunningSnapshot", () => {
+describe("reconcileRunningKimiSnapshot", () => {
   const pendingTurn: TimelineEvent[] = [{
     id: "user-new", type: "user_message", timestamp: 8, content: "新问题",
   }, {
@@ -94,15 +94,26 @@ describe("preservePendingTurnInRunningSnapshot", () => {
     const snapshot: TimelineEvent[] = [{
       id: "official-user", type: "user_message", timestamp: 8, content: "新问题",
     }];
-    const result = preservePendingTurnInRunningSnapshot(pendingTurn, snapshot);
+    const result = reconcileRunningKimiSnapshot(pendingTurn, snapshot);
     expect(result.filter((event) => event.type === "user_message")).toHaveLength(1);
-    expect(result.at(-1)).toMatchObject({ id: "assistant-pending", isComplete: false });
+    expect(result.find((event) => event.id === "assistant-pending")).toMatchObject({ isComplete: false });
   });
 
-  it("lets an in-flight official assistant row take ownership", () => {
+  it("merges an in-flight official assistant into the mounted local row", () => {
     const snapshot: TimelineEvent[] = [{
       id: "official-assistant", type: "assistant_message", timestamp: 11, content: "处理中", isThinking: false, isComplete: false,
     }];
-    expect(preservePendingTurnInRunningSnapshot(pendingTurn, snapshot)).toEqual(snapshot);
+    const result = reconcileRunningKimiSnapshot(pendingTurn, snapshot);
+    expect(result.at(-1)).toMatchObject({ id: "assistant-pending", content: "处理中", isComplete: false });
+  });
+
+  it("retains stable ids for historical rows across repeated snapshots", () => {
+    const local: TimelineEvent[] = [{
+      id: "mounted-assistant", type: "assistant_message", timestamp: 1, content: "旧回复", isThinking: false, isComplete: true,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "remapped-assistant", type: "assistant_message", timestamp: 1, content: "旧回复", isThinking: false, isComplete: true,
+    }];
+    expect(reconcileRunningKimiSnapshot(local, snapshot)).toEqual(local);
   });
 });

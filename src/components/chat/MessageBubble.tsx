@@ -1578,7 +1578,6 @@ function KimiWebProcessList({ items }: { items: ProcessItem[] }) {
 function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean }) {
   const defaultExpanded = displayMode === "kimi-web" && expandByDefault;
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const previousDefaultExpandedRef = useRef(defaultExpanded);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
   const pendingToggleAnchorRef = useRef<{
@@ -1606,12 +1605,6 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
     subagents.length > 0 ? `${subagents.length} 个子代理` : "",
     approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
-
-  useLayoutEffect(() => {
-    if (previousDefaultExpandedRef.current === defaultExpanded) return;
-    previousDefaultExpandedRef.current = defaultExpanded;
-    setExpanded(defaultExpanded);
-  }, [defaultExpanded]);
 
   const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
     const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;

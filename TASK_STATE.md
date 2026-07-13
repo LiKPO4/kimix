@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
+
+- 当前目标：修复最新 Agent 继续工作时，用户展开较早 Agent 输出或命令详情后被自动折叠，并伴随页面向下跳动的问题。
+- 根因：运行中 quiet-stream snapshot 会把重新映射、带全新事件 ID 的历史整体替换进时间线，导致旧消息 React 组件重挂载、内部展开状态清零；同时流程摘要会在“最新流程轮次”变化时再次应用默认展开值，覆盖用户选择。折叠造成内容高度骤减，滚动锚点失去原 DOM 身份后表现为跳动。
+- 已完成：运行中 snapshot 改为增量归并，已挂载的相同 Assistant 与工具历史保持既有事件身份；流程默认展开只在组件首次挂载时应用，之后由用户选择控制；版本号三处同步到 v2.15.21。
+- 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`、`src/components/chat/MessageBubble.tsx`、`src/App.tsx`。
+- 验证：snapshot 与事件归并局部测试 86 项通过；`pnpm test:run` 62 个文件、441 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 下一步：提交本轮改动；用户在 v2.15.21 运行中展开历史 Agent/命令详情并停留观察。
+
 ## 2026-07-13 v2.15.20 运行中消息头连续性
 
 - 当前目标：修复发送消息后 Assistant 计时消息头短暂出现、消失、再重新出现的问题。
@@ -7,7 +16,7 @@
 - 已完成：运行中 snapshot 合并时保留当前用户消息、关联发送状态和未完成 Assistant 占位行；只有 snapshot 已包含官方未完成 Assistant 时才由官方行接管；版本号三处同步到 v2.15.20。
 - 关键文件：`src/App.tsx`、`src/utils/kimiCodeSnapshotReplay.ts`。
 - 验证：snapshot 与事件归并局部测试 85 项通过；`pnpm test:run` 62 个文件、440 项测试通过；`pnpm build`、`pnpm knowledge:validate` 和 `git diff --check` 通过。
-- 下一步：提交本轮改动；用户用 v2.15.20 在首个回复事件延迟的场景确认消息头保持连续。
+- 下一步：用户用 v2.15.20 在首个回复事件延迟的场景确认消息头保持连续。
 
 ## 2026-07-13 v2.15.19 撤回重写服从官方历史
 

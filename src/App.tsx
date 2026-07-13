@@ -15,7 +15,7 @@ import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetric
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
-import { preservePendingTurnInRunningSnapshot, shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
+import { reconcileRunningKimiSnapshot, shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
@@ -2901,10 +2901,7 @@ function App() {
             if (disposed || !loaded?.success) return;
             const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
             const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
-            const snapshotEvents = preservePendingTurnInRunningSnapshot(
-              latestSession.events,
-              preserveLocalUserMediaInCanonicalHistory(latestSession.events, canonicalSnapshotEvents),
-            );
+            const snapshotEvents = reconcileRunningKimiSnapshot(latestSession.events, canonicalSnapshotEvents);
             if (shouldReplaceWithCanonicalKimiHistory(latestSession.events, snapshotEvents)) {
               updateSession(session.id, (item) => ({
                 ...item,
