@@ -3,6 +3,15 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import type { PendingMessage } from "@/stores/sessionStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import {
+  getPrimaryRoomAgent,
+  getRoomAgentRuntimeId,
+  isPrimaryRoomAgent,
+  normalizeLoadedSessionCollaboration,
+  roomAgentActivityKey,
+  scopeEventToRoomAgent,
+  synchronizeCollaborationPrimaryMirror,
+} from "@/utils/collaborationRooms";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
 import {
   commitState,
@@ -264,14 +273,42 @@ async function extractImages(
 async function stripImagesFromSessions(sessions: Session[], into: StoredImage[]): Promise<unknown[]> {
   return Promise.all(
     sessions.map(async (session) => {
-      const strippedEvents = await Promise.all(
-        session.events.map(async (event) => {
+      const stripEvents = (events: TimelineEvent[]) => Promise.all(
+        events.map(async (event) => {
           if (event.type !== "user_message" && event.type !== "steer_message") return event;
           const images = await extractImages(event.images, into);
           return { ...event, images } as unknown as TimelineEvent;
-        })
+        }),
       );
-      return { ...session, events: strippedEvents };
+      const strippedEvents = await stripEvents(session.events);
+      const { unsupportedCollaboration, ...storedSession } = session;
+      if (unsupportedCollaboration) {
+        return {
+          ...storedSession,
+          collaboration: unsupportedCollaboration.raw,
+          events: strippedEvents,
+        };
+      }
+      if (!session.collaboration) return { ...storedSession, events: strippedEvents };
+
+      const messages = await Promise.all(session.collaboration.messages.map(async (message) => ({
+        ...message,
+        images: await extractImages(message.images, into),
+      })));
+      const agentEvents = Object.fromEntries(await Promise.all(
+        Object.entries(session.collaboration.agentEvents).map(async ([agentId, events]) => (
+          [agentId, await stripEvents(events)] as const
+        )),
+      ));
+      return {
+        ...storedSession,
+        events: strippedEvents,
+        collaboration: {
+          ...session.collaboration,
+          messages,
+          agentEvents,
+        },
+      };
     })
   );
 }
@@ -313,20 +350,36 @@ function hydrateMessageImages(
 
 function hydrateSessions(raw: unknown[], dataUrlById: Map<string, string>): Session[] {
   return raw.map((item) => {
-    const session = item as Session;
-    return {
+    const hydrateEvents = (events: TimelineEvent[]) => events.map((event) => {
+      if (event.type !== "user_message" && event.type !== "steer_message") return event;
+      return {
+        ...event,
+        images: hydrateMessageImages(
+          event.images as (UserMessageImage & { imageRef?: string })[] | undefined,
+          dataUrlById,
+        ),
+      } as TimelineEvent;
+    });
+    const session = normalizeLoadedSessionCollaboration(item as Session);
+    const hydrated: Session = {
       ...session,
-      events: session.events.map((event) => {
-        if (event.type !== "user_message" && event.type !== "steer_message") return event;
-        return {
-          ...event,
-          images: hydrateMessageImages(
-            event.images as (UserMessageImage & { imageRef?: string })[] | undefined,
-            dataUrlById,
-          ),
-        } as TimelineEvent;
-      }),
+      events: hydrateEvents(session.events),
     };
+    if (!session.collaboration) return hydrated;
+    const collaboration = {
+      ...session.collaboration,
+      messages: session.collaboration.messages.map((message) => ({
+        ...message,
+        images: hydrateMessageImages(
+          message.images as (UserMessageImage & { imageRef?: string })[] | undefined,
+          dataUrlById,
+        ),
+      })),
+      agentEvents: Object.fromEntries(Object.entries(session.collaboration.agentEvents).map(([agentId, events]) => (
+        [agentId, hydrateEvents(events)]
+      ))),
+    };
+    return synchronizeCollaborationPrimaryMirror({ ...hydrated, collaboration });
   });
 }
 
@@ -394,12 +447,54 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
 
 export async function persistLocalConversationState(): Promise<PersistResult> {
   const state = useSessionStore.getState();
-  const runningSessionId = useAppStore.getState().runningSessionId;
-  const preparedSessions = state.sessions.map((session) => ({
-    ...session,
-    events: resetStaleSessionRecommendationEvents(sanitizePersistedEvents(session.id === runningSessionId ? session.events : settleInactiveEvents(session.events))),
-    isLoading: false,
-  }));
+  const appState = useAppStore.getState();
+  const activeStatuses = new Set(["creating", "queued", "sending", "running", "waiting_approval", "waiting_question"]);
+  const prepareEvents = (session: Session, roomAgentId: string | null, events: TimelineEvent[]) => {
+    const activity = roomAgentId
+      ? appState.roomAgentActivities[roomAgentActivityKey(session.id, roomAgentId)]
+      : undefined;
+    const runtimeId = roomAgentId ? getRoomAgentRuntimeId(session, roomAgentId) : null;
+    const legacyPrimaryRunning = Boolean(roomAgentId && isPrimaryRoomAgent(session, roomAgentId) && (
+      appState.runningSessionId === session.id ||
+      appState.runningSessionId === session.runtimeSessionId ||
+      appState.runningSessionId === session.officialSessionId ||
+      appState.runningSessionId === runtimeId
+    ));
+    const legacySessionRunning = !roomAgentId && (
+      appState.runningSessionId === session.id ||
+      appState.runningSessionId === session.runtimeSessionId ||
+      appState.runningSessionId === session.officialSessionId
+    );
+    const active = activity ? activeStatuses.has(activity.status) : legacyPrimaryRunning || legacySessionRunning;
+    const settled = active ? events : settleInactiveEvents(events);
+    const sanitized = resetStaleSessionRecommendationEvents(sanitizePersistedEvents(settled));
+    return roomAgentId ? sanitized.map((event) => scopeEventToRoomAgent(event, roomAgentId)) : sanitized;
+  };
+  const preparedSessions = state.sessions.map((session) => {
+    if (!session.collaboration) {
+      return {
+        ...session,
+        events: prepareEvents(session, null, session.events),
+        isLoading: false,
+      };
+    }
+    const primary = getPrimaryRoomAgent(session);
+    const agentEvents = Object.fromEntries(Object.entries(session.collaboration.agentEvents).map(([agentId, events]) => (
+      [agentId, prepareEvents(session, agentId, events)]
+    )));
+    const prepared = synchronizeCollaborationPrimaryMirror({
+      ...session,
+      collaboration: {
+        ...session.collaboration,
+        agentEvents,
+      },
+      isLoading: false,
+    });
+    return {
+      ...prepared,
+      events: prepared.collaboration?.agentEvents[primary.id] ?? prepared.events,
+    };
+  });
 
   const snapshot: PersistSnapshot = {
     sessions: preparedSessions,

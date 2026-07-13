@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-3 已完成，下一步进入阶段 4，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-3、4A 已完成，下一步进入 4B，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -303,11 +303,11 @@ interface AgentDelivery {
 
 #### 4A：本地持久化规范化
 
-- [ ] 为 collaboration 增加防御性 normalizer、schema gate 和 primary 镜像版本标记。
-- [ ] `sanitizePersistedEvents`、`settleInactiveEvents` 和 stale recommendation 清理按 Agent 活动态分别处理，运行中的 Agent 不被提前结算。
-- [ ] 图片抽取/恢复覆盖顶层事件、`collaboration.messages[].images` 和全部 `agentEvents` 分区。
-- [ ] 老 Session 保持懒升级；普通会话序列化前后不凭空出现 collaboration。
-- [ ] 未知未来 schema 保留原始值并只读，不降级覆盖。
+- [x] 为 collaboration 增加防御性 normalizer、schema gate 和 primary 镜像版本标记。
+- [x] `sanitizePersistedEvents`、`settleInactiveEvents` 和 stale recommendation 清理按 Agent 活动态分别处理，运行中的 Agent 不被提前结算。
+- [x] 图片抽取/恢复覆盖顶层事件、`collaboration.messages[].images` 和全部 `agentEvents` 分区。
+- [x] 老 Session 保持懒升级；普通会话序列化前后不凭空出现 collaboration。
+- [x] 未知未来 schema 保留原始值并只读，不降级覆盖。
 
 退出门禁：单 Agent 存储快照兼容；2/4 Agent 重启后消息、图片、事件分区和 primary 镜像无损。
 
@@ -507,13 +507,14 @@ git diff --check
 
 ## 11. 当前实现审计与开放条件
 
-截至 2026-07-13，阶段 0-3 已完成。阶段 3 已实现并验证：
+截至 2026-07-13，阶段 0-3 和 4A 已完成。阶段 3 已实现并验证：
 
 1. `startup`、quiet running snapshot、后台 repair、消息撤回重写和 `/undo` 全部使用统一的 Agent-scoped canonical reconcile。
 2. ChatThread 的响应块、展开/滚动身份和最终 usage 只由对应 `roomAgentId + agentTurnId` 控制。
 3. 新房间消息只接受 delivery/room/官方事件身份绑定；文本+时间仅用于已有官方 ID 的唯一旧数据迁移，歧义时不绑定。
 4. 未关联的 compaction、session meta、用户、Assistant 或工具事件保留在所属 Agent 的独立时间线段，不再静默丢失或挂到最近一轮。
-5. 当前工作树已通过 66 个测试文件、465 项测试、生产构建和 diff 检查；添加 Agent UI 仍必须等待阶段 4 的持久化、目录和崩溃恢复门禁。
+5. 阶段 4A 已实现 collaboration 防御性规范化、旧版本 primary 镜像恢复、逐 Agent 活动态结算、房间消息和全部事件分区的图片抽取/恢复，以及未知 schema 原样回写保护。
+6. 当前工作树已通过 66 个测试文件、470 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的目录、创建、崩溃恢复、备份和生命周期门禁。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

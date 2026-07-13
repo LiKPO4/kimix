@@ -173,12 +173,21 @@ export interface RoomAgent {
 
 export interface CollaborationState {
   schemaVersion: 1;
+  /** 最近一次由支持房间结构的版本同步顶层 primary 兼容镜像的时间。 */
+  primaryMirrorUpdatedAt: number;
   primaryAgentId: string;
   defaultRecipientIds: string[];
   focusedAgentId?: string;
   agents: RoomAgent[];
   messages: RoomUserMessage[];
   agentEvents: Record<string, TimelineEvent[]>;
+}
+
+export interface UnsupportedCollaborationState {
+  reason: "unsupported-schema" | "invalid-schema";
+  schemaVersion?: number;
+  /** 仅在运行时保存；持久化时重新写回 collaboration 原字段。 */
+  raw: unknown;
 }
 
 export interface Session {
@@ -217,6 +226,8 @@ export interface Session {
   officialGoal?: OfficialGoalState;
   /** 用户控制的多 Agent 房间；缺失时按单一 synthetic primary Agent 兼容读取。 */
   collaboration?: CollaborationState;
+  /** 未知或损坏的协同结构保持原样，当前版本不得降级覆盖。 */
+  unsupportedCollaboration?: UnsupportedCollaborationState;
   events: TimelineEvent[];
   isLoading: boolean;
 }

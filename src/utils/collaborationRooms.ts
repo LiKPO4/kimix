@@ -12,6 +12,148 @@ export const COLLABORATION_ROOMS_DEV_ENABLED = false;
 export const COLLABORATION_ROOM_SCHEMA_VERSION = 1 as const;
 export const MAX_ROOM_AGENTS = 4;
 
+const ROOM_AGENT_DELIVERY_STATUSES = new Set<RoomAgentDeliveryStatus>([
+  "queued",
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isPermissionMode(value: unknown): value is PermissionMode {
+  return value === "manual" || value === "auto" || value === "yolo";
+}
+
+function isTimelineEventLike(value: unknown): value is TimelineEvent {
+  return isRecord(value) &&
+    typeof value.id === "string" && Boolean(value.id.trim()) &&
+    typeof value.type === "string" && Boolean(value.type.trim()) &&
+    isFiniteNumber(value.timestamp);
+}
+
+function isUserMessageImageLike(value: unknown): boolean {
+  return isRecord(value) && typeof value.name === "string";
+}
+
+function normalizeRoomAgent(value: unknown): RoomAgent | null {
+  if (!isRecord(value)) return null;
+  const id = typeof value.id === "string" ? value.id.trim() : "";
+  const displayName = typeof value.displayName === "string" ? value.displayName.trim() : "";
+  const mentionName = typeof value.mentionName === "string" ? value.mentionName.trim() : "";
+  if (!id || !displayName || !mentionName || !isPermissionMode(value.permissionMode) || !isFiniteNumber(value.createdAt)) {
+    return null;
+  }
+  if (value.modelAlias !== null && typeof value.modelAlias !== "string") return null;
+  return {
+    ...(value as unknown as RoomAgent),
+    id,
+    displayName,
+    mentionName,
+    modelAlias: value.modelAlias as string | null,
+    permissionMode: value.permissionMode,
+    createdAt: value.createdAt,
+  };
+}
+
+function normalizeRoomMessage(
+  value: unknown,
+  agentIds: ReadonlySet<string>,
+): RoomUserMessage | null {
+  if (!isRecord(value)) return null;
+  const id = typeof value.id === "string" ? value.id.trim() : "";
+  if (!id || typeof value.content !== "string" || !isFiniteNumber(value.timestamp)) return null;
+  if (!Array.isArray(value.recipientAgentIds) || !isRecord(value.deliveries)) return null;
+  if (value.images !== undefined && (!Array.isArray(value.images) || !value.images.every(isUserMessageImageLike))) return null;
+
+  const recipientAgentIds = Array.from(new Set(value.recipientAgentIds.filter((agentId): agentId is string => (
+    typeof agentId === "string" && agentIds.has(agentId)
+  ))));
+  if (recipientAgentIds.length === 0) return null;
+
+  const deliveries: RoomUserMessage["deliveries"] = {};
+  for (const [agentId, rawDelivery] of Object.entries(value.deliveries)) {
+    if (!agentIds.has(agentId) || !isRecord(rawDelivery)) continue;
+    const status = rawDelivery.status;
+    const agentTurnId = typeof rawDelivery.agentTurnId === "string" ? rawDelivery.agentTurnId.trim() : "";
+    if (!ROOM_AGENT_DELIVERY_STATUSES.has(status as RoomAgentDeliveryStatus) || !agentTurnId) continue;
+    deliveries[agentId] = {
+      ...(rawDelivery as unknown as RoomUserMessage["deliveries"][string]),
+      status: status as RoomAgentDeliveryStatus,
+      agentTurnId,
+    };
+  }
+  if (recipientAgentIds.some((agentId) => !deliveries[agentId])) return null;
+
+  return {
+    ...(value as unknown as RoomUserMessage),
+    id,
+    content: value.content,
+    recipientAgentIds,
+    deliveries,
+    timestamp: value.timestamp,
+  };
+}
+
+function normalizeCollaborationState(
+  session: Session,
+  raw: Record<string, unknown>,
+): CollaborationState | null {
+  if (raw.schemaVersion !== COLLABORATION_ROOM_SCHEMA_VERSION || !Array.isArray(raw.agents)) return null;
+  const agents = raw.agents.map(normalizeRoomAgent);
+  if (agents.length === 0 || agents.some((agent) => !agent)) return null;
+  const normalizedAgents = agents as RoomAgent[];
+  const agentIds = new Set(normalizedAgents.map((agent) => agent.id));
+  if (agentIds.size !== normalizedAgents.length) return null;
+
+  const primaryAgentId = typeof raw.primaryAgentId === "string" ? raw.primaryAgentId : "";
+  if (!agentIds.has(primaryAgentId) || !Array.isArray(raw.messages) || !isRecord(raw.agentEvents)) return null;
+
+  const messages = raw.messages.map((message) => normalizeRoomMessage(message, agentIds));
+  if (messages.some((message) => !message)) return null;
+
+  const agentEvents: Record<string, TimelineEvent[]> = {};
+  for (const [agentId, rawEvents] of Object.entries(raw.agentEvents)) {
+    if (!Array.isArray(rawEvents) || !rawEvents.every(isTimelineEventLike)) return null;
+    agentEvents[agentId] = rawEvents.map((event) => scopeEventToRoomAgent(event, agentId));
+  }
+  if (normalizedAgents.some((agent) => !agentEvents[agent.id])) return null;
+
+  const defaultRecipientIds = Array.isArray(raw.defaultRecipientIds)
+    ? Array.from(new Set(raw.defaultRecipientIds.filter((agentId): agentId is string => (
+      typeof agentId === "string" && agentIds.has(agentId)
+    ))))
+    : [];
+  const focusedAgentId = typeof raw.focusedAgentId === "string" && agentIds.has(raw.focusedAgentId)
+    ? raw.focusedAgentId
+    : undefined;
+
+  return {
+    ...(raw as unknown as CollaborationState),
+    schemaVersion: COLLABORATION_ROOM_SCHEMA_VERSION,
+    primaryMirrorUpdatedAt: isFiniteNumber(raw.primaryMirrorUpdatedAt)
+      ? raw.primaryMirrorUpdatedAt
+      : session.updatedAt,
+    primaryAgentId,
+    defaultRecipientIds: defaultRecipientIds.length > 0 ? defaultRecipientIds : [primaryAgentId],
+    focusedAgentId,
+    agents: normalizedAgents,
+    messages: messages as RoomUserMessage[],
+    agentEvents,
+  };
+}
+
 export interface RoomRuntimeOwner {
   roomId: string;
   roomAgentId: string;
@@ -258,14 +400,130 @@ function createLegacyRoomMessages(session: Session, primaryAgentId: string): Roo
   });
 }
 
+function reconcileLegacyPrimaryWrite(session: Session, collaboration: CollaborationState): CollaborationState {
+  const primaryIndex = collaboration.agents.findIndex((agent) => agent.id === collaboration.primaryAgentId);
+  if (primaryIndex < 0) return collaboration;
+  const currentPrimary = collaboration.agents[primaryIndex];
+  const legacyPrimary = createSyntheticPrimaryAgent(session, currentPrimary.permissionMode);
+  const nextPrimary: RoomAgent = {
+    ...currentPrimary,
+    runtimeSessionId: legacyPrimary.runtimeSessionId,
+    officialSessionId: legacyPrimary.officialSessionId,
+    skillRegistrySyncedAt: legacyPrimary.skillRegistrySyncedAt,
+    skillForkParentSessionId: legacyPrimary.skillForkParentSessionId,
+    kimiHistoryCacheVersion: legacyPrimary.kimiHistoryCacheVersion,
+    officialCatalogConfirmedAt: legacyPrimary.officialCatalogConfirmedAt,
+    swarmModeLockedAt: legacyPrimary.swarmModeLockedAt,
+    swarmMode: legacyPrimary.swarmMode,
+    swarmModeDesired: legacyPrimary.swarmModeDesired,
+    modelAlias: legacyPrimary.modelAlias,
+    modelSwitchedAt: legacyPrimary.modelSwitchedAt,
+    switchedToModel: legacyPrimary.switchedToModel,
+    officialGoal: legacyPrimary.officialGoal,
+    btwRounds: legacyPrimary.btwRounds,
+  };
+
+  const withoutPrimary = collaboration.messages.flatMap((message): RoomUserMessage[] => {
+    if (!message.recipientAgentIds.includes(currentPrimary.id) && !message.deliveries[currentPrimary.id]) return [message];
+    const recipientAgentIds = message.recipientAgentIds.filter((agentId) => agentId !== currentPrimary.id);
+    const deliveries = { ...message.deliveries };
+    delete deliveries[currentPrimary.id];
+    return recipientAgentIds.length > 0 ? [{ ...message, recipientAgentIds, deliveries }] : [];
+  });
+  const byMessageId = new Map(withoutPrimary.map((message) => [message.id, message]));
+  for (const legacyMessage of createLegacyRoomMessages(session, currentPrimary.id)) {
+    const existing = byMessageId.get(legacyMessage.id);
+    if (!existing) {
+      byMessageId.set(legacyMessage.id, legacyMessage);
+      continue;
+    }
+    byMessageId.set(legacyMessage.id, {
+      ...existing,
+      recipientAgentIds: [...existing.recipientAgentIds, currentPrimary.id],
+      deliveries: {
+        ...existing.deliveries,
+        [currentPrimary.id]: legacyMessage.deliveries[currentPrimary.id],
+      },
+    });
+  }
+
+  const agents = [...collaboration.agents];
+  agents[primaryIndex] = nextPrimary;
+  return {
+    ...collaboration,
+    primaryMirrorUpdatedAt: session.updatedAt,
+    agents,
+    messages: Array.from(byMessageId.values()).sort((left, right) => left.timestamp - right.timestamp),
+    agentEvents: {
+      ...collaboration.agentEvents,
+      [currentPrimary.id]: session.events.map((event) => scopeEventToRoomAgent(event, currentPrimary.id)),
+    },
+  };
+}
+
+export function normalizeLoadedSessionCollaboration(session: Session): Session {
+  const raw = (session as Session & { collaboration?: unknown }).collaboration;
+  if (raw === undefined || raw === null) {
+    if (!session.unsupportedCollaboration) return session;
+    const { unsupportedCollaboration: _unsupported, ...rest } = session;
+    return rest;
+  }
+  const schemaVersion = isRecord(raw) && isFiniteNumber(raw.schemaVersion) ? raw.schemaVersion : undefined;
+  if (!isRecord(raw) || schemaVersion !== COLLABORATION_ROOM_SCHEMA_VERSION) {
+    return {
+      ...session,
+      collaboration: undefined,
+      unsupportedCollaboration: {
+        reason: "unsupported-schema",
+        schemaVersion,
+        raw,
+      },
+    };
+  }
+  const hadPrimaryMirrorMarker = isFiniteNumber(raw.primaryMirrorUpdatedAt);
+  const normalized = normalizeCollaborationState(session, raw);
+  if (!normalized) {
+    return {
+      ...session,
+      collaboration: undefined,
+      unsupportedCollaboration: {
+        reason: "invalid-schema",
+        schemaVersion,
+        raw,
+      },
+    };
+  }
+  const collaboration = hadPrimaryMirrorMarker && session.updatedAt > normalized.primaryMirrorUpdatedAt
+    ? reconcileLegacyPrimaryWrite(session, normalized)
+    : normalized;
+  const { unsupportedCollaboration: _unsupported, ...rest } = session;
+  return { ...rest, collaboration };
+}
+
+export function synchronizeCollaborationPrimaryMirror(session: Session): Session {
+  if (!session.collaboration) return session;
+  const mirrored = mirrorPrimaryAgentToLegacySession(session);
+  return {
+    ...mirrored,
+    collaboration: {
+      ...mirrored.collaboration!,
+      primaryMirrorUpdatedAt: mirrored.updatedAt,
+    },
+  };
+}
+
 export function createCollaborationStateFromSession(
   session: Session,
   permissionMode: PermissionMode = "manual",
 ): CollaborationState {
   if (session.collaboration) return session.collaboration;
+  if (session.unsupportedCollaboration) {
+    throw new Error("当前会话包含此版本无法安全修改的协同数据，请升级 Kimix 后重试。");
+  }
   const primary = createSyntheticPrimaryAgent(session, permissionMode);
   return {
     schemaVersion: COLLABORATION_ROOM_SCHEMA_VERSION,
+    primaryMirrorUpdatedAt: session.updatedAt,
     primaryAgentId: primary.id,
     defaultRecipientIds: [primary.id],
     focusedAgentId: primary.id,

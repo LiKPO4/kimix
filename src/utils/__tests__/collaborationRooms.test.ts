@@ -9,6 +9,7 @@ import {
   getRoomAgents,
   getSyntheticPrimaryAgentId,
   mirrorPrimaryAgentToLegacySession,
+  normalizeLoadedSessionCollaboration,
   replaceRoomAgentEvents,
   resolveRoomRuntimeOwner,
   scopeEventToRoomAgent,
@@ -76,6 +77,7 @@ describe("collaborationRooms", () => {
     const persisted = { ...session, collaboration };
 
     expect(createCollaborationStateFromSession(persisted)).toBe(collaboration);
+    expect(collaboration.primaryMirrorUpdatedAt).toBe(session.updatedAt);
     expect(collaboration.messages).toEqual([expect.objectContaining({
       content: "Review this",
       recipientAgentIds: [collaboration.primaryAgentId],
@@ -84,6 +86,86 @@ describe("collaborationRooms", () => {
       expect.objectContaining({ id: "user-1", roomAgentId: collaboration.primaryAgentId }),
       expect.objectContaining({ id: "assistant-1", roomAgentId: collaboration.primaryAgentId }),
     ]);
+  });
+
+  it("reconciles a newer legacy primary write without changing secondary history", () => {
+    const oldPrimary: TimelineEvent = { id: "user-old", type: "user_message", timestamp: 100, content: "Old" };
+    const session = legacySession([oldPrimary]);
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const secondary = secondaryAgent();
+    const room: Session = {
+      ...session,
+      model: "kimi-code/k2.5",
+      updatedAt: 500,
+      events: [{ id: "user-new", type: "user_message", timestamp: 400, content: "New primary" }],
+      collaboration: {
+        ...collaboration,
+        primaryMirrorUpdatedAt: 200,
+        agents: [primary, secondary],
+        messages: collaboration.messages.map((message) => ({
+          ...message,
+          recipientAgentIds: [primary.id, secondary.id],
+          deliveries: {
+            ...message.deliveries,
+            [secondary.id]: {
+              status: "completed",
+              agentTurnId: "turn-secondary-old",
+              officialUserEventId: "user-secondary-old",
+            },
+          },
+        })),
+        agentEvents: {
+          ...collaboration.agentEvents,
+          [secondary.id]: [{
+            id: "secondary-history",
+            type: "user_message",
+            timestamp: 105,
+            content: "Secondary stays",
+            roomAgentId: secondary.id,
+          }],
+        },
+      },
+    };
+
+    const normalized = normalizeLoadedSessionCollaboration(room);
+    expect(normalized.unsupportedCollaboration).toBeUndefined();
+    expect(normalized.collaboration?.primaryMirrorUpdatedAt).toBe(500);
+    expect(normalized.collaboration?.agents.find((agent) => agent.id === primary.id)?.modelAlias).toBe("kimi-code/k2.5");
+    expect(normalized.collaboration?.agentEvents[primary.id].map((event) => event.id)).toEqual(["user-new"]);
+    expect(normalized.collaboration?.agentEvents[secondary.id].map((event) => event.id)).toEqual(["secondary-history"]);
+    expect(normalized.collaboration?.messages).toEqual([
+      expect.objectContaining({ id: "room-message:user-old", recipientAgentIds: [secondary.id] }),
+      expect.objectContaining({ id: "room-message:user-new", recipientAgentIds: [primary.id] }),
+    ]);
+  });
+
+  it("keeps future and invalid collaboration payloads opaque instead of downgrading them", () => {
+    const session = legacySession();
+    const futureRaw = { schemaVersion: 2, futureAgents: [{ id: "future" }] };
+    const future = normalizeLoadedSessionCollaboration({
+      ...session,
+      collaboration: futureRaw as unknown as Session["collaboration"],
+    });
+    expect(future.collaboration).toBeUndefined();
+    expect(future.unsupportedCollaboration).toEqual({
+      reason: "unsupported-schema",
+      schemaVersion: 2,
+      raw: futureRaw,
+    });
+    expect(() => createCollaborationStateFromSession(future)).toThrow("无法安全修改");
+
+    const invalidRaw = { schemaVersion: 1, agents: [], messages: [], agentEvents: {} };
+    const invalid = normalizeLoadedSessionCollaboration({
+      ...session,
+      collaboration: invalidRaw as unknown as Session["collaboration"],
+    });
+    expect(invalid.collaboration).toBeUndefined();
+    expect(invalid.unsupportedCollaboration).toEqual({
+      reason: "invalid-schema",
+      schemaVersion: 1,
+      raw: invalidRaw,
+    });
   });
 
   it("resolves two runtime identities to different owners in the same room", () => {
