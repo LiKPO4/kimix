@@ -3,7 +3,8 @@ import { Check, ChevronDown, ChevronRight, CircleHelp, SendHorizontal } from "lu
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { getRoomAgent } from "@/utils/collaborationRooms";
+import { resolveRoomEventOwner, updateRoomEventForOwner } from "@/utils/roomEventOwner";
 
 interface QuestionCardProps {
   event: Extract<TimelineEvent, { type: "question_request" }>;
@@ -64,6 +65,9 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
   const [customSelected, setCustomSelected] = useState<Record<string, boolean>>(() => Object.fromEntries(Object.keys(initialCustomAnswers).map((key) => [key, true])));
   const [collapsed, setCollapsed] = useState(event.status !== "pending");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const roomAgentName = currentSession?.collaboration && event.roomAgentId
+    ? getRoomAgent(currentSession, event.roomAgentId)?.displayName
+    : undefined;
 
   useEffect(() => {
     setAnswers(initialAnswers);
@@ -112,22 +116,23 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
     return payload;
   };
 
-  const markSettled = (status: "answered" | "skipped", answerPayload?: Record<string, string>) => {
+  const markSettled = (roomAgentId: string, status: "answered" | "skipped", answerPayload?: Record<string, string>) => {
     if (!currentSession) return;
     let updatedSession = currentSession;
     updateSession(currentSession.id, (session) => {
       updatedSession = {
-      ...session,
-      events: session.events.map((item) => (
-        item.id === event.id && item.type === "question_request"
-          ? { ...item, status, answers: answerPayload }
-          : item
-      )),
-      updatedAt: Date.now(),
+        ...updateRoomEventForOwner(session, roomAgentId, event.id, (item) => (
+          item.type === "question_request"
+            ? { ...item, status, answers: answerPayload }
+            : item
+        )),
+        updatedAt: Date.now(),
       };
       return updatedSession;
     });
-    setCurrentSession(updatedSession);
+    if (useAppStore.getState().currentSession?.id === currentSession.id) {
+      setCurrentSession(updatedSession);
+    }
   };
 
   const submitAnswers = async (skip = false) => {
@@ -135,19 +140,20 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
     setIsSubmitting(true);
     const answerPayload = skip ? {} : buildAnswerPayload();
     try {
-      const runtimeSessionId = getRuntimeSessionId(currentSession);
-      if (!runtimeSessionId) return;
+      const owner = resolveRoomEventOwner(currentSession, event);
       const res = await window.api.respondKimiCodeQuestion({
-        sessionId: runtimeSessionId,
+        sessionId: owner.runtimeSessionId,
         requestId: event.requestId,
         answers: answerPayload,
         skipped: skip,
       });
       if (!res.success) throw new Error(res.error);
-      markSettled(skip ? "skipped" : "answered", answerPayload);
+      markSettled(owner.roomAgentId, skip ? "skipped" : "answered", answerPayload);
       setCollapsed(true);
     } catch (err) {
       console.error("Respond question failed:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `提交回答失败：${message}` }));
     } finally {
       setIsSubmitting(false);
     }
@@ -177,7 +183,9 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-medium leading-6">需要你确认一下</div>
-            <div className="mt-0.5 truncate text-[13px] leading-5 text-text-secondary">{summary}</div>
+            <div className="mt-0.5 truncate text-[13px] leading-5 text-text-secondary">
+              {roomAgentName ? `${roomAgentName} · ${summary}` : summary}
+            </div>
           </div>
           <span className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-accent-primary-soft">
             {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}

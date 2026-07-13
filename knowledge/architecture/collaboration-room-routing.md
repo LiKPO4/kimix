@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T19:30:00+08:00"
+timestamp: "2026-07-13T21:10:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -40,6 +40,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Room messages, recipient order, and stable delivery attempts are persisted as `queued` before dispatch; each target must then persist `sending` before any network call. Failure to persist `sending` returns that target to `queued` without invoking the runtime.
 * Official acceptance records prompt/message identities. A `sending` attempt whose result is unknown or whose persisted state cannot be reconciled with stable official or canonical room/turn evidence becomes `indeterminate` and is never automatically resent.
 * After official acceptance, runtime status is the delivery settlement authority: running, approval, question, completion, error, and interruption update only the matching `roomMessageId + roomAgentId` delivery. Accepted work remains lifecycle-active until that Agent reaches a terminal state.
+* Approval and structured-question responses resolve the explicit event `roomAgentId` before IPC, use only that Agent's runtime identity, and settle only its event partition. A room event without an owner or with an unavailable Agent/runtime is rejected instead of falling back to primary.
 * Delivery transitions are monotonic after acceptance and terminal settlement. Only an explicit user retry may replace an indeterminate, failed, or cancelled attempt; the retry creates a new `dispatchAttemptId` and `agentTurnId` while preserving the previous attempt as durable audit history.
 * Cancel, steer, approval, question response, permission mutation, model mutation, Plan, Goal, Swarm, and slash session mutation require an explicit Agent/runtime owner.
 * A terminal event or Server-to-SDK migration for one Agent cannot clear or replace another Agent's activity or runtime binding.

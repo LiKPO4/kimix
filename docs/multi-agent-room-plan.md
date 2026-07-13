@@ -391,7 +391,8 @@ interface AgentDelivery {
 
 ### 阶段 7：Agent 级高级操作
 
-- [ ] ApprovalCard、QuestionCard、Stop、Steer 绑定事件 owner。
+- [x] ApprovalCard、QuestionCard 绑定事件 owner，并只结算所属 Agent 分区。
+- [ ] Stop、Steer 绑定明确运行中的 Agent owner。
 - [ ] 模型、权限、Plan、Goal、Swarm 绑定明确 Agent。
 - [ ] session mutation 命令要求唯一目标。
 - [ ] 单接收者 undo 使用 Agent scoped canonical snapshot。
@@ -525,6 +526,8 @@ git diff --check
 14. 阶段 6A 已建立纯数据路由和调度门禁：真实 Agent mention 大小写无关且按文本顺序去重，只有识别成功的房间 token 从 outbound payload 剥离；逐 Agent 调度器每次只取最早 queued，运行中或 indeterminate 的 Agent 不阻塞其他空闲 Agent。
 15. 阶段 6B 已把多选、mention 覆盖、并发投递和自动续发接入 Composer；queued 可逐 Agent 取消，failed/indeterminate 只经显式重试创建新 attempt，响应块顺序继续由冻结 recipient 顺序决定。
 16. 阶段 6 已通过 71 个测试文件、520 项测试、生产构建、OKF 校验和 diff check；真实双 Provider 并发与重启续发留到阶段 9 统一验收。
+17. 阶段 7A 已把 ApprovalCard 和 QuestionCard 绑定到事件所属 Agent runtime；房间事件缺 owner、Agent 不可用或 runtime 未就绪时明确拒绝，交互结算只更新对应 `agentEvents` 分区，并在卡片中显示来源 Agent。
+18. 阶段 7A 已通过 72 个测试文件、524 项测试、生产构建、OKF 校验和 diff check；下一增量处理多运行 Agent 下不得猜测 owner 的 Stop/Steer。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

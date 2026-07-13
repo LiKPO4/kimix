@@ -3,8 +3,9 @@ import { memo, useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent } from "@/types/ui";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { getRoomAgent } from "@/utils/collaborationRooms";
 import { normalizePathForComparison } from "@/utils/pathCase";
+import { resolveRoomEventOwner, updateRoomEventForOwner } from "@/utils/roomEventOwner";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 type ApprovalDiffPreview = {
@@ -128,6 +129,7 @@ function buildUnifiedPreview(oldText = "", newText = "") {
 
 export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [] }: ApprovalCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
+  const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const summary = useMemo(() => parseApprovalSummary(event), [event]);
@@ -149,52 +151,64 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
       };
     });
   }, [diffPreviews, summary.paths]);
+  const roomAgentName = currentSession?.collaboration && event.roomAgentId
+    ? getRoomAgent(currentSession, event.roomAgentId)?.displayName
+    : undefined;
+
+  const markSettled = (roomAgentId: string, status: "approved" | "rejected") => {
+    if (!currentSession) return;
+    let updatedSession = currentSession;
+    updateSession(currentSession.id, (session) => {
+      updatedSession = {
+        ...updateRoomEventForOwner(session, roomAgentId, event.id, (item) => (
+          item.type === "approval_request" ? { ...item, status } : item
+        )),
+        updatedAt: Date.now(),
+      };
+      return updatedSession;
+    });
+    if (useAppStore.getState().currentSession?.id === currentSession.id) {
+      setCurrentSession(updatedSession);
+    }
+  };
+
+  const showError = (action: string, error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`${action} failed:`, error);
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${action}失败：${message}` }));
+  };
 
   const handleApprove = async (scope?: "once" | "session", selectedLabel?: string) => {
     if (!currentSession) return;
-    const runtimeSessionId = getRuntimeSessionId(currentSession);
-    if (!runtimeSessionId) return;
     try {
-      await window.api.respondKimiCodeApproval({
-        sessionId: runtimeSessionId,
+      const owner = resolveRoomEventOwner(currentSession, event);
+      const result = await window.api.respondKimiCodeApproval({
+        sessionId: owner.runtimeSessionId,
         requestId: event.requestId,
         approved: true,
         scope,
         selectedLabel,
       });
-      updateSession(currentSession.id, (session) => ({
-        ...session,
-        events: session.events.map((e) =>
-          e.id === event.id && e.type === "approval_request"
-            ? { ...e, status: "approved" as const }
-            : e
-        ),
-      }));
+      if (!result.success) throw new Error(result.error);
+      markSettled(owner.roomAgentId, "approved");
     } catch (err) {
-      console.error("Approve failed:", err);
+      showError("批准", err);
     }
   };
 
   const handleReject = async () => {
     if (!currentSession) return;
-    const runtimeSessionId = getRuntimeSessionId(currentSession);
-    if (!runtimeSessionId) return;
     try {
-      await window.api.respondKimiCodeApproval({
-        sessionId: runtimeSessionId,
+      const owner = resolveRoomEventOwner(currentSession, event);
+      const result = await window.api.respondKimiCodeApproval({
+        sessionId: owner.runtimeSessionId,
         requestId: event.requestId,
         approved: false,
       });
-      updateSession(currentSession.id, (session) => ({
-        ...session,
-        events: session.events.map((e) =>
-          e.id === event.id && e.type === "approval_request"
-            ? { ...e, status: "rejected" as const }
-            : e
-        ),
-      }));
+      if (!result.success) throw new Error(result.error);
+      markSettled(owner.roomAgentId, "rejected");
     } catch (err) {
-      console.error("Reject failed:", err);
+      showError("拒绝", err);
     }
   };
 
@@ -211,9 +225,20 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
         className="max-w-[90%] w-full rounded-2xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
         style={{ padding: "14px 18px 16px" }}
       >
-        <div className="flex items-center text-sm font-medium text-text-primary" style={{ gap: 10 }}>
-          <AlertTriangle size={16} className="text-accent-orange shrink-0" />
-          <span className="min-w-0 break-words">工具请求: {event.description}</span>
+        <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+          <div className="flex min-w-0 items-center text-sm font-medium text-text-primary" style={{ gap: 10 }}>
+            <AlertTriangle size={16} className="text-accent-orange shrink-0" />
+            <span className="min-w-0 break-words">工具请求: {event.description}</span>
+          </div>
+          {roomAgentName && (
+            <span
+              className="truncate rounded-full border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-xs font-normal text-text-secondary"
+              style={{ maxWidth: 176, minHeight: 26, padding: "3px 10px", lineHeight: "18px" }}
+              title={`来自 ${roomAgentName}`}
+            >
+              {roomAgentName}
+            </span>
+          )}
         </div>
 
         <div
