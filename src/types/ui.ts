@@ -185,9 +185,15 @@ export interface RoomAgent {
   btwRounds?: BtwRound[];
   createdAt: number;
   removedAt?: number;
+  archivedAt?: number;
   missingSince?: number;
   recoveryIssue?: {
     status: "error" | "unavailable";
+    message: string;
+    updatedAt: number;
+  };
+  lifecycleIssue?: {
+    operation: "archive" | "restore";
     message: string;
     updatedAt: number;
   };

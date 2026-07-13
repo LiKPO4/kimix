@@ -447,6 +447,7 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
     officialGoal: undefined,
     missingSince: undefined,
     recoveryIssue: undefined,
+    lifecycleIssue: undefined,
   }));
   const remapped: CollaborationState = {
     ...collaboration,

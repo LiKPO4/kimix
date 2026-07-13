@@ -17,6 +17,7 @@ import {
 } from "@/utils/sessionBackup";
 import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import { restoreCollaborationRoom } from "@/utils/sessionArchive";
 import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog } from "@electron/types/ipc";
 import { usePresence } from "@/hooks/usePresence";
 
@@ -43,7 +44,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.15.21";
+const KIMIX_VERSION = "2.15.22";
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -1247,6 +1248,41 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   const handleRestoreOfficialArchivedSession = async (session: KimiCodeArchivedSessionSummary) => {
     setRestoringOfficialArchivedId(session.id);
+    const localRoom = useSessionStore.getState().sessions.find((item) => (
+      item.collaboration?.agents.some((agent) => !agent.removedAt && (
+        agent.runtimeSessionId === session.id || agent.officialSessionId === session.id
+      ))
+    ));
+    if (localRoom?.collaboration) {
+      const result = await restoreCollaborationRoom(
+        localRoom,
+        (officialSessionId) => window.api.restoreKimiCodeArchivedSession({ sessionId: officialSessionId }),
+      );
+      useSessionStore.getState().updateSession(localRoom.id, () => result.session);
+      if (useAppStore.getState().currentSession?.id === localRoom.id) {
+        useAppStore.getState().setCurrentSession(result.session);
+      }
+      const restoredIds = Array.from(new Set(result.outcomes.flatMap((outcome) => {
+        if (!outcome.success) return [];
+        const agent = result.session.collaboration?.agents.find((candidate) => candidate.id === outcome.roomAgentId);
+        return [outcome.officialSessionId, agent?.runtimeSessionId, agent?.officialSessionId]
+          .filter((id): id is string => Boolean(id));
+      })));
+      if (restoredIds.length > 0) {
+        forgetArchivedSessionTombstonesByIds(restoredIds);
+        setOfficialArchivedSessions((items) => items.filter((item) => !restoredIds.includes(item.id)));
+      }
+      setRestoringOfficialArchivedId(null);
+      if (!result.success) {
+        setOfficialArchivedMessage(result.partial
+          ? `房间「${localRoom.title}」仅部分恢复：${result.error ?? "请重试失败的 Agent"}`
+          : `恢复房间「${localRoom.title}」失败：${result.error ?? "未知错误"}`);
+        return;
+      }
+      forgetArchivedSessionTombstonesByIds([localRoom.id, ...restoredIds]);
+      setOfficialArchivedMessage(`已恢复房间「${localRoom.title}」的全部 Agent。切换到对应项目后会重新同步到侧栏。`);
+      return;
+    }
     const res = await window.api.restoreKimiCodeArchivedSession({ sessionId: session.id });
     setRestoringOfficialArchivedId(null);
     if (!res.success) {

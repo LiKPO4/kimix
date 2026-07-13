@@ -106,7 +106,7 @@ export function createRoomMessageDispatch(
   if (recipientAgentIds.length === 0) throw new Error("至少选择一个 Agent");
   for (const roomAgentId of recipientAgentIds) {
     const agent = getRoomAgent(session, roomAgentId);
-    if (!agent || agent.removedAt) throw new Error("Agent " + roomAgentId + " 不存在或已移出房间");
+    if (!agent || agent.removedAt || agent.archivedAt) throw new Error("Agent " + roomAgentId + " 不存在、已移出或已归档");
   }
   const createId = input.createId ?? defaultCreateId;
   const timestamp = input.timestamp ?? Date.now();

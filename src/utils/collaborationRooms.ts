@@ -65,6 +65,15 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     !recoveryIssue.message.trim() ||
     !isFiniteNumber(recoveryIssue.updatedAt)
   )) return null;
+  const lifecycleIssue = value.lifecycleIssue;
+  if (lifecycleIssue !== undefined && (
+    !isRecord(lifecycleIssue) ||
+    (lifecycleIssue.operation !== "archive" && lifecycleIssue.operation !== "restore") ||
+    typeof lifecycleIssue.message !== "string" ||
+    !lifecycleIssue.message.trim() ||
+    !isFiniteNumber(lifecycleIssue.updatedAt)
+  )) return null;
+  if (value.archivedAt !== undefined && !isFiniteNumber(value.archivedAt)) return null;
   return {
     ...(value as unknown as RoomAgent),
     id,
@@ -74,6 +83,8 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     permissionMode: value.permissionMode,
     createdAt: value.createdAt,
     recoveryIssue: recoveryIssue as RoomAgent["recoveryIssue"],
+    archivedAt: value.archivedAt as number | undefined,
+    lifecycleIssue: lifecycleIssue as RoomAgent["lifecycleIssue"],
   };
 }
 
@@ -372,6 +383,7 @@ export function resolveRoomRuntimeOwner(
     if (session.archivedAt || session.longTask) continue;
     const agents = getRoomAgents(session);
     for (const agent of agents) {
+      if (agent.removedAt || agent.archivedAt) continue;
       const matchesAgent = identities.has(agent.id)
         || Boolean(agent.runtimeSessionId && identities.has(agent.runtimeSessionId))
         || Boolean(agent.officialSessionId && identities.has(agent.officialSessionId));

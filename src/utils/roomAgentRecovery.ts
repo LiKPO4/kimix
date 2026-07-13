@@ -28,7 +28,7 @@ export type ResumeRoomAgentResponse = {
 
 export function getRoomAgentRecoveryTargets(session: Session): RoomAgentRecoveryTarget[] {
   const primary = getPrimaryRoomAgent(session);
-  return getRoomAgents(session).filter((agent) => !agent.removedAt).map((agent) => ({
+  return getRoomAgents(session).filter((agent) => !agent.removedAt && !agent.archivedAt).map((agent) => ({
     roomAgentId: agent.id,
     sessionIds: Array.from(new Set([
       agent.runtimeSessionId,
@@ -119,7 +119,7 @@ export function reconcileRoomAgentModelAvailability(
   if (!session.collaboration || !availableModelAliases) return session;
   let next = session;
   for (const agent of session.collaboration.agents) {
-    if (agent.removedAt || !agent.modelAlias) continue;
+    if (agent.removedAt || agent.archivedAt || !agent.modelAlias) continue;
     const available = availableModelAliases.has(agent.modelAlias);
     if (!available) {
       const message = `模型 ${agent.modelAlias} 当前不可用，请恢复对应 Provider 或为该 Agent 重新选择模型。`;
@@ -140,7 +140,7 @@ export function reconcileRoomAgentModelAvailability(
 
 export function roomAgentCanResume(session: Session, roomAgentId: string): boolean {
   const agent = getRoomAgent(session, roomAgentId);
-  return Boolean(agent && !agent.removedAt && agent.recoveryIssue?.status !== "unavailable");
+  return Boolean(agent && !agent.removedAt && !agent.archivedAt && agent.recoveryIssue?.status !== "unavailable");
 }
 
 export function getPrimaryRecoveryTarget(session: Session): RoomAgentRecoveryTarget {

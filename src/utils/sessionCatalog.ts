@@ -238,7 +238,7 @@ export function reconcileOfficialSessionCatalog(
       primary.officialSessionId,
     ].filter((id): id is string => Boolean(id)));
     const agent = room.collaboration?.agents.find((candidate) => candidate.id === metadata.roomAgentId);
-    if (!agent || agent.removedAt || agent.id === primary.id || !primaryIds.has(metadata.primarySessionId)) continue;
+    if (!agent || agent.removedAt || agent.archivedAt || agent.id === primary.id || !primaryIds.has(metadata.primarySessionId)) continue;
     const key = `${metadata.roomId}\n${metadata.roomAgentId}`;
     const matches = roomMatches.get(key) ?? [];
     matches.push({ official, roomIndex, agentId: agent.id });
@@ -360,7 +360,7 @@ export function reconcileOfficialSessionCatalog(
       let room = session;
       let roomChanged = false;
       for (const agent of session.collaboration.agents) {
-        if (agent.id === primary.id || agent.removedAt) continue;
+        if (agent.id === primary.id || agent.removedAt || agent.archivedAt) continue;
         const boundIds = [agent.runtimeSessionId, agent.officialSessionId].filter((id): id is string => Boolean(id));
         if (boundIds.length === 0) continue;
         const present = boundIds.some((id) => visibleOfficialIds.has(id));
