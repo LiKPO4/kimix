@@ -804,6 +804,7 @@ export type SessionBackupSnapshot = {
   projects: unknown[];
   archivedTombstones: unknown[];
   hiddenHandoffSessionIds: string[];
+  roomAgentActivities?: unknown[];
   activeContext?: unknown;
 };
 

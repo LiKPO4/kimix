@@ -2900,7 +2900,8 @@ async function exportKimiSessionArchive(request: { sessionId?: string; title?: s
   return { path: result.filePath, output: `Kimi Code fallback export completed\n${output}` };
 }
 
-const SESSION_BACKUP_SCHEMA_VERSION = 1;
+const LEGACY_SESSION_BACKUP_SCHEMA_VERSION = 1;
+const SESSION_BACKUP_SCHEMA_VERSION = 2;
 
 function emptySessionBackupSnapshot(): SessionBackupSnapshot {
   return {
@@ -2913,6 +2914,7 @@ function emptySessionBackupSnapshot(): SessionBackupSnapshot {
     projects: [],
     archivedTombstones: [],
     hiddenHandoffSessionIds: [],
+    roomAgentActivities: [],
   };
 }
 
@@ -2935,9 +2937,12 @@ function stringArray(value: unknown): string[] {
 function normalizeSessionBackupSnapshot(value: unknown): SessionBackupSnapshot {
   const record = asPlainRecord(value);
   if (!record) throw new Error("会话快照格式无效");
-  const schemaVersion = typeof record.schemaVersion === "number" && Number.isFinite(record.schemaVersion)
+  const schemaVersion = typeof record.schemaVersion === "number" && Number.isInteger(record.schemaVersion)
     ? record.schemaVersion
-    : SESSION_BACKUP_SCHEMA_VERSION;
+    : LEGACY_SESSION_BACKUP_SCHEMA_VERSION;
+  if (schemaVersion !== LEGACY_SESSION_BACKUP_SCHEMA_VERSION && schemaVersion !== SESSION_BACKUP_SCHEMA_VERSION) {
+    throw new Error(`当前 Kimix 不支持会话备份 schema ${schemaVersion}`);
+  }
   return {
     schemaVersion,
     appVersion: typeof record.appVersion === "string" ? record.appVersion : undefined,
@@ -2948,6 +2953,7 @@ function normalizeSessionBackupSnapshot(value: unknown): SessionBackupSnapshot {
     projects: unknownArray(record.projects),
     archivedTombstones: unknownArray(record.archivedTombstones ?? record.archivedSessionTombstones),
     hiddenHandoffSessionIds: stringArray(record.hiddenHandoffSessionIds),
+    roomAgentActivities: unknownArray(record.roomAgentActivities),
     activeContext: record.activeContext,
   };
 }
@@ -2969,6 +2975,9 @@ async function exportSessionBackupArchive(request: unknown) {
   const req = asPlainRecord(request);
   if (!req) throw new Error("缺少导出请求");
   const snapshot = normalizeSessionBackupSnapshot(req.snapshot);
+  if (snapshot.schemaVersion !== SESSION_BACKUP_SCHEMA_VERSION) {
+    throw new Error(`当前版本只能导出 schema ${SESSION_BACKUP_SCHEMA_VERSION} 会话备份`);
+  }
   const suggestedName = typeof req.suggestedName === "string" && req.suggestedName.trim()
     ? req.suggestedName.trim()
     : "Kimix 会话快照";
@@ -3000,6 +3009,7 @@ async function exportSessionBackupArchive(request: unknown) {
       projects: fullSnapshot.projects.length,
       archivedTombstones: fullSnapshot.archivedTombstones.length,
       hiddenHandoffSessionIds: fullSnapshot.hiddenHandoffSessionIds.length,
+      roomAgentActivities: fullSnapshot.roomAgentActivities?.length ?? 0,
     },
   });
   addBackupJson(zip, "sessions.json", fullSnapshot.sessions);
@@ -3007,6 +3017,7 @@ async function exportSessionBackupArchive(request: unknown) {
   addBackupJson(zip, "projects.json", fullSnapshot.projects);
   addBackupJson(zip, "archived-tombstones.json", fullSnapshot.archivedTombstones);
   addBackupJson(zip, "hidden-handoff-session-ids.json", fullSnapshot.hiddenHandoffSessionIds);
+  addBackupJson(zip, "room-agent-activities.json", fullSnapshot.roomAgentActivities ?? []);
   addBackupJson(zip, "active-context.json", fullSnapshot.activeContext ?? null);
   addBackupJson(zip, "snapshot.json", fullSnapshot);
   await zip.writeZipPromise(result.filePath, { overwrite: true });
@@ -3052,13 +3063,15 @@ async function readSessionBackupSnapshot(filePath: string): Promise<SessionBacku
   });
   const snapshot = readZipJson(zip, "snapshot.json");
   if (snapshot) return normalizeSessionBackupSnapshot(snapshot);
+  const manifest = asPlainRecord(readZipJson(zip, "manifest.json"));
   return normalizeSessionBackupSnapshot({
-    schemaVersion: SESSION_BACKUP_SCHEMA_VERSION,
+    schemaVersion: manifest?.schemaVersion ?? LEGACY_SESSION_BACKUP_SCHEMA_VERSION,
     sessions: readZipJson(zip, "sessions.json") ?? [],
     pendingMessages: readZipJson(zip, "pending.json") ?? [],
     projects: readZipJson(zip, "projects.json") ?? [],
     archivedTombstones: readZipJson(zip, "archived-tombstones.json") ?? [],
     hiddenHandoffSessionIds: readZipJson(zip, "hidden-handoff-session-ids.json") ?? [],
+    roomAgentActivities: readZipJson(zip, "room-agent-activities.json") ?? [],
     activeContext: readZipJson(zip, "active-context.json") ?? undefined,
   });
 }

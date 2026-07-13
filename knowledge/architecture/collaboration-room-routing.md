@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T16:35:00+08:00"
+timestamp: "2026-07-13T17:07:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -59,7 +59,9 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Persistence records when a collaboration-aware writer last synchronized the legacy primary mirror. If a legacy version later changes the top-level Session, the next compatible version merges those changes into the primary Agent only and preserves every secondary partition.
 * Unknown future collaboration schemas are read-only and retained verbatim; current code must not downgrade or overwrite them.
 * Removing an Agent preserves its history. Room archive and restore operate per Agent and expose partial failure because official sessions have no cross-session transaction.
-* Backup schema migration must remap room Agent IDs, recipients, deliveries, events, queues, and official bindings together.
+* Backup schema 2 serializes complete collaboration partitions and scoped Agent activity references, while schema 1 remains a single-Agent import format. Unknown future backup schemas and collaboration payloads with dangling or cross-Agent references are rejected instead of being normalized into partial rooms.
+* A conflict fork remaps the room ID, every Agent, message, turn, dispatch attempt, delivery key, event scope, pending-queue reference, activity reference, hidden-session reference, and active context as one transaction. The copy clears top-level and per-Agent runtime, official, catalog, Skill-fork, missing, recovery, Swarm, model-switch, and Goal bindings before it becomes visible.
+* Archived-room tombstones contain the room ID plus every Agent runtime and official identity so a secondary catalog row cannot resurrect an archived room. A collaboration-aware exporter refuses opaque future collaboration data rather than writing it back under schema 2.
 
 # UI Stability
 

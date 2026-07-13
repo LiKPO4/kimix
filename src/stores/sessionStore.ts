@@ -7,6 +7,10 @@ export interface PendingMessage {
   content: string;
   createdAt: number;
   images?: UserMessageImage[];
+  roomAgentId?: string;
+  roomMessageId?: string;
+  agentTurnId?: string;
+  recipientAgentIds?: string[];
 }
 
 export interface SessionStore {

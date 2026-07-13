@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-3、4A-4E 已完成，下一步进入 4F，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-3、4A-4F 已完成，下一步进入 4G，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -351,11 +351,11 @@ interface AgentDelivery {
 
 #### 4F：备份 schema 2 与身份重映射
 
-- [ ] schema 2 完整保存 collaboration；schema 1 继续导入为单 Agent。
-- [ ] normalizer 校验 agents、messages、deliveries、agentEvents 和全部引用关系。
-- [ ] 创建导入副本时重映射 room Agent ID、recipient、delivery key、roomMessageId、agentTurnId、activity 和队列引用。
-- [ ] 导入副本清空全部 Agent 的 runtime/official/catalog/missing 绑定，不连接导出来源的官方会话。
-- [ ] tombstone 收集全部 Agent runtime/official ID；未知未来 schema 不允许写回。
+- [x] schema 2 完整保存 collaboration；schema 1 继续导入为单 Agent。
+- [x] normalizer 校验 agents、messages、deliveries、agentEvents 和全部引用关系。
+- [x] 创建导入副本时重映射 room Agent ID、recipient、delivery key、roomMessageId、agentTurnId、activity 和队列引用。
+- [x] 导入副本清空全部 Agent 的 runtime/official/catalog/missing 绑定，不连接导出来源的官方会话。
+- [x] tombstone 收集全部 Agent runtime/official ID；未知未来 schema 不允许写回。
 
 退出门禁：v1/v2 导入、冲突分叉、重复导入、损坏引用和导入副本解绑全部通过。
 
@@ -507,7 +507,7 @@ git diff --check
 
 ## 11. 当前实现审计与开放条件
 
-截至 2026-07-13，阶段 0-3 和 4A-4E 已完成。阶段 3 已实现并验证：
+截至 2026-07-13，阶段 0-3 和 4A-4F 已完成。阶段 3 已实现并验证：
 
 1. `startup`、quiet running snapshot、后台 repair、消息撤回重写和 `/undo` 全部使用统一的 Agent-scoped canonical reconcile。
 2. ChatThread 的响应块、展开/滚动身份和最终 usage 只由对应 `roomAgentId + agentTurnId` 控制。
@@ -518,7 +518,8 @@ git diff --check
 7. 阶段 4C 已实现受控 metadata 的精确目录折叠与重绑；主、次 Agent 同批目录只保留一个房间镜像，歧义或孤儿 session 保持独立可见，Server 缺失只标记对应 Agent，SDK 非权威目录不下删除结论。
 8. 阶段 4D 已把 startup、后台 repair、running snapshot 和 resume 收口到逐 Agent runtime/official 候选；部分失败保留 canonical history 与恢复错误，Server -> SDK 迁移同步目标 Agent activity，模型目录缺失标记 unavailable 并阻止静默切换。
 9. 阶段 4E 已建立逐 delivery 可靠投递事务：网络前依次持久化 `queued` 与 `sending`，官方结果不确定时进入 `indeterminate` 且不自动重发，重启只凭稳定官方/房间身份恢复，用户显式重试创建新 attempt/turn 并保留旧尝试审计。
-10. 当前工作树已通过 69 个测试文件、494 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的备份和生命周期门禁。
+10. 阶段 4F 已把会话备份升级为 schema 2：完整保存房间与活动引用，schema 1 保持单 Agent 导入；损坏引用和未来 schema 被拒绝，分叉副本全量重映射房间/Agent/message/turn/attempt/事件/活动/队列身份并清除全部官方绑定，tombstone 覆盖所有 Agent runtime/official ID。
+11. 当前工作树已通过 69 个测试文件、502 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4G 生命周期门禁。
 
 UI 开放必须同时满足以下 go/no-go gate：
 
