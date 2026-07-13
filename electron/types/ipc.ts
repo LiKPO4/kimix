@@ -1301,9 +1301,20 @@ export type TriggerShortcutRequest = {
 export type TurnCompleteNotificationRequest = {
   title?: string;
   body?: string;
+  fallbackBody?: string;
   sessionId?: string;
+  roomAgentId?: string;
+  agentTurnId?: string;
+  eventId?: string;
   windowFocused?: boolean;
   pageVisible?: boolean;
+}
+
+export type NotificationClickPayload = {
+  sessionId: string;
+  roomAgentId?: string;
+  agentTurnId?: string;
+  eventId?: string;
 }
 
 export type RendererHeartbeatPayload = {

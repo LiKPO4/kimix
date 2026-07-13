@@ -396,7 +396,7 @@ interface AgentDelivery {
 - [x] 模型、权限、Plan、Goal、Swarm 绑定明确 Agent；ContextBar、Composer、AppShell 与 SessionToolbar 共用唯一 mutation owner。
 - [x] Composer 内 Skill、Plugin、compact、reload、status、usage、BTW 等 session mutation 命令要求唯一目标。
 - [x] 单接收者 undo 使用 Agent scoped canonical snapshot。
-- [ ] 通知包含 Agent 并定位对应 turn。
+- [x] 通知包含 Agent，并携带 room/Agent/turn/event 身份定位对应时间线节点。
 
 退出门禁：所有操作均命中正确 runtime；部分 Agent 失败不影响其他 Agent。
 
@@ -534,6 +534,8 @@ git diff --check
 22. 阶段 7C1 已通过 74 个测试文件、535 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-B5Q8DEyj.js`。零接收者和多接收者均在 IPC 前拒绝；旧会话权限 fallback 保持当前应用值；官方 Skill 失败转房间兼容兜底时只保留一条可见命令。
 23. 阶段 7C2 已将 ContextBar 模型、AppShell Goal/BTW/Plan、SessionToolbar 官方重命名/派生/Kimi Web/可视化绑定唯一 Agent；运行门禁同时读取 Agent 活动态，右侧栏明确显示当前 Agent。
 24. 阶段 7C2 已通过 74 个测试文件、536 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CcZ7ADVd.js`。
+25. 阶段 7D 已扩展桌面通知 IPC：完成、提问和审批通知包含 Agent 名称，关闭内容预览时仍保留非敏感 Agent fallback；点击选择对应 Agent 并复用 `kimix:focus-timeline-event` 定位 event/turn。
+26. 阶段 7D 已通过 74 个测试文件、538 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BVqfw5y3.js`。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

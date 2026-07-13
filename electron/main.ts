@@ -30,7 +30,7 @@ import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
-import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse } from "./types/ipc";
+import type { ExportSessionBackupRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -2401,7 +2401,7 @@ function clearTaskbarAttention() {
   app.setBadgeCount(0);
 }
 
-function showTurnCompleteNotification(title: string, body: string, sessionId = "", rendererWindowFocused = false, rendererPageVisible = false) {
+function showTurnCompleteNotification(title: string, body: string, fallbackBody: string, target: NotificationClickPayload, rendererWindowFocused = false, rendererPageVisible = false) {
   const settings = settingsService.loadSettings();
   const notificationMode = settings.notificationMode ?? "unfocused";
   const notificationShowContent = settings.notificationShowContent ?? false;
@@ -2412,7 +2412,7 @@ function showTurnCompleteNotification(title: string, body: string, sessionId = "
   if (!Notification.isSupported()) return;
   const safeBody = notificationShowContent
     ? body.trim()
-    : "";
+    : fallbackBody.trim();
   const notification = new Notification({
     title: title.trim() || "Kimix 本轮已完成",
     body: safeBody || "当前轮次处理已完成，可以回来查看结果。",
@@ -2424,7 +2424,7 @@ function showTurnCompleteNotification(title: string, body: string, sessionId = "
     mainWindow.show();
     mainWindow.focus();
     clearTaskbarAttention();
-    if (sessionId) mainWindow.webContents.send("app:notification-clicked", { sessionId });
+    if (target.sessionId) mainWindow.webContents.send("app:notification-clicked", target);
   });
   notification.show();
 }
@@ -6738,10 +6738,14 @@ ipcMain.handle("app:notifyTurnComplete", async (_, request: unknown) => {
     const payload = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const title = typeof payload.title === "string" ? payload.title.slice(0, 80) : "Kimix 本轮已完成";
     const body = typeof payload.body === "string" ? payload.body.slice(0, 180) : "当前轮次处理已完成，可以回来查看结果。";
+    const fallbackBody = typeof payload.fallbackBody === "string" ? payload.fallbackBody.slice(0, 180) : "当前轮次处理已完成，可以回来查看结果。";
     const sessionId = typeof payload.sessionId === "string" ? payload.sessionId.slice(0, 160) : "";
+    const roomAgentId = typeof payload.roomAgentId === "string" ? payload.roomAgentId.slice(0, 160) : undefined;
+    const agentTurnId = typeof payload.agentTurnId === "string" ? payload.agentTurnId.slice(0, 200) : undefined;
+    const eventId = typeof payload.eventId === "string" ? payload.eventId.slice(0, 200) : undefined;
     const windowFocused = payload.windowFocused === true;
     const pageVisible = payload.pageVisible === true;
-    showTurnCompleteNotification(title, body, sessionId, windowFocused, pageVisible);
+    showTurnCompleteNotification(title, body, fallbackBody, { sessionId, roomAgentId, agentTurnId, eventId }, windowFocused, pageVisible);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

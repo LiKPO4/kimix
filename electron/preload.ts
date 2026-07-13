@@ -100,6 +100,7 @@ import type {
   LaunchCommandRequest,
   TriggerShortcutRequest,
   TurnCompleteNotificationRequest,
+  NotificationClickPayload,
   RendererHeartbeatPayload,
   RendererStartupMark,
   ScheduleShutdownRequest,
@@ -492,8 +493,8 @@ const api = {
     ipcRenderer.invoke("app:triggerShortcut", req),
   notifyTurnComplete: (req: TurnCompleteNotificationRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:notifyTurnComplete", req),
-  onNotificationClick: (callback: (payload: { sessionId: string }) => void) => {
-    const handler = (_: unknown, payload: { sessionId: string }) => callback(payload);
+  onNotificationClick: (callback: (payload: NotificationClickPayload) => void) => {
+    const handler = (_: unknown, payload: NotificationClickPayload) => callback(payload);
     ipcRenderer.on("app:notification-clicked", handler);
     return () => ipcRenderer.off("app:notification-clicked", handler);
   },

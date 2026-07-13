@@ -23,7 +23,13 @@ import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeli
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
-import { approvalRequestNotificationKey, findNotificationSession, summarizeApprovalRequest } from "@/utils/notificationRouting";
+import {
+  approvalRequestNotificationKey,
+  focusNotificationRoomAgent,
+  resolveNotificationClickTarget,
+  summarizeApprovalRequest,
+  type NotificationClickTarget,
+} from "@/utils/notificationRouting";
 import {
   settleInactiveEvents,
   settleFailedEvents,
@@ -667,10 +673,10 @@ function summarizeNotificationBody(content: string): string {
   return normalized.length > 120 ? `${normalized.slice(0, 118)}...` : normalized;
 }
 
-function extractAssistantContentForTurn(
+function extractAssistantForTurn(
   events: TimelineEvent[],
   start?: { eventStartIndex: number; openAssistantIds: Set<string> },
-): string {
+) {
   const settled = settleInactiveEvents(events);
   const eventStartIndex = Math.max(0, Math.min(start?.eventStartIndex ?? 0, settled.length));
   const openAssistantIds = start?.openAssistantIds ?? new Set<string>();
@@ -682,19 +688,44 @@ function extractAssistantContentForTurn(
       entry.event.content.trim().length > 0 &&
       (entry.index >= eventStartIndex || openAssistantIds.has(entry.event.id))
     ));
-  return assistant?.event.content.trim() ?? "";
+  return assistant?.event;
 }
 
-function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label?: string, assistantContent?: string) {
+function getNotificationAgentContext(uiSessionId: string, runtimeSessionId: string, target?: Partial<NotificationClickTarget>) {
   const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+  const runtimeOwner = resolveRoomRuntimeOwner(session ? [session] : [], runtimeSessionId);
+  const roomAgentId = target?.roomAgentId ?? runtimeOwner?.roomAgentId;
+  const agent = session?.collaboration && roomAgentId ? getRoomAgent(session, roomAgentId) : undefined;
+  return { session, roomAgentId, agentName: agent?.displayName };
+}
+
+function notifyTurnComplete(
+  uiSessionId: string,
+  runtimeSessionId: string,
+  label?: string,
+  assistant?: Extract<TimelineEvent, { type: "assistant_message" }>,
+  target?: Partial<NotificationClickTarget>,
+) {
+  const { session, roomAgentId, agentName } = getNotificationAgentContext(uiSessionId, runtimeSessionId, target);
   const sessionTitle = session?.title?.trim() || "当前会话";
   const showContent = useAppStore.getState().notificationShowContent ?? false;
-  const summary = showContent ? summarizeNotificationBody(assistantContent ?? "") : "";
+  const summary = showContent ? summarizeNotificationBody(assistant?.content ?? "") : "";
   const suffix = label ? `（${label}）` : "";
+  const fallbackBody = agentName
+    ? `${agentName} 已处理完成，可以回来查看结果。`
+    : "当前轮次处理已完成，可以回来查看结果。";
   void window.api.notifyTurnComplete({
-    title: `Kimix 本轮已完成${suffix}`,
-    body: summary || `「${sessionTitle}」已处理完成，可以回来查看结果。`,
+    title: agentName ? `Kimix · ${agentName} 本轮已完成${suffix}` : `Kimix 本轮已完成${suffix}`,
+    body: summary
+      ? `${agentName ? `${agentName}：` : ""}${summary}`
+      : agentName
+        ? `「${sessionTitle}」中的 ${agentName} 已处理完成，可以回来查看结果。`
+        : `「${sessionTitle}」已处理完成，可以回来查看结果。`,
+    fallbackBody,
     sessionId: uiSessionId,
+    roomAgentId,
+    agentTurnId: target?.agentTurnId ?? assistant?.agentTurnId,
+    eventId: target?.eventId ?? assistant?.id,
     windowFocused: document.hasFocus() || rendererWindowFocusedHint,
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
@@ -702,15 +733,26 @@ function notifyTurnComplete(uiSessionId: string, runtimeSessionId: string, label
   });
 }
 
-function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string, questionContent?: string) {
-  const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string, event: Extract<TimelineEvent, { type: "question_request" }>) {
+  const { session, roomAgentId, agentName } = getNotificationAgentContext(uiSessionId, runtimeSessionId, event);
   const sessionTitle = session?.title?.trim() || "当前会话";
   const showContent = useAppStore.getState().notificationShowContent ?? false;
-  const summary = showContent ? summarizeNotificationBody(questionContent ?? "") : "";
+  const summary = showContent ? summarizeNotificationBody(summarizeQuestionRequest(event)) : "";
+  const fallbackBody = agentName
+    ? `${agentName} 正在等待你的澄清回复。`
+    : "当前会话正在等待你的澄清回复。";
   void window.api.notifyTurnComplete({
-    title: "Kimix 需要你回复需求澄清",
-    body: summary || `「${sessionTitle}」正在等待你的澄清回复。`,
+    title: agentName ? `Kimix · ${agentName} 等待你的回复` : "Kimix 需要你回复需求澄清",
+    body: summary
+      ? `${agentName ? `${agentName}：` : ""}${summary}`
+      : agentName
+        ? `「${sessionTitle}」中的 ${agentName} 正在等待你的澄清回复。`
+        : `「${sessionTitle}」正在等待你的澄清回复。`,
+    fallbackBody,
     sessionId: uiSessionId,
+    roomAgentId,
+    agentTurnId: event.agentTurnId,
+    eventId: event.id,
     windowFocused: document.hasFocus() || rendererWindowFocusedHint,
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
@@ -719,14 +761,25 @@ function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string
 }
 
 function notifyApprovalNeeded(uiSessionId: string, runtimeSessionId: string, event: Extract<TimelineEvent, { type: "approval_request" }>) {
-  const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+  const { session, roomAgentId, agentName } = getNotificationAgentContext(uiSessionId, runtimeSessionId, event);
   const sessionTitle = session?.title?.trim() || "当前会话";
   const showContent = useAppStore.getState().notificationShowContent ?? false;
   const summary = showContent ? summarizeNotificationBody(summarizeApprovalRequest(event)) : "";
+  const fallbackBody = agentName
+    ? `${agentName} 需要你确认工具操作后才能继续。`
+    : "当前会话需要你确认工具操作后才能继续。";
   void window.api.notifyTurnComplete({
-    title: "Kimix 工具操作等待审批",
-    body: summary || `「${sessionTitle}」需要你确认后才能继续。`,
+    title: agentName ? `Kimix · ${agentName} 等待审批` : "Kimix 工具操作等待审批",
+    body: summary
+      ? `${agentName ? `${agentName}：` : ""}${summary}`
+      : agentName
+        ? `「${sessionTitle}」中的 ${agentName} 需要你确认后才能继续。`
+        : `「${sessionTitle}」需要你确认后才能继续。`,
+    fallbackBody,
     sessionId: uiSessionId,
+    roomAgentId,
+    agentTurnId: event.agentTurnId,
+    eventId: event.id,
     windowFocused: document.hasFocus() || rendererWindowFocusedHint,
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
@@ -1441,16 +1494,26 @@ function App() {
   const runtimeLastStreamEventAtRef = useRef<Map<string, number>>(new Map());
   const runtimeHistoryRefreshAtRef = useRef<Map<string, number>>(new Map());
 
-  useEffect(() => window.api.onNotificationClick(({ sessionId }) => {
+  useEffect(() => window.api.onNotificationClick((payload) => {
     const sessionState = useSessionStore.getState();
-    const session = findNotificationSession(sessionState.sessions, sessionId);
-    if (!session) return;
+    const target = resolveNotificationClickTarget(sessionState.sessions, payload);
+    if (!target) return;
+    const focusedSession = focusNotificationRoomAgent(target.session, target.roomAgentId);
+    if (focusedSession !== target.session) {
+      sessionState.updateSession(target.session.id, () => focusedSession);
+      void persistLocalConversationState();
+    }
     const appState = useAppStore.getState();
-    const project = sessionState.recentProjects.find((item) => isSamePath(item.path, session.projectPath));
+    const project = sessionState.recentProjects.find((item) => isSamePath(item.path, focusedSession.projectPath));
     if (project) appState.setCurrentProject(project);
     appState.setWorkspaceView("chat");
     appState.setSettingsOpen(false);
-    appState.setCurrentSession(session);
+    appState.setCurrentSession(focusedSession);
+    if (target.eventId) {
+      window.dispatchEvent(new CustomEvent("kimix:focus-timeline-event", {
+        detail: { sessionId: focusedSession.id, eventId: target.eventId },
+      }));
+    }
   }), []);
 
   useRendererLagDetector();
@@ -2881,7 +2944,7 @@ function App() {
         const notifyKey = `${payload.sessionId}:${questionRequestNotificationKey(mappedForRoom)}`;
         if (!notifiedQuestionRequestRef.current.has(notifyKey)) {
           notifiedQuestionRequestRef.current.add(notifyKey);
-          notifyClarificationNeeded(uiSessionId, payload.sessionId, summarizeQuestionRequest(mappedForRoom));
+          notifyClarificationNeeded(uiSessionId, payload.sessionId, mappedForRoom);
         }
       }
       if (mappedForRoom.type === "approval_request" && mappedForRoom.status === "pending") {
@@ -3087,8 +3150,10 @@ function App() {
       flushStreamEvents();
       void refreshOfficialGoalState(uiSessionId, statusRuntimeSessionId, roomAgentId);
       goalLastRefreshRef.current.set(`${uiSessionId}:${roomAgentId ?? "primary"}:${statusRuntimeSessionId}`, Date.now());
+      const terminalActivity = roomAgentId
+        ? useAppStore.getState().roomAgentActivities[roomAgentActivityKey(uiSessionId, roomAgentId)]
+        : undefined;
       if (roomAgentId) {
-        const terminalActivity = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(uiSessionId, roomAgentId)];
         setRoomAgentActivity({
           roomId: uiSessionId,
           roomAgentId,
@@ -3150,8 +3215,12 @@ function App() {
       const completedEvents = completedSession && roomAgentId
         ? getRoomAgentEvents(completedSession, roomAgentId)
         : completedSession?.events ?? [];
-      const assistantContent = extractAssistantContentForTurn(completedEvents, turnStart);
-      notifyTurnComplete(uiSessionId, statusRuntimeSessionId, undefined, assistantContent);
+      const assistant = extractAssistantForTurn(completedEvents, turnStart);
+      notifyTurnComplete(uiSessionId, statusRuntimeSessionId, undefined, assistant, {
+        roomAgentId,
+        agentTurnId: assistant?.agentTurnId ?? terminalActivity?.activeTurnId,
+        eventId: assistant?.id,
+      });
       runtimeTurnStartRef.current.delete(statusRuntimeSessionId);
 
       if (!roomAgentId || !completedSession || isPrimaryRoomAgent(completedSession, roomAgentId)) {
@@ -3256,8 +3325,8 @@ function App() {
           payload.sessionId,
         );
         const completedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-        const assistantContent = extractAssistantContentForTurn(completedSession?.events ?? [], turnStart);
-        notifyTurnComplete(uiSessionId, payload.sessionId, completedRole === "executor" ? "执行" : completedRole === "reviewer" ? "审核" : undefined, assistantContent);
+        const assistant = extractAssistantForTurn(completedSession?.events ?? [], turnStart);
+        notifyTurnComplete(uiSessionId, payload.sessionId, completedRole === "executor" ? "执行" : completedRole === "reviewer" ? "审核" : undefined, assistant);
         runtimeTurnStartRef.current.delete(payload.sessionId);
 
         applyLongTaskProgressFromLatestOutput(uiSessionId, payload.sessionId);
