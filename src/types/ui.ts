@@ -172,6 +172,7 @@ export interface RoomAgent {
   permissionMode: PermissionMode;
   runtimeSessionId?: string;
   officialSessionId?: string;
+  provisioningError?: string;
   skillRegistrySyncedAt?: number;
   skillForkParentSessionId?: string;
   kimiHistoryCacheVersion?: number;

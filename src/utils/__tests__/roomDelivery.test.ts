@@ -7,6 +7,7 @@ import {
   synchronizeCollaborationPrimaryMirror,
 } from "@/utils/collaborationRooms";
 import {
+  applyRoomDeliveryRuntimeStatus,
   collectRoomDeliveryEvidenceFromHistory,
   createRoomMessageDispatch,
   dispatchQueuedRoomDelivery,
@@ -329,5 +330,24 @@ describe("roomDelivery", () => {
     const terminal = setRoomDeliveryStatus(accepted, created.message.id, primary.id, "completed");
     expect(() => setRoomDeliveryStatus(terminal, created.message.id, primary.id, "sending"))
       .toThrow("非法投递状态转换");
+  });
+
+  it("runtime 状态只结算对应 Agent delivery，终态后不再保持房间繁忙", () => {
+    const primary = getPrimaryRoomAgent(room());
+    const created = createRoomMessageDispatch(room(), {
+      content: "执行",
+      recipientAgentIds: [primary.id],
+      createId: deterministicIds(),
+    });
+    const messageId = created.message.id;
+    let next = setRoomDeliveryStatus(created.session, messageId, primary.id, "sending", {}, 100);
+    next = setRoomDeliveryStatus(next, messageId, primary.id, "accepted", {}, 110);
+    next = applyRoomDeliveryRuntimeStatus(next, messageId, primary.id, "running", 120);
+    expect(next.collaboration?.messages[0].deliveries[primary.id].status).toBe("running");
+    next = applyRoomDeliveryRuntimeStatus(next, messageId, primary.id, "waiting_approval", 130);
+    expect(next.collaboration?.messages[0].deliveries[primary.id].status).toBe("waiting_approval");
+    next = applyRoomDeliveryRuntimeStatus(next, messageId, primary.id, "completed", 140);
+    expect(next.collaboration?.messages[0].deliveries[primary.id].status).toBe("completed");
+    expect(applyRoomDeliveryRuntimeStatus(next, messageId, primary.id, "running", 150)).toBe(next);
   });
 });

@@ -78,6 +78,7 @@ import {
   type RoomAgentRecoveryTarget,
 } from "@/utils/roomAgentRecovery";
 import {
+  applyRoomDeliveryRuntimeStatus,
   collectRoomDeliveryEvidenceFromHistory,
   recoverInterruptedRoomDeliveries,
   type RoomDeliveryOfficialEvidence,
@@ -3051,6 +3052,14 @@ function App() {
             startedAt: previous?.startedAt ?? Date.now(),
             updatedAt: Date.now(),
           });
+          if (runningSession && previous?.roomMessageId) {
+            updateSession(uiSessionId, (session) => applyRoomDeliveryRuntimeStatus(
+              session,
+              previous.roomMessageId,
+              roomAgentId,
+              payload.status,
+            ));
+          }
           if (runningSession && isPrimaryRoomAgent(runningSession, roomAgentId)) {
             setRunningSessionId(uiSessionId);
           }
@@ -3079,6 +3088,7 @@ function App() {
       void refreshOfficialGoalState(uiSessionId, statusRuntimeSessionId, roomAgentId);
       goalLastRefreshRef.current.set(`${uiSessionId}:${roomAgentId ?? "primary"}:${statusRuntimeSessionId}`, Date.now());
       if (roomAgentId) {
+        const terminalActivity = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(uiSessionId, roomAgentId)];
         setRoomAgentActivity({
           roomId: uiSessionId,
           roomAgentId,
@@ -3086,6 +3096,14 @@ function App() {
           status: payload.status,
           updatedAt: Date.now(),
         });
+        if (terminalActivity?.roomMessageId) {
+          updateSession(uiSessionId, (session) => applyRoomDeliveryRuntimeStatus(
+            session,
+            terminalActivity.roomMessageId,
+            roomAgentId,
+            payload.status,
+          ));
+        }
       }
       const activeRunningSessionId = useAppStore.getState().runningSessionId;
       const latestRoom = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);

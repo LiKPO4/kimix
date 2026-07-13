@@ -57,6 +57,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     return null;
   }
   if (value.modelAlias !== null && typeof value.modelAlias !== "string") return null;
+  if (value.provisioningError !== undefined && (typeof value.provisioningError !== "string" || !value.provisioningError.trim())) return null;
   const recoveryIssue = value.recoveryIssue;
   if (recoveryIssue !== undefined && (
     !isRecord(recoveryIssue) ||
@@ -80,6 +81,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     displayName,
     mentionName,
     modelAlias: value.modelAlias as string | null,
+    provisioningError: value.provisioningError as string | undefined,
     permissionMode: value.permissionMode,
     createdAt: value.createdAt,
     recoveryIssue: recoveryIssue as RoomAgent["recoveryIssue"],

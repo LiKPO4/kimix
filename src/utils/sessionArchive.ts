@@ -13,6 +13,7 @@ const ROOM_LIFECYCLE_ACTIVE_STATUSES = new Set([
   "creating",
   "queued",
   "sending",
+  "accepted",
   "running",
   "waiting_approval",
   "waiting_question",

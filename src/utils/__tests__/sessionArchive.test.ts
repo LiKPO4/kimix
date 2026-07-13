@@ -243,6 +243,12 @@ describe("official-first session archive", () => {
     expect(roomHasActiveAgentWork(source, [{
       roomId: source.id,
       roomAgentId: secondary.id,
+      status: "accepted",
+      updatedAt: 90,
+    }])).toBe(true);
+    expect(roomHasActiveAgentWork(source, [{
+      roomId: source.id,
+      roomAgentId: secondary.id,
       status: "waiting_approval",
       updatedAt: 100,
     }])).toBe(true);
@@ -252,5 +258,19 @@ describe("official-first session archive", () => {
       status: "running",
       updatedAt: 100,
     }])).toThrow("房间仍有 Agent 在运行");
+    const accepted = {
+      ...source,
+      collaboration: {
+        ...source.collaboration!,
+        messages: source.collaboration!.messages.map((message) => ({
+          ...message,
+          deliveries: {
+            ...message.deliveries,
+            [secondary.id]: { ...message.deliveries[secondary.id], status: "accepted" as const },
+          },
+        })),
+      },
+    };
+    expect(roomHasActiveAgentWork(accepted)).toBe(true);
   });
 });

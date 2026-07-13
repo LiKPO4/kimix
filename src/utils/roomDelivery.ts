@@ -162,6 +162,33 @@ export function setRoomDeliveryStatus(
   }, now);
 }
 
+export function applyRoomDeliveryRuntimeStatus(
+  session: Session,
+  roomMessageId: string | undefined,
+  roomAgentId: string,
+  runtimeStatus: "running" | "waiting_approval" | "waiting_question" | "completed" | "error" | "interrupted",
+  now = Date.now(),
+): Session {
+  if (!roomMessageId || !session.collaboration) return session;
+  const message = session.collaboration.messages.find((candidate) => candidate.id === roomMessageId);
+  const delivery = message?.deliveries[roomAgentId];
+  if (!message || !delivery) return session;
+  const status: RoomAgentDeliveryStatus = runtimeStatus === "error"
+    ? "failed"
+    : runtimeStatus === "interrupted"
+      ? "cancelled"
+      : runtimeStatus;
+  if (delivery.status === status) return session;
+  if (!DELIVERY_TRANSITIONS[delivery.status].has(status)) return session;
+  return setRoomDeliveryStatus(session, roomMessageId, roomAgentId, status, {
+    error: runtimeStatus === "error"
+      ? delivery.error ?? "当前 Agent 执行失败。"
+      : runtimeStatus === "interrupted"
+        ? delivery.error ?? "当前 Agent 已停止。"
+        : undefined,
+  }, now);
+}
+
 export function recoverInterruptedRoomDeliveries(
   session: Session,
   evidenceByAttempt: ReadonlyMap<string, RoomDeliveryOfficialEvidence> = new Map(),
