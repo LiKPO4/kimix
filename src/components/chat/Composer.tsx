@@ -28,7 +28,7 @@ import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgent, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import {
   appendRoomAgentSteerEvent,
@@ -37,6 +37,12 @@ import {
   settleStoppedRoomAgent,
   type RoomAgentControlTarget,
 } from "@/utils/roomAgentControl";
+import {
+  appendRoomMutationEvent,
+  resolveRoomMutationOwner,
+  updateRoomMutationOwner,
+  type RoomMutationOwner,
+} from "@/utils/roomMutationOwner";
 import {
   bindRecoveredRoomAgentRuntime,
   getPrimaryRecoveryTarget,
@@ -540,14 +546,9 @@ export function Composer() {
   const activeSession = liveSession ?? currentSession;
   const multiAgentRoomUiEnabled = isMultiAgentRoomUiEnabled();
   const activeRoomAgents = activeSession?.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
-  const activeRoomPrimary = activeSession ? getPrimaryRoomAgent(activeSession) : null;
   const selectedRoomAgentIds = activeSession?.collaboration
     ? Array.from(new Set(activeSession.collaboration.defaultRecipientIds.filter((id) => activeRoomAgents.some((agent) => agent.id === id))))
     : [];
-  if (activeSession?.collaboration && selectedRoomAgentIds.length === 0) {
-    const fallbackId = activeSession.collaboration.focusedAgentId ?? activeRoomPrimary?.id;
-    if (fallbackId) selectedRoomAgentIds.push(fallbackId);
-  }
   const selectedRoomAgents = selectedRoomAgentIds
     .map((id) => activeRoomAgents.find((agent) => agent.id === id))
     .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent));
@@ -570,23 +571,40 @@ export function Composer() {
       }).join("|")
     : "";
   const roomReadOnly = Boolean(activeSession?.collaboration && !multiAgentRoomUiEnabled);
-  const selectedSecondaryRoomAgent = Boolean(
-    activeSession?.collaboration && (
-      selectedRoomAgentIds.length !== 1 || selectedRoomAgentIds[0] !== activeSession.collaboration.primaryAgentId
-    ),
-  );
+  let activeMutationOwner: RoomMutationOwner | null = null;
+  let mutationOwnerError = "";
+  if (activeSession) {
+    try {
+      activeMutationOwner = resolveRoomMutationOwner(activeSession, activeSession.collaboration ? selectedRoomAgentIds : undefined, permissionMode);
+    } catch (error) {
+      mutationOwnerError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const hasUniqueMutationOwner = Boolean(activeMutationOwner);
   const editingRoomAgent = activeSession && editingRoomAgentId
     ? getRoomAgent(activeSession, editingRoomAgentId)
     : undefined;
   const pendingMessages = currentSession
     ? allPendingMessages.filter((msg) => msg.sessionId === currentSession.id)
     : [];
-  const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
+  const activeRuntimeSessionId = activeSession?.collaboration
+    ? activeMutationOwner?.runtimeSessionId
+    : activeSession ? getRuntimeSessionId(activeSession) : undefined;
   const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
+  const isMutationOwnerRunning = activeMutationOwner
+    ? isSessionRuntimeRunning(activeMutationOwner.sessionView, runningSessionId)
+    : false;
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
   const hasActiveAssistantTurn = activeSession?.collaboration ? activeRoomBusy : isCurrentSessionRunning;
-  const swarmModeEnabled = displayedSwarmMode(activeSession ?? undefined);
-  const swarmModePending = hasPendingSwarmMode(activeSession ?? undefined);
+  const mutationSessionView = activeMutationOwner?.sessionView ?? activeSession ?? undefined;
+  const mutationPermissionMode = activeSession?.collaboration
+    ? activeMutationOwner?.agent.permissionMode
+    : activeSession?.permissionMode ?? permissionMode;
+  const mutationPlanMode = activeSession?.collaboration
+    ? activeMutationOwner?.agent.planMode ?? defaultPlanMode
+    : activeSession?.planMode ?? defaultPlanMode;
+  const swarmModeEnabled = displayedSwarmMode(mutationSessionView);
+  const swarmModePending = hasPendingSwarmMode(mutationSessionView);
   const canSteerActiveTurn = Boolean(
     activeSession?.collaboration
       ? roomSteerTargets.length > 0
@@ -594,7 +612,7 @@ export function Composer() {
   );
   const shouldShowStopButton = activeSession?.collaboration ? roomStopTargets.length > 0 : isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
-  const canTogglePlanMode = canUseComposer && !hasActiveAssistantTurn && !selectedSecondaryRoomAgent;
+  const canTogglePlanMode = canUseComposer && hasUniqueMutationOwner && !isMutationOwnerRunning;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -1012,6 +1030,8 @@ export function Composer() {
       id: genId(),
       engine: "kimi-code" as const,
       model,
+      permissionMode,
+      planMode: defaultPlanMode,
       title: "新会话",
       projectPath: currentProject.path,
       createdAt: Date.now(),
@@ -1173,7 +1193,7 @@ export function Composer() {
   const sendRoomPrompt = async (
     session: Session,
     content: string,
-    options?: { images?: ImageAttachment[]; manualSubmitAutoScroll?: boolean; skipClarification?: boolean },
+    options?: { images?: ImageAttachment[]; manualSubmitAutoScroll?: boolean; skipClarification?: boolean; outboundContent?: string },
   ) => {
     const images = options?.images ?? [];
     const route = resolveRoomPromptRoute(session, content, session.collaboration?.defaultRecipientIds);
@@ -1189,7 +1209,7 @@ export function Composer() {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "请在 @Agent 之后输入要处理的任务。" }));
       return false;
     }
-    const contentWithAttachments = buildAttachmentPromptContent(route.outboundContent, images);
+    const contentWithAttachments = buildAttachmentPromptContent(options?.outboundContent ?? route.outboundContent, images);
     const outboundContent = session.longTask || options?.skipClarification
       ? contentWithAttachments
       : withClarificationBehavior(contentWithAttachments, clarificationToolMode);
@@ -1264,6 +1284,7 @@ export function Composer() {
         images,
         manualSubmitAutoScroll: options?.manualSubmitAutoScroll,
         skipClarification: options?.skipClarification,
+        outboundContent: options?.outboundContent,
       });
     }
 
@@ -1520,43 +1541,49 @@ export function Composer() {
     return false;
   };
 
-  const settlePendingClarifications = (sessionId: string, status: "skipped" | "answered" = "skipped") => {
-    updateSession(sessionId, (session) => ({
-      ...session,
-      events: session.events.map((event) => (
+  const settlePendingClarifications = (sessionId: string, roomAgentId?: string, status: "skipped" | "answered" = "skipped") => {
+    updateSession(sessionId, (session) => {
+      const updateEvents = (events: TimelineEvent[]) => events.map((event) => (
         event.type === "question_request" && event.status === "pending"
           ? { ...event, status, answers: event.answers ?? {} }
           : event
-      )),
-      updatedAt: Date.now(),
-    }));
+      ));
+      const next = roomAgentId
+        ? updateRoomAgentEvents(session, roomAgentId, updateEvents)
+        : { ...session, events: updateEvents(session.events) };
+      return { ...next, updatedAt: Date.now() };
+    });
   };
 
-  const appendLocalEvent = async (event: TimelineEvent) => {
+  const appendLocalEvent = async (event: TimelineEvent, roomAgentId?: string) => {
     const targetSession = await ensureSession();
     if (!targetSession) return null;
-    updateSession(targetSession.id, (session) => ({
-      ...session,
-      events: [...session.events, event],
-      updatedAt: Date.now(),
-    }));
+    updateSession(targetSession.id, (session) => {
+      const next = roomAgentId
+        ? appendRoomMutationEvent(session, roomAgentId, event)
+        : { ...session, events: [...session.events, event] };
+      return { ...next, updatedAt: Date.now() };
+    });
     return syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
   };
 
-  const appendStatusMessage = async (message: string) => {
+  const appendStatusMessage = async (message: string, roomAgentId?: string) => {
     await appendLocalEvent({
       id: genId(),
       type: "status_update",
       timestamp: Date.now(),
       message,
-    });
+    }, roomAgentId);
   };
 
-  const appendSlashUserMessage = async (command: string) => {
+  const appendSlashUserMessage = async (command: string, roomAgentId?: string) => {
     const targetSession = await ensureSession();
     if (!targetSession) return;
     const timestamp = Date.now();
-    const latestMatchingCommand = targetSession.events.findLast((event) => (
+    const ownerEvents = roomAgentId && targetSession.collaboration
+      ? targetSession.collaboration.agentEvents[roomAgentId] ?? []
+      : targetSession.events;
+    const latestMatchingCommand = ownerEvents.findLast((event) => (
       event.type === "user_message" &&
       event.content.trim() === command.trim() &&
       Math.abs(timestamp - event.timestamp) <= 10_000
@@ -1567,13 +1594,13 @@ export function Composer() {
       type: "user_message",
       timestamp,
       content: command,
-    });
+    }, roomAgentId);
     window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
       detail: { sessionId: targetSession.id },
     }));
   };
 
-  const appendAssistantNotice = async (content: string) => {
+  const appendAssistantNotice = async (content: string, roomAgentId?: string) => {
     await appendLocalEvent({
       id: genId(),
       type: "assistant_message",
@@ -1582,16 +1609,19 @@ export function Composer() {
       isThinking: false,
       isComplete: true,
       durationMs: 0,
-    });
+    }, roomAgentId);
   };
 
-  const recordAppliedSwarmMode = (uiSessionId: string, enabled: boolean) => {
+  const recordAppliedSwarmMode = (uiSessionId: string, roomAgentId: string, enabled: boolean) => {
     const timestamp = Date.now();
     updateSession(uiSessionId, (session) => ({
-      ...session,
-      swarmModeLockedAt: enabled ? session.swarmModeLockedAt ?? timestamp : session.swarmModeLockedAt,
-      swarmMode: enabled,
-      swarmModeDesired: undefined,
+      ...updateRoomMutationOwner(session, roomAgentId, (agent) => ({
+        ...agent,
+        swarmModeLockedAt: enabled ? agent.swarmModeLockedAt ?? timestamp : agent.swarmModeLockedAt,
+        swarmMode: enabled,
+        swarmModeDesired: undefined,
+      }), permissionMode),
+      updatedAt: timestamp,
     }));
     const updated = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (updated && useAppStore.getState().currentSession?.id === uiSessionId) {
@@ -1599,52 +1629,76 @@ export function Composer() {
     }
   };
 
-  const ensureOfficialRuntimeForSession = async () => {
+  const ensureOfficialRuntimeForSession = async (explicitRoomAgentId?: string) => {
     const targetSession = await ensureSession();
     if (!targetSession) return null;
-    const primaryAgentId = getPrimaryRoomAgent(targetSession).id;
-    if (!roomAgentCanResume(targetSession, primaryAgentId)) {
-      throw new Error(getPrimaryRoomAgent(targetSession).recoveryIssue?.message ?? "当前 Agent 暂时不可恢复");
+    let owner: RoomMutationOwner;
+    try {
+      owner = resolveRoomMutationOwner(
+        targetSession,
+        explicitRoomAgentId ? [explicitRoomAgentId] : targetSession.collaboration?.defaultRecipientIds,
+        permissionMode,
+      );
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+      return null;
     }
-    const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
-    if (recoveryTarget.sessionIds.length > 0) {
+    if (!roomAgentCanResume(targetSession, owner.roomAgentId)) {
+      throw new Error(owner.agent.recoveryIssue?.message ?? `Agent“${owner.displayName}”暂时不可恢复`);
+    }
+    if (owner.agent.runtimeSessionId || owner.agent.officialSessionId) {
       const resumeRes = await resumeRoomAgentRuntime({
         session: targetSession,
-        roomAgentId: primaryAgentId,
+        roomAgentId: owner.roomAgentId,
         additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         resume: (request) => window.api.resumeKimiCodeSession(request),
       });
       if (resumeRes.success) {
         updateSession(targetSession.id, (session) => ({
-          ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+          ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
             sessionId: resumeRes.data.sessionId,
             model: resumeRes.data.model,
           }),
           engine: "kimi-code",
         }));
         const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
-        if (updated) setCurrentSession(updated);
-        return { uiSessionId: targetSession.id, runtimeSessionId: resumeRes.data.sessionId };
+        if (updated && useAppStore.getState().currentSession?.id === targetSession.id) setCurrentSession(updated);
+        return {
+          uiSessionId: targetSession.id,
+          roomAgentId: owner.roomAgentId,
+          displayName: owner.displayName,
+          runtimeSessionId: resumeRes.data.sessionId,
+        };
       }
+      if (targetSession.collaboration) throw new Error(`恢复 Agent“${owner.displayName}”失败：${resumeRes.error}`);
+    } else if (targetSession.collaboration) {
+      throw new Error(`Agent“${owner.displayName}”尚未绑定官方运行会话。`);
     }
     const createRes = await window.api.createKimiCodeSession({
       workDir: targetSession.projectPath,
-      model: getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
-      permission: permissionMode,
-      planMode: defaultPlanMode,
+      model: owner.agent.modelAlias ?? undefined,
+      permission: owner.agent.permissionMode,
+      planMode: owner.agent.planMode ?? defaultPlanMode,
       additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
     });
     if (!createRes.success) throw new Error(createRes.error);
     updateSession(targetSession.id, (session) => ({
-      ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+      ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
         sessionId: createRes.data.sessionId,
         model: createRes.data.model,
       }),
       engine: "kimi-code",
     }));
     const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
-    if (updated) setCurrentSession(updated);
-    return { uiSessionId: targetSession.id, runtimeSessionId: createRes.data.sessionId };
+    if (updated && useAppStore.getState().currentSession?.id === targetSession.id) setCurrentSession(updated);
+    return {
+      uiSessionId: targetSession.id,
+      roomAgentId: owner.roomAgentId,
+      displayName: owner.displayName,
+      runtimeSessionId: createRes.data.sessionId,
+    };
   };
 
   const provisionRoomAgent = async (roomId: string, roomAgentId: string) => {
@@ -1667,7 +1721,7 @@ export function Composer() {
         workDir: latest.projectPath,
         model: agent.modelAlias ?? undefined,
         permission: agent.permissionMode,
-        planMode: defaultPlanMode,
+        planMode: agent.planMode ?? defaultPlanMode,
         additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         roomMetadata: {
           schemaVersion: 1,
@@ -1747,13 +1801,18 @@ export function Composer() {
     setAddRoomAgentBusy(true);
     setAddRoomAgentError("");
     try {
-      const primaryRuntime = await ensureOfficialRuntimeForSession();
+      const primaryRuntime = await ensureOfficialRuntimeForSession(activeSession ? getPrimaryRoomAgent(activeSession).id : undefined);
       if (!primaryRuntime) throw new Error("无法建立原会话 runtime");
       const baseSession = useSessionStore.getState().sessions.find((session) => session.id === primaryRuntime.uiSessionId);
       if (!baseSession) throw new Error("会话不存在");
+      const preparedBaseSession = {
+        ...baseSession,
+        permissionMode: baseSession.permissionMode ?? permissionMode,
+        planMode: baseSession.planMode ?? defaultPlanMode,
+      };
       const prepared = prepareRoomAgentProvisioning(
-        baseSession,
-        draft,
+        preparedBaseSession,
+        { ...draft, planMode: defaultPlanMode },
         Object.values(useAppStore.getState().roomAgentActivities),
       );
       updateSession(baseSession.id, () => prepared.session);
@@ -1921,18 +1980,33 @@ export function Composer() {
     const latestActiveSession = activeSession
       ? useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession
       : null;
-    if (latestActiveSession && isSessionRuntimeRunning(latestActiveSession, useAppStore.getState().runningSessionId)) {
-      updateSession(latestActiveSession.id, (session) => ({
-        ...session,
-        swarmModeDesired: pendingSwarmModeValue(session, enabled),
-      }));
+    let owner: RoomMutationOwner | null = null;
+    if (latestActiveSession) {
+      try {
+        owner = resolveRoomMutationOwner(
+          latestActiveSession,
+          latestActiveSession.collaboration?.defaultRecipientIds,
+          permissionMode,
+        );
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: error instanceof Error ? error.message : String(error),
+        }));
+        return false;
+      }
+    }
+    if (latestActiveSession && owner && isSessionRuntimeRunning(owner.sessionView, useAppStore.getState().runningSessionId)) {
+      updateSession(latestActiveSession.id, (session) => updateRoomMutationOwner(session, owner!.roomAgentId, (agent) => ({
+        ...agent,
+        swarmModeDesired: pendingSwarmModeValue(owner!.sessionView, enabled),
+      }), permissionMode));
       const updated = useSessionStore.getState().sessions.find((session) => session.id === latestActiveSession.id);
-      if (updated) setCurrentSession(updated);
+      if (updated && useAppStore.getState().currentSession?.id === latestActiveSession.id) setCurrentSession(updated);
       const message = `Swarm 模式将在下一轮${enabled ? "开启" : "关闭"}。`;
-      if (feedback === "status") await appendStatusMessage(message);
+      if (feedback === "status") await appendStatusMessage(message, owner.roomAgentId);
       else {
         window.dispatchEvent(new CustomEvent("kimix:toast", {
-          detail: message,
+          detail: `${owner.displayName}：${message}`,
         }));
       }
       return true;
@@ -1946,7 +2020,7 @@ export function Composer() {
     });
     if (!res.success) {
       const message = `Swarm 模式${enabled ? "开启" : "关闭"}失败：${res.error}`;
-      if (feedback === "status") await appendStatusMessage(message);
+      if (feedback === "status") await appendStatusMessage(message, runtime.roomAgentId);
       else {
         window.dispatchEvent(new CustomEvent("kimix:toast", {
           detail: message,
@@ -1954,29 +2028,31 @@ export function Composer() {
       }
       return false;
     }
-    recordAppliedSwarmMode(runtime.uiSessionId, enabled);
+    recordAppliedSwarmMode(runtime.uiSessionId, runtime.roomAgentId, enabled);
     if (feedback === "status") {
-      await appendStatusMessage(`Swarm 模式已${enabled ? "开启" : "关闭"}。`);
+      await appendStatusMessage(`Swarm 模式已${enabled ? "开启" : "关闭"}。`, runtime.roomAgentId);
     } else {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: `Swarm ${enabled ? "开" : "关"}`,
+        detail: `${runtime.displayName} · Swarm ${enabled ? "开" : "关"}`,
       }));
     }
     return true;
   };
 
-  const syncOfficialGoal = (uiSessionId: string, goal: unknown, error?: string | null) => {
+  const syncOfficialGoal = (uiSessionId: string, roomAgentId: string, goal: unknown, error?: string | null) => {
     updateSession(uiSessionId, (session) => ({
-      ...session,
-      officialGoal: {
-        goal: reconcileOfficialGoalSnapshot(goal && typeof goal === "object" ? goal as NonNullable<Session["officialGoal"]>["goal"] : null, session.officialGoal?.goal),
-        error: error ?? null,
-        updatedAt: Date.now(),
-      },
+      ...updateRoomMutationOwner(session, roomAgentId, (agent) => ({
+        ...agent,
+        officialGoal: {
+          goal: reconcileOfficialGoalSnapshot(goal && typeof goal === "object" ? goal as NonNullable<Session["officialGoal"]>["goal"] : null, agent.officialGoal?.goal),
+          error: error ?? null,
+          updatedAt: Date.now(),
+        },
+      }), permissionMode),
       updatedAt: Date.now(),
     }));
     const updated = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (updated) setCurrentSession(updated);
+    if (updated && useAppStore.getState().currentSession?.id === uiSessionId) setCurrentSession(updated);
   };
 
   const formatGoalStatusNotice = (goal: OfficialGoalSnapshot | null) => {
@@ -1995,22 +2071,22 @@ export function Composer() {
     if (!runtime) return false;
     const res = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
     if (!res.success) {
-      syncOfficialGoal(runtime.uiSessionId, null, res.error);
-      await appendStatusMessage(`官方 Goal 状态读取失败：${res.error}`);
+      syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, null, res.error);
+      await appendStatusMessage(`官方 Goal 状态读取失败：${res.error}`, runtime.roomAgentId);
       return false;
     }
-    syncOfficialGoal(runtime.uiSessionId, res.data.goal);
+    syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
     if (options?.feedback === "assistant") {
-      await appendAssistantNotice(formatGoalStatusNotice(res.data.goal));
+      await appendAssistantNotice(formatGoalStatusNotice(res.data.goal), runtime.roomAgentId);
     } else {
-      await appendStatusMessage(res.data.goal ? `官方 Goal：${goalStatusLabel(res.data.goal.status)} · ${res.data.goal.objective}` : "当前没有官方 Goal。");
+      await appendStatusMessage(res.data.goal ? `官方 Goal：${goalStatusLabel(res.data.goal.status)} · ${res.data.goal.objective}` : "当前没有官方 Goal。", runtime.roomAgentId);
     }
     return true;
   };
 
   const handleGoalSlashCommand = async (rawCommand: string, rawArgs: string) => {
     if (imageAttachments.length > 0) {
-      await appendStatusMessage("/goal 命令暂不接收图片附件，请先移除图片。");
+      await appendStatusMessage("/goal 命令暂不接收图片附件，请先移除图片。", activeMutationOwner?.roomAgentId);
       return true;
     }
     const args = rawArgs.trim();
@@ -2019,20 +2095,24 @@ export function Composer() {
     const rest = restParts.join(" ").trim();
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return true;
+    const runtimeSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+    const isRoomCommand = Boolean(runtimeSession?.collaboration);
 
     const runGoalAction = async (message: string, action: () => Promise<{ success: true; data: { goal: unknown } } | { success: false; error: string }>) => {
+      await appendSlashUserMessage(rawCommand, runtime.roomAgentId);
       const res = await action();
       if (!res.success) {
-        syncOfficialGoal(runtime.uiSessionId, null, res.error);
-        await appendStatusMessage(`${message}失败：${res.error}`);
+        syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, null, res.error);
+        await appendStatusMessage(`${message}失败：${res.error}`, runtime.roomAgentId);
         return true;
       }
-      syncOfficialGoal(runtime.uiSessionId, res.data.goal);
-      await appendStatusMessage(message);
+      syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
+      await appendStatusMessage(message, runtime.roomAgentId);
       return true;
     };
 
     if (!args || subcommand === "status" || subcommand === "show") {
+      await appendSlashUserMessage(rawCommand, runtime.roomAgentId);
       await refreshOfficialGoal({ feedback: "assistant" });
       return true;
     }
@@ -2049,14 +2129,16 @@ export function Composer() {
     const replace = subcommand === "replace";
     const objective = ["start", "create", "new", "replace", "next"].includes(subcommand) ? rest : args;
     if (!objective) {
-      await appendStatusMessage("请输入 Goal 目标，例如：/goal 完成项目构建并修复失败。");
+      await appendSlashUserMessage(rawCommand, runtime.roomAgentId);
+      await appendStatusMessage("请输入 Goal 目标，例如：/goal 完成项目构建并修复失败。", runtime.roomAgentId);
       return true;
     }
     if (subcommand === "next") {
       const current = await window.api.getKimiCodeGoal({ sessionId: runtime.runtimeSessionId });
       if (current.success && current.data.goal) {
-        syncOfficialGoal(runtime.uiSessionId, current.data.goal);
-        await appendStatusMessage("Kimi Code 已默认提供 Goal 队列；当前兼容链路尚未公开队列管理能力。当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。");
+        await appendSlashUserMessage(rawCommand, runtime.roomAgentId);
+        syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, current.data.goal);
+        await appendStatusMessage("Kimi Code 已默认提供 Goal 队列；当前兼容链路尚未公开队列管理能力。当前已有 Goal 时，请先完成/取消当前 Goal，或使用 /goal replace 替换。", runtime.roomAgentId);
         return true;
       }
     }
@@ -2066,11 +2148,13 @@ export function Composer() {
       replace,
     });
     if (!res.success) {
-      syncOfficialGoal(runtime.uiSessionId, null, res.error);
-      await appendStatusMessage(`${replace ? "替换" : "启动"}官方 Goal 失败：${res.error}`);
+      await appendSlashUserMessage(rawCommand, runtime.roomAgentId);
+      syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, null, res.error);
+      await appendStatusMessage(`${replace ? "替换" : "启动"}官方 Goal 失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
-    syncOfficialGoal(runtime.uiSessionId, res.data.goal);
+    syncOfficialGoal(runtime.uiSessionId, runtime.roomAgentId, res.data.goal);
+    if (!isRoomCommand) await appendSlashUserMessage(rawCommand, runtime.roomAgentId);
     await sendPromptContent(rawCommand, {
       addUserEvent: false,
       manualSubmitAutoScroll: false,
@@ -2080,7 +2164,7 @@ export function Composer() {
     return true;
   };
 
-  const handleSdkSlashCommand = async (content: string) => {
+  const handleSdkSlashCommand = async (content: string, roomAgentId?: string) => {
     const match = content.trim().match(slashCommandPattern);
     if (!match) return false;
     const name = match[1].toLowerCase();
@@ -2089,47 +2173,51 @@ export function Composer() {
     if (routing !== "local" && routing !== "official-skill-first") return false;
     const commandNotice = args ? `/${name} ${args}` : `/${name}`;
     if (name === "theme") {
-      await appendSlashUserMessage(commandNotice);
+      await appendSlashUserMessage(commandNotice, roomAgentId);
       setWorkspaceView("settings");
-      await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的主题选择器，Kimix 使用独立的全局主题色板。");
+      await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的主题选择器，Kimix 使用独立的全局主题色板。", roomAgentId);
       return true;
     }
     if (name === "custom-theme") {
-      await sendPromptContent(content.trim(), {
+      if (!roomAgentId) await appendSlashUserMessage(commandNotice);
+      const sent = await sendPromptContent(content.trim(), {
         addUserEvent: false,
         manualSubmitAutoScroll: false,
         outboundContent: buildCustomThemeKickoffPrompt(args),
         skipClarification: true,
         postUserStatusMessage: `官方 Skill 不可用，已使用兼容兜底：${commandNotice}`,
       });
+      if (sent && roomAgentId) {
+        await appendStatusMessage(`官方 Skill 不可用，已使用兼容兜底：${commandNotice}`, roomAgentId);
+      }
       return true;
     }
     if (name === "import-from-cc-codex") {
-      await appendSlashUserMessage(commandNotice);
+      await appendSlashUserMessage(commandNotice, roomAgentId);
       const [subcommand, previewId] = args.split(/\s+/);
       if (subcommand === "apply") {
         if (!previewId) {
-          await appendStatusMessage("请输入预览 ID，例如：/import-from-cc-codex apply abc12345。");
+          await appendStatusMessage("请输入预览 ID，例如：/import-from-cc-codex apply abc12345。", roomAgentId);
           return true;
         }
         const res = await window.api.applyImportFromCcCodex({ previewId });
         if (!res.success) {
-          await appendStatusMessage(`导入失败：${res.error}`);
+          await appendStatusMessage(`导入失败：${res.error}`, roomAgentId);
           return true;
         }
         const imported = res.data.imported.length;
         const skipped = res.data.skipped.length;
         const backups = res.data.backups.length;
-        await appendStatusMessage(`导入完成：已写入 ${imported} 项，跳过 ${skipped} 项，创建备份 ${backups} 个。请在设置/插件面板刷新确认，必要时重启 Kimi Code 会话。`);
+        await appendStatusMessage(`导入完成：已写入 ${imported} 项，跳过 ${skipped} 项，创建备份 ${backups} 个。请在设置/插件面板刷新确认，必要时重启 Kimi Code 会话。`, roomAgentId);
         return true;
       }
       if (args) {
-        await appendStatusMessage("当前仅支持 /import-from-cc-codex 生成安全预览，或 /import-from-cc-codex apply <预览ID> 应用预览。");
+        await appendStatusMessage("当前仅支持 /import-from-cc-codex 生成安全预览，或 /import-from-cc-codex apply <预览ID> 应用预览。", roomAgentId);
         return true;
       }
       const res = await window.api.previewImportFromCcCodex({ workDir: currentProject?.path });
       if (!res.success) {
-        await appendStatusMessage(`生成导入预览失败：${res.error}`);
+        await appendStatusMessage(`生成导入预览失败：${res.error}`, roomAgentId);
         return true;
       }
       const writable = res.data.items.filter((item) => item.action !== "skip");
@@ -2142,7 +2230,7 @@ export function Composer() {
           ? `确认无误后发送：/import-from-cc-codex apply ${res.data.previewId}`
           : "没有发现需要写入的新内容。",
       ].filter(Boolean);
-      await appendStatusMessage(previewLines.join("\n"));
+      await appendStatusMessage(previewLines.join("\n"), roomAgentId);
       return true;
     }
     return false;
@@ -2176,7 +2264,7 @@ export function Composer() {
         timestamp: Date.now(),
         message: `Plugin 命令 /${command.commandName ?? `${command.pluginId}:${command.pluginCommandName}`} 激活失败：${res.error}`,
         source: "ui",
-      });
+      }, runtime.roomAgentId);
     }
     return true;
   };
@@ -2194,18 +2282,22 @@ export function Composer() {
       return true;
     }
     if (name === "goal") {
-      await appendSlashUserMessage(commandNotice);
       return handleGoalSlashCommand(content.trim(), args);
     }
     if (name === "swarm") {
       const normalized = args.toLowerCase();
+      const owner = activeMutationOwner;
+      if (!owner) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
+        return true;
+      }
       if (!args) {
-        await appendSlashUserMessage(commandNotice);
-        await appendStatusMessage("请输入 Swarm 任务，例如：/swarm 并行检查最近改动并给出修复建议；也可使用 /swarm on 或 /swarm off 切换模式。");
+        await appendSlashUserMessage(commandNotice, owner.roomAgentId);
+        await appendStatusMessage("请输入 Swarm 任务，例如：/swarm 并行检查最近改动并给出修复建议；也可使用 /swarm on 或 /swarm off 切换模式。", owner.roomAgentId);
         return true;
       }
       if (normalized === "on" || normalized === "off") {
-        await appendSlashUserMessage(commandNotice);
+        await appendSlashUserMessage(commandNotice, owner.roomAgentId);
         const enabled = normalized === "on";
         await setSwarmModeForCurrentSession(enabled, { feedback: "status" });
         return true;
@@ -2228,120 +2320,143 @@ export function Composer() {
         tone: "info",
         parentEventId: userEvent.id,
       };
-      updateSession(runtime.uiSessionId, (session) => ({
-        ...session,
-        events: [...session.events, userEvent, statusEvent],
+      updateSession(runtime.uiSessionId, (session) => {
+        const withUser = appendRoomMutationEvent(session, runtime.roomAgentId, userEvent);
+        const withStatus = appendRoomMutationEvent(withUser, runtime.roomAgentId, statusEvent);
+        return { ...withStatus, updatedAt: Date.now() };
+      });
+      setRoomAgentActivity({
+        roomId: runtime.uiSessionId,
+        roomAgentId: runtime.roomAgentId,
+        runtimeSessionId: runtime.runtimeSessionId,
+        status: "running",
+        startedAt: Date.now(),
         updatedAt: Date.now(),
-      }));
-      setRunningSessionId(runtime.uiSessionId);
+      });
+      const swarmRoom = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+      if (swarmRoom && getPrimaryRoomAgent(swarmRoom).id === runtime.roomAgentId) {
+        setRunningSessionId(runtime.uiSessionId);
+      }
       const modeRes = await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, enabled: true, trigger: "task" });
       if (modeRes.success) {
-        recordAppliedSwarmMode(runtime.uiSessionId, true);
+        recordAppliedSwarmMode(runtime.uiSessionId, runtime.roomAgentId, true);
       }
       const res = modeRes.success ? await window.api.swarmKimiCode({ sessionId: runtime.runtimeSessionId, content: args }) : modeRes;
       if (!res.success) {
-        setRunningSessionId(null);
+        setRoomAgentActivity({
+          roomId: runtime.uiSessionId,
+          roomAgentId: runtime.roomAgentId,
+          runtimeSessionId: runtime.runtimeSessionId,
+          status: "error",
+          updatedAt: Date.now(),
+        });
+        const currentRoom = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+        if (currentRoom && getPrimaryRoomAgent(currentRoom).id === runtime.roomAgentId) setRunningSessionId(null);
         updateSession(runtime.uiSessionId, (session) => ({
-          ...session,
-          events: [
-            ...session.events,
-            {
-              id: genId(),
-              type: "error",
-              timestamp: Date.now(),
-              message: `Swarm 启动失败：${res.error}`,
-              source: "ipc",
-            },
-          ],
+          ...appendRoomMutationEvent(session, runtime.roomAgentId, {
+            id: genId(),
+            type: "error",
+            timestamp: Date.now(),
+            message: `Swarm 启动失败：${res.error}`,
+            source: "ipc",
+          }),
           updatedAt: Date.now(),
         }));
       }
       return true;
     }
     if (name === "compact") {
-      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
       const res = await window.api.compactKimiCodeSession({ sessionId: runtime.runtimeSessionId, instruction: args || undefined });
-      if (!res.success) await appendStatusMessage(`压缩失败：${res.error}`);
+      if (!res.success) await appendStatusMessage(`压缩失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
     if (name === "plan") {
-      await appendSlashUserMessage(commandNotice);
+      const owner = activeMutationOwner;
+      if (!owner) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
+        return true;
+      }
+      await appendSlashUserMessage(commandNotice, owner.roomAgentId);
       const normalized = args.toLowerCase();
       const next = normalized === "on" || normalized === "true" || normalized === "1"
         ? true
         : normalized === "off" || normalized === "false" || normalized === "0"
           ? false
-          : !defaultPlanMode;
-      setDefaultPlanMode(next);
-      const runtime = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId ?? null;
-      if (runtime) {
-        const res = await window.api.setKimiCodePlanMode({ sessionId: runtime, enabled: next });
-        if (!res.success) await appendStatusMessage(`Plan 模式切换失败：${res.error}`);
-        else await appendStatusMessage(next ? "Plan 模式已开启。" : "Plan 模式已关闭。");
+          : !mutationPlanMode;
+      updateSession(activeSession!.id, (session) => updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: next }), permissionMode));
+      syncCurrentSessionFromStore(activeSession!.id);
+      if (owner.runtimeSessionId) {
+        const res = await window.api.setKimiCodePlanMode({ sessionId: owner.runtimeSessionId, enabled: next });
+        if (!res.success) {
+          updateSession(activeSession!.id, (session) => updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: !next }), permissionMode));
+          syncCurrentSessionFromStore(activeSession!.id);
+          if (!activeSession?.collaboration) setDefaultPlanMode(!next);
+          await appendStatusMessage(`Plan 模式切换失败：${res.error}`, owner.roomAgentId);
+          return true;
+        } else await appendStatusMessage(next ? "Plan 模式已开启。" : "Plan 模式已关闭。", owner.roomAgentId);
       } else {
-        await appendStatusMessage(next ? "Plan 模式已开启，新会话发送时生效。" : "Plan 模式已关闭。");
+        await appendStatusMessage(next ? "Plan 模式已开启，新会话发送时生效。" : "Plan 模式已关闭。", owner.roomAgentId);
       }
+      if (!activeSession?.collaboration) setDefaultPlanMode(next);
       return true;
     }
     if (name === "reload") {
-      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
       const res = await window.api.reloadKimiCodeSession({ sessionId: runtime.runtimeSessionId });
-      await appendStatusMessage(res.success ? "已重载当前会话配置。" : `重载失败：${res.error}`);
+      await appendStatusMessage(res.success ? "已重载当前会话配置。" : `重载失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
     if (name === "status") {
-      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
       const res = await window.api.getKimiCodeStatus({ sessionId: runtime.runtimeSessionId });
-      await appendAssistantNotice(res.success ? formatKimiCodeStatus(res.data as Record<string, unknown>) : `读取 Kimi Code 状态失败：${res.error}`);
+      await appendAssistantNotice(res.success ? formatKimiCodeStatus(res.data as Record<string, unknown>) : `读取 Kimi Code 状态失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
     if (name === "usage") {
-      await appendSlashUserMessage(commandNotice);
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
       const res = await window.api.getKimiCodeUsage({ sessionId: runtime.runtimeSessionId });
-      await appendAssistantNotice(res.success ? formatKimiCodeUsage(res.data) : `读取 Kimi Code 会话用量失败：${res.error}`);
+      await appendAssistantNotice(res.success ? formatKimiCodeUsage(res.data) : `读取 Kimi Code 会话用量失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
     if (name === "btw") {
-      await appendSlashUserMessage(commandNotice);
-      if (!args) {
-        await appendStatusMessage("请输入侧问内容，例如：/btw 这个函数是谁调用的？");
-        return true;
-      }
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
+      if (!args) {
+        await appendStatusMessage("请输入侧问内容，例如：/btw 这个函数是谁调用的？", runtime.roomAgentId);
+        return true;
+      }
       const roundId = `btw-round-${Date.now()}`;
       updateSession(runtime.uiSessionId, (session) => ({
-        ...session,
-        btwRounds: [...(session.btwRounds ?? []), { id: roundId, userContent: args, timestamp: Date.now() }],
+        ...updateRoomMutationOwner(session, runtime.roomAgentId, (agent) => ({
+          ...agent,
+          btwRounds: [...(agent.btwRounds ?? []), { id: roundId, userContent: args, timestamp: Date.now() }],
+        }), permissionMode),
         updatedAt: Date.now(),
       }));
       const res = await window.api.askKimiCodeBtw({ sessionId: runtime.runtimeSessionId, content: args });
       updateSession(runtime.uiSessionId, (session) => ({
-        ...session,
-        btwRounds: (session.btwRounds ?? []).map((round) => round.id === roundId
-          ? { ...round, assistantContent: res.success ? res.data.content || "没有返回正文。" : `侧问失败：${res.error}`, thinking: res.success ? res.data.thinking || undefined : undefined }
-          : round),
+        ...updateRoomMutationOwner(session, runtime.roomAgentId, (agent) => ({
+          ...agent,
+          btwRounds: (agent.btwRounds ?? []).map((round) => round.id === roundId
+            ? { ...round, assistantContent: res.success ? res.data.content || "没有返回正文。" : `侧问失败：${res.error}`, thinking: res.success ? res.data.thinking || undefined : undefined }
+            : round),
+        }), permissionMode),
         updatedAt: Date.now(),
       }));
-      await appendStatusMessage(res.success ? "BTW 侧问已完成，结果在右侧会话栏。" : `BTW 侧问失败：${res.error}`);
+      await appendStatusMessage(res.success ? "BTW 侧问已完成，结果在右侧会话栏。" : `BTW 侧问失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
     if (name === "undo") {
-      const roomSession = await ensureSession();
-      if (roomSession && hasMultipleRoomAgents(roomSession)) {
-        window.dispatchEvent(new CustomEvent("kimix:toast", {
-          detail: "多 Agent 房间的撤回必须指定唯一目标 Agent；当前版本不会猜测或整组撤回。",
-        }));
-        return true;
-      }
       const runtime = await ensureOfficialRuntimeForSession();
       if (!runtime) return true;
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
@@ -2357,11 +2472,10 @@ export function Composer() {
         if (!loaded.success) {
           message = `官方撤回成功，但刷新官方历史失败：${loaded.error}`;
         } else {
-          const roomAgentId = getPrimaryRoomAgent(targetSession).id;
           updateSession(runtime.uiSessionId, (session) => {
             const reconciliation = reconcileAgentCanonicalHistory({
               session,
-              roomAgentId,
+              roomAgentId: runtime.roomAgentId,
               expectedRuntimeSessionId: runtime.runtimeSessionId,
               canonicalEvents: mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []),
               reason: "undo",
@@ -2371,8 +2485,8 @@ export function Composer() {
           syncCurrentSessionFromStore(runtime.uiSessionId);
         }
       }
-      await appendSlashUserMessage(commandNotice);
-      await appendStatusMessage(message);
+      await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
+      await appendStatusMessage(message, runtime.roomAgentId);
       return true;
     }
     return false;
@@ -2402,7 +2516,7 @@ export function Composer() {
     if (!officialSkill && allowMigration) {
       const prepareRes = await window.api.prepareKimiSkill({ name: skillName });
       if (!prepareRes.success) {
-        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `调用 Skill 失败：${prepareRes.error}`, source: "ui" });
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `调用 Skill 失败：${prepareRes.error}`, source: "ui" }, runtime.roomAgentId);
         return false;
       }
       migrated = prepareRes.data.copied;
@@ -2410,15 +2524,16 @@ export function Composer() {
       const reloadRes = await window.api.reloadKimiCodeSession({ sessionId: runtimeSessionId });
       if (reloadRes.success) {
         reloaded = true;
-        updateSession(runtime.uiSessionId, (session) => ({
-          ...session,
+        updateSession(runtime.uiSessionId, (session) => updateRoomMutationOwner(session, runtime.roomAgentId, (agent) => ({
+          ...agent,
           skillRegistrySyncedAt: syncedAt,
-        }));
+        }), permissionMode));
       } else {
         const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
           runtime.uiSessionId,
           runtimeSessionId,
           syncedAt,
+          runtime.roomAgentId,
         );
         if (!refreshedRuntimeSessionId) return false;
         runtimeSessionId = refreshedRuntimeSessionId;
@@ -2429,6 +2544,7 @@ export function Composer() {
           runtime.uiSessionId,
           runtimeSessionId,
           syncedAt,
+          runtime.roomAgentId,
         );
         if (!refreshedRuntimeSessionId) return false;
         runtimeSessionId = refreshedRuntimeSessionId;
@@ -2438,7 +2554,7 @@ export function Composer() {
     }
     if (!officialSkill) {
       if (reportFailure) {
-        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Server 未识别 Skill：${skillName}。请新建会话后重试。`, source: "ui" });
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Server 未识别 Skill：${skillName}。请新建会话后重试。`, source: "ui" }, runtime.roomAgentId);
       }
       return false;
     }
@@ -2450,7 +2566,8 @@ export function Composer() {
     });
     if (activateRes.success) {
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
-      if (targetSession && (targetSession.title === "新会话" || /^User activated the skill\b/i.test(targetSession.title))) {
+      const ownerIsPrimary = Boolean(targetSession && getPrimaryRoomAgent(targetSession).id === runtime.roomAgentId);
+      if (targetSession && ownerIsPrimary && (targetSession.title === "新会话" || /^User activated the skill\b/i.test(targetSession.title))) {
         const nextTitle = (args?.trim() || `使用 ${officialSkill.name}`).slice(0, 48);
         updateSession(runtime.uiSessionId, (session) => ({ ...session, title: nextTitle, updatedAt: Date.now() }));
         const renamedSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
@@ -2467,12 +2584,12 @@ export function Composer() {
           ? `${migrated ? (reloaded ? "已迁移并刷新会话后" : "已迁移并") : "已"}调用官方 Skill：${officialSkill.name}`
           : `调用 Skill 失败：${activateRes.error}`,
         source: "ui",
-      });
+      }, runtime.roomAgentId);
     }
     return activateRes.success;
   };
 
-  const forkRuntimeForSkillRegistry = async (uiSessionId: string, runtimeSessionId: string, syncedAt: number) => {
+  const forkRuntimeForSkillRegistry = async (uiSessionId: string, runtimeSessionId: string, syncedAt: number, roomAgentId: string) => {
     const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     const forkRes = await window.api.forkKimiCodeSession({
       sessionId: runtimeSessionId,
@@ -2480,22 +2597,24 @@ export function Composer() {
       title: targetSession?.title,
     });
     if (!forkRes.success) {
-      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已安装，但会话刷新失败：${forkRes.error}`, source: "ui" });
+      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已安装，但会话刷新失败：${forkRes.error}`, source: "ui" }, roomAgentId);
       return null;
     }
 
     const nextRuntimeSessionId = forkRes.data.sessionId;
     updateSession(uiSessionId, (session) => ({
-      ...session,
+      ...updateRoomMutationOwner(session, roomAgentId, (agent) => ({
+        ...agent,
+        runtimeSessionId: nextRuntimeSessionId,
+        officialSessionId: nextRuntimeSessionId,
+        skillForkParentSessionId: runtimeSessionId,
+        skillRegistrySyncedAt: syncedAt,
+      }), permissionMode),
       engine: "kimi-code",
-      runtimeSessionId: nextRuntimeSessionId,
-      officialSessionId: nextRuntimeSessionId,
-      skillForkParentSessionId: runtimeSessionId,
-      skillRegistrySyncedAt: syncedAt,
       updatedAt: Date.now(),
     }));
     const refreshedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (refreshedSession) setCurrentSession(refreshedSession);
+    if (refreshedSession && useAppStore.getState().currentSession?.id === uiSessionId) setCurrentSession(refreshedSession);
     await window.api.closeKimiCodeSession({ sessionId: runtimeSessionId }).catch(() => undefined);
     return nextRuntimeSessionId;
   };
@@ -2504,10 +2623,9 @@ export function Composer() {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
-    if (activeSession?.collaboration && trimmed.startsWith("/")) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "房间内的 Slash / Skill / Goal 等会话操作需要明确 Agent owner，当前阶段暂不执行。",
-      }));
+    const slashRoomAgentId = activeSession?.collaboration ? activeMutationOwner?.roomAgentId : undefined;
+    if (activeSession?.collaboration && trimmed.startsWith("/") && !slashRoomAgentId) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
       return;
     }
     if (activeSession?.collaboration) {
@@ -2547,53 +2665,53 @@ export function Composer() {
       const skillName = match?.[1]?.slice("skill:".length) ?? "";
       const skillArgs = (match?.[2] ?? "").trim();
       if (imagesToSend.length > 0) {
-        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`, slashRoomAgentId);
         return;
       }
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
-        settlePendingClarifications(activeSession.id);
+        settlePendingClarifications(activeSession.id, slashRoomAgentId);
       }
-      await appendSlashUserMessage(trimmed);
+      await appendSlashUserMessage(trimmed, slashRoomAgentId);
       await applySkillCommand(skillName, skillArgs || undefined);
       return;
     }
     if (pluginCommand) {
       if (imagesToSend.length > 0) {
-        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`, slashRoomAgentId);
         return;
       }
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
-        settlePendingClarifications(activeSession.id);
+        settlePendingClarifications(activeSession.id, slashRoomAgentId);
       }
-      await appendSlashUserMessage(trimmed);
+      await appendSlashUserMessage(trimmed, slashRoomAgentId);
       await handleOfficialPluginCommand(pluginCommand, slashArgs);
       return;
     }
     if (slashRouting === "official-skill-first") {
       if (imagesToSend.length > 0) {
-        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`, slashRoomAgentId);
         return;
       }
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
-        settlePendingClarifications(activeSession.id);
+        settlePendingClarifications(activeSession.id, slashRoomAgentId);
       }
-      await appendSlashUserMessage(trimmed);
       const activated = await applySkillCommand(slashName, slashArgs, {
         allowMigration: false,
         reportFailure: false,
       });
-      if (!activated) {
-        await appendStatusMessage(`官方 /${slashName} Skill 当前不可用，正在尝试 Kimix 兼容兜底。`);
-        const fallbackHandled = await handleSdkSlashCommand(trimmed);
+      if (activated) {
+        await appendSlashUserMessage(trimmed, slashRoomAgentId);
+      } else {
+        const fallbackHandled = await handleSdkSlashCommand(trimmed, slashRoomAgentId);
         if (!fallbackHandled) {
           await appendLocalEvent({
             id: genId(),
@@ -2601,27 +2719,27 @@ export function Composer() {
             timestamp: Date.now(),
             message: `官方 /${slashName} Skill 激活失败，当前没有可用的兼容处理。`,
             source: "ui",
-          });
+          }, slashRoomAgentId);
         }
       }
       return;
     }
     if (slashRouting === "direct") {
       if (imagesToSend.length > 0) {
-        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`);
+        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`, slashRoomAgentId);
         return;
       }
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
-        settlePendingClarifications(activeSession.id);
+        settlePendingClarifications(activeSession.id, slashRoomAgentId);
       }
       await handleDirectSlashCommand(trimmed);
       return;
     }
     const slashHandled = trimmed.startsWith("/")
-      ? await handleSdkSlashCommand(trimmed)
+      ? await handleSdkSlashCommand(trimmed, slashRoomAgentId)
       : false;
     if (slashHandled) {
       setInput("");
@@ -2633,7 +2751,7 @@ export function Composer() {
     setImageAttachments([]);
     inputRef.current?.reset();
 
-    if (!hasActiveAssistantTurn && activeSession) {
+    if (!hasActiveAssistantTurn && activeSession && !activeSession.collaboration) {
       settlePendingClarifications(activeSession.id);
     }
 
@@ -2913,17 +3031,28 @@ export function Composer() {
     }));
   };
 
-  const applyPermissionMode = useCallback(async (mode: PermissionMode, runtimeSessionId?: string, traceId = genId()) => {
-    const previousMode = useAppStore.getState().permissionMode;
+  const applyPermissionMode = useCallback(async (mode: PermissionMode, runtimeSessionId?: string, roomAgentId?: string, traceId = genId()) => {
     const stateSnapshot = useSessionStore.getState();
-    const activeSnapshot = activeSession;
+    const targetSession = roomAgentId
+      ? stateSnapshot.sessions.find((session) => Boolean(getRoomAgent(session, roomAgentId)))
+      : stateSnapshot.sessions.find((session) => (
+          session.id === runtimeSessionId ||
+          session.runtimeSessionId === runtimeSessionId ||
+          session.officialSessionId === runtimeSessionId
+        )) ?? useAppStore.getState().currentSession ?? undefined;
+    const ownerId = targetSession
+      ? roomAgentId ?? getPrimaryRoomAgent(targetSession).id
+      : roomAgentId;
+    const appPermissionMode = useAppStore.getState().permissionMode;
+    const targetAgent = targetSession && ownerId ? getRoomAgent(targetSession, ownerId, appPermissionMode) : null;
+    const previousMode = targetAgent?.permissionMode ?? targetSession?.permissionMode ?? appPermissionMode;
     emitPermissionModeDiag("apply:start", {
       traceId,
       requestedMode: mode,
       previousMode,
       runtimeSessionId,
-      activeSessionId: activeSnapshot?.id,
-      activeRuntimeSessionId: activeSnapshot ? getRuntimeSessionId(activeSnapshot) : undefined,
+      activeSessionId: targetSession?.id,
+      activeRuntimeSessionId: runtimeSessionId,
       currentSessionId: useAppStore.getState().currentSession?.id,
       runningSessionId: useAppStore.getState().runningSessionId,
       sessionCount: stateSnapshot.sessions.length,
@@ -2934,11 +3063,6 @@ export function Composer() {
     // into createKimiCodeSession at send time, so the local update is enough.
     let appliedRuntimeSessionId = runtimeSessionId;
     if (runtimeSessionId) {
-      const targetSession = useSessionStore.getState().sessions.find((session) => (
-        session.id === runtimeSessionId ||
-        session.runtimeSessionId === runtimeSessionId ||
-        session.officialSessionId === runtimeSessionId
-      ));
       emitPermissionModeDiag("apply:before-set-permission", {
         traceId,
         requestedMode: mode,
@@ -2966,7 +3090,7 @@ export function Composer() {
           targetSessionId: targetSession?.id,
           error: res.error,
         });
-        setPermissionMode(previousMode);
+        if (!targetSession?.collaboration) setPermissionMode(previousMode);
         window.dispatchEvent(new CustomEvent("kimix:toast", {
           detail: `权限切换失败：${res.error}`,
         }));
@@ -2982,7 +3106,7 @@ export function Composer() {
         targetSessionId: targetSession?.id,
         recoveredRuntimeSession: appliedRuntimeSessionId !== runtimeSessionId,
       });
-      if (targetSession && appliedRuntimeSessionId !== runtimeSessionId) {
+      if (targetSession && ownerId && appliedRuntimeSessionId !== runtimeSessionId) {
         emitPermissionModeDiag("apply:update-runtime-binding", {
           traceId,
           requestedMode: mode,
@@ -2991,12 +3115,20 @@ export function Composer() {
           runtimeSessionId,
           appliedRuntimeSessionId,
         });
-        updateSession(targetSession.id, (session) => ({
-          ...session,
+        updateSession(targetSession.id, (session) => updateRoomMutationOwner(session, ownerId, (agent) => ({
+          ...agent,
           runtimeSessionId: appliedRuntimeSessionId,
           officialSessionId: appliedRuntimeSessionId,
-        }));
+        }), previousMode));
       }
+    }
+
+    if (targetSession && ownerId) {
+      updateSession(targetSession.id, (session) => ({
+        ...updateRoomMutationOwner(session, ownerId, (agent) => ({ ...agent, permissionMode: mode }), previousMode),
+        updatedAt: Date.now(),
+      }));
+      syncCurrentSessionFromStore(targetSession.id);
     }
 
     emitPermissionModeDiag("apply:before-set-ui-mode", {
@@ -3008,26 +3140,31 @@ export function Composer() {
       currentSessionId: useAppStore.getState().currentSession?.id,
       runningSessionId: useAppStore.getState().runningSessionId,
     });
-    setPermissionMode(mode);
+    if (!targetSession?.collaboration) setPermissionMode(mode);
     emitPermissionModeDiag("apply:after-set-ui-mode", {
       traceId,
       requestedMode: mode,
       previousMode,
       runtimeSessionId,
       appliedRuntimeSessionId,
-      currentPermissionMode: useAppStore.getState().permissionMode,
+      currentPermissionMode: targetSession?.collaboration ? mode : useAppStore.getState().permissionMode,
       currentSessionId: useAppStore.getState().currentSession?.id,
       runningSessionId: useAppStore.getState().runningSessionId,
     });
-    if (!appliedRuntimeSessionId) return;
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: "权限模式已切换",
+      detail: targetAgent ? `${targetAgent.displayName} · 权限模式已切换` : "权限模式已切换",
     }));
   }, [setPermissionMode, updateSession]);
 
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     const traceId = genId();
-    const previousMode = permissionMode;
+    const owner = activeMutationOwner;
+    if (!owner) {
+      setShowPermissionMenu(false);
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
+      return;
+    }
+    const previousMode = mutationPermissionMode ?? permissionMode;
     emitPermissionModeDiag("click", {
       traceId,
       requestedMode: mode,
@@ -3059,7 +3196,13 @@ export function Composer() {
       });
       return;
     }
-    if (activeSession && isCurrentSessionRunning) {
+    if (activeSession?.collaboration && isMutationOwnerRunning) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `${owner.displayName} 正在运行，请在本轮结束后切换权限。`,
+      }));
+      return;
+    }
+    if (activeSession && isMutationOwnerRunning) {
       if (!activeRuntimeSessionId) {
         emitPermissionModeDiag("pending:error-no-runtime", {
           traceId,
@@ -3076,6 +3219,7 @@ export function Composer() {
       pendingPermissionChangeRef.current = {
         sessionId: activeSession.id,
         runtimeSessionId: activeRuntimeSessionId,
+        roomAgentId: owner.roomAgentId,
         mode,
       };
       emitPermissionModeDiag("pending:stored", {
@@ -3092,7 +3236,7 @@ export function Composer() {
       }));
       return;
     }
-    await applyPermissionMode(mode, activeRuntimeSessionId, traceId);
+    await applyPermissionMode(mode, activeRuntimeSessionId, owner.roomAgentId, traceId);
   };
 
   useEffect(() => window.api.onKimiCodeEvent((payload) => {
@@ -3111,31 +3255,45 @@ export function Composer() {
       currentSessionId: useAppStore.getState().currentSession?.id,
       runningSessionId: useAppStore.getState().runningSessionId,
     });
-    void applyPermissionMode(pending.mode, pending.runtimeSessionId, traceId);
+    void applyPermissionMode(pending.mode, pending.runtimeSessionId, pending.roomAgentId, traceId);
   }), [applyPermissionMode]);
 
   const handleTogglePlanMode = async () => {
     if (!canTogglePlanMode) return;
-    const next = !defaultPlanMode;
-    setDefaultPlanMode(next);
-    const runtimeSessionId = activeSession?.runtimeSessionId ?? activeSession?.officialSessionId ?? null;
+    const owner = activeMutationOwner;
+    if (!activeSession || !owner) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
+      return;
+    }
+    const next = !mutationPlanMode;
+    updateSession(activeSession.id, (session) => ({
+      ...updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: next }), permissionMode),
+      updatedAt: Date.now(),
+    }));
+    syncCurrentSessionFromStore(activeSession.id);
+    if (!activeSession.collaboration) setDefaultPlanMode(next);
+    const runtimeSessionId = owner.runtimeSessionId ?? null;
     if (!runtimeSessionId) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: next ? "Plan 模式已开启，新会话发送时生效" : "Plan 模式已关闭",
+        detail: `${owner.displayName} · ${next ? "Plan 模式已开启，新会话发送时生效" : "Plan 模式已关闭"}`,
       }));
       return;
     }
     const res = await window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: next });
     if (!res.success) {
-      setDefaultPlanMode(!next);
+      updateSession(activeSession.id, (session) => ({
+        ...updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: !next }), permissionMode),
+        updatedAt: Date.now(),
+      }));
+      syncCurrentSessionFromStore(activeSession.id);
+      if (!activeSession.collaboration) setDefaultPlanMode(!next);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: `Plan 模式切换失败：${res.error}`,
       }));
       return;
     }
-    setDefaultPlanMode(next);
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: next ? "Plan 模式已开启" : "Plan 模式已关闭",
+      detail: `${owner.displayName} · ${next ? "Plan 模式已开启" : "Plan 模式已关闭"}`,
     }));
   };
 
@@ -3338,7 +3496,7 @@ export function Composer() {
     manual: "手动审批",
     auto: "自动权限",
     yolo: "完全访问权限",
-  }[permissionMode];
+  }[mutationPermissionMode ?? permissionMode];
 
   const placeholder = roomReadOnly
     ? "多 Agent 房间功能当前处于只读 gate"
@@ -3355,7 +3513,7 @@ export function Composer() {
   const todoHidden = hiddenCards.includes("todo");
   const pendingHidden = hiddenCards.includes("pending");
   const goalHidden = hiddenCards.includes("goal");
-  const currentGoal = activeSession?.officialGoal?.goal ?? null;
+  const currentGoal = mutationSessionView?.officialGoal?.goal ?? null;
   const goalStatus = currentGoal?.status ?? "";
   const showGoalModeCard = Boolean(currentGoal && !goalHidden && !["complete", "cancelled", "canceled"].includes(goalStatus));
   const goalToneClass = goalStatus === "blocked"
@@ -3910,7 +4068,7 @@ export function Composer() {
                         </div>
                         <button
                           type="button"
-                          disabled={!canUseComposer || selectedSecondaryRoomAgent}
+                          disabled={!canUseComposer || !hasUniqueMutationOwner}
                           onClick={() => {
                             setShowAddMenu(false);
                             void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" });
@@ -3918,8 +4076,8 @@ export function Composer() {
                           className={`kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] disabled:cursor-not-allowed disabled:opacity-55 ${swarmModeEnabled ? "text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                           style={{ minWidth: 72, height: 32, paddingLeft: 12, paddingRight: 12 }}
                           title={swarmModeEnabled
-                            ? "关闭 Swarm；运行中切换会在下一轮生效"
-                            : "开启 Swarm；运行中切换会在下一轮生效"
+                            ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm；运行中切换会在下一轮生效`
+                            : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm；运行中切换会在下一轮生效`
                           }
                         >
                           {swarmModeEnabled ? "关闭" : "开启"}
@@ -3948,13 +4106,17 @@ export function Composer() {
 
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
               <button
-                disabled={!canUseComposer || selectedSecondaryRoomAgent}
+                disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={() => setShowPermissionMenu((v) => !v)}
                 className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35"
-                title={selectedSecondaryRoomAgent ? "次要 Agent 的权限在添加时固定；Agent scoped 修改将在后续阶段开放" : undefined}
+                title={!hasUniqueMutationOwner
+                  ? mutationOwnerError
+                  : isMutationOwnerRunning
+                    ? `${activeMutationOwner?.displayName ?? "Agent"} 正在运行，本轮结束后可切换权限`
+                    : activeMutationOwner ? `修改 ${activeMutationOwner.displayName} 的权限` : undefined}
               >
                 {(() => {
-                  const PermissionIcon = permissionMenuIcons[permissionMode];
+                  const PermissionIcon = permissionMenuIcons[mutationPermissionMode ?? permissionMode];
                   return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
                 })()}
                 <span className="truncate">{permissionLabel}</span>
@@ -3965,10 +4127,10 @@ export function Composer() {
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${permissionMode === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                         <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
-                        {permissionMode === opt.value && <Check size={13} className="mr-1 shrink-0 text-[var(--kimix-panel-text)]" />}
+                        {(mutationPermissionMode ?? permissionMode) === opt.value && <Check size={13} className="mr-1 shrink-0 text-[var(--kimix-panel-text)]" />}
                       </button>
                     );
                   })}
@@ -3981,7 +4143,7 @@ export function Composer() {
             {activeSession && (
               <button
                 type="button"
-                disabled={!canUseComposer || selectedSecondaryRoomAgent}
+                disabled={!canUseComposer || !hasUniqueMutationOwner}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
                 className="kimix-icon-text-button kimix-muted-action is-compact min-w-[104px] border disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
@@ -3990,7 +4152,11 @@ export function Composer() {
                   color: swarmModeEnabled ? "var(--accent-primary-dark)" : undefined,
                   boxShadow: swarmModeEnabled ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
                 }}
-                title={swarmModePending ? `Swarm 将在下一轮${swarmModeEnabled ? "开启" : "关闭"}` : swarmModeEnabled ? "关闭 Swarm 模式" : "开启 Swarm 模式"}
+                title={swarmModePending
+                  ? `${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 将在下一轮${swarmModeEnabled ? "开启" : "关闭"}`
+                  : swarmModeEnabled
+                    ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 模式`
+                    : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 模式`}
                 aria-label={swarmModePending ? `Swarm 将在下一轮${swarmModeEnabled ? "开启" : "关闭"}` : `Swarm 模式已${swarmModeEnabled ? "开启" : "关闭"}`}
                 aria-pressed={swarmModeEnabled}
               >
@@ -4002,17 +4168,17 @@ export function Composer() {
               disabled={!canTogglePlanMode}
               onClick={() => void handleTogglePlanMode()}
               className="kimix-icon-text-button kimix-muted-action is-compact min-w-[92px] border disabled:cursor-not-allowed disabled:opacity-35"
-              style={{
-                borderColor: defaultPlanMode ? "var(--accent-primary-soft)" : "transparent",
-                backgroundColor: defaultPlanMode ? "var(--accent-primary-light)" : "transparent",
-                color: defaultPlanMode ? "var(--accent-primary-dark)" : undefined,
-                boxShadow: defaultPlanMode ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
+                style={{
+                borderColor: mutationPlanMode ? "var(--accent-primary-soft)" : "transparent",
+                backgroundColor: mutationPlanMode ? "var(--accent-primary-light)" : "transparent",
+                color: mutationPlanMode ? "var(--accent-primary-dark)" : undefined,
+                boxShadow: mutationPlanMode ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
               }}
-              title={defaultPlanMode ? "关闭 Plan 模式。Plan 模式会先生成计划，等待确认后再执行。" : "开启 Plan 模式。Plan 模式会先生成计划，等待确认后再执行。"}
-              aria-pressed={defaultPlanMode}
+              title={mutationPlanMode ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式` : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式`}
+              aria-pressed={mutationPlanMode}
             >
               <ClipboardList size={14} className="shrink-0" />
-              <span>{defaultPlanMode ? "Plan 开" : "Plan 关"}</span>
+              <span>{mutationPlanMode ? "Plan 开" : "Plan 关"}</span>
             </button>
             <button
               disabled={!canUseComposer}

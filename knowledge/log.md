@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Composer session mutations require one Agent owner**: Agent permission and Plan state are durable, direct Slash/Skill/Goal/Swarm/BTW operations use the selected Agent runtime and event partition, and single-target undo replaces only that Agent's canonical history. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Manifest-changing validation runs pnpm commands serially**: Concurrent fresh pnpm processes can race while repairing dependency state and native bins, so tests, build, and knowledge validation run one at a time after manifest changes; read-only Git checks may still overlap. See [/operations/release-process.md](/operations/release-process.md).
 * **Room Stop and Steer require an explicit running Agent owner**: Activity state outranks stale delivery evidence, multi-running rooms present a target list, stop-all aggregates independent cancellations, and Steer/stop settlement remains scoped to the selected Agent turn and delivery. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room approvals and questions never fall back to primary**: Interactive request cards resolve the explicit event owner before IPC, target only that Agent runtime, settle only its event partition, and reject missing or unavailable ownership with visible feedback. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

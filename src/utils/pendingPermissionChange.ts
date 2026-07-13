@@ -3,6 +3,7 @@ import type { PermissionMode } from "@/types/ui";
 export type PendingPermissionChange = {
   sessionId: string;
   runtimeSessionId: string;
+  roomAgentId?: string;
   mode: PermissionMode;
 };
 

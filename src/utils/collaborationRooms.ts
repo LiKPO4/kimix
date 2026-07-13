@@ -57,6 +57,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     return null;
   }
   if (value.modelAlias !== null && typeof value.modelAlias !== "string") return null;
+  if (value.planMode !== undefined && typeof value.planMode !== "boolean") return null;
   if (value.provisioningError !== undefined && (typeof value.provisioningError !== "string" || !value.provisioningError.trim())) return null;
   const recoveryIssue = value.recoveryIssue;
   if (recoveryIssue !== undefined && (
@@ -83,6 +84,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     modelAlias: value.modelAlias as string | null,
     provisioningError: value.provisioningError as string | undefined,
     permissionMode: value.permissionMode,
+    planMode: value.planMode as boolean | undefined,
     createdAt: value.createdAt,
     recoveryIssue: recoveryIssue as RoomAgent["recoveryIssue"],
     archivedAt: value.archivedAt as number | undefined,
@@ -228,7 +230,8 @@ export function createSyntheticPrimaryAgent(
     displayName,
     mentionName: displayName.replace(/\s+/g, "-") || "Kimi",
     modelAlias: session.model ?? null,
-    permissionMode,
+    permissionMode: session.permissionMode ?? permissionMode,
+    planMode: session.planMode,
     runtimeSessionId: session.runtimeSessionId,
     officialSessionId: session.officialSessionId,
     skillRegistrySyncedAt: session.skillRegistrySyncedAt,
@@ -358,6 +361,8 @@ export function getRoomAgentSessionView(session: Session, roomAgentId: string): 
     swarmMode: agent.swarmMode,
     swarmModeDesired: agent.swarmModeDesired,
     model: agent.modelAlias,
+    permissionMode: agent.permissionMode,
+    planMode: agent.planMode,
     modelSwitchedAt: agent.modelSwitchedAt,
     switchedToModel: agent.switchedToModel,
     officialGoal: agent.officialGoal,
@@ -460,6 +465,8 @@ function reconcileLegacyPrimaryWrite(session: Session, collaboration: Collaborat
     swarmMode: legacyPrimary.swarmMode,
     swarmModeDesired: legacyPrimary.swarmModeDesired,
     modelAlias: legacyPrimary.modelAlias,
+    permissionMode: legacyPrimary.permissionMode,
+    planMode: legacyPrimary.planMode,
     modelSwitchedAt: legacyPrimary.modelSwitchedAt,
     switchedToModel: legacyPrimary.switchedToModel,
     officialGoal: legacyPrimary.officialGoal,
@@ -593,6 +600,8 @@ export function mirrorPrimaryAgentToLegacySession(session: Session): Session {
     swarmMode: primary.swarmMode,
     swarmModeDesired: primary.swarmModeDesired,
     model: primary.modelAlias,
+    permissionMode: primary.permissionMode,
+    planMode: primary.planMode,
     modelSwitchedAt: primary.modelSwitchedAt,
     switchedToModel: primary.switchedToModel,
     officialGoal: primary.officialGoal,

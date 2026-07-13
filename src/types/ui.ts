@@ -173,6 +173,7 @@ export interface RoomAgent {
   modelLabelSnapshot?: string;
   providerLabelSnapshot?: string;
   permissionMode: PermissionMode;
+  planMode?: boolean;
   runtimeSessionId?: string;
   officialSessionId?: string;
   provisioningError?: string;
@@ -244,6 +245,8 @@ export interface Session {
   swarmModeDesired?: boolean;
   titleLocked?: boolean;
   model?: string | null;
+  permissionMode?: PermissionMode;
+  planMode?: boolean;
   /** 最近一次会话模型切换时间，用于阻止空闲状态污染上一轮消息元信息。 */
   modelSwitchedAt?: number;
   /** 正在切换到的目标模型（API 返回前即写入），用于早于 store 更新的 SDK 事件判断。 */

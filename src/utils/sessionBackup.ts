@@ -586,6 +586,10 @@ function normalizeImportedSession(value: unknown, schemaVersion: number): Sessio
     officialSessionId: optionalString(value.officialSessionId),
     titleLocked: value.titleLocked === true ? true : undefined,
     model: typeof value.model === "string" || value.model === null ? value.model : undefined,
+    permissionMode: value.permissionMode === "manual" || value.permissionMode === "auto" || value.permissionMode === "yolo"
+      ? value.permissionMode
+      : undefined,
+    planMode: typeof value.planMode === "boolean" ? value.planMode : undefined,
     longTask: isRecord(value.longTask) ? value.longTask as Session["longTask"] : undefined,
     title,
     projectPath,
@@ -807,6 +811,8 @@ function mergeSession(local: Session, imported: Session) {
     officialSessionId: local.officialSessionId ?? imported.officialSessionId,
     titleLocked: local.titleLocked ?? imported.titleLocked,
     model: local.model ?? imported.model,
+    permissionMode: importedNewer ? (imported.permissionMode ?? local.permissionMode) : (local.permissionMode ?? imported.permissionMode),
+    planMode: importedNewer ? (imported.planMode ?? local.planMode) : (local.planMode ?? imported.planMode),
     longTask: local.longTask ?? imported.longTask,
     btwRounds: local.btwRounds ?? imported.btwRounds,
     officialGoal: importedNewer ? (imported.officialGoal ?? local.officialGoal) : (local.officialGoal ?? imported.officialGoal),

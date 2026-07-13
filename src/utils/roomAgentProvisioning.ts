@@ -24,6 +24,7 @@ export type RoomAgentDraft = {
   modelLabelSnapshot?: string;
   providerLabelSnapshot?: string;
   permissionMode: PermissionMode;
+  planMode?: boolean;
 };
 
 function normalizeDisplayName(value: string) {
@@ -75,6 +76,7 @@ export function prepareRoomAgentProvisioning(
     modelLabelSnapshot: draft.modelLabelSnapshot?.trim() || undefined,
     providerLabelSnapshot: draft.providerLabelSnapshot?.trim() || undefined,
     permissionMode: draft.permissionMode,
+    planMode: draft.planMode,
     createdAt: now,
   };
   return {
