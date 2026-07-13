@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T13:46:43+08:00"
+timestamp: "2026-07-13T14:16:39+08:00"
 ---
 
 # Collaboration Room Routing
@@ -27,12 +27,15 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 4. A room user message is displayed once. Each recipient delivery records its own official user-event identity and response `agentTurnId`.
 5. Deterministic source identities keep `agentTurnId`, React keys, search anchors, expansion state, and scroll anchors stable across snapshot replay and restart.
 6. Agent output is visible in the room but does not enter another Agent's official context unless the user explicitly routes or quotes it.
+7. New deliveries bind through persisted official prompt or message identities. Text-and-time matching is only a legacy recovery hint; ambiguous history stays in the owning Agent partition without being attached to an arbitrary turn.
+8. Usage and terminal presentation settle by `roomAgentId + agentTurnId`; another Agent's running state cannot keep a completed response open or close it early.
 
 # Runtime and Queue Authority
 
 * The authoritative activity registry is keyed by `roomId + roomAgentId`; the legacy scalar `runningSessionId` is only a single-Agent compatibility projection.
 * Busy, queued, sending, running, waiting-for-approval, waiting-for-answer, failed, and completed states are Agent-scoped.
 * A busy Agent queues only its own delivery. Other idle recipients dispatch immediately.
+* Room messages and stable delivery attempts are persisted before network dispatch. An attempt whose official acceptance is unknown becomes indeterminate and is never automatically resent.
 * Cancel, steer, approval, question response, permission mutation, model mutation, Plan, Goal, Swarm, and slash session mutation require an explicit Agent/runtime owner.
 * A terminal event or Server-to-SDK migration for one Agent cannot clear or replace another Agent's activity or runtime binding.
 
@@ -41,6 +44,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Old Sessions are normalized as one synthetic primary Agent in memory and are not persistently upgraded until a second Agent is added.
 * Legacy top-level runtime, official ID, model, and event fields continue to mirror the primary Agent during the compatibility period.
 * Secondary official sessions carry Kimix room metadata so catalog reconciliation groups them under the room.
+* Agent provisioning persists the local participant before official creation. Fixed room and Agent metadata allows an official session created immediately before a crash to be rebound idempotently instead of duplicated or hidden.
 * A bound secondary session is hidden as a duplicate sidebar row. When the local binding is absent, the official session remains discoverable as an independent conversation rather than becoming invisible.
 * Removing an Agent preserves its history. Room archive and restore operate per Agent and expose partial failure because official sessions have no cross-session transaction.
 * Backup schema migration must remap room Agent IDs, recipients, deliveries, events, queues, and official bindings together.
@@ -57,4 +61,3 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 
 * [User-Controlled Multi-Agent Rooms](/decisions/user-controlled-multi-agent-rooms.md)
 * [Runtime Routing](/architecture/runtime-routing.md)
-

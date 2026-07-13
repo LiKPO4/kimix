@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0 进行中；在事件归属、运行状态、历史分区和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-2 已完成，阶段 3 正在实现且仍处于内部开发 gate；在事件归属、运行状态、历史分区、可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -67,8 +67,11 @@ interface RoomAgent {
   permissionMode: PermissionMode;
   runtimeSessionId?: string;
   officialSessionId?: string;
+  /** 未绑定 officialSessionId 时表示创建中或创建失败后可重试，不静默删除。 */
+  provisioningError?: string;
   createdAt: number;
   removedAt?: number;
+  missingSince?: number;
 }
 
 interface RoomUserMessage {
@@ -77,6 +80,19 @@ interface RoomUserMessage {
   recipientAgentIds: string[];
   deliveries: Record<string, AgentDelivery>;
   timestamp: number;
+}
+
+interface AgentDelivery {
+  status: "queued" | "sending" | "accepted" | "running" |
+    "waiting_approval" | "waiting_question" | "completed" |
+    "failed" | "cancelled" | "indeterminate";
+  /** 本地先生成并持久化；整个生命周期不变。 */
+  agentTurnId: string;
+  /** 每次明确重试生成新值，用于识别旧回包和重复提交。 */
+  dispatchAttemptId: string;
+  officialPromptId?: string;
+  officialUserEventId?: string;
+  error?: string;
 }
 ```
 
@@ -100,6 +116,40 @@ interface RoomUserMessage {
 
 不得复用现有 `TimelineEvent.agentId` 或 `agentRole`；它们已分别承担 Kimi 内部 Subagent/Swarm 和 Long Task executor/reviewer 语义。
 
+### 3.4 两类可恢复事务
+
+#### 添加 Agent
+
+第一版只允许在房间全部 Agent 空闲时添加或移出 Agent，按以下顺序执行：
+
+1. 校验四人上限、名称与 mention 唯一性、模型 alias 仍存在、权限值合法。
+2. 先在本地持久化一个尚未绑定 runtime/official session 的 `RoomAgent`，使应用崩溃后仍知道有一次未完成创建。
+3. 使用固定 `kimixRoomId + kimixRoomAgentId` metadata 创建官方 session；重试时先查目录并复用同一身份，不能盲目再创建。
+4. 官方创建成功后绑定 `runtimeSessionId` / `officialSessionId` 并再次持久化。
+5. 创建失败时保留可见的失败 Agent 条目，允许重试或移出；不自动删除可能已经创建成功的官方 session。
+
+这样即使在“官方创建成功、本地绑定写入前”退出，目录恢复也能按 metadata 找回，而不会生成永久不可见的孤儿会话。
+
+#### 发送房间消息
+
+每次发送先冻结接收者快照，再逐 delivery 独立推进：
+
+1. 解析合法房间 mention，保留原始展示文本，只从模型 payload 剥离已确认的路由 token。
+2. 校验目标 Agent 可用性和命令能力；多目标 session mutation 直接拒绝，不做部分执行。
+3. 在任何网络调用前，持久化 `RoomUserMessage`、接收者顺序、每个 `agentTurnId`、`dispatchAttemptId` 和初始 `queued` 状态。
+4. 空闲 Agent 独立进入 `sending`，忙碌 Agent 留在自己的队列；一个目标失败不能回滚已被其他目标接受的 delivery。
+5. 官方确认后记录 `officialPromptId` / `officialUserEventId`；后续事件必须同时通过 runtime owner 和 delivery 关联进入对应 Agent turn。
+6. 若应用在“已发送但未收到确认”期间退出，重启后先查官方状态和 snapshot。无法证明未发送时标记为 `indeterminate`，禁止自动重发，避免模型收到重复提示。
+7. 用户明确重试时创建新的 `dispatchAttemptId`，沿用原 `roomMessageId` 但创建新的 `agentTurnId`，并在 UI 中标明这是重试响应。
+
+### 3.5 官方历史关联规则
+
+- `officialPromptId`、官方 message ID 和持久化 delivery 是新消息关联的权威来源。
+- “规范化文本 + 时间窗口”只能用于迁移旧数据的候选恢复，不能作为新房间消息的最终绑定依据。
+- 候选恢复出现零个或多个匹配时，不猜测、不串线；事件保留在所属 Agent 的 canonical history 中，并显示为待关联历史或记录诊断信息。
+- `agentTurnId` 必须在网络发送前生成并持久化，不能由时间戳、数组位置或 snapshot 回放顺序临时生成。
+- snapshot 产生的稳定 source ID 只解决事件自身身份；它不能替代 room message、delivery 和 Agent turn 的关联。
+
 ## 4. 强制运行不变量
 
 1. runtime 事件进入归并器前必须解析出 `{ roomId, roomAgentId }`。
@@ -115,6 +165,11 @@ interface RoomUserMessage {
 11. 已绑定房间的次要官方 session 不得重复显示在侧栏；绑定丢失时必须可作为独立会话找回。
 12. Provider 配置失效时显示不可用状态，不得静默切换模型。
 13. 一个 Agent 失败、停止、迁移或等待审批时，其他 Agent 的状态与队列不受影响。
+14. 新房间消息不得仅凭文本和时间戳绑定官方事件；无法唯一确认时宁可待关联，也不能绑错 Agent turn。
+15. 添加 Agent 和发送消息都必须先保存本地意图，再调用官方接口；中途退出后必须可以继续、重试或明确放弃。
+16. `sending` 状态恢复后若无法确认官方是否已接受，禁止自动重发，避免重复上下文和重复工具操作。
+17. 用量、耗时和完成气泡只由当前 `roomAgentId + agentTurnId` 的真实终态决定；房间内其他 Agent 是否运行不得干扰。
+18. 未能关联到 room message 的官方事件仍属于对应 Agent，不能被丢弃、隐藏或误挂到最近一轮。
 
 ## 5. 用户交互
 
@@ -127,6 +182,7 @@ interface RoomUserMessage {
 - 模型：复用 `buildSessionModelOptions` 和 `groupSessionModelOptions` 的 Provider 分组目录。
 - 权限：复用 `manual`、`auto`、`yolo`。
 - “管理模型与供应商”：跳转现有设置页。
+- 房间有任一 Agent 正在发送、运行、待审批或待回答时，第一版禁用添加和移出，避免成员列表与在途事件所有权同时变化。
 
 不提供角色、身份模板或自动系统提示词。
 
@@ -149,9 +205,11 @@ interface RoomUserMessage {
 - 按用户选择顺序立即创建各 Agent 的独立响应块。
 - 每个 Agent 独立显示空闲、排队、发送、运行、待审批、待回答、失败和完成状态。
 - 空闲目标立即发送，忙碌目标进入自身队列。
+- `sending` 超时但官方状态不明时显示“待确认”，不伪装成失败，也不自动重试。
 - 单个停止只停止目标 Agent；多个运行时提供明确的 Agent 列表和“停止全部”。
 - 模型、权限、Plan、Goal、Swarm 等 session 级操作必须先明确一个 Agent。
 - 运行中的 Agent 不允许切模型，但不阻止操作其他空闲 Agent。
+- 每个响应块的模型、Provider、状态、审批和最终用量都来自该 Agent turn，不使用房间级最新值代替。
 
 ## 6. 官方目录、持久化和生命周期
 
@@ -173,12 +231,14 @@ interface RoomUserMessage {
 - 本地房间绑定缺失时，session 作为普通独立会话显示，避免历史不可见。
 - 次要 session 缺失时只标记对应 Agent missing，不归档整个房间。
 - 搜索命中次要 session 时打开所属房间并定位具体 Agent。
+- 目录出现 metadata 完整但本地未绑定的 session 时，优先按 `kimixRoomAgentId` 恢复绑定；所属房间已不存在时作为可找回的独立会话显示。
 
 生命周期规则：
 
 - “移出房间”不删除历史，默认将该 Agent 变成普通独立会话。
 - “归档房间”逐 Agent 调用官方归档并使用 `allSettled` 汇总。
 - 部分失败时保留房间可见并显示可重试状态。
+- 归档、恢复、移出和删除 Provider 配置期间禁止把 missing/unavailable 自动解释成成功，所有部分失败都保留明确记录。
 - 备份 schema 升至 2，支持 v1 -> v2 迁移。
 - 导入副本必须清空全部 Agent 的 runtime/official 绑定，避免连接原官方会话。
 
@@ -219,6 +279,9 @@ interface RoomUserMessage {
 - [ ] 历史映射使用稳定 source identity。
 - [ ] ChatThread 投影房间用户消息和多个 Agent turn。
 - [ ] 展开状态与滚动锚点绑定永久 `agentTurnId`。
+- [ ] startup、running-sample、repair、undo 全部收口到同一个 Agent-scoped canonical reconcile 入口。
+- [ ] 结算门禁完全 Agent/turn 化，移除房间级运行状态对单个响应块的干扰。
+- [ ] 新房间消息不再使用文本+时间作为权威关联；歧义历史保留但不误绑。
 
 退出门禁：两 Agent 事件交错、ID 相同、同时运行和迟到 snapshot 均不串线、不重挂载。
 
@@ -229,6 +292,8 @@ interface RoomUserMessage {
 - [ ] 重启分别恢复每个 Agent 历史。
 - [ ] 图片引用、备份 schema 2、导入 ID 重映射和 tombstone。
 - [ ] 移出、归档、恢复和部分失败状态。
+- [ ] 添加 Agent 两阶段持久化、metadata 幂等找回和创建中崩溃恢复。
+- [ ] delivery 的 dispatch attempt、官方 prompt/message 绑定和 `indeterminate` 恢复。
 
 退出门禁：重启后侧栏仍只有一个房间，全部 Agent 绑定正确且孤儿历史可见。
 
@@ -239,6 +304,7 @@ interface RoomUserMessage {
 - [ ] 添加名称、mention、权限校验。
 - [ ] 普通会话原地升级；单 Agent UI 保持原样。
 - [ ] 第一小步只开放单接收者。
+- [ ] 内部 gate 默认关闭；已存在房间在 gate 关闭时只读可见，不丢数据。
 
 退出门禁：添加、重启、重命名、模型失效和移出均可恢复。
 
@@ -248,6 +314,7 @@ interface RoomUserMessage {
 - [ ] 房间 token 从模型 payload 中剥离。
 - [ ] 每 Agent delivery、placeholder、队列、重试和取消。
 - [ ] 多个 Agent 并发执行和固定响应块顺序。
+- [ ] 重启后对 `sending` delivery 先官方核验，不能自动重复投递。
 
 退出门禁：未点名 Agent 无上下文新增；忙碌 Agent 不阻塞空闲 Agent。
 
@@ -291,9 +358,13 @@ interface RoomUserMessage {
 - 两 Agent Assistant delta、toolCallId、requestId 和 terminal 隔离。
 - snapshot/undo 只更新所属 Agent。
 - 稳定 ID 重载不变。
+- 重复相同文本、相同秒级时间戳时仍按官方 prompt/message 身份准确关联。
+- 无法唯一关联的历史保持可见且不进入错误 turn。
 - Provider catalog 折叠与 orphan 可见。
 - `@` 路由、名称冲突和房间 token 清理。
 - per-Agent pending queue 和逐 delivery 状态。
+- 创建 Agent 在官方成功、本地绑定前崩溃后的 metadata 找回。
+- delivery 在发送后、确认前崩溃时进入 `indeterminate` 且不自动重发。
 - 备份 v1 -> v2、Agent ID 重映射和副本解绑。
 - Agent scoped approval、question、stop、undo、archive。
 
@@ -304,7 +375,9 @@ interface RoomUserMessage {
 - 两 Agent 同时流式执行。
 - 一个等待审批、另一个继续运行。
 - 一个 runtime 失败或 Server -> SDK 迁移、另一个完成。
+- 一个 Agent 已终态时立即显示自己的最终 usage，另一个仍运行不影响它；反向也成立。
 - 添加第二 Agent 后重启恢复。
+- 添加 Agent 和多目标发送的每个持久化/网络边界都做故障注入。
 - Provider 配置删除、Agent session missing、房间归档部分失败。
 - 多 Agent 输出期间历史展开和滚动稳定。
 
@@ -327,4 +400,26 @@ git diff --check
 - 不做破坏性 IndexedDB 版本迁移，不删除旧顶层字段。
 - 内部 gate 关闭时仅禁用新增和发送，已存在次要 Agent 保持只读可见。
 - 不把二级 Agent 历史静默隐藏或删除。
+- 回滚代码不得回滚或降级已写入的 schema 2 数据；旧版本无法识别时应保留原始记录并提示升级，而不是覆盖保存。
+- 网络状态不确定时回滚只改变本地可操作性，不自动取消、重发或删除官方 session。
 - UI 改动开始后，每轮同步版本号三处；最终发布只推 tag 触发 GitHub Actions。
+
+## 10. 当前实现审计与开放条件
+
+截至 2026-07-13，阶段 0-2 已独立提交；阶段 3 存在未提交实现，定向测试 4 个文件、95 项通过，但仍不得开放 UI。已知阻断项：
+
+1. `startup`、quiet running snapshot、后台 repair、official undo 还没有全部改用统一的 Agent-scoped canonical reconcile。
+2. ChatThread 的结算判断仍保留房间级 `isSessionRunning` 兼容门禁，必须验证某个 Agent 完成时不被另一个运行中的 Agent 延迟或污染最终 usage。
+3. 时间线投影对尚未显式绑定 delivery 的历史仍有“文本 + 30 秒窗口”回退；它只能服务旧数据迁移，不能成为新消息权威路径。
+4. compaction、session meta、迟到工具结果等无法关联 room message 的事件，需要定义保留和诊断呈现，不能静默丢失。
+5. 当前工作树已通过 66 个测试文件、459 项测试、生产构建、知识校验和 diff 检查；这些结果证明现有回归门禁未破坏，但不能替代前四项架构阻断条件。
+
+UI 开放必须同时满足以下 go/no-go gate：
+
+- 单 Agent 全量回归与当前发布行为一致。
+- 两 Agent 并发、终态、审批、提问、取消、迁移和 snapshot 故障注入不串线。
+- 添加 Agent、发送消息和重启恢复不存在自动重复创建或自动重复投递。
+- 官方目录折叠不会隐藏孤儿 session，也不会在侧栏重复显示已绑定 session。
+- schema 1/2 备份、导入副本解绑、Provider 缺失和部分归档失败均可恢复。
+- 内部 gate 关闭后，现有房间数据仍可只读展示，普通会话完全不出现协同 UI。
+- 用户完成空态、1/2/4 Agent、窄窗口、长名称和真实跨 Provider 审查验收。
