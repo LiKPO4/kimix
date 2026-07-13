@@ -5,15 +5,23 @@ import {
   archiveCollaborationRoom,
   archiveSessionOfficialFirst,
   getRelatedArchiveSessionIds,
+  type RoomAgentLifecycleOutcome,
   roomHasActiveAgentWork,
 } from "@/utils/sessionArchive";
 import { rememberArchivedSessionTombstone } from "@/utils/persistence";
+
+export type ArchiveSessionResult = {
+  success: boolean;
+  error?: string;
+  partial?: boolean;
+  outcomes?: RoomAgentLifecycleOutcome[];
+};
 
 export function useArchiveSession() {
   const archiveLocalSession = useSessionStore((state) => state.archiveSession);
   const updateSession = useSessionStore((state) => state.updateSession);
 
-  return useCallback(async (sessionId: string) => {
+  return useCallback(async (sessionId: string): Promise<ArchiveSessionResult> => {
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
     if (!session) return { success: false as const, error: "没有找到要归档的会话" };
     if (session.collaboration) {
@@ -38,10 +46,12 @@ export function useArchiveSession() {
         }
         const archived = useSessionStore.getState().sessions.find((item) => item.id === session.id);
         if (archived?.archivedAt) rememberArchivedSessionTombstone(archived);
-        return { success: true as const };
+        return { success: true, partial: false, outcomes: result.outcomes };
       }
       return {
-        success: false as const,
+        success: false,
+        partial: result.partial,
+        outcomes: result.outcomes,
         error: result.partial ? `房间仅部分归档：${result.error ?? "请重试失败的 Agent"}` : result.error ?? "房间归档失败",
       };
     }

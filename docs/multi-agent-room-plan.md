@@ -405,7 +405,7 @@ interface AgentDelivery {
 - [x] 搜索结果显示 Agent 名称/模型，点击选择来源 Agent 并稳定定位事件；全局次要 session 反向折叠到现有房间。
 - [x] Markdown 导出整个房间并标注接收者/说话者。
 - [x] 官方 ZIP 导出选择具体 Agent。
-- [ ] 归档/恢复逐 Agent 报告结果。
+- [x] 归档/恢复逐 Agent 报告结果。
 - [ ] 提供孤儿 session 找回路径。
 
 退出门禁：备份、重启、搜索、导出和部分失败路径全部通过。
@@ -541,6 +541,8 @@ git diff --check
 29. 阶段 8B 已让 Markdown 按房间展示时间线导出，用户消息保留实际接收者，Agent 输出保留名称/模型归属，头部列出 mention、Provider、模型与成员状态。
 30. 阶段 8B 的官方调试 ZIP 不再默认主 Agent：房间先通过原生对话框明确选择可导出 Agent，再以该 Agent 的 runtime/official session ID 调用既有 SDK/CLI 导出链路；普通会话流程保持不变。
 31. 阶段 8B 已通过 75 个测试文件、541 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-De8bjFy-.js`。额外 `tsc` 检查仍受仓库既有类型基线错误阻塞，本阶段新增类型错误已清理。
+32. 阶段 8C 将既有逐 Agent lifecycle outcome 贯通到侧栏、顶部会话菜单和设置归档恢复区；成功与失败 Agent 同时报告，部分失败继续保留可重试状态，Agent 选择器显示具体“归档失败/恢复失败”及错误提示。
+33. 阶段 8C 已通过 75 个测试文件、542 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CDdEAMyJ.js`。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

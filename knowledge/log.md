@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Room lifecycle outcomes remain visible per Agent**: Archive and restore surfaces list every attempted Agent success/failure, while partial failures keep operation-specific status and the official error on the failed participant for retry. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room exports preserve visible and official ownership boundaries**: Markdown includes the complete room timeline with recipients and Agent/model labels, while Kimi debug ZIP export requires an explicit Agent selection and exports only that Agent's official session. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room search indexes Agent partitions and folds runtime results**: Local matches expose Agent/model ownership and exact event focus, while global secondary runtime rows open their existing room instead of duplicating a session. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room notifications preserve Agent and turn identity**: Completion, question, and approval notifications include the Agent even with content preview disabled, and clicks select the owner Agent before focusing the exact timeline event/turn. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

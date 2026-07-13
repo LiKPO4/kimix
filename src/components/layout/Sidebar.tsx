@@ -20,6 +20,7 @@ import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder }
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { getHiddenHandoffSessionIds } from "@/utils/persistence";
 import { getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
+import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -956,6 +957,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           void archiveSession(s.id).then((result) => {
+                                            if (result.outcomes?.length) {
+                                              toast(`房间${formatRoomLifecycleOutcomes("archive", result.outcomes)}`);
+                                              if (!result.success) return;
+                                            }
                                             if (!result.success) {
                                               toast(`归档失败：${result.error}`);
                                               return;
@@ -967,7 +972,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                             if (runningSessionId === s.id || runningSessionId === s.runtimeSessionId) {
                                               setRunningSessionId(null);
                                             }
-                                            toast("已归档对话");
+                                            if (!result.outcomes?.length) toast("已归档对话");
                                           });
                                         }}
                                         className="kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
@@ -1005,7 +1010,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.31</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.15.32</span>
         </button>
       </div>
     </aside>

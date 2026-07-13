@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T22:30:07+08:00"
+timestamp: "2026-07-13T22:46:54+08:00"
 ---
 
 # Collaboration Room Routing
@@ -72,6 +72,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Unknown future collaboration schemas are read-only and retained verbatim; current code must not downgrade or overwrite them.
 * Removing a secondary Agent preserves its room partition, strips room-only scope from a copied independent history, transfers the runtime/official binding to that independent Session, and clears the removed room participant's binding. Runtime owner resolution ignores removed Agents so late events cannot be captured by the former room.
 * Room archive and restore execute every eligible Agent through `Promise.allSettled`. Per-Agent `archivedAt` and lifecycle errors survive restart; partial archive or restore keeps the room visible, and retries target only the remaining failed Agents. The room-level `archivedAt` is set only after every active participant is archived.
+* Archive and restore UI reports every attempted Agent outcome instead of collapsing the transaction into a room boolean. Partial failures retain an operation-specific status and durable error on the failed Agent so the result remains inspectable after transient notifications disappear.
 * Membership and archive mutations are blocked while any Agent is creating, queued, sending, accepted, running, waiting for approval, waiting for an answer, or has an indeterminate delivery. The gate consults both live activity and persisted delivery state so reload cannot bypass it.
 * Backup schema 2 serializes complete collaboration partitions and scoped Agent activity references, while schema 1 remains a single-Agent import format. Unknown future backup schemas and collaboration payloads with dangling or cross-Agent references are rejected instead of being normalized into partial rooms.
 * A conflict fork remaps the room ID, every Agent, message, turn, dispatch attempt, delivery key, event scope, pending-queue reference, activity reference, hidden-session reference, and active context as one transaction. The copy clears top-level and per-Agent runtime, official, catalog, Skill-fork, missing, recovery, Swarm, model-switch, and Goal bindings before it becomes visible.

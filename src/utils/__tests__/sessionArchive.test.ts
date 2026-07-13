@@ -4,6 +4,7 @@ import {
   archiveCollaborationRoom,
   archiveSessionOfficialFirst,
   detachRoomAgentAsSession,
+  formatRoomLifecycleOutcomes,
   getOfficialArchiveSessionId,
   getRelatedArchiveSessionIds,
   restoreCollaborationRoom,
@@ -85,6 +86,17 @@ function room(): Session {
 }
 
 describe("official-first session archive", () => {
+  it("逐 Agent 格式化归档与恢复结果", () => {
+    const outcomes = [
+      { roomAgentId: "primary", displayName: "Implementer", success: true },
+      { roomAgentId: "reviewer", displayName: "Reviewer", success: false, error: "Server unavailable" },
+    ];
+    expect(formatRoomLifecycleOutcomes("archive", outcomes))
+      .toBe("归档结果：Implementer：成功；Reviewer：失败（Server unavailable）");
+    expect(formatRoomLifecycleOutcomes("restore", []))
+      .toBe("恢复结果：没有需要操作的 Agent");
+  });
+
   it("归档所有共享同一官方 runtime id 的本地镜像", () => {
     const target = session({ id: "local-a", runtimeSessionId: "official-1" });
     const duplicate = session({ id: "local-b", officialSessionId: "official-1" });

@@ -22,7 +22,10 @@ function agentStatus(agent: RoomAgent, activity?: RoomAgentActivity) {
   if (activity?.status === "waiting_question") return { label: "待回答", tone: "text-accent-warning" };
   if (agent.provisioningError) return { label: "创建失败", tone: "text-accent-danger" };
   if (agent.recoveryIssue) return { label: agent.recoveryIssue.status === "unavailable" ? "模型不可用" : "恢复失败", tone: "text-accent-danger" };
-  if (agent.lifecycleIssue) return { label: "操作失败", tone: "text-accent-danger" };
+  if (agent.lifecycleIssue) return {
+    label: agent.lifecycleIssue.operation === "archive" ? "归档失败" : "恢复失败",
+    tone: "text-accent-danger",
+  };
   if (agent.archivedAt) return { label: "已归档", tone: "text-[var(--kimix-panel-text-muted)]" };
   if (!agent.runtimeSessionId && !agent.officialSessionId) return { label: "未连接", tone: "text-[var(--kimix-panel-text-muted)]" };
   return { label: "空闲", tone: "text-[var(--kimix-panel-text-muted)]" };
@@ -135,7 +138,7 @@ export function RoomAgentPicker({
                     }}
                     className="grid min-w-0 rounded-lg text-left transition-colors hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ gridTemplateColumns: "28px minmax(0, 1fr) 18px", gap: 9, minHeight: 48, paddingLeft: 8, paddingRight: 6 }}
-                    title={unavailable ? agent.provisioningError || agent.recoveryIssue?.message : `${selectedRow ? "取消" : "选择"} ${agent.displayName}`}
+                    title={agent.provisioningError || agent.recoveryIssue?.message || agent.lifecycleIssue?.message || `${selectedRow ? "取消" : "选择"} ${agent.displayName}`}
                   >
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)]">
                       <Bot size={14} />

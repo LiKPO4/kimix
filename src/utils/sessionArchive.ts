@@ -84,6 +84,19 @@ export type RoomLifecycleResult = {
   error?: string;
 };
 
+export function formatRoomLifecycleOutcomes(
+  operation: "archive" | "restore",
+  outcomes: RoomAgentLifecycleOutcome[],
+) {
+  const operationLabel = operation === "archive" ? "归档" : "恢复";
+  if (outcomes.length === 0) return `${operationLabel}结果：没有需要操作的 Agent`;
+  return `${operationLabel}结果：${outcomes.map((outcome) => (
+    outcome.success
+      ? `${outcome.displayName}：成功`
+      : `${outcome.displayName}：失败（${outcome.error ?? "未知错误"}）`
+  )).join("；")}`;
+}
+
 type OfficialLifecycleResult = { success: true; data?: unknown } | { success: false; error: string };
 
 async function runRoomLifecycle(

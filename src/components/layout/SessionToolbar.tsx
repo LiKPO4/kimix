@@ -36,6 +36,7 @@ import { sessionToMarkdown } from "@/utils/markdownExport";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { persistLocalActiveContext, persistLocalConversationState } from "@/utils/persistence";
 import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
+import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 
 export type SessionMenuEntry =
   | { type: "separator" }
@@ -208,12 +209,16 @@ export function SessionToolbar({
       return;
     }
     const result = await archiveSession(liveCurrentSession.id);
+    if (result.outcomes?.length) {
+      showToast(`房间${formatRoomLifecycleOutcomes("archive", result.outcomes)}`);
+      if (!result.success) return;
+    }
     if (!result.success) {
       showToast(`归档失败：${result.error}`);
       return;
     }
     setCurrentSession(null);
-    showToast("已归档对话");
+    if (!result.outcomes?.length) showToast("已归档对话");
   };
 
   const forkCurrentSession = async () => {
