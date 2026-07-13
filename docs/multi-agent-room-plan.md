@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-5 代码已完成，功能仍处于内部开发 gate；下一步先完成单目标真实重启/跨 Provider 实测，再进入阶段 6 的精确 mention 与多目标并行。
+状态：已批准实施。阶段 0-6 代码已完成，功能仍处于内部开发 gate；下一步进入阶段 7 的 Agent scoped 高级操作，再统一完成真实跨 Provider 与视觉验收。
 
 ## 1. 产品目标
 
@@ -381,11 +381,11 @@ interface AgentDelivery {
 
 ### 阶段 6：精确路由、多目标和独立队列
 
-- [ ] 房间 Agent mention 补全与确定性解析。
-- [ ] 房间 token 从模型 payload 中剥离。
-- [ ] 每 Agent delivery、placeholder、队列、重试和取消。
-- [ ] 多个 Agent 并发执行和固定响应块顺序。
-- [ ] 重启后对 `sending` delivery 先官方核验，不能自动重复投递。
+- [x] 房间 Agent mention 补全与确定性解析。
+- [x] 房间 token 从模型 payload 中剥离。
+- [x] 每 Agent delivery、placeholder、队列、重试和取消。
+- [x] 多个 Agent 并发执行和固定响应块顺序。
+- [x] 重启后对 `sending` delivery 先官方核验，不能自动重复投递。
 
 退出门禁：未点名 Agent 无上下文新增；忙碌 Agent 不阻塞空闲 Agent。
 
@@ -523,6 +523,8 @@ git diff --check
 12. 阶段 5 已接入 gated 添加弹层、模型/Provider 复用、创建失败重试、名称与 mention 编辑、单接收者选择、移出转独立会话和可靠单目标发送；房间运行期间禁止改变成员或创建尚未具备 Agent owner 的共享队列。
 13. 阶段 5 已通过 70 个测试文件、514 项测试、生产构建、OKF 校验和 diff check；仍需在真实应用中完成添加第二 Agent、重启恢复、跨 Provider 发送和视觉验收，gate 在此之前保持关闭。
 14. 阶段 6A 已建立纯数据路由和调度门禁：真实 Agent mention 大小写无关且按文本顺序去重，只有识别成功的房间 token 从 outbound payload 剥离；逐 Agent 调度器每次只取最早 queued，运行中或 indeterminate 的 Agent 不阻塞其他空闲 Agent。
+15. 阶段 6B 已把多选、mention 覆盖、并发投递和自动续发接入 Composer；queued 可逐 Agent 取消，failed/indeterminate 只经显式重试创建新 attempt，响应块顺序继续由冻结 recipient 顺序决定。
+16. 阶段 6 已通过 71 个测试文件、520 项测试、生产构建、OKF 校验和 diff check；真实双 Provider 并发与重启续发留到阶段 9 统一验收。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

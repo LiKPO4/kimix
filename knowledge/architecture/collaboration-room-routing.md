@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T19:14:00+08:00"
+timestamp: "2026-07-13T19:30:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -72,7 +72,9 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 
 * Single-Agent conversations do not show room controls.
 * The add-Agent and room-recipient controls are protected by a local development gate. With the gate closed, existing room data remains visible but read-only; ordinary sessions retain their existing composer and send path.
-* The first UI increment freezes exactly one recipient per room message. Busy rooms do not create an unowned shared queue, and Agent-scoped slash, Skill, Goal, permission, Plan, and Swarm mutations remain unavailable unless the selected owner is explicitly supported.
+* Room UI freezes an ordered recipient set per message before dispatch. Agent-scoped slash, Skill, Goal, permission, Plan, and Swarm mutations remain unavailable unless the selected owner is explicitly supported.
+* The multi-recipient UI stores an ordered default recipient set and exposes real Agent mention completion. Mentions may override that default for one message without mutating future defaults.
+* A queued response block names its Agent and can be cancelled without touching another delivery or the Agent's currently running activity. Failed and indeterminate attempts require an explicit retry action, which re-enters the same oldest-first dispatcher with a new audited turn identity.
 * Display name and mention edits change only the local room identity. They do not recreate the official session, replace the model, or inject a preset role into Agent context.
 * Multi-recipient response blocks are created in user-selected order and never reordered by later timestamps.
 * `agentTurnId` is the permanent render identity. New stream events, snapshots, and runtime migration may update content but may not remount an existing block.

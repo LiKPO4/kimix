@@ -83,6 +83,7 @@ function deliveryFallbackEvents(
     roomAgentId,
     roomMessageId: message.id,
     agentTurnId: delivery.agentTurnId,
+    roomDeliveryStatus: delivery.status,
   }];
 }
 

@@ -7,6 +7,7 @@ const ACTIVE_ACTIVITY_STATUSES = new Set([
   "creating",
   "queued",
   "sending",
+  "accepted",
   "running",
   "waiting_approval",
   "waiting_question",
@@ -30,20 +31,20 @@ function agentStatus(agent: RoomAgent, activity?: RoomAgentActivity) {
 export function RoomAgentPicker({
   session,
   activities,
-  selectedAgentId,
+  selectedAgentIds,
   busyAgentId,
   disabled,
-  onSelect,
+  onSelectionChange,
   onEdit,
   onRetry,
   onRemove,
 }: {
   session: Session;
   activities: Record<string, RoomAgentActivity>;
-  selectedAgentId: string;
+  selectedAgentIds: string[];
   busyAgentId?: string | null;
   disabled?: boolean;
-  onSelect: (roomAgentId: string) => void;
+  onSelectionChange: (roomAgentIds: string[]) => void;
   onEdit: (roomAgentId: string) => void;
   onRetry: (roomAgentId: string) => void;
   onRemove: (roomAgentId: string) => void;
@@ -52,12 +53,14 @@ export function RoomAgentPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const primaryAgentId = getPrimaryRoomAgent(session).id;
   const agents = session.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
-  const selected = agents.find((agent) => agent.id === selectedAgentId) ?? agents[0];
+  const selected = selectedAgentIds
+    .map((id) => agents.find((agent) => agent.id === id))
+    .filter((agent): agent is RoomAgent => Boolean(agent));
   const roomBusy = agents.some((agent) => {
     const activity = activities[roomAgentActivityKey(session.id, agent.id)];
     return Boolean(activity && ACTIVE_ACTIVITY_STATUSES.has(activity.status));
   }) || Boolean(session.collaboration?.messages.some((message) => Object.values(message.deliveries).some((delivery) => (
-    ["queued", "sending", "accepted", "running", "waiting_approval", "waiting_question"].includes(delivery.status)
+    ["queued", "sending", "accepted", "running", "waiting_approval", "waiting_question", "indeterminate"].includes(delivery.status)
   ))));
 
   useEffect(() => {
@@ -70,8 +73,8 @@ export function RoomAgentPicker({
 
   useEffect(() => setOpen(false), [session.id]);
 
-  if (!selected || agents.length < 2) return null;
-  const selectedStatus = agentStatus(selected, activities[roomAgentActivityKey(session.id, selected.id)]);
+  if (selected.length === 0 || agents.length < 2) return null;
+  const selectedLabel = selected.length === 1 ? selected[0].displayName : `${selected[0].displayName} 等 ${selected.length} 个`;
 
   return (
     <div ref={rootRef} className="relative min-w-0 shrink">
@@ -80,13 +83,13 @@ export function RoomAgentPicker({
         onClick={() => setOpen((value) => !value)}
         disabled={disabled}
         className="kimix-icon-text-button kimix-muted-action is-compact max-w-[210px] min-w-0 disabled:cursor-not-allowed disabled:opacity-40"
-        title={`发送给 ${selected.displayName}`}
+        title={`默认发送给 ${selected.map((agent) => agent.displayName).join("、")}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         <Bot size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-        <span className="min-w-0 truncate">{selected.displayName}</span>
-        <span className={`shrink-0 text-[11.5px] ${selectedStatus.tone}`}>{selectedStatus.label}</span>
+        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <span className="shrink-0 text-[11.5px] text-[var(--kimix-panel-text-muted)]">{selected.length} 个</span>
         <ChevronDown size={12} className="shrink-0" />
       </button>
 
@@ -100,7 +103,7 @@ export function RoomAgentPicker({
             <div className="min-w-0">
               <div className="text-[13.5px] font-medium text-[var(--kimix-panel-text)]">本轮接收者</div>
               <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 3 }}>
-                第一版每次只发送给一个 Agent。
+                可多选；正文中的 @Agent 会覆盖这里的默认选择。
               </div>
             </div>
             <span className="shrink-0 text-[11.5px] leading-5 text-[var(--kimix-panel-text-muted)]">{agents.length}/4</span>
@@ -110,7 +113,7 @@ export function RoomAgentPicker({
             {agents.map((agent) => {
               const activity = activities[roomAgentActivityKey(session.id, agent.id)];
               const status = agentStatus(agent, activity);
-              const selectedRow = agent.id === selected.id;
+              const selectedRow = selected.some((candidate) => candidate.id === agent.id);
               const unavailable = Boolean(agent.archivedAt || agent.provisioningError || agent.recoveryIssue);
               const actionBusy = busyAgentId === agent.id;
               return (
@@ -121,16 +124,18 @@ export function RoomAgentPicker({
                 >
                   <button
                     type="button"
-                    role="menuitemradio"
+                    role="menuitemcheckbox"
                     aria-checked={selectedRow}
-                    disabled={unavailable || roomBusy || Boolean(busyAgentId)}
+                    disabled={(unavailable && !selectedRow) || Boolean(busyAgentId)}
                     onClick={() => {
-                      onSelect(agent.id);
-                      setOpen(false);
+                      const next = selectedRow
+                        ? selectedAgentIds.filter((id) => id !== agent.id)
+                        : [...selectedAgentIds, agent.id];
+                      if (next.length > 0) onSelectionChange(next);
                     }}
                     className="grid min-w-0 rounded-lg text-left transition-colors hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ gridTemplateColumns: "28px minmax(0, 1fr) 18px", gap: 9, minHeight: 48, paddingLeft: 8, paddingRight: 6 }}
-                    title={unavailable ? agent.provisioningError || agent.recoveryIssue?.message : `发送给 ${agent.displayName}`}
+                    title={unavailable ? agent.provisioningError || agent.recoveryIssue?.message : `${selectedRow ? "取消" : "选择"} ${agent.displayName}`}
                   >
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)]">
                       <Bot size={14} />
@@ -192,7 +197,7 @@ export function RoomAgentPicker({
 
           {roomBusy && (
             <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 12, paddingLeft: 2, paddingRight: 2 }}>
-              Agent 工作期间暂不切换接收者或调整成员。
+              运行中的 Agent 会独立排队；编辑、重试和移出成员仍需等待房间空闲。
             </div>
           )}
         </div>

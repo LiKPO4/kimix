@@ -23,6 +23,7 @@ import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import {
   getPrimaryRoomAgent,
+  getRoomAgent,
   getRoomAgentEvents,
   getRoomAgentRuntimeId,
   roomAgentActivityKey,
@@ -1850,6 +1851,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
+  const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
+  const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
+  const roomDelivery = roomSession?.collaboration?.messages
+    .find((message) => message.id === event.roomMessageId)
+    ?.deliveries[event.roomAgentId ?? ""];
+  const roomDeliveryStatus = event.roomDeliveryStatus ?? roomDelivery?.status;
   const displayContent = restoreAssistantProgressParagraphs(event.content);
   const hasContent = displayContent.trim().length > 0;
   const changedSet = new Set(changedFiles.map((f) => normalizePathForComparison(f)));
@@ -1890,6 +1897,43 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const footerFallbackLabel = assistantFooterFallbackLabel(event, isActiveAssistant);
   const processToBodyGap = processDisplayMode === "kimi-web" && !hideProcessSummary && shouldShowBodyFooter ? 12 : 20;
 
+  if (roomDeliveryStatus === "queued" && event.roomAgentId && event.roomMessageId) {
+    return (
+      <div className="group flex justify-start" style={{ paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
+        <div
+          className="kimix-soft-card grid w-full items-center rounded-xl text-[13px] text-[var(--kimix-panel-text-secondary)]"
+          style={{ gridTemplateColumns: "30px minmax(0, 1fr) auto", gap: 10, minHeight: 50, padding: "9px 12px 9px 14px" }}
+        >
+          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)]">
+            <Bot size={15} />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-[var(--kimix-panel-text)]">{roomAgent?.displayName ?? "Agent"}</span>
+            <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">等待该 Agent 当前任务结束后自动发送</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("kimix:room-delivery-action", {
+              detail: { action: "cancel", sessionId, roomMessageId: event.roomMessageId, roomAgentId: event.roomAgentId },
+            }))}
+            className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
+            style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}
+          >
+            取消排队
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const processLabel = (
+    <span className="inline-flex min-w-0 items-center" style={{ gap: 6 }}>
+      {roomAgent && <span className="shrink-0 font-medium text-[var(--kimix-panel-text)]">{roomAgent.displayName}</span>}
+      {roomAgent && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">·</span>}
+      <AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />
+    </span>
+  );
+
   return (
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: processToBodyGap }}>
@@ -1901,7 +1945,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             approvals={leadingApprovals}
             displayMode={processDisplayMode}
             expandByDefault={expandProcessByDefault}
-            label={<AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />}
+            label={processLabel}
           />
         )}
 

@@ -318,6 +318,8 @@ export interface RoomEventScope {
   agentTurnId?: string;
   /** 用户消息的实际房间接收者。 */
   recipientAgentIds?: string[];
+  /** 仅用于房间时间线投影的 delivery 状态提示。 */
+  roomDeliveryStatus?: RoomAgentDeliveryStatus;
 }
 
 export type TimelineEvent = (

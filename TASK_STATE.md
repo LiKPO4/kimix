@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；完成阶段 0-4 的 Agent 身份、runtime owner、事件/历史分区、可靠 provisioning/delivery、目录折叠、恢复、备份和部分失败生命周期事务；完成阶段 5A 创建/结算底座；完成阶段 5B gated Composer UI，`+` 菜单复用现有模型/Provider 目录添加 Agent，支持失败重试、名称与 mention 编辑、单接收者选择、移出转独立会话，房间普通消息统一走可靠 delivery，快速 runtime 状态不会把 delivery 回退，运行期间拒绝尚无 owner 的共享队列和成员变更；完成阶段 6A 确定性路由与调度底座，真实房间 mention 按文本顺序精确解析，只有已识别 Agent token 会从冻结 outbound payload 中剥离，逐 Agent 调度器只选择最早 queued，忙碌或 indeterminate 的 Agent 不阻塞其他空闲 Agent；版本保持 v2.15.23。
-- 未完成：阶段 6B 多选 UI、并发投递、自动续发和显式重试/取消；阶段 5/6 真实应用添加、重启、跨 Provider 与视觉验收；Agent scoped 操作；搜索/导出以及最终发布验收。
+- 已完成：完成阶段 0-4 的 Agent 身份、runtime owner、事件/历史分区、可靠 provisioning/delivery、目录折叠、恢复、备份和部分失败生命周期事务；完成阶段 5 的 gated 添加、恢复、编辑、移出和单目标 UI；完成阶段 6 精确路由、多目标与独立队列，真实 Agent mention 覆盖多选默认接收者，路由 token 只从 outbound payload 剥离，空闲 Agent 并发、忙碌 Agent 独立排队并在终态后自动续发，queued 可取消，失败/不确定仅显式重试，多响应块保持 recipient 顺序；版本三处同步到 v2.15.24；全量 71 个测试文件、520 项测试、生产构建、OKF 校验和 diff check 通过。
+- 未完成：阶段 7 Agent scoped 审批、提问、停止、Steer、模型/权限/Plan/Goal/Swarm、撤回与通知；阶段 8 搜索/导出/孤儿找回；阶段 9 真实跨 Provider、并发、视觉和性能验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
 - 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：提交阶段 6A；随后让 Composer 使用真实 Agent mention 补全和多选接收者，按逐 Agent 调度器并发发送并在各自终态后自动续发队列。
+- 下一步：完成 v2.15.24 全量验证并提交；随后进入阶段 7，把审批、提问、停止、Steer 和所有 session mutation 明确绑定到事件所属 Agent runtime。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
 

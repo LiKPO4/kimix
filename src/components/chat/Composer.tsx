@@ -28,7 +28,7 @@ import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents, roomAgentActivityKey } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import {
   bindRecoveredRoomAgentRuntime,
@@ -46,7 +46,14 @@ import {
   renameRoomAgent,
   type RoomAgentDraft,
 } from "@/utils/roomAgentProvisioning";
-import { createRoomMessageDispatch, dispatchQueuedRoomDelivery } from "@/utils/roomDelivery";
+import {
+  cancelQueuedRoomDelivery,
+  createRoomMessageDispatch,
+  dispatchQueuedRoomDelivery,
+  getDispatchableRoomDeliveries,
+  retryRoomDelivery,
+} from "@/utils/roomDelivery";
+import { resolveRoomPromptRoute } from "@/utils/roomRouting";
 import { detachRoomAgentAsSession, roomHasActiveAgentWork } from "@/utils/sessionArchive";
 
 function genId(): string {
@@ -451,6 +458,7 @@ export function Composer() {
   const inputRef = useRef<ComposerInputHandle>(null);
   const completionListRef = useRef<HTMLDivElement>(null);
   const completionItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const roomDispatchingRef = useRef(new Set<string>());
 
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
@@ -512,22 +520,33 @@ export function Composer() {
   const multiAgentRoomUiEnabled = isMultiAgentRoomUiEnabled();
   const activeRoomAgents = activeSession?.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
   const activeRoomPrimary = activeSession ? getPrimaryRoomAgent(activeSession) : null;
-  const selectedRoomAgent = activeSession?.collaboration
-    ? activeRoomAgents.find((agent) => agent.id === activeSession.collaboration?.focusedAgentId)
-      ?? activeRoomAgents.find((agent) => activeSession.collaboration?.defaultRecipientIds.includes(agent.id))
-      ?? activeRoomPrimary
-    : null;
-  const selectedRoomAgentId = selectedRoomAgent?.id ?? activeRoomPrimary?.id;
+  const selectedRoomAgentIds = activeSession?.collaboration
+    ? Array.from(new Set(activeSession.collaboration.defaultRecipientIds.filter((id) => activeRoomAgents.some((agent) => agent.id === id))))
+    : [];
+  if (activeSession?.collaboration && selectedRoomAgentIds.length === 0) {
+    const fallbackId = activeSession.collaboration.focusedAgentId ?? activeRoomPrimary?.id;
+    if (fallbackId) selectedRoomAgentIds.push(fallbackId);
+  }
+  const selectedRoomAgents = selectedRoomAgentIds
+    .map((id) => activeRoomAgents.find((agent) => agent.id === id))
+    .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent));
   const activeRoomBusy = Boolean(activeSession?.collaboration && roomHasActiveAgentWork(
     activeSession,
     Object.values(roomAgentActivities),
   ));
+  const activeRoomDispatchSignature = activeSession?.collaboration
+    ? activeSession.collaboration.messages.flatMap((message) => message.recipientAgentIds.map((agentId) => (
+        `${message.id}:${agentId}:${message.deliveries[agentId]?.status ?? "missing"}`
+      ))).join("|") + "::" + activeRoomAgents.map((agent) => {
+        const activity = roomAgentActivities[roomAgentActivityKey(activeSession.id, agent.id)];
+        return `${agent.id}:${activity?.status ?? "idle"}:${agent.runtimeSessionId ?? agent.officialSessionId ?? "none"}`;
+      }).join("|")
+    : "";
   const roomReadOnly = Boolean(activeSession?.collaboration && !multiAgentRoomUiEnabled);
   const selectedSecondaryRoomAgent = Boolean(
-    activeSession?.collaboration && selectedRoomAgentId && selectedRoomAgentId !== activeSession.collaboration.primaryAgentId,
-  );
-  const selectedRoomAgentUnavailable = Boolean(
-    selectedRoomAgent?.archivedAt || selectedRoomAgent?.provisioningError || selectedRoomAgent?.recoveryIssue,
+    activeSession?.collaboration && (
+      selectedRoomAgentIds.length !== 1 || selectedRoomAgentIds[0] !== activeSession.collaboration.primaryAgentId
+    ),
   );
   const editingRoomAgent = activeSession && editingRoomAgentId
     ? getRoomAgent(activeSession, editingRoomAgentId)
@@ -538,7 +557,7 @@ export function Composer() {
   const activeRuntimeSessionId = activeSession ? getRuntimeSessionId(activeSession) : undefined;
   const isCurrentSessionRunning = isSessionRuntimeRunning(activeSession, runningSessionId);
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
-  const hasActiveAssistantTurn = isCurrentSessionRunning || activeRoomBusy;
+  const hasActiveAssistantTurn = isCurrentSessionRunning;
   const swarmModeEnabled = displayedSwarmMode(activeSession ?? undefined);
   const swarmModePending = hasPendingSwarmMode(activeSession ?? undefined);
   const canSteerActiveTurn = Boolean(
@@ -699,7 +718,18 @@ export function Composer() {
       })
     : [];
   const roomAwareMentionBaseItems = activeSession?.collaboration
-    ? mentionBaseItems.filter((item) => item.kind !== "agent")
+    ? [
+        ...activeRoomAgents
+          .filter((agent) => !agent.archivedAt && !agent.provisioningError && !agent.recoveryIssue)
+          .map((agent): CompletionItem => ({
+            id: `room-agent-${agent.id}`,
+            label: agent.displayName,
+            detail: `@${agent.mentionName} · ${agent.modelLabelSnapshot || agent.modelAlias || "模型未知"}`,
+            insertText: `@${agent.mentionName} `,
+            kind: "agent",
+          })),
+        ...mentionBaseItems.filter((item) => item.kind !== "agent"),
+      ]
     : mentionBaseItems;
   const filteredMentionBaseItems = activeCompletion?.mode === "mention"
     ? roomAwareMentionBaseItems.filter((item) => {
@@ -978,153 +1008,210 @@ export function Composer() {
     return resumed.data.sessionId;
   };
 
-  const sendSingleRoomPrompt = async (
+  const dispatchRoomDeliveryTarget = async (roomId: string, roomMessageId: string, roomAgentId: string) => {
+    const dispatchKey = `${roomId}:${roomAgentId}`;
+    if (roomDispatchingRef.current.has(dispatchKey)) return;
+    roomDispatchingRef.current.add(dispatchKey);
+    try {
+      const initial = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+      const message = initial?.collaboration?.messages.find((candidate) => candidate.id === roomMessageId);
+      const agent = initial ? getRoomAgent(initial, roomAgentId) : undefined;
+      if (!initial || !message || !agent) return;
+      let runtimeSessionId = agent.runtimeSessionId ?? agent.officialSessionId;
+      const promptImages = (message.images ?? [])
+        .filter((image): image is typeof image & { dataUrl: string } => Boolean(image.dataUrl))
+        .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+      const result = await dispatchQueuedRoomDelivery({
+        roomMessageId,
+        roomAgentId,
+        getSession: () => useSessionStore.getState().sessions.find((session) => session.id === roomId) ?? initial,
+        setSession: (next) => {
+          updateSession(roomId, () => next);
+          syncCurrentSessionFromStore(roomId);
+        },
+        persist: async () => persistLocalConversationState(),
+        send: async ({ delivery }) => {
+          if (!runtimeSessionId) {
+            try {
+              runtimeSessionId = await resumeRoomAgentForPrompt(roomId, roomAgentId);
+            } catch (error) {
+              return { success: false as const, certainty: "not-sent" as const, error: error instanceof Error ? error.message : String(error) };
+            }
+          }
+          setRoomAgentActivity({
+            roomId,
+            roomAgentId,
+            runtimeSessionId,
+            status: "sending",
+            roomMessageId,
+            activeTurnId: delivery.agentTurnId,
+            startedAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          let response = await sendKimiCodePromptWithRetry({
+            sessionId: runtimeSessionId,
+            content: message.outboundContent ?? message.content,
+            images: promptImages,
+          });
+          if (!response.success && /not active|not found|session/i.test(response.error)) {
+            try {
+              runtimeSessionId = await resumeRoomAgentForPrompt(roomId, roomAgentId);
+            } catch (error) {
+              return { success: false as const, certainty: "not-sent" as const, error: error instanceof Error ? error.message : String(error) };
+            }
+            setRoomAgentActivity({
+              roomId,
+              roomAgentId,
+              runtimeSessionId,
+              status: "sending",
+              roomMessageId,
+              activeTurnId: delivery.agentTurnId,
+              startedAt: Date.now(),
+              updatedAt: Date.now(),
+            });
+            response = await sendKimiCodePromptWithRetry({
+              sessionId: runtimeSessionId,
+              content: message.outboundContent ?? message.content,
+              images: promptImages,
+            });
+          }
+          if (!response.success) {
+            return {
+              success: false as const,
+              certainty: isKimiActiveTurnError(response.error) || /not active|not found/i.test(response.error)
+                ? "not-sent" as const
+                : "unknown" as const,
+              error: response.error,
+            };
+          }
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route)}`,
+          }));
+          return { success: true as const };
+        },
+      });
+      if (!result.success) {
+        const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+        const delivery = latest?.collaboration?.messages.find((candidate) => candidate.id === roomMessageId)?.deliveries[roomAgentId];
+        if (delivery?.status === "queued") {
+          setRoomAgentActivity({
+            roomId,
+            roomAgentId,
+            runtimeSessionId,
+            status: "queued",
+            roomMessageId,
+            activeTurnId: delivery.agentTurnId,
+            updatedAt: Date.now(),
+          });
+        } else {
+          setRoomAgentActivity({
+            roomId,
+            roomAgentId,
+            runtimeSessionId,
+            status: "error",
+            roomMessageId,
+            activeTurnId: delivery?.agentTurnId,
+            updatedAt: Date.now(),
+          });
+        }
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `发送给 ${agent.displayName} 失败：${result.error}` }));
+      }
+    } finally {
+      roomDispatchingRef.current.delete(dispatchKey);
+    }
+  };
+
+  const dispatchAvailableRoomDeliveries = async (roomId: string) => {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
+    if (!latest?.collaboration) return;
+    const targets = getDispatchableRoomDeliveries(latest, Object.values(useAppStore.getState().roomAgentActivities))
+      .filter((target) => !roomDispatchingRef.current.has(`${roomId}:${target.roomAgentId}`));
+    await Promise.all(targets.map((target) => dispatchRoomDeliveryTarget(roomId, target.roomMessageId, target.roomAgentId)));
+  };
+
+  const sendRoomPrompt = async (
     session: Session,
-    roomAgentId: string,
     content: string,
     options?: { images?: ImageAttachment[]; manualSubmitAutoScroll?: boolean; skipClarification?: boolean },
   ) => {
-    const agent = getRoomAgent(session, roomAgentId);
-    if (!agent || agent.removedAt || agent.archivedAt) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "目标 Agent 不存在、已移出或已归档。" }));
-      return false;
-    }
-    if (agent.provisioningError || agent.recoveryIssue) {
+    const images = options?.images ?? [];
+    const route = resolveRoomPromptRoute(session, content, session.collaboration?.defaultRecipientIds);
+    const recipients = route.recipientAgentIds.map((id) => getRoomAgent(session, id));
+    const unavailable = recipients.find((agent) => !agent || agent.provisioningError || agent.recoveryIssue || agent.archivedAt || agent.removedAt);
+    if (unavailable) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: agent.provisioningError || agent.recoveryIssue?.message || "目标 Agent 当前不可用。",
+        detail: unavailable?.provisioningError || unavailable?.recoveryIssue?.message || "至少一个目标 Agent 当前不可用。",
       }));
       return false;
     }
-    const images = options?.images ?? [];
-    const contentWithAttachments = buildAttachmentPromptContent(content, images);
+    if (!route.outboundContent.trim() && images.length === 0) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "请在 @Agent 之后输入要处理的任务。" }));
+      return false;
+    }
+    const contentWithAttachments = buildAttachmentPromptContent(route.outboundContent, images);
     const outboundContent = session.longTask || options?.skipClarification
       ? contentWithAttachments
       : withClarificationBehavior(contentWithAttachments, clarificationToolMode);
     const created = createRoomMessageDispatch(session, {
       content,
+      outboundContent,
       images: toUserAttachments(images),
-      recipientAgentIds: [roomAgentId],
+      recipientAgentIds: route.recipientAgentIds,
     });
-    const baseSession = session;
-    const roomMessageId = created.message.id;
-    const delivery = created.message.deliveries[roomAgentId];
     updateSession(session.id, () => created.session);
     syncCurrentSessionFromStore(session.id);
-    setRoomAgentActivity({
-      roomId: session.id,
-      roomAgentId,
-      runtimeSessionId: agent.runtimeSessionId ?? agent.officialSessionId,
-      status: "queued",
-      roomMessageId,
-      activeTurnId: delivery.agentTurnId,
-      updatedAt: Date.now(),
-    });
     if (options?.manualSubmitAutoScroll !== false) {
-      window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
-        detail: { sessionId: session.id },
-      }));
+      window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", { detail: { sessionId: session.id } }));
     }
-
-    let runtimeSessionId = agent.runtimeSessionId ?? agent.officialSessionId;
-    const result = await dispatchQueuedRoomDelivery({
-      roomMessageId,
-      roomAgentId,
-      getSession: () => useSessionStore.getState().sessions.find((candidate) => candidate.id === session.id) ?? created.session,
-      setSession: (next) => {
-        updateSession(session.id, () => next);
-        syncCurrentSessionFromStore(session.id);
-      },
-      persist: async () => persistLocalConversationState(),
-      send: async ({ delivery: currentDelivery }) => {
-        if (!runtimeSessionId) {
-          try {
-            runtimeSessionId = await resumeRoomAgentForPrompt(session.id, roomAgentId);
-          } catch (error) {
-            return {
-              success: false as const,
-              certainty: "not-sent" as const,
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-        }
-        setRoomAgentActivity({
-          roomId: session.id,
-          roomAgentId,
-          runtimeSessionId,
-          status: "sending",
-          roomMessageId,
-          activeTurnId: currentDelivery.agentTurnId,
-          startedAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        let response = await sendKimiCodePromptWithRetry({
-          sessionId: runtimeSessionId,
-          content: outboundContent,
-          images: toPromptImages(images),
-        });
-        if (!response.success && /not active|not found|session/i.test(response.error)) {
-          try {
-            runtimeSessionId = await resumeRoomAgentForPrompt(session.id, roomAgentId);
-          } catch (error) {
-            return {
-              success: false as const,
-              certainty: "not-sent" as const,
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-          setRoomAgentActivity({
-            roomId: session.id,
-            roomAgentId,
-            runtimeSessionId,
-            status: "sending",
-            roomMessageId,
-            activeTurnId: currentDelivery.agentTurnId,
-            startedAt: Date.now(),
-            updatedAt: Date.now(),
-          });
-          response = await sendKimiCodePromptWithRetry({
-            sessionId: runtimeSessionId,
-            content: outboundContent,
-            images: toPromptImages(images),
-          });
-        }
-        if (!response.success) {
-          return {
-            success: false as const,
-            certainty: isKimiActiveTurnError(response.error) || /not active|not found/i.test(response.error)
-              ? "not-sent" as const
-              : "unknown" as const,
-            error: response.error,
-          };
-        }
-        window.dispatchEvent(new CustomEvent("kimix:toast", {
-          detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route)}`,
-        }));
-        return { success: true as const };
-      },
-    });
-
-    if (!result.success) {
-      if (result.error.startsWith("queued 状态保存失败")) {
-        updateSession(session.id, () => baseSession);
-        syncCurrentSessionFromStore(session.id);
-        removeRoomAgentActivity(session.id, roomAgentId);
-      } else {
-        setRoomAgentActivity({
-          roomId: session.id,
-          roomAgentId,
-          runtimeSessionId,
-          status: "error",
-          roomMessageId,
-          activeTurnId: delivery.agentTurnId,
-          updatedAt: Date.now(),
-        });
-      }
-      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `发送给 ${agent.displayName} 失败：${result.error}` }));
-      return false;
-    }
+    await dispatchAvailableRoomDeliveries(session.id);
     return true;
   };
+
+  useEffect(() => {
+    if (!multiAgentRoomUiEnabled || !activeSession?.collaboration) return;
+    void dispatchAvailableRoomDeliveries(activeSession.id);
+  }, [activeRoomDispatchSignature, activeSession?.id, multiAgentRoomUiEnabled]);
+
+  useEffect(() => {
+    const handleRoomDeliveryAction = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        action?: "cancel" | "retry";
+        sessionId?: string;
+        roomMessageId?: string;
+        roomAgentId?: string;
+      }>).detail;
+      if (!detail?.action || !detail.sessionId || !detail.roomMessageId || !detail.roomAgentId) return;
+      void (async () => {
+        const previous = useSessionStore.getState().sessions.find((session) => session.id === detail.sessionId);
+        if (!previous?.collaboration) return;
+        try {
+          const next = detail.action === "cancel"
+            ? cancelQueuedRoomDelivery(previous, detail.roomMessageId!, detail.roomAgentId!)
+            : retryRoomDelivery(previous, detail.roomMessageId!, detail.roomAgentId!);
+          updateSession(previous.id, () => next);
+          const activity = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(previous.id, detail.roomAgentId!)];
+          if (!activity || activity.roomMessageId === detail.roomMessageId) {
+            removeRoomAgentActivity(previous.id, detail.roomAgentId!);
+          }
+          syncCurrentSessionFromStore(previous.id);
+          const persisted = await persistLocalConversationState();
+          if (!persisted.success) {
+            updateSession(previous.id, () => previous);
+            syncCurrentSessionFromStore(previous.id);
+            await persistLocalConversationState();
+            throw new Error(persisted.error);
+          }
+          if (detail.action === "retry") await dispatchAvailableRoomDeliveries(previous.id);
+        } catch (error) {
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `${detail.action === "retry" ? "重试" : "取消排队"}失败：${error instanceof Error ? error.message : String(error)}`,
+          }));
+        }
+      })();
+    };
+    window.addEventListener("kimix:room-delivery-action", handleRoomDeliveryAction);
+    return () => window.removeEventListener("kimix:room-delivery-action", handleRoomDeliveryAction);
+  }, [removeRoomAgentActivity, updateSession]);
 
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
@@ -1132,10 +1219,7 @@ export function Composer() {
     let targetSession = ensuredSession;
     const images = options?.images ?? [];
     if (multiAgentRoomUiEnabled && targetSession.collaboration) {
-      const targetAgentId = targetSession.collaboration.focusedAgentId
-        ?? targetSession.collaboration.defaultRecipientIds[0]
-        ?? targetSession.collaboration.primaryAgentId;
-      return sendSingleRoomPrompt(targetSession, targetAgentId, content, {
+      return sendRoomPrompt(targetSession, content, {
         images,
         manualSubmitAutoScroll: options?.manualSubmitAutoScroll,
         skipClarification: options?.skipClarification,
@@ -1682,18 +1766,19 @@ export function Composer() {
     }
   };
 
-  const handleSelectRoomAgent = async (roomAgentId: string) => {
-    if (!activeSession?.collaboration || activeRoomBusy) return;
+  const handleSelectRoomAgents = async (roomAgentIds: string[]) => {
+    if (!activeSession?.collaboration || roomAgentIds.length === 0) return;
     const previous = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id);
     if (!previous?.collaboration) return;
-    const agent = getRoomAgent(previous, roomAgentId);
-    if (!agent || agent.removedAt || agent.archivedAt || agent.provisioningError || agent.recoveryIssue) return;
+    const uniqueIds = Array.from(new Set(roomAgentIds));
+    const agents = uniqueIds.map((id) => getRoomAgent(previous, id));
+    if (agents.some((agent) => !agent || agent.removedAt || agent.archivedAt || agent.provisioningError || agent.recoveryIssue)) return;
     updateSession(previous.id, (session) => ({
       ...session,
       collaboration: session.collaboration ? {
         ...session.collaboration,
-        focusedAgentId: roomAgentId,
-        defaultRecipientIds: [roomAgentId],
+        focusedAgentId: uniqueIds.length === 1 ? uniqueIds[0] : session.collaboration.focusedAgentId,
+        defaultRecipientIds: uniqueIds,
       } : session.collaboration,
       updatedAt: Date.now(),
     }));
@@ -2378,25 +2463,34 @@ export function Composer() {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
-    if (activeSession?.collaboration && activeRoomBusy) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "当前房间仍有 Agent 在工作；单目标阶段暂不创建跨 Agent 队列。",
-      }));
-      return;
-    }
-    if (activeSession?.collaboration && selectedRoomAgentUnavailable) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: selectedRoomAgent?.provisioningError || selectedRoomAgent?.recoveryIssue?.message || "当前接收者不可用，请先恢复或切换 Agent。",
-      }));
-      return;
-    }
     if (activeSession?.collaboration && trimmed.startsWith("/")) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: "房间内的 Slash / Skill / Goal 等会话操作需要明确 Agent owner，当前阶段暂不执行。",
       }));
       return;
     }
-    if (hasActiveAssistantTurn && currentSession) {
+    if (activeSession?.collaboration) {
+      try {
+        const route = resolveRoomPromptRoute(activeSession, trimmed, activeSession.collaboration.defaultRecipientIds);
+        const unavailable = route.recipientAgentIds
+          .map((id) => getRoomAgent(activeSession, id))
+          .find((agent) => !agent || agent.provisioningError || agent.recoveryIssue || agent.archivedAt || agent.removedAt);
+        if (unavailable) {
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: unavailable?.provisioningError || unavailable?.recoveryIssue?.message || "至少一个目标 Agent 当前不可用。",
+          }));
+          return;
+        }
+        if (!route.outboundContent.trim() && imagesToSend.length === 0) {
+          window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "请在 @Agent 之后输入要处理的任务。" }));
+          return;
+        }
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: error instanceof Error ? error.message : String(error) }));
+        return;
+      }
+    }
+    if (hasActiveAssistantTurn && currentSession && !currentSession.collaboration) {
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
@@ -3048,12 +3142,8 @@ export function Composer() {
 
   const placeholder = roomReadOnly
     ? "多 Agent 房间功能当前处于只读 gate"
-    : activeRoomBusy && activeSession?.collaboration
-      ? "当前房间 Agent 正在工作"
-      : selectedRoomAgentUnavailable && selectedRoomAgent
-        ? `${selectedRoomAgent.displayName} 当前不可用，请从接收者菜单恢复或切换`
-      : selectedRoomAgent && activeSession?.collaboration
-        ? `发送给 ${selectedRoomAgent.displayName}`
+    : selectedRoomAgents.length > 0 && activeSession?.collaboration
+      ? `默认发送给 ${selectedRoomAgents.map((agent) => agent.displayName).join("、")}；@Agent 可临时覆盖`
         : canUseComposer
           ? "向 Agent 询问任何事。输入 @ 使用插件或提及文件"
     : isCurrentSessionHandoff
@@ -3073,7 +3163,7 @@ export function Composer() {
     : goalStatus === "paused"
       ? "text-accent-warning"
       : "text-accent-primary";
-  const canSendNow = canUseComposer && !activeRoomBusy && !selectedRoomAgentUnavailable && (input.trim().length > 0 || imageAttachments.length > 0);
+  const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
   const hideComposerCard = (card: ComposerDockCard, label: string) => {
     setComposerCardHidden(composerCardSessionId, card, true);
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
@@ -3640,14 +3730,14 @@ export function Composer() {
               )}
             </div>
 
-            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentId && (
+            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
               <RoomAgentPicker
                 session={activeSession}
                 activities={roomAgentActivities}
-                selectedAgentId={selectedRoomAgentId}
+                selectedAgentIds={selectedRoomAgentIds}
                 busyAgentId={roomAgentMutationId}
                 disabled={!canUseComposer}
-                onSelect={(roomAgentId) => void handleSelectRoomAgent(roomAgentId)}
+                onSelectionChange={(roomAgentIds) => void handleSelectRoomAgents(roomAgentIds)}
                 onEdit={handleEditRoomAgent}
                 onRetry={(roomAgentId) => void handleRetryRoomAgent(roomAgentId)}
                 onRemove={(roomAgentId) => void handleRemoveRoomAgent(roomAgentId)}

@@ -438,7 +438,24 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
     case "diff":
       return <ChangeCard changes={[{ path: event.filePath, oldText: event.oldText, newText: event.newText }]} />;
     case "error":
-      return <ErrorCard event={event} onDismiss={onDismissError ? () => onDismissError(event.id) : undefined} />;
+      return (
+        <ErrorCard
+          event={event}
+          onRetry={event.roomMessageId && event.roomAgentId
+            ? async () => {
+                window.dispatchEvent(new CustomEvent("kimix:room-delivery-action", {
+                  detail: {
+                    action: "retry",
+                    sessionId,
+                    roomMessageId: event.roomMessageId,
+                    roomAgentId: event.roomAgentId,
+                  },
+                }));
+              }
+            : onRetryError}
+          onDismiss={onDismissError ? () => onDismissError(event.id) : undefined}
+        />
+      );
     case "subagent":
       return (
         <div className="kimix-soft-card flex items-center gap-2 rounded-xl text-[14.5px]" style={{ paddingLeft: 14, paddingRight: 16, paddingTop: 10, paddingBottom: 10 }}>

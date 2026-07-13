@@ -8,6 +8,7 @@ import {
 } from "@/utils/collaborationRooms";
 import {
   applyRoomDeliveryRuntimeStatus,
+  cancelQueuedRoomDelivery,
   collectRoomDeliveryEvidenceFromHistory,
   createRoomMessageDispatch,
   dispatchQueuedRoomDelivery,
@@ -429,5 +430,19 @@ describe("roomDelivery", () => {
     expect(getDispatchableRoomDeliveries(second.session)).toEqual([
       { roomMessageId: second.message.id, roomAgentId: "agent-2" },
     ]);
+  });
+
+  it("queued 可按 Agent 取消且不改变同消息其他 delivery", () => {
+    const source = room();
+    const primary = getPrimaryRoomAgent(source);
+    const created = createRoomMessageDispatch(source, {
+      content: "分别执行",
+      recipientAgentIds: [primary.id, "agent-2"],
+      createId: deterministicIds(),
+    });
+    const cancelled = cancelQueuedRoomDelivery(created.session, created.message.id, primary.id, 120);
+    expect(cancelled.collaboration?.messages[0].deliveries[primary.id].status).toBe("cancelled");
+    expect(cancelled.collaboration?.messages[0].deliveries["agent-2"].status).toBe("queued");
+    expect(() => cancelQueuedRoomDelivery(cancelled, created.message.id, primary.id)).toThrow("只有排队中");
   });
 });

@@ -329,6 +329,19 @@ export function retryRoomDelivery(
   }, now);
 }
 
+export function cancelQueuedRoomDelivery(
+  session: Session,
+  roomMessageId: string,
+  roomAgentId: string,
+  now = Date.now(),
+) {
+  const delivery = session.collaboration?.messages.find((message) => message.id === roomMessageId)?.deliveries[roomAgentId];
+  if (!delivery || delivery.status !== "queued") throw new Error("只有排队中的投递可以直接取消");
+  return setRoomDeliveryStatus(session, roomMessageId, roomAgentId, "cancelled", {
+    error: "用户已取消排队。",
+  }, now);
+}
+
 export async function dispatchQueuedRoomDelivery(input: {
   roomMessageId: string;
   roomAgentId: string;
