@@ -53,6 +53,7 @@ import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
 import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { logError } from "@/utils/reportError";
+import { resolveRoomRuntimeOwner } from "@/utils/collaborationRooms";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -113,6 +114,11 @@ interface StartHandoffDetail {
 }
 
 function findSessionByRuntimeIdentity(sessions: Session[], historySessionId: string, runtimeSessionId?: string, officialSessionId?: string | null): Session | undefined {
+  const roomOwner = [historySessionId, runtimeSessionId, officialSessionId]
+    .filter((id): id is string => Boolean(id))
+    .map((id) => resolveRoomRuntimeOwner(sessions, id))
+    .find((owner) => Boolean(owner));
+  if (roomOwner) return roomOwner.session;
   const ids = new Set([historySessionId, runtimeSessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
   return sessions.find((session) => !session.archivedAt && (
     ids.has(session.id) ||
@@ -510,6 +516,8 @@ ${visibleHistory}
 }
 
 function resolveUiSessionId(sessionId: string, officialSessionId?: string | null): string {
+  const roomOwner = resolveRoomRuntimeOwner(useSessionStore.getState().sessions, sessionId, officialSessionId);
+  if (roomOwner) return roomOwner.roomId;
   const ids = new Set([sessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
   const owner = useSessionStore.getState().sessions.find((session) => (
     ids.has(session.id) ||

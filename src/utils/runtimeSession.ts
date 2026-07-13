@@ -1,4 +1,5 @@
 import type { LongTaskSessionMeta, Session } from "@/types/ui";
+import { getPrimaryRoomAgent, getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
 
 type LongTaskAgentRole = LongTaskSessionMeta["activeAgent"];
 
@@ -6,6 +7,9 @@ export function getRuntimeSessionId(session: Session | null | undefined): string
   if (!session) return null;
   if (session.longTask) {
     return session.longTask.executorSessionId;
+  }
+  if (session.collaboration) {
+    return getRoomAgentRuntimeId(session, getPrimaryRoomAgent(session).id);
   }
   return session.runtimeSessionId ?? session.id;
 }

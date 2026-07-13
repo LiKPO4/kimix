@@ -189,17 +189,17 @@ interface RoomUserMessage {
 - [x] 持久化本计划。
 - [x] 记录产品与架构决策。
 - [x] 记录当前 62 个文件、441 项测试基线。
-- [ ] 增加内部开发 gate；不作为用户产品模式。
-- [ ] 建立第一组兼容数据测试。
+- [x] 增加内部开发 gate；不作为用户产品模式。
+- [x] 建立第一组兼容数据测试。
 
 退出门禁：现有单 Agent 行为无变化。
 
 ### 阶段 1：兼容数据模型和所有者 helper
 
-- [ ] 新增 CollaborationState、RoomAgent、RoomUserMessage 和归属字段。
-- [ ] 新增规范化、primary、runtime owner 和事件 owner helper。
-- [ ] 旧 Session 只在内存中映射，不立即持久化。
-- [ ] primary 顶层兼容字段由统一适配器镜像。
+- [x] 新增 CollaborationState、RoomAgent、RoomUserMessage 和归属字段。
+- [x] 新增规范化、primary、runtime owner 和事件 owner helper。
+- [x] 旧 Session 只在内存中映射，不立即持久化。
+- [x] primary 顶层兼容字段由统一适配器镜像。
 
 退出门禁：老会话序列化、图片、模型、runtime 和历史无损。
 
@@ -328,4 +328,3 @@ git diff --check
 - 内部 gate 关闭时仅禁用新增和发送，已存在次要 Agent 保持只读可见。
 - 不把二级 Agent 历史静默隐藏或删除。
 - UI 改动开始后，每轮同步版本号三处；最终发布只推 tag 触发 GitHub Actions。
-

@@ -94,6 +94,69 @@ export interface Project {
   sortOrder?: number;
 }
 
+export type RoomAgentDeliveryStatus =
+  | "queued"
+  | "sending"
+  | "accepted"
+  | "running"
+  | "waiting_approval"
+  | "waiting_question"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface RoomAgentDelivery {
+  status: RoomAgentDeliveryStatus;
+  agentTurnId: string;
+  officialUserEventId?: string;
+  error?: string;
+}
+
+export interface RoomUserMessage {
+  id: string;
+  content: string;
+  images?: UserMessageImage[];
+  recipientAgentIds: string[];
+  deliveries: Record<string, RoomAgentDelivery>;
+  timestamp: number;
+}
+
+export interface RoomAgent {
+  id: string;
+  displayName: string;
+  mentionName: string;
+  modelAlias: string | null;
+  modelLabelSnapshot?: string;
+  providerLabelSnapshot?: string;
+  permissionMode: PermissionMode;
+  runtimeSessionId?: string;
+  officialSessionId?: string;
+  skillRegistrySyncedAt?: number;
+  skillForkParentSessionId?: string;
+  kimiHistoryCacheVersion?: number;
+  officialCatalogConfirmedAt?: number;
+  swarmModeLockedAt?: number;
+  swarmMode?: boolean;
+  swarmModeDesired?: boolean;
+  modelSwitchedAt?: number;
+  switchedToModel?: string;
+  officialGoal?: OfficialGoalState;
+  btwRounds?: BtwRound[];
+  createdAt: number;
+  removedAt?: number;
+  missingSince?: number;
+}
+
+export interface CollaborationState {
+  schemaVersion: 1;
+  primaryAgentId: string;
+  defaultRecipientIds: string[];
+  focusedAgentId?: string;
+  agents: RoomAgent[];
+  messages: RoomUserMessage[];
+  agentEvents: Record<string, TimelineEvent[]>;
+}
+
 export interface Session {
   id: string;
   engine?: "prompt" | "kimi-code";
@@ -128,6 +191,8 @@ export interface Session {
   archivedAt?: number;
   btwRounds?: BtwRound[];
   officialGoal?: OfficialGoalState;
+  /** 用户控制的多 Agent 房间；缺失时按单一 synthetic primary Agent 兼容读取。 */
+  collaboration?: CollaborationState;
   events: TimelineEvent[];
   isLoading: boolean;
 }
@@ -177,7 +242,18 @@ export interface LongTaskSessionMeta {
   targetStep: number | null;
 }
 
-export type TimelineEvent =
+export interface RoomEventScope {
+  /** 房间参与者所有权；缺失时兼容解释为 primary Agent。 */
+  roomAgentId?: string;
+  /** 房间级用户消息身份。 */
+  roomMessageId?: string;
+  /** 单个 Agent 回复块的稳定身份。 */
+  agentTurnId?: string;
+  /** 用户消息的实际房间接收者。 */
+  recipientAgentIds?: string[];
+}
+
+export type TimelineEvent = (
   | UserMessageEvent
   | SteerMessageEvent
   | AssistantMessageEvent
@@ -194,7 +270,8 @@ export type TimelineEvent =
   | CompactionEvent
   | ErrorEvent
   | DiffEvent
-  | TodoEvent;
+  | TodoEvent
+) & RoomEventScope;
 
 export interface UserMessageEvent {
   id: string;
