@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成阶段 0-8；搜索可遍历逐 Agent 分区并反向打开房间，Markdown/官方 ZIP 导出保留 Agent 所有权，归档/恢复显示逐 Agent 结果；“待找回 Agent”筛选会列出未绑定或元数据异常的官方房间 session，并只允许非破坏性独立打开；版本三处同步到 v2.15.33；全量 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check 通过，renderer 为 `assets/index-BfAVTea0.js`。
-- 未完成：阶段 9 真实跨 Provider、并发、视觉和性能验收。
+- 已完成：完成阶段 0-8；阶段 9A 已在 Agent 选择器持续提示共享工作目录与并行写入覆盖风险，并引导用户通过接收者、@Agent 和提示词划分文件职责；版本三处同步到 v2.15.34；全量 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check 通过，renderer 为 `assets/index-BN08iKjZ.js`。
+- 未完成：阶段 9 的 1/2/4 Agent、窄窗口、长名称、真实并行、同 Provider 不同模型、跨 Provider、单 Provider 失败、历史展开/滚动与截图验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
 - 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/markdownExport.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：进入阶段 9，先补同目录多 Agent 写入风险提示和静态布局门禁，再启动内部 gate 做真实跨 Provider/并发验收。
+- 下一步：启动内部 gate，由用户按阶段 9 验收矩阵实测并回传版本 v2.15.34 的 2/4 Agent 与窄窗口截图；随后根据截图和真实运行日志收口问题。
 - 验证补充：`pnpm exec tsc -p tsconfig.json --noEmit` 仍被仓库既有类型基线错误阻塞；本阶段涉及文件的新增类型问题已清理，正式门禁仍以现有 `test:run`、`build`、`knowledge:validate` 和 diff check 为准。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性

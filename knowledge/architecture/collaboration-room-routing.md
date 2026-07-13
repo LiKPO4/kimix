@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T22:57:07+08:00"
+timestamp: "2026-07-13T23:01:12+08:00"
 ---
 
 # Collaboration Room Routing
@@ -91,6 +91,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * `agentTurnId` is the permanent render identity. New stream events, snapshots, and runtime migration may update content but may not remount an existing block.
 * Manual history browsing and expansion state remain owned by the user while any Agent continues streaming.
 * Existing Provider/model configuration remains the only source for add-Agent model selection.
+* Every room Agent shares the room project path. The recipient picker keeps this write-collision risk visible and instructs users to coordinate file ownership explicitly; Kimix does not claim filesystem isolation between independently running Agents.
 
 # Related Knowledge
 

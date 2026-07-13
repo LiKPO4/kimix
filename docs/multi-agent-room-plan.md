@@ -415,7 +415,7 @@ interface AgentDelivery {
 - [ ] 空态、1/2/4 Agent、窄窗口、长名称、多个并行运行。
 - [ ] 历史展开与滚动稳定性回归。
 - [ ] 同 Provider 不同模型、不同 Provider、单 Provider 失败。
-- [ ] 多 Agent 同目录写入风险提示。
+- [x] 多 Agent 同目录写入风险提示。
 - [ ] 用户截图和真实交叉审查流程验收。
 - [ ] 同步版本号三处和专属 release notes。
 
@@ -545,6 +545,8 @@ git diff --check
 33. 阶段 8C 已通过 75 个测试文件、542 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-CDdEAMyJ.js`。
 34. 阶段 8D 在搜索弹窗新增“待找回 Agent”筛选：带 Kimix 房间来源但未绑定本地 collaboration 房间的官方 session（包括异常 schema）保持可见，可明确作为独立会话打开，不对歧义房间执行自动重绑。
 35. 阶段 8D 已通过 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BfAVTea0.js`。阶段 8 全部退出项完成。
+36. 阶段 9A 在房间 Agent 选择器中持续提示共享工作目录的并发写入风险，引导用户通过接收者、@Agent 和提示词明确文件修改分工；提示区使用独立边框、14px 区块间距和双侧内边距，避免与 Agent 列表或运行状态连成一块。
+37. 阶段 9A 已通过 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BN08iKjZ.js`。视觉验收按项目规则等待用户回传 2/4 Agent 与窄窗口截图。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

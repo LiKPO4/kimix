@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Collaboration rooms state their shared-worktree risk**: The Agent picker keeps a persistent warning that independently running participants share one project path and require explicit user coordination for overlapping file writes. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Orphan room sessions have an explicit non-destructive recovery path**: Global search lists unbound or malformed Kimix room sessions under “待找回 Agent”, shows recoverable identity hints, and opens them independently without guessing a room binding. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room lifecycle outcomes remain visible per Agent**: Archive and restore surfaces list every attempted Agent success/failure, while partial failures keep operation-specific status and the official error on the failed participant for retry. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room exports preserve visible and official ownership boundaries**: Markdown includes the complete room timeline with recipients and Agent/model labels, while Kimi debug ZIP export requires an explicit Agent selection and exports only that Agent's official session. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Check, ChevronDown, Pencil, RefreshCw, UserMinus } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, Pencil, RefreshCw, UserMinus } from "lucide-react";
 import type { RoomAgent, RoomAgentActivity, Session } from "@/types/ui";
 import { getPrimaryRoomAgent, roomAgentActivityKey } from "@/utils/collaborationRooms";
 
@@ -196,6 +196,14 @@ export function RoomAgentPicker({
                 </div>
               );
             })}
+          </div>
+
+          <div
+            className="grid rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
+            style={{ gridTemplateColumns: "16px minmax(0, 1fr)", gap: 10, marginTop: 14, padding: "10px 12px" }}
+          >
+            <AlertTriangle size={15} className="text-accent-warning" style={{ marginTop: 2 }} />
+            <span>这些 Agent 共享同一工作目录。并行修改同一文件可能互相覆盖，请用接收者、@Agent 和提示词明确分工。</span>
           </div>
 
           {roomBusy && (
