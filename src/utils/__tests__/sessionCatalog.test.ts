@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Session } from "@/types/ui";
+import type { RoomAgent, Session } from "@/types/ui";
+import { createCollaborationStateFromSession } from "@/utils/collaborationRooms";
+import { buildOfficialRoomMetadata } from "@/utils/roomSessionMetadata";
 import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog, selectStartupOfficialSession, shouldHideOfficialSessionPlaceholder } from "../sessionCatalog";
 
 function localSession(overrides: Partial<Session> = {}): Session {
@@ -13,6 +15,36 @@ function localSession(overrides: Partial<Session> = {}): Session {
     events: [],
     isLoading: false,
     ...overrides,
+  };
+}
+
+function collaborationRoom(secondaryOverrides: Partial<RoomAgent> = {}): { room: Session; secondary: RoomAgent } {
+  const base = localSession({
+    id: "room-1",
+    runtimeSessionId: "primary-official",
+    officialSessionId: "primary-official",
+    title: "房间标题",
+  });
+  const collaboration = createCollaborationStateFromSession(base);
+  const secondary: RoomAgent = {
+    id: "agent-2",
+    displayName: "Reviewer",
+    mentionName: "reviewer",
+    modelAlias: "openai/gpt-5",
+    permissionMode: "manual",
+    createdAt: 30,
+    ...secondaryOverrides,
+  };
+  return {
+    secondary,
+    room: {
+      ...base,
+      collaboration: {
+        ...collaboration,
+        agents: [...collaboration.agents, secondary],
+        agentEvents: { ...collaboration.agentEvents, [secondary.id]: [] },
+      },
+    },
   };
 }
 
@@ -33,6 +65,165 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result.map((session) => session.id)).toEqual(["official-1", "official-2"]);
     expect(result[0]).toMatchObject({ officialSessionId: "official-1", title: "第一条", events: [] });
     expect(result[0].officialCatalogConfirmedAt).toBeTypeOf("number");
+  });
+
+  it("按唯一受控 metadata 折叠次要 session、恢复绑定且不覆盖房间标题", () => {
+    const { room, secondary } = collaborationRoom({ runtimeSessionId: "stale-runtime", missingSince: 1 });
+    const result = reconcileOfficialSessionCatalog([room], [{
+      id: "secondary-official",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      title: "不应覆盖房间标题",
+      source: "server",
+      metadata: buildOfficialRoomMetadata({
+        schemaVersion: 1,
+        roomId: room.id,
+        roomAgentId: secondary.id,
+        primarySessionId: "primary-official",
+      }),
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result.filter((session) => !session.archivedAt)).toHaveLength(1);
+    expect(result[0].id).toBe(room.id);
+    expect(result[0].title).toBe("房间标题");
+    expect(result[0].collaboration?.agents.find((agent) => agent.id === secondary.id)).toMatchObject({
+      officialSessionId: "secondary-official",
+      missingSince: undefined,
+      officialCatalogConfirmedAt: expect.any(Number),
+    });
+    expect(result[0].collaboration?.agents.find((agent) => agent.id === secondary.id)?.runtimeSessionId).toBeUndefined();
+  });
+
+  it("同批目录同时包含主 Agent 时仍只保留一个房间镜像", () => {
+    const { room, secondary } = collaborationRoom();
+    const result = reconcileOfficialSessionCatalog([room], [
+      {
+        id: "primary-official",
+        workDir: "D:\\work\\demo",
+        updatedAt: 210,
+        title: "主会话标题",
+        source: "server",
+      },
+      {
+        id: "secondary-official",
+        workDir: "D:\\work\\demo",
+        updatedAt: 200,
+        title: "次要会话标题",
+        source: "server",
+        metadata: buildOfficialRoomMetadata({
+          schemaVersion: 1,
+          roomId: room.id,
+          roomAgentId: secondary.id,
+          primarySessionId: "primary-official",
+        }),
+      },
+    ], "D:\\work\\demo", { source: "server" });
+
+    expect(result.filter((session) => !session.archivedAt)).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: room.id,
+      officialSessionId: "primary-official",
+      title: "主会话标题",
+    });
+    expect(result[0].collaboration?.agents.find((agent) => agent.id === secondary.id)).toMatchObject({
+      officialSessionId: "secondary-official",
+    });
+  });
+
+  it("已绑定 Agent 也会清理过期 runtimeSessionId", () => {
+    const { room, secondary } = collaborationRoom({
+      runtimeSessionId: "stale-runtime",
+      officialSessionId: "secondary-official",
+      officialCatalogConfirmedAt: 10,
+    });
+    const result = reconcileOfficialSessionCatalog([room], [{
+      id: "secondary-official",
+      workDir: "D:\\work\\demo",
+      updatedAt: 20,
+      source: "server",
+      metadata: buildOfficialRoomMetadata({
+        schemaVersion: 1,
+        roomId: room.id,
+        roomAgentId: secondary.id,
+        primarySessionId: "primary-official",
+      }),
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].collaboration?.agents.find((agent) => agent.id === secondary.id)).toMatchObject({
+      officialSessionId: "secondary-official",
+    });
+    expect(result[0].collaboration?.agents.find((agent) => agent.id === secondary.id)?.runtimeSessionId).toBeUndefined();
+  });
+
+  it("本地房间缺失、primary 不匹配或 metadata 重复时保持官方 session 独立可见", () => {
+    const metadata = buildOfficialRoomMetadata({
+      schemaVersion: 1,
+      roomId: "room-1",
+      roomAgentId: "agent-2",
+      primarySessionId: "primary-official",
+    });
+    const orphan = reconcileOfficialSessionCatalog([], [{
+      id: "orphan-agent",
+      workDir: "D:\\work\\demo",
+      updatedAt: 100,
+      source: "server",
+      metadata,
+    }], "D:\\work\\demo", { source: "server" });
+    expect(orphan.map((session) => session.id)).toEqual(["orphan-agent"]);
+
+    const { room } = collaborationRoom();
+    const wrongPrimary = reconcileOfficialSessionCatalog([room], [{
+      id: "wrong-primary-agent",
+      workDir: "D:\\work\\demo",
+      updatedAt: 100,
+      source: "server",
+      metadata: { ...metadata, kimixPrimarySessionId: "other-primary" },
+    }], "D:\\work\\demo", { source: "server" });
+    expect(wrongPrimary.filter((session) => !session.archivedAt).map((session) => session.id).sort()).toEqual([
+      "room-1",
+      "wrong-primary-agent",
+    ]);
+
+    const duplicates = reconcileOfficialSessionCatalog([room], [
+      { id: "duplicate-a", workDir: "D:\\work\\demo", updatedAt: 110, source: "server", metadata },
+      { id: "duplicate-b", workDir: "D:\\work\\demo", updatedAt: 100, source: "server", metadata },
+    ], "D:\\work\\demo", { source: "server" });
+    expect(duplicates.filter((session) => !session.archivedAt).map((session) => session.id).sort()).toEqual([
+      "duplicate-a",
+      "duplicate-b",
+      "room-1",
+    ]);
+  });
+
+  it("Server 目录缺失只标记对应 Agent missing，不归档整个房间；SDK 空目录不下结论", () => {
+    const { room, secondary } = collaborationRoom({
+      runtimeSessionId: "secondary-missing",
+      officialSessionId: "secondary-missing",
+    });
+    const serverResult = reconcileOfficialSessionCatalog([room], [], "D:\\work\\demo", { source: "server" });
+    expect(serverResult[0].archivedAt).toBeUndefined();
+    expect(serverResult[0].collaboration?.agents.find((agent) => agent.id === secondary.id)?.missingSince).toBeTypeOf("number");
+
+    const sdkResult = reconcileOfficialSessionCatalog([room], [], "D:\\work\\demo", { source: "sdk" });
+    expect(sdkResult[0]).toBe(room);
+    expect(sdkResult[0].collaboration?.agents.find((agent) => agent.id === secondary.id)?.missingSince).toBeUndefined();
+  });
+
+  it("Server 目录中的已归档绑定不算可见，仍标记对应 Agent missing", () => {
+    const { room, secondary } = collaborationRoom({
+      runtimeSessionId: "secondary-archived",
+      officialSessionId: "secondary-archived",
+    });
+    const result = reconcileOfficialSessionCatalog([room], [{
+      id: "secondary-archived",
+      workDir: "D:\\work\\demo",
+      updatedAt: 100,
+      archived: true,
+      source: "server",
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBeUndefined();
+    expect(result[0].collaboration?.agents.find((agent) => agent.id === secondary.id)?.missingSince).toBeTypeOf("number");
   });
 
   it("首屏隐藏尚未被官方目录确认的旧空占位", () => {

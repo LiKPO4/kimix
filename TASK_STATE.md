@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；新增 CollaborationState、RoomAgent、房间消息/delivery 和事件归属字段；旧 Session 可无损映射为 synthetic primary；新增 `roomId + roomAgentId` 活动表，流事件按 Agent 分批，事件、状态、终态、quiet snapshot、轮询和 Server -> SDK 迁移均先解析 runtime owner；完成并提交阶段 3；完成阶段 4A 的防御性 collaboration 持久化、旧版本 primary 回写恢复、逐 Agent settle 和递归图片保存；完成阶段 4B，renderer 只能提交严格 roomMetadata，主进程生成官方字段并用稳定 roomAgentId 请求 session，创建前查询包含空 session 的官方目录，唯一匹配直接恢复，重复或已归档停止自动创建，metadata 贯穿 Server、SDK 和 fallback；当前 67 个测试文件、473 项测试和生产构建通过。
-- 未完成：阶段 4C-4G 的官方目录折叠、逐 Agent runtime 恢复、delivery、备份迁移和生命周期；添加 Agent UI；精确路由与并行队列；Agent scoped 操作；搜索/导出/归档以及视觉和真实流程验收。
+- 已完成：完成运行态、持久化历史和 UI 路由审计；确定不新增外部 Runtime/Provider 体系、不预设身份、不增加独立模式；持久化完整实施计划与 OKF 架构决策；建立 `codex/multi-agent-room` 功能分支；新增 CollaborationState、RoomAgent、房间消息/delivery 和事件归属字段；旧 Session 可无损映射为 synthetic primary；新增 `roomId + roomAgentId` 活动表，流事件按 Agent 分批，事件、状态、终态、quiet snapshot、轮询和 Server -> SDK 迁移均先解析 runtime owner；完成并提交阶段 3；完成阶段 4A 的防御性 collaboration 持久化、旧版本 primary 回写恢复、逐 Agent settle 和递归图片保存；完成阶段 4B，renderer 只能提交严格 roomMetadata，主进程生成官方字段并用稳定 roomAgentId 请求 session，创建前查询包含空 session 的官方目录，唯一匹配直接恢复，重复或已归档停止自动创建，metadata 贯穿 Server、SDK 和 fallback；完成阶段 4C，受控 metadata 只在 schema、路径、房间、primary 和 Agent 身份唯一匹配时折叠并重绑次要 session，同批主、次目录仍只保留一个房间镜像，歧义与孤儿保持独立可见，Server 只标记缺失 Agent、SDK 非权威目录不下删除结论；当前 67 个测试文件、479 项测试和生产构建通过。
+- 未完成：阶段 4D-4G 的逐 Agent runtime 恢复、delivery、备份迁移和生命周期；添加 Agent UI；精确路由与并行队列；Agent scoped 操作；搜索/导出/归档以及视觉和真实流程验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
 - 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：只实施阶段 4C：官方 catalog 按受控 metadata 精确折叠和重绑；路径、schema 或身份歧义时保持独立可见，单个 Agent missing 不归档整个房间；不同时开放 UI。
+- 下一步：只实施阶段 4D：让 startup、后台 repair、running snapshot 和 resume 对每个 Agent 独立选择 runtime/official session；单个 Agent 恢复失败不得影响其他 Agent，也不得静默切换缺失的 Provider/model alias；不同时开放 UI。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
 

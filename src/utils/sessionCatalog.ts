@@ -1,5 +1,7 @@
 import type { Session } from "@/types/ui";
+import { getPrimaryRoomAgent, updateRoomAgent } from "@/utils/collaborationRooms";
 import { normalizePathForComparison } from "@/utils/pathCase";
+import { parseOfficialRoomMetadata } from "@/utils/roomSessionMetadata";
 import { isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 
 const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
@@ -145,6 +147,7 @@ function belongsToOfficialLineage(session: Session, lineageIds: Set<string>) {
 function isAbandonedEmptyMirror(session: Session, projectPath: string) {
   return session.engine === "kimi-code" &&
     !session.longTask &&
+    !session.collaboration &&
     !session.archivedAt &&
     normalizeProjectPath(session.projectPath) === normalizeProjectPath(projectPath) &&
     session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
@@ -154,6 +157,7 @@ function isAbandonedEmptyMirror(session: Session, projectPath: string) {
 export function isUnconfirmedOfficialSessionPlaceholder(session: Session) {
   return session.engine === "kimi-code" &&
     !session.longTask &&
+    !session.collaboration &&
     !session.archivedAt &&
     !session.officialCatalogConfirmedAt &&
     Boolean(session.officialSessionId || session.runtimeSessionId || !session.id.startsWith("local-")) &&
@@ -165,6 +169,7 @@ export function shouldHideOfficialSessionPlaceholder(session: Session) {
   if (isUnconfirmedOfficialSessionPlaceholder(session)) return true;
   return session.engine === "kimi-code" &&
     !session.longTask &&
+    !session.collaboration &&
     !session.archivedAt &&
     isDefaultSessionTitle(session.title) &&
     session.events.every((event) => event.type !== "user_message" && event.type !== "steer_message") &&
@@ -209,8 +214,65 @@ export function reconcileOfficialSessionCatalog(
   let changed = false;
   let next = sessions;
   const claimedSessionIndexes = new Set<number>();
+  const hiddenRoomOfficialIds = new Set<string>();
+  const roomMatches = new Map<string, Array<{ official: OfficialSessionCatalogItem; roomIndex: number; agentId: string }>>();
 
   for (const official of effectiveOfficialSessions) {
+    if (official.archived === true || normalizeProjectPath(official.workDir || projectPath) !== normalizedProjectPath) continue;
+    const metadata = parseOfficialRoomMetadata(official.metadata);
+    if (!metadata) continue;
+    const roomIndex = sessions.findIndex((session) => (
+      session.id === metadata.roomId &&
+      !session.archivedAt &&
+      Boolean(session.collaboration) &&
+      normalizeProjectPath(session.projectPath) === normalizedProjectPath
+    ));
+    if (roomIndex < 0) continue;
+    const room = sessions[roomIndex];
+    const primary = getPrimaryRoomAgent(room);
+    const primaryIds = new Set([
+      room.id,
+      room.runtimeSessionId,
+      room.officialSessionId,
+      primary.runtimeSessionId,
+      primary.officialSessionId,
+    ].filter((id): id is string => Boolean(id)));
+    const agent = room.collaboration?.agents.find((candidate) => candidate.id === metadata.roomAgentId);
+    if (!agent || agent.removedAt || agent.id === primary.id || !primaryIds.has(metadata.primarySessionId)) continue;
+    const key = `${metadata.roomId}\n${metadata.roomAgentId}`;
+    const matches = roomMatches.get(key) ?? [];
+    matches.push({ official, roomIndex, agentId: agent.id });
+    roomMatches.set(key, matches);
+  }
+
+  for (const matches of roomMatches.values()) {
+    if (matches.length !== 1) continue;
+    const { official, roomIndex, agentId } = matches[0];
+    const current = next[roomIndex];
+    const agent = current.collaboration?.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) continue;
+    hiddenRoomOfficialIds.add(official.id);
+    const alreadyBound = agent.officialSessionId === official.id &&
+      (!agent.runtimeSessionId || agent.runtimeSessionId === official.id) &&
+      !agent.missingSince &&
+      agent.officialCatalogConfirmedAt;
+    if (alreadyBound && current.updatedAt >= (official.updatedAt || 0)) continue;
+    if (next === sessions) next = [...sessions];
+    const rebound = updateRoomAgent(current, agentId, (candidate) => ({
+      ...candidate,
+      runtimeSessionId: candidate.runtimeSessionId === official.id ? candidate.runtimeSessionId : undefined,
+      officialSessionId: official.id,
+      officialCatalogConfirmedAt: catalogConfirmedAt,
+      missingSince: undefined,
+    }));
+    next[roomIndex] = {
+      ...rebound,
+      updatedAt: Math.max(rebound.updatedAt, official.updatedAt || 0),
+    };
+    changed = true;
+  }
+
+  for (const official of effectiveOfficialSessions.filter((item) => !hiddenRoomOfficialIds.has(item.id))) {
     if (!official.id || normalizeProjectPath(official.workDir || projectPath) !== normalizedProjectPath) continue;
     if (official.archived === true) continue;
     const lineageIds = officialLineageIds(official, officialById, parentById);
@@ -290,9 +352,33 @@ export function reconcileOfficialSessionCatalog(
     changed = true;
   }
 
+  if (serverAuthoritative) {
+    const missingAt = Date.now();
+    next.forEach((session, roomIndex) => {
+      if (!session.collaboration || session.archivedAt || normalizeProjectPath(session.projectPath) !== normalizedProjectPath) return;
+      const primary = getPrimaryRoomAgent(session);
+      let room = session;
+      let roomChanged = false;
+      for (const agent of session.collaboration.agents) {
+        if (agent.id === primary.id || agent.removedAt) continue;
+        const boundIds = [agent.runtimeSessionId, agent.officialSessionId].filter((id): id is string => Boolean(id));
+        if (boundIds.length === 0) continue;
+        const present = boundIds.some((id) => visibleOfficialIds.has(id));
+        if (present || agent.missingSince) continue;
+        room = updateRoomAgent(room, agent.id, (candidate) => ({ ...candidate, missingSince: missingAt }));
+        roomChanged = true;
+      }
+      if (!roomChanged) return;
+      if (next === sessions) next = [...sessions];
+      next[roomIndex] = room;
+      changed = true;
+    });
+  }
+
   if (serverAuthoritative || archivedOfficialIds.size > 0 || supersededOfficialIds.size > 0 || next.some((session) => isAbandonedEmptyMirror(session, projectPath))) {
     const archivedAt = Date.now();
     next.forEach((session, index) => {
+      if (session.collaboration) return;
       if (!isOfficialMirrorSession(session, projectPath)) return;
       if (claimedSessionIndexes.has(index)) return;
       const referencesVisibleSession = officialSessionIds(session).some((id) => visibleOfficialIds.has(id));

@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-3、4A-4B 已完成，下一步进入 4C，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
+状态：已批准实施。阶段 0-3、4A-4C 已完成，下一步进入 4D，功能仍处于内部开发 gate；在可靠投递、持久化恢复和官方目录门禁全部通过前，不开放添加 Agent 的用户入口。
 
 ## 1. 产品目标
 
@@ -323,11 +323,11 @@ interface AgentDelivery {
 
 #### 4C：官方 catalog 分组与保守找回
 
-- [ ] 解析受控 `kimix-room-agent` metadata，并把已绑定次要 session 折叠到对应房间 Agent。
-- [ ] metadata 完整且本地 Agent 仍在但绑定缺失时自动重绑；次要标题不覆盖房间标题。
-- [ ] 本地房间不存在、metadata 歧义、schema 未知或路径不一致时，官方 session 作为独立可找回会话显示。
-- [ ] 单个次要 Agent 缺失只标记该 Agent `missing`，不得把整个房间归档。
-- [ ] Server authoritative 空目录、SDK 非权威目录和暂时网络失败必须使用不同语义，不能把“未列出”都解释成已删除。
+- [x] 解析受控 `kimix-room-agent` metadata，并把已绑定次要 session 折叠到对应房间 Agent。
+- [x] metadata 完整且本地 Agent 仍在但绑定缺失时自动重绑；次要标题不覆盖房间标题。
+- [x] 本地房间不存在、metadata 歧义、schema 未知或路径不一致时，官方 session 作为独立可找回会话显示。
+- [x] 单个次要 Agent 缺失只标记该 Agent `missing`，不得把整个房间归档。
+- [x] Server authoritative 空目录、SDK 非权威目录和暂时网络失败必须使用不同语义，不能把“未列出”都解释成已删除。
 
 退出门禁：侧栏不会同时出现房间和已绑定次要镜像，也不会隐藏任何无法精确归属的官方历史。
 
@@ -507,7 +507,7 @@ git diff --check
 
 ## 11. 当前实现审计与开放条件
 
-截至 2026-07-13，阶段 0-3 和 4A-4B 已完成。阶段 3 已实现并验证：
+截至 2026-07-13，阶段 0-3 和 4A-4C 已完成。阶段 3 已实现并验证：
 
 1. `startup`、quiet running snapshot、后台 repair、消息撤回重写和 `/undo` 全部使用统一的 Agent-scoped canonical reconcile。
 2. ChatThread 的响应块、展开/滚动身份和最终 usage 只由对应 `roomAgentId + agentTurnId` 控制。
@@ -515,7 +515,8 @@ git diff --check
 4. 未关联的 compaction、session meta、用户、Assistant 或工具事件保留在所属 Agent 的独立时间线段，不再静默丢失或挂到最近一轮。
 5. 阶段 4A 已实现 collaboration 防御性规范化、旧版本 primary 镜像恢复、逐 Agent 活动态结算、房间消息和全部事件分区的图片抽取/恢复，以及未知 schema 原样回写保护。
 6. 阶段 4B 已实现严格 roomMetadata IPC、稳定 Agent session ID、包含空 session 的创建前查找、重复/归档停止条件，以及 Server、SDK、fallback metadata 贯通。
-7. 当前工作树已通过 67 个测试文件、473 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的目录折叠、逐 Agent 恢复、delivery、备份和生命周期门禁。
+7. 阶段 4C 已实现受控 metadata 的精确目录折叠与重绑；主、次 Agent 同批目录只保留一个房间镜像，歧义或孤儿 session 保持独立可见，Server 缺失只标记对应 Agent，SDK 非权威目录不下删除结论。
+8. 当前工作树已通过 67 个测试文件、479 项测试和生产构建；添加 Agent UI 仍必须等待阶段 4 的逐 Agent 恢复、delivery、备份和生命周期门禁。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

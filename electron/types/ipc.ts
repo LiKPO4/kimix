@@ -1,3 +1,5 @@
+import type { RoomSessionMetadataInput } from "../../src/utils/roomSessionMetadata";
+
 export type OpenProjectRequest = {
   defaultPath?: string;
 }
@@ -1693,12 +1695,7 @@ export type KimiCodeCreateSessionRequest = {
   roomMetadata?: KimiCodeRoomMetadataRequest;
 };
 
-export type KimiCodeRoomMetadataRequest = {
-  schemaVersion: 1;
-  roomId: string;
-  roomAgentId: string;
-  primarySessionId: string;
-};
+export type KimiCodeRoomMetadataRequest = RoomSessionMetadataInput;
 
 export type KimiCodeResumeSessionRequest = {
   sessionId: string;
