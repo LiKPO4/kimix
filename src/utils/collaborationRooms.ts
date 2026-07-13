@@ -97,6 +97,7 @@ function normalizeRoomMessage(
   if (!isRecord(value)) return null;
   const id = typeof value.id === "string" ? value.id.trim() : "";
   if (!id || typeof value.content !== "string" || !isFiniteNumber(value.timestamp)) return null;
+  if (value.outboundContent !== undefined && typeof value.outboundContent !== "string") return null;
   if (!Array.isArray(value.recipientAgentIds) || !isRecord(value.deliveries)) return null;
   if (value.images !== undefined && (!Array.isArray(value.images) || !value.images.every(isUserMessageImageLike))) return null;
 
@@ -140,6 +141,7 @@ function normalizeRoomMessage(
     ...(value as unknown as RoomUserMessage),
     id,
     content: value.content,
+    outboundContent: value.outboundContent as string | undefined,
     recipientAgentIds,
     deliveries,
     timestamp: value.timestamp,

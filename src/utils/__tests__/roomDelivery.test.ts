@@ -11,6 +11,7 @@ import {
   collectRoomDeliveryEvidenceFromHistory,
   createRoomMessageDispatch,
   dispatchQueuedRoomDelivery,
+  getDispatchableRoomDeliveries,
   recoverInterruptedRoomDeliveries,
   retryRoomDelivery,
   setRoomDeliveryStatus,
@@ -65,12 +66,14 @@ describe("roomDelivery", () => {
     const primary = getPrimaryRoomAgent(session);
     const created = createRoomMessageDispatch(session, {
       content: "请分别检查",
+      outboundContent: "请分别检查",
       recipientAgentIds: ["agent-2", primary.id, "agent-2"],
       timestamp: 100,
       createId: deterministicIds(),
     });
 
     expect(created.message.recipientAgentIds).toEqual(["agent-2", primary.id]);
+    expect(created.message.outboundContent).toBe("请分别检查");
     expect(created.message.deliveries["agent-2"]).toMatchObject({
       status: "queued",
       dispatchAttemptId: "attempt:agent-2:2",
@@ -376,5 +379,55 @@ describe("roomDelivery", () => {
     next = applyRoomDeliveryRuntimeStatus(next, messageId, primary.id, "completed", 140);
     expect(next.collaboration?.messages[0].deliveries[primary.id].status).toBe("completed");
     expect(applyRoomDeliveryRuntimeStatus(next, messageId, primary.id, "running", 150)).toBe(next);
+  });
+
+  it("每个空闲 Agent 只选择最早 queued；一个 Agent 忙碌不阻塞另一个", () => {
+    const source = room();
+    const primary = getPrimaryRoomAgent(source);
+    const first = createRoomMessageDispatch(source, {
+      content: "第一条",
+      recipientAgentIds: [primary.id, "agent-2"],
+      timestamp: 100,
+      createId: deterministicIds(),
+    });
+    const second = createRoomMessageDispatch(first.session, {
+      content: "第二条",
+      recipientAgentIds: [primary.id, "agent-2"],
+      timestamp: 110,
+      createId: deterministicIds(),
+    });
+    const targets = getDispatchableRoomDeliveries(second.session, [{
+      roomId: source.id,
+      roomAgentId: primary.id,
+      status: "running",
+      updatedAt: 120,
+    }]);
+    expect(targets).toEqual([{ roomMessageId: first.message.id, roomAgentId: "agent-2" }]);
+  });
+
+  it("indeterminate 阻止同 Agent 后续 queued 自动发送，但不影响其他 Agent", () => {
+    const source = room();
+    const primary = getPrimaryRoomAgent(source);
+    const first = createRoomMessageDispatch(source, {
+      content: "第一条",
+      recipientAgentIds: [primary.id],
+      timestamp: 100,
+      createId: deterministicIds(),
+    });
+    const blocked = setRoomDeliveryStatus(
+      setRoomDeliveryStatus(first.session, first.message.id, primary.id, "sending"),
+      first.message.id,
+      primary.id,
+      "indeterminate",
+    );
+    const second = createRoomMessageDispatch(blocked, {
+      content: "第二条",
+      recipientAgentIds: [primary.id, "agent-2"],
+      timestamp: 110,
+      createId: deterministicIds(),
+    });
+    expect(getDispatchableRoomDeliveries(second.session)).toEqual([
+      { roomMessageId: second.message.id, roomAgentId: "agent-2" },
+    ]);
   });
 });

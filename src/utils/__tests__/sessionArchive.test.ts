@@ -272,5 +272,19 @@ describe("official-first session archive", () => {
       },
     };
     expect(roomHasActiveAgentWork(accepted)).toBe(true);
+    const indeterminate = {
+      ...source,
+      collaboration: {
+        ...source.collaboration!,
+        messages: source.collaboration!.messages.map((message) => ({
+          ...message,
+          deliveries: {
+            ...message.deliveries,
+            [secondary.id]: { ...message.deliveries[secondary.id], status: "indeterminate" as const },
+          },
+        })),
+      },
+    };
+    expect(roomHasActiveAgentWork(indeterminate)).toBe(true);
   });
 });

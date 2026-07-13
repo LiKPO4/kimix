@@ -157,6 +157,8 @@ export interface RoomAgentDelivery {
 export interface RoomUserMessage {
   id: string;
   content: string;
+  /** 已移除 Kimix 房间路由 token、可直接发送给每个接收 Agent 的冻结正文。 */
+  outboundContent?: string;
   images?: UserMessageImage[];
   recipientAgentIds: string[];
   deliveries: Record<string, RoomAgentDelivery>;

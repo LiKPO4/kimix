@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-13T18:56:00+08:00"
+timestamp: "2026-07-13T19:14:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -35,6 +35,8 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * The authoritative activity registry is keyed by `roomId + roomAgentId`; the legacy scalar `runningSessionId` is only a single-Agent compatibility projection.
 * Busy, queued, sending, running, waiting-for-approval, waiting-for-answer, failed, and completed states are Agent-scoped.
 * A busy Agent queues only its own delivery. Other idle recipients dispatch immediately.
+* Deterministic room routing recognizes only exact active Agent mention names at token boundaries. Recognized room mentions override the frozen default recipient list in textual order and are removed from the outbound model payload; unknown mentions, plugin mentions, email-like text, and visible room content remain unchanged.
+* The dispatch selector emits at most the oldest queued delivery for each idle Agent. Sending, accepted, running, interaction-waiting, and indeterminate deliveries block only that Agent; another participant can dispatch independently.
 * Room messages, recipient order, and stable delivery attempts are persisted as `queued` before dispatch; each target must then persist `sending` before any network call. Failure to persist `sending` returns that target to `queued` without invoking the runtime.
 * Official acceptance records prompt/message identities. A `sending` attempt whose result is unknown or whose persisted state cannot be reconciled with stable official or canonical room/turn evidence becomes `indeterminate` and is never automatically resent.
 * After official acceptance, runtime status is the delivery settlement authority: running, approval, question, completion, error, and interruption update only the matching `roomMessageId + roomAgentId` delivery. Accepted work remains lifecycle-active until that Agent reaches a terminal state.
@@ -61,7 +63,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Unknown future collaboration schemas are read-only and retained verbatim; current code must not downgrade or overwrite them.
 * Removing a secondary Agent preserves its room partition, strips room-only scope from a copied independent history, transfers the runtime/official binding to that independent Session, and clears the removed room participant's binding. Runtime owner resolution ignores removed Agents so late events cannot be captured by the former room.
 * Room archive and restore execute every eligible Agent through `Promise.allSettled`. Per-Agent `archivedAt` and lifecycle errors survive restart; partial archive or restore keeps the room visible, and retries target only the remaining failed Agents. The room-level `archivedAt` is set only after every active participant is archived.
-* Membership and archive mutations are blocked while any Agent is creating, queued, sending, accepted, running, waiting for approval, or waiting for an answer. The gate consults both live activity and persisted delivery state so reload cannot bypass it.
+* Membership and archive mutations are blocked while any Agent is creating, queued, sending, accepted, running, waiting for approval, waiting for an answer, or has an indeterminate delivery. The gate consults both live activity and persisted delivery state so reload cannot bypass it.
 * Backup schema 2 serializes complete collaboration partitions and scoped Agent activity references, while schema 1 remains a single-Agent import format. Unknown future backup schemas and collaboration payloads with dangling or cross-Agent references are rejected instead of being normalized into partial rooms.
 * A conflict fork remaps the room ID, every Agent, message, turn, dispatch attempt, delivery key, event scope, pending-queue reference, activity reference, hidden-session reference, and active context as one transaction. The copy clears top-level and per-Agent runtime, official, catalog, Skill-fork, missing, recovery, Swarm, model-switch, and Goal bindings before it becomes visible.
 * Archived-room tombstones contain the room ID plus every Agent runtime and official identity so a secondary catalog row cannot resurrect an archived room. A collaboration-aware exporter refuses opaque future collaboration data rather than writing it back under schema 2.

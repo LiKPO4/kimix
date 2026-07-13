@@ -2,6 +2,7 @@ import type {
   RoomAgentDelivery,
   RoomAgentDeliveryAttempt,
   RoomAgentDeliveryStatus,
+  RoomAgentActivity,
   RoomUserMessage,
   Session,
   UserMessageImage,
@@ -12,6 +13,7 @@ type DeliveryIdentityFactory = (kind: "message" | "attempt" | "turn", roomAgentI
 
 export interface CreateRoomMessageInput {
   content: string;
+  outboundContent?: string;
   images?: UserMessageImage[];
   recipientAgentIds: string[];
   timestamp?: number;
@@ -113,6 +115,7 @@ export function createRoomMessageDispatch(
   const message: RoomUserMessage = {
     id: createId("message"),
     content: input.content,
+    outboundContent: input.outboundContent,
     images: input.images,
     recipientAgentIds,
     deliveries: Object.fromEntries(recipientAgentIds.map((roomAgentId) => [
@@ -139,6 +142,54 @@ export function createRoomMessageDispatch(
       updatedAt: timestamp,
     },
   };
+}
+
+const AGENT_RUNTIME_BLOCKING_STATUSES = new Set<RoomAgentActivity["status"]>([
+  "creating",
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+]);
+
+const DELIVERY_DISPATCH_BLOCKING_STATUSES = new Set<RoomAgentDeliveryStatus>([
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+  "indeterminate",
+]);
+
+export interface DispatchableRoomDelivery {
+  roomMessageId: string;
+  roomAgentId: string;
+}
+
+export function getDispatchableRoomDeliveries(
+  session: Session,
+  activities: Iterable<RoomAgentActivity> = [],
+): DispatchableRoomDelivery[] {
+  if (!session.collaboration) return [];
+  const activeByAgent = new Map<string, RoomAgentActivity>();
+  for (const activity of activities) {
+    if (activity.roomId === session.id) activeByAgent.set(activity.roomAgentId, activity);
+  }
+  const dispatchable: DispatchableRoomDelivery[] = [];
+  for (const agent of session.collaboration.agents) {
+    if (agent.removedAt || agent.archivedAt || agent.provisioningError || agent.recoveryIssue) continue;
+    const activity = activeByAgent.get(agent.id);
+    if (activity && AGENT_RUNTIME_BLOCKING_STATUSES.has(activity.status)) continue;
+    const agentDeliveries = session.collaboration.messages.flatMap((message) => {
+      const delivery = message.deliveries[agent.id];
+      return delivery ? [{ message, delivery }] : [];
+    });
+    if (agentDeliveries.some(({ delivery }) => DELIVERY_DISPATCH_BLOCKING_STATUSES.has(delivery.status))) continue;
+    const queued = agentDeliveries.find(({ delivery }) => delivery.status === "queued");
+    if (queued) dispatchable.push({ roomMessageId: queued.message.id, roomAgentId: agent.id });
+  }
+  return dispatchable;
 }
 
 export function setRoomDeliveryStatus(

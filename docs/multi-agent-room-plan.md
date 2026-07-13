@@ -522,6 +522,7 @@ git diff --check
 11. 阶段 4G 已实现逐 Agent 归档/恢复 `allSettled` 事务和可重试 lifecycleIssue；部分成功时房间保持可见，已归档 Agent 停止恢复和接收；移出次要 Agent 保留房间历史、转移官方绑定到独立会话，并阻止旧房间重新截获事件；活跃房间禁止归档和成员变更。
 12. 阶段 5 已接入 gated 添加弹层、模型/Provider 复用、创建失败重试、名称与 mention 编辑、单接收者选择、移出转独立会话和可靠单目标发送；房间运行期间禁止改变成员或创建尚未具备 Agent owner 的共享队列。
 13. 阶段 5 已通过 70 个测试文件、514 项测试、生产构建、OKF 校验和 diff check；仍需在真实应用中完成添加第二 Agent、重启恢复、跨 Provider 发送和视觉验收，gate 在此之前保持关闭。
+14. 阶段 6A 已建立纯数据路由和调度门禁：真实 Agent mention 大小写无关且按文本顺序去重，只有识别成功的房间 token 从 outbound payload 剥离；逐 Agent 调度器每次只取最早 queued，运行中或 indeterminate 的 Agent 不阻塞其他空闲 Agent。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

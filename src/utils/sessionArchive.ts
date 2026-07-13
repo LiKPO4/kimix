@@ -17,6 +17,7 @@ const ROOM_LIFECYCLE_ACTIVE_STATUSES = new Set([
   "running",
   "waiting_approval",
   "waiting_question",
+  "indeterminate",
 ]);
 
 export function roomHasActiveAgentWork(
