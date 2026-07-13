@@ -5,6 +5,8 @@ import {
   failRoomAgentProvisioning,
   getRoomPrimaryMetadataIdentity,
   isMultiAgentRoomUiEnabled,
+  setMultiAgentRoomUiEnabled,
+  MULTI_AGENT_ROOM_UI_CHANGED_EVENT,
   MULTI_AGENT_ROOM_UI_GATE_KEY,
   prepareRoomAgentProvisioning,
   renameRoomAgent,
@@ -30,9 +32,16 @@ describe("roomAgentProvisioning", () => {
   beforeEach(() => localStorage.clear());
 
   it("keeps the UI gate closed unless explicitly enabled", () => {
+    let changeCount = 0;
+    const handleChange = () => { changeCount += 1; };
+    window.addEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, handleChange);
     expect(isMultiAgentRoomUiEnabled()).toBe(false);
-    localStorage.setItem(MULTI_AGENT_ROOM_UI_GATE_KEY, "1");
+    expect(setMultiAgentRoomUiEnabled(true)).toBe(true);
     expect(isMultiAgentRoomUiEnabled()).toBe(true);
+    expect(setMultiAgentRoomUiEnabled(false)).toBe(true);
+    expect(localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY)).toBeNull();
+    window.removeEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, handleChange);
+    expect(changeCount).toBe(2);
   });
 
   it("upgrades an ordinary session and persists a stable pending Agent before official creation", () => {

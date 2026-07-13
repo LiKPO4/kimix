@@ -55,6 +55,7 @@ import {
   failRoomAgentProvisioning,
   getRoomPrimaryMetadataIdentity,
   isMultiAgentRoomUiEnabled,
+  MULTI_AGENT_ROOM_UI_CHANGED_EVENT,
   prepareRoomAgentProvisioning,
   renameRoomAgent,
   type RoomAgentDraft,
@@ -529,6 +530,7 @@ export function Composer() {
   const [draggingPendingId, setDraggingPendingId] = useState<string | null>(null);
   const [pendingMoreId, setPendingMoreId] = useState<string | null>(null);
   const [showAddRoomAgentDialog, setShowAddRoomAgentDialog] = useState(false);
+  const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled] = useState(() => isMultiAgentRoomUiEnabled());
   const [addRoomAgentTargetId, setAddRoomAgentTargetId] = useState<string | null>(null);
   const [addRoomAgentBusy, setAddRoomAgentBusy] = useState(false);
   const [addRoomAgentError, setAddRoomAgentError] = useState("");
@@ -544,7 +546,6 @@ export function Composer() {
   const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
-  const multiAgentRoomUiEnabled = isMultiAgentRoomUiEnabled();
   const activeRoomAgents = activeSession?.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
   const selectedRoomAgentIds = activeSession?.collaboration
     ? Array.from(new Set(activeSession.collaboration.defaultRecipientIds.filter((id) => activeRoomAgents.some((agent) => agent.id === id))))
@@ -613,6 +614,16 @@ export function Composer() {
   const shouldShowStopButton = activeSession?.collaboration ? roomStopTargets.length > 0 : isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
   const canTogglePlanMode = canUseComposer && hasUniqueMutationOwner && !isMutationOwnerRunning;
+
+  useEffect(() => {
+    const syncMultiAgentRoomGate = () => {
+      const enabled = isMultiAgentRoomUiEnabled();
+      setMultiAgentRoomUiEnabled(enabled);
+      if (!enabled) setShowAddRoomAgentDialog(false);
+    };
+    window.addEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, syncMultiAgentRoomGate);
+    return () => window.removeEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, syncMultiAgentRoomGate);
+  }, []);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

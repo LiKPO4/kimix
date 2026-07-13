@@ -7,11 +7,23 @@ import {
 import { roomHasActiveAgentWork } from "@/utils/sessionArchive";
 
 export const MULTI_AGENT_ROOM_UI_GATE_KEY = "kimix_multi_agent_room_ui";
+export const MULTI_AGENT_ROOM_UI_CHANGED_EVENT = "kimix:multi-agent-room-ui-changed";
 export const MAX_ROOM_AGENTS = 4;
 
 export function isMultiAgentRoomUiEnabled() {
   try {
     return localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setMultiAgentRoomUiEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.setItem(MULTI_AGENT_ROOM_UI_GATE_KEY, "1");
+    else localStorage.removeItem(MULTI_AGENT_ROOM_UI_GATE_KEY);
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(MULTI_AGENT_ROOM_UI_CHANGED_EVENT));
+    return true;
   } catch {
     return false;
   }

@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+* **Internal room acceptance has a safe local switch**: Settings can enable the default-off multi-Agent UI gate on one device, mounted Composers update immediately, and disabling access preserves all room data. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Collaboration rooms state their shared-worktree risk**: The Agent picker keeps a persistent warning that independently running participants share one project path and require explicit user coordination for overlapping file writes. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Orphan room sessions have an explicit non-destructive recovery path**: Global search lists unbound or malformed Kimix room sessions under “待找回 Agent”, shows recoverable identity hints, and opens them independently without guessing a room binding. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room lifecycle outcomes remain visible per Agent**: Archive and restore surfaces list every attempted Agent success/failure, while partial failures keep operation-specific status and the official error on the failed participant for retry. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

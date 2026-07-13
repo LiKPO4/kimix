@@ -547,6 +547,8 @@ git diff --check
 35. 阶段 8D 已通过 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BfAVTea0.js`。阶段 8 全部退出项完成。
 36. 阶段 9A 在房间 Agent 选择器中持续提示共享工作目录的并发写入风险，引导用户通过接收者、@Agent 和提示词明确文件修改分工；提示区使用独立边框、14px 区块间距和双侧内边距，避免与 Agent 列表或运行状态连成一块。
 37. 阶段 9A 已通过 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check；renderer hash 为 `assets/index-BN08iKjZ.js`。视觉验收按项目规则等待用户回传 2/4 Agent 与窄窗口截图。
+38. 阶段 9B 在设置“实验功能”中加入本机内部验收开关，通过 `localStorage + window event` 即时开放/关闭 Composer 添加 Agent 入口；默认仍关闭且关闭不删除房间数据。新增四 Agent 验收场景，覆盖同 Provider 不同模型、跨 Provider、长名称、四目标顺序、单 Provider 失败与其他 Agent 继续调度。
+39. 阶段 9B 运行冒烟确认 v2.15.35 设置开关、Composer `+` 入口和添加 Agent 弹层可见，模型列表复用本机 Kimi Code/opencode-go Provider，Kimi Server 超时时自动回退 SDK；未提交创建操作。用户验收步骤固定在 `docs/multi-agent-room-user-acceptance.md`。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

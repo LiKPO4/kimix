@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List } from "lucide-react";
+import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isWindows } from "@/utils/platform";
 import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
@@ -20,6 +20,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/sessionArchive";
 import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog } from "@electron/types/ipc";
 import { usePresence } from "@/hooks/usePresence";
+import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/roomAgentProvisioning";
 
 type FreezeReport = {
   at: string;
@@ -44,7 +45,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.15.34";
+const KIMIX_VERSION = "2.15.35";
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -486,6 +487,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
+  const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
 
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
@@ -2062,7 +2064,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Zap size={16} className="text-text-muted" />
-                    <span>工具加载</span>
+                    <span>实验功能</span>
                   </div>
                   <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                     <button
@@ -2074,7 +2076,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <RefreshCw size={15} className={experimentalSettingsLoading ? "kimix-spin" : ""} />
                       <span>刷新</span>
                     </button>
-                    {settingsDragHandle("experiment", "工具加载")}
+                    {settingsDragHandle("experiment", "实验功能")}
                   </div>
                 </div>
                 <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
@@ -2104,6 +2106,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
                         {experimentalKimiToolSelect ? "已开启" : "关闭"}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 14, paddingTop: 14 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !multiAgentRoomUiEnabled;
+                        if (setMultiAgentRoomUiEnabled(next)) setMultiAgentRoomUiEnabledState(next);
+                      }}
+                      className={`kimix-settings-permission ${multiAgentRoomUiEnabled ? "is-active" : ""}`}
+                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                    >
+                      <SelectionIndicator selected={multiAgentRoomUiEnabled} />
+                      <div className="kimix-settings-permission-copy">
+                        <div className="kimix-settings-permission-label flex items-center" style={{ gap: 7 }}>
+                          <Bot size={14} className="text-text-muted" />
+                          <span>多 Agent 房间（内部验收）</span>
+                        </div>
+                        <div className="kimix-settings-permission-desc">
+                          在 Composer 的 + 菜单开放“添加 Agent”。仅保存在本机；关闭后普通会话隐藏入口，已有房间数据仍保留。
+                        </div>
+                      </div>
+                      <span className={`rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                        {multiAgentRoomUiEnabled ? "验收中" : "关闭"}
                       </span>
                     </button>
                   </div>

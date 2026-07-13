@@ -3,11 +3,11 @@
 ## 2026-07-13 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成阶段 0-8；阶段 9A 已在 Agent 选择器持续提示共享工作目录与并行写入覆盖风险，并引导用户通过接收者、@Agent 和提示词划分文件职责；版本三处同步到 v2.15.34；全量 76 个测试文件、546 项测试、生产构建、OKF 校验和 diff check 通过，renderer 为 `assets/index-BN08iKjZ.js`。
-- 未完成：阶段 9 的 1/2/4 Agent、窄窗口、长名称、真实并行、同 Provider 不同模型、跨 Provider、单 Provider 失败、历史展开/滚动与截图验收。
+- 已完成：完成阶段 0-8；阶段 9A 已提示共享目录写入风险；阶段 9B 新增默认关闭的本机内部验收开关与四 Agent 接受场景，覆盖同 Provider 不同模型、跨 Provider、长名称、接收者顺序、单 Agent 失败和继续调度；真实 Electron 冒烟确认 v2.15.35、设置开关、Composer 入口、现有 Provider 模型列表与 Server 超时后的 SDK 回退均可用；全量 77 个测试文件、547 项测试和生产构建通过，renderer 为 `assets/index-qJx4eZSW.js`。
+- 未完成：用户按 `docs/multi-agent-room-user-acceptance.md` 完成真实 2/4 Agent、窄窗口、并行、重启、跨 Provider、历史展开/滚动与截图验收。
 - 阻塞：无。添加 Agent UI 必须等待 runtime owner、事件分区和 catalog 门禁通过。
-- 关键文件：`docs/multi-agent-room-plan.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/markdownExport.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：启动内部 gate，由用户按阶段 9 验收矩阵实测并回传版本 v2.15.34 的 2/4 Agent 与窄窗口截图；随后根据截图和真实运行日志收口问题。
+- 关键文件：`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/markdownExport.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
+- 下一步：用户直接在当前已启动且 gate 已开启的 v2.15.35 开发版按验收清单实测并回传截图；发现问题后继续在当前分支修复，全部通过后再决定推送/tag。
 - 验证补充：`pnpm exec tsc -p tsconfig.json --noEmit` 仍被仓库既有类型基线错误阻塞；本阶段涉及文件的新增类型问题已清理，正式门禁仍以现有 `test:run`、`build`、`knowledge:validate` 和 diff check 为准。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
