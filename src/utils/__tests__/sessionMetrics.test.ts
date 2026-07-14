@@ -5,6 +5,7 @@ import {
   isEmptyStatusUpdate,
   getLatestMetricStatus,
   getLatestMeaningfulStatus,
+  getSessionContextUsages,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
   shouldRenderStandaloneStatusUpdate,
@@ -201,6 +202,51 @@ describe("getSessionRecommendationMetrics", () => {
   it("defaults limit to 1 when given 0", () => {
     const metrics = getSessionRecommendationMetrics(makeSession([]), 0);
     expect(metrics.turnLimit).toBe(1);
+  });
+});
+
+describe("getSessionContextUsages", () => {
+  it("returns independent context usage for every active room agent", () => {
+    const session: Session = {
+      ...makeSession([]),
+      collaboration: {
+        schemaVersion: 1,
+        primaryMirrorUpdatedAt: 1,
+        primaryAgentId: "agent-a",
+        defaultRecipientIds: ["agent-a", "agent-b"],
+        messages: [],
+        agents: [
+          { id: "agent-a", displayName: "审查", mentionName: "review", modelAlias: "model-a", modelLabelSnapshot: "Model A", permissionMode: "manual", createdAt: 1 },
+          { id: "agent-b", displayName: "实现", mentionName: "build", modelAlias: "model-b", modelLabelSnapshot: "Model B", permissionMode: "manual", createdAt: 2 },
+          { id: "agent-removed", displayName: "旧 Agent", mentionName: "old", modelAlias: "model-old", permissionMode: "manual", createdAt: 3, removedAt: 4 },
+        ],
+        agentEvents: {
+          "agent-a": [{ id: "a-status", type: "status_update", timestamp: 2, contextSize: 0.25, contextLimit: 200000 }],
+          "agent-b": [{ id: "b-status", type: "status_update", timestamp: 3, contextSize: 90000, contextLimit: 300000 }],
+          "agent-removed": [{ id: "old-status", type: "status_update", timestamp: 4, contextSize: 1000, contextLimit: 10000 }],
+        },
+      },
+    };
+
+    expect(getSessionContextUsages(session)).toEqual([
+      expect.objectContaining({ agentId: "agent-a", modelLabel: "Model A", isPrimary: true, used: 50000, limit: 200000, percent: 25 }),
+      expect.objectContaining({ agentId: "agent-b", modelLabel: "Model B", isPrimary: false, used: 90000, limit: 300000, percent: 30 }),
+    ]);
+  });
+
+  it("does not report missing room context metrics as zero percent usage", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "model-a",
+      events: [{ id: "status", type: "status_update", timestamp: 1, tokenCount: 12, contextSize: 0, contextLimit: 256000 }],
+    };
+
+    expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
+      modelLabel: "model-a",
+      hasContext: false,
+      used: 0,
+      percent: 0,
+    }));
   });
 });
 

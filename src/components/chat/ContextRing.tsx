@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import { getSessionRecommendationMetrics, getLatestMetricStatus } from "@/utils/sessionMetrics";
+import { getSessionContextUsages, getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 
@@ -73,7 +73,8 @@ export function ContextRing() {
   const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
   const session = useLiveSession(currentSession?.id);
 
-  const latestStatus = getLatestMetricStatus(session?.events ?? []);
+  const contextUsages = useMemo(() => getSessionContextUsages(session), [session]);
+  const primaryContextUsage = contextUsages.find((usage) => usage.isPrimary) ?? contextUsages[0];
 
   // 从事件流中判断是否在压缩中：最近一个 compaction 事件是 begin 且后面没有 end
   const isCompacting = useMemo(() => {
@@ -92,12 +93,8 @@ export function ContextRing() {
     return hasBegin;
   }, [session?.events]);
 
-  const hasContextStatus = Boolean(latestStatus);
-  const contextSize = latestStatus?.contextSize ?? 0;
-  const contextLimit = latestStatus?.contextLimit ?? 256000;
-  const used = contextSize <= 1 ? contextSize * contextLimit : contextSize;
-  const percent = contextLimit > 0 ? Math.min(100, (used / contextLimit) * 100) : 0;
-  const remaining = Math.max(0, 100 - percent);
+  const hasContextStatus = primaryContextUsage?.hasContext ?? false;
+  const percent = primaryContextUsage?.percent ?? 0;
   const recommendation = getSessionRecommendationMetrics(session, sessionRecommendationTurnLimit);
   const isCurrentSessionRunning = isSessionRuntimeRunning(currentSession, runningSessionId);
   const compactRequestPending = compactStatus === "pending";
@@ -160,10 +157,17 @@ export function ContextRing() {
       </button>
       {showTooltip && (
         <div
-          className="absolute bottom-full right-0 z-[90] mb-2 w-[248px] rounded-xl border border-border-subtle bg-surface-elevated shadow-floating-token"
-          style={{ padding: "18px 20px" }}
+          className="absolute bottom-full right-0 z-[90] rounded-xl border border-border-subtle bg-surface-elevated shadow-floating-token"
+          style={{ width: 320, marginBottom: 8, padding: "18px 20px" }}
         >
-          <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
             <span className="text-[13px] text-text-muted">背景信息窗口：</span>
             <button
               type="button"
@@ -183,35 +187,61 @@ export function ContextRing() {
               ) : compactStatus === "sent" ? "已请求" : compactStatus === "failed" ? "压缩失败" : "压缩"}
             </button>
           </div>
-          {hasContextStatus ? (
-            <>
-              <div className="kimix-tabular-nums text-[14px] font-medium text-text-primary">
-                {percent.toFixed(0)}% 已用（剩余 {remaining.toFixed(0)}%）
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              marginTop: 14,
+            }}
+          >
+            {contextUsages.map((usage) => (
+              <div
+                key={usage.agentId}
+                className="rounded-lg border border-border-subtle bg-surface-secondary"
+                style={{ padding: "10px 16px" }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div className="min-w-0 truncate text-[13px] font-medium text-text-primary" title={`${usage.agentName} · ${usage.modelLabel}`}>
+                    {usage.agentName}
+                    <span className="font-normal text-text-muted"> · {usage.modelLabel}</span>
+                  </div>
+                  <span className="kimix-tabular-nums shrink-0 text-[13px] text-text-secondary">
+                    {usage.hasContext ? `${usage.percent.toFixed(0)}%` : "--"}
+                  </span>
+                </div>
+                <div className="kimix-tabular-nums text-[12.5px] text-text-muted" style={{ marginTop: 6 }}>
+                  {usage.hasContext
+                    ? `已用 ${formatK(usage.used)} 标记，共 ${formatK(usage.limit)}`
+                    : "等待上下文数据"}
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover" style={{ marginTop: 8 }}>
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${usage.percent}%`,
+                      backgroundColor: usage.percent >= 90 ? "var(--accent-danger)" : usage.percent >= 70 ? "var(--accent-warning)" : "var(--accent-primary)",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
               </div>
-              <div className="kimix-tabular-nums text-[13px] text-text-muted" style={{ marginTop: 4 }}>
-                已用 {formatK(used)} 标记，共 {formatK(contextLimit)}
+            ))}
+            {contextUsages.length === 0 && (
+              <div className="text-[13px] text-text-muted" style={{ padding: "8px 0" }}>
+                暂无可用 Agent。
               </div>
-            </>
-          ) : (
-            <>
-              <div className="text-[14px] font-medium text-text-primary">暂无上下文用量</div>
-              <div className="text-[13px] text-text-muted" style={{ marginTop: 4 }}>
-                发送消息后会显示 Tokens 和 Context。
-              </div>
-            </>
-          )}
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${percent}%`,
-                backgroundColor: percent >= 90 ? "var(--accent-danger)" : percent >= 70 ? "var(--accent-warning)" : "var(--accent-primary)",
-                transition: "width 0.3s ease",
-              }}
-            />
+            )}
           </div>
           {sessionRecommendationEnabled && (
-            <div className="mt-4 border-t border-border-subtle" style={{ paddingTop: 14 }}>
+            <div className="border-t border-border-subtle" style={{ marginTop: 16, paddingTop: 14 }}>
               <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 7 }}>
                 <span className="text-[13px] text-text-muted">推荐会话长度：</span>
                 <span className={`kimix-tabular-nums shrink-0 text-[13px] ${recommendation.remainingTurns === 0 ? "text-accent-warning" : "text-text-secondary"}`}>

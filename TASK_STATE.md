@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.60 分 Agent 背景信息用量
+
+- 当前目标：让多 Agent 房间的背景信息窗口显示每个模型各自的上下文用量；发布继续保持暂停。
+- 根因：`ContextRing` 只读取房间顶层 `session.events` 的 primary 兼容镜像，其他 Agent 各自 `collaboration.agentEvents` 中的 Context 指标没有参与展示；仅有 Tokens 而没有 Context 的状态还会被误报为 0% 已用。
+- 已完成：逐个读取未移除 Agent 的独立事件分区，分别计算模型上下文已用比例、标记数和上限；同名模型保留 Agent 名称用于区分，缺少正数 Context 指标时显示“等待上下文数据”。圆环和压缩操作仍绑定 primary Agent，不改变 runtime 控制边界。版本号三处同步至 v2.15.60；定向测试 1 个文件、26 项通过；全量测试 85 个文件、609 项通过；`pnpm build` 通过，renderer 为 `assets/index-CMOOuT9e.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 未完成：提交并启动新构建后等待用户截图验收；发布未经再次确认继续暂停。
+- 阻塞：无。
+- 关键文件：`src/components/chat/ContextRing.tsx`、`src/utils/sessionMetrics.ts`、`src/utils/__tests__/sessionMetrics.test.ts`。
+- 下一步：完成门禁并启动 v2.15.60；用户确认浮层中每个 Agent 的模型和上下文用量分别正确显示。
+
 ## 2026-07-14 v2.15.59 房间实时用户消息唯一投影
 
 - 当前目标：修复 v2.15.58 多 Agent 房间单次输入在运行中仍出现多条相同用户气泡的问题；发布保持暂停。

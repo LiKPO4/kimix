@@ -1,4 +1,5 @@
 import type { Session, TimelineEvent } from "@/types/ui";
+import { getPrimaryRoomAgent, getRoomAgentEvents, getRoomAgents } from "@/utils/collaborationRooms";
 
 export interface SessionRecommendationMetrics {
   turnCount: number;
@@ -34,6 +35,17 @@ export function isEmptyStatusUpdate(event: Extract<TimelineEvent, { type: "statu
     (event.contextSize ?? 0) === 0;
 }
 
+export interface SessionContextUsage {
+  agentId: string;
+  agentName: string;
+  modelLabel: string;
+  isPrimary: boolean;
+  hasContext: boolean;
+  used: number;
+  limit: number;
+  percent: number;
+}
+
 export function shouldShowInlineStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>) {
   const message = event.message?.trim() ?? "";
   if (message.startsWith("模型：")) return true;
@@ -67,6 +79,36 @@ export function getLatestMetricStatus(events: TimelineEvent[]) {
     if (hasMetricStatus(statuses[index]) && !isEmptyStatusUpdate(statuses[index])) return statuses[index];
   }
   return undefined;
+}
+
+export function getSessionContextUsages(session: Session | undefined): SessionContextUsage[] {
+  if (!session) return [];
+  const primaryAgentId = getPrimaryRoomAgent(session).id;
+  return getRoomAgents(session)
+    .filter((agent) => !agent.removedAt)
+    .map((agent) => {
+      const latestStatus = getLatestMetricStatus(getRoomAgentEvents(session, agent.id));
+      const contextSize = latestStatus?.contextSize;
+      const hasContext = typeof contextSize === "number" && Number.isFinite(contextSize) && contextSize > 0;
+      const reportedLimit = latestStatus?.contextLimit;
+      const limit = typeof reportedLimit === "number" && Number.isFinite(reportedLimit) && reportedLimit > 0
+        ? reportedLimit
+        : 256000;
+      const used = hasContext
+        ? Math.max(0, contextSize <= 1 ? contextSize * limit : contextSize)
+        : 0;
+      const percent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+      return {
+        agentId: agent.id,
+        agentName: agent.displayName,
+        modelLabel: agent.modelLabelSnapshot || agent.modelAlias || "模型未知",
+        isPrimary: agent.id === primaryAgentId,
+        hasContext,
+        used,
+        limit,
+        percent,
+      };
+    });
 }
 
 export function getSessionRecommendationMetrics(session: Session | undefined, turnLimit: number): SessionRecommendationMetrics {
