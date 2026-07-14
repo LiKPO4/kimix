@@ -1,4 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, Notification, session, shell } from "electron";
+import type { MessageBoxOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -31,7 +32,7 @@ import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataR
 import { activateWindow } from "./windowActivation";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
-import type { ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
+import type { AppSettings, ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -300,12 +301,10 @@ async function updateKimiCli() {
       upgradeError = err instanceof Error ? err.message : String(err);
     }
   } else {
-    const npmPath = await resolveCommand(process.platform === "win32" ? "npm.cmd" : "npm");
+    const npmPath = await resolveCommand("npm");
     if (npmPath) {
       try {
-        output = process.platform === "win32"
-          ? await runLongCommand("cmd.exe", ["/d", "/s", "/c", `"${npmPath}" install -g @moonshot-ai/kimi-code@latest`])
-          : await runLongCommand(npmPath, ["install", "-g", "@moonshot-ai/kimi-code@latest"]);
+        output = await runLongCommand(npmPath, ["install", "-g", "@moonshot-ai/kimi-code@latest"]);
       } catch (err) {
         upgradeError = err instanceof Error ? err.message : String(err);
       }
@@ -2237,7 +2236,7 @@ function listProjectPreviewFiles(projectPath: string, extensions?: unknown) {
     const stat = fs.statSync(fullPath);
     const ext = path.extname(relativePath).toLowerCase();
     const extension = ext.replace(/^\./, "");
-    if (!allowedExts.has(ext) || !READABLE_TEXT_EXTENSIONS.has(ext)) return;
+    if (!allowedExts.has(ext) || !isPreviewReadableExtension(ext)) return;
     if (stat.size > 1024 * 1024) return;
     results.push({
       path: relativePath.replace(/\\/g, "/"),
@@ -2300,13 +2299,14 @@ if (!gotTheLock) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-process.env.APP_ROOT = path.join(__dirname, "..");
+const APP_ROOT = path.join(__dirname, "..");
+process.env.APP_ROOT = APP_ROOT;
 
 export const DEV_SERVER_URL = process.env["ELECTRON_RENDERER_URL"] ?? process.env["VITE_DEV_SERVER_URL"];
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "..", "out", "renderer");
+const RENDERER_DIST = path.join(APP_ROOT, "..", "out", "renderer");
 
 process.env.VITE_PUBLIC = DEV_SERVER_URL
-  ? path.join(process.env.APP_ROOT, "public")
+  ? path.join(APP_ROOT, "public")
   : RENDERER_DIST;
 
 if (process.platform === "win32") {
@@ -2314,6 +2314,30 @@ if (process.platform === "win32") {
 }
 
 let mainWindow: BrowserWindow | null = null;
+
+function getDialogParent(): BrowserWindow | null {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+}
+
+function showOpenDialog(options: OpenDialogOptions) {
+  const parent = getDialogParent();
+  return parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options);
+}
+
+function showSaveDialog(options: SaveDialogOptions) {
+  const parent = getDialogParent();
+  return parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options);
+}
+
+function showMessageBox(options: MessageBoxOptions) {
+  const parent = getDialogParent();
+  return parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options);
+}
+
+function showMessageBoxSync(options: MessageBoxOptions) {
+  const parent = getDialogParent();
+  return parent ? dialog.showMessageBoxSync(parent, options) : dialog.showMessageBoxSync(options);
+}
 let isQuitting = false;
 let rendererReloadedAfterBlank = false;
 let taskbarAttentionActive = false;
@@ -2418,7 +2442,7 @@ function showTurnCompleteNotification(title: string, body: string, fallbackBody:
   });
   notification.on("click", () => {
     const notificationWindow = mainWindow;
-    if (!activateWindow(notificationWindow)) return;
+    if (!notificationWindow || !activateWindow(notificationWindow)) return;
     clearTaskbarAttention();
     if (target.sessionId && !notificationWindow.isDestroyed()) {
       notificationWindow.webContents.send("app:notification-clicked", target);
@@ -2847,7 +2871,7 @@ async function exportMarkdownDocument(request: unknown) {
     content: z.string().min(1),
   }).parse(request);
   const defaultName = `${sanitizeDownloadName(parsed.title || "Kimix 会话")}-${new Date().toISOString().replace(/[:.]/g, "-")}.md`;
-  const result = await dialog.showSaveDialog(mainWindow ?? undefined, {
+  const result = await showSaveDialog({
     title: "导出 Markdown",
     defaultPath: path.join(app.getPath("downloads"), defaultName),
     filters: [{ name: "Markdown", extensions: ["md"] }],
@@ -2864,7 +2888,7 @@ async function exportKimiSessionArchive(request: ExportSessionRequest) {
   let selectedAgent: NonNullable<ExportSessionRequest["agents"]>[number] | undefined;
   if (request.agents?.length) {
     const cancelId = request.agents.length;
-    const selection = await dialog.showMessageBox(mainWindow ?? undefined, {
+    const selection = await showMessageBox({
       type: "question",
       title: "选择导出 Agent",
       message: `要导出“${request.title || "协同房间"}”中的哪个 Agent？`,
@@ -3014,7 +3038,7 @@ async function exportSessionBackupArchive(request: unknown) {
     ? req.suggestedName.trim()
     : "Kimix 会话快照";
   const defaultName = `${sanitizeDownloadName(suggestedName)}-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
-  const result = await dialog.showSaveDialog(mainWindow ?? undefined, {
+  const result = await showSaveDialog({
     title: "导出 Kimix 会话快照",
     defaultPath: path.join(app.getPath("downloads"), defaultName),
     filters: [{ name: "Kimix 会话快照", extensions: ["zip"] }],
@@ -3114,7 +3138,7 @@ async function importSessionBackupArchive(request?: ImportSessionBackupRequest) 
     if (!await readFileIfExists(filePath)) throw new Error("快照文件不存在");
     return { path: filePath, snapshot: await readSessionBackupSnapshot(filePath), canceled: false };
   }
-  const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+  const result = await showOpenDialog({
     title: "导入 Kimix 会话快照",
     properties: ["openFile"],
     filters: [
@@ -3821,7 +3845,7 @@ function createWindow() {
     },
     autoHideMenuBar: true,
     frame: false,
-    icon: path.join(process.env.APP_ROOT, "..", "Kimix.png"),
+    icon: path.join(APP_ROOT, "..", "Kimix.png"),
   });
 
   // Kimi Code Host is the single event source for renderer sessions.
@@ -3997,7 +4021,7 @@ ipcMain.handle("project:chooseDirectory", async (_, request?: { defaultPath?: st
       request?.defaultPath && typeof request.defaultPath === "string"
         ? request.defaultPath
         : settingsService.loadSettings().defaultOpenDir;
-    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+    const result = await showOpenDialog({
       title: "选择额外工作目录",
       properties: ["openDirectory"],
       defaultPath,
@@ -4367,7 +4391,7 @@ ipcMain.handle("app:chooseExecutable", async () => {
     const defaultPath = settings.selectedExecutablePath && fs.existsSync(settings.selectedExecutablePath)
       ? path.dirname(settings.selectedExecutablePath)
       : settings.defaultOpenDir;
-    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+    const result = await showOpenDialog({
       title: "选择要启动的文件",
       defaultPath,
       properties: ["openFile"],
@@ -4393,7 +4417,7 @@ ipcMain.handle("app:launchExecutable", async () => {
   try {
     let filePath = settingsService.loadSettings().selectedExecutablePath;
     if (!filePath || !fs.existsSync(filePath)) {
-      const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      const result = await showOpenDialog({
         title: "选择要启动的文件",
         properties: ["openFile"],
         filters: process.platform === "win32"
@@ -4534,17 +4558,16 @@ ipcMain.handle("project:checkRevertConflicts", async (_, request: unknown) => {
       : [];
     const allowedRoots = [req.projectPath, ...additionalWorkDirs];
     const targets = req.files
-      .map((file) => {
+      .flatMap((file): projectService.RevertFileTarget[] => {
         if (file && typeof file === "object" && typeof (file as { path?: unknown }).path === "string" && (file as { path: string }).path.trim().length > 0) {
           const snapshotHash = (file as { snapshotHash?: unknown }).snapshotHash;
-          return {
+          return [{
             path: (file as { path: string }).path,
-            snapshotHash: typeof snapshotHash === "string" ? snapshotHash : undefined,
-          };
+            ...(typeof snapshotHash === "string" ? { snapshotHash } : {}),
+          }];
         }
-        return null;
-      })
-      .filter((file): file is projectService.RevertFileTarget => file !== null);
+        return [];
+      });
     for (const target of targets) {
       const resolved = path.isAbsolute(target.path) ? path.resolve(target.path) : path.resolve(req.projectPath, target.path);
       if (!allowedRoots.some((root) => isPathInside(root, resolved))) {
@@ -4694,7 +4717,7 @@ ipcMain.handle("project:importSkillArchive", async (_, request: unknown) => {
       : "";
     let archivePath = providedPath;
     if (!archivePath) {
-      const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      const result = await showOpenDialog({
         title: "选择 Skill 压缩包",
         properties: ["openFile"],
         filters: [{ name: "Skill 压缩包", extensions: ["zip"] }],
@@ -6699,7 +6722,7 @@ const SettingsSchema = z.object({
   fontSize: z.number().int().min(8).max(32).optional(),
   showThinking: z.boolean().optional(),
   detailedContext: z.boolean().optional(),
-  statusUpdateDisplay: z.enum(["each", "turn_end"]).optional(),
+  statusUpdateDisplay: z.enum(["each", "turn_end", "never"]).optional(),
   sessionRecommendationEnabled: z.boolean().optional(),
   sessionRecommendationTurnLimit: z.number().int().min(1).max(200).optional(),
   voiceShortcut: z.string().min(1).max(80).optional(),
@@ -6749,7 +6772,7 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
     if (!parsed.success) {
       return { success: false, error: "Invalid settings data" };
     }
-    settingsService.saveSettings(parsed.data);
+    settingsService.saveSettings(parsed.data as Partial<AppSettings>);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -7079,7 +7102,7 @@ app.on("before-quit", (event) => {
     const shutdownState = readScheduledShutdown();
     if (shutdownState) {
       const remainingSeconds = Math.max(0, Math.round((shutdownState.deadline - Date.now()) / 1000));
-      const response = dialog.showMessageBoxSync(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined, {
+      const response = showMessageBoxSync({
         type: "warning",
         buttons: ["退出并取消关机", "返回 Kimix"],
         defaultId: 1,
@@ -7100,7 +7123,7 @@ app.on("before-quit", (event) => {
         })
         .catch((err) => {
           console.error("[scheduled-shutdown] failed to cancel before quit:", err);
-          const forceResponse = dialog.showMessageBoxSync(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined, {
+          const forceResponse = showMessageBoxSync({
             type: "error",
             buttons: ["仍要退出", "返回 Kimix"],
             defaultId: 1,

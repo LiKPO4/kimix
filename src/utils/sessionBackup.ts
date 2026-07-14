@@ -6,6 +6,7 @@ import type {
   Project,
   RoomAgentActivity,
   RoomAgentDelivery,
+  RoomAgentDeliveryAttempt,
   RoomUserMessage,
   Session,
   TimelineEvent,
@@ -436,13 +437,13 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
       }
     }
   }
-  const remapAttempt = <T extends RoomAgentDelivery>(attempt: T): T => ({
+  const remapAttempt = <T extends RoomAgentDelivery | RoomAgentDeliveryAttempt>(attempt: T): T => ({
     ...attempt,
     agentTurnId: agentTurnIds.get(attempt.agentTurnId)!,
     dispatchAttemptId: attempt.dispatchAttemptId
       ? dispatchAttemptIds.get(attempt.dispatchAttemptId)
       : undefined,
-  });
+  } as T);
   const messages = collaboration.messages.map((message): RoomUserMessage => ({
     ...message,
     id: roomMessageIds.get(message.id)!,
@@ -460,7 +461,7 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
             return `user:${roomMessageIds.get(sourceId) ?? sourceId}`;
           }),
         } : undefined,
-        previousAttempts: delivery.previousAttempts?.map((attempt) => remapAttempt(attempt as RoomAgentDelivery)),
+        previousAttempts: delivery.previousAttempts?.map((attempt) => remapAttempt(attempt)),
       }];
     })),
   }));
@@ -626,14 +627,14 @@ function normalizeImportedSession(value: unknown, schemaVersion: number): Sessio
       ? value.permissionMode
       : undefined,
     planMode: typeof value.planMode === "boolean" ? value.planMode : undefined,
-    longTask: isRecord(value.longTask) ? value.longTask as Session["longTask"] : undefined,
+    longTask: isRecord(value.longTask) ? value.longTask as unknown as Session["longTask"] : undefined,
     title,
     projectPath,
     createdAt,
     updatedAt,
     archivedAt: optionalNumber(value.archivedAt),
     btwRounds: Array.isArray(value.btwRounds) ? value.btwRounds as Session["btwRounds"] : undefined,
-    officialGoal: isRecord(value.officialGoal) ? value.officialGoal as Session["officialGoal"] : undefined,
+    officialGoal: isRecord(value.officialGoal) ? value.officialGoal as unknown as Session["officialGoal"] : undefined,
     collaboration: undefined,
     unsupportedCollaboration: undefined,
     events: normalizeTimelineEvents(value.events),

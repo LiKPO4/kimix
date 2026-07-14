@@ -4,7 +4,6 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import type { TimelineEvent } from "@/types/ui";
-import type { RevertConflict } from "../../../../electron/types/ipc";
 import { sha256Hex } from "@/utils/hash";
 
 interface Change {
@@ -202,7 +201,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     const reverted = new Set(paths.map((path) => normalizePath(path, projectPath)));
     updateSession(currentSession.id, (session) => ({
       ...session,
-      events: session.events.flatMap((item) => {
+      events: session.events.flatMap<TimelineEvent>((item) => {
         if (item.type !== "change_summary") return [item];
         const eventIds = event.id.split(":");
         if (!eventIds.includes(item.id)) return [item];

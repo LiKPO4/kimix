@@ -40,6 +40,7 @@ function roomFixture(): Session {
           type: "assistant_message",
           timestamp: 4,
           content: "发现权限回滚问题",
+          isThinking: false,
           isComplete: true,
           roomAgentId: secondary.id,
           agentTurnId: "review-turn",

@@ -907,7 +907,7 @@ export function Composer() {
     const timer = window.setTimeout(() => {
       void window.api.searchProjectFiles({
         projectPath: currentProject.path,
-        sessionId: activeRuntimeSessionId,
+        sessionId: activeRuntimeSessionId ?? undefined,
         additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
         query,
         limit: 12,
@@ -2894,7 +2894,7 @@ export function Composer() {
       return;
     }
     let roomTarget: RoomAgentControlTarget | undefined;
-    let runtimeSessionId = getRuntimeSessionId(activeSession);
+    let runtimeSessionId: string | null | undefined = getRuntimeSessionId(activeSession);
     if (activeSession.collaboration) {
       try {
         const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession;
@@ -3279,7 +3279,7 @@ export function Composer() {
       }));
       return;
     }
-    await applyPermissionMode(mode, activeRuntimeSessionId, owner.roomAgentId, traceId);
+    await applyPermissionMode(mode, activeRuntimeSessionId ?? undefined, owner.roomAgentId, traceId);
   };
 
   useEffect(() => window.api.onKimiCodeEvent((payload) => {
@@ -3292,9 +3292,11 @@ export function Composer() {
       requestedMode: pending.mode,
       pendingSessionId: pending.sessionId,
       pendingRuntimeSessionId: pending.runtimeSessionId,
-      eventType: payload.type,
+      eventType: payload.event && typeof payload.event === "object" && "type" in payload.event
+        ? String(payload.event.type)
+        : undefined,
       eventSessionId: payload.sessionId,
-      eventRuntimeSessionId: payload.runtimeSessionId,
+      eventRuntimeSessionId: payload.sessionId,
       currentSessionId: useAppStore.getState().currentSession?.id,
       runningSessionId: useAppStore.getState().runningSessionId,
     });
@@ -3403,7 +3405,7 @@ export function Composer() {
       return;
     }
     let roomTarget: RoomAgentControlTarget | undefined;
-    let runtimeSessionId = getRuntimeSessionId(activeSession);
+    let runtimeSessionId: string | null | undefined = getRuntimeSessionId(activeSession);
     if (activeSession.collaboration) {
       try {
         const latest = useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession;

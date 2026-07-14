@@ -323,6 +323,7 @@ describe("persistLocalConversationState", () => {
       type: "steer_message",
       timestamp: 101,
       content: wrapped,
+      status: "sent",
     };
     const collaboration = createCollaborationStateFromSession({
       ...session,

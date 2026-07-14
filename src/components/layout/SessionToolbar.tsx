@@ -55,7 +55,7 @@ const longTaskStageLabels: Record<LongTaskStage, string> = {
   completed: "已完成",
 };
 
-function longTaskRecoveryLabel(recovery?: Session["longTask"] extends infer T ? T extends object ? T["recovery"] : never : never) {
+function longTaskRecoveryLabel(recovery?: NonNullable<Session["longTask"]>["recovery"]) {
   if (!recovery || recovery.status === "none") return "";
   if (recovery.status === "failed") return "可恢复 · 失败";
   if (recovery.status === "interrupted") return "可恢复 · 中断";

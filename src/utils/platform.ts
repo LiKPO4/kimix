@@ -8,8 +8,11 @@
 export type KimixPlatform = NodeJS.Platform | "browser-preview";
 
 export function getPlatform(): KimixPlatform | undefined {
-  if (typeof window !== "undefined" && window.api && (window.api as { platform?: KimixPlatform }).platform) {
-    return (window.api as { platform?: KimixPlatform }).platform;
+  const browserWindow = typeof window !== "undefined"
+    ? window as Window & { api?: { platform?: KimixPlatform } }
+    : undefined;
+  if (browserWindow?.api?.platform) {
+    return browserWindow.api.platform;
   }
   if (typeof process !== "undefined" && process.platform) {
     return process.platform;

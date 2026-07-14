@@ -120,6 +120,7 @@ export function EmptyState() {
 
   const handleSuggestion = async (text: string) => {
     let targetSession: Session | null = null;
+    let optimisticEventIds: string[] = [];
     try {
       if (suggestionLockRef.current) return;
       if (runningSessionId) return;
@@ -158,6 +159,7 @@ export function EmptyState() {
         tone: "info",
         parentEventId: userEvent.id,
       };
+      optimisticEventIds = [userEvent.id, responsePlaceholder.id, linkStatusEvent.id];
 
       updateSession(targetSession.id, (session) => ({
         ...session,
@@ -230,15 +232,11 @@ export function EmptyState() {
       const message = err instanceof Error ? err.message : String(err);
       setRunningSessionId(null);
       if (targetSession) {
-        if (isKimiActiveTurnError(message)) {
+        if (isKimiActiveTurnError(message) && optimisticEventIds.length > 0) {
           setRunningSessionId(targetSession.id);
           updateSession(targetSession.id, (session) => ({
             ...session,
-            events: session.events.filter((event) => (
-              event.id !== userEvent.id &&
-              event.id !== responsePlaceholder.id &&
-              event.id !== linkStatusEvent.id
-            )),
+            events: session.events.filter((event) => !optimisticEventIds.includes(event.id)),
             updatedAt: Date.now(),
           }));
           const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession?.id);

@@ -4,7 +4,7 @@ title: Release Process
 description: Kimix releases are built and published only by the tag-triggered GitHub Actions workflow with version-specific release notes.
 resource: https://github.com/LiKPO4/kimix/blob/master/.github/workflows/release.yml
 tags: [release, github-actions, versioning, operations]
-timestamp: "2026-07-13T21:58:00+08:00"
+timestamp: "2026-07-14T23:30:00+08:00"
 ---
 
 # Release Process
@@ -15,10 +15,12 @@ Kimix release artifacts are produced by GitHub Actions, not by manual local pack
 
 1. Synchronize the application version in `package.json`, `src/components/layout/Sidebar.tsx`, and `src/components/settings/SettingsPanel.tsx` when a product release is being prepared.
 2. Add `docs/release-notes/vX.Y.Z.md` with content specific to that version.
-3. Run `pnpm knowledge:validate`, tests, production build, and `git diff --check`.
+3. Run `pnpm typecheck`, tests, production build, `pnpm knowledge:validate`, and `git diff --check`.
 4. Commit and push the reviewed code to `master`.
 
 After changing `package.json`, `pnpm-lock.yaml`, or dependency state, run the `pnpm` validation commands serially. Multiple fresh `pnpm` processes may simultaneously enter dependency-status repair and race on `node_modules/.bin` or native rebuild output; that infrastructure failure does not provide valid test evidence. Non-`pnpm` read-only checks such as `git diff --check` may still run alongside a single package-manager command.
+
+`pnpm typecheck` is the strict compile-time gate for both process boundaries. It runs `tsconfig.node.json` for Electron main/preload code before `tsconfig.json` for renderer, shared utilities, and tests. Production builds are not accepted as type evidence because Vite transpiles TypeScript without proving these contracts. Unused-symbol cleanup remains outside this safety gate; strict nullability, unions, IPC payloads, and control-flow checks remain enabled.
 
 # Publish
 

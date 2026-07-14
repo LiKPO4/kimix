@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.16.1 TypeScript 严格门禁
+
+- 当前目标：清除仓库既有 TypeScript 类型基线错误，并让生产构建之外的严格类型检查成为可重复门禁。
+- 根因：Vite 生产构建只转译 TypeScript；根配置停在 ES2022、未统一检查 Electron 主进程，且未使用诊断与类型安全诊断混杂，导致 IPC 类型、事件状态、空值和不可达控制流长期漂移。
+- 已完成：主进程与渲染端严格类型错误全部清零；新增串行 `pnpm typecheck` 覆盖 `tsconfig.node.json` 与 `tsconfig.json`。修复 BTW SDK 侧问缺失执行器、空白页异常清理越界、消息分组不可达分支、设置“从不显示状态”无法持久化、窗口对话框重载及多个 IPC/事件类型漂移；补齐浏览器预览 API 契约；版本号三处同步至 v2.16.1。`pnpm typecheck` 通过；全量测试 85 个文件、614 项通过；`pnpm build` 通过，renderer 为 `assets/index-BiLF6AMh.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。
+- 未完成：等待用户最终运行验收。
+- 阻塞：无。
+- 关键文件：`tsconfig.json`、`tsconfig.node.json`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`electron/preload.ts`、`src/App.tsx`、`src/types/ui.ts`、`package.json`。
+- 下一步：用户用 v2.16.1 新构建重点验收 BTW、空白页快捷发送、消息分组和“从不显示状态”设置；本轮不推送、不打 tag、不发布。
+
 ## 2026-07-14 v2.16.0 多 Agent 房间发布
 
 - 当前目标：完成从多 Agent 房间开发起点到当前 HEAD 的全量审查，在没有未解决高风险问题时发布一个新的中版本。

@@ -12,7 +12,7 @@ export function createReplayLatestChannel<T>() {
     subscribe(listener: (value: T) => void) {
       listeners.add(listener);
       if (hasLatestValue) listener(latestValue);
-      return () => listeners.delete(listener);
+      return () => { listeners.delete(listener); };
     },
   };
 }

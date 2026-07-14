@@ -130,7 +130,7 @@ export function installNonVisionFetchInterceptor() {
       }
 
       const parsed = JSON.parse(body) as Record<string, unknown>;
-      const model = parsed.model;
+      const model = typeof parsed.model === "string" ? parsed.model : undefined;
 
       if (requestModelIsNonVision(model)) {
         interceptorLog("info", "fetch interceptor: known non-vision model, rewriting proactively", {

@@ -56,7 +56,7 @@ export function hasMalformedAssistantMarkdown(events: TimelineEvent[]) {
 }
 
 export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[] {
-  return events.flatMap((event) => {
+  return events.flatMap<TimelineEvent>((event) => {
     if (event.type === "error" && isLegacyKimiWorkDirError(event.message)) return [];
     if (event.type !== "user_message") return [event];
     const activation = parseKimiSkillActivation(event.content);
@@ -238,7 +238,7 @@ function isStaleRunningEvent(event: TimelineEvent, settledAt: number) {
 }
 
 export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.now()): TimelineEvent[] {
-  const settled = events.flatMap((event) => {
+  const settled = events.flatMap<TimelineEvent>((event) => {
     if (event.type === "subagent") {
       if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
         return [{ ...event, status: "completed" as const }];
@@ -273,7 +273,7 @@ export function settleFailedEvents(
   message = "当前轮执行失败。",
   settledAt = Date.now(),
 ): TimelineEvent[] {
-  const settled = events.flatMap((event) => {
+  const settled = events.flatMap<TimelineEvent>((event) => {
     if (event.type === "subagent" && ["queued", "running", "suspended"].includes(event.status)) {
       return [{ ...event, status: "error" as const, error: event.error ?? message }];
     }

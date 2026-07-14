@@ -284,7 +284,7 @@ describe("mapStreamEvent", () => {
     const user = event as Extract<TimelineEvent, { type: "user_message" }>;
     expect(user.content).toBe("Look at this");
     expect(user.images).toHaveLength(1);
-    expect(user.images[0].dataUrl).toBe("data:image/png;base64,abc");
+    expect(user.images![0].dataUrl).toBe("data:image/png;base64,abc");
   });
 
   it("extracts images from camelCase imageUrl user_input", () => {
@@ -300,8 +300,8 @@ describe("mapStreamEvent", () => {
     const user = event as Extract<TimelineEvent, { type: "user_message" }>;
     expect(user.content).toBe("Look at this");
     expect(user.images).toHaveLength(1);
-    expect(user.images[0].name).toBe("shot.png");
-    expect(user.images[0].dataUrl).toBe("data:image/png;base64,abc");
+    expect(user.images![0].name).toBe("shot.png");
+    expect(user.images![0].dataUrl).toBe("data:image/png;base64,abc");
   });
 });
 
@@ -1137,9 +1137,9 @@ describe("mergeEvents", () => {
 
   it("merges question_request by requestId", () => {
     const existing: TimelineEvent[] = [
-      { id: "1", type: "question_request", timestamp: 1, requestId: "q1", toolCallId: "", questions: [], status: "pending" },
+      { id: "1", type: "question_request", timestamp: 1, requestId: "q1", rpcRequestId: "rpc-q1", toolCallId: "", questions: [], status: "pending" },
     ];
-    const incoming: TimelineEvent = { id: "2", type: "question_request", timestamp: 2, requestId: "q1", toolCallId: "", questions: [], status: "answered" };
+    const incoming: TimelineEvent = { id: "2", type: "question_request", timestamp: 2, requestId: "q1", rpcRequestId: "rpc-q1", toolCallId: "", questions: [], status: "answered" };
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(1);
     expect((result[0] as Extract<TimelineEvent, { type: "question_request" }>).status).toBe("answered");

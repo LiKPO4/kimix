@@ -29,7 +29,7 @@ function writeFileAtomic(filePath: string, data: string) {
   try {
     const fd = fs.openSync(tempPath, "w");
     try {
-      fs.writeSync(fd, data, "utf-8");
+      fs.writeFileSync(fd, data, "utf-8");
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
@@ -213,7 +213,7 @@ function readStateFile(statePath: string): LongTaskSummary | null {
         return {
           ...(parsed as LongTaskSummary),
           activeAgent: "executor",
-          stage: parsed.stage === "reviewing" ? "paused" : parsed.stage,
+          stage: parsed.stage === "reviewing" ? "paused" : (parsed.stage ?? "drafting"),
         };
       }
       return parsed as LongTaskSummary;

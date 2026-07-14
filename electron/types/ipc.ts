@@ -1417,7 +1417,7 @@ export type AppSettings = {
   fontSizeBaselineVersion?: number;
   showThinking: boolean;
   detailedContext: boolean;
-  statusUpdateDisplay: "each" | "turn_end";
+  statusUpdateDisplay: "each" | "turn_end" | "never";
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;
@@ -1514,6 +1514,7 @@ export type KimiCodeSessionInfo = {
   sessionId: string;
   workDir: string;
   status: KimiCodeEngineStatus;
+  model?: string | null;
   additionalDirs?: readonly string[];
 };
 

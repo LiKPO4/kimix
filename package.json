@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -26,6 +26,7 @@
     "dist:linux": "electron-vite build && electron-builder --linux",
     "test": "vitest",
     "test:run": "vitest run",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.json --noEmit",
     "knowledge:validate": "node scripts/validate-okf.mjs",
     "knowledge:validate:spec": "node scripts/validate-okf.mjs --spec-only",
     "knowledge:audit": "node scripts/validate-okf.mjs --audit --max-age-days 180",

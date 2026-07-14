@@ -644,27 +644,7 @@ export function buildRenderItems(
         if (mergedChangeSummary) changeSummaryAttached = true;
         continue;
       }
-      if (
-        (event.type !== "assistant_message" || assistantEventIds.has(event.id)) &&
-        event.type !== "assistant_message" &&
-        event.type !== "approval_request" &&
-        event.type !== "question_request" &&
-        event.type !== "file_artifact" &&
-        event.type !== "change_summary" &&
-        event.type !== "session_recommendation" &&
-        event.type !== "diff" &&
-        event.type !== "error" &&
-        event.type !== "compaction"
-      ) {
-        continue;
-      }
-      if (event.type === "assistant_message" && !toolsAttached) {
-        items.push({ type: "event", event, turnStartedAt, leadingTools: tools, leadingSubagents: subagents, leadingHooks: hooks, changedFiles: Array.from(changedFiles), changeSummary: mergedChangeSummary ?? undefined, trailingStatuses: trailingStatusEvents });
-        toolsAttached = true;
-        assistantAttached = true;
-        if (mergedChangeSummary) changeSummaryAttached = true;
-        continue;
-      }
+      if (event.type === "user_message" || event.type === "todo") continue;
       if (!toolsAttached) {
         if (tools.length > 0) {
           pushStandaloneTools(tools, turnStartedAt);
@@ -873,7 +853,7 @@ export const ChatThread = memo(function ChatThread() {
   const showScrollToBottomRef = useRef(false);
   const scrollToBottomButtonRef = useRef<HTMLButtonElement>(null);
   const sessionAutoBottomUntilRef = useRef(0);
-  const sessionAutoBottomTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const sessionAutoBottomTimerRef = useRef<number | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
   const pendingOlderItemsScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingTailExpandScrollAnchorRef = useRef<ViewportAnchor | null>(null);
@@ -1355,8 +1335,9 @@ export const ChatThread = memo(function ChatThread() {
       if (!detail?.sessionId || !detail.eventId) return;
       pendingFocusEventRef.current = { sessionId: detail.sessionId, eventId: detail.eventId, searchText: detail.searchText };
       if (session?.id === detail.sessionId) {
+        const eventId = detail.eventId;
         window.requestAnimationFrame(() => {
-          if (focusTimelineEvent(detail.eventId, detail.searchText)) {
+          if (focusTimelineEvent(eventId, detail.searchText)) {
             pendingFocusEventRef.current = null;
           }
         });
@@ -1728,7 +1709,7 @@ export const ChatThread = memo(function ChatThread() {
   // triggers forced layout. Keep it out of the hot scroll path; scrolling only
   // schedules one idle capture after the wheel/touch stream settles.
   const anchorCaptureFrameRef = useRef(0);
-  const anchorCaptureIdleTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const anchorCaptureIdleTimerRef = useRef<number | null>(null);
   const scheduleAnchorCapture = () => {
     if (anchorCaptureFrameRef.current) return;
     anchorCaptureFrameRef.current = window.requestAnimationFrame(() => {
@@ -1854,7 +1835,7 @@ export const ChatThread = memo(function ChatThread() {
   }), [fullVisibleRenderItems]);
   const visibleRenderItems = isInitialTailOnly ? initialTailRenderItems : fullVisibleRenderItems;
   const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
-  const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId, hasActiveTurn));
+  const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId ?? undefined, hasActiveTurn));
   const isRestoringOfficialHistory = Boolean(session?.isLoading && roomTimeline.length > 0);
   const isSessionScrollPrimed = !session?.id || primedSessionId === session.id;
   const eagerMarkdown = Boolean(session?.id && (
@@ -2139,11 +2120,11 @@ export const ChatThread = memo(function ChatThread() {
             >
               {item.type === "tool_group"
                 ? <ToolGroup tools={item.tools} />
-                : item.type === "plan_preview"
-                  ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId} />
+                  : item.type === "plan_preview"
+                  ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId ?? undefined} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} />
+                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} />
               }
             </div>
           ))}

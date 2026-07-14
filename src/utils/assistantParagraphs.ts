@@ -216,7 +216,7 @@ export function normalizeIndentedFencedCodeBlocks(content: string) {
       continue;
     }
 
-    if (insideIndentedFence && line.trim() && line.match(/^\s*/)?.[0].length < fenceIndent) {
+    if (insideIndentedFence && line.trim() && (line.match(/^\s*/)?.[0].length ?? 0) < fenceIndent) {
       normalized.push(`${" ".repeat(fenceIndent)}${line}`);
       continue;
     }

@@ -462,12 +462,12 @@ const api = {
   onKimiCodeEvent: (callback: (payload: KimiCodeEventPayload) => void) => {
     const handler = (_: unknown, payload: KimiCodeEventPayload) => callback(payload);
     ipcRenderer.on("kimi-code:event", handler);
-    return () => ipcRenderer.off("kimi-code:event", handler);
+    return () => { ipcRenderer.off("kimi-code:event", handler); };
   },
   onKimiCodeStatus: (callback: (payload: KimiCodeStatusPayload) => void) => {
     const handler = (_: unknown, payload: KimiCodeStatusPayload) => callback(payload);
     ipcRenderer.on("kimi-code:status", handler);
-    return () => ipcRenderer.off("kimi-code:status", handler);
+    return () => { ipcRenderer.off("kimi-code:status", handler); };
   },
 
   // App
@@ -480,7 +480,7 @@ const api = {
   onDownloadUpdateProgress: (callback: (payload: DownloadUpdateProgress) => void) => {
     const handler = (_: unknown, payload: DownloadUpdateProgress) => callback(payload);
     ipcRenderer.on("app:downloadUpdateProgress", handler);
-    return () => ipcRenderer.off("app:downloadUpdateProgress", handler);
+    return () => { ipcRenderer.off("app:downloadUpdateProgress", handler); };
   },
   writeDiag: (req?: LoggerWriteRequest): Promise<LoggerWriteResponse> =>
     ipcRenderer.invoke("app:writeDiag", req),
@@ -506,7 +506,7 @@ const api = {
   onNotificationClick: (callback: (payload: NotificationClickPayload) => void) => {
     const handler = (_: unknown, payload: NotificationClickPayload) => callback(payload);
     ipcRenderer.on("app:notification-clicked", handler);
-    return () => ipcRenderer.off("app:notification-clicked", handler);
+    return () => { ipcRenderer.off("app:notification-clicked", handler); };
   },
   getDraggedFilePath: (file: File): string => webUtils.getPathForFile(file),
   reportRendererHeartbeat: (payload: RendererHeartbeatPayload): void =>
@@ -536,14 +536,14 @@ const api = {
   onWindowMaximizedChange: (callback: (payload: { maximized: boolean; fullscreen?: boolean }) => void) => {
     const handler = (_: unknown, payload: { maximized: boolean; fullscreen?: boolean }) => callback(payload);
     ipcRenderer.on("window:maximized-change", handler);
-    return () => ipcRenderer.off("window:maximized-change", handler);
+    return () => { ipcRenderer.off("window:maximized-change", handler); };
   },
   closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
 
   onMainLog: (callback: (payload: { level: string; message: string }) => void) => {
     const handler = (_: unknown, payload: { level: string; message: string }) => callback(payload);
     ipcRenderer.on("kimix:main-log", handler);
-    return () => ipcRenderer.off("kimix:main-log", handler);
+    return () => { ipcRenderer.off("kimix:main-log", handler); };
   },
 };
 

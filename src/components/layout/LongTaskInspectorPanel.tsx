@@ -49,7 +49,7 @@ import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isWindows } from "@/utils/platform";
-import { alignSessionDiffsToGitStatus } from "@/utils/diff";
+import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 
 const GIT_GRAPH_PAGE_SIZE = 100;
 
@@ -234,7 +234,7 @@ interface LongTaskInspectorPanelProps {
   backgroundTasks: LongTaskBackgroundTaskView[];
   backgroundTasksLoading: boolean;
   backgroundTasksError: string | null;
-  sessionDiffs: { id: string; filePath: string; additions: number; deletions: number; timestamp: number }[];
+  sessionDiffs: SessionDiffEntry[];
   btwState: BtwPanelState;
   btwDisabled: boolean;
   defaultPlanMode: boolean;

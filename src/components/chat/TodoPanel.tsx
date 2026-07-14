@@ -46,9 +46,9 @@ function extractTodoItemsFromTool(event: Extract<TimelineEvent, { type: "tool_ca
   if (!isTodoToolName(event.toolName)) return null;
   const hasTodoArgs = Array.isArray(event.arguments.todos) || Array.isArray(event.arguments.items);
   if (!hasTodoArgs) return null;
-  const rawItems = Array.isArray(event.arguments.todos)
+  const rawItems: unknown[] = Array.isArray(event.arguments.todos)
     ? event.arguments.todos
-    : event.arguments.items;
+    : Array.isArray(event.arguments.items) ? event.arguments.items : [];
 
   return rawItems.flatMap((item, index) => {
     if (!item || typeof item !== "object") return [];

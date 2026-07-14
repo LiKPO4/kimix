@@ -142,7 +142,7 @@ interface HandoffJob {
   projectPath: string;
   recommendationEventId: string;
   events: TimelineEvent[];
-  timeoutId: ReturnType<typeof window.setTimeout>;
+  timeoutId: number;
 }
 
 interface StartHandoffDetail {
@@ -914,7 +914,7 @@ function markLongTaskRuntimeActivity(uiSessionId: string, runtimeSessionId: stri
   store.updateSession(uiSessionId, (session) => {
     if (!session.longTask) return session;
     let stage = session.longTask.stage;
-    let recovery = session.longTask.recovery ?? null;
+    let recovery: NonNullable<Session["longTask"]>["recovery"] | null = session.longTask.recovery ?? null;
     if (status === "interrupted" || status === "error") {
       stage = "paused";
       recovery = buildLongTaskRecovery(role, status);
@@ -1034,8 +1034,8 @@ function attachLongTaskAgentRole(event: TimelineEvent, role: "executor" | "revie
 function toLongTaskMeta(summary: {
   id: string;
   title: string;
-  stage: Session["longTask"] extends infer T ? T extends object ? T["stage"] : never : never;
-  activeAgent: Session["longTask"] extends infer T ? T extends object ? T["activeAgent"] : never : never;
+  stage: NonNullable<Session["longTask"]>["stage"];
+  activeAgent: NonNullable<Session["longTask"]>["activeAgent"];
   executorSessionId: string;
   reviewerSessionId: string;
   bigPlanPath: string;
@@ -1493,7 +1493,7 @@ function App() {
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
-  const goalRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const goalRefreshTimersRef = useRef<Map<string, number>>(new Map());
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
@@ -1799,7 +1799,7 @@ function App() {
       }
 
       if (latestProxyIndex === -1) {
-        if (!detail || status === "running") return session;
+        if (!detail) return session;
         return {
           ...session,
           events: [
@@ -2073,8 +2073,9 @@ function App() {
         }).catch(logError("updateLongTaskState"));
       }
       setRunningSessionId(uiSessionId);
+      const latestLongTask = latestSession.longTask;
       void window.api.sendKimiCodePrompt({
-      sessionId: latestSession.longTask.reviewerSessionId,
+      sessionId: latestLongTask.reviewerSessionId,
       content: buildLongTaskReviewPrompt(latestForPrompt),
     }).then((res) => {
       if (res.success) return;
@@ -2084,7 +2085,7 @@ function App() {
         try {
           await recoverLongTaskReviewerSession(
             uiSessionId,
-            latestSession.longTask.reviewerSessionId,
+            latestLongTask.reviewerSessionId,
             buildLongTaskReviewPrompt(useSessionStore.getState().sessions.find((session) => session.id === uiSessionId) ?? latestForPrompt),
           );
           return;
@@ -2235,7 +2236,7 @@ function App() {
             if (retryRes.success) return;
             message = retryRes.error;
           } else {
-            message = recoveryRes.error;
+            message = "error" in recoveryRes ? recoveryRes.error : "恢复 Agent 会话失败";
           }
         }
         if (isKimiAbortError(message)) {
@@ -2658,7 +2659,9 @@ function App() {
                     roomId: session.id,
                     roomAgentId: ownerAgentId,
                     runtimeSessionId: historySessionId,
-                    status: runtimeStatus?.success ? runtimeStatus.data.engineStatus : "running",
+                    status: runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
+                      ? runtimeStatus.data.engineStatus
+                      : "running",
                     updatedAt: Date.now(),
                   });
                 }
@@ -2953,10 +2956,11 @@ function App() {
       })) {
         return;
       }
+      const modelSwitchedAt = targetAgentSession?.modelSwitchedAt;
       if (
         mappedForRoom.type === "status_update" &&
-        targetAgentSession?.modelSwitchedAt &&
-        !targetAgentSession.events.some((event) => event.type === "assistant_message" && event.timestamp > targetAgentSession.modelSwitchedAt)
+        modelSwitchedAt &&
+        !targetAgentSession.events.some((event) => event.type === "assistant_message" && event.timestamp > modelSwitchedAt)
       ) {
         return;
       }
@@ -3122,7 +3126,8 @@ function App() {
       // longTask 会话由专属监听器 (unsubscribeLongTaskStatus) 单独处理，通用监听器跳过避免重复执行
       if (targetSession?.longTask) return;
 
-      if (["running", "waiting_approval", "waiting_question"].includes(payload.status)) {
+      if (isActiveKimiCodeEngineStatus(payload.status)) {
+        const activeStatus = payload.status;
         runtimeLastStreamEventAtRef.current.set(statusRuntimeSessionId, Date.now());
         const runningSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         const runningEvents = runningSession && roomAgentId
@@ -3142,7 +3147,7 @@ function App() {
             roomId: uiSessionId,
             roomAgentId,
             runtimeSessionId: statusRuntimeSessionId,
-            status: payload.status,
+            status: activeStatus,
             roomMessageId: previous?.roomMessageId,
             activeTurnId: previous?.activeTurnId,
             startedAt: previous?.startedAt ?? Date.now(),
@@ -3153,7 +3158,7 @@ function App() {
               session,
               previous.roomMessageId,
               roomAgentId,
-              payload.status,
+              activeStatus,
             ));
           }
           if (runningSession && isPrimaryRoomAgent(runningSession, roomAgentId)) {
@@ -3163,7 +3168,8 @@ function App() {
         return;
       }
 
-      if (!["completed", "error", "interrupted"].includes(payload.status)) return;
+      if (!isTerminalKimiCodeEngineStatus(payload.status) || payload.status === "idle") return;
+      const terminalStatus = payload.status;
 
       if (payload.migratedTo) {
         cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
@@ -3191,7 +3197,7 @@ function App() {
           roomId: uiSessionId,
           roomAgentId,
           runtimeSessionId: statusRuntimeSessionId,
-          status: payload.status,
+          status: terminalStatus,
           updatedAt: Date.now(),
         });
         if (terminalActivity?.roomMessageId) {
@@ -3199,7 +3205,7 @@ function App() {
             session,
             terminalActivity.roomMessageId,
             roomAgentId,
-            payload.status,
+            terminalStatus,
           ));
         }
       }
@@ -3576,7 +3582,7 @@ function App() {
         }
         runtimeSessionId = resolvedRuntimeSessionId;
         syncSessionSwarmMode(session.id, response.data, roomAgentId);
-        if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) {
+        if (isActiveKimiCodeEngineStatus(response.data.engineStatus)) {
           setRoomAgentActivity({
             roomId: session.id,
             roomAgentId,
@@ -3621,6 +3627,8 @@ function App() {
           }
           return;
         }
+        if (!isTerminalKimiCodeEngineStatus(response.data.engineStatus)) return;
+        const terminalStatus = response.data.engineStatus;
         if (Date.now() - reconciliationStartedAt < 2500) return;
 
         const terminalPolls = (runtimeTerminalPollRef.current.get(runtimeSessionId) ?? 0) + 1;
@@ -3647,7 +3655,7 @@ function App() {
           roomId: session.id,
           roomAgentId,
           runtimeSessionId,
-          status: response.data.engineStatus,
+          status: terminalStatus,
           updatedAt: Date.now(),
         });
         if (isPrimaryRoomAgent(session, roomAgentId)) setRunningSessionId(null);

@@ -177,6 +177,7 @@ export type KimiCodeSessionSummary = {
   createdAt: number;
   updatedAt: number;
   archived?: boolean;
+  source?: "server" | "sdk";
   metadata?: JsonObject;
   additionalDirs?: readonly string[];
 };
@@ -304,6 +305,8 @@ export type KimiCodeBackgroundTaskInfo = {
   subagentType?: string;
   failureReason?: string;
   outputBytes?: number;
+  outputPreview?: string;
+  transport?: "server" | "sdk";
 };
 
 export type KimiCodeServerTerminalInfo = {
@@ -1078,7 +1081,7 @@ async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManag
 function scheduleServerRecovery() {
   const status = kimiCodeServerHost.getStatus();
   if (!status.enabled || kimiCodeServerHost.isReady() || serverRecoveryPromise || Date.now() < nextServerRecoveryAt) return;
-  if (!isKimiCodeServerSessionRoutingEnabled(process.env, settingsService.loadSettings())) return;
+  if (!isKimiCodeServerSessionRoutingEnabled(process.env)) return;
   nextServerRecoveryAt = Date.now() + 30_000;
   serverRecoveryPromise = kimiCodeServerHost.start()
     .then(() => undefined)
@@ -1179,6 +1182,23 @@ export async function askBtw(
   } finally {
     managed.btwRuns.delete(agentId);
     managed.hiddenAgentIds.delete(agentId);
+  }
+}
+
+async function runWithInteractiveAgent<T>(
+  harness: KimiHarnessLike,
+  agentId: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (harness.withInteractiveAgent) {
+    return await harness.withInteractiveAgent(agentId, run);
+  }
+  const previousAgentId = harness.interactiveAgentId;
+  harness.interactiveAgentId = agentId;
+  try {
+    return await run();
+  } finally {
+    harness.interactiveAgentId = previousAgentId;
   }
 }
 
@@ -1314,9 +1334,9 @@ function toArchivedSessionSummary(session: ServerSession): KimiCodeArchivedSessi
     id: session.id,
     title: session.title?.trim() || "未命名对话",
     projectPath: serverSessionProjectPath(session),
-    archivedAt: session.updated_at,
-    updatedAt: session.updated_at,
-    createdAt: session.created_at,
+    archivedAt: session.updated_at ?? "",
+    updatedAt: session.updated_at ?? "",
+    createdAt: session.created_at ?? "",
   };
 }
 
@@ -2139,10 +2159,10 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
   }
   const catalogUrl = sdk.DEFAULT_CATALOG_URL ?? "https://models.dev/api.json";
   const catalog = await sdk.fetchCatalog(catalogUrl);
-  return Object.entries(catalog)
-    .map(([providerId, provider]) => {
+  const entries: KimiCodeProviderCatalogEntry[] = [];
+  for (const [providerId, provider] of Object.entries(catalog)) {
       const wire = sdk.inferWireType?.(provider);
-      if (wire !== "openai") return null;
+      if (wire !== "openai") continue;
       const baseUrl = sdk.catalogBaseUrl?.(provider, wire) ?? null;
       const models = (sdk.catalogProviderModels?.(provider) ?? [])
         .filter((model) => typeof model.id === "string" && model.id.length > 0)
@@ -2157,17 +2177,16 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
           };
         })
         .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
-      if (!baseUrl || models.length === 0) return null;
-      return {
+      if (!baseUrl || models.length === 0) continue;
+      entries.push({
         providerId,
         type: wire,
         baseUrl,
         modelCount: models.length,
         models,
-      };
-    })
-    .filter((entry): entry is KimiCodeProviderCatalogEntry => Boolean(entry))
-    .sort((a, b) => a.providerId.localeCompare(b.providerId, "zh-CN"));
+      });
+  }
+  return entries.sort((a, b) => a.providerId.localeCompare(b.providerId, "zh-CN"));
 }
 
 export async function closeSession(sessionId: string): Promise<void> {
@@ -2237,21 +2256,26 @@ export async function runOneShotPrompt(options: {
   let ended = false;
   let endError: string | undefined;
 
-  const unsubscribe = session.onEvent((event) => {
+  const unsubscribe = session.onEvent((rawEvent) => {
+    if (!rawEvent || typeof rawEvent !== "object" || !("type" in rawEvent)) return;
+    const event = rawEvent as Record<string, unknown>;
     if (event.type === "assistant.delta") {
       if (typeof event.delta === "string") parts.push(event.delta);
     }
     if (event.type === "turn.ended") {
       ended = true;
       if (event.reason === "failed" || event.reason === "error") {
-        endError = event.error?.code
-          ? `${event.error.code}: ${event.error.message}`
+        const eventError = event.error && typeof event.error === "object"
+          ? event.error as Record<string, unknown>
+          : undefined;
+        endError = typeof eventError?.code === "string"
+          ? `${eventError.code}: ${String(eventError.message ?? "")}`
           : event.reason;
       }
     }
     if (event.type === "error") {
       ended = true;
-      endError = event.message ?? "Unknown SDK error";
+      endError = typeof event.message === "string" ? event.message : "Unknown SDK error";
     }
   });
 

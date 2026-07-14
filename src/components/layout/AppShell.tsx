@@ -39,7 +39,7 @@ import { TextContextMenu } from "@/components/chat/TextContextMenu";
 import { SessionToolbar } from "./SessionToolbar";
 import { DiffPanel } from "./DiffPanel";
 import { ToastSystem } from "./ToastSystem";
-import { LongTaskInspectorPanel, type BtwPanelState, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
+import { LongTaskInspectorPanel, type BtwPanelState, type HiddenComposerCardEntry, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
@@ -162,7 +162,6 @@ const HELP_TOPICS: Record<MenuAction, { title: string; body: string; url?: strin
   "close-chat": { title: "", body: "" },
   "new-window": { title: "", body: "" },
   "new-chat": { title: "", body: "" },
-  "quick-chat": { title: "", body: "" },
   "open-project": { title: "", body: "" },
   settings: { title: "", body: "" },
   logout: { title: "", body: "" },
@@ -1034,7 +1033,7 @@ export function AppShell() {
     setPreviewResolvedPath("");
     window.api.readTextFile({
       projectPath: previewProjectPath,
-      sessionId: liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : undefined,
+      sessionId: liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) ?? undefined : undefined,
       path: previewFile.path,
     }).then((res) => {
       if (cancelled) return;
@@ -1089,7 +1088,7 @@ export function AppShell() {
           icon: Target,
         }
       : null,
-  ].filter((item): item is { key: "todo" | "pending" | "goal" | "swarm"; title: string; desc: string; icon: LucideIcon } => Boolean(item));
+  ].filter((item) => item !== null) as HiddenComposerCardEntry[];
   const visibleSessionLongTasks = useMemo(() => {
     const activeTaskIds = new Set(
       sessions
@@ -1270,7 +1269,7 @@ ${isFinalStep
     const target = (Number.isInteger(draftNumber) && draftNumber >= 1)
       ? draftNumber
       : (startNow ? liveCurrentSession.longTask.targetStep : 0);
-    if (!Number.isInteger(target) || target < 1) {
+    if (typeof target !== "number" || !Number.isInteger(target) || target < 1) {
       showToast("请输入有效步骤");
       return;
     }
@@ -1477,7 +1476,7 @@ ${isFinalStep
     }
     void window.api.readTextFile({
       projectPath: liveCurrentSessionProjectPath,
-      sessionId: mutationSessionView ? getRuntimeSessionId(mutationSessionView) : undefined,
+      sessionId: mutationSessionView ? getRuntimeSessionId(mutationSessionView) ?? undefined : undefined,
       path: pathToRead,
     }).then((res) => {
       if (res.success) {
@@ -2085,7 +2084,7 @@ ${isFinalStep
       <ToastSystem message={toastMessage} />
       <TextContextMenu />
       <DialogSystem
-        showKimiOnboarding={showKimiOnboarding}
+        showKimiOnboarding={Boolean(showKimiOnboarding)}
         kimiOnboardingMessage={kimiOnboarding.message}
         kimiInstallBusy={kimiInstallBusy}
         kimiInstallPercent={cliUpdateState.progressPercent}

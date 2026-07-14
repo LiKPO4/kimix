@@ -258,7 +258,7 @@ async function makeImageRef(dataUrl: string): Promise<string> {
   return `img-${dataUrl.length}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-type PersistedImageRef = Omit<UserMessageImage, "dataUrl"> & { imageRef: string };
+type PersistedImageRef = Omit<UserMessageImage, "dataUrl"> & { imageRef?: string };
 
 async function extractImages(
   images: UserMessageImage[] | undefined,

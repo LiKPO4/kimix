@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { WindowAPI } from "../electron/preload";
 import type {
   AppInfoResponse,
+  AppSettings,
   GetKimiAuthStatusResponse,
   CheckKimiCliResponse,
   CheckKimiCliUpdateResponse,
@@ -58,6 +59,7 @@ import type {
   ImportPluginMcpServerRequest,
   TestMcpServerResponse,
   SaveEnabledSkillsResponse,
+  SaveSettingsRequest,
   PrepareKimiSkillResponse,
   SyncKimiAgentSkillsResponse,
   SearchProjectFilesResponse,
@@ -73,7 +75,7 @@ import { applyCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 const BROWSER_PREVIEW_SETTINGS_KEY = "kimix_browser_preview_settings";
 
-const defaultBrowserPreviewSettings = {
+const defaultBrowserPreviewSettings: AppSettings = {
   defaultModel: "",
   defaultThinking: true,
   defaultPlanMode: false,
@@ -131,8 +133,9 @@ function readBrowserPreviewSettings(): SettingsResponse {
 
 function writeBrowserPreviewSettings(settings: Partial<typeof defaultBrowserPreviewSettings>) {
   if (typeof window === "undefined") return;
+  const current = readBrowserPreviewSettings();
   const next = {
-    ...readBrowserPreviewSettings().data,
+    ...(current.success ? current.data : defaultBrowserPreviewSettings),
     ...settings,
   };
   window.localStorage.setItem(BROWSER_PREVIEW_SETTINGS_KEY, JSON.stringify(next));
@@ -144,7 +147,7 @@ function installBrowserPreviewApi() {
   if (typeof window === "undefined" || window.api) return;
 
   const okVoid = (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined });
-  const fail = <T extends { success: false; error: string }>(action: string): Promise<T> =>
+  const fail = <T,>(action: string): Promise<T> =>
     Promise.resolve({ success: false, error: unsupported(action) } as T);
 
   const previewApi: WindowAPI = {
@@ -172,13 +175,20 @@ function installBrowserPreviewApi() {
     openProjectEditor: () => fail<VoidResponse>("打开编辑器"),
     openProjectTerminal: () => fail<VoidResponse>("打开终端"),
     searchProjectFiles: (): Promise<SearchProjectFilesResponse> => Promise.resolve({ success: true, data: [] }),
-    listSkills: (): Promise<ListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
+    listSkills: (): Promise<ListSkillsResponse> => Promise.resolve({
+      success: true,
+      data: { skills: [], scanErrors: [], enabledIds: [], enabledDir: "" },
+    }),
     saveEnabledSkills: (): Promise<SaveEnabledSkillsResponse> =>
-      Promise.resolve({ success: true, data: { enabledNames: [], enabledDir: "" } }),
+      Promise.resolve({ success: true, data: { enabledIds: [], enabledDir: "" } }),
     prepareKimiSkill: (): Promise<PrepareKimiSkillResponse> => fail("迁移 Skill 到 Kimi Code"),
     syncKimiAgentSkills: (): Promise<SyncKimiAgentSkillsResponse> =>
       Promise.resolve({ success: true, data: { names: [], copiedNames: [], latestModifiedAt: 0, warnings: [] } }),
     importSkillArchive: () => fail("导入技能包"),
+    previewImportFromCcCodex: () => fail("预览 CC/Codex 导入"),
+    applyImportFromCcCodex: () => fail("导入 CC/Codex 配置"),
+    previewKimiThemeImport: () => fail("预览 Kimi 主题导入"),
+    applyKimiThemeImport: () => fail("导入 Kimi 主题"),
     listLongTasks: (): Promise<ListLongTasksResponse> => Promise.resolve({ success: true, data: [] }),
     createLongTask: () => fail("创建长程任务"),
     getLongTaskDetail: () => fail("读取长程任务详情"),
@@ -430,6 +440,8 @@ function installBrowserPreviewApi() {
     startKimiCodeVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),
     openKimiCodeWebServer: (): Promise<VoidResponse> => fail("打开 Kimi Web Server"),
     createKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("创建 Kimi Code 会话"),
+    listKimiCodeChildSessions: () => fail("读取 Kimi Code 子会话"),
+    createKimiCodeChildSession: () => fail("创建 Kimi Code 子会话"),
     resumeKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("恢复 Kimi Code 会话"),
     forkKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("派生 Kimi Code 会话"),
     renameKimiCodeSession: (): Promise<VoidResponse> => fail("重命名 Kimi Code 会话"),
@@ -446,6 +458,7 @@ function installBrowserPreviewApi() {
     undoKimiCodeHistory: (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined }),
     cancelKimiCodeTurn: (): Promise<VoidResponse> => fail("停止 Kimi Code"),
     setKimiCodePlanMode: (): Promise<VoidResponse> => fail("切换 Kimi Code Plan 模式"),
+    compactKimiCodeSession: () => fail("压缩 Kimi Code 会话"),
     setKimiCodeModel: (): Promise<VoidResponse> => fail("切换 Kimi Code 会话模型"),
     setKimiCodePermission: (): Promise<VoidResponse> => fail("切换 Kimi Code 权限"),
     archiveKimiCodeSession: (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined }),
@@ -472,6 +485,13 @@ function installBrowserPreviewApi() {
     getKimiCodeBackgroundTaskOutputPath: (): Promise<KimiCodeBackgroundTaskOutputPathResponse> => fail("读取 Kimi Code 后台任务输出路径"),
     stopKimiCodeBackgroundTask: (): Promise<VoidResponse> => fail("停止 Kimi Code 后台任务"),
     detachKimiCodeBackgroundTask: (): Promise<KimiCodeBackgroundTaskResponse> => fail("将 Kimi Code 前台任务转入后台"),
+    listKimiCodeServerTerminals: () => fail("读取 Kimi Code 终端"),
+    createKimiCodeServerTerminal: () => fail("创建 Kimi Code 终端"),
+    closeKimiCodeServerTerminal: () => fail("关闭 Kimi Code 终端"),
+    attachKimiCodeServerTerminal: () => fail("连接 Kimi Code 终端"),
+    detachKimiCodeServerTerminal: () => fail("断开 Kimi Code 终端"),
+    writeKimiCodeServerTerminal: () => fail("写入 Kimi Code 终端"),
+    resizeKimiCodeServerTerminal: () => fail("调整 Kimi Code 终端"),
     listKimiCodeSessions: (): Promise<KimiCodeListSessionsResponse> => Promise.resolve({ success: true, data: [], source: "sdk" }),
     listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> => Promise.resolve({ success: true, data: [] }),
     listKimiCodeSkills: (): Promise<KimiCodeListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
@@ -487,7 +507,7 @@ function installBrowserPreviewApi() {
     onKimiCodeStatus: () => () => {},
 
     getSettings: (): Promise<SettingsResponse> => Promise.resolve(readBrowserPreviewSettings()),
-    saveSettings: (settings) => {
+    saveSettings: (settings: SaveSettingsRequest) => {
       writeBrowserPreviewSettings(settings);
       return okVoid();
     },
@@ -512,6 +532,8 @@ function installBrowserPreviewApi() {
     }),
     downloadUpdate: () => fail("下载更新"),
     onDownloadUpdateProgress: () => () => {},
+    writeDiag: () => fail("写入诊断日志"),
+    getDiagLogPath: () => fail("读取诊断日志路径"),
     openExternal: async (url: string): Promise<VoidResponse> => {
       window.open(url, "_blank", "noopener,noreferrer");
       return { success: true, data: undefined };
@@ -543,6 +565,7 @@ function installBrowserPreviewApi() {
     isWindowMaximized: async () => ({ success: true as const, data: false }),
     onWindowMaximizedChange: () => () => {},
     closeWindow: () => Promise.resolve(),
+    onMainLog: () => () => {},
   };
 
   window.api = previewApi;

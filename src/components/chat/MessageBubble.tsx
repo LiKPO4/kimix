@@ -62,7 +62,7 @@ interface MessageBubbleProps {
   onDeleteUserMessage?: (eventId: string) => void;
 }
 
-export function timelineEventMemoKey(event: TimelineEvent) {
+export function timelineEventMemoKey(event: TimelineEvent): string {
   switch (event.type) {
     case "assistant_message":
       return [
@@ -311,16 +311,17 @@ function AttachmentThumb({
   onPreview: (image: PreviewImage) => void;
 }) {
   if (image.dataUrl) {
+    const dataUrl = image.dataUrl;
     return (
       <button
         key={image.id ?? `${image.name}-${index}`}
         type="button"
-        onClick={() => onPreview({ id: image.id, name: image.name, dataUrl: image.dataUrl })}
+        onClick={() => onPreview({ id: image.id, name: image.name, dataUrl })}
         className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
         title="点击查看图片"
         aria-label={`查看图片 ${image.name}`}
       >
-        <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
+        <img src={dataUrl} alt={image.name} className="h-full w-full object-cover" />
       </button>
     );
   }

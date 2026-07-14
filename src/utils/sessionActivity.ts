@@ -27,11 +27,18 @@ export function compareSessionsByRecentConversation(left: Session, right: Sessio
 
 export const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
 
-export function isTerminalKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {
+type TerminalKimiCodeEngineStatus = Extract<KimiCodeEngineStatus, "completed" | "interrupted" | "error" | "idle">;
+type ActiveKimiCodeEngineStatus = Extract<KimiCodeEngineStatus, "running" | "waiting_approval" | "waiting_question">;
+
+export function isTerminalKimiCodeEngineStatus(
+  status: KimiCodeEngineStatus | undefined,
+): status is TerminalKimiCodeEngineStatus {
   return status === "completed" || status === "interrupted" || status === "error" || status === "idle";
 }
 
-export function isActiveKimiCodeEngineStatus(status: KimiCodeEngineStatus | undefined) {
+export function isActiveKimiCodeEngineStatus(
+  status: KimiCodeEngineStatus | undefined,
+): status is ActiveKimiCodeEngineStatus {
   return status === "running" || status === "waiting_approval" || status === "waiting_question";
 }
 
@@ -82,7 +89,7 @@ export function hasActiveTimelineWork(session: Session, now = Date.now()) {
   return hasActiveTimelineWorkEvents(session.events, now);
 }
 
-export function isSessionRuntimeRunning(session: Session | undefined, runningSessionId: string | null, now = Date.now()) {
+export function isSessionRuntimeRunning(session: Session | null | undefined, runningSessionId: string | null, now = Date.now()) {
   if (!session) return false;
   const runtimeSessionId = getRuntimeSessionId(session);
   return runningSessionId === session.id ||

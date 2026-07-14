@@ -6,6 +6,7 @@
 
 import { exec } from "node:child_process";
 import type { HookRule, HookRunLogEntry } from "./types/ipc";
+import type { KimiCodePromptPart } from "./kimiCodeHost";
 import * as settingsService from "./settingsService";
 import { matchesHookTarget } from "../src/utils/hookMatcher";
 
@@ -116,7 +117,7 @@ function appendHookLog(
   });
 }
 
-function getPromptSubmitTarget(content: string | Array<{ type: string; text?: string }>): string {
+function getPromptSubmitTarget(content: string | KimiCodePromptPart[]): string {
   const text =
     typeof content === "string"
       ? content
@@ -145,9 +146,9 @@ ${context}
 }
 
 function withPromptSubmitContext(
-  content: string | Array<{ type: string; text?: string }>,
+  content: string | KimiCodePromptPart[],
   context: string,
-): string | Array<{ type: string; text?: string }> {
+): string | KimiCodePromptPart[] {
   if (typeof content === "string") return appendPromptSubmitInstructionToText(content, context);
   const firstTextIndex = content.findIndex((part) => part.type === "text");
   if (firstTextIndex === -1) {
@@ -173,9 +174,9 @@ function withPromptSubmitContext(
  */
 export async function applyPromptSubmitHooks(
   sessionId: string,
-  content: string | Array<{ type: string; text?: string }>,
+  content: string | KimiCodePromptPart[],
   workDir: string,
-): Promise<string | Array<{ type: string; text?: string }>> {
+): Promise<string | KimiCodePromptPart[]> {
   const target = getPromptSubmitTarget(content);
   const rules = (settingsService.loadSettings().hookRules ?? [])
     .filter((rule) => rule.event === "UserPromptSubmit")

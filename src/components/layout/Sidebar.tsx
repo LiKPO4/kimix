@@ -136,9 +136,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const sessions = useSessionStore((s) => s.sessions);
   const archiveSession = useArchiveSession();
   const updateSession = useSessionStore((s) => s.updateSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
 
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
-  const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; left: number } | null>(null);
+  const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; bottom: number; left: number } | null>(null);
   const [projectActionFocusId, setProjectActionFocusId] = useState<string | null>(null);
   const [sessionActionFocusId, setSessionActionFocusId] = useState<string | null>(null);
   const lastAutoExpandedProjectId = useRef<string | null>(null);
@@ -1010,7 +1011,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.16.0</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.16.1</span>
         </button>
       </div>
     </aside>

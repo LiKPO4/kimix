@@ -59,7 +59,7 @@ function writeFileAtomic(filePath: string, data: string): void {
   try {
     const fd = fs.openSync(tempPath, "w");
     try {
-      fs.writeSync(fd, data, "utf-8");
+      fs.writeFileSync(fd, data, "utf-8");
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);

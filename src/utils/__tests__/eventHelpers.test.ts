@@ -224,7 +224,7 @@ describe("hasMalformedAssistantMarkdown", () => {
       isComplete: true,
     }];
     const canonical: TimelineEvent[] = [{
-      ...malformed[0],
+      ...(malformed[0] as Extract<TimelineEvent, { type: "assistant_message" }>),
       type: "assistant_message",
       content: "- **Achiever**：图鉴\n- **Explorer**：骰子组合",
     }];

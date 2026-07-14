@@ -282,7 +282,8 @@ export interface Session {
   /** 未知或损坏的协同结构保持原样，当前版本不得降级覆盖。 */
   unsupportedCollaboration?: UnsupportedCollaborationState;
   events: TimelineEvent[];
-  isLoading: boolean;
+  /** 仅 UI 加载期间使用；旧持久化会话可能缺失，缺失等同 false。 */
+  isLoading?: boolean;
 }
 
 export interface OfficialGoalState {
@@ -413,14 +414,14 @@ export interface ThinkingPart {
   signature?: string;
 }
 
-export interface ToolCallEvent {
+export interface ToolCallEvent extends RoomEventScope {
   id: string;
   type: "tool_call";
   timestamp: number;
   agentId?: string;
   toolCallId: string;
   toolName: string;
-  status: "running" | "success" | "error";
+  status: "running" | "success" | "completed" | "error";
   arguments: Record<string, unknown>;
   rawArguments?: string;
   description?: string;
@@ -544,7 +545,8 @@ export interface StatusUpdateEvent {
   planMode?: boolean;
   swarmMode?: boolean;
   message?: string;
-  source?: "runtime" | "slash" | "ui" | "ipc";
+  level?: string;
+  source?: "runtime" | "slash" | "skill" | "ui" | "ipc";
   tone?: "default" | "info" | "success" | "warning" | "danger";
   parentEventId?: string;
 }

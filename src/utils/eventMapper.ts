@@ -1241,7 +1241,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
 
     case "SubagentEvent": {
-      const subagentStatus = isString(payload.status) && ["running", "completed", "error"].includes(payload.status)
+      const subagentStatus = payload.status === "completed" || payload.status === "error"
         ? payload.status
         : "running";
       return {

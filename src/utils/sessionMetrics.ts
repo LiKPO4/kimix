@@ -111,7 +111,7 @@ export function getSessionContextUsages(session: Session | undefined): SessionCo
     });
 }
 
-export function getSessionRecommendationMetrics(session: Session | undefined, turnLimit: number): SessionRecommendationMetrics {
+export function getSessionRecommendationMetrics(session: Session | null | undefined, turnLimit: number): SessionRecommendationMetrics {
   const safeLimit = Math.max(1, Math.round(turnLimit || 1));
   const events = session?.events ?? [];
   const turnCount = countUserTurns(events);
