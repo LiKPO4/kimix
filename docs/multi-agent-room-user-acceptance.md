@@ -103,4 +103,5 @@
 - [x] 搜索 `FOUR_AGENT_OK` 返回四条带正确 Agent/模型归属的结果；Markdown 导出包含成员表与四个最终响应分区。
 - [x] Kimi 调试 ZIP 明确选择 Reviewer 后只导出该 Agent 的官方 session，包含 manifest、wire、state 与日志。
 - [x] SDK fallback 下归档四 Agent 房间后，设置页可列出归档成员；从任一成员恢复会成组恢复房间全部官方 session。恢复后侧栏房间、四成员、默认接收者、历史与 usage 完整保留。
+- [x] 四 Agent 自动验收矩阵覆盖同 Provider 不同模型、跨 Provider，以及一个 Provider 失败时已完成/运行中/排队 Agent 各自保持独立状态并继续调度。
 - [ ] 用户截图与真实工作任务交叉审查仍待验收。
