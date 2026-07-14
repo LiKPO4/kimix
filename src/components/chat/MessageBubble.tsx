@@ -34,6 +34,13 @@ import {
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 import { isRoomDeliveryWaitingBehindAgentWork } from "@/utils/roomDelivery";
+import {
+  canLiveThinkingViewportConsumeWheel,
+  LIVE_THINKING_MAX_HEIGHT_PX,
+  shouldCollapseKimiWebProcessOnFinalContent,
+  shouldFollowLiveThinkingViewport,
+  shouldUseLiveThinkingViewport,
+} from "@/utils/liveThinkingViewport";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -1045,7 +1052,7 @@ const KIMI_WEB_THINKING_SUMMARY_STYLE: CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
-function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
+function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const paragraphs = useMemo(() =>
     block.text
@@ -1059,6 +1066,16 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
   // is folded to its last paragraph and expands inline on click.
   const isFoldable = paragraphs.length > 1;
   const teaser = paragraphs.at(-1) ?? block.text;
+  if (isLive) {
+    return (
+      <div
+        className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+        style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+      >
+        {block.text}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
       {isFoldable ? (
@@ -1090,7 +1107,9 @@ function KimiWebThinkingItem({ block }: { block: ThinkingBlock }) {
   );
 }
 
-function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
+function KimiWebThinkingBlock({ blocks, isLive }: { blocks: ThinkingBlock[]; isLive: boolean }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
   const dedupedBlocks = useMemo(() => {
     const result: ThinkingBlock[] = [];
     for (const block of blocks) {
@@ -1106,11 +1125,67 @@ function KimiWebThinkingBlock({ blocks }: { blocks: ThinkingBlock[] }) {
     }
     return result;
   }, [blocks]);
+  const contentVersion = useMemo(
+    () => dedupedBlocks.map((block) => `${block.id}:${block.text.length}`).join("|"),
+    [dedupedBlocks],
+  );
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!isLive || !viewport) return;
+    followLatestRef.current = true;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [isLive]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!isLive || !viewport || !followLatestRef.current) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [contentVersion, isLive]);
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (canLiveThinkingViewportConsumeWheel(event.currentTarget, event.deltaY)) {
+      event.stopPropagation();
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const deltaY = ["ArrowUp", "PageUp", "Home"].includes(event.key)
+      ? -1
+      : ["ArrowDown", "PageDown", "End"].includes(event.key)
+        ? 1
+        : 0;
+    if (deltaY && canLiveThinkingViewportConsumeWheel(event.currentTarget, deltaY)) {
+      event.stopPropagation();
+    }
+  };
 
   return (
-    <div className="flex flex-col" style={{ gap: 8 }}>
+    <div
+      ref={viewportRef}
+      className={`flex min-w-0 flex-col ${isLive ? "kimix-live-thinking-scroll" : ""}`}
+      style={{
+        gap: 8,
+        ...(isLive ? {
+          maxHeight: LIVE_THINKING_MAX_HEIGHT_PX,
+          overflowX: "hidden",
+          overflowY: "auto",
+          scrollbarGutter: "stable",
+        } : {}),
+      }}
+      role={isLive ? "region" : undefined}
+      aria-label={isLive ? "正在生成的思考过程" : undefined}
+      tabIndex={isLive ? 0 : undefined}
+      onScroll={isLive ? (event) => {
+        followLatestRef.current = shouldFollowLiveThinkingViewport(event.currentTarget);
+      } : undefined}
+      onWheel={isLive ? handleWheel : undefined}
+      onKeyDown={isLive ? handleKeyDown : undefined}
+      onTouchStart={isLive ? (event) => event.stopPropagation() : undefined}
+      onTouchMove={isLive ? (event) => event.stopPropagation() : undefined}
+    >
       {dedupedBlocks.map((block) => (
-        <KimiWebThinkingItem key={block.id} block={block} />
+        <KimiWebThinkingItem key={block.id} block={block} isLive={isLive} />
       ))}
     </div>
   );
@@ -1619,10 +1694,10 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
   );
 }
 
-function KimiWebProcessGroup({ group }: { group: ProcessGroup }) {
+function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: boolean }) {
   switch (group.type) {
     case "thinking":
-      return <KimiWebThinkingBlock blocks={group.blocks} />;
+      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":
@@ -1632,20 +1707,32 @@ function KimiWebProcessGroup({ group }: { group: ProcessGroup }) {
   }
 }
 
-function KimiWebProcessList({ items }: { items: ProcessItem[] }) {
+function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent }: { items: ProcessItem[]; isActiveAssistant: boolean; hasFinalContent: boolean }) {
   const groups = useMemo(() => groupProcessItems(items), [items]);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
       {groups.map((group, index) => (
-        <KimiWebProcessGroup key={`${group.type}-${index}`} group={group} />
+        <KimiWebProcessGroup
+          key={`${group.type}-${index}`}
+          group={group}
+          isLive={shouldUseLiveThinkingViewport({
+            groupIndex: index,
+            groupCount: groups.length,
+            isThinkingGroup: group.type === "thinking",
+            isActiveAssistant,
+            hasFinalContent,
+          })}
+        />
       ))}
     </div>
   );
 }
 
-function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean }) {
-  const defaultExpanded = displayMode === "kimi-web" && expandByDefault;
+function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean }) {
+  const isKimiWeb = displayMode === "kimi-web";
+  const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent;
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const previousHasFinalContentRef = useRef(hasFinalContent);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
   const pendingToggleAnchorRef = useRef<{
@@ -1673,6 +1760,17 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
     subagents.length > 0 ? `${subagents.length} 个子代理` : "",
     approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
+
+  useLayoutEffect(() => {
+    const shouldCollapse = shouldCollapseKimiWebProcessOnFinalContent({
+      previousHasFinalContent: previousHasFinalContentRef.current,
+      hasFinalContent,
+      isKimiWeb,
+      expanded,
+    });
+    previousHasFinalContentRef.current = hasFinalContent;
+    if (shouldCollapse) setExpanded(false);
+  }, [expanded, hasFinalContent, isKimiWeb]);
 
   const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
     const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
@@ -1709,7 +1807,6 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
     return () => window.cancelAnimationFrame(frame);
   }, [expanded]);
 
-  const isKimiWeb = displayMode === "kimi-web";
   const summaryContent = (
     <>
       {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
@@ -1743,7 +1840,13 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
       )}
       {expanded && hasDetails && (
         <div className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
-          {isKimiWeb ? <KimiWebProcessList items={items} /> : <ProcessDetailList items={items} />}
+          {isKimiWeb ? (
+            <KimiWebProcessList
+              items={items}
+              isActiveAssistant={isActiveAssistant}
+              hasFinalContent={hasFinalContent}
+            />
+          ) : <ProcessDetailList items={items} />}
           {!isKimiWeb && (
             <button
               type="button"
@@ -1980,6 +2083,8 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             approvals={leadingApprovals}
             displayMode={processDisplayMode}
             expandByDefault={expandProcessByDefault}
+            isActiveAssistant={isActiveAssistant}
+            hasFinalContent={hasContent}
             label={processLabel}
           />
         )}
