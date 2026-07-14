@@ -261,6 +261,59 @@ describe("persistLocalConversationState", () => {
     expect(loaded.events).toEqual(loaded.collaboration?.agentEvents[primary.id]);
   });
 
+  it("restores user text from the retired clarification wrapper while hydrating local sessions", async () => {
+    const wrapped = [
+      "【Kimix 需求澄清：自动判断】",
+      "这段旧指令不应再显示。",
+      "",
+      "用户原始需求：",
+      "他说的你看懂了吗",
+    ].join("\n");
+    const wrappedEvent: TimelineEvent = {
+      id: "wrapped-user",
+      type: "user_message",
+      timestamp: 100,
+      content: wrapped,
+    };
+    const steerEvent: TimelineEvent = {
+      id: "wrapped-steer",
+      type: "steer_message",
+      timestamp: 101,
+      content: wrapped,
+    };
+    const collaboration = createCollaborationStateFromSession({
+      ...session,
+      events: [wrappedEvent, steerEvent],
+    });
+    const primary = collaboration.agents[0];
+    const stored: Session = {
+      ...session,
+      events: [wrappedEvent, steerEvent],
+      collaboration: {
+        ...collaboration,
+        messages: collaboration.messages.map((message) => ({
+          ...message,
+          content: wrapped,
+          outboundContent: wrapped,
+        })),
+        agentEvents: {
+          [primary.id]: [wrappedEvent, steerEvent],
+        },
+      },
+    };
+    getStateItemMock.mockResolvedValue([stored]);
+
+    const { loadLocalSessions } = await import("@/utils/persistence");
+    const loaded = (await loadLocalSessions())[0];
+
+    expect((loaded.events[0] as Extract<TimelineEvent, { type: "user_message" }>).content).toBe("他说的你看懂了吗");
+    expect((loaded.events[1] as Extract<TimelineEvent, { type: "steer_message" }>).content).toBe(wrapped);
+    expect(loaded.collaboration?.messages[0].content).toBe("他说的你看懂了吗");
+    expect(loaded.collaboration?.messages[0].outboundContent).toBe("他说的你看懂了吗");
+    expect((loaded.collaboration?.agentEvents[primary.id][0] as Extract<TimelineEvent, { type: "user_message" }>).content)
+      .toBe("他说的你看懂了吗");
+  });
+
   it("preserves an unknown future collaboration payload byte-for-byte on the next save", async () => {
     const futureRaw = { schemaVersion: 2, agents: [{ id: "future-agent" }], opaque: { keep: true } };
     getStateItemMock.mockResolvedValue([{ ...session, collaboration: futureRaw }]);

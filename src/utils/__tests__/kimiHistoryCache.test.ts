@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
 
 const assistant: TimelineEvent = {
   id: "assistant",
@@ -22,8 +22,20 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 3 for canonical thinking repair across every history entry point", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(3);
+  it("uses cache version 4 for canonical user-text and thinking repair across every history entry point", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(4);
+  });
+
+  it("detects both generations of legacy clarification wrappers in cached user messages", () => {
+    const wrapped = (content: string): TimelineEvent => ({
+      id: content,
+      type: "user_message",
+      timestamp: 1,
+      content,
+    });
+    expect(hasLegacyKimiClarificationWrapper([wrapped("【Kimix 需求澄清：自动判断】\n用户原始需求：\n你好")])).toBe(true);
+    expect(hasLegacyKimiClarificationWrapper([wrapped("【Kimix 需求澄清工具：开启】\n用户原始需求：\n你好")])).toBe(true);
+    expect(hasLegacyKimiClarificationWrapper([wrapped("你好")])).toBe(false);
   });
 
   it("prefers canonical history when old cache lost process events", () => {

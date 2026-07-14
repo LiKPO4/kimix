@@ -64,7 +64,6 @@ export interface RoomAgentActivity {
   updatedAt: number;
 }
 
-export type ClarificationToolMode = "off" | "on" | "auto";
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm";
 export type RightSidebarCardId = "longTaskStatus" | "background" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
@@ -89,7 +88,6 @@ export interface AppState {
   voiceShortcut: string;
   notificationMode: NotificationMode;
   notificationShowContent: boolean;
-  clarificationToolMode: ClarificationToolMode;
   processDisplayMode: ProcessDisplayMode;
   filePreviewExtensions: string[];
   longTasksOpen: boolean;

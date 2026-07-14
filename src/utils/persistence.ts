@@ -13,6 +13,7 @@ import {
   synchronizeCollaborationPrimaryMirror,
 } from "@/utils/collaborationRooms";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
+import { stripLegacyKimixClarificationWrapper } from "./eventMapper";
 import {
   commitState,
   deleteImages,
@@ -354,6 +355,9 @@ function hydrateSessions(raw: unknown[], dataUrlById: Map<string, string>): Sess
       if (event.type !== "user_message" && event.type !== "steer_message") return event;
       return {
         ...event,
+        content: event.type === "user_message"
+          ? stripLegacyKimixClarificationWrapper(event.content)
+          : event.content,
         images: hydrateMessageImages(
           event.images as (UserMessageImage & { imageRef?: string })[] | undefined,
           dataUrlById,
@@ -370,6 +374,10 @@ function hydrateSessions(raw: unknown[], dataUrlById: Map<string, string>): Sess
       ...session.collaboration,
       messages: session.collaboration.messages.map((message) => ({
         ...message,
+        content: stripLegacyKimixClarificationWrapper(message.content),
+        outboundContent: message.outboundContent
+          ? stripLegacyKimixClarificationWrapper(message.outboundContent)
+          : message.outboundContent,
         images: hydrateMessageImages(
           message.images as (UserMessageImage & { imageRef?: string })[] | undefined,
           dataUrlById,

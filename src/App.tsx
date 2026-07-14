@@ -58,7 +58,7 @@ import { useSettingsSync } from "@/hooks/useSettingsSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
-import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { logError } from "@/utils/reportError";
 import {
   getRoomAgent,
@@ -235,6 +235,7 @@ function shouldReplaceWithCanonicalKimiHistory(cachedEvents: TimelineEvent[], ca
     displayableUserImageCount(canonicalEvents) > displayableUserImageCount(cachedEvents) ||
     (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
     (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(cachedEvents)) ||
+    (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
     hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
     hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
 }
@@ -248,6 +249,7 @@ function roomAgentNeedsKimiCodeHistoryRepair(session: Session, roomAgentId: stri
       event.type === "assistant_message" &&
       (event.content.trim().length > 0 || (event.isComplete && event.content.trim().length === 0))
     )) ||
+    hasLegacyKimiClarificationWrapper(events) ||
     hasMalformedAssistantMarkdown(events) ||
     hasPossiblyLostUserImages(events);
 }
@@ -1458,7 +1460,6 @@ function App() {
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setNotificationShowContent = useAppStore((s) => s.setNotificationShowContent);
-  const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -1554,7 +1555,6 @@ function App() {
       setVoiceShortcut,
       setNotificationMode,
       setNotificationShowContent,
-      setClarificationToolMode,
       setFilePreviewExtensions,
       setRecentProjects,
     }), [
@@ -1563,7 +1563,7 @@ function App() {
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setNotificationShowContent,
-      setClarificationToolMode, setFilePreviewExtensions, setRecentProjects,
+      setFilePreviewExtensions, setRecentProjects,
     ]);
     useBootstrap(bootstrapSetters);
 

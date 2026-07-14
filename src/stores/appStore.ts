@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, ClarificationToolMode, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity } from "@/types/ui";
 import { DEFAULT_CUSTOM_THEME_PALETTE, DEFAULT_KIMI_THEME_PRESETS, DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
@@ -78,7 +78,6 @@ export interface AppStore extends AppState {
   setVoiceShortcut: (shortcut: string) => void;
   setNotificationMode: (mode: NotificationMode) => void;
   setNotificationShowContent: (enabled: boolean) => void;
-  setClarificationToolMode: (mode: ClarificationToolMode) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setFilePreviewExtensions: (extensions: string[]) => void;
   setLongTasksOpen: (open: boolean) => void;
@@ -124,7 +123,6 @@ export const useAppStore = create<AppStore>((set) => ({
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   notificationShowContent: false,
-  clarificationToolMode: "auto",
   processDisplayMode: readProcessDisplayMode(),
   filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
@@ -182,7 +180,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setVoiceShortcut: (shortcut) => set({ voiceShortcut: shortcut.trim() || "Win+H" }),
   setNotificationMode: (mode) => set({ notificationMode: mode }),
   setNotificationShowContent: (enabled) => set({ notificationShowContent: enabled }),
-  setClarificationToolMode: (mode) => set({ clarificationToolMode: mode }),
   setProcessDisplayMode: (mode) => {
     writeProcessDisplayMode(mode);
     set({ processDisplayMode: mode });

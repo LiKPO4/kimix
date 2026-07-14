@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, CircleHelp, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, UserMessageImage, RoomContextShareSelection } from "@/types/ui";
+import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, UserMessageImage, RoomContextShareSelection } from "@/types/ui";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -114,25 +114,8 @@ function emitPermissionModeDiag(stage: string, data: Record<string, unknown>) {
   }).catch(logError("writeDiag"));
 }
 
-const CLARIFICATION_OPTIONS: { value: ClarificationToolMode; label: string; desc: string }[] = [
-  { value: "on", label: "开启", desc: "优先澄清不明确需求" },
-  { value: "off", label: "关闭", desc: "直接发送原消息" },
-  { value: "auto", label: "自动", desc: "由 AI 判断是否需要澄清" },
-];
-
 const DRAWING_BOARD_RATIOS: DrawingBoardRequest["ratio"][] = ["1:1", "4:3", "3:4", "16:9", "9:16"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
-
-const CLARIFICATION_PROMPTS: Record<Exclude<ClarificationToolMode, "off">, string> = {
-  auto: "【Kimix 需求澄清：自动判断】\n请先判断用户需求是否足够明确。若缺少会影响目标、范围、验收或风险边界的关键信息，且当前环境允许提问，请使用官方结构化提问能力提出 1-3 个简短问题；若当前环境不允许提问，请基于最合理假设继续，并在回复中说明关键假设和风险。若需求已足够明确，直接执行，不要为了澄清而打断用户。",
-  on: "【Kimix 需求澄清：开启】\n请在开始执行前做需求澄清检查。若缺少会影响目标、范围、验收或风险边界的关键信息，且当前环境允许提问，请优先使用官方结构化提问能力提出 1-3 个简短问题；若当前环境不允许提问，请基于最合理假设继续，并在回复中说明关键假设和风险。若需求已足够明确，直接执行，不要为了澄清而打断用户。",
-};
-
-function withClarificationBehavior(content: string, mode: ClarificationToolMode): string {
-  const trimmed = content.trim();
-  if (!trimmed || mode === "off") return content;
-  return `${CLARIFICATION_PROMPTS[mode]}\n\n用户原始需求：\n${content}`;
-}
 
 function removeLocalSendAttempt(
   events: TimelineEvent[],
@@ -512,8 +495,6 @@ export function Composer() {
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
-  const clarificationToolMode = useAppStore((s) => s.clarificationToolMode);
-  const setClarificationToolMode = useAppStore((s) => s.setClarificationToolMode);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const setRoomAgentActivity = useAppStore((s) => s.setRoomAgentActivity);
   const removeRoomAgentActivity = useAppStore((s) => s.removeRoomAgentActivity);
@@ -1239,7 +1220,7 @@ export function Composer() {
   const sendRoomPrompt = async (
     session: Session,
     content: string,
-    options?: { images?: ImageAttachment[]; manualSubmitAutoScroll?: boolean; skipClarification?: boolean; outboundContent?: string },
+    options?: { images?: ImageAttachment[]; manualSubmitAutoScroll?: boolean; outboundContent?: string },
   ) => {
     const images = options?.images ?? [];
     const route = resolveRoomPromptRoute(session, content, session.collaboration?.defaultRecipientIds);
@@ -1256,14 +1237,11 @@ export function Composer() {
       return false;
     }
     const contentWithAttachments = buildAttachmentPromptContent(options?.outboundContent ?? route.outboundContent, images);
-    const outboundContent = session.longTask || options?.skipClarification
-      ? contentWithAttachments
-      : withClarificationBehavior(contentWithAttachments, clarificationToolMode);
     let created: ReturnType<typeof createRoomMessageDispatch>;
     try {
       created = createRoomMessageDispatch(session, {
         content,
-        outboundContent,
+        outboundContent: contentWithAttachments,
         images: toUserAttachments(images),
         recipientAgentIds: route.recipientAgentIds,
         contextShareSelection: roomContextShareSelection,
@@ -1330,7 +1308,7 @@ export function Composer() {
     return () => window.removeEventListener("kimix:room-delivery-action", handleRoomDeliveryAction);
   }, [removeRoomAgentActivity, updateSession]);
 
-  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; skipClarification?: boolean; postUserStatusMessage?: string }) => {
+  const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
@@ -1339,7 +1317,6 @@ export function Composer() {
       return sendRoomPrompt(targetSession, content, {
         images,
         manualSubmitAutoScroll: options?.manualSubmitAutoScroll,
-        skipClarification: options?.skipClarification,
         outboundContent: options?.outboundContent,
       });
     }
@@ -1402,9 +1379,7 @@ export function Composer() {
 
     const effectiveEngine = "kimi-code";
     const contentWithAttachments = buildAttachmentPromptContent(content, images);
-    const outboundContent = options?.outboundContent ?? (targetSession.longTask || options?.skipClarification
-      ? contentWithAttachments
-      : withClarificationBehavior(contentWithAttachments, clarificationToolMode));
+    const outboundContent = options?.outboundContent ?? contentWithAttachments;
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = toPromptImages(images);
@@ -2215,7 +2190,6 @@ export function Composer() {
       addUserEvent: false,
       manualSubmitAutoScroll: false,
       outboundContent: buildGoalKickoffPrompt(objective),
-      skipClarification: true,
     });
     return true;
   };
@@ -2240,7 +2214,6 @@ export function Composer() {
         addUserEvent: false,
         manualSubmitAutoScroll: false,
         outboundContent: buildCustomThemeKickoffPrompt(args),
-        skipClarification: true,
         postUserStatusMessage: `官方 Skill 不可用，已使用兼容兜底：${commandNotice}`,
       });
       if (sent && roomAgentId) {
@@ -2822,7 +2795,7 @@ export function Composer() {
       settlePendingClarifications(activeSession.id);
     }
 
-    await sendPromptContent(trimmed, { images: imagesToSend, skipClarification: trimmed.startsWith("/") });
+    await sendPromptContent(trimmed, { images: imagesToSend });
   };
 
   const handleApplyThemeImport = async (themeId: string) => {
@@ -3088,13 +3061,6 @@ export function Composer() {
     inputRef.current?.focus();
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: res.success ? `已触发语音快捷键：${shortcut}` : `语音快捷键失败：${res.error}`,
-    }));
-  };
-
-  const handleSetClarificationToolMode = (mode: ClarificationToolMode) => {
-    setClarificationToolMode(mode);
-    window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: `需求澄清工具：${CLARIFICATION_OPTIONS.find((option) => option.value === mode)?.label ?? mode}`,
     }));
   };
 
@@ -4091,34 +4057,6 @@ export function Composer() {
                             {ratio}
                           </button>
                         ))}
-                      </div>
-                    </section>
-
-                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
-                      <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                        <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
-                          <CircleHelp size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-                          <span>需求澄清</span>
-                        </div>
-                        <div
-                          className="flex w-[132px] shrink-0 rounded-xl bg-[var(--kimix-panel-soft-bg)]"
-                          style={{ gap: 4, padding: 4 }}
-                        >
-                          {CLARIFICATION_OPTIONS.map((option) => {
-                            const active = clarificationToolMode === option.value;
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                title={option.desc}
-                                onClick={() => handleSetClarificationToolMode(option.value)}
-                                className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
                       </div>
                     </section>
 

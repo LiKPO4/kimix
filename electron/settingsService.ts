@@ -31,7 +31,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   notificationShowContent: false,
-  clarificationToolMode: "auto",
   filePreviewExtensions: ["md", "txt"],
   expandToolCalls: false,
   experimentalKimiServer: true,
@@ -90,23 +89,26 @@ export function loadSettings(): AppSettings {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return { ...DEFAULT_SETTINGS };
     }
-    const rawSettings = parsed as Partial<AppSettings> & { clarificationToolEnabled?: boolean };
-    const shouldMigrateLegacyFontSize = (rawSettings.fontSizeBaselineVersion ?? 0) < 1 && rawSettings.fontSize === 14;
-    const clarificationToolMode = rawSettings.clarificationToolMode ??
-      (rawSettings.clarificationToolEnabled === true ? "on" :
-        rawSettings.clarificationToolEnabled === false ? "off" :
-          DEFAULT_SETTINGS.clarificationToolMode);
+    const rawSettings = parsed as Partial<AppSettings> & {
+      clarificationToolMode?: unknown;
+      clarificationToolEnabled?: unknown;
+    };
+    const sanitizedRawSettings: Partial<AppSettings> & Record<string, unknown> = { ...rawSettings };
+    const hadLegacyClarificationSetting = Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "clarificationToolMode") ||
+      Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "clarificationToolEnabled");
+    delete sanitizedRawSettings.clarificationToolMode;
+    delete sanitizedRawSettings.clarificationToolEnabled;
+    const shouldMigrateLegacyFontSize = (sanitizedRawSettings.fontSizeBaselineVersion ?? 0) < 1 && sanitizedRawSettings.fontSize === 14;
     const settings = {
       ...DEFAULT_SETTINGS,
-      ...rawSettings,
-      fontSize: shouldMigrateLegacyFontSize ? 15 : rawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
+      ...sanitizedRawSettings,
+      fontSize: shouldMigrateLegacyFontSize ? 15 : sanitizedRawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
       fontSizeBaselineVersion: 1,
-      clarificationToolMode,
     };
-    if (shouldMigrateLegacyFontSize || rawSettings.fontSizeBaselineVersion !== 1) {
-      writeFileAtomic(SETTINGS_FILE, JSON.stringify({ ...rawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2));
+    if (shouldMigrateLegacyFontSize || sanitizedRawSettings.fontSizeBaselineVersion !== 1 || hadLegacyClarificationSetting) {
+      writeFileAtomic(SETTINGS_FILE, JSON.stringify({ ...sanitizedRawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2));
     }
-    const legacyKimiThemePalette = (rawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;
+    const legacyKimiThemePalette = (sanitizedRawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;
     if ((!settings.kimiThemePalettes || settings.kimiThemePalettes.length === 0) && legacyKimiThemePalette) {
       settings.kimiThemePalettes = [{
         id: "default",

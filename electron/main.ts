@@ -6707,8 +6707,6 @@ const SettingsSchema = z.object({
   voiceShortcut: z.string().min(1).max(80).optional(),
   notificationMode: z.enum(["never", "unfocused", "always"]).optional(),
   notificationShowContent: z.boolean().optional(),
-  clarificationToolMode: z.enum(["off", "on", "auto"]).optional(),
-  clarificationToolEnabled: z.boolean().optional(),
   filePreviewExtensions: z.array(z.string().trim().min(1).max(16)).max(20).optional(),
   expandToolCalls: z.boolean().optional(),
   experimentalKimiServer: z.boolean().optional(),

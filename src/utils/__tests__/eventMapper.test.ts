@@ -249,13 +249,15 @@ describe("mapStreamEvent", () => {
   });
 
   it("strips Kimix clarification instructions from user input", () => {
-    const event = mapStreamEvent({
-      type: "TurnBegin",
-      payload: {
-        user_input: "【Kimix 需求澄清工具：自动判断】\n\n用户原始需求：\n\nHello world",
-      },
-    });
-    expect((event as Extract<TimelineEvent, { type: "user_message" }>).content.trim()).toBe("Hello world");
+    for (const header of ["【Kimix 需求澄清工具：自动判断】", "【Kimix 需求澄清：自动判断】"]) {
+      const event = mapStreamEvent({
+        type: "TurnBegin",
+        payload: {
+          user_input: `${header}\n请先判断需求是否明确。\n\n用户原始需求：\n\nHello world`,
+        },
+      });
+      expect((event as Extract<TimelineEvent, { type: "user_message" }>).content.trim()).toBe("Hello world");
+    }
   });
 
   it("extracts images from array user_input", () => {

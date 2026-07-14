@@ -1,6 +1,8 @@
 import type { TimelineEvent } from "@/types/ui";
 
-export const KIMI_HISTORY_CACHE_VERSION = 3;
+export const KIMI_HISTORY_CACHE_VERSION = 4;
+
+const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 
 const PROCESS_EVENT_TYPES = new Set<TimelineEvent["type"]>([
   "tool_call",
@@ -32,4 +34,10 @@ function thinkingHistoryText(events: TimelineEvent[]) {
 export function hasCanonicalKimiThinkingHistory(cached: TimelineEvent[], canonical: TimelineEvent[]) {
   const canonicalThinking = thinkingHistoryText(canonical);
   return canonicalThinking.trim().length > 0 && canonicalThinking !== thinkingHistoryText(cached);
+}
+
+export function hasLegacyKimiClarificationWrapper(events: TimelineEvent[]) {
+  return events.some((event) => (
+    event.type === "user_message" && LEGACY_CLARIFICATION_PREFIX.test(event.content)
+  ));
 }

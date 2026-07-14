@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAppStore } from "@/stores/appStore";
-import type { Theme, ThemePaletteColors, ThemePaletteId, PermissionMode, StatusUpdateDisplay, NotificationMode, ClarificationToolMode, Project, KimiThemePreset } from "@/types/ui";
+import type { Theme, ThemePaletteColors, ThemePaletteId, PermissionMode, StatusUpdateDisplay, NotificationMode, Project, KimiThemePreset } from "@/types/ui";
 import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 interface BootstrapSetters {
@@ -19,7 +19,6 @@ interface BootstrapSetters {
   setSessionRecommendationTurnLimit: (v: number) => void;
   setVoiceShortcut: (v: string) => void;
   setNotificationMode: (v: NotificationMode) => void;
-  setClarificationToolMode: (v: ClarificationToolMode) => void;
   setFilePreviewExtensions: (v: string[]) => void;
   setRecentProjects: (projects: Project[]) => void;
 }
@@ -53,7 +52,6 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);
           setters.setVoiceShortcut(res.data.voiceShortcut);
           setters.setNotificationMode(res.data.notificationMode);
-          setters.setClarificationToolMode(res.data.clarificationToolMode);
           setters.setFilePreviewExtensions(res.data.filePreviewExtensions ?? ["md", "txt"]);
         } else {
           console.warn("[useBootstrap] getSettings failed:", res.error);

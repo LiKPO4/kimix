@@ -599,6 +599,13 @@ function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: Timeli
   return result;
 }
 
+export function stripLegacyKimixClarificationWrapper(content: string): string {
+  if (!/^【Kimix 需求澄清(?:工具)?[:：]/.test(content)) return content;
+  const markerIndex = content.indexOf(CLARIFICATION_ORIGINAL_MARKER);
+  if (markerIndex === -1) return content;
+  return content.slice(markerIndex + CLARIFICATION_ORIGINAL_MARKER.length);
+}
+
 function stripKimixClarificationInstruction(content: string): string {
   const withoutRoomContext = stripRoomContextFromPrompt(content);
   if (withoutRoomContext !== content) return stripKimixClarificationInstruction(withoutRoomContext);
@@ -629,10 +636,9 @@ function stripKimixClarificationInstruction(content: string): string {
     if (markerIndex === -1) return "";
     return content.slice(markerIndex + LONG_TASK_ORIGINAL_MARKER.length);
   }
-  if (!content.startsWith("【Kimix 需求澄清工具：")) return content;
-  const markerIndex = content.indexOf(CLARIFICATION_ORIGINAL_MARKER);
-  if (markerIndex === -1) return content;
-  return stripKimixClarificationInstruction(content.slice(markerIndex + CLARIFICATION_ORIGINAL_MARKER.length));
+  const withoutClarificationWrapper = stripLegacyKimixClarificationWrapper(content);
+  if (withoutClarificationWrapper === content) return content;
+  return stripKimixClarificationInstruction(withoutClarificationWrapper);
 }
 
 function stripOfficialSystemReminders(content: string): string {

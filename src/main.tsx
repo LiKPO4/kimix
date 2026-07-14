@@ -97,7 +97,6 @@ const defaultBrowserPreviewSettings = {
   voiceShortcut: "Win+H",
   notificationMode: "unfocused",
   notificationShowContent: false,
-  clarificationToolMode: "auto",
   filePreviewExtensions: ["md", "txt"],
   expandToolCalls: false,
   experimentalKimiServer: true,
