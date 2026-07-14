@@ -77,22 +77,23 @@ export function RoomAgentPicker({
   useEffect(() => setOpen(false), [session.id]);
 
   if (selected.length === 0 || agents.length < 2) return null;
-  const selectedLabel = selected.length === 1 ? selected[0].displayName : `${selected[0].displayName} 等 ${selected.length} 个`;
+  const selectedLabel = selected[0].displayName;
+  const selectedLabelFontSize = selectedLabel.length > 28 ? 11 : selectedLabel.length > 20 ? 12 : 13;
 
   return (
-    <div ref={rootRef} className="relative min-w-0 shrink">
+    <div ref={rootRef} className="relative min-w-0" style={{ flex: "0 1 210px", width: 210 }}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         disabled={disabled}
-        className="kimix-icon-text-button kimix-muted-action is-compact max-w-[210px] min-w-0 disabled:cursor-not-allowed disabled:opacity-40"
-        style={{ height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
+        className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-40"
+        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
         title={`默认发送给 ${selected.map((agent) => agent.displayName).join("、")}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         <Bot size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-        <span className="min-w-0 truncate" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
+        <span className="min-w-0 flex-1 truncate" style={{ fontSize: selectedLabelFontSize, lineHeight: "20px" }}>{selectedLabel}</span>
         <span
           className="shrink-0 text-[11.5px] tabular-nums text-[var(--kimix-panel-text-muted)]"
           style={{ display: "inline-flex", height: 20, alignItems: "center", lineHeight: "20px" }}

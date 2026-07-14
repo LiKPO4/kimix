@@ -127,14 +127,30 @@ export function RoomContextPicker({
                       type="button"
                       onClick={() => toggleEntry(entry.id)}
                       className={`grid w-full rounded-xl border text-left transition-colors ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
-                      style={{ gridTemplateColumns: "22px minmax(0, 1fr)", gap: 10, minHeight: 58, padding: "10px 12px" }}
+                      style={{ gridTemplateColumns: "22px minmax(0, 1fr)", gap: 10, height: 76, minHeight: 76, maxHeight: 76, overflow: "hidden", padding: "10px 12px" }}
                     >
                       <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-md border ${selected ? "border-accent-primary bg-accent-primary text-white" : "border-[var(--kimix-panel-border)] text-transparent"}`}>
                         <Check size={13} />
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 self-center" style={{ height: 54, minHeight: 54, maxHeight: 54, overflow: "hidden" }}>
                         <span className="block truncate text-[12.5px] font-medium text-[var(--kimix-panel-text)]">{entry.label}</span>
-                        <span className="line-clamp-2 block text-[11.5px] leading-[18px] text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 3 }}>{entry.content}</span>
+                        <span
+                          className="block text-[11.5px] text-[var(--kimix-panel-text-muted)]"
+                          style={{
+                            display: "-webkit-box",
+                            WebkitBoxOrient: "vertical",
+                            WebkitLineClamp: 2,
+                            marginTop: 3,
+                            maxHeight: 36,
+                            overflow: "hidden",
+                            overflowWrap: "anywhere",
+                            lineHeight: "18px",
+                            whiteSpace: "normal",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {entry.content}
+                        </span>
                       </span>
                     </button>
                   );
