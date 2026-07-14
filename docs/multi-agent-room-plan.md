@@ -551,6 +551,7 @@ git diff --check
 39. 阶段 9B 运行冒烟确认 v2.15.35 设置开关、Composer `+` 入口和添加 Agent 弹层可见，模型列表复用本机 Kimi Code/opencode-go Provider，Kimi Server 超时时自动回退 SDK；未提交创建操作。用户验收步骤固定在 `docs/multi-agent-room-user-acceptance.md`。
 40. 阶段 9C 完成真实双 Agent 路由：Reviewer 单目标、主 Agent mention 覆盖和 Reviewer → deepseek-v4-pro 双目标并行均只触发预期参与者，并保持用户冻结的显示顺序。
 41. 阶段 9C 修复 Windows 次要 Agent session ID 与并行终态 usage：官方 session 使用确定性文件系统安全 ID，原始 roomAgent 身份继续由 metadata 持有；`turn_end` 状态按 Agent turn 分区，连续状态合并保留最终 token/context，真实 `MULTI8_OK` 回归中两个 Agent 的最终 usage 同时稳定可见。
+42. 阶段 9C 修复启动 active context 的两段竞态：preload 对最新 bootstrap 载荷提供 replay-latest 语义，避免 React 晚订阅漏掉一次性主进程事件；renderer 随后等待 IndexedDB 本地会话水合，再从完整状态解析房间身份和逐 Agent 恢复目标。读取失败也会释放门禁并走普通 fallback，避免永久等待。v2.15.37 冷启动无需点击即自动回到 RemoveBlack 测试房间，双 Agent、默认接收者、历史与 usage 均恢复。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

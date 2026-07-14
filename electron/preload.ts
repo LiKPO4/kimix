@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { createReplayLatestChannel } from "./replayLatestChannel";
 import type {
   OpenProjectRequest,
   OpenProjectResponse,
@@ -175,6 +176,15 @@ import type {
   LoggerWriteRequest,
   LoggerWriteResponse,
 } from "./types/ipc";
+
+type BootstrapPayload = {
+  project: { id: string; path: string; name: string; lastOpenedAt: number };
+};
+
+const bootstrapChannel = createReplayLatestChannel<BootstrapPayload>();
+ipcRenderer.on("kimix:bootstrap", (_event, payload: BootstrapPayload) => {
+  bootstrapChannel.publish(payload);
+});
 
 const api = {
   platform: process.platform,
@@ -513,11 +523,7 @@ const api = {
     ipcRenderer.invoke("app:getScheduledShutdown"),
 
   // Bootstrap
-  onBootstrap: (callback: (payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => void) => {
-    const handler = (_: unknown, payload: { project: { id: string; path: string; name: string; lastOpenedAt: number } }) => callback(payload);
-    ipcRenderer.on("kimix:bootstrap", handler);
-    return () => ipcRenderer.off("kimix:bootstrap", handler);
-  },
+  onBootstrap: (callback: (payload: BootstrapPayload) => void) => bootstrapChannel.subscribe(callback),
 
   // Window controls
   minimizeWindow: (): Promise<void> => ipcRenderer.invoke("window:minimize"),

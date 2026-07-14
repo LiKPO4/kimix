@@ -1,12 +1,12 @@
 # Kimix 多 Agent 房间用户验收清单
 
-验收版本：`v2.15.36`
+验收版本：`v2.15.37`
 
 验收范围：内部开发 gate，不推送、不发布。建议使用干净 Git 工作区或专门测试项目，避免多个 Agent 同时修改重要文件。
 
 ## 0. 准备
 
-- [ ] 左下角版本显示 `v2.15.36`。
+- [ ] 左下角版本显示 `v2.15.37`。
 - [ ] 设置 → 实验功能 → “多 Agent 房间（内部验收）”显示“验收中”。
 - [ ] Composer `+` 菜单顶部显示“添加 Agent”，初始计数为 `1/4`。
 - [ ] 添加弹层能看到现有 Kimi Code Provider 和模型，不需要重新录入 API Key。
@@ -96,4 +96,5 @@
 - [x] Reviewer 单目标发送只触发 Reviewer；`@deepseek-v4-pro` 只触发主 Agent。
 - [x] Reviewer → deepseek-v4-pro 双目标并行保持用户选择顺序。
 - [x] `MULTI8_OK` 实时回归中两个 Agent 均保留最终模型、输入、输出与 Context；Reviewer 先结束后，主 Agent 完成不会隐藏 Reviewer usage。
-- [ ] 四 Agent、长名称、窄窗口、历史展开/滚动、重启自动恢复、搜索/导出/归档仍需继续真实验收。
+- [x] v2.15.37 冷启动无需点击即自动回到 RemoveBlack 房间；Reviewer、deepseek-v4-pro、默认接收者、历史分区与双方最终 usage 保持不变。
+- [ ] 四 Agent、长名称、窄窗口、历史展开/滚动、搜索/导出/归档仍需继续真实验收。

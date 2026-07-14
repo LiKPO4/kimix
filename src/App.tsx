@@ -20,6 +20,7 @@ import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
+import { createStartupHydrationGate } from "@/utils/startupHydration";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
@@ -2423,9 +2424,15 @@ function App() {
   };
 
   useEffect(() => {
-    const unsubscribeBootstrap = window.api.onBootstrap((payload) => {
+    const localSessionsHydration = createStartupHydrationGate();
+    const unsubscribeBootstrap = window.api.onBootstrap(async (payload) => {
       if (bootstrapDoneRef.current) return;
       bootstrapDoneRef.current = true;
+      // The main-process bootstrap event can arrive before IndexedDB finishes
+      // hydrating local sessions. Room identity only exists in that local state,
+      // so selecting the startup session before hydration silently falls back to
+      // a recent project/new conversation and never revisits the saved room.
+      await localSessionsHydration.wait();
       const activeContext = STARTUP_ACTIVE_CONTEXT;
       const localSessions = useSessionStore.getState().sessions;
       const latestLocalSession = [...localSessions]
@@ -2728,6 +2735,8 @@ function App() {
         }
       } catch {
         // ignore load error
+      } finally {
+        localSessionsHydration.markReady();
       }
 
       try {
