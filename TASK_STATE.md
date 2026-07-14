@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.50 固定正文范围弹窗锚点
+
+- 当前目标：修复“本次补充正文”触发器按选项文字自适应宽度，导致上方弹窗左右移动的问题。
+- 已完成：`RoomContextPicker` 触发器固定为 128px 槽位，弹窗继续以固定槽位右边界对齐；同步版本号至 v2.15.50。`pnpm test:run`（83 个文件、583 项）、`pnpm build`（renderer `assets/index-DEspJajq.js`）、`pnpm knowledge:validate` 和 `git diff --check` 已通过。
+- 未完成：等待用户在 v2.15.50 窗口切换“上一轮/最近 3 轮/选择消息/全部正文/不补充”确认弹窗右边界稳定。
+- 阻塞：无。
+- 关键文件：`src/components/chat/RoomContextPicker.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：提交后用根目录 `start-kimix.bat` 启动 v2.15.50，切换正文范围选项，确认弹窗右边界保持稳定并回传截图。
+
 ## 2026-07-14 v2.15.49 Agents 文字色统一
 
 - 当前目标：收束输入区固定 Agents 选择槽的视觉层级，让标签文字与“手动审批”“上一轮”等次要工具按钮一致。

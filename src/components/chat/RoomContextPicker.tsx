@@ -61,13 +61,13 @@ export function RoomContextPicker({
   };
 
   return (
-    <div ref={rootRef} className="relative min-w-0 shrink-0">
+    <div ref={rootRef} className="relative shrink-0" style={{ flex: "0 0 128px", width: 128 }}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
-        className={`kimix-icon-text-button kimix-muted-action is-compact min-w-0 max-w-[142px] disabled:cursor-not-allowed disabled:opacity-40 ${invalidSelection ? "text-accent-warning" : ""}`}
-        style={{ height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
+        className={`kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-40 ${invalidSelection ? "text-accent-warning" : ""}`}
+        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
         title="设置本次发送给 Agent 的房间正文范围；发送后恢复为上一轮"
         aria-haspopup="menu"
         aria-expanded={open}
