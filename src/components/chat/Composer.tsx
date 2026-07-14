@@ -3534,6 +3534,7 @@ export function Composer() {
     auto: "自动权限",
     yolo: "完全访问权限",
   }[mutationPermissionMode ?? permissionMode];
+  const permissionLabelFontSize = permissionLabel.length > 5 ? 11 : permissionLabel.length > 4 ? 12 : 13;
 
   const placeholder = roomReadOnly
     ? "多 Agent 房间功能当前处于只读 gate"
@@ -4119,7 +4120,7 @@ export function Composer() {
                   const PermissionIcon = permissionMenuIcons[mutationPermissionMode ?? permissionMode];
                   return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
                 })()}
-                <span className="truncate">{permissionLabel}</span>
+                <span className="min-w-0 flex-1 truncate" style={{ fontSize: permissionLabelFontSize }}>{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (
