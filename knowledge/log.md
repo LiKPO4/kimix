@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Startup navigation has one writer and sidebar expansion is durable**: Settings hydration only populates recent projects; active-context writes wait for startup resolution, a saved empty project does not fall through to another project's latest conversation, and path-keyed project expansion preserves explicit collapse across restart. See [/project/kimix.md](/project/kimix.md).
+
 * **TypeScript is a two-boundary release gate**: `pnpm typecheck` checks Electron main/preload first and renderer/shared/test code second under strict mode; a successful Vite production build is no longer treated as evidence that IPC, event, nullability, or control-flow contracts are sound. See [/operations/release-process.md](/operations/release-process.md).
 
 * **User-controlled multi-Agent rooms graduated in v2.16.0**: After runtime ownership, history partitioning, durable concurrent dispatch, recovery, catalog, and real-task acceptance gates passed, the room UI defaults on as a released feature while retaining a device-local opt-out for new-room creation. See [/decisions/user-controlled-multi-agent-rooms.md](/decisions/user-controlled-multi-agent-rooms.md) and [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

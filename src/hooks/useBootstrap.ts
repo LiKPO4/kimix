@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { useAppStore } from "@/stores/appStore";
 import type { Theme, ThemePaletteColors, ThemePaletteId, PermissionMode, StatusUpdateDisplay, NotificationMode, Project, KimiThemePreset } from "@/types/ui";
 import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
@@ -64,9 +63,6 @@ export function useBootstrap(setters: BootstrapSetters) {
     window.api.listRecentProjects().then((res) => {
       if (res.success) {
         setters.setRecentProjects(res.data);
-        if (!useAppStore.getState().currentProject && res.data[0]) {
-          useAppStore.setState({ currentProject: res.data[0] });
-        }
       } else {
         console.warn("[useBootstrap] listRecentProjects failed:", res.error);
       }

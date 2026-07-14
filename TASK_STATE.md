@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.16.2 项目展开与启动上下文恢复
+
+- 当前目标：完整修复项目展开/折叠状态未持久化，以及启动时可能进入非退出前项目或会话的问题。
+- 根因：侧栏仅以内存项目 ID 集合记录展开状态；设置 bootstrap、主启动恢复和活动上下文持久化之间存在临时项目双写；保存项目但没有活动会话时又错误回退到其他项目的最近会话。
+- 已完成：展开集合改为按规范化项目路径持久化，区分首次启动与用户明确全部折叠；启动设置加载不再选择项目；活动上下文写入等待正式恢复完成；启动优先级改为有效保存会话、保存项目、无保存上下文时的最近会话、默认项目。版本号三处同步至 v2.16.2；`pnpm typecheck` 通过；全量测试 87 个文件、622 项通过；`pnpm build` 通过，renderer 为 `assets/index-MZ4jIt_p.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。
+- 未完成：等待用户重启验收。
+- 阻塞：无。
+- 关键文件：`src/App.tsx`、`src/components/layout/Sidebar.tsx`、`src/hooks/useBootstrap.ts`、`src/hooks/useStatePersistence.ts`、`src/utils/startupContext.ts`、`src/utils/sidebarProjectExpansion.ts`。
+- 下一步：用户在 v2.16.2 验收多个项目的展开/折叠组合、停留在无活动会话项目后的重启，以及最近项目顺序与退出项目不一致时的恢复；本轮不推送、不打 tag、不发布。
+
 ## 2026-07-14 v2.16.1 TypeScript 严格门禁
 
 - 当前目标：清除仓库既有 TypeScript 类型基线错误，并让生产构建之外的严格类型检查成为可重复门禁。

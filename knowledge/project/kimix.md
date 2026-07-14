@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-07-14T16:35:04+08:00"
+timestamp: "2026-07-14T23:35:00+08:00"
 ---
 
 # Kimix
@@ -43,7 +43,8 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 * Official session catalog titles prefer a non-default official title over first/last prompt fallbacks, so lazy history hydration cannot visibly rename the row. A transient `isLoading` flag belongs only to the currently loading view; non-current rows show a spinner only for genuine runtime activity.
 * Official empty-session visibility is shared by the shell and sidebar. A default-title Kimi session older than the creation grace period with no user or steer content stays hidden even before asynchronous project catalog reconciliation completes; freshly created sessions and sessions with real user content remain visible.
 * Kimi placeholder titles are bilingual: both `New Session` and `新会话` are defaults even when legacy or fork metadata marks them custom. Catalog and live metadata paths reject either placeholder and fall back to meaningful prompt text instead of renaming only after history hydration.
-* Active project/session persistence is written by store changes and flushed again on the real `beforeunload` boundary. React effect cleanup must never write active context because Strict Mode and HMR run cleanup before startup restoration and can replace a valid saved session with `null`.
+* Active project/session persistence is written by store changes and flushed again on the real `beforeunload` boundary. React effect cleanup must never write active context because Strict Mode and HMR run cleanup before startup restoration and can replace a valid saved session with `null`. Startup has one navigation owner: settings hydration may populate the recent-project catalog but cannot select a project, and active-context writes remain gated until persisted sessions and the frozen startup context have resolved. A saved project with no active session remains intentionally empty instead of falling through to another project's latest conversation; only the complete absence of saved context permits that recent-conversation fallback.
+* Sidebar expansion is a path-keyed user preference, separate from active project/session navigation. Restored expansion state, including an explicitly empty set, is authoritative on first startup paint; the active project is auto-expanded only when no preference has ever been saved. Later explicit session navigation may expand its project, while manually collapsing the active project remains stable across restart.
 * Theme presets imported from the active Kimi Code `themes` directory are a cached filesystem projection. A rescan must reconcile additions, updates, and deletions from that directory while preserving presets owned by other sources. Removing a Kimix record and deleting its source are separate actions; source deletion requires confirmation and a main-process path guard restricted to direct JSON children of the active themes directory.
 * Stable runtime choices are described by [Runtime Routing](/architecture/runtime-routing.md).
 * Operational MCP behavior is described by [MCP and Plugin Lifecycle](/operations/mcp-and-plugin-lifecycle.md).

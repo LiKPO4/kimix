@@ -10,11 +10,18 @@ import {
   rememberArchivedSessionTombstone,
 } from "@/utils/persistence";
 
-export function useStatePersistence() {
+export function useStatePersistence(activeContextReady = true) {
   const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const conversationDirtyRef = useRef(false);
   const isUnloadingRef = useRef(false);
   const lastConversationPersistAtRef = useRef(Date.now());
+  const activeContextReadyRef = useRef(activeContextReady);
+
+  useEffect(() => {
+    const becameReady = !activeContextReadyRef.current && activeContextReady;
+    activeContextReadyRef.current = activeContextReady;
+    if (becameReady) persistLocalActiveContext();
+  }, [activeContextReady]);
 
   useEffect(() => {
     const maxPersistWaitMs = 5000;
@@ -75,6 +82,7 @@ export function useStatePersistence() {
     });
     const unsubscribeActiveContextPersistence = useAppStore.subscribe((state, prev) => {
       if (state.currentProject === prev.currentProject && state.currentSession === prev.currentSession) return;
+      if (!activeContextReadyRef.current) return;
       persistLocalActiveContext();
     });
 
@@ -84,7 +92,7 @@ export function useStatePersistence() {
       // beforeunload 是同步事件，无法等待异步 IndexedDB 写入完成。
       // 串行化队列在平时已尽量保证最新状态落地，此处仅作最后尝试。
       void persistLocalConversationState();
-      persistLocalActiveContext();
+      if (activeContextReadyRef.current) persistLocalActiveContext();
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {

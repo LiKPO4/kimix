@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
@@ -22,6 +22,7 @@ import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCo
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
+import { selectStartupLocalSession, selectStartupProject } from "@/utils/startupContext";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
@@ -1488,6 +1489,7 @@ function App() {
   currentSessionRef.current = currentSession;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bootstrapDoneRef = useRef(false);
+  const [startupContextResolved, setStartupContextResolved] = useState(false);
   const handoffJobRef = useRef<HandoffJob | null>(null);
   const longTaskReviewDispatchRef = useRef<Set<string>>(new Set());
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
@@ -1526,7 +1528,7 @@ function App() {
 
   useRendererLagDetector();
   useSettingsSync();
-  useStatePersistence();
+  useStatePersistence(startupContextResolved);
   const { enqueueStreamEvent, flushStreamEvents } = useEventStream();
 
   const handleEscape = useCallback(() => {
@@ -2454,18 +2456,21 @@ function App() {
       const activeContextSession = activeContext?.sessionId
         ? findSessionByRuntimeIdentity(localSessions, activeContext.sessionId)
         : undefined;
-      const activeLocalSession = activeContext?.sessionId
-        ? activeContextSession
-        : latestLocalSession;
+      const activeLocalSession = selectStartupLocalSession({
+        activeContext,
+        activeContextSession,
+        latestLocalSession,
+      });
 
       window.api.listRecentProjects().then(async (projectsRes) => {
         const recentProjects = projectsRes.success ? projectsRes.data : [payload.project];
         if (projectsRes.success) setRecentProjects(projectsRes.data);
-        const activeProject = activeLocalSession
-          ? recentProjects.find((project) => isSameLocalProjectPath(project.path, activeLocalSession.projectPath)) ?? activeContext?.project ?? payload.project
-          : activeContext?.project
-            ? recentProjects.find((project) => isSameLocalProjectPath(project.path, activeContext.project?.path)) ?? activeContext.project
-            : payload.project;
+        const activeProject = selectStartupProject({
+          activeContext,
+          activeLocalSession,
+          recentProjects,
+          fallbackProject: payload.project,
+        });
         const startupActiveSession = activeLocalSession
           ? { ...activeLocalSession, isLoading: true }
           : null;
@@ -2483,8 +2488,9 @@ function App() {
         }
         useAppStore.setState({
           currentProject: activeProject,
-          currentSession: startupActiveSession ?? useAppStore.getState().currentSession,
+          currentSession: startupActiveSession,
         });
+        setStartupContextResolved(true);
 
         window.setTimeout(() => {
           void (async () => {
@@ -2727,7 +2733,14 @@ function App() {
             }
           })();
         }, 0);
-      }).catch(logError("loadKimiCodeSession"));
+      }).catch((error) => {
+        useAppStore.setState({
+          currentProject: activeContext?.project ?? payload.project,
+          currentSession: activeLocalSession ?? null,
+        });
+        setStartupContextResolved(true);
+        logError("loadKimiCodeSession")(error);
+      });
     });
 
     void (async () => {

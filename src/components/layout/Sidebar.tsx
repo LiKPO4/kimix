@@ -19,6 +19,7 @@ import { reportError } from "@/utils/reportError";
 import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { getHiddenHandoffSessionIds } from "@/utils/persistence";
+import { persistSidebarExpandedProjectPaths, readSidebarExpandedProjectPaths } from "@/utils/sidebarProjectExpansion";
 import { getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
 import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 
@@ -138,11 +139,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const updateSession = useSessionStore((s) => s.updateSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
 
-  const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
+  const [restoredProjectExpansion] = useState(readSidebarExpandedProjectPaths);
+  const [expandedProjectPaths, setExpandedProjectPaths] = useState<Set<string>>(
+    () => restoredProjectExpansion.paths,
+  );
   const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; bottom: number; left: number } | null>(null);
   const [projectActionFocusId, setProjectActionFocusId] = useState<string | null>(null);
   const [sessionActionFocusId, setSessionActionFocusId] = useState<string | null>(null);
-  const lastAutoExpandedProjectId = useRef<string | null>(null);
+  const lastAutoExpandedProjectPath = useRef<string | null>(null);
+  const handledInitialProjectExpansionRef = useRef(false);
   const projectCatalogRefreshInFlightRef = useRef<Set<string>>(new Set());
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
 
@@ -174,20 +179,32 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   }, []);
 
   useEffect(() => {
-    if (!currentProject) {
-      lastAutoExpandedProjectId.current = null;
+    persistSidebarExpandedProjectPaths(expandedProjectPaths);
+  }, [expandedProjectPaths]);
+
+  useEffect(() => {
+    const currentProjectPath = normalizeProjectPath(currentProject?.path);
+    if (!currentProjectPath) {
+      lastAutoExpandedProjectPath.current = null;
       return;
     }
-    if (lastAutoExpandedProjectId.current !== currentProject.id) {
-      lastAutoExpandedProjectId.current = currentProject.id;
-      setExpandedProjectIds((current) => new Set([...current, currentProject.id]));
+    if (!handledInitialProjectExpansionRef.current) {
+      handledInitialProjectExpansionRef.current = true;
+      lastAutoExpandedProjectPath.current = currentProjectPath;
+      if (restoredProjectExpansion.hasSavedState) return;
+      setExpandedProjectPaths((current) => new Set([...current, currentProjectPath]));
+      return;
     }
-  }, [currentProject?.id]);
+    if (lastAutoExpandedProjectPath.current !== currentProjectPath) {
+      lastAutoExpandedProjectPath.current = currentProjectPath;
+      setExpandedProjectPaths((current) => new Set([...current, currentProjectPath]));
+    }
+  }, [currentProject?.path, restoredProjectExpansion.hasSavedState]);
 
   useEffect(() => {
     for (const project of recentProjects) {
-      if (!expandedProjectIds.has(project.id)) continue;
       const projectKey = normalizeProjectPath(project.path);
+      if (!expandedProjectPaths.has(projectKey)) continue;
       if (!projectKey || projectCatalogRefreshInFlightRef.current.has(projectKey)) continue;
 
       projectCatalogRefreshInFlightRef.current.add(projectKey);
@@ -207,7 +224,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         projectCatalogRefreshInFlightRef.current.delete(projectKey);
       });
     }
-  }, [expandedProjectIds, recentProjects]);
+  }, [expandedProjectPaths, recentProjects]);
 
   const currentSessionId = currentSession?.id;
   const currentSessionUpdatedAt = currentSession?.updatedAt;
@@ -293,7 +310,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setCurrentProject(project);
       setWorkspaceView("chat");
       setCurrentSession(session);
-      setExpandedProjectIds((current) => new Set([...current, project.id]));
+      setExpandedProjectPaths((current) => new Set([...current, normalizeProjectPath(project.path)]));
       } catch (err) {
         reportError(err, { context: "createSessionForProject", userVisible: true });
       } finally {
@@ -458,10 +475,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       const nextProject = nextProjects.find((item) => item.id !== project.id) ?? null;
       setCurrentProject(nextProject);
       setCurrentSession(null);
-      setExpandedProjectIds((current) => {
+      setExpandedProjectPaths((current) => {
         const next = new Set(current);
-        next.delete(project.id);
-        if (nextProject?.id) next.add(nextProject.id);
+        next.delete(normalizeProjectPath(project.path));
+        if (nextProject?.path) next.add(normalizeProjectPath(nextProject.path));
         return next;
       });
     }
@@ -590,7 +607,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     const project = recentProjects.find((item) => isSameProjectPath(item.path, session.projectPath));
     if (!project) return;
     setCurrentProject(project);
-    setExpandedProjectIds((current) => new Set([...current, project.id]));
+    setExpandedProjectPaths((current) => new Set([...current, normalizeProjectPath(project.path)]));
   };
 
   const selectSession = async (sessionId: string) => {
@@ -708,7 +725,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {recentProjects.map((project, projectIndex) => {
-                    const isExpanded = expandedProjectIds.has(project.id);
+                    const projectPathKey = normalizeProjectPath(project.path);
+                    const isExpanded = expandedProjectPaths.has(projectPathKey);
                     const isActive = currentProject?.id === project.id;
                     const isPinned = project.pinned ?? false;
                     const pSessions = projectSessions(project.path);
@@ -761,11 +779,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           <button
                             onClick={() => {
                               setProjectActionFocusId(null);
-                              if (isExpanded) lastAutoExpandedProjectId.current = project.id;
-                              setExpandedProjectIds((current) => {
+                              if (isExpanded) lastAutoExpandedProjectPath.current = projectPathKey;
+                              setExpandedProjectPaths((current) => {
                                 const next = new Set(current);
-                                if (next.has(project.id)) next.delete(project.id);
-                                else next.add(project.id);
+                                if (next.has(projectPathKey)) next.delete(projectPathKey);
+                                else next.add(projectPathKey);
                                 return next;
                               });
                             }}
@@ -816,7 +834,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 setCurrentProject(project);
-                                setExpandedProjectIds((current) => new Set([...current, project.id]));
+                                setExpandedProjectPaths((current) => new Set([...current, projectPathKey]));
                                 await createSessionForProject(project);
                               }}
                               disabled={Boolean(creatingSessionProjectPath)}
@@ -1011,7 +1029,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.16.1</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.16.2</span>
         </button>
       </div>
     </aside>

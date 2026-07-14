@@ -9,8 +9,8 @@ import type { Project, Session } from "@/types/ui";
 import { LOCAL_ACTIVE_CONTEXT_KEY } from "@/utils/persistence";
 import { useStatePersistence } from "../useStatePersistence";
 
-function PersistenceProbe() {
-  useStatePersistence();
+function PersistenceProbe({ activeContextReady = true }: { activeContextReady?: boolean }) {
+  useStatePersistence(activeContextReady);
   return null;
 }
 
@@ -69,6 +69,29 @@ describe("useStatePersistence", () => {
     localStorage.removeItem(LOCAL_ACTIVE_CONTEXT_KEY);
     act(() => window.dispatchEvent(new Event("beforeunload")));
 
+    expect(JSON.parse(localStorage.getItem(LOCAL_ACTIVE_CONTEXT_KEY) ?? "null")).toMatchObject({
+      project,
+      sessionId: session.id,
+    });
+  });
+
+  it("does not overwrite the saved context with provisional bootstrap state", () => {
+    const saved = { project, sessionId: session.id, updatedAt: 123 };
+    localStorage.setItem(LOCAL_ACTIVE_CONTEXT_KEY, JSON.stringify(saved));
+
+    root = createRoot(container);
+    act(() => root?.render(createElement(PersistenceProbe, { activeContextReady: false })));
+    act(() => useAppStore.setState({
+      currentProject: { ...project, id: "temporary-project", path: "D:/WORKS/temporary" },
+      currentSession: null,
+    }));
+
+    expect(JSON.parse(localStorage.getItem(LOCAL_ACTIVE_CONTEXT_KEY) ?? "null")).toEqual(saved);
+
+    act(() => {
+      useAppStore.setState({ currentProject: project, currentSession: session });
+      root?.render(createElement(PersistenceProbe, { activeContextReady: true }));
+    });
     expect(JSON.parse(localStorage.getItem(LOCAL_ACTIVE_CONTEXT_KEY) ?? "null")).toMatchObject({
       project,
       sessionId: session.id,
