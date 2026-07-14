@@ -376,10 +376,19 @@ function appendAfterConfirmedSteer(
   return [...closeOpenAssistantBeforeIndex(existing, existing.length, settledAt), ...additions];
 }
 
-function findTurnAnchorTimestamp(events: TimelineEvent[], beforeIndex: number): number | undefined {
+function findTurnAnchorTimestamp(
+  events: TimelineEvent[],
+  beforeIndex: number,
+  assistant: Extract<TimelineEvent, { type: "assistant_message" }>,
+): number | undefined {
   for (let index = beforeIndex - 1; index >= 0; index -= 1) {
     const event = events[index];
-    if (event.type === "user_message") return event.timestamp;
+    if (event.type !== "user_message") continue;
+    if (assistant.roomMessageId) {
+      if (event.roomMessageId !== assistant.roomMessageId) continue;
+      if (assistant.roomAgentId && event.roomAgentId && event.roomAgentId !== assistant.roomAgentId) continue;
+    }
+    return event.timestamp;
   }
   return undefined;
 }
@@ -391,7 +400,7 @@ function completedAssistantDuration(
   completedAt: number,
   incomingDurationMs?: number,
 ): number | undefined {
-  const turnStartedAt = findTurnAnchorTimestamp(events, assistantIndex);
+  const turnStartedAt = findTurnAnchorTimestamp(events, assistantIndex, assistant);
   const turnDuration = turnStartedAt !== undefined
     ? reliableAssistantDurationBetween(turnStartedAt, completedAt)
     : undefined;

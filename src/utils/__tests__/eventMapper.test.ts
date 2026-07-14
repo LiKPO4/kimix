@@ -553,6 +553,71 @@ describe("mergeEvents", () => {
     expect(assistant.durationMs).toBe(31_000);
   });
 
+  it("does not use an older room message as the current Agent turn duration anchor", () => {
+    const existing: TimelineEvent[] = [
+      { id: "old-user", type: "user_message", timestamp: 1_000, content: "旧消息", roomMessageId: "room-message-old", roomAgentId: "agent-a" },
+      {
+        id: "assistant-current",
+        type: "assistant_message",
+        timestamp: 100_000,
+        content: "本轮回复",
+        isThinking: false,
+        isComplete: false,
+        roomMessageId: "room-message-current",
+        roomAgentId: "agent-a",
+        agentTurnId: "turn-current",
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "turn-end",
+      type: "assistant_message",
+      timestamp: 110_000,
+      content: "",
+      isThinking: false,
+      isComplete: true,
+      roomMessageId: "room-message-current",
+      roomAgentId: "agent-a",
+      agentTurnId: "turn-current",
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.durationMs).toBe(10_000);
+  });
+
+  it("uses only the matching room message as the Agent turn duration anchor", () => {
+    const existing: TimelineEvent[] = [
+      { id: "old-user", type: "user_message", timestamp: 1_000, content: "旧消息", roomMessageId: "room-message-old", roomAgentId: "agent-a" },
+      { id: "current-user", type: "user_message", timestamp: 90_000, content: "当前消息", roomMessageId: "room-message-current", roomAgentId: "agent-a" },
+      {
+        id: "assistant-current",
+        type: "assistant_message",
+        timestamp: 100_000,
+        content: "本轮回复",
+        isThinking: false,
+        isComplete: false,
+        roomMessageId: "room-message-current",
+        roomAgentId: "agent-a",
+        agentTurnId: "turn-current",
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "turn-end",
+      type: "assistant_message",
+      timestamp: 110_000,
+      content: "",
+      isThinking: false,
+      isComplete: true,
+      roomMessageId: "room-message-current",
+      roomAgentId: "agent-a",
+      agentTurnId: "turn-current",
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const assistant = result[2] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(assistant.durationMs).toBe(20_000);
+  });
+
   it("merges streaming tool calls by toolCallId", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "read", status: "running", arguments: { path: "a" }, rawArguments: '{"path":"a"}' },

@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.63 房间本轮耗时稳定锚点
+
+- 当前目标：修复刚发送并在约 10 秒内完成的多 Agent 回复偶尔显示“本轮总耗时 42–44 分钟”的问题；保持当前进程运行直到完成取证。
+- 现场证据：官方 wire 中 mimo-v2.5-pro 本轮从 prompt 到 step.end 为 9.989 秒，deepseek-v4-pro 为 11.132 秒；UI 的 44分54秒和 42分27秒来自各 Agent 旧用户消息到本次完成事件的跨回合时间差。
+- 根因：`completedAssistantDuration` 在房间当前 prompt 尚未进入 Agent 本地事件分区时，会把最近任意 `user_message` 当成本轮起点；房间隔离后这个回退可能命中数十分钟前的旧消息。
+- 已完成：房间 Assistant 只接受相同 `roomMessageId`、同 Agent 的用户耗时锚点；找不到时回退到本轮 Assistant 占位起点，普通单 Agent 最近用户消息逻辑保持不变。版本号三处同步至 v2.15.63；定向测试 1 个文件、85 项通过；全量测试 85 个文件、613 项通过；`pnpm build` 通过，renderer 为 `assets/index-UEs024dF.js`；`pnpm knowledge:validate` 通过。
+- 未完成：完成 diff check，提交并启动新构建；等待用户用新消息验收实际耗时。
+- 阻塞：无。
+- 关键文件：`src/utils/eventMapper.ts`、`src/utils/__tests__/eventMapper.test.ts`、`src/components/chat/MessageBubble.tsx`。
+- 下一步：完成门禁并启动 v2.15.63，发送一次双 Agent 短回复确认各自耗时约为真实 10 秒量级。
+
 ## 2026-07-14 v2.15.62 持久化任务唤醒运行态校准
 
 - 当前目标：修复 v2.15.61 打开后仍显示假运行态、必须再次点击停止才会正确收尾的问题；发布继续暂停。
