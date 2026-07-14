@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.52 更新 Kimi Code 版本动态入口
+
+- 当前目标：将更新记录弹窗中 Kimi Code 的“浏览器查看”替换为更新更及时的官方 CLI Changelog 地址。
+- 已完成：仅将 `KIMI_CODE_UPDATE_PAGE_URL` 从旧 `whats-new.html` 替换为 `https://www.kimi.com/code/docs/kimi-code-cli/release-notes/changelog.html`；Kimix 本体 Release 地址、Kimi Code 更新检测和安装逻辑均未改动；版本号三处同步至 v2.15.52。新地址 HTTP 200；全量测试 83 个文件、590 项通过；`pnpm build` 通过，renderer 为 `assets/index-De7xUNe3.js`；`pnpm knowledge:validate` 通过。
+- 未完成：等待用户点击验收。
+- 阻塞：无。
+- 关键文件：`src/components/layout/DialogSystem.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：用户在 v2.15.52 点击 Kimi Code 卡片下方“浏览器查看”，确认打开官方 Changelog。
+
 ## 2026-07-14 v2.15.51 稳定多 Agent 消息信息气泡
 
 - 当前目标：修复已完成 Agent 的 Tokens/Context 信息气泡在输出结束、切换 Agent、下一 Agent 开始输出或切换权限后，偶尔降级成超长耗时的问题，同时保持官方历史和消息归属不变。
