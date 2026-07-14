@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.59 房间实时用户消息唯一投影
+
+- 当前目标：修复 v2.15.58 多 Agent 房间单次输入在运行中仍出现多条相同用户气泡的问题；发布保持暂停。
+- 根因：稳定投递身份已经进入 TurnBegin 与 canonical history，但通用 `mergeEvents` 仍只用“正文相同且 10 秒内”识别用户回声。同一投递的 snapshot 别名超过 10 秒会持续追加；反过来，两次身份不同但正文相同的真实输入又可能被误吞。房间投影器还只认领首个官方用户事件，其他同身份别名会被当作未归属历史再次显示。
+- 已完成：房间用户事件仅按完整 `roomMessageId + agentTurnId + dispatchAttemptId` 合并，不再使用正文猜测；身份不同的相同输入分别保留。投影器按匹配投递身份认领全部用户事件别名，并拒绝用不匹配的旧 official ID 越过稳定身份。新增三项回归覆盖延迟 snapshot、相同正文不同投递及已有多别名投影；定向测试 2 个文件、88 项通过；全量测试 85 个文件、607 项通过；`pnpm build` 通过，renderer 为 `assets/index-CugjeIAX.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。版本号三处同步至 v2.15.59。
+- 未完成：提交并启动新构建后等待用户复测；未经用户再次确认不发布。
+- 阻塞：发布被本问题主动暂停，修复验证无阻塞。
+- 关键文件：`src/utils/eventMapper.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/__tests__/eventMapper.test.ts`、`src/utils/__tests__/collaborationTimeline.test.ts`。
+- 下一步：完成门禁并启动 v2.15.59；用户在运行超过 10 秒的真实房间轮次中确认单次输入始终只有一个气泡，关闭重开后仍一致。
+
 ## 2026-07-14 v2.15.58 输入区文字基线统一
 
 - 当前目标：统一输入区底部权限、Agents、携带正文、Swarm、Plan 和思考按钮的文字视觉高度与基线。

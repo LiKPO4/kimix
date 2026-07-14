@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Room user-event aliases collapse only by stable delivery identity**: Live merging deduplicates the complete `roomMessageId + agentTurnId + dispatchAttemptId` triple without a time window, different triples preserve repeated real prompts, and the room projection claims every official alias for one delivery so snapshot replay cannot create extra user bubbles. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Room prompts carry stable delivery identity across live and canonical history**: The versioned Kimix envelope binds `roomMessageId`, `agentTurnId`, and `dispatchAttemptId` before visible text is restored; room messages own user bubbles, Agent user events remain delivery anchors, and text/time matching is limited to identity-less legacy migration. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 
 * **Room history binds an identity-less acknowledgement only by a unique canonical match**: When the prompt API omits the official user-event ID, exact visible text and a 30-second Agent-local time window may recover one unclaimed delivery; repeated candidates remain separate instead of being guessed. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

@@ -344,6 +344,52 @@ describe("mergeEvents", () => {
     expect(user.images?.[0].dataUrl).toBe("data:image/png;base64,local");
   });
 
+  it("deduplicates delayed room user echoes by stable delivery identity", () => {
+    const existing: TimelineEvent[] = [{
+      id: "live-user",
+      type: "user_message",
+      timestamp: 1,
+      content: "发一版 release 吧",
+      roomMessageId: "room-message-1",
+      agentTurnId: "agent-turn-1",
+      dispatchAttemptId: "dispatch-attempt-1",
+    }];
+    const incoming: TimelineEvent = {
+      id: "snapshot-user",
+      type: "user_message",
+      timestamp: 60_001,
+      content: "发一版 release 吧",
+      roomMessageId: "room-message-1",
+      agentTurnId: "agent-turn-1",
+      dispatchAttemptId: "dispatch-attempt-1",
+    };
+
+    expect(mergeEvents(existing, incoming)).toEqual(existing);
+  });
+
+  it("keeps identical room prompts when their stable delivery identities differ", () => {
+    const existing: TimelineEvent[] = [{
+      id: "first-user",
+      type: "user_message",
+      timestamp: 1,
+      content: "继续",
+      roomMessageId: "room-message-1",
+      agentTurnId: "agent-turn-1",
+      dispatchAttemptId: "dispatch-attempt-1",
+    }];
+    const incoming: TimelineEvent = {
+      id: "second-user",
+      type: "user_message",
+      timestamp: 2,
+      content: "继续",
+      roomMessageId: "room-message-2",
+      agentTurnId: "agent-turn-2",
+      dispatchAttemptId: "dispatch-attempt-2",
+    };
+
+    expect(mergeEvents(existing, incoming).map((event) => event.id)).toEqual(["first-user", "second-user"]);
+  });
+
   it("merges streaming assistant content", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Hel", isThinking: false, isComplete: false },

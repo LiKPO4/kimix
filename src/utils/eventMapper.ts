@@ -1289,22 +1289,35 @@ function isKimixSyntheticThinking(text: string) {
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
-    // 取最近一条 user_message，若内容与 incoming 相同且在 10 秒内，则认为是重复
-    const lastUserMessageIndex = existing.findLastIndex((e) => e.type === "user_message");
-    if (lastUserMessageIndex >= 0) {
-      const lastUser = existing[lastUserMessageIndex] as Extract<TimelineEvent, { type: "user_message" }>;
-      if (Math.abs(lastUser.timestamp - incoming.timestamp) <= 10000) {
-        const lastContent = normalizeUserContent(lastUser.content);
-        const incomingContent = normalizeUserContent(incoming.content);
-        if (lastContent === incomingContent && incomingContent.length > 0) {
-          return existing;
-        }
-        if (lastContent === incomingContent && incomingContent.length === 0) {
-          if (shouldPreserveLocalUserImages(lastUser, incoming)) {
+    const deliveryIdentity = incoming.roomMessageId && incoming.agentTurnId && incoming.dispatchAttemptId
+      ? `${incoming.roomMessageId}\n${incoming.agentTurnId}\n${incoming.dispatchAttemptId}`
+      : null;
+    if (deliveryIdentity) {
+      const alreadyMerged = existing.some((event) => (
+        event.type === "user_message" &&
+        event.roomMessageId && event.agentTurnId && event.dispatchAttemptId &&
+        `${event.roomMessageId}\n${event.agentTurnId}\n${event.dispatchAttemptId}` === deliveryIdentity
+      ));
+      if (alreadyMerged) return existing;
+    } else {
+      // Identity-less ordinary and legacy sessions retain the bounded echo
+      // fallback. Room deliveries never use text/time guessing.
+      const lastUserMessageIndex = existing.findLastIndex((e) => e.type === "user_message");
+      if (lastUserMessageIndex >= 0) {
+        const lastUser = existing[lastUserMessageIndex] as Extract<TimelineEvent, { type: "user_message" }>;
+        if (Math.abs(lastUser.timestamp - incoming.timestamp) <= 10000) {
+          const lastContent = normalizeUserContent(lastUser.content);
+          const incomingContent = normalizeUserContent(incoming.content);
+          if (lastContent === incomingContent && incomingContent.length > 0) {
             return existing;
           }
-          if (getUserImageSignature(lastUser) === getUserImageSignature(incoming)) {
-            return existing;
+          if (lastContent === incomingContent && incomingContent.length === 0) {
+            if (shouldPreserveLocalUserImages(lastUser, incoming)) {
+              return existing;
+            }
+            if (getUserImageSignature(lastUser) === getUserImageSignature(incoming)) {
+              return existing;
+            }
           }
         }
       }

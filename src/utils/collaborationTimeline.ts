@@ -15,12 +15,21 @@ function findDeliveryUserIndex(
   message: RoomUserMessage,
   delivery: RoomAgentDelivery,
 ): number {
-  return events.findIndex((event) => (
-    event.type === "user_message" && (
-      event.id === delivery.officialUserEventId ||
-      event.roomMessageId === message.id
-    )
-  ));
+  return events.findIndex((event) => isDeliveryUserEvent(event, message, delivery));
+}
+
+function isDeliveryUserEvent(
+  event: TimelineEvent,
+  message: RoomUserMessage,
+  delivery: RoomAgentDelivery,
+): boolean {
+  if (event.type !== "user_message") return false;
+  const hasDeliveryIdentity = Boolean(event.roomMessageId || event.agentTurnId || event.dispatchAttemptId);
+  if (!hasDeliveryIdentity) return event.id === delivery.officialUserEventId;
+  const expectedDispatchAttemptId = delivery.dispatchAttemptId ?? `legacy:${delivery.agentTurnId}`;
+  return event.roomMessageId === message.id &&
+    (!event.agentTurnId || event.agentTurnId === delivery.agentTurnId) &&
+    (!event.dispatchAttemptId || event.dispatchAttemptId === expectedDispatchAttemptId);
 }
 
 function deliveryEvents(
@@ -31,6 +40,9 @@ function deliveryEvents(
 ): { events: TimelineEvent[]; claimedEventIds: string[] } {
   const events = getRoomAgentEvents(session, roomAgentId);
   const startIndex = findDeliveryUserIndex(events, message, delivery);
+  const matchingUserEventIds = events.flatMap((event) => (
+    isDeliveryUserEvent(event, message, delivery) ? [event.id] : []
+  ));
   const explicitlyBound = events.filter((event) => event.agentTurnId === delivery.agentTurnId);
   const source = explicitlyBound.length > 0
     ? explicitlyBound.filter((event) => event.type !== "user_message")
@@ -46,10 +58,11 @@ function deliveryEvents(
       roomMessageId: message.id,
       agentTurnId: delivery.agentTurnId,
     })),
-    claimedEventIds: [
+    claimedEventIds: Array.from(new Set([
+      ...matchingUserEventIds,
       ...(startIndex >= 0 ? [events[startIndex].id] : []),
       ...source.map((event) => event.id),
-    ],
+    ])),
   };
 }
 

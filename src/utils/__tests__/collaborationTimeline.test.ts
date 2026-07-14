@@ -103,6 +103,79 @@ describe("projectCollaborationTimeline", () => {
     expect(second[1].id).toBe(first[1].id);
   });
 
+  it("claims every user-event alias with the same stable room delivery identity", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [{
+          id: "message-stable",
+          content: "发一版 release 吧",
+          recipientAgentIds: [primary.id],
+          deliveries: {
+            [primary.id]: {
+              status: "running",
+              dispatchAttemptId: "attempt-stable",
+              agentTurnId: "turn-stable",
+              officialUserEventId: "canonical-user-latest",
+            },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: [
+            {
+              id: "live-user",
+              type: "user_message",
+              timestamp: 20,
+              content: "发一版 release 吧",
+              roomMessageId: "message-stable",
+              agentTurnId: "turn-stable",
+              dispatchAttemptId: "attempt-stable",
+            },
+            {
+              id: "canonical-user-old",
+              type: "user_message",
+              timestamp: 40,
+              content: "发一版 release 吧",
+              roomMessageId: "message-stable",
+              agentTurnId: "turn-stable",
+              dispatchAttemptId: "attempt-stable",
+            },
+            {
+              id: "canonical-user-latest",
+              type: "user_message",
+              timestamp: 60,
+              content: "发一版 release 吧",
+              roomMessageId: "message-stable",
+              agentTurnId: "turn-stable",
+              dispatchAttemptId: "attempt-stable",
+            },
+            {
+              id: "assistant-live",
+              type: "assistant_message",
+              timestamp: 61,
+              content: "处理中",
+              isThinking: false,
+              isComplete: false,
+              roomMessageId: "message-stable",
+              agentTurnId: "turn-stable",
+            },
+          ],
+        },
+      },
+    };
+
+    const projected = projectCollaborationTimeline(room);
+    expect(projected.filter((event) => event.type === "user_message")).toEqual([
+      expect.objectContaining({ id: "message-stable" }),
+    ]);
+    expect(projected.find((event) => event.id === "assistant-live")).toBeDefined();
+  });
+
   it("keeps an unselected Agent history separate instead of attaching it to the room message", () => {
     const session = baseSession();
     const collaboration = createCollaborationStateFromSession(session);
