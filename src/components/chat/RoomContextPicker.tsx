@@ -67,7 +67,7 @@ export function RoomContextPicker({
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
         className={`kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-40 ${invalidSelection ? "text-accent-warning" : ""}`}
-        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
+        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, fontSize: 13, lineHeight: "20px" }}
         title="设置本次发送给 Agent 的房间正文范围；发送后恢复为上一轮"
         aria-haspopup="menu"
         aria-expanded={open}

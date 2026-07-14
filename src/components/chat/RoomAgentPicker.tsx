@@ -86,14 +86,14 @@ export function RoomAgentPicker({
         onClick={() => setOpen((value) => !value)}
         disabled={disabled}
         className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-40"
-        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
+        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, fontSize: 13, lineHeight: "20px" }}
         title={`默认发送给 ${selected.map((agent) => agent.displayName).join("、")}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="shrink-0 text-[13px] font-medium" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
+        <span className="shrink-0 font-medium" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
         <span
-          className="shrink-0 text-[11.5px] tabular-nums text-[var(--kimix-panel-text-muted)]"
+          className="shrink-0 tabular-nums text-[var(--kimix-panel-text-muted)]"
           style={{ display: "inline-flex", height: 20, alignItems: "center", lineHeight: "20px" }}
         >
           {selected.length}

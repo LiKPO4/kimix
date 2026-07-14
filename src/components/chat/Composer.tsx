@@ -4125,7 +4125,7 @@ export function Composer() {
                   const PermissionIcon = permissionMenuIcons[mutationPermissionMode ?? permissionMode];
                   return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
                 })()}
-                <span className="min-w-0 flex-1 truncate" style={{ fontSize: permissionLabelFontSize }}>{permissionLabel}</span>
+                <span className="min-w-0 flex-1 truncate" style={{ fontSize: permissionLabelFontSize, lineHeight: "20px" }}>{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (
@@ -4179,6 +4179,8 @@ export function Composer() {
                 style={{
                   width: 84,
                   minWidth: 84,
+                  fontSize: 13,
+                  lineHeight: "20px",
                   gap: 6,
                   paddingLeft: 12,
                   paddingRight: 12,
@@ -4206,6 +4208,8 @@ export function Composer() {
               style={{
                 width: 72,
                 minWidth: 72,
+                fontSize: 13,
+                lineHeight: "20px",
                 gap: 6,
                 paddingLeft: 12,
                 paddingRight: 12,
@@ -4234,6 +4238,8 @@ export function Composer() {
               style={{
                 width: 76,
                 minWidth: 76,
+                fontSize: 13,
+                lineHeight: "20px",
                 gap: 6,
                 paddingLeft: 12,
                 paddingRight: 12,

@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.58 输入区文字基线统一
+
+- 当前目标：统一输入区底部权限、Agents、携带正文、Swarm、Plan 和思考按钮的文字视觉高度与基线。
+- 根因：权限标签继承 `line-height: 1`，Agents 使用 20px 行高且数字单独缩至 11.5px，右侧模式按钮又继承 `line-height: 1`；flex 只能让不同高度的行盒几何居中，无法形成一致的文字基线。
+- 已完成：六类文字入口显式统一为 13px 基准字号和 20px 行高，Agents 数字恢复 13px 并保留等宽数字与次要颜色；长权限标签仍可按既有规则缩小字号，但统一使用 20px 行高。按钮宽度、高度、状态和交互均未改变；版本号三处同步至 v2.15.58；全量测试 85 个文件、604 项通过；`pnpm build` 通过，renderer 为 `assets/index-C17_fZNi.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 未完成：提交并启动新构建后，等待用户截图验收整行文字基线。
+- 阻塞：无。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/chat/RoomContextPicker.tsx`。
+- 下一步：完成门禁并启动 v2.15.58；用户确认自动权限、Agents 数字、携带正文及右侧模式文字视觉高度一致。
+
 ## 2026-07-14 v2.15.57 输入区工具栏瘦身
 
 - 当前目标：减少多 Agent 房间输入区底部按钮的横向占用，避免携带正文按钮挤压右侧 Swarm 等工具。
