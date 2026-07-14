@@ -37,7 +37,7 @@ function Test-BuildOutputStale {
   $porcelain = @(& git -C $workspace status --porcelain --untracked-files=all 2>$null)
   if ($LASTEXITCODE -ne 0 -or $porcelain.Count -gt 0) { return $true }
 
-  $stampPath = Join-Path (Split-Path -Parent $OutMarker) ".kimix-build-fingerprint"
+  $stampPath = Join-Path $workspace "out\.kimix-build-fingerprint"
   if (-not (Test-Path -LiteralPath $stampPath)) { return $true }
   $expected = Get-CurrentGitHead
   if (-not $expected) { return $true }
