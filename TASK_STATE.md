@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.64 并发投递持久化屏障
+
+- 当前目标：在发布前审查多 Agent 房间全部改动，修复并发投递可能绕过 `sending` 耐久化门禁的风险。
+- 根因：通用持久化器在已有写入进行中时，只替换待写快照并立即返回成功；并行 Agent 因而可能在自己的 `sending` 状态真正落盘前调用官方运行时。
+- 已完成：并发持久化调用统一等待当前写入及最新合并快照完成；队列写入失败会回传给所有等待者。新增成功合并与失败传播回归；版本号三处同步至 v2.15.64。定向测试 2 个文件、22 项通过；全量测试 85 个文件、614 项通过；`pnpm build` 通过，renderer 为 `assets/index-DtJcKY9M.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。
+- 未完成：提交本安全修复；随后准备 v2.16.0 发布提交。
+- 阻塞：无。
+- 关键文件：`src/utils/persistence.ts`、`src/utils/__tests__/persistence.test.ts`、`knowledge/architecture/collaboration-room-routing.md`。
+- 下一步：提交 v2.15.64，再生成 v2.16.0 Release notes 并按 Actions 流程发布。
+
 ## 2026-07-14 v2.15.63 房间本轮耗时稳定锚点
 
 - 当前目标：修复刚发送并在约 10 秒内完成的多 Agent 回复偶尔显示“本轮总耗时 42–44 分钟”的问题；保持当前进程运行直到完成取证。

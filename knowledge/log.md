@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Concurrent room dispatch waits for the durable coalesced snapshot**: Persistence callers queued behind an active write now share the drain result, so every Agent's `sending` identity is committed before its official prompt can start and one failed write reaches all waiting dispatches. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Room turn duration cannot cross message identity**: A room Assistant uses only a same-Agent user anchor with the matching `roomMessageId`; when the prompt is absent from that partition, duration falls back to the current Assistant placeholder instead of an older user message. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 
 * **Persisted room deliveries wake reconciliation after restart**: Active delivery evidence starts Agent runtime polling even when the ephemeral activity registry and legacy running ID are empty, so an unavailable runtime can settle automatically without requiring a second Stop click. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

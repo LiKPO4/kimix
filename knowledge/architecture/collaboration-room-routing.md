@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T21:48:03+08:00"
+timestamp: "2026-07-14T22:08:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -38,6 +38,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Deterministic room routing recognizes only exact active Agent mention names at token boundaries. Recognized room mentions override the frozen default recipient list in textual order and are removed from the outbound model payload; unknown mentions, plugin mentions, email-like text, and visible room content remain unchanged.
 * The dispatch selector emits at most the oldest queued delivery for each idle Agent. Sending, accepted, running, interaction-waiting, and indeterminate deliveries block only that Agent; another participant can dispatch independently.
 * Room messages, recipient order, and stable delivery attempts are persisted as `queued` before dispatch; each target must then persist `sending` before any network call. Failure to persist `sending` returns that target to `queued` without invoking the runtime.
+* Renderer persistence is a shared durability barrier rather than a fire-and-forget queue. When several Agent dispatches coalesce snapshots behind an in-flight write, every caller waits until the newest queued snapshot is committed; a queued-but-unwritten `sending` state must never be reported as durable.
 * Each delivery freezes its own visible-body share before `queued` persistence. The projection contains only user-visible user/Assistant bodies, never thinking, tools, command results, approvals, usage, or hidden instructions; simultaneous recipients cannot see unfinished sibling output from the same turn.
 * The recipient's stable `contextBridgeId` and accepted delivery `entryIds` form the read boundary. Default previous-turn sharing and one-shot recent-three, selected-message, all-body, or none scopes omit entries already known by that Agent; retry reuses the same frozen share instead of compiling a different prompt.
 * The hidden room-context envelope is length-delimited and stripped from official history before visible event reconciliation. A single recipient share above 48,000 characters is rejected with a visible error instead of truncation.

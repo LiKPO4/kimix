@@ -435,6 +435,7 @@ type PersistSnapshot = {
 
 let persistQueue: PersistSnapshot | null = null;
 let isPersisting = false;
+let activePersistPromise: Promise<PersistResult> | null = null;
 
 async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   isPersisting = true;
@@ -546,7 +547,10 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
 
   if (isPersisting) {
     persistQueue = snapshot;
-    return { success: true };
+    // A queued snapshot is not durable yet. Room delivery relies on this
+    // promise as a pre-dispatch barrier, so every concurrent caller must wait
+    // until the current write and the latest coalesced snapshot both finish.
+    return activePersistPromise ?? { success: false, error: "持久化队列状态异常" };
   }
 
   // A previous write may have failed after a newer snapshot was queued. The
@@ -554,7 +558,13 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
   // it before starting a fresh write; otherwise it could be written after this
   // successful state and roll the persisted conversation backwards.
   persistQueue = null;
-  return runPersist(snapshot);
+  const promise = runPersist(snapshot);
+  activePersistPromise = promise;
+  try {
+    return await promise;
+  } finally {
+    if (activePersistPromise === promise) activePersistPromise = null;
+  }
 }
 
 export async function loadLocalSessions(): Promise<Session[]> {

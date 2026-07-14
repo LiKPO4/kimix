@@ -111,16 +111,59 @@ describe("persistLocalConversationState", () => {
 
     useAppStore.setState({ currentSession: withTitle("B") });
     useSessionStore.setState({ sessions: [withTitle("B")] });
-    await persistLocalConversationState();
+    const second = persistLocalConversationState();
 
     releaseFirstWrite?.();
     expect((await first).success).toBe(false);
+    expect((await second).success).toBe(false);
 
     useAppStore.setState({ currentSession: withTitle("C") });
     useSessionStore.setState({ sessions: [withTitle("C")] });
     expect((await persistLocalConversationState()).success).toBe(true);
 
     expect(persistedTitles).toEqual(["A", "C"]);
+    expect(calls).toBe(2);
+  });
+
+  it("waits for a coalesced snapshot to become durable before resolving concurrent callers", async () => {
+    let releaseFirstWrite: (() => void) | undefined;
+    const firstWriteGate = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const persistedTitles: string[] = [];
+    let calls = 0;
+    commitStateMock.mockImplementation(async (entries: Array<{ key: string; value: unknown }>) => {
+      calls += 1;
+      const sessionsEntry = entries.find((entry) => entry.key === "kimix_sessions");
+      const title = Array.isArray(sessionsEntry?.value)
+        ? (sessionsEntry.value[0] as { title?: string } | undefined)?.title
+        : undefined;
+      if (title) persistedTitles.push(title);
+      if (calls === 1) await firstWriteGate;
+    });
+
+    const { persistLocalConversationState } = await import("@/utils/persistence");
+    const withTitle = (title: string): Session => ({ ...session, title });
+
+    useAppStore.setState({ currentProject: project, currentSession: withTitle("A") });
+    useSessionStore.setState({ sessions: [withTitle("A")], pendingMessages: [] });
+    const first = persistLocalConversationState();
+    await vi.waitFor(() => expect(commitStateMock).toHaveBeenCalledTimes(1));
+
+    useAppStore.setState({ currentSession: withTitle("B") });
+    useSessionStore.setState({ sessions: [withTitle("B")] });
+    let secondSettled = false;
+    const second = persistLocalConversationState().then((result) => {
+      secondSettled = true;
+      return result;
+    });
+    await Promise.resolve();
+    expect(secondSettled).toBe(false);
+
+    releaseFirstWrite?.();
+    expect((await first).success).toBe(true);
+    expect((await second).success).toBe(true);
+    expect(persistedTitles).toEqual(["A", "B"]);
     expect(calls).toBe(2);
   });
 
