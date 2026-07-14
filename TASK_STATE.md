@@ -1,13 +1,13 @@
 # Kimix 长程任务状态
 
-## 2026-07-14 多 Agent 消息信息气泡降级诊断
+## 2026-07-14 v2.15.51 稳定多 Agent 消息信息气泡
 
-- 当前目标：定位已完成 Agent 消息的 Tokens/Context 信息气泡偶尔降级成“已完成 · 用时 N 分 N 秒”的触发链路。
-- 已完成：确认该文案只在当前轮没有可用最终 `status_update` 时由 `AssistantMessageFooter` 的兜底分支显示；`durationMs` 由终态事件与最近用户消息时间戳计算，因而会把迟到终态或历史回放间隔误显示为数小时。定向渲染测试 1 个文件、13 项通过，但仅覆盖“最终用量状态存在”的正常路径。会话诊断日志显示本次权限切换时 runtime 未运行、事件数未变且未恢复 runtime；Agent 选择只更新接收者/焦点元数据，均非直接改写上一轮消息的路径。
-- 未完成：补充“终态/用量状态乱序或缺失”以及“多 Agent 交替输出”覆盖，并修正页脚的错误时长降级策略。
-- 阻塞：目标会话当前已不在现行本地状态文件中，无法从落盘事件还原缺失最终状态的上游来源。
-- 关键文件：`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/eventMapper.ts`、`src/utils/kimiCodeEventMapper.ts`、`src/utils/__tests__/chatRenderItems.test.ts`。
-- 下一步：用户确认后，以一个最小增量固定每个 Agent turn 的最终信息归属，并避免把历史回放间隔展示为本轮耗时。
+- 当前目标：修复已完成 Agent 的 Tokens/Context 信息气泡在输出结束、切换 Agent、下一 Agent 开始输出或切换权限后，偶尔降级成超长耗时的问题，同时保持官方历史和消息归属不变。
+- 已完成：确认根因是 `turn_end` 状态筛选只保留同一 Agent turn 的最后普通状态，导致晚到的权限、Plan 或运行状态在渲染前删除已有用量；现在按用户/steer 边界及 `agentTurnId` 优先保留最后一条指标状态，只有完全无指标时才保留最后普通状态。多 Agent 缺少指标时改为显示官方回复事件的模型或“已完成”，不再显示由历史间隔推导的耗时；普通单 Agent 耗时逻辑保持不变。状态 memo key 同步纳入指标和房间归属字段。版本号三处同步至 v2.15.51；定向测试 1 个文件、20 项通过；全量测试 83 个文件、590 项通过；`pnpm build` 通过，renderer 为 `assets/index-_ednI1AV.js`；`pnpm knowledge:validate` 通过。
+- 未完成：等待用户在 v2.15.51 实机复测 Agent 输出结束、切换 Agent、下一 Agent 开始输出、切换权限四个节点。
+- 阻塞：无。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/sessionMetrics.ts`、`src/utils/__tests__/chatRenderItems.test.ts`。
+- 下一步：用户用 v2.15.51 确认上一轮 Agent 的 Tokens/Context 在输出结束、切换 Agent、下一 Agent 开始输出、切换权限后不再变化。
 
 ## 2026-07-14 v2.15.50 固定正文范围弹窗锚点
 

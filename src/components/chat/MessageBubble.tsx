@@ -16,6 +16,7 @@ import { hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents } from "@/utils/
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
+import { compactModelDisplayName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, truncateLatestUserTurn } from "@/utils/eventHelpers";
@@ -54,7 +55,7 @@ interface MessageBubbleProps {
   onDeleteUserMessage?: (eventId: string) => void;
 }
 
-function timelineEventMemoKey(event: TimelineEvent) {
+export function timelineEventMemoKey(event: TimelineEvent) {
   switch (event.type) {
     case "assistant_message":
       return [
@@ -68,6 +69,10 @@ function timelineEventMemoKey(event: TimelineEvent) {
         event.isComplete ? 1 : 0,
         event.durationMs ?? "",
         event.agentRole ?? "",
+        event.model ?? "",
+        event.roomAgentId ?? "",
+        event.roomMessageId ?? "",
+        event.agentTurnId ?? "",
       ].join("\u001e");
     case "user_message":
       return [
@@ -142,6 +147,20 @@ function timelineEventMemoKey(event: TimelineEvent) {
         event.timestamp,
         event.message ?? "",
         event.level ?? "",
+        event.step ?? "",
+        event.totalSteps ?? "",
+        event.inputTokenCount ?? "",
+        event.tokenCount ?? "",
+        event.contextSize ?? "",
+        event.contextLimit ?? "",
+        event.planMode === undefined ? "" : event.planMode ? 1 : 0,
+        event.swarmMode === undefined ? "" : event.swarmMode ? 1 : 0,
+        event.source ?? "",
+        event.tone ?? "",
+        event.parentEventId ?? "",
+        event.roomAgentId ?? "",
+        event.roomMessageId ?? "",
+        event.agentTurnId ?? "",
       ].join("\u001e");
     case "change_summary":
       return [
@@ -1840,8 +1859,13 @@ function AssistantMessageFooter({
   );
 }
 
-function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean): string {
+export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean): string {
   if (isActiveAssistant) return "消息处理中";
+  if (event.roomAgentId) {
+    if (!event.isComplete) return "消息处理中";
+    const model = compactModelDisplayName(event.model);
+    return model ? `模型：${model}` : "已完成";
+  }
   const duration = reliableAssistantDurationMs(event.durationMs);
   if (duration !== undefined) return `已完成 · 用时 ${formatAssistantTurnDuration(duration)}`;
   return event.isComplete ? "已完成" : "消息处理中";

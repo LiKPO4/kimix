@@ -18,7 +18,7 @@ import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
-import { shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { hasMetricStatus, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError } from "@/utils/reportError";
 import { bottomScrollTop, distanceFromBottom, scrollTopPreservingBottomDistance, shouldResumeAutoFollowAtBottom, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
@@ -579,9 +579,7 @@ export function buildRenderItems(
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
-    const finalUsageStatus = settledStatusEvents.findLast((status) => (
-      status.inputTokenCount !== undefined || status.tokenCount !== undefined
-    ));
+    const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
     const trailingStatusEvents = turnSettled
       ? (finalUsageStatus ? [finalUsageStatus] : settledStatusEvents.slice(-1))
       : [];
@@ -779,17 +777,26 @@ export function filterStatusUpdates(events: TimelineEvent[], display: "each" | "
     if (event.source === "ipc" && event.parentEventId) return true;
     if (display === "never") return false;
     if (display === "each") return true;
+    const previousTurnIndex = events.findLastIndex((candidate, candidateIndex) => (
+      candidateIndex < index &&
+      (candidate.type === "user_message" || candidate.type === "steer_message")
+    ));
     const nextTurnIndex = events.findIndex((candidate, candidateIndex) => (
       candidateIndex > index &&
       (candidate.type === "user_message" || candidate.type === "steer_message")
     ));
+    const turnStart = previousTurnIndex === -1 ? 0 : previousTurnIndex + 1;
     const turnEnd = nextTurnIndex === -1 ? events.length : nextTurnIndex;
-    return !events.slice(index + 1, turnEnd).some((candidate) => {
+    const statusesInAgentTurn = events.slice(turnStart, turnEnd).filter((candidate): candidate is Extract<TimelineEvent, { type: "status_update" }> => {
       if (candidate.type !== "status_update") return false;
+      if (candidate.source === "slash") return false;
+      if (candidate.source === "ipc" && candidate.parentEventId) return false;
       if (event.agentTurnId) return candidate.agentTurnId === event.agentTurnId;
       if (event.roomAgentId) return candidate.roomAgentId === event.roomAgentId && !candidate.agentTurnId;
       return !candidate.agentTurnId && !candidate.roomAgentId;
     });
+    const preferredStatus = statusesInAgentTurn.findLast(hasMetricStatus) ?? statusesInAgentTurn.at(-1);
+    return preferredStatus === event;
   });
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems, filterStatusUpdates } from "@/components/chat/ChatThread";
+import { assistantFooterFallbackLabel, timelineEventMemoKey } from "@/components/chat/MessageBubble";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "../chatRenderItems";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
 
@@ -202,6 +203,48 @@ describe("filterStatusUpdates room isolation", () => {
 
     expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual(["reviewer-final"]);
   });
+
+  it("keeps the final metric status when a generic status arrives later in the same Agent turn", () => {
+    const statuses: TimelineEvent[] = [{
+      id: "reviewer-usage",
+      type: "status_update",
+      timestamp: 1,
+      inputTokenCount: 22036,
+      tokenCount: 22,
+      contextSize: 0.42,
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }, {
+      id: "reviewer-permission",
+      type: "status_update",
+      timestamp: 2,
+      message: "权限：完全访问",
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }];
+
+    expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual(["reviewer-usage"]);
+  });
+
+  it("keeps the latest generic status when an Agent turn has no metrics", () => {
+    const statuses: TimelineEvent[] = [{
+      id: "reviewer-plan",
+      type: "status_update",
+      timestamp: 1,
+      message: "Plan 开",
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }, {
+      id: "reviewer-completed",
+      type: "status_update",
+      timestamp: 2,
+      message: "已完成",
+      roomAgentId: "reviewer",
+      agentTurnId: "reviewer-turn",
+    }];
+
+    expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual(["reviewer-completed"]);
+  });
 });
 
 describe("buildRenderItems room Agent turns", () => {
@@ -279,5 +322,85 @@ describe("buildRenderItems room Agent turns", () => {
     expect(assistantB?.type).toBe("event");
     if (assistantB?.type !== "event") return;
     expect(assistantB.trailingStatuses?.map((status) => status.id)).toEqual(["usage-b"]);
+  });
+
+  it("keeps Agent A usage attached after Agent B starts and emits a generic status", () => {
+    const visibleEvents = filterStatusUpdates([...events, {
+      id: "agent-b-running",
+      type: "status_update",
+      timestamp: 6,
+      message: "正在处理",
+      roomAgentId: "agent-b",
+      roomMessageId: "room-message",
+      agentTurnId: "turn-b",
+    }], "turn_end");
+    const rendered = buildRenderItems(visibleEvents, "kimi-code", undefined, true, new Set(["agent-b"]));
+    const assistantA = rendered.find((item) => item.type === "event" && item.event.id === "assistant:turn-a");
+    expect(assistantA?.type).toBe("event");
+    if (assistantA?.type !== "event") return;
+    expect(assistantA.trailingStatuses?.map((status) => status.id)).toEqual(["usage-a"]);
+  });
+});
+
+describe("assistant footer fallback", () => {
+  it("uses the official turn model instead of an unreliable long duration for room Agents", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-room",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "完成",
+      model: "openai/gpt-5",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 12_370_000,
+      roomAgentId: "agent-a",
+      agentTurnId: "turn-a",
+    }, false)).toBe("模型：gpt-5");
+  });
+
+  it("shows only completed when a room Agent has neither metrics nor an official model", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-room",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "完成",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 12_370_000,
+      roomAgentId: "agent-a",
+      agentTurnId: "turn-a",
+    }, false)).toBe("已完成");
+  });
+
+  it("keeps the existing reliable duration fallback for ordinary single-Agent sessions", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-single",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "完成",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 65_000,
+    }, false)).toBe("已完成 · 用时 1分5秒");
+  });
+});
+
+describe("message footer memoization", () => {
+  it("detects metric changes even when a status keeps the same event identity", () => {
+    const before: TimelineEvent = {
+      id: "usage",
+      type: "status_update",
+      timestamp: 1,
+      inputTokenCount: 100,
+      tokenCount: 20,
+    };
+    const after: TimelineEvent = {
+      ...before,
+      inputTokenCount: 120,
+      tokenCount: 30,
+      contextSize: 0.5,
+    };
+
+    expect(timelineEventMemoKey(before)).not.toBe(timelineEventMemoKey(after));
   });
 });
