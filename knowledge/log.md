@@ -2,6 +2,7 @@
 
 ## 2026-07-14
 
+* **Room archive lifecycle follows one Server/SDK authority**: SDK fallback now lists archived SessionStore entries and restores them by removing the official archive marker, while restoring any member owned by a local room delegates to the full room transaction. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Startup bootstrap survives both late subscription and local hydration**: Preload replays the latest one-shot main-process payload to late React subscribers; renderer then waits for persisted sessions before resolving active context, while read failures release the gate for normal fallback instead of hanging. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room terminal usage is isolated per Agent turn**: Turn-end filtering retains one final status for each `agentTurnId`, concrete token/context values survive generic late snapshots, and successful SDK terminal status waits briefly for final usage without blocking providers that omit it. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Room Agent official IDs are Windows-safe without losing identity**: Secondary sessions use a deterministic filesystem-safe ID derived from the stable room Agent ID, while controlled metadata remains the source of the original room/Agent ownership. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

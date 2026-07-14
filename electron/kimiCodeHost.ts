@@ -1320,14 +1320,65 @@ function toArchivedSessionSummary(session: ServerSession): KimiCodeArchivedSessi
   };
 }
 
+function sdkSessionTimestamp(value: number) {
+  return new Date(value > 1e12 ? value : value * 1_000).toISOString();
+}
+
+export function toSdkArchivedSessionSummary(session: KimiCodeSessionSummary): KimiCodeArchivedSessionSummary {
+  return {
+    id: session.id,
+    title: session.title?.trim() || session.lastPrompt?.trim() || "未命名对话",
+    projectPath: session.workDir,
+    archivedAt: sdkSessionTimestamp(session.updatedAt),
+    updatedAt: sdkSessionTimestamp(session.updatedAt),
+    createdAt: sdkSessionTimestamp(session.createdAt),
+  };
+}
+
 export async function listArchivedSessions(): Promise<KimiCodeArchivedSessionSummary[]> {
+  if (!shouldRouteNewSessionToServer()) {
+    const sessions = await listSdkSessionSummaries(undefined, { includeBrief: false });
+    return sessions.filter((session) => session.archived === true).map(toSdkArchivedSessionSummary);
+  }
   const sessions = await getServerClient().listArchivedSessions();
   return sessions.map(toArchivedSessionSummary);
 }
 
 export async function restoreArchivedSession(sessionId: string): Promise<KimiCodeArchivedSessionSummary> {
+  if (!shouldRouteNewSessionToServer()) {
+    return restoreSdkArchivedSession(await getHarness(), sessionId);
+  }
   const restored = await getServerClient().restoreSession(sessionId);
   return toArchivedSessionSummary(restored);
+}
+
+export async function restoreSdkArchivedSession(
+  sdkHarness: { listSessions: (input: { sessionId: string; includeArchive: boolean }) => Promise<KimiCodeSessionSummary[]> },
+  sessionId: string,
+): Promise<KimiCodeArchivedSessionSummary> {
+  const summaries = await sdkHarness.listSessions({ sessionId, includeArchive: true });
+  const summary = summaries.find((item) => item.id === sessionId);
+  if (!summary?.sessionDir) {
+    throw new Error(`Session "${sessionId}" was not found`);
+  }
+  const statePath = path.join(summary.sessionDir, "state.json");
+  let state: JsonObject;
+  try {
+    const parsed = JSON.parse(await fs.promises.readFile(statePath, "utf-8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid state");
+    state = parsed as JsonObject;
+  } catch (error) {
+    throw new Error(`Session "${sessionId}" state.json was not found`, { cause: error });
+  }
+  const { archived: _archived, ...restoredState } = state;
+  const restoredAt = new Date().toISOString();
+  await fs.promises.writeFile(statePath, `${JSON.stringify({ ...restoredState, updatedAt: restoredAt }, null, 2)}\n`, "utf-8");
+  return {
+    ...toSdkArchivedSessionSummary({ ...summary, archived: false, updatedAt: Date.parse(restoredAt) }),
+    title: typeof state.title === "string" && state.title.trim()
+      ? state.title.trim()
+      : toSdkArchivedSessionSummary(summary).title,
+  };
 }
 
 export async function archiveSdkSession(

@@ -2,7 +2,7 @@
 
 日期：2026-07-13
 
-状态：已批准实施。阶段 0-8 已完成，功能仍处于内部开发 gate；下一步进入真实跨 Provider、并发、视觉和性能验收。
+状态：已批准实施。阶段 0-8 已完成，阶段 9 内部真实验收已覆盖四 Agent 并发、窄窗口、历史稳定、搜索、导出、冷启动和 SDK 归档恢复；功能仍处于内部开发 gate，下一步交用户截图与真实交叉审查流程验收。
 
 ## 1. 产品目标
 
@@ -412,12 +412,12 @@ interface AgentDelivery {
 
 ### 阶段 9：视觉、性能和发布验收
 
-- [ ] 空态、1/2/4 Agent、窄窗口、长名称、多个并行运行。
-- [ ] 历史展开与滚动稳定性回归。
+- [x] 空态、1/2/4 Agent、窄窗口、长名称、多个并行运行。
+- [x] 历史展开与滚动稳定性回归。
 - [ ] 同 Provider 不同模型、不同 Provider、单 Provider 失败。
 - [x] 多 Agent 同目录写入风险提示。
 - [ ] 用户截图和真实交叉审查流程验收。
-- [ ] 同步版本号三处和专属 release notes。
+- [x] 同步版本号三处和专属 release notes。
 
 退出门禁：全量自动验证通过并可交给用户实测；仅在用户验收后决定推送/tag。
 
@@ -553,6 +553,8 @@ git diff --check
 41. 阶段 9C 修复 Windows 次要 Agent session ID 与并行终态 usage：官方 session 使用确定性文件系统安全 ID，原始 roomAgent 身份继续由 metadata 持有；`turn_end` 状态按 Agent turn 分区，连续状态合并保留最终 token/context，真实 `MULTI8_OK` 回归中两个 Agent 的最终 usage 同时稳定可见。
 42. 阶段 9C 修复启动 active context 的两段竞态：preload 对最新 bootstrap 载荷提供 replay-latest 语义，避免 React 晚订阅漏掉一次性主进程事件；renderer 随后等待 IndexedDB 本地会话水合，再从完整状态解析房间身份和逐 Agent 恢复目标。读取失败也会释放门禁并走普通 fallback，避免永久等待。v2.15.37 冷启动无需点击即自动回到 RemoveBlack 测试房间，双 Agent、默认接收者、历史与 usage 均恢复。
 43. 阶段 9C 完成真实 4 Agent 与窄窗口验收：房间包含 deepseek-v4-pro、Reviewer、tester 和 40 字符显示名称的 docs-long Agent，模型跨 Kimi Code 与 opencode-go。v2.15.38 在 Composer 宽度不足时把成员/权限与模式控制分成两行，更窄时右侧控制可继续换行；4/4 面板的长名称、状态、选择与操作列保持对齐，共享目录警告保持独立留白。
+44. 阶段 9C 在四 Agent 并行期间完成历史展开与滚动稳定性回归；`FOUR_AGENT_OK` 四个响应均保留最终模型、输入、输出和 Context。搜索结果保持 Agent/模型归属，Markdown 导出保留房间成员与完整分区，Reviewer 调试 ZIP 只包含明确选择的官方 session。
+45. 阶段 9C 修复归档生命周期的 Server/SDK 路由不对称：SDK fallback 归档后，设置页列表与恢复现在同样读取 SDK SessionStore；从任一房间成员恢复会触发房间级逐 Agent 恢复。v2.15.39 实测归档计数从 375 降到 370，恢复后侧栏房间、四成员、默认接收者、历史和最终 usage 均完整保留。
 
 UI 开放必须同时满足以下 go/no-go gate：
 

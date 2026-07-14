@@ -3,11 +3,11 @@
 ## 2026-07-14 多 Agent 房间实施
 
 - 当前目标：将普通会话升级为用户控制的多 Agent 房间；每个 Agent 使用独立 Kimi Code session 和现有 Provider/model alias，用户通过接收者或 `@Agent` 精确路由，未选中 Agent 不接收消息。
-- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已创建 Reviewer（Kimi Code / kimi-for-coding）并与主 Agent（opencode-go / deepseek-v4-pro）完成单目标、mention 覆盖和双目标并行路由。修复 `room-agent:<uuid>` 作为官方 session ID 时的 Windows 冒号失败；并修复房间级 `turn_end` 状态筛选隐藏先结束 Agent usage、连续状态覆盖 token/context 以及成功终态早于最终 usage 的时序问题。`MULTI8_OK` 回归中 Reviewer 与主 Agent 均稳定显示各自模型、输入、输出和 Context。v2.15.37 修复一次性 bootstrap 晚订阅丢失与本地会话水合竞态，冷启动自动回到 RemoveBlack 房间。v2.15.38 真实扩展到 4/4 Agent，包含跨 Provider 模型和正好 40 字符显示名称；约 1024px 窄窗口下工具栏响应式分行，成员面板与共享目录警告布局稳定。
-- 未完成：运行期间历史展开/滚动、搜索、导出、归档/恢复和用户截图验收。
-- 阻塞：无。v2.15.38 全量 81 个测试文件、562 项测试与生产构建通过，renderer 为 `assets/index-Cyqjfr9P.js`；知识库无需更新。下一项进入四 Agent 并行时的历史展开/滚动验收。
+- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。Windows 安全 session ID、逐 Agent 终态 usage、启动 bootstrap/水合竞态和窄窗口工具栏均已修复。四 Agent 运行期间回看并展开旧历史保持稳定；搜索 `FOUR_AGENT_OK` 返回四条正确 Agent/模型结果，Markdown 房间导出与 Reviewer 单 Agent 调试 ZIP 均实测成功。v2.15.39 补齐 SDK fallback 的归档列表和恢复路径；归档房间后从任一成员恢复会成组恢复全部官方 session，侧栏房间、四成员、默认接收者、历史与 usage 完整保留。
+- 未完成：用户截图验收、真实工作任务中的实施者/审查者交叉审查，以及单 Provider 真实故障不影响其他 Agent 的人工验收。
+- 阻塞：无。v2.15.39 真实 Electron SDK 归档/恢复通过；全量 81 个测试文件、564 项测试、生产构建、OKF 严格校验与 diff check 通过，renderer 为 `assets/index-Dgy-w4PA.js`。
 - 关键文件：`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/markdownExport.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：在当前 v2.15.38 房间进行四 Agent 并行，运行期间展开旧历史并滚动；随后完成搜索、导出与归档/恢复验收。全部通过后交用户截图验收，再决定推送/tag。
+- 下一步：提交 v2.15.39 当前增量；随后交用户截图和真实交叉审查流程验收，再决定是否合并、推送或打 tag。
 - 验证补充：`pnpm exec tsc -p tsconfig.json --noEmit` 仍被仓库既有类型基线错误阻塞；本阶段涉及文件的新增类型问题已清理，正式门禁仍以现有 `test:run`、`build`、`knowledge:validate` 和 diff check 为准。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性
