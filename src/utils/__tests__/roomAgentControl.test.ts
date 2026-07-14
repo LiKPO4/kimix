@@ -4,6 +4,7 @@ import { createCollaborationStateFromSession } from "../collaborationRooms";
 import {
   appendRoomAgentSteerEvent,
   getRoomAgentControlTargets,
+  getPersistedRoomAgentControlTargets,
   resolveRoomAgentControlTarget,
   settleStoppedRoomAgent,
 } from "../roomAgentControl";
@@ -219,5 +220,24 @@ describe("roomAgentControl", () => {
       id: "secondary-steer",
       status: "failed",
     });
+  });
+
+  it("discovers persisted active deliveries without an in-memory activity registry", () => {
+    const room = roomFixture();
+
+    expect(getPersistedRoomAgentControlTargets([room], "stop")).toEqual([
+      expect.objectContaining({
+        roomId: room.id,
+        roomAgentId: room.collaboration?.primaryAgentId,
+        roomMessageId: "message-primary",
+        status: "running",
+      }),
+      expect.objectContaining({
+        roomId: room.id,
+        roomAgentId: "agent-secondary",
+        roomMessageId: "message-secondary",
+        status: "running",
+      }),
+    ]);
   });
 });

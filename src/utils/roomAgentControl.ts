@@ -23,6 +23,10 @@ export interface RoomAgentControlTarget {
   activeTurnId?: string;
 }
 
+export interface PersistedRoomAgentControlTarget extends RoomAgentControlTarget {
+  roomId: string;
+}
+
 const STOPPABLE_STATUSES = new Set<RoomAgentActivityStatus | RoomAgentDeliveryStatus>([
   "accepted",
   "running",
@@ -82,6 +86,16 @@ export function getRoomAgentControlTargets(
       activeTurnId: activity?.activeTurnId ?? fallback?.delivery.agentTurnId,
     }];
   });
+}
+
+export function getPersistedRoomAgentControlTargets(
+  sessions: Session[],
+  action: RoomAgentControlAction,
+): PersistedRoomAgentControlTarget[] {
+  return sessions.flatMap((session) => getRoomAgentControlTargets(session, [], action).map((target) => ({
+    ...target,
+    roomId: session.id,
+  })));
 }
 
 export function resolveRoomAgentControlTarget(

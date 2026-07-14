@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.62 持久化任务唤醒运行态校准
+
+- 当前目标：修复 v2.15.61 打开后仍显示假运行态、必须再次点击停止才会正确收尾的问题；发布继续暂停。
+- 根因：v2.15.61 已能正确处理 unavailable runtime，但校准 effect 只由内存 `roomAgentActivities` 或 `runningSessionId` 唤醒；重启后两者为空，界面状态来自持久化 active delivery，导致校准逻辑根本没有执行。
+- 已完成：从所有房间的持久化 active delivery 构造 Agent 校准目标和稳定签名；即使没有内存 activity 或 room 级 running ID，残留 delivery 也会启动周期校准并沿用 Agent 级安全收尾。版本号三处同步至 v2.15.62；定向测试 1 个文件、6 项通过；全量测试 85 个文件、611 项通过；`pnpm build` 通过，renderer 为 `assets/index-CbuxqMEE.js`；`pnpm knowledge:validate` 通过。
+- 未完成：完成 diff check，提交并启动新构建；等待用户验证下一次外部终止后打开即自动恢复。
+- 阻塞：无。
+- 关键文件：`src/App.tsx`、`src/utils/roomAgentControl.ts`、`src/utils/__tests__/roomAgentControl.test.ts`。
+- 下一步：完成门禁并启动 v2.15.62；使用持久化 active delivery 回归打开即校准场景。
+
 ## 2026-07-14 v2.15.61 外部终止后的 Agent 状态收束
 
 - 当前目标：修复新 Agent 首轮运行时 Kimix 被重启，runtime 已终止但本地仍永久显示运行中、再次停止只返回 `session is not active` 的问题；发布继续暂停。

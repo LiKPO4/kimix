@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Persisted room deliveries wake reconciliation after restart**: Active delivery evidence starts Agent runtime polling even when the ephemeral activity registry and legacy running ID are empty, so an unavailable runtime can settle automatically without requiring a second Stop click. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Unavailable room runtimes settle instead of remaining falsely active**: When every runtime or official identity owned by one Agent reports inactive or missing, periodic reconciliation and explicit Stop close only that Agent's events, delivery, and activity as interrupted without resuming or resending its prompt. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 
 * **Room user-event aliases collapse only by stable delivery identity**: Live merging deduplicates the complete `roomMessageId + agentTurnId + dispatchAttemptId` triple without a time window, different triples preserve repeated real prompts, and the room projection claims every official alias for one delivery so snapshot replay cannot create extra user bubbles. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

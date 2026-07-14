@@ -91,7 +91,7 @@ import {
   recoverInterruptedRoomDeliveries,
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
-import { getRoomAgentControlTargets, settleStoppedRoomAgent } from "@/utils/roomAgentControl";
+import { getPersistedRoomAgentControlTargets, getRoomAgentControlTargets, settleStoppedRoomAgent } from "@/utils/roomAgentControl";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -1478,6 +1478,10 @@ function App() {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const updateSession = useSessionStore((s) => s.updateSession);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
+  const activeRoomDeliverySignature = useSessionStore((s) => getPersistedRoomAgentControlTargets(s.sessions, "stop")
+    .map((target) => `${target.roomId}:${target.roomAgentId}:${target.runtimeSessionId ?? ""}:${target.status}`)
+    .sort()
+    .join("|"));
   const currentSession = useAppStore((s) => s.currentSession);
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSessionRef = useRef(currentSession);
@@ -3503,7 +3507,7 @@ function App() {
   }, [setHandoffSessionId, setRunningSessionId, setRoomAgentActivity, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
-    if (!runningSessionId && !activeRoomAgentActivitySignature) return;
+    if (!runningSessionId && !activeRoomAgentActivitySignature && !activeRoomDeliverySignature) return;
     let disposed = false;
     const checkingRuntimeIds = new Set<string>();
     const reconciliationStartedAt = Date.now();
@@ -3675,6 +3679,15 @@ function App() {
         return;
       }
 
+      const persistedTargets = getPersistedRoomAgentControlTargets(useSessionStore.getState().sessions, "stop");
+      if (persistedTargets.length > 0) {
+        await Promise.all(persistedTargets.map(async (target) => {
+          if (!target.runtimeSessionId) return;
+          await reconcileAgentRuntime(target.roomId, target.roomAgentId, target.runtimeSessionId);
+        }));
+        return;
+      }
+
       const activeRunningId = state.runningSessionId;
       if (!activeRunningId) return;
       const session = useSessionStore.getState().sessions.find((item) => (
@@ -3699,7 +3712,7 @@ function App() {
       window.removeEventListener("focus", syncNow);
       document.removeEventListener("visibilitychange", syncNow);
     };
-  }, [activeRoomAgentActivitySignature, runningSessionId, setRoomAgentActivity, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode]);
+  }, [activeRoomAgentActivitySignature, activeRoomDeliverySignature, runningSessionId, setRoomAgentActivity, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
