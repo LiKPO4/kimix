@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.48 固定 Agents 选择槽
+
+- 当前目标：收束多 Agent 房间工具栏的实测视觉反馈，避免输入区 Agent 选择器用模型/Agent 名称造成省略。
+- 已完成：`RoomAgentPicker` 触发器改为固定 136px 槽位，统一显示 `Agents`，保留已选数量、下拉入口和完整接收者 title；移除该触发器不再需要的动态字号测量。`pnpm test:run`（83 个文件、583 项）、`pnpm build`（renderer `assets/index-DypQPYoq.js`）、`pnpm knowledge:validate` 和 `git diff --check` 已通过。
+- 未完成：等待用户在 v2.15.48 窗口确认固定标签、数量和正文范围按钮之间的间距是否合适。
+- 阻塞：无。
+- 关键文件：`src/components/chat/RoomAgentPicker.tsx`、`src/components/chat/Composer.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：提交后用根目录 `start-kimix.bat` 启动 v2.15.48，确认输入区显示固定 `Agents`、数量与下拉箭头，并回传截图做最终视觉验收。
+
 ## 2026-07-14 启动器构建指纹与旧进程清理
 
 - 当前目标：修复通过 `start-kimix.bat` 启动时误用旧构建或被旧 Kimix 单实例窗口接管的问题。

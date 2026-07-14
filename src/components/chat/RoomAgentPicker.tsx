@@ -1,8 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, Pencil, RefreshCw, UserMinus } from "lucide-react";
 import type { RoomAgent, RoomAgentActivity, Session } from "@/types/ui";
 import { getPrimaryRoomAgent, roomAgentActivityKey } from "@/utils/collaborationRooms";
-import { fitFontSizeToWidth } from "@/utils/fitText";
 
 const ACTIVE_ACTIVITY_STATUSES = new Set([
   "creating",
@@ -55,15 +54,12 @@ export function RoomAgentPicker({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const selectedLabelRef = useRef<HTMLSpanElement>(null);
   const primaryAgentId = getPrimaryRoomAgent(session).id;
   const agents = session.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
   const selected = selectedAgentIds
     .map((id) => agents.find((agent) => agent.id === id))
     .filter((agent): agent is RoomAgent => Boolean(agent));
-  const selectedLabel = selected[0]?.displayName ?? "";
-  const selectedLabelBaseFontSize = selectedLabel.length > 28 ? 11 : selectedLabel.length > 20 ? 12 : 13;
-  const [selectedLabelFontSize, setSelectedLabelFontSize] = useState(selectedLabelBaseFontSize);
+  const selectedLabel = "Agents";
   const roomBusy = agents.some((agent) => {
     const activity = activities[roomAgentActivityKey(session.id, agent.id)];
     return Boolean(activity && ACTIVE_ACTIVITY_STATUSES.has(activity.status));
@@ -81,58 +77,22 @@ export function RoomAgentPicker({
 
   useEffect(() => setOpen(false), [session.id]);
 
-  useLayoutEffect(() => {
-    let frameId = 0;
-    const measure = () => {
-      const label = selectedLabelRef.current;
-      if (!label || !selectedLabel) {
-        setSelectedLabelFontSize(selectedLabelBaseFontSize);
-        return;
-      }
-
-      const previousFontSize = label.style.fontSize;
-      label.style.fontSize = `${selectedLabelBaseFontSize}px`;
-      const availableWidth = label.clientWidth;
-      const requiredWidthAtBase = label.scrollWidth;
-      label.style.fontSize = previousFontSize;
-      const nextFontSize = fitFontSizeToWidth({
-        availableWidth,
-        requiredWidthAtBase,
-        baseFontSize: selectedLabelBaseFontSize,
-        minFontSize: 10,
-      });
-      setSelectedLabelFontSize((current) => current === nextFontSize ? current : nextFontSize);
-    };
-    const scheduleMeasure = () => {
-      cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(measure);
-    };
-
-    scheduleMeasure();
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleMeasure);
-    if (rootRef.current) resizeObserver?.observe(rootRef.current);
-    return () => {
-      cancelAnimationFrame(frameId);
-      resizeObserver?.disconnect();
-    };
-  }, [selected.length, selectedLabel, selectedLabelBaseFontSize]);
-
   if (selected.length === 0 || agents.length < 2) return null;
 
   return (
-    <div ref={rootRef} className="relative min-w-0" style={{ flex: "0 1 210px", width: 210 }}>
+    <div ref={rootRef} className="relative shrink-0" style={{ flex: "0 0 136px", width: 136 }}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         disabled={disabled}
         className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-40"
-        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
+        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 7, paddingLeft: 10, paddingRight: 10, lineHeight: "20px" }}
         title={`默认发送给 ${selected.map((agent) => agent.displayName).join("、")}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         <Bot size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-        <span ref={selectedLabelRef} className="min-w-0 flex-1 truncate" style={{ fontSize: selectedLabelFontSize, lineHeight: "20px" }}>{selectedLabel}</span>
+        <span className="shrink-0 text-[13px] font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
         <span
           className="shrink-0 text-[11.5px] tabular-nums text-[var(--kimix-panel-text-muted)]"
           style={{ display: "inline-flex", height: 20, alignItems: "center", lineHeight: "20px" }}
