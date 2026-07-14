@@ -192,6 +192,21 @@ export function getDispatchableRoomDeliveries(
   return dispatchable;
 }
 
+export function isRoomDeliveryWaitingBehindAgentWork(
+  session: Session,
+  roomMessageId: string,
+  roomAgentId: string,
+  activities: Iterable<RoomAgentActivity> = [],
+): boolean {
+  const delivery = session.collaboration?.messages
+    .find((message) => message.id === roomMessageId)
+    ?.deliveries[roomAgentId];
+  if (delivery?.status !== "queued") return false;
+  return !getDispatchableRoomDeliveries(session, activities).some((candidate) => (
+    candidate.roomMessageId === roomMessageId && candidate.roomAgentId === roomAgentId
+  ));
+}
+
 export function setRoomDeliveryStatus(
   session: Session,
   roomMessageId: string,

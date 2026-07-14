@@ -9,6 +9,7 @@ import {
   getRelatedArchiveSessionIds,
   restoreCollaborationRoom,
   roomHasActiveAgentWork,
+  roomHasExecutingAgentWork,
 } from "../sessionArchive";
 import {
   createCollaborationStateFromSession,
@@ -298,5 +299,31 @@ describe("official-first session archive", () => {
       },
     };
     expect(roomHasActiveAgentWork(indeterminate)).toBe(true);
+  });
+
+  it("预发送 queued 只阻止生命周期变更，不冒充 Agent 正在执行", () => {
+    const source = room();
+    const secondary = source.collaboration!.agents[1];
+    const queued = {
+      ...source,
+      collaboration: {
+        ...source.collaboration!,
+        messages: source.collaboration!.messages.map((message) => ({
+          ...message,
+          deliveries: {
+            ...message.deliveries,
+            [secondary.id]: { ...message.deliveries[secondary.id], status: "queued" as const },
+          },
+        })),
+      },
+    };
+    expect(roomHasActiveAgentWork(queued)).toBe(true);
+    expect(roomHasExecutingAgentWork(queued)).toBe(false);
+    expect(roomHasExecutingAgentWork(source, [{
+      roomId: source.id,
+      roomAgentId: secondary.id,
+      status: "sending",
+      updatedAt: 100,
+    }])).toBe(true);
   });
 });

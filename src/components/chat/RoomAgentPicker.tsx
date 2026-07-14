@@ -86,13 +86,19 @@ export function RoomAgentPicker({
         onClick={() => setOpen((value) => !value)}
         disabled={disabled}
         className="kimix-icon-text-button kimix-muted-action is-compact max-w-[210px] min-w-0 disabled:cursor-not-allowed disabled:opacity-40"
+        style={{ height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
         title={`默认发送给 ${selected.map((agent) => agent.displayName).join("、")}`}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         <Bot size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-        <span className="min-w-0 truncate">{selectedLabel}</span>
-        <span className="shrink-0 text-[11.5px] text-[var(--kimix-panel-text-muted)]">{selected.length} 个</span>
+        <span className="min-w-0 truncate" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
+        <span
+          className="shrink-0 text-[11.5px] tabular-nums text-[var(--kimix-panel-text-muted)]"
+          style={{ display: "inline-flex", height: 20, alignItems: "center", lineHeight: "20px" }}
+        >
+          {selected.length} 个
+        </span>
         <ChevronDown size={12} className="shrink-0" />
       </button>
 

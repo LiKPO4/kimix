@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T09:18:53+08:00"
+timestamp: "2026-07-14T09:36:11+08:00"
 ---
 
 # Collaboration Room Routing
@@ -38,6 +38,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Deterministic room routing recognizes only exact active Agent mention names at token boundaries. Recognized room mentions override the frozen default recipient list in textual order and are removed from the outbound model payload; unknown mentions, plugin mentions, email-like text, and visible room content remain unchanged.
 * The dispatch selector emits at most the oldest queued delivery for each idle Agent. Sending, accepted, running, interaction-waiting, and indeterminate deliveries block only that Agent; another participant can dispatch independently.
 * Room messages, recipient order, and stable delivery attempts are persisted as `queued` before dispatch; each target must then persist `sending` before any network call. Failure to persist `sending` returns that target to `queued` without invoking the runtime.
+* Lifecycle occupancy and runtime execution are separate projections. A dispatchable `queued` delivery still blocks archive or membership mutation so persisted intent cannot be orphaned, but it does not present the Agent as running or render a queue card; only a queued delivery blocked by earlier work is user-visible as waiting.
 * Official acceptance records prompt/message identities. A `sending` attempt whose result is unknown or whose persisted state cannot be reconciled with stable official or canonical room/turn evidence becomes `indeterminate` and is never automatically resent.
 * After official acceptance, runtime status is the delivery settlement authority: running, approval, question, completion, error, and interruption update only the matching `roomMessageId + roomAgentId` delivery. Accepted work remains lifecycle-active until that Agent reaches a terminal state.
 * Approval and structured-question responses resolve the explicit event `roomAgentId` before IPC, use only that Agent's runtime identity, and settle only its event partition. A room event without an owner or with an unavailable Agent/runtime is rejected instead of falling back to primary.
@@ -88,7 +89,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Internal acceptance can toggle the local room UI gate from Settings without developer tools. The setting remains device-local and default-off, notifies mounted Composer instances immediately, and closing it removes creation access without deleting persisted collaboration data.
 * Room UI freezes an ordered recipient set per message before dispatch. Agent-scoped slash, Skill, Goal, permission, Plan, and Swarm mutations remain unavailable unless the selected owner is explicitly supported.
 * The multi-recipient UI stores an ordered default recipient set and exposes real Agent mention completion. Mentions may override that default for one message without mutating future defaults.
-* A queued response block names its Agent and can be cancelled without touching another delivery or the Agent's currently running activity. Failed and indeterminate attempts require an explicit retry action, which re-enters the same oldest-first dispatcher with a new audited turn identity.
+* A response block shows queued state only when its delivery is actually blocked behind earlier work for that Agent. The queued block names its Agent and can be cancelled without touching another delivery or the Agent's currently running activity. Failed and indeterminate attempts require an explicit retry action, which re-enters the same oldest-first dispatcher with a new audited turn identity.
 * Display name and mention edits change only the local room identity. They do not recreate the official session, replace the model, or inject a preset role into Agent context.
 * Multi-recipient response blocks are created in user-selected order and never reordered by later timestamps.
 * `agentTurnId` is the permanent render identity. New stream events, snapshots, and runtime migration may update content but may not remount an existing block.

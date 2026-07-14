@@ -32,6 +32,7 @@ import {
 } from "@/utils/collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
+import { isRoomDeliveryWaitingBehindAgentWork } from "@/utils/roomDelivery";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -1851,12 +1852,22 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
   const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
   const roomDelivery = roomSession?.collaboration?.messages
     .find((message) => message.id === event.roomMessageId)
     ?.deliveries[event.roomAgentId ?? ""];
   const roomDeliveryStatus = event.roomDeliveryStatus ?? roomDelivery?.status;
+  const isWaitingBehindAgentWork = Boolean(
+    roomSession && event.roomAgentId && event.roomMessageId &&
+    isRoomDeliveryWaitingBehindAgentWork(
+      roomSession,
+      event.roomMessageId,
+      event.roomAgentId,
+      Object.values(roomAgentActivities),
+    )
+  );
   const displayContent = restoreAssistantProgressParagraphs(event.content);
   const hasContent = displayContent.trim().length > 0;
   const changedSet = new Set(changedFiles.map((f) => normalizePathForComparison(f)));
@@ -1897,7 +1908,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   const footerFallbackLabel = assistantFooterFallbackLabel(event, isActiveAssistant);
   const processToBodyGap = processDisplayMode === "kimi-web" && !hideProcessSummary && shouldShowBodyFooter ? 12 : 20;
 
-  if (roomDeliveryStatus === "queued" && event.roomAgentId && event.roomMessageId) {
+  if (roomDeliveryStatus === "queued" && isWaitingBehindAgentWork && event.roomAgentId && event.roomMessageId) {
     return (
       <div className="group flex justify-start" style={{ paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
         <div

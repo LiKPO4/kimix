@@ -68,7 +68,7 @@ import {
   retryRoomDelivery,
 } from "@/utils/roomDelivery";
 import { resolveRoomPromptRoute } from "@/utils/roomRouting";
-import { detachRoomAgentAsSession, roomHasActiveAgentWork } from "@/utils/sessionArchive";
+import { detachRoomAgentAsSession, roomHasActiveAgentWork, roomHasExecutingAgentWork } from "@/utils/sessionArchive";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -557,6 +557,10 @@ export function Composer() {
     activeSession,
     Object.values(roomAgentActivities),
   ));
+  const activeRoomExecuting = Boolean(activeSession?.collaboration && roomHasExecutingAgentWork(
+    activeSession,
+    Object.values(roomAgentActivities),
+  ));
   const roomStopTargets = activeSession?.collaboration
     ? getRoomAgentControlTargets(activeSession, Object.values(roomAgentActivities), "stop")
     : [];
@@ -596,7 +600,7 @@ export function Composer() {
     ? isSessionRuntimeRunning(activeMutationOwner.sessionView, runningSessionId)
     : false;
   const isCurrentSessionHandoff = Boolean(activeSession && handoffSessionId === activeSession.id);
-  const hasActiveAssistantTurn = activeSession?.collaboration ? activeRoomBusy : isCurrentSessionRunning;
+  const hasActiveAssistantTurn = activeSession?.collaboration ? activeRoomExecuting : isCurrentSessionRunning;
   const mutationSessionView = activeMutationOwner?.sessionView ?? activeSession ?? undefined;
   const mutationPermissionMode = activeSession?.collaboration
     ? activeMutationOwner?.agent.permissionMode
@@ -4101,20 +4105,6 @@ export function Composer() {
               )}
             </div>
 
-            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
-              <RoomAgentPicker
-                session={activeSession}
-                activities={roomAgentActivities}
-                selectedAgentIds={selectedRoomAgentIds}
-                busyAgentId={roomAgentMutationId}
-                disabled={!canUseComposer}
-                onSelectionChange={(roomAgentIds) => void handleSelectRoomAgents(roomAgentIds)}
-                onEdit={handleEditRoomAgent}
-                onRetry={(roomAgentId) => void handleRetryRoomAgent(roomAgentId)}
-                onRemove={(roomAgentId) => void handleRemoveRoomAgent(roomAgentId)}
-              />
-            )}
-
             <div ref={permissionBtnRef} className="relative min-w-0 shrink">
               <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
@@ -4148,6 +4138,20 @@ export function Composer() {
                 </div>
               )}
             </div>
+
+            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
+              <RoomAgentPicker
+                session={activeSession}
+                activities={roomAgentActivities}
+                selectedAgentIds={selectedRoomAgentIds}
+                busyAgentId={roomAgentMutationId}
+                disabled={!canUseComposer}
+                onSelectionChange={(roomAgentIds) => void handleSelectRoomAgents(roomAgentIds)}
+                onEdit={handleEditRoomAgent}
+                onRetry={(roomAgentId) => void handleRetryRoomAgent(roomAgentId)}
+                onRemove={(roomAgentId) => void handleRemoveRoomAgent(roomAgentId)}
+              />
+            )}
           </div>
 
           <div className="kimix-composer-toolbar-secondary flex shrink-0 items-center gap-1.5">

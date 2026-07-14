@@ -13,6 +13,7 @@ import {
   createRoomMessageDispatch,
   dispatchQueuedRoomDelivery,
   getDispatchableRoomDeliveries,
+  isRoomDeliveryWaitingBehindAgentWork,
   recoverInterruptedRoomDeliveries,
   retryRoomDelivery,
   setRoomDeliveryStatus,
@@ -385,17 +386,18 @@ describe("roomDelivery", () => {
   it("每个空闲 Agent 只选择最早 queued；一个 Agent 忙碌不阻塞另一个", () => {
     const source = room();
     const primary = getPrimaryRoomAgent(source);
+    const createId = deterministicIds();
     const first = createRoomMessageDispatch(source, {
       content: "第一条",
       recipientAgentIds: [primary.id, "agent-2"],
       timestamp: 100,
-      createId: deterministicIds(),
+      createId,
     });
     const second = createRoomMessageDispatch(first.session, {
       content: "第二条",
       recipientAgentIds: [primary.id, "agent-2"],
       timestamp: 110,
-      createId: deterministicIds(),
+      createId,
     });
     const targets = getDispatchableRoomDeliveries(second.session, [{
       roomId: source.id,
@@ -404,6 +406,14 @@ describe("roomDelivery", () => {
       updatedAt: 120,
     }]);
     expect(targets).toEqual([{ roomMessageId: first.message.id, roomAgentId: "agent-2" }]);
+    expect(isRoomDeliveryWaitingBehindAgentWork(second.session, first.message.id, primary.id, [{
+      roomId: source.id,
+      roomAgentId: primary.id,
+      status: "running",
+      updatedAt: 120,
+    }])).toBe(true);
+    expect(isRoomDeliveryWaitingBehindAgentWork(second.session, first.message.id, "agent-2")).toBe(false);
+    expect(isRoomDeliveryWaitingBehindAgentWork(second.session, second.message.id, "agent-2")).toBe(true);
   });
 
   it("indeterminate 阻止同 Agent 后续 queued 自动发送，但不影响其他 Agent", () => {

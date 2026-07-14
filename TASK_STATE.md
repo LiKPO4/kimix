@@ -2,12 +2,12 @@
 
 ## 2026-07-14 多 Agent 房间实施
 
-- 当前目标：多 Agent 房间开发实施已经完成并达到可交用户实测状态；保持内部 gate，等待用户按验收清单完成截图和真实实施者/审查者工作流验收。
-- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。Windows 安全 session ID、逐 Agent 终态 usage、启动 bootstrap/水合竞态和窄窗口工具栏均已修复。四 Agent 运行期间回看并展开旧历史保持稳定；搜索 `FOUR_AGENT_OK` 返回四条正确 Agent/模型结果，Markdown 房间导出与 Reviewer 单 Agent 调试 ZIP 均实测成功。v2.15.39 补齐 SDK fallback 的归档列表和恢复路径；归档房间后从任一成员恢复会成组恢复全部官方 session，侧栏房间、四成员、默认接收者、历史与 usage 完整保留。
-- 未完成：仅剩用户侧验收——截图、真实工作任务中的实施者/审查者交叉审查，以及可选的单 Provider 真实故障人工复核；这些不再阻塞交付实测。
-- 阻塞：无。v2.15.39 真实 Electron SDK 归档/恢复通过；全量 81 个测试文件、564 项测试、生产构建、OKF 严格校验与 diff check 通过，renderer 为 `assets/index-Dgy-w4PA.js`。
+- 当前目标：收束多 Agent 房间首轮用户实测反馈；v2.15.40 修正预发送状态误报、工具栏顺序和 Agent 选择器垂直对齐，并等待用户确认新 Agent 的历史正文共享方案。
+- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。Windows 安全 session ID、逐 Agent 终态 usage、启动 bootstrap/水合竞态、窄窗口工具栏及 SDK fallback 归档恢复均已修复。v2.15.40 区分内部预发送 `queued` 与真实队列等待：只有被前序工作阻塞才展示排队卡，底栏和停止按钮也只响应真实执行态；权限入口恢复到 Agent 入口之前，Agent 名称和“1 个”使用明确 34px 控件及 20px 行高对齐。
+- 未完成：用户确认新 Agent 的模型上下文导入策略；随后再实现创建时导入房间可见正文。另需用户继续截图、真实实施者/审查者交叉审查，以及可选的单 Provider 真实故障人工复核。
+- 阻塞：无。v2.15.39 真实 Electron SDK 归档/恢复通过；v2.15.40 全量 81 个测试文件、565 项测试、生产构建、OKF 严格校验与 diff check 通过，renderer 为 `assets/index-LieT391D.js`。本轮未自行截图，按项目规则等待用户视觉验收。
 - 关键文件：`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/markdownExport.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：用户按 `docs/multi-agent-room-user-acceptance.md` 实测并回传截图/问题；通过后再决定是否合并、推送或打 tag。
+- 下一步：用户复测新消息直发、权限/Agent 顺序和文字对齐，并确认“新 Agent 创建时一次性导入可见正文、后续按显式路由转发”的上下文方案。
 - 验证补充：`pnpm exec tsc -p tsconfig.json --noEmit` 仍被仓库既有类型基线错误阻塞；本阶段涉及文件的新增类型问题已清理，正式门禁仍以现有 `test:run`、`build`、`knowledge:validate` 和 diff check 为准。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性

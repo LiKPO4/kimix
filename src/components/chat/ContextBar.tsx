@@ -15,7 +15,7 @@ import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
 import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
-import { roomHasActiveAgentWork } from "@/utils/sessionArchive";
+import { roomHasExecutingAgentWork } from "@/utils/sessionArchive";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -311,7 +311,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const firstPendingQuestion = statusEvents.find((event) => event.type === "question_request" && event.status === "pending");
   const latestError = [...statusEvents].sort((left, right) => right.timestamp - left.timestamp).find((event) => event.type === "error");
   const isSessionRunning = Boolean(activeSession?.collaboration
-    ? roomHasActiveAgentWork(activeSession, Object.values(roomAgentActivities))
+    ? roomHasExecutingAgentWork(activeSession, Object.values(roomAgentActivities))
     : isSessionRuntimeRunning(activeSession ?? undefined, runningSessionId));
   // Only block model switching when the active session is the one currently
   // tracked as running. A session with stale open timeline work should not

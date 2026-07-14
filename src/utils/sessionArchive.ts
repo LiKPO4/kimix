@@ -20,6 +20,15 @@ const ROOM_LIFECYCLE_ACTIVE_STATUSES = new Set([
   "indeterminate",
 ]);
 
+const ROOM_RUNTIME_ACTIVE_STATUSES = new Set([
+  "creating",
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+]);
+
 export function roomHasActiveAgentWork(
   session: Session,
   activities: Iterable<RoomAgentActivity> = [],
@@ -30,6 +39,19 @@ export function roomHasActiveAgentWork(
   ))) return true;
   return session.collaboration.messages.some((message) => Object.values(message.deliveries).some((delivery) => (
     ROOM_LIFECYCLE_ACTIVE_STATUSES.has(delivery.status)
+  )));
+}
+
+export function roomHasExecutingAgentWork(
+  session: Session,
+  activities: Iterable<RoomAgentActivity> = [],
+) {
+  if (!session.collaboration) return false;
+  if ([...activities].some((activity) => (
+    activity.roomId === session.id && ROOM_RUNTIME_ACTIVE_STATUSES.has(activity.status)
+  ))) return true;
+  return session.collaboration.messages.some((message) => Object.values(message.deliveries).some((delivery) => (
+    ROOM_RUNTIME_ACTIVE_STATUSES.has(delivery.status)
   )));
 }
 
