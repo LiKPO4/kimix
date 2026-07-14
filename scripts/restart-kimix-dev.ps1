@@ -47,7 +47,7 @@ function Test-BuildOutputStale {
 
 function Write-BuildFingerprint {
   $head = Get-CurrentGitHead
-  if (-not $head) { throw "无法读取当前 Git HEAD，拒绝写入构建指纹。" }
+  if (-not $head) { throw "Cannot read Git HEAD; refusing to launch a stale build." }
   $stampPath = Join-Path $workspace "out\.kimix-build-fingerprint"
   Set-Content -LiteralPath $stampPath -Value $head -NoNewline -Encoding UTF8
 }
@@ -145,7 +145,7 @@ function Start-KimixBuiltApp {
 function Invoke-KimixBuild {
   pnpm build
   if ($LASTEXITCODE -ne 0) {
-    throw "pnpm build 失败，已停止启动旧构建产物。"
+    throw "pnpm build failed; refusing to launch the stale build output."
   }
   Write-BuildFingerprint
 }

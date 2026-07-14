@@ -2,7 +2,7 @@
 
 ## 2026-07-14
 
-* **Built-app startup is fingerprinted and old Kimix instances are closed**: The canonical BAT launcher no longer treats a clean worktree as proof that `out/` is current; it rebuilds on missing or mismatched Git fingerprints, refuses to launch after a failed build, and clears current, compatibility-copy, and packaged Kimix processes before starting. See [/project/kimix.md](/project/kimix.md).
+* **Built-app startup is fingerprinted and old Kimix instances are closed**: The canonical BAT launcher no longer treats a clean worktree as proof that `out/` is current; it rebuilds on missing or mismatched Git fingerprints, refuses to launch after a failed build, and clears current, compatibility-copy, and packaged Kimix processes before starting. Its no-BOM PowerShell helper keeps executable strings ASCII-safe for Windows PowerShell 5.1. See [/project/kimix.md](/project/kimix.md).
 
 * **Room identity overrides local UI and snapshot drift**: A missing room-gate record defaults open, explicit opt-out is persisted separately, existing collaboration sessions retain their controls and dispatch path, persistence blocks ordinary-snapshot downgrade, and unique official metadata can rebuild an already orphaned room before per-Agent history recovery. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Composer no longer rewrites prompts for local clarification mode**: The retired three-state UI, renderer state, settings, and IPC fields are removed; official structured questions remain available, while local hydration and canonical history strip both generations of legacy wrappers and cache mapping version 4 actively repairs polluted user bubbles. See [/project/kimix.md](/project/kimix.md).
