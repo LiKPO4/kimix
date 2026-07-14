@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 启动器构建指纹与旧进程清理
+
+- 当前目标：修复通过 `start-kimix.bat` 启动时误用旧构建或被旧 Kimix 单实例窗口接管的问题。
+- 已完成：启动器不再以“工作区干净”推断 `out` 一定最新；默认模式校验 Git HEAD 构建指纹，缺失或不一致时重建，并在 native 构建失败时拒绝启动旧产物。启动前同步清理当前仓库、旧兼容副本和已安装版 Kimix 进程，保留 `--fast` 作为明确跳过校验的入口。PowerShell 语法解析、`pnpm test:run`（83 个文件、583 项）、`pnpm build`（renderer `index-GGEvNiw2.js`）、`pnpm knowledge:validate` 和 `git diff --check` 已通过；本轮故障根因已记录到 `knowledge/project/kimix.md`。
+- 未完成：等待用户用仓库根目录 `start-kimix.bat` 验收左下角版本与旧窗口不会被复用。
+- 阻塞：无。
+- 关键文件：`start-kimix.bat`、`scripts/restart-kimix-dev.ps1`、`electron/main.ts`。
+- 下一步：提交后用仓库根目录 `start-kimix.bat` 验收左下角版本为 v2.15.47，并确认不会复用旧窗口。
+
 ## 2026-07-14 多 Agent 房间实施
 
 - 当前目标：收束多 Agent 房间首轮用户实测反馈；v2.15.47 让固定宽度工具栏优先缩小文字再省略。

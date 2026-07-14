@@ -22,51 +22,38 @@ function Test-ContainsIgnoreCase {
   return $Text.IndexOf($Needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
-$script:relevantSourcePrefixes = @("src/", "electron/")
-$script:relevantRootFiles = @(
-  "index.html",
-  "package.json",
-  "electron.vite.config.ts",
-  "tailwind.config.ts",
-  "tsconfig.json",
-  "tsconfig.node.json",
-  "electron-builder.yml"
-)
-
-function Test-IsRelevantSourceFile {
-  param([string]$RelativePath)
-  foreach ($prefix in $script:relevantSourcePrefixes) {
-    if ($RelativePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
-  }
-  foreach ($file in $script:relevantRootFiles) {
-    if ($RelativePath -eq $file) { return $true }
-  }
-  return $false
+function Get-CurrentGitHead {
+  $head = (& git -C $workspace rev-parse HEAD 2>$null)
+  if ($LASTEXITCODE -ne 0) { return "" }
+  return ([string]$head).Trim()
 }
 
 function Test-BuildOutputStale {
   param([string]$OutMarker)
   if (-not (Test-Path -LiteralPath $OutMarker)) { return $true }
-  $outTime = (Get-Item -LiteralPath $OutMarker).LastWriteTime
-  $porcelain = & git -C $workspace status --porcelain 2>$null
-  if (-not $porcelain) { return $false }
-  foreach ($line in $porcelain) {
-    if ($line.Length -lt 4) { continue }
-    $relativePath = $line.Substring(3).Trim()
-    if (-not (Test-IsRelevantSourceFile $relativePath)) { continue }
-    $fullPath = Join-Path $workspace $relativePath
-    if (-not (Test-Path -LiteralPath $fullPath)) {
-      # File was deleted; output is stale.
-      return $true
-    }
-    $fileTime = (Get-Item -LiteralPath $fullPath).LastWriteTime
-    if ($fileTime -gt $outTime) { return $true }
-  }
-  return $false
+
+  # A dirty workspace is always rebuilt. File timestamps are not a reliable
+  # build identity after checkout, restore, or copying the workspace.
+  $porcelain = @(& git -C $workspace status --porcelain --untracked-files=all 2>$null)
+  if ($LASTEXITCODE -ne 0 -or $porcelain.Count -gt 0) { return $true }
+
+  $stampPath = Join-Path (Split-Path -Parent $OutMarker) ".kimix-build-fingerprint"
+  if (-not (Test-Path -LiteralPath $stampPath)) { return $true }
+  $expected = Get-CurrentGitHead
+  if (-not $expected) { return $true }
+  $actual = (Get-Content -LiteralPath $stampPath -Raw).Trim()
+  return $actual -ne $expected
+}
+
+function Write-BuildFingerprint {
+  $head = Get-CurrentGitHead
+  if (-not $head) { throw "无法读取当前 Git HEAD，拒绝写入构建指纹。" }
+  $stampPath = Join-Path $workspace "out\.kimix-build-fingerprint"
+  Set-Content -LiteralPath $stampPath -Value $head -NoNewline -Encoding UTF8
 }
 
 function Stop-KimixProcessTree {
-  $all = Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe", "electron.exe", "node.exe", "esbuild.exe") }
+  $all = Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe", "Kimix.exe", "electron.exe", "node.exe", "esbuild.exe") }
   $targetIds = New-Object "System.Collections.Generic.HashSet[int]"
   $protectedIds = New-Object "System.Collections.Generic.HashSet[int]"
   $currentId = [int]$PID
@@ -81,23 +68,29 @@ function Stop-KimixProcessTree {
 
   foreach ($process in $all) {
     $commandLine = [string]$process.CommandLine
+    $processIdentity = @([string]$process.ExecutablePath, $commandLine) -join " "
     $isProtected = $protectedIds.Contains([int]$process.ProcessId)
-    $inWorkspace = Test-ContainsIgnoreCase $commandLine $workspace
-    $isKimixElectron = $process.Name -eq "electron.exe" -and $inWorkspace
-    $isKimixShell = $process.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe") -and $inWorkspace -and (
+    $inKnownKimixPath = (Test-ContainsIgnoreCase $processIdentity $workspace) -or
+      (Test-ContainsIgnoreCase $processIdentity "kimix-pre-dev-compat") -or
+      ($processIdentity -match "(?i)[\\/]kimix(?:-[^\\/\s]+)?[\\/]")
+    $isKimixElectron = $process.Name -eq "electron.exe" -and (
+      $inKnownKimixPath
+    )
+    $isKimixPackaged = $process.Name -eq "Kimix.exe"
+    $isKimixShell = $process.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe") -and $inKnownKimixPath -and (
       (Test-ContainsIgnoreCase $commandLine "start-kimix.bat") -or
       (Test-ContainsIgnoreCase $commandLine "restart-kimix-dev.ps1")
     )
     $isKimixNode = $process.Name -eq "node.exe" -and (
-      $inWorkspace -and (
+      $inKnownKimixPath -and (
         (Test-ContainsIgnoreCase $commandLine "scripts/dev.cjs") -or
         (Test-ContainsIgnoreCase $commandLine "electron-vite") -or
         (Test-ContainsIgnoreCase $commandLine "pnpm")
       )
     )
-    $isKimixEsbuild = $process.Name -eq "esbuild.exe" -and $inWorkspace
+    $isKimixEsbuild = $process.Name -eq "esbuild.exe" -and $inKnownKimixPath
 
-    if (-not $isProtected -and ($isKimixElectron -or $isKimixShell -or $isKimixNode -or $isKimixEsbuild)) {
+    if (-not $isProtected -and ($isKimixElectron -or $isKimixPackaged -or $isKimixShell -or $isKimixNode -or $isKimixEsbuild)) {
       [void]$targetIds.Add([int]$process.ProcessId)
     }
   }
@@ -149,6 +142,14 @@ function Start-KimixBuiltApp {
   Start-Process -FilePath $electronBin -ArgumentList "." -WorkingDirectory $workspace
 }
 
+function Invoke-KimixBuild {
+  pnpm build
+  if ($LASTEXITCODE -ne 0) {
+    throw "pnpm build 失败，已停止启动旧构建产物。"
+  }
+  Write-BuildFingerprint
+}
+
 if ($hotReloadDev) {
   Write-Host "Starting dev server with hot reload..."
   pnpm dev
@@ -175,7 +176,7 @@ if ($fullClean) {
   }
 
   Write-Host "Clean rebuild..."
-  pnpm build
+  Invoke-KimixBuild
   Start-KimixBuiltApp
   return
 }
@@ -188,14 +189,14 @@ if ($fastLaunch) {
   Write-Host "No built output found; building..."
   $needsBuild = $true
 } elseif (Test-BuildOutputStale $outMarker) {
-  Write-Host "Source changes newer than built output; rebuilding..."
+  Write-Host "Build fingerprint missing or stale; rebuilding..."
   $needsBuild = $true
 } else {
   Write-Host "Built output is up to date; launching directly."
 }
 
 if ($needsBuild) {
-  pnpm build
+  Invoke-KimixBuild
 }
 
 Start-KimixBuiltApp

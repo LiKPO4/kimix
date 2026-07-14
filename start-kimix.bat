@@ -21,7 +21,7 @@ if "%~1"=="--clean" (
 ) else if "%~1"=="--fast" (
   echo Launching existing built output without checking for source changes.
 ) else (
-  echo Auto mode: rebuilds if source changed/out missing, otherwise launches directly.
+  echo Auto mode: validates the build fingerprint and rebuilds when needed.
   echo Use --dev for hot reload, --clean for full rebuild, --fast to skip rebuild.
 )
 echo.
