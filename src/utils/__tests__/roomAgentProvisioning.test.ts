@@ -4,6 +4,7 @@ import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
   getRoomPrimaryMetadataIdentity,
+  isMultiAgentRoomUiAvailable,
   isMultiAgentRoomUiEnabled,
   setMultiAgentRoomUiEnabled,
   MULTI_AGENT_ROOM_UI_CHANGED_EVENT,
@@ -31,17 +32,32 @@ function session(): Session {
 describe("roomAgentProvisioning", () => {
   beforeEach(() => localStorage.clear());
 
-  it("keeps the UI gate closed unless explicitly enabled", () => {
+  it("keeps the UI gate open by default and persists an explicit opt-out", () => {
     let changeCount = 0;
     const handleChange = () => { changeCount += 1; };
     window.addEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, handleChange);
-    expect(isMultiAgentRoomUiEnabled()).toBe(false);
-    expect(setMultiAgentRoomUiEnabled(true)).toBe(true);
     expect(isMultiAgentRoomUiEnabled()).toBe(true);
     expect(setMultiAgentRoomUiEnabled(false)).toBe(true);
-    expect(localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY)).toBeNull();
+    expect(isMultiAgentRoomUiEnabled()).toBe(false);
+    expect(localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY)).toBe("0");
+    expect(setMultiAgentRoomUiEnabled(true)).toBe(true);
+    expect(isMultiAgentRoomUiEnabled()).toBe(true);
+    expect(localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY)).toBe("1");
     window.removeEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, handleChange);
     expect(changeCount).toBe(2);
+  });
+
+  it("keeps existing room controls available when the local gate record is missing or disabled", () => {
+    const ordinary = session();
+    const room = prepareRoomAgentProvisioning(ordinary, {
+      displayName: "Reviewer",
+      mentionName: "reviewer",
+      modelAlias: "openai/gpt-5",
+      permissionMode: "manual",
+    }, [], 100, () => "agent-reviewer").session;
+
+    expect(isMultiAgentRoomUiAvailable(ordinary, false)).toBe(false);
+    expect(isMultiAgentRoomUiAvailable(room, false)).toBe(true);
   });
 
   it("upgrades an ordinary session and persists a stable pending Agent before official creation", () => {

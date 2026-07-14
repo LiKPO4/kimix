@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T11:00:43+08:00"
+timestamp: "2026-07-14T12:04:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -90,8 +90,10 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 # UI Stability
 
 * Single-Agent conversations do not show room controls.
-* The add-Agent and room-recipient controls are protected by a local development gate. With the gate closed, existing room data remains visible but read-only; ordinary sessions retain their existing composer and send path.
-* Internal acceptance can toggle the local room UI gate from Settings without developer tools. The setting remains device-local and default-off, notifies mounted Composer instances immediately, and closing it removes creation access without deleting persisted collaboration data.
+* The add-Agent entry for ordinary sessions remains controlled by a device-local development gate, but an existing collaboration room always keeps its member, recipient, visible-context, and room-send controls. A missing or stale UI preference must never reinterpret collaboration data as an ordinary single-Agent session.
+* Internal acceptance can toggle the local room UI gate from Settings without developer tools. The setting defaults on after initial acceptance, stores explicit opt-out as `0`, and notifies mounted Composer instances immediately. Closing it hides creation access only in ordinary sessions; it does not make an existing room read-only or change its dispatch protocol.
+* A valid collaboration session is a monotonic local identity. Persistence remembers confirmed room snapshots; if a later ordinary primary snapshot reuses the same session and project identity, it is reconciled into the primary partition rather than deleting `collaboration`. Unsupported future collaboration payloads are never replaced by this guard.
+* If the local room grouping is already absent, active official catalog metadata may rebuild a skeleton only when room ID, primary session ID, working directory, and every secondary Agent/session mapping are unique and within the room-size limit. The existing per-Agent canonical startup recovery then reloads authoritative histories. Ambiguous, duplicate, archived, cross-project, or future-schema metadata remains in the explicit orphan recovery UI. Schema 1 metadata cannot restore custom display/mention names, so recovered members use deterministic generic names until the user renames them.
 * Room UI freezes an ordered recipient set per message before dispatch. Agent-scoped slash, Skill, Goal, permission, Plan, and Swarm mutations remain unavailable unless the selected owner is explicitly supported.
 * The multi-recipient UI stores an ordered default recipient set and exposes real Agent mention completion. Mentions may override that default for one message without mutating future defaults.
 * The Composer exposes a compact one-shot visible-context selector after the Agent picker. Its five scopes are previous turn, recent three turns, selected messages, all bodies, and none; every successful send resets the control to previous turn.

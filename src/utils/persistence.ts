@@ -3,6 +3,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import type { PendingMessage } from "@/stores/sessionStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
+import { isSamePath } from "@/utils/pathCase";
 import {
   getPrimaryRoomAgent,
   getRoomAgentRuntimeId,
@@ -45,6 +46,27 @@ export type ArchivedSessionTombstone = {
 export type PersistResult = { success: true } | { success: false; error: string };
 
 let persistErrorHandler: ((error: Error) => void) | null = null;
+const rememberedRoomSessions = new Map<string, Session>();
+
+function rememberCollaborationSessions(sessions: Session[]) {
+  sessions.forEach((session) => {
+    if (session.collaboration) rememberedRoomSessions.set(session.id, session);
+  });
+}
+
+function restoreRememberedCollaboration(session: Session): Session {
+  if (session.collaboration || session.unsupportedCollaboration) return session;
+  const remembered = rememberedRoomSessions.get(session.id);
+  if (!remembered?.collaboration || !isSamePath(remembered.projectPath, session.projectPath)) return session;
+  const restored = normalizeLoadedSessionCollaboration({
+    ...remembered,
+    ...session,
+    updatedAt: Math.max(session.updatedAt, remembered.collaboration.primaryMirrorUpdatedAt + 1),
+    events: session.events,
+    collaboration: remembered.collaboration,
+  });
+  return restored.collaboration ? synchronizeCollaborationPrimaryMirror(restored) : session;
+}
 
 export function onPersistError(handler: ((error: Error) => void) | null) {
   persistErrorHandler = handler;
@@ -350,7 +372,7 @@ function hydrateMessageImages(
 }
 
 function hydrateSessions(raw: unknown[], dataUrlById: Map<string, string>): Session[] {
-  return raw.map((item) => {
+  const sessions = raw.map((item) => {
     const hydrateEvents = (events: TimelineEvent[]) => events.map((event) => {
       if (event.type !== "user_message" && event.type !== "steer_message") return event;
       return {
@@ -389,6 +411,8 @@ function hydrateSessions(raw: unknown[], dataUrlById: Map<string, string>): Sess
     };
     return synchronizeCollaborationPrimaryMirror({ ...hydrated, collaboration });
   });
+  rememberCollaborationSessions(sessions);
+  return sessions;
 }
 
 function hydratePending(raw: unknown[], dataUrlById: Map<string, string>): PendingMessage[] {
@@ -456,6 +480,16 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
 export async function persistLocalConversationState(): Promise<PersistResult> {
   const state = useSessionStore.getState();
   const appState = useAppStore.getState();
+  rememberCollaborationSessions(state.sessions);
+  const guardedSessions = state.sessions.map(restoreRememberedCollaboration);
+  if (guardedSessions.some((session, index) => session !== state.sessions[index])) {
+    useSessionStore.setState({ sessions: guardedSessions });
+    const currentSessionId = appState.currentSession?.id;
+    const restoredCurrent = currentSessionId
+      ? guardedSessions.find((session) => session.id === currentSessionId)
+      : undefined;
+    if (restoredCurrent) useAppStore.setState({ currentSession: restoredCurrent });
+  }
   const activeStatuses = new Set(["creating", "queued", "sending", "accepted", "running", "waiting_approval", "waiting_question"]);
   const prepareEvents = (session: Session, roomAgentId: string | null, events: TimelineEvent[]) => {
     const activity = roomAgentId
@@ -478,7 +512,7 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
     const sanitized = resetStaleSessionRecommendationEvents(sanitizePersistedEvents(settled));
     return roomAgentId ? sanitized.map((event) => scopeEventToRoomAgent(event, roomAgentId)) : sanitized;
   };
-  const preparedSessions = state.sessions.map((session) => {
+  const preparedSessions = guardedSessions.map((session) => {
     if (!session.collaboration) {
       return {
         ...session,
@@ -503,6 +537,7 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
       events: prepared.collaboration?.agentEvents[primary.id] ?? prepared.events,
     };
   });
+  rememberCollaborationSessions(preparedSessions);
 
   const snapshot: PersistSnapshot = {
     sessions: preparedSessions,

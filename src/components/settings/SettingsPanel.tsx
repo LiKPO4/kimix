@@ -45,7 +45,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.15.44";
+const KIMIX_VERSION = "2.15.45";
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -2126,7 +2126,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <span>多 Agent 房间（内部验收）</span>
                         </div>
                         <div className="kimix-settings-permission-desc">
-                          在 Composer 的 + 菜单开放“添加 Agent”。仅保存在本机；关闭后普通会话隐藏入口，已有房间数据仍保留。
+                          在 Composer 的 + 菜单开放“添加 Agent”，默认开启。关闭后普通会话隐藏创建入口，已有房间仍可正常使用。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>

@@ -314,6 +314,53 @@ describe("persistLocalConversationState", () => {
       .toBe("他说的你看懂了吗");
   });
 
+  it("prevents a known collaboration room from being persisted as an ordinary session", async () => {
+    const primaryEvent: TimelineEvent = {
+      id: "guard-user-old",
+      type: "user_message",
+      timestamp: 1,
+      content: "旧房间消息",
+    };
+    const guardedBase: Session = {
+      ...session,
+      id: "guard-room",
+      events: [primaryEvent],
+      updatedAt: 10,
+    };
+    const guardedRoom: Session = {
+      ...guardedBase,
+      collaboration: createCollaborationStateFromSession(guardedBase),
+    };
+    getStateItemMock.mockResolvedValue([guardedRoom]);
+    const { loadLocalSessions, persistLocalConversationState } = await import("@/utils/persistence");
+    await loadLocalSessions();
+
+    const newPrimaryEvent: TimelineEvent = {
+      id: "guard-user-new",
+      type: "user_message",
+      timestamp: 20,
+      content: "刷新后的主 Agent 消息",
+    };
+    const downgraded: Session = {
+      ...guardedBase,
+      events: [newPrimaryEvent],
+      updatedAt: 20,
+      collaboration: undefined,
+    };
+    useSessionStore.setState({ sessions: [downgraded] });
+    useAppStore.setState({ currentSession: downgraded });
+
+    expect((await persistLocalConversationState()).success).toBe(true);
+    const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
+    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    const primaryId = stored.collaboration?.primaryAgentId ?? "";
+    expect(stored.collaboration?.agents).toHaveLength(1);
+    expect(stored.collaboration?.agentEvents[primaryId]).toEqual([
+      expect.objectContaining({ id: "guard-user-new", content: "刷新后的主 Agent 消息" }),
+    ]);
+    expect(useAppStore.getState().currentSession?.collaboration).toBeTruthy();
+  });
+
   it("preserves an unknown future collaboration payload byte-for-byte on the next save", async () => {
     const futureRaw = { schemaVersion: 2, agents: [{ id: "future-agent" }], opaque: { keep: true } };
     getStateItemMock.mockResolvedValue([{ ...session, collaboration: futureRaw }]);

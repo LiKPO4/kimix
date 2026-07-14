@@ -12,21 +12,24 @@ export const MAX_ROOM_AGENTS = 4;
 
 export function isMultiAgentRoomUiEnabled() {
   try {
-    return localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY) === "1";
+    return localStorage.getItem(MULTI_AGENT_ROOM_UI_GATE_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
 export function setMultiAgentRoomUiEnabled(enabled: boolean) {
   try {
-    if (enabled) localStorage.setItem(MULTI_AGENT_ROOM_UI_GATE_KEY, "1");
-    else localStorage.removeItem(MULTI_AGENT_ROOM_UI_GATE_KEY);
+    localStorage.setItem(MULTI_AGENT_ROOM_UI_GATE_KEY, enabled ? "1" : "0");
     if (typeof window !== "undefined") window.dispatchEvent(new Event(MULTI_AGENT_ROOM_UI_CHANGED_EVENT));
     return true;
   } catch {
     return false;
   }
+}
+
+export function isMultiAgentRoomUiAvailable(session: Session | null | undefined, gateEnabled: boolean) {
+  return gateEnabled || Boolean(session?.collaboration);
 }
 
 export type RoomAgentDraft = {

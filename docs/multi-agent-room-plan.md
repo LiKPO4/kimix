@@ -392,7 +392,7 @@ interface AgentDelivery {
 - [x] 添加名称、mention、权限校验，并支持后续重命名。
 - [x] 普通会话原地升级；单 Agent UI 保持原样。
 - [x] 第一小步只开放单接收者。
-- [x] 内部 gate 默认关闭；已存在房间在 gate 关闭时只读可见，不丢数据。
+- [x] 内部 gate 在首轮实测后改为默认开放；显式关闭只隐藏普通会话的创建入口，已存在房间保持完整可用且不丢数据。
 
 退出门禁：添加、重启、重命名、模型失效和移出均可恢复。
 
@@ -577,6 +577,8 @@ git diff --check
 44. 阶段 9C 在四 Agent 并行期间完成历史展开与滚动稳定性回归；`FOUR_AGENT_OK` 四个响应均保留最终模型、输入、输出和 Context。搜索结果保持 Agent/模型归属，Markdown 导出保留房间成员与完整分区，Reviewer 调试 ZIP 只包含明确选择的官方 session。
 45. 阶段 9C 修复归档生命周期的 Server/SDK 路由不对称：SDK fallback 归档后，设置页列表与恢复现在同样读取 SDK SessionStore；从任一房间成员恢复会触发房间级逐 Agent 恢复。v2.15.39 实测归档计数从 375 降到 370，恢复后侧栏房间、四成员、默认接收者、历史和最终 usage 均完整保留。
 46. 阶段 9C 完成开发者交付审计：真实房间已覆盖同 Provider 的 Kimi 两模型与跨 Provider 的 opencode-go，四 Agent 自动验收矩阵覆盖同 Provider 不同模型、跨 Provider 和单 Provider 失败时其余 Agent 继续运行/调度。所有非用户验收项均有当前代码、自动测试或真实 Electron 证据，状态进入“可交用户实测”。
+47. v2.15.45 修复本机 UI gate 缺失时错误关闭房间功能：无记录默认开放，显式关闭写入独立 `0` 值；已有 collaboration 房间始终保留添加成员、接收者、正文补充和房间发送链路，避免 UI 配置异常把房间误降级成普通单 Agent 会话。
+48. v2.15.45 实机确认原测试房间 `m13fnosjo` 的本地 collaboration 已丢失，3 个次要官方 session 因 metadata 无法绑定而进入“待找回 Agent”。启动目录对账现在仅在 roomId、primarySessionId、roomAgentId 和工作目录唯一一致时重建房间骨架，再复用逐 Agent canonical 恢复；持久化同时记住已确认房间，普通主会话 snapshot 只能更新 primary 镜像，不能删除 collaboration。旧 schema 1 metadata 不含自定义昵称，恢复成员使用稳定通用名称并保留模型标识；歧义和未来 schema 继续人工找回。
 
 UI 开放必须同时满足以下 go/no-go gate：
 
@@ -585,7 +587,7 @@ UI 开放必须同时满足以下 go/no-go gate：
 - 添加 Agent、发送消息和重启恢复不存在自动重复创建或自动重复投递。
 - 官方目录折叠不会隐藏孤儿 session，也不会在侧栏重复显示已绑定 session。
 - schema 1/2 备份、导入副本解绑、Provider 缺失和部分归档失败均可恢复。
-- 内部 gate 关闭后，现有房间数据仍可只读展示，普通会话完全不出现协同 UI。
+- 内部 gate 显式关闭后，普通会话不出现创建入口；现有房间仍可完整使用，且不会退回普通发送链路。
 - 用户完成空态、1/2/4 Agent、窄窗口、长名称和真实跨 Provider 审查验收。
 
 开放顺序固定为：开发者内部只读观察 -> 单目标添加/发送 -> 重启与恢复实测 -> 多目标并行 -> 用户截图和真实跨 Provider 审查验收。任何一步失败都只关闭后续能力，不删除已保存房间数据。

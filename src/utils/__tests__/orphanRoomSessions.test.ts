@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "@/types/ui";
 import { createCollaborationStateFromSession } from "../collaborationRooms";
 import { buildOfficialRoomMetadata } from "../roomSessionMetadata";
-import { getOrphanRoomSessionInfo } from "../orphanRoomSessions";
+import { getOrphanRoomSessionInfo, recoverOrphanRoomsFromOfficialCatalog } from "../orphanRoomSessions";
+import { reconcileOfficialSessionCatalog } from "../sessionCatalog";
 
 function room(): Session {
   const base: Session = {
@@ -85,5 +86,62 @@ describe("orphan room sessions", () => {
       id: "broken-session",
       metadata: { ...metadata, kimixRoomSchemaVersion: 99 },
     }, [])).toEqual({ reason: "invalid_metadata" });
+  });
+
+  it("本地分组丢失时依据唯一官方 metadata 重建房间骨架", () => {
+    const primary: Session = {
+      id: "room-1",
+      engine: "kimi-code",
+      runtimeSessionId: "primary-session",
+      officialSessionId: "primary-session",
+      model: "opencode-go/deepseek-v4-pro",
+      title: "交叉审查",
+      projectPath: "D:/project",
+      createdAt: 1,
+      updatedAt: 2,
+      events: [],
+      isLoading: false,
+    };
+    const reviewer = {
+      id: "reviewer-session",
+      title: "Review",
+      workDir: "D:/project",
+      sessionDir: "D:/sessions/reviewer",
+      createdAt: 3,
+      updatedAt: 4,
+      metadata,
+    };
+
+    const recovered = recoverOrphanRoomsFromOfficialCatalog([primary], [reviewer], "D:/project", 10);
+
+    expect(recovered.recoveredRoomIds).toEqual(["room-1"]);
+    expect(recovered.sessions[0].collaboration?.agents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ displayName: "deepseek-v4-pro" }),
+      expect.objectContaining({
+        id: "reviewer-agent",
+        displayName: "Agent 2",
+        runtimeSessionId: "reviewer-session",
+        officialSessionId: "reviewer-session",
+      }),
+    ]));
+    expect(recovered.sessions[0].collaboration?.agentEvents["reviewer-agent"]).toEqual([]);
+    const reconciled = reconcileOfficialSessionCatalog(recovered.sessions, [reviewer], "D:/project", { source: "server" });
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0].collaboration?.agents[1]).toMatchObject({ officialSessionId: "reviewer-session" });
+  });
+
+  it("重复 Agent metadata 或未来 schema 会保持待找回而不自动合并", () => {
+    const primary = { ...room(), collaboration: undefined };
+    const duplicate = {
+      id: "reviewer-session-2",
+      workDir: "D:/project",
+      sessionDir: "D:/sessions/reviewer-2",
+      createdAt: 4,
+      updatedAt: 4,
+      metadata,
+    };
+    const original = { ...duplicate, id: "reviewer-session" };
+
+    expect(recoverOrphanRoomsFromOfficialCatalog([primary], [original, duplicate], "D:/project").recoveredRoomIds).toEqual([]);
   });
 });

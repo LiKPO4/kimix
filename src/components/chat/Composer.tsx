@@ -55,6 +55,7 @@ import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
   getRoomPrimaryMetadataIdentity,
+  isMultiAgentRoomUiAvailable,
   isMultiAgentRoomUiEnabled,
   MULTI_AGENT_ROOM_UI_CHANGED_EVENT,
   prepareRoomAgentProvisioning,
@@ -534,6 +535,9 @@ export function Composer() {
   const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
+  const activeSessionRef = useRef(activeSession);
+  activeSessionRef.current = activeSession;
+  const multiAgentRoomUiAvailable = isMultiAgentRoomUiAvailable(activeSession, multiAgentRoomUiEnabled);
   const activeRoomAgents = activeSession?.collaboration?.agents.filter((agent) => !agent.removedAt) ?? [];
   const selectedRoomAgentIds = activeSession?.collaboration
     ? Array.from(new Set(activeSession.collaboration.defaultRecipientIds.filter((id) => activeRoomAgents.some((agent) => agent.id === id))))
@@ -575,7 +579,7 @@ export function Composer() {
         return `${agent.id}:${activity?.status ?? "idle"}:${agent.runtimeSessionId ?? agent.officialSessionId ?? "none"}`;
       }).join("|")
     : "";
-  const roomReadOnly = Boolean(activeSession?.collaboration && !multiAgentRoomUiEnabled);
+  const roomReadOnly = Boolean(activeSession?.collaboration && !multiAgentRoomUiAvailable);
   let activeMutationOwner: RoomMutationOwner | null = null;
   let mutationOwnerError = "";
   if (activeSession) {
@@ -623,7 +627,7 @@ export function Composer() {
     const syncMultiAgentRoomGate = () => {
       const enabled = isMultiAgentRoomUiEnabled();
       setMultiAgentRoomUiEnabled(enabled);
-      if (!enabled) setShowAddRoomAgentDialog(false);
+      if (!isMultiAgentRoomUiAvailable(activeSessionRef.current, enabled)) setShowAddRoomAgentDialog(false);
     };
     window.addEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, syncMultiAgentRoomGate);
     return () => window.removeEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, syncMultiAgentRoomGate);
@@ -1263,9 +1267,9 @@ export function Composer() {
   };
 
   useEffect(() => {
-    if (!multiAgentRoomUiEnabled || !activeSession?.collaboration) return;
+    if (!multiAgentRoomUiAvailable || !activeSession?.collaboration) return;
     void dispatchAvailableRoomDeliveries(activeSession.id);
-  }, [activeRoomDispatchSignature, activeSession?.id, multiAgentRoomUiEnabled]);
+  }, [activeRoomDispatchSignature, activeSession?.id, multiAgentRoomUiAvailable]);
 
   useEffect(() => {
     const handleRoomDeliveryAction = (event: Event) => {
@@ -1313,7 +1317,7 @@ export function Composer() {
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
     const images = options?.images ?? [];
-    if (multiAgentRoomUiEnabled && targetSession.collaboration) {
+    if (targetSession.collaboration) {
       return sendRoomPrompt(targetSession, content, {
         images,
         manualSubmitAutoScroll: options?.manualSubmitAutoScroll,
@@ -1819,7 +1823,7 @@ export function Composer() {
   };
 
   const handleOpenAddRoomAgent = async () => {
-    if (!multiAgentRoomUiEnabled || !canUseComposer || activeRoomBusy) return;
+    if (!multiAgentRoomUiAvailable || !canUseComposer || activeRoomBusy) return;
     const target = await ensureSession();
     if (!target) return;
     setShowAddMenu(false);
@@ -4013,7 +4017,7 @@ export function Composer() {
               {showAddMenu && (
                 <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[260px] rounded-xl" style={{ padding: "14px 14px 14px" }}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
-                    {multiAgentRoomUiEnabled && (
+                    {multiAgentRoomUiAvailable && (
                       <section>
                         <button
                           type="button"
@@ -4037,7 +4041,7 @@ export function Composer() {
                       </section>
                     )}
 
-                    <section className={multiAgentRoomUiEnabled ? "border-t border-[var(--kimix-panel-divider)]" : undefined} style={multiAgentRoomUiEnabled ? { paddingTop: 14 } : undefined}>
+                    <section className={multiAgentRoomUiAvailable ? "border-t border-[var(--kimix-panel-divider)]" : undefined} style={multiAgentRoomUiAvailable ? { paddingTop: 14 } : undefined}>
                       <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <Palette size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
@@ -4129,7 +4133,7 @@ export function Composer() {
               )}
             </div>
 
-            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
+            {multiAgentRoomUiAvailable && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
               <RoomAgentPicker
                 session={activeSession}
                 activities={roomAgentActivities}
@@ -4143,7 +4147,7 @@ export function Composer() {
               />
             )}
 
-            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
+            {multiAgentRoomUiAvailable && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
               <RoomContextPicker
                 session={activeSession}
                 selectedAgentIds={roomContextTargetAgentIds}

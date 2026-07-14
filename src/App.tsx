@@ -11,6 +11,7 @@ import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionReques
 import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { reconcileOfficialSessionCatalog, selectStartupOfficialSession } from "@/utils/sessionCatalog";
+import { recoverOrphanRoomsFromOfficialCatalog } from "@/utils/orphanRoomSessions";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
@@ -1586,9 +1587,15 @@ function App() {
         !hiddenHandoffSessionIds.has(session.id) &&
         !isHiddenInternalSession(session)
       ));
-      useSessionStore.setState((state) => ({
-        sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSessions, projectPath, { source: res.source }),
-      }));
+      const recovery = recoverOrphanRoomsFromOfficialCatalog(
+        useSessionStore.getState().sessions,
+        catalogSessions,
+        projectPath,
+      );
+      useSessionStore.setState({
+        sessions: reconcileOfficialSessionCatalog(recovery.sessions, catalogSessions, projectPath, { source: res.source }),
+      });
+      recovery.recoveredRoomIds.forEach((roomId) => void recoverCollaborationRoomAtStartup(roomId));
       }).catch(logError("listKimiCodeSessions"));
       return () => {
         cancelled = true;
@@ -2496,16 +2503,25 @@ function App() {
                 !hiddenHandoffSessionIds.has(session.id) && !isHiddenInternalSession(session)
               ));
               const activeSummaries = catalogSummaries.filter((session) => session.archived !== true && isUsableHistorySession(session));
-              useSessionStore.setState((state) => ({
-                sessions: reconcileOfficialSessionCatalog(state.sessions, catalogSummaries, activeProject.path, { source: res.source }),
-              }));
+              const orphanRecovery = recoverOrphanRoomsFromOfficialCatalog(
+                useSessionStore.getState().sessions,
+                catalogSummaries,
+                activeProject.path,
+              );
+              useSessionStore.setState({
+                sessions: reconcileOfficialSessionCatalog(orphanRecovery.sessions, catalogSummaries, activeProject.path, { source: res.source }),
+              });
               const startupRoom = activeLocalSession
                 ? useSessionStore.getState().sessions.find((session) => session.id === activeLocalSession.id)
                 : undefined;
               if (startupRoom?.collaboration) {
                 await recoverCollaborationRoomAtStartup(startupRoom.id);
+                orphanRecovery.recoveredRoomIds
+                  .filter((roomId) => roomId !== startupRoom.id)
+                  .forEach((roomId) => void recoverCollaborationRoomAtStartup(roomId));
                 return;
               }
+              orphanRecovery.recoveredRoomIds.forEach((roomId) => void recoverCollaborationRoomAtStartup(roomId));
               if (useSessionStore.getState().sessions.some((session) => Boolean(session.collaboration))) {
                 void readAvailableRoomModelAliases().then((availableModelAliases) => {
                   useSessionStore.setState((state) => ({
