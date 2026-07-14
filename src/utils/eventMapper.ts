@@ -1,7 +1,7 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
 import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
-import { stripRoomContextFromPrompt } from "./roomContextBridge";
+import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -26,6 +26,7 @@ const OFFICIAL_SYSTEM_REMINDER_PATTERN = /(?:^|\r?\n)[ \t]*<system-reminder\b[^>
 type ExtractedUserMessage = {
   content: string;
   images: { name: string; dataUrl?: string }[];
+  deliveryIdentity?: RoomDeliveryPromptIdentity;
 };
 
 function parseArguments(value: unknown): Record<string, unknown> {
@@ -654,15 +655,25 @@ function sanitizeUserMessageText(content: string): string {
 }
 
 function extractUserMessage(input: unknown): ExtractedUserMessage {
-  if (isString(input)) return { content: sanitizeUserMessageText(input), images: [] };
+  if (isString(input)) {
+    const parsed = parseRoomDeliveryPrompt(input);
+    return {
+      content: sanitizeUserMessageText(parsed.currentPrompt),
+      images: [],
+      deliveryIdentity: parsed.deliveryIdentity,
+    };
+  }
   if (!Array.isArray(input)) return { content: "", images: [] };
 
   const textParts: string[] = [];
   const images: { name: string; dataUrl?: string }[] = [];
+  let deliveryIdentity: RoomDeliveryPromptIdentity | undefined;
   input.forEach((part, index) => {
     if (!isRecord(part)) return;
     if (part.type === "text" && isString(part.text)) {
-      const text = sanitizeUserMessageText(part.text);
+      const parsed = parseRoomDeliveryPrompt(part.text);
+      const text = sanitizeUserMessageText(parsed.currentPrompt);
+      deliveryIdentity ??= parsed.deliveryIdentity;
       if (text) textParts.push(text);
       return;
     }
@@ -701,6 +712,7 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
   return {
     content: sanitizeUserMessageText(textParts.filter(Boolean).join("\n")),
     images,
+    deliveryIdentity,
   };
 }
 
@@ -952,6 +964,9 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           ? formatKimiSkillActivationCommand(skillActivation.name, skillActivation.args)
           : userMessage.content,
         images: userMessage.images,
+        roomMessageId: userMessage.deliveryIdentity?.roomMessageId,
+        agentTurnId: userMessage.deliveryIdentity?.agentTurnId,
+        dispatchAttemptId: userMessage.deliveryIdentity?.dispatchAttemptId,
       };
     }
 

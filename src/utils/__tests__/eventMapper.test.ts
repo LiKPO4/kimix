@@ -39,10 +39,21 @@ describe("mapStreamEvent", () => {
             createdAt: 1,
           },
           { displayName: "Reviewer", mentionName: "reviewer" },
+          {
+            roomMessageId: "message:review",
+            agentTurnId: "turn:review",
+            dispatchAttemptId: "attempt:review",
+          },
         ),
       },
     });
-    expect(event).toMatchObject({ type: "user_message", content: "请检查最新改动" });
+    expect(event).toMatchObject({
+      type: "user_message",
+      content: "请检查最新改动",
+      roomMessageId: "message:review",
+      agentTurnId: "turn:review",
+      dispatchAttemptId: "attempt:review",
+    });
   });
 
   it("restores server base64 image parts from TurnBegin history", () => {

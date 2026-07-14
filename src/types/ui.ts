@@ -337,6 +337,8 @@ export interface RoomEventScope {
   roomMessageId?: string;
   /** 单个 Agent 回复块的稳定身份。 */
   agentTurnId?: string;
+  /** 单次房间投递尝试的稳定身份。 */
+  dispatchAttemptId?: string;
   /** 用户消息的实际房间接收者。 */
   recipientAgentIds?: string[];
   /** 仅用于房间时间线投影的 delivery 状态提示。 */

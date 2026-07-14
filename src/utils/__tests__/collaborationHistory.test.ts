@@ -132,7 +132,7 @@ describe("reconcileAgentCanonicalHistory", () => {
     ]);
   });
 
-  it("binds a new room delivery to one unique canonical user event", () => {
+  it("migrates an identity-less legacy room delivery from one unique canonical user event", () => {
     const current = room();
     current.session.collaboration!.messages = [{
       id: "room-message-new",
@@ -171,6 +171,72 @@ describe("reconcileAgentCanonicalHistory", () => {
     ]);
   });
 
+  it("binds repeated text by stable delivery identity without guessing", () => {
+    const current = room();
+    current.session.collaboration!.messages = [{
+      id: "room-message-first",
+      content: "Repeat",
+      outboundContent: "Repeat",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          dispatchAttemptId: "attempt-first",
+          agentTurnId: "turn-first",
+        },
+      },
+      timestamp: 100,
+    }, {
+      id: "room-message-second",
+      content: "Repeat",
+      outboundContent: "Repeat",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          dispatchAttemptId: "attempt-second",
+          agentTurnId: "turn-second",
+        },
+      },
+      timestamp: 101,
+    }];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [
+        {
+          id: "canonical-user-first",
+          type: "user_message",
+          timestamp: 102,
+          content: "Repeat",
+          roomMessageId: "room-message-first",
+          agentTurnId: "turn-first",
+          dispatchAttemptId: "attempt-first",
+        },
+        { id: "assistant-first", type: "assistant_message", timestamp: 103, content: "First", isThinking: false, isComplete: true },
+        {
+          id: "canonical-user-second",
+          type: "user_message",
+          timestamp: 104,
+          content: "Repeat",
+          roomMessageId: "room-message-second",
+          agentTurnId: "turn-second",
+          dispatchAttemptId: "attempt-second",
+        },
+        { id: "assistant-second", type: "assistant_message", timestamp: 105, content: "Second", isThinking: false, isComplete: true },
+      ],
+      reason: "startup",
+    });
+
+    expect(result.session.collaboration?.messages.map((message) => (
+      message.deliveries[current.primaryId].officialUserEventId
+    ))).toEqual(["canonical-user-first", "canonical-user-second"]);
+    expect(projectCollaborationTimeline(result.session).filter((event) => event.type === "user_message").map((event) => event.id))
+      .toEqual(["b-old", "room-message-first", "room-message-second"]);
+  });
+
   it("does not guess between repeated canonical user messages", () => {
     const current = room();
     current.session.collaboration!.messages = [{
@@ -200,6 +266,44 @@ describe("reconcileAgentCanonicalHistory", () => {
 
     expect(result.session.collaboration?.messages[0].deliveries[current.primaryId].officialUserEventId).toBe("legacy-user-a");
     expect(result.events.every((event) => event.roomMessageId === undefined && event.agentTurnId === undefined)).toBe(true);
+  });
+
+  it("does not let a stale official event ID override mismatched delivery identity", () => {
+    const current = room();
+    current.session.collaboration!.messages = [{
+      id: "room-message-safe",
+      content: "Safe",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          dispatchAttemptId: "attempt-safe",
+          agentTurnId: "turn-safe",
+          officialUserEventId: "canonical-user-stale",
+        },
+      },
+      timestamp: 100,
+    }];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [{
+        id: "canonical-user-stale",
+        type: "user_message",
+        timestamp: 101,
+        content: "Safe",
+        roomMessageId: "another-message",
+        agentTurnId: "another-turn",
+        dispatchAttemptId: "another-attempt",
+      }],
+      reason: "startup",
+    });
+
+    expect(result.events[0]).not.toHaveProperty("agentTurnId", "turn-safe");
+    expect(result.session.collaboration?.messages[0].deliveries[current.primaryId].officialUserEventId)
+      .toBe("canonical-user-stale");
   });
 
   it("removes only the target single-recipient room message after official undo", () => {

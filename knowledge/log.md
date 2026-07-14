@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Room prompts carry stable delivery identity across live and canonical history**: The versioned Kimix envelope binds `roomMessageId`, `agentTurnId`, and `dispatchAttemptId` before visible text is restored; room messages own user bubbles, Agent user events remain delivery anchors, and text/time matching is limited to identity-less legacy migration. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Room history binds an identity-less acknowledgement only by a unique canonical match**: When the prompt API omits the official user-event ID, exact visible text and a 30-second Agent-local time window may recover one unclaimed delivery; repeated candidates remain separate instead of being guessed. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 
 * **Windows notification clicks use an explicit foreground activation pulse**: Completion, approval, and question notifications restore the Kimix window, briefly elevate it before `moveTop` and `focus`, and then restore its prior always-on-top state; single-instance activation shares the same path. See [/project/kimix.md](/project/kimix.md).

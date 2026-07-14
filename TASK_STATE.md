@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.56 房间投递稳定身份协议
+
+- 当前目标：从数据模型上消除多 Agent 房间单次输入被房间消息与 Agent 官方历史重复投影的问题，不再让新消息依赖正文和时间猜测归属。
+- 根因：房间级 `collaboration.messages` 是共享用户气泡的显示权威，每个 Agent 的 canonical `TurnBegin` 是独立官方回合边界；运行时虽能从 activity 临时补上 `roomMessageId + agentTurnId`，但 canonical snapshot 会重建事件并丢失关联。投影器随后把未认领的官方用户事件当作独立消息，形成第二个气泡；运行中多次 snapshot 会让临时重复更明显。官方目标会话只有一次 prompt，不是重复发送。
+- 已完成：现有长度校验房间封套新增协议版本和 `roomMessageId + agentTurnId + dispatchAttemptId`，解析器只有三项全部合法才恢复身份，用户正文仍按原协议剥离；非法换行身份在发送前拒绝。发送、流事件、官方历史映射、canonical 绑定与投影共享稳定身份；同文重复输入可分别精确归属。身份事件不匹配时不允许旧官方事件 ID 覆盖，也不做文字猜测；仅无身份旧历史保留同 Agent、30 秒内、正文一致且候选唯一的迁移。备份校验及冲突副本同步验证、重映射投递尝试身份。版本号三处同步至 v2.15.56；定向测试 5 个文件、113 项通过；全量测试 85 个文件、604 项通过；`pnpm build` 通过，renderer 为 `assets/index-VlSsF6XN.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 未完成：提交并启动新构建后，等待用户复测目标会话和连续相同文本。
+- 阻塞：无。
+- 关键文件：`src/utils/roomContextBridge.ts`、`src/utils/eventMapper.ts`、`src/utils/collaborationHistory.ts`、`src/utils/sessionBackup.ts`、`src/components/chat/Composer.tsx`。
+- 下一步：提交并启动 v2.15.56；用户确认单次 @ 消息在运行中和重启后均只有一个气泡，并验证连续发送相同文字仍显示为两次真实输入。
+
 ## 2026-07-14 v2.15.55 多 Agent 房间用户消息唯一绑定
 
 - 当前目标：修复 `session_5b681eb3-a77a-4c16-b25e-4e2b8bc06f22` 中单次输入在运行中出现多份、重启后仍显示两份的问题。

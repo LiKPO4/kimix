@@ -63,13 +63,18 @@ function bindCanonicalHistoryToRoomMessages(
     if (!message.recipientAgentIds.includes(roomAgentId)) return message;
     const delivery = message.deliveries[roomAgentId];
     if (!delivery) return message;
+    const expectedDispatchAttemptId = delivery.dispatchAttemptId ?? `legacy:${delivery.agentTurnId}`;
 
-    let userIndex = canonicalEvents.findIndex((event) => (
-      event.type === "user_message" && (
-        event.id === delivery.officialUserEventId ||
-        event.roomMessageId === message.id
-      )
-    ));
+    let userIndex = canonicalEvents.findIndex((event) => {
+      if (event.type !== "user_message") return false;
+      const hasDeliveryIdentity = Boolean(event.roomMessageId || event.agentTurnId || event.dispatchAttemptId);
+      if (hasDeliveryIdentity) {
+        return event.roomMessageId === message.id &&
+          (!event.agentTurnId || event.agentTurnId === delivery.agentTurnId) &&
+          (!event.dispatchAttemptId || event.dispatchAttemptId === expectedDispatchAttemptId);
+      }
+      return event.id === delivery.officialUserEventId;
+    });
 
     // The prompt API does not always return an official user-event ID. In that
     // case, bind only when content and time identify exactly one canonical event;
@@ -80,6 +85,9 @@ function bindCanonicalHistoryToRoomMessages(
         if (claimedUserIndexes.has(index)) return false;
         const event = canonicalEvents[index];
         return event.type === "user_message" &&
+          !event.roomMessageId &&
+          !event.agentTurnId &&
+          !event.dispatchAttemptId &&
           normalizedMessageText(event.content) === expectedText &&
           Math.abs(event.timestamp - message.timestamp) <= 30_000;
       });

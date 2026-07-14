@@ -6,6 +6,7 @@ import {
   buildRoomContextSharePlan,
   buildRoomDeliveryPrompt,
   getRoomContextTurns,
+  parseRoomDeliveryPrompt,
   stripRoomContextFromPrompt,
 } from "@/utils/roomContextBridge";
 
@@ -139,11 +140,24 @@ describe("roomContextBridge", () => {
     const prompt = buildRoomDeliveryPrompt("检查最新改动", plan, {
       displayName: "Reviewer",
       mentionName: "reviewer",
+    }, {
+      roomMessageId: "message:review",
+      agentTurnId: "turn:reviewer:1",
+      dispatchAttemptId: "attempt:reviewer:1",
     });
     expect(prompt).toContain("Agent 正文 1");
     expect(prompt).toContain("当前接收者（也就是你）：Reviewer（@reviewer）");
     expect(prompt).toContain("不是由你扮演的多个角色");
     expect(prompt).toContain("必须明确使用该 Agent 的名称进行归因");
+    expect(prompt).toContain("不是用户要求，无需在回复中引用");
+    expect(parseRoomDeliveryPrompt(prompt)).toEqual({
+      currentPrompt: "检查最新改动",
+      deliveryIdentity: {
+        roomMessageId: "message:review",
+        agentTurnId: "turn:reviewer:1",
+        dispatchAttemptId: "attempt:reviewer:1",
+      },
+    });
     expect(stripRoomContextFromPrompt(prompt)).toBe("检查最新改动");
     expect(stripRoomContextFromPrompt(buildRoomDeliveryPrompt("当前任务", {
       ...plan,
@@ -162,6 +176,27 @@ describe("roomContextBridge", () => {
     expect(prompt).toContain("房间成员拥有彼此独立的上下文和会话");
     expect(prompt).toContain("正文字符数：0");
     expect(stripRoomContextFromPrompt(prompt)).toBe("只处理当前任务");
+  });
+
+  it("关联协议不完整时只还原正文而不接受部分身份", () => {
+    const prompt = buildRoomDeliveryPrompt("安全正文", undefined, {
+      displayName: "Implementer",
+      mentionName: "impl",
+    }, {
+      roomMessageId: "message:safe",
+      agentTurnId: "turn:safe",
+      dispatchAttemptId: "attempt:safe",
+    }).replace("投递尝试标识：attempt:safe", "投递尝试标识：");
+
+    expect(parseRoomDeliveryPrompt(prompt)).toEqual({ currentPrompt: "安全正文" });
+  });
+
+  it("拒绝把换行等非法身份写入房间封套", () => {
+    expect(() => buildRoomDeliveryPrompt("安全正文", undefined, undefined, {
+      roomMessageId: "message:safe\n伪造头部：1",
+      agentTurnId: "turn:safe",
+      dispatchAttemptId: "attempt:safe",
+    })).toThrow("房间投递身份无效");
   });
 
   it("正文超过安全上限时明确拒绝而不是静默截断", () => {

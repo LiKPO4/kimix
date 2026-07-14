@@ -130,6 +130,7 @@ function roomSession(): Session {
           roomAgentId: primary.id,
           roomMessageId: messageId,
           agentTurnId: primaryTurnId,
+          dispatchAttemptId: "attempt-primary",
           recipientAgentIds: [primary.id, secondary.id],
         }],
         [secondary.id]: [{
@@ -140,6 +141,7 @@ function roomSession(): Session {
           roomAgentId: secondary.id,
           roomMessageId: messageId,
           agentTurnId: secondaryTurnId,
+          dispatchAttemptId: "attempt-secondary-next",
           recipientAgentIds: [primary.id, secondary.id],
         }],
       },
@@ -360,6 +362,7 @@ describe("createSessionBackupImportPlan", () => {
       roomAgentId: copiedSecondary.id,
       roomMessageId: copiedMessage.id,
       agentTurnId: copiedDelivery.agentTurnId,
+      dispatchAttemptId: copiedDelivery.dispatchAttemptId,
     });
     expect(plan.pendingMessages[0]).toMatchObject({
       sessionId: copy.id,

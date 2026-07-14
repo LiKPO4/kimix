@@ -241,6 +241,7 @@ type SessionImportIdentityMap = {
   roomAgentIds: Map<string, string>;
   roomMessageIds: Map<string, string>;
   agentTurnIds: Map<string, string>;
+  dispatchAttemptIds: Map<string, string>;
 };
 
 function rawCollaborationReferencesAreConsistent(value: unknown): boolean {
@@ -315,6 +316,7 @@ function validateCollaborationReferences(collaboration: CollaborationState): boo
   const messagesById = new Map<string, RoomUserMessage>();
   const turnOwners = new Map<string, { roomAgentId: string; roomMessageId: string }>();
   const attemptIds = new Set<string>();
+  const attemptOwners = new Map<string, { roomAgentId: string; roomMessageId: string }>();
   for (const message of collaboration.messages) {
     if (messagesById.has(message.id)) return false;
     messagesById.set(message.id, message);
@@ -332,6 +334,7 @@ function validateCollaborationReferences(collaboration: CollaborationState): boo
         if (attemptId) {
           if (attemptIds.has(attemptId)) return false;
           attemptIds.add(attemptId);
+          attemptOwners.set(attemptId, { roomAgentId, roomMessageId: message.id });
         }
       }
     }
@@ -344,7 +347,10 @@ function validateCollaborationReferences(collaboration: CollaborationState): boo
     if (event.roomMessageId && (!message || !message.recipientAgentIds.includes(roomAgentId))) return false;
     const turnOwner = event.agentTurnId ? turnOwners.get(event.agentTurnId) : undefined;
     if (event.agentTurnId && (!turnOwner || turnOwner.roomAgentId !== roomAgentId)) return false;
+    const attemptOwner = event.dispatchAttemptId ? attemptOwners.get(event.dispatchAttemptId) : undefined;
+    if (event.dispatchAttemptId && (!attemptOwner || attemptOwner.roomAgentId !== roomAgentId)) return false;
     if (message && turnOwner && turnOwner.roomMessageId !== message.id) return false;
+    if (message && attemptOwner && attemptOwner.roomMessageId !== message.id) return false;
     if (message && event.recipientAgentIds && !sameStringSet(message.recipientAgentIds, event.recipientAgentIds)) return false;
     return event.type !== "subagent" || event.events.every((nested) => validateEvent(nested, roomAgentId));
   };
@@ -363,6 +369,12 @@ function createIdentityMap(imported: Session, targetSessionId: string): SessionI
       [delivery.agentTurnId, delivery.agentTurnId] as const,
       ...(delivery.previousAttempts ?? []).map((attempt) => [attempt.agentTurnId, attempt.agentTurnId] as const),
     ])) ?? []),
+    dispatchAttemptIds: new Map(collaboration?.messages.flatMap((message) => Object.values(message.deliveries).flatMap((delivery) => [
+      ...(delivery.dispatchAttemptId ? [[delivery.dispatchAttemptId, delivery.dispatchAttemptId] as const] : []),
+      ...(delivery.previousAttempts ?? []).flatMap((attempt) => (
+        attempt.dispatchAttemptId ? [[attempt.dispatchAttemptId, attempt.dispatchAttemptId] as const] : []
+      )),
+    ])) ?? []),
   };
 }
 
@@ -371,13 +383,16 @@ function remapTimelineEvent(
   roomAgentIds: ReadonlyMap<string, string>,
   roomMessageIds: ReadonlyMap<string, string>,
   agentTurnIds: ReadonlyMap<string, string>,
+  dispatchAttemptIds: ReadonlyMap<string, string>,
 ): TimelineEvent {
   const roomAgentId = event.roomAgentId ? roomAgentIds.get(event.roomAgentId) : undefined;
   const roomMessageId = event.roomMessageId ? roomMessageIds.get(event.roomMessageId) : undefined;
   const agentTurnId = event.agentTurnId ? agentTurnIds.get(event.agentTurnId) : undefined;
+  const dispatchAttemptId = event.dispatchAttemptId ? dispatchAttemptIds.get(event.dispatchAttemptId) : undefined;
   if (event.roomAgentId && !roomAgentId) throw new Error(`房间事件引用未知 Agent：${event.roomAgentId}`);
   if (event.roomMessageId && !roomMessageId) throw new Error(`房间事件引用未知消息：${event.roomMessageId}`);
   if (event.agentTurnId && !agentTurnId) throw new Error(`房间事件引用未知 turn：${event.agentTurnId}`);
+  if (event.dispatchAttemptId && !dispatchAttemptId) throw new Error(`房间事件引用未知投递尝试：${event.dispatchAttemptId}`);
   const recipientAgentIds = event.recipientAgentIds?.map((id) => {
     const mapped = roomAgentIds.get(id);
     if (!mapped) throw new Error(`房间事件引用未知接收者：${id}`);
@@ -388,9 +403,10 @@ function remapTimelineEvent(
     roomAgentId,
     roomMessageId,
     agentTurnId,
+    dispatchAttemptId,
     recipientAgentIds,
     ...(event.type === "subagent" ? {
-      events: event.events.map((nested) => remapTimelineEvent(nested, roomAgentIds, roomMessageIds, agentTurnIds)),
+      events: event.events.map((nested) => remapTimelineEvent(nested, roomAgentIds, roomMessageIds, agentTurnIds, dispatchAttemptIds)),
     } : {}),
   } as TimelineEvent;
 }
@@ -477,11 +493,11 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
     messages,
     agentEvents: Object.fromEntries(Object.entries(collaboration.agentEvents).map(([roomAgentId, events]) => [
       roomAgentIds.get(roomAgentId)!,
-      events.map((event) => remapTimelineEvent(event, roomAgentIds, roomMessageIds, agentTurnIds)),
+      events.map((event) => remapTimelineEvent(event, roomAgentIds, roomMessageIds, agentTurnIds, dispatchAttemptIds)),
     ])),
   };
   if (!validateCollaborationReferences(remapped)) throw new Error("导入副本的房间身份重映射结果无效");
-  return { collaboration: remapped, roomAgentIds, roomMessageIds, agentTurnIds };
+  return { collaboration: remapped, roomAgentIds, roomMessageIds, agentTurnIds, dispatchAttemptIds };
 }
 
 function createImportedSessionCopy(imported: Session, existingIds: Set<string>) {
@@ -517,11 +533,13 @@ function createImportedSessionCopy(imported: Session, existingIds: Set<string>) 
       roomAgentIds: remapped.roomAgentIds,
       roomMessageIds: remapped.roomMessageIds,
       agentTurnIds: remapped.agentTurnIds,
+      dispatchAttemptIds: remapped.dispatchAttemptIds,
     } satisfies SessionImportIdentityMap : {
       targetSessionId: id,
       roomAgentIds: new Map(),
       roomMessageIds: new Map(),
       agentTurnIds: new Map(),
+      dispatchAttemptIds: new Map(),
     } satisfies SessionImportIdentityMap,
   };
 }

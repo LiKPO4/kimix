@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T16:45:00+08:00"
+timestamp: "2026-07-14T18:56:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -27,7 +27,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 4. A room user message is displayed once. Each recipient delivery records its own official user-event identity and response `agentTurnId`.
 5. Deterministic source identities keep `agentTurnId`, React keys, search anchors, expansion state, and scroll anchors stable across snapshot replay and restart.
 6. Agent output is visible in the room but enters another Agent's official context only when that Agent is explicitly routed and the current visible-body scope includes it. The default scope is the previous completed room turn, not the full room history.
-7. New deliveries prefer persisted official prompt or message identities. Because the prompt API may acknowledge a delivery without returning a user-event identity, canonical reconciliation may fall back to exact visible text within a 30-second window only when that Agent has exactly one unclaimed candidate. Repeated identical candidates remain unbound, so recovery never guesses across genuine repeated input.
+7. Every new room prompt carries a versioned, length-delimited Kimix delivery identity containing `roomMessageId`, `agentTurnId`, and `dispatchAttemptId`. Stream events and canonical history recover the same identity before the transport envelope is removed from visible text, so the room message remains the sole user-bubble authority while each Agent's official user event is only its delivery anchor. Identity-bearing events never fall back to text guessing. Old history without protocol identity may use exact outbound text within a 30-second, Agent-local window only when there is one unclaimed candidate; repeated legacy candidates remain unbound.
 8. Usage and terminal presentation settle by `roomAgentId + agentTurnId`; turn-end status filtering keeps the last status inside each Agent turn rather than the whole room, and a generic late snapshot cannot erase concrete token/context values. Another Agent's running or later-completing state cannot keep a completed response open, close it early, or hide its final usage.
 
 # Runtime and Queue Authority

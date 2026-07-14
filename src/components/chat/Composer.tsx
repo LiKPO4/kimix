@@ -1139,6 +1139,11 @@ export function Composer() {
               displayName: agent.displayName,
               mentionName: agent.mentionName,
             },
+            {
+              roomMessageId: message.id,
+              agentTurnId: delivery.agentTurnId,
+              dispatchAttemptId: delivery.dispatchAttemptId ?? `legacy:${delivery.agentTurnId}`,
+            },
           );
           let response = await sendKimiCodePromptWithRetry({
             sessionId: runtimeSessionId,
