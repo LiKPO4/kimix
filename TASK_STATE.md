@@ -5,10 +5,10 @@
 - 当前目标：修复新 Agent 首轮运行时 Kimix 被重启，runtime 已终止但本地仍永久显示运行中、再次停止只返回 `session is not active` 的问题；发布继续暂停。
 - 根因：运行态校准在所有 Agent runtime 候选均返回“不活跃/不存在”时直接退出，停止入口也只在官方 cancel 成功后收尾；外部终止因此没有任何终态事件来清除本地 activity 和 active delivery。
 - 已完成：统一识别“不活跃/不存在”为 runtime 已终止；停止入口和周期校准都按对应 `roomId + roomAgentId + roomMessageId` 收束未完成事件、投递及活动状态，不恢复或重发消息，不影响其他 Agent。版本号三处同步至 v2.15.61；定向测试 2 个文件、11 项通过；全量测试 85 个文件、610 项通过；`pnpm build` 通过，renderer 为 `assets/index-Bq-Pj4Gr.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。
-- 未完成：提交并启动新构建；等待用户确认当前卡住 Agent 自动退出运行态。
+- 未完成：等待用户确认当前卡住 Agent 已自动退出运行态，并复测外部终止后再次点击停止不再报错。
 - 阻塞：无。
 - 关键文件：`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/utils/kimiCodeSessionRecovery.ts`、`src/utils/roomAgentControl.ts`。
-- 下一步：完成门禁并启动 v2.15.61，观察目标房间在 1.5 秒校准周期内退出假运行态。
+- 下一步：用户在已启动的 v2.15.61 确认目标房间已退出假运行态；发布未经再次确认继续暂停。
 
 ## 2026-07-14 v2.15.60 分 Agent 背景信息用量
 
