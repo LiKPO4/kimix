@@ -89,6 +89,7 @@ export function prepareRoomAgentProvisioning(
     providerLabelSnapshot: draft.providerLabelSnapshot?.trim() || undefined,
     permissionMode: draft.permissionMode,
     planMode: draft.planMode,
+    contextBridgeId: `room-context:${id}`,
     createdAt: now,
   };
   return {

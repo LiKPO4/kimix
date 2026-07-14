@@ -140,7 +140,7 @@ export function AddRoomAgentDialog({
               <span id="add-room-agent-title">添加 Agent</span>
             </div>
             <p className="m-0 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 7, paddingLeft: 42 }}>
-              新 Agent 使用独立上下文；行为由你之后发送的提示词决定。
+              新 Agent 保持独立上下文；首次任务默认带入上一轮房间正文。
             </p>
           </div>
           <button

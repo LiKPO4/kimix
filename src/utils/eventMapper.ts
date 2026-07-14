@@ -1,6 +1,7 @@
 import type { TimelineEvent, TodoItem } from "@/types/ui";
 import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
+import { stripRoomContextFromPrompt } from "./roomContextBridge";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -599,6 +600,8 @@ function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: Timeli
 }
 
 function stripKimixClarificationInstruction(content: string): string {
+  const withoutRoomContext = stripRoomContextFromPrompt(content);
+  if (withoutRoomContext !== content) return stripKimixClarificationInstruction(withoutRoomContext);
   if (content.startsWith("【Kimix Hooks 上下文】")) {
     const markerIndex = content.indexOf(HOOK_CONTEXT_MARKER);
     if (markerIndex === -1) return "";

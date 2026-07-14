@@ -1,8 +1,8 @@
 # Kimix 用户控制的多 Agent 房间实施计划
 
-日期：2026-07-13
+日期：2026-07-14
 
-状态：开发实施完成，可交用户实测。阶段 0-8 和阶段 9 开发者前置验收已完成；功能仍处于内部开发 gate，等待用户截图与真实交叉审查流程验收后再决定推送、tag 和发布。
+状态：开发实施完成，可交用户实测。阶段 0-8、阶段 9 开发者前置验收和房间正文桥接已完成；功能仍处于内部开发 gate，等待用户截图与真实交叉审查流程验收后再决定推送、tag 和发布。
 
 ## 1. 产品目标
 
@@ -13,7 +13,7 @@
 - 用户通过接收者选择或 `@Agent` 决定谁接收消息；未选中的 Agent 不接收、不响应。
 - 每个 Agent 直接复用现有 Kimi Code Provider、模型 alias、权限、工具和事件协议。
 - 不新增外部 Agent Runtime，不新增第二套 Provider/API Key 管理，也不增加独立产品模式。
-- 不自动把一个 Agent 的输出注入另一个 Agent 的上下文；跨 Agent 转交必须由用户明确触发。
+- 只有被用户明确选中或 `@` 的 Agent 才接收当前消息；目标 Agent 可按本次用户选择补入房间可见正文，默认仅补上一轮。
 
 内部和文档统一使用“多 Agent 房间”或“协同房间”，避免与 Kimi Code 已有 Swarm 功能混用。
 
@@ -22,7 +22,7 @@
 - 最多 4 个房间 Agent。
 - 仅普通 Kimi Code 会话支持；Long Task 暂不支持添加房间 Agent。
 - 多个 Agent 共享当前项目目录，不自动创建 worktree，不自动加锁或回滚文件。
-- 新 Agent 默认从空上下文开始，只接收用户明确路由给它的后续内容。
+- 新 Agent 使用独立官方上下文；首次被路由时默认补入上一轮房间可见正文，可临时改为最近 3 轮、选择消息、全部正文或不补充。
 - Agent 不能自动触发另一个房间 Agent，也不能形成循环调用。
 - 多接收者普通提示允许并行；session mutation 命令必须只有一个接收者。
 - 多接收者消息暂不支持整组撤回重写；单接收者撤回只作用于对应 Agent 最新空闲轮次。
@@ -74,6 +74,8 @@ interface RoomAgent {
   createdAt: number;
   removedAt?: number;
   missingSince?: number;
+  /** 房间正文已读边界所属的稳定逻辑上下文。 */
+  contextBridgeId?: string;
 }
 
 interface RoomUserMessage {
@@ -95,6 +97,8 @@ interface AgentDelivery {
   officialPromptId?: string;
   officialUserEventId?: string;
   error?: string;
+  /** 本次投递冻结的可见正文和去重 entry ID。 */
+  contextShare?: RoomDeliveryContextShare;
 }
 ```
 
@@ -161,6 +165,16 @@ interface AgentDelivery {
 - 目录折叠必须保守：只有 metadata 字段完整、schema 受支持、项目路径一致且本地房间/Agent 身份精确匹配时才隐藏次要官方 session；任何歧义都保持独立可见。
 - room metadata 只能由主进程根据专用结构生成并校验，renderer 不得传入任意 metadata 对象。
 - room metadata 必须贯穿 Server 创建、SDK 创建、Server -> SDK fallback 和 catalog summary；任何一次 runtime 迁移都不能丢失房间身份。
+
+### 3.7 房间可见正文桥接
+
+- 桥接不合并官方 session，也不改变 Agent/runtime 所有权；它只修改目标 delivery 的模型 payload。
+- 默认范围为上一轮已完成房间正文；用户可对本次发送临时选择最近 3 轮、具体消息、全部正文或不补充，发送后恢复默认。
+- 只投影用户可见消息和各 Agent 最终正文，不包含思考、工具、命令结果、审批、用量或隐藏系统提示。
+- 每个目标在网络调用前冻结自己的 `contextShare`；官方可能接收后按 `contextBridgeId + entryIds` 去重，同一正文不重复补入。
+- 隐藏桥接包使用长度定界；官方历史映射必须还原当前用户消息，搜索、时间线和 Markdown 导出不得显示重复桥接正文。
+- 单目标补入正文超过 48,000 字时明确拒绝并要求缩小范围，不能静默截断。
+- 同轮并行 Agent 不读取彼此尚未完成的输出；下一轮再按用户选择补入。
 
 ## 4. 强制运行不变量
 
@@ -418,6 +432,8 @@ interface AgentDelivery {
 - [x] 多 Agent 同目录写入风险提示。
 - [ ] 用户截图和真实交叉审查流程验收。
 - [x] 同步版本号三处和专属 release notes。
+- [x] 新 Agent 默认补入上一轮可见正文；最近 3 轮、选择消息、全部和不补充作为单次覆盖。
+- [x] 正文桥接按 Agent 去重、随 delivery 冻结并通过历史回放隐藏前缀。
 
 退出门禁：全量自动验证通过并可交给用户实测；仅在用户验收后决定推送/tag。
 
@@ -435,6 +451,7 @@ interface AgentDelivery {
 - Provider catalog 折叠与 orphan 可见。
 - `@` 路由、名称冲突和房间 token 清理。
 - per-Agent pending queue 和逐 delivery 状态。
+- 上一轮/最近 3 轮/选择消息/全部正文投影、跨 Agent 去重和 48,000 字拒绝门禁。
 - 创建 Agent 在官方成功、本地绑定前崩溃后的 metadata 找回。
 - delivery 在发送后、确认前崩溃时进入 `indeterminate` 且不自动重发。
 - 备份 v1 -> v2、Agent ID 重映射和副本解绑。

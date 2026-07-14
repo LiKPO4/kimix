@@ -76,6 +76,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     !isFiniteNumber(lifecycleIssue.updatedAt)
   )) return null;
   if (value.archivedAt !== undefined && !isFiniteNumber(value.archivedAt)) return null;
+  if (value.contextBridgeId !== undefined && (typeof value.contextBridgeId !== "string" || !value.contextBridgeId.trim())) return null;
   return {
     ...(value as unknown as RoomAgent),
     id,
@@ -89,6 +90,9 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
     recoveryIssue: recoveryIssue as RoomAgent["recoveryIssue"],
     archivedAt: value.archivedAt as number | undefined,
     lifecycleIssue: lifecycleIssue as RoomAgent["lifecycleIssue"],
+    contextBridgeId: typeof value.contextBridgeId === "string" && value.contextBridgeId.trim()
+      ? value.contextBridgeId.trim()
+      : `room-context:${id}`,
   };
 }
 
@@ -129,12 +133,23 @@ function normalizeRoomMessage(
       !isFiniteNumber(attempt.createdAt) ||
       !isFiniteNumber(attempt.updatedAt)
     )))) continue;
+    const contextShare = rawDelivery.contextShare;
+    if (contextShare !== undefined && (
+      !isRecord(contextShare) ||
+      !["last", "recent3", "selected", "all", "none"].includes(String(contextShare.mode)) ||
+      typeof contextShare.bridgeId !== "string" || !contextShare.bridgeId.trim() ||
+      !Array.isArray(contextShare.entryIds) || contextShare.entryIds.some((entryId) => typeof entryId !== "string" || !entryId.trim()) ||
+      typeof contextShare.content !== "string" || !contextShare.content.trim() ||
+      !isFiniteNumber(contextShare.contentChars) ||
+      !isFiniteNumber(contextShare.createdAt)
+    )) continue;
     deliveries[agentId] = {
       ...(rawDelivery as unknown as RoomUserMessage["deliveries"][string]),
       status: status as RoomAgentDeliveryStatus,
       agentTurnId,
       dispatchAttemptId,
       previousAttempts: previousAttempts as RoomUserMessage["deliveries"][string]["previousAttempts"],
+      contextShare: contextShare as RoomUserMessage["deliveries"][string]["contextShare"],
     };
   }
   if (recipientAgentIds.some((agentId) => !deliveries[agentId])) return null;
@@ -244,8 +259,9 @@ export function createSyntheticPrimaryAgent(
   permissionMode: PermissionMode = "manual",
 ): RoomAgent {
   const displayName = compactAgentName(session.model);
+  const id = getSyntheticPrimaryAgentId(session.id);
   return {
-    id: getSyntheticPrimaryAgentId(session.id),
+    id,
     displayName,
     mentionName: displayName.replace(/\s+/g, "-") || "Kimi",
     modelAlias: session.model ?? null,
@@ -264,6 +280,7 @@ export function createSyntheticPrimaryAgent(
     switchedToModel: session.switchedToModel,
     officialGoal: session.officialGoal,
     btwRounds: session.btwRounds,
+    contextBridgeId: `room-context:${id}`,
     createdAt: session.createdAt,
   };
 }

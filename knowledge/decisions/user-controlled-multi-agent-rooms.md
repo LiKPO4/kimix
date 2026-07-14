@@ -3,7 +3,7 @@ type: Architecture Decision
 title: User-Controlled Multi-Agent Rooms
 description: Kimix upgrades ordinary conversations into user-routed rooms of independent Kimi Code sessions without adding a new provider or runtime system.
 tags: [decision, collaboration, multi-agent, session, provider]
-timestamp: "2026-07-13T13:46:43+08:00"
+timestamp: "2026-07-14T10:18:37+08:00"
 ---
 
 # User-Controlled Multi-Agent Rooms
@@ -24,7 +24,8 @@ The renderer currently assumes that one visible Kimix Session owns one runtime, 
 * Reuse the existing Kimi Code Provider and model alias catalog. Provider credentials remain global configuration and are never copied into room data.
 * Add Agents directly from the existing Composer `+` menu; do not introduce a separate collaboration or Swarm mode.
 * Do not assign built-in implementer, reviewer, explorer, or test-runner identities. User prompts define behavior.
-* Route messages only to Agents explicitly selected by the user or named through registered room mentions. Unselected Agents receive no prompt and gain no context.
+* Route the current message only to Agents explicitly selected by the user or named through registered room mentions. A routed Agent may also receive a user-selected projection of visible room bodies: the previous completed turn by default, with one-shot recent-three, selected-message, all-body, or none overrides.
+* Keep visible-body sharing delivery-scoped and duplicate-aware. It never merges official sessions, includes hidden reasoning/tool state, or causes an Agent to trigger another Agent.
 * Keep room Agents separate from Kimi internal Subagent/Swarm identities and Long Task executor/reviewer roles.
 * Permit multiple room Agents to share the same project directory, but do not add implicit worktrees, filesystem locks, automatic rollback, or Agent-to-Agent triggering in the first version.
 * Complete runtime ownership, event/history partitioning, persistence/catalog grouping, and recovery gates before the add-Agent UI becomes available.
@@ -33,6 +34,7 @@ The renderer currently assumes that one visible Kimix Session owns one runtime, 
 # Consequences
 
 * Different Provider/model aliases can cross-check the same user request while retaining independent official context.
+* Cross-Agent review can consume visible prior results without copying whole official histories. Shared bodies still occupy the recipient model's context, so each entry is injected at most once per logical Agent context and oversized selections are rejected explicitly.
 * Single-Agent conversations retain their current behavior through a compatibility view and lazy room upgrade.
 * Room-level UI must project one user message over multiple Agent-scoped deliveries and stable response blocks.
 * Approval, question, cancellation, model, permission, snapshot, undo, export, archive, and recovery operations must always resolve an explicit room Agent and runtime.
@@ -47,4 +49,3 @@ The renderer currently assumes that one visible Kimix Session owns one runtime, 
 # Related Plan
 
 * `docs/multi-agent-room-plan.md`
-

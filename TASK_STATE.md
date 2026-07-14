@@ -2,12 +2,12 @@
 
 ## 2026-07-14 多 Agent 房间实施
 
-- 当前目标：收束多 Agent 房间首轮用户实测反馈；v2.15.40 修正预发送状态误报、工具栏顺序和 Agent 选择器垂直对齐，并等待用户确认新 Agent 的历史正文共享方案。
-- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。Windows 安全 session ID、逐 Agent 终态 usage、启动 bootstrap/水合竞态、窄窗口工具栏及 SDK fallback 归档恢复均已修复。v2.15.40 区分内部预发送 `queued` 与真实队列等待：只有被前序工作阻塞才展示排队卡，底栏和停止按钮也只响应真实执行态；权限入口恢复到 Agent 入口之前，Agent 名称和“1 个”使用明确 34px 控件及 20px 行高对齐。
-- 未完成：用户确认新 Agent 的模型上下文导入策略；随后再实现创建时导入房间可见正文。另需用户继续截图、真实实施者/审查者交叉审查，以及可选的单 Provider 真实故障人工复核。
-- 阻塞：无。v2.15.39 真实 Electron SDK 归档/恢复通过；v2.15.40 全量 81 个测试文件、565 项测试、生产构建、OKF 严格校验与 diff check 通过，renderer 为 `assets/index-LieT391D.js`。本轮未自行截图，按项目规则等待用户视觉验收。
-- 关键文件：`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/App.tsx`、`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/markdownExport.ts`、`src/utils/roomDelivery.ts`、`src/utils/sessionArchive.ts`、`src/utils/persistence.ts`、`src/utils/sessionCatalog.ts`、`src/utils/sessionBackup.ts`、`electron/types/ipc.ts`、`electron/main.ts`、`electron/kimiCodeHost.ts`。
-- 下一步：用户复测新消息直发、权限/Agent 顺序和文字对齐，并确认“新 Agent 创建时一次性导入可见正文、后续按显式路由转发”的上下文方案。
+- 当前目标：收束多 Agent 房间首轮用户实测反馈；v2.15.41 实现按投递补充房间可见正文，使独立 Provider / 模型的 Agent 能在用户控制下理解彼此最终输出。
+- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。v2.15.40 已修正预发送状态误报、工具栏顺序和 Agent 选择器垂直对齐。v2.15.41 默认向目标 Agent 补入上一轮已完成正文，并提供最近 3 轮、选择消息、全部正文和不补充五种单次范围；只共享用户消息与 Agent 最终正文，按 Agent 去重，投递失败重试保持冻结内容，隐藏桥接包不会污染官方历史显示；单 Agent 超过 48,000 字时明确拒绝。
+- 未完成：等待用户实机验收 v2.15.41 的上下文选择浮层、新 Agent 首次理解上一轮正文、逐 Agent 去重，以及窄窗口布局；随后继续真实实施者/审查者交叉审查和可选的单 Provider 真实故障人工复核。
+- 阻塞：无。v2.15.41 定向 5 个测试文件、120 项测试通过；全量 82 个测试文件、572 项测试通过；生产构建通过，renderer 为 `assets/index-CFzRNZdj.js`；OKF 严格校验通过。diff check 待提交前完成。本轮不自行截图，按项目规则等待用户视觉验收。
+- 关键文件：`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/chat/RoomContextPicker.tsx`、`src/utils/roomContextBridge.ts`、`src/utils/roomDelivery.ts`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/eventMapper.ts`、`src/utils/sessionBackup.ts`。
+- 下一步：完成全量门禁并提交；用户用 v2.15.41 让新 Reviewer 接收首个任务，确认其能理解上一轮正文，再验证“选择消息”和“不补充”各一次。
 - 验证补充：`pnpm exec tsc -p tsconfig.json --noEmit` 仍被仓库既有类型基线错误阻塞；本阶段涉及文件的新增类型问题已清理，正式门禁仍以现有 `test:run`、`build`、`knowledge:validate` 和 diff check 为准。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性

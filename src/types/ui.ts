@@ -131,6 +131,22 @@ export type RoomAgentDeliveryStatus =
   | "indeterminate"
   | "cancelled";
 
+export type RoomContextShareMode = "last" | "recent3" | "selected" | "all" | "none";
+
+export interface RoomContextShareSelection {
+  mode: RoomContextShareMode;
+  selectedEntryIds?: string[];
+}
+
+export interface RoomDeliveryContextShare {
+  mode: RoomContextShareMode;
+  bridgeId: string;
+  entryIds: string[];
+  content: string;
+  contentChars: number;
+  createdAt: number;
+}
+
 export interface RoomAgentDeliveryAttempt {
   dispatchAttemptId: string;
   agentTurnId: string;
@@ -152,6 +168,8 @@ export interface RoomAgentDelivery {
   createdAt?: number;
   updatedAt?: number;
   previousAttempts?: RoomAgentDeliveryAttempt[];
+  /** 冻结到本次投递的房间可见正文；发送后按 entryIds 为目标 Agent 去重。 */
+  contextShare?: RoomDeliveryContextShare;
 }
 
 export interface RoomUserMessage {
@@ -202,6 +220,8 @@ export interface RoomAgent {
     message: string;
     updatedAt: number;
   };
+  /** 跨 runtime/fork 保持稳定；导入为空会话副本时重建，用于隔离正文已读边界。 */
+  contextBridgeId?: string;
 }
 
 export interface CollaborationState {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory } from "../eventMapper";
 import type { TimelineEvent } from "@/types/ui";
+import { buildRoomDeliveryPrompt } from "../roomContextBridge";
 
 describe("mapStreamEvent", () => {
   it("returns null for non-object input", () => {
@@ -21,6 +22,23 @@ describe("mapStreamEvent", () => {
     expect(event).not.toBeNull();
     expect(event?.type).toBe("user_message");
     expect((event as Extract<TimelineEvent, { type: "user_message" }>).content).toBe("Hello");
+  });
+
+  it("hides room context bridge content from the visible user message", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: buildRoomDeliveryPrompt("请检查最新改动", {
+          mode: "last",
+          bridgeId: "room-context:agent-2",
+          entryIds: ["assistant:old"],
+          content: "旧 Agent：\n历史正文",
+          contentChars: 16,
+          createdAt: 1,
+        }),
+      },
+    });
+    expect(event).toMatchObject({ type: "user_message", content: "请检查最新改动" });
   });
 
   it("restores server base64 image parts from TurnBegin history", () => {

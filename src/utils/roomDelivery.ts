@@ -3,11 +3,13 @@ import type {
   RoomAgentDeliveryAttempt,
   RoomAgentDeliveryStatus,
   RoomAgentActivity,
+  RoomContextShareSelection,
   RoomUserMessage,
   Session,
   UserMessageImage,
 } from "@/types/ui";
 import { getRoomAgent, getRoomAgentEvents } from "@/utils/collaborationRooms";
+import { buildRoomContextSharePlan, getDefaultRoomContextSelection } from "@/utils/roomContextBridge";
 
 type DeliveryIdentityFactory = (kind: "message" | "attempt" | "turn", roomAgentId?: string) => string;
 
@@ -18,6 +20,7 @@ export interface CreateRoomMessageInput {
   recipientAgentIds: string[];
   timestamp?: number;
   createId?: DeliveryIdentityFactory;
+  contextShareSelection?: RoomContextShareSelection;
 }
 
 export type RoomDeliveryOfficialEvidence = {
@@ -112,6 +115,7 @@ export function createRoomMessageDispatch(
   }
   const createId = input.createId ?? defaultCreateId;
   const timestamp = input.timestamp ?? Date.now();
+  const contextShareSelection = input.contextShareSelection ?? getDefaultRoomContextSelection();
   const message: RoomUserMessage = {
     id: createId("message"),
     content: input.content,
@@ -127,6 +131,7 @@ export function createRoomMessageDispatch(
         createdAt: timestamp,
         updatedAt: timestamp,
         previousAttempts: [],
+        contextShare: buildRoomContextSharePlan(session, roomAgentId, contextShareSelection, timestamp),
       },
     ])),
     timestamp,

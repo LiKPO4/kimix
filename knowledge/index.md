@@ -8,6 +8,7 @@ okf_version: "0.1"
 
 # Architecture
 
+* [Collaboration Room Routing](architecture/collaboration-room-routing.md) - How multi-Agent rooms isolate official sessions while projecting routing, queues, visible-body sharing, and recovery into one conversation.
 * [Runtime Routing](architecture/runtime-routing.md) - How Kimix routes sessions between the official Server and vendored SDK fallback.
 
 # Operations
@@ -21,6 +22,7 @@ okf_version: "0.1"
 
 # Decisions
 
+* [User-Controlled Multi-Agent Rooms](decisions/user-controlled-multi-agent-rooms.md) - Why ordinary conversations can add independently configured, explicitly routed Agent participants without a separate product mode.
 * [Adopt OKF v0.1](decisions/adopt-okf-v0.1.md) - Why Kimix uses a dedicated OKF bundle and how project rules extend the draft specification.
 
 # References

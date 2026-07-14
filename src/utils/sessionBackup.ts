@@ -285,6 +285,14 @@ function validateDeliveryShape(delivery: RoomAgentDelivery): boolean {
     !optionalNonEmptyString(delivery.error) ||
     (delivery.createdAt !== undefined && !Number.isFinite(delivery.createdAt)) ||
     (delivery.updatedAt !== undefined && !Number.isFinite(delivery.updatedAt))) return false;
+  if (delivery.contextShare && (
+    !["last", "recent3", "selected", "all", "none"].includes(delivery.contextShare.mode) ||
+    !delivery.contextShare.bridgeId.trim() ||
+    delivery.contextShare.entryIds.some((entryId) => !entryId.trim()) ||
+    !delivery.contextShare.content.trim() ||
+    !Number.isFinite(delivery.contextShare.contentChars) ||
+    !Number.isFinite(delivery.contextShare.createdAt)
+  )) return false;
   return (delivery.previousAttempts ?? []).every((attempt) => (
     Boolean(attempt.dispatchAttemptId.trim()) &&
     Boolean(attempt.agentTurnId.trim()) &&
@@ -427,6 +435,15 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
       const mappedAgentId = roomAgentIds.get(roomAgentId)!;
       return [mappedAgentId, {
         ...remapAttempt(delivery),
+        contextShare: delivery.contextShare ? {
+          ...delivery.contextShare,
+          bridgeId: `room-context:${mappedAgentId}`,
+          entryIds: delivery.contextShare.entryIds.map((entryId) => {
+            if (!entryId.startsWith("user:")) return entryId;
+            const sourceId = entryId.slice("user:".length);
+            return `user:${roomMessageIds.get(sourceId) ?? sourceId}`;
+          }),
+        } : undefined,
         previousAttempts: delivery.previousAttempts?.map((attempt) => remapAttempt(attempt as RoomAgentDelivery)),
       }];
     })),
@@ -448,6 +465,7 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
     missingSince: undefined,
     recoveryIssue: undefined,
     lifecycleIssue: undefined,
+    contextBridgeId: `room-context:${roomAgentIds.get(agent.id)!}`,
   }));
   const remapped: CollaborationState = {
     ...collaboration,
@@ -782,6 +800,7 @@ function mergeCollaborationStates(
       officialCatalogConfirmedAt: localAgent.officialCatalogConfirmedAt ?? importedAgent.officialCatalogConfirmedAt,
       missingSince: localAgent.missingSince ?? importedAgent.missingSince,
       recoveryIssue: localAgent.recoveryIssue ?? importedAgent.recoveryIssue,
+      contextBridgeId: localAgent.contextBridgeId ?? importedAgent.contextBridgeId,
     };
   });
   return {

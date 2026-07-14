@@ -3,7 +3,7 @@ import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, Shie
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, UserMessageImage } from "@/types/ui";
+import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, ClarificationToolMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, UserMessageImage, RoomContextShareSelection } from "@/types/ui";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -13,6 +13,7 @@ import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { AddRoomAgentDialog } from "./AddRoomAgentDialog";
 import { EditRoomAgentDialog } from "./EditRoomAgentDialog";
 import { RoomAgentPicker } from "./RoomAgentPicker";
+import { RoomContextPicker } from "./RoomContextPicker";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isWindows } from "@/utils/platform";
@@ -69,6 +70,11 @@ import {
 } from "@/utils/roomDelivery";
 import { resolveRoomPromptRoute } from "@/utils/roomRouting";
 import { detachRoomAgentAsSession, roomHasActiveAgentWork, roomHasExecutingAgentWork } from "@/utils/sessionArchive";
+import {
+  buildRoomDeliveryPrompt,
+  estimateRoomContextShare,
+  getDefaultRoomContextSelection,
+} from "@/utils/roomContextBridge";
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -531,6 +537,7 @@ export function Composer() {
   const [pendingMoreId, setPendingMoreId] = useState<string | null>(null);
   const [showAddRoomAgentDialog, setShowAddRoomAgentDialog] = useState(false);
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled] = useState(() => isMultiAgentRoomUiEnabled());
+  const [roomContextShareSelection, setRoomContextShareSelection] = useState<RoomContextShareSelection>(() => getDefaultRoomContextSelection());
   const [addRoomAgentTargetId, setAddRoomAgentTargetId] = useState<string | null>(null);
   const [addRoomAgentBusy, setAddRoomAgentBusy] = useState(false);
   const [addRoomAgentError, setAddRoomAgentError] = useState("");
@@ -553,6 +560,18 @@ export function Composer() {
   const selectedRoomAgents = selectedRoomAgentIds
     .map((id) => activeRoomAgents.find((agent) => agent.id === id))
     .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent));
+  let roomContextTargetAgentIds = selectedRoomAgentIds;
+  if (activeSession?.collaboration && input.trim()) {
+    try {
+      roomContextTargetAgentIds = resolveRoomPromptRoute(
+        activeSession,
+        input.trim(),
+        activeSession.collaboration.defaultRecipientIds,
+      ).recipientAgentIds;
+    } catch {
+      roomContextTargetAgentIds = selectedRoomAgentIds;
+    }
+  }
   const activeRoomBusy = Boolean(activeSession?.collaboration && roomHasActiveAgentWork(
     activeSession,
     Object.values(roomAgentActivities),
@@ -628,6 +647,10 @@ export function Composer() {
     window.addEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, syncMultiAgentRoomGate);
     return () => window.removeEventListener(MULTI_AGENT_ROOM_UI_CHANGED_EVENT, syncMultiAgentRoomGate);
   }, []);
+
+  useEffect(() => {
+    setRoomContextShareSelection(getDefaultRoomContextSelection());
+  }, [activeSession?.id]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -1124,9 +1147,13 @@ export function Composer() {
             startedAt: Date.now(),
             updatedAt: Date.now(),
           });
+          const outboundPrompt = buildRoomDeliveryPrompt(
+            message.outboundContent ?? message.content,
+            delivery.contextShare,
+          );
           let response = await sendKimiCodePromptWithRetry({
             sessionId: runtimeSessionId,
-            content: message.outboundContent ?? message.content,
+            content: outboundPrompt,
             images: promptImages,
           });
           if (!response.success && /not active|not found|session/i.test(response.error)) {
@@ -1147,7 +1174,7 @@ export function Composer() {
             });
             response = await sendKimiCodePromptWithRetry({
               sessionId: runtimeSessionId,
-              content: message.outboundContent ?? message.content,
+              content: outboundPrompt,
               images: promptImages,
             });
           }
@@ -1228,18 +1255,28 @@ export function Composer() {
     const outboundContent = session.longTask || options?.skipClarification
       ? contentWithAttachments
       : withClarificationBehavior(contentWithAttachments, clarificationToolMode);
-    const created = createRoomMessageDispatch(session, {
-      content,
-      outboundContent,
-      images: toUserAttachments(images),
-      recipientAgentIds: route.recipientAgentIds,
-    });
+    let created: ReturnType<typeof createRoomMessageDispatch>;
+    try {
+      created = createRoomMessageDispatch(session, {
+        content,
+        outboundContent,
+        images: toUserAttachments(images),
+        recipientAgentIds: route.recipientAgentIds,
+        contextShareSelection: roomContextShareSelection,
+      });
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+      return false;
+    }
     updateSession(session.id, () => created.session);
     syncCurrentSessionFromStore(session.id);
     if (options?.manualSubmitAutoScroll !== false) {
       window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", { detail: { sessionId: session.id } }));
     }
     await dispatchAvailableRoomDeliveries(session.id);
+    setRoomContextShareSelection(getDefaultRoomContextSelection());
     return true;
   };
 
@@ -2657,6 +2694,17 @@ export function Composer() {
         }
         if (!route.outboundContent.trim() && imagesToSend.length === 0) {
           window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "请在 @Agent 之后输入要处理的任务。" }));
+          return;
+        }
+        const contextEstimate = estimateRoomContextShare(
+          activeSession,
+          route.recipientAgentIds,
+          roomContextShareSelection,
+        );
+        if (contextEstimate.overLimitAgentNames.length > 0) {
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `${contextEstimate.overLimitAgentNames.join("、")} 要补充的正文超过安全上限，请改用最近 3 轮或选择消息。`,
+          }));
           return;
         }
       } catch (error) {
@@ -4150,6 +4198,16 @@ export function Composer() {
                 onEdit={handleEditRoomAgent}
                 onRetry={(roomAgentId) => void handleRetryRoomAgent(roomAgentId)}
                 onRemove={(roomAgentId) => void handleRemoveRoomAgent(roomAgentId)}
+              />
+            )}
+
+            {multiAgentRoomUiEnabled && activeSession?.collaboration && activeRoomAgents.length > 1 && selectedRoomAgentIds.length > 0 && (
+              <RoomContextPicker
+                session={activeSession}
+                selectedAgentIds={roomContextTargetAgentIds}
+                selection={roomContextShareSelection}
+                disabled={!canUseComposer}
+                onChange={setRoomContextShareSelection}
               />
             )}
           </div>

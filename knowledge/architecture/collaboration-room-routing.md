@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T09:36:11+08:00"
+timestamp: "2026-07-14T10:18:37+08:00"
 ---
 
 # Collaboration Room Routing
@@ -26,7 +26,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 3. Official snapshots reconcile only the matching Agent partition. Startup, running-sample, repair, and undo reasons may use different replacement policies, but none may replace another Agent's events.
 4. A room user message is displayed once. Each recipient delivery records its own official user-event identity and response `agentTurnId`.
 5. Deterministic source identities keep `agentTurnId`, React keys, search anchors, expansion state, and scroll anchors stable across snapshot replay and restart.
-6. Agent output is visible in the room but does not enter another Agent's official context unless the user explicitly routes or quotes it.
+6. Agent output is visible in the room but enters another Agent's official context only when that Agent is explicitly routed and the current visible-body scope includes it. The default scope is the previous completed room turn, not the full room history.
 7. New deliveries bind through persisted official prompt or message identities. Text-and-time matching is only a legacy recovery hint; ambiguous history stays in the owning Agent partition without being attached to an arbitrary turn.
 8. Usage and terminal presentation settle by `roomAgentId + agentTurnId`; turn-end status filtering keeps the last status inside each Agent turn rather than the whole room, and a generic late snapshot cannot erase concrete token/context values. Another Agent's running or later-completing state cannot keep a completed response open, close it early, or hide its final usage.
 
@@ -38,6 +38,9 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Deterministic room routing recognizes only exact active Agent mention names at token boundaries. Recognized room mentions override the frozen default recipient list in textual order and are removed from the outbound model payload; unknown mentions, plugin mentions, email-like text, and visible room content remain unchanged.
 * The dispatch selector emits at most the oldest queued delivery for each idle Agent. Sending, accepted, running, interaction-waiting, and indeterminate deliveries block only that Agent; another participant can dispatch independently.
 * Room messages, recipient order, and stable delivery attempts are persisted as `queued` before dispatch; each target must then persist `sending` before any network call. Failure to persist `sending` returns that target to `queued` without invoking the runtime.
+* Each delivery freezes its own visible-body share before `queued` persistence. The projection contains only user-visible user/Assistant bodies, never thinking, tools, command results, approvals, usage, or hidden instructions; simultaneous recipients cannot see unfinished sibling output from the same turn.
+* The recipient's stable `contextBridgeId` and accepted delivery `entryIds` form the read boundary. Default previous-turn sharing and one-shot recent-three, selected-message, all-body, or none scopes omit entries already known by that Agent; retry reuses the same frozen share instead of compiling a different prompt.
+* The hidden room-context envelope is length-delimited and stripped from official history before visible event reconciliation. A single recipient share above 48,000 characters is rejected with a visible error instead of truncation.
 * Lifecycle occupancy and runtime execution are separate projections. A dispatchable `queued` delivery still blocks archive or membership mutation so persisted intent cannot be orphaned, but it does not present the Agent as running or render a queue card; only a queued delivery blocked by earlier work is user-visible as waiting.
 * Official acceptance records prompt/message identities. A `sending` attempt whose result is unknown or whose persisted state cannot be reconciled with stable official or canonical room/turn evidence becomes `indeterminate` and is never automatically resent.
 * After official acceptance, runtime status is the delivery settlement authority: running, approval, question, completion, error, and interruption update only the matching `roomMessageId + roomAgentId` delivery. Accepted work remains lifecycle-active until that Agent reaches a terminal state.
@@ -80,6 +83,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Membership and archive mutations are blocked while any Agent is creating, queued, sending, accepted, running, waiting for approval, waiting for an answer, or has an indeterminate delivery. The gate consults both live activity and persisted delivery state so reload cannot bypass it.
 * Backup schema 2 serializes complete collaboration partitions and scoped Agent activity references, while schema 1 remains a single-Agent import format. Unknown future backup schemas and collaboration payloads with dangling or cross-Agent references are rejected instead of being normalized into partial rooms.
 * A conflict fork remaps the room ID, every Agent, message, turn, dispatch attempt, delivery key, event scope, pending-queue reference, activity reference, hidden-session reference, and active context as one transaction. The copy clears top-level and per-Agent runtime, official, catalog, Skill-fork, missing, recovery, Swarm, model-switch, and Goal bindings before it becomes visible.
+* Backup conflict forks remap each Agent's `contextBridgeId` and room-message-backed context entry IDs. This resets the logical read boundary for newly empty official sessions while preserving frozen audit text.
 * Archived-room tombstones contain the room ID plus every Agent runtime and official identity so a secondary catalog row cannot resurrect an archived room. A collaboration-aware exporter refuses opaque future collaboration data rather than writing it back under schema 2.
 
 # UI Stability
@@ -89,6 +93,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Internal acceptance can toggle the local room UI gate from Settings without developer tools. The setting remains device-local and default-off, notifies mounted Composer instances immediately, and closing it removes creation access without deleting persisted collaboration data.
 * Room UI freezes an ordered recipient set per message before dispatch. Agent-scoped slash, Skill, Goal, permission, Plan, and Swarm mutations remain unavailable unless the selected owner is explicitly supported.
 * The multi-recipient UI stores an ordered default recipient set and exposes real Agent mention completion. Mentions may override that default for one message without mutating future defaults.
+* The Composer exposes a compact one-shot visible-context selector after the Agent picker. Its five scopes are previous turn, recent three turns, selected messages, all bodies, and none; every successful send resets the control to previous turn.
 * A response block shows queued state only when its delivery is actually blocked behind earlier work for that Agent. The queued block names its Agent and can be cancelled without touching another delivery or the Agent's currently running activity. Failed and indeterminate attempts require an explicit retry action, which re-enters the same oldest-first dispatcher with a new audited turn identity.
 * Display name and mention edits change only the local room identity. They do not recreate the official session, replace the model, or inject a preset role into Agent context.
 * Multi-recipient response blocks are created in user-selected order and never reordered by later timestamps.
