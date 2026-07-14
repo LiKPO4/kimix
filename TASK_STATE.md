@@ -2,12 +2,12 @@
 
 ## 2026-07-14 多 Agent 房间实施
 
-- 当前目标：收束多 Agent 房间首轮用户实测反馈；v2.15.45 修复本机 gate 记录缺失后房间成员、正文补充与多接收者入口消失的问题。
-- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。v2.15.40 已修正预发送状态误报、工具栏顺序和 Agent 选择器垂直对齐。v2.15.41 默认向目标 Agent 补入上一轮已完成正文，并提供最近 3 轮、选择消息、全部正文和不补充五种单次范围；只共享用户消息与 Agent 最终正文，按 Agent 去重，投递失败重试保持冻结内容，隐藏桥接包不会污染官方历史显示；单 Agent 超过 48,000 字时明确拒绝。v2.15.45 实机确认原房间 `m13fnosjo` 的 3 个次要 Agent 仍在官方目录但本地 collaboration 丢失，已加入唯一 metadata 自动重组和持久化防降级。
-- 未完成：等待用户实机验收 v2.15.45 自动把 `m13fnosjo` 和 3 个孤立 Agent 重组为房间，恢复成员、历史、接收者和正文补充控件；同时继续验收需求澄清包装移除与房间 Agent 独立归因。
-- 阻塞：无。v2.15.45 gate、孤立房间重组与持久化防降级定向 4 个测试文件、50 项测试通过；全量 82 个测试文件、579 项测试通过；生产构建通过，renderer 为 `assets/index-D1-rPALC.js`；OKF 严格校验通过。本轮不自行截图，按项目规则等待用户验收。
+- 当前目标：收束多 Agent 房间首轮用户实测反馈；v2.15.46 修复权限按钮受压后侵入 Agent 选择器的问题。
+- 已完成：完成阶段 0-8 与阶段 9A/9B；真实 Windows Electron 已完成单目标、mention 覆盖、双目标与四目标跨 Provider 并行。v2.15.40 已修正预发送状态误报、工具栏顺序和 Agent 选择器垂直对齐。v2.15.41 默认向目标 Agent 补入上一轮已完成正文，并提供最近 3 轮、选择消息、全部正文和不补充五种单次范围；只共享用户消息与 Agent 最终正文，按 Agent 去重，投递失败重试保持冻结内容，隐藏桥接包不会污染官方历史显示；单 Agent 超过 48,000 字时明确拒绝。v2.15.45 实机确认原房间 `m13fnosjo` 的 3 个次要 Agent 仍在官方目录但本地 collaboration 丢失，已加入唯一 metadata 自动重组和持久化防降级。v2.15.46 将权限按钮固定在 124px 槽位内，并为权限、Agent 与正文范围热区设置明确的 8px 间距。
+- 未完成：等待用户实机验收 v2.15.46 权限与 Agent 按钮不再重叠；同时继续验收房间历史、需求澄清包装移除与房间 Agent 独立归因。
+- 阻塞：无。v2.15.46 全量 82 个测试文件、579 项测试通过；生产构建通过，renderer 为 `assets/index-DKofM6zb.js`；OKF 严格校验通过；新构建已启动并完成同宽度运行检查。本轮不以 Agent 截图代替用户验收，仍等待用户回传确认。
 - 关键文件：`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`、`src/types/ui.ts`、`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/chat/RoomContextPicker.tsx`、`src/utils/roomContextBridge.ts`、`src/utils/roomDelivery.ts`、`src/utils/collaborationRooms.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/eventMapper.ts`、`src/utils/sessionBackup.ts`。
-- 下一步：用户用 v2.15.45 重新打开截图中的房间，确认成员选择、上一轮正文补充和 `添加 Agent` 均恢复；再发送一次双 Agent 消息确认仍走房间路由。
+- 下一步：用户在已启动的 v2.15.46 窗口确认权限按钮固定边界、Agent 名称省略和相邻热区间距。
 - 验证补充：`pnpm exec tsc -p tsconfig.json --noEmit` 仍被仓库既有类型基线错误阻塞；本阶段涉及文件的新增类型问题已清理，正式门禁仍以现有 `test:run`、`build`、`knowledge:validate` 和 diff check 为准。
 
 ## 2026-07-13 v2.15.21 历史流程展开与滚动稳定性

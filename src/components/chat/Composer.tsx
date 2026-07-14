@@ -4009,8 +4009,8 @@ export function Composer() {
         />
 
         <div className="kimix-composer-toolbar mt-2 flex h-9 min-w-0 flex-nowrap items-center justify-between gap-3">
-          <div className="kimix-composer-toolbar-primary flex min-w-0 flex-1 items-center gap-1" style={{ marginLeft: -6 }}>
-            <div ref={addBtnRef} className="relative">
+          <div className="kimix-composer-toolbar-primary flex min-w-0 flex-1 items-center" style={{ gap: 8, marginLeft: -6 }}>
+            <div ref={addBtnRef} className="relative shrink-0">
               <button disabled={!canUseComposer} onClick={() => setShowAddMenu((value) => !value)} className={iconButtonClass} title="更多工具" aria-label="更多工具">
                 <Plus size={18} />
               </button>
@@ -4099,11 +4099,16 @@ export function Composer() {
               )}
             </div>
 
-            <div ref={permissionBtnRef} className="relative min-w-0 shrink">
+            <div
+              ref={permissionBtnRef}
+              className="relative min-w-0 shrink-0"
+              style={{ flex: "0 0 124px", width: 124 }}
+            >
               <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={() => setShowPermissionMenu((v) => !v)}
-                className="kimix-icon-text-button kimix-muted-action is-compact max-w-[188px] min-w-0 disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
+                style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 7, paddingLeft: 12, paddingRight: 10 }}
                 title={!hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
