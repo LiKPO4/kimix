@@ -92,7 +92,7 @@ export function RoomAgentPicker({
         aria-expanded={open}
       >
         <Bot size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
-        <span className="shrink-0 text-[13px] font-medium text-[var(--kimix-panel-text)]" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
+        <span className="shrink-0 text-[13px] font-medium" style={{ lineHeight: "20px" }}>{selectedLabel}</span>
         <span
           className="shrink-0 text-[11.5px] tabular-nums text-[var(--kimix-panel-text-muted)]"
           style={{ display: "inline-flex", height: 20, alignItems: "center", lineHeight: "20px" }}

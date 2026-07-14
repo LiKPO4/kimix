@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.49 Agents 文字色统一
+
+- 当前目标：收束输入区固定 Agents 选择槽的视觉层级，让标签文字与“手动审批”“上一轮”等次要工具按钮一致。
+- 已完成：移除 `Agents` 标签覆盖主文本色的显式样式，改为继承 `kimix-muted-action` 的次要文本色；同步版本号至 v2.15.49。`pnpm test:run`（83 个文件、583 项）、`pnpm build`（renderer `assets/index-VCEPHidv.js`）、`pnpm knowledge:validate` 和 `git diff --check` 已通过。
+- 未完成：等待用户在 v2.15.49 窗口确认 Agents 标签颜色与相邻按钮一致。
+- 阻塞：无。
+- 关键文件：`src/components/chat/RoomAgentPicker.tsx`、`package.json`、`src/components/layout/Sidebar.tsx`、`src/components/settings/SettingsPanel.tsx`。
+- 下一步：提交后用根目录 `start-kimix.bat` 启动 v2.15.49，确认 Agents 标签与相邻次要按钮使用一致的灰色。
+
 ## 2026-07-14 v2.15.48 固定 Agents 选择槽
 
 - 当前目标：收束多 Agent 房间工具栏的实测视觉反馈，避免输入区 Agent 选择器用模型/Agent 名称造成省略。
