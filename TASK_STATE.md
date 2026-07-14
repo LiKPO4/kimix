@@ -4,11 +4,11 @@
 
 - 当前目标：完成从多 Agent 房间开发起点到当前 HEAD 的全量审查，在没有未解决高风险问题时发布一个新的中版本。
 - 审查结论：投递身份、事件/历史分区、运行态恢复、停止、上下文桥接、归档恢复、搜索导出和 UI 归属均与设计不变量一致；发现的唯一发布阻塞项是并发持久化提前返回成功，已在 v2.15.64 独立修复并通过回归。未发现剩余 P0/P1 问题。
-- 已完成：版本号三处同步至 v2.16.0；设置中的“内部验收”文案升级为正式功能状态；README、实施计划、验收记录、ADR、架构知识和专属 Release notes 已同步。全量测试 85 个文件、614 项通过；`pnpm build` 通过，renderer 为 `assets/index-CRwBxskp.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。
-- 未完成：提交发布元数据；快进 `master`、推送代码与 `v2.16.0` 标签并检查 GitHub Actions。
+- 已完成：版本号三处同步至 v2.16.0；设置中的“内部验收”文案升级为正式功能状态；README、实施计划、验收记录、ADR、架构知识和专属 Release notes 已同步。全量测试 85 个文件、614 项通过；`pnpm build` 通过，renderer 为 `assets/index-CRwBxskp.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。`master` 已快进并推送至 `f32e986e`，`v2.16.0` 标签已推送；GitHub Actions `29339368596` 的知识校验、Windows、macOS、Linux 与 `publish-release` 全部成功，Release 已公开并生成 `SHA256SUMS.txt`。
+- 未完成：等待用户安装 v2.16.0 做最终版本号与真实任务回归。
 - 阻塞：无。
 - 关键文件：`docs/release-notes/v2.16.0.md`、`docs/multi-agent-room-plan.md`、`docs/multi-agent-room-user-acceptance.md`、`knowledge/decisions/user-controlled-multi-agent-rooms.md`、`knowledge/architecture/collaboration-room-routing.md`。
-- 下一步：提交 v2.16.0 发布元数据并执行 tag-only Actions 发布流程。
+- 下一步：用户从 `https://github.com/LiKPO4/kimix/releases/tag/v2.16.0` 安装并确认左下角版本为 v2.16.0；后续若出现归属、重复投递或恢复异常，立即暂停下一版本发布并按会话取证。
 
 ## 2026-07-14 v2.15.64 并发投递持久化屏障
 
