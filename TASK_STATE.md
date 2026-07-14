@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.53 Windows 通知点击聚焦
+
+- 当前目标：修复点击任务完成后的 Windows 系统通知时，Kimix 窗口没有获得前台焦点的问题。
+- 已完成：确认原路径仅调用 `restore/show/focus`，会受 Windows 后台应用前台抢占限制；新增统一 `activateWindow`，Windows 下短暂置顶、恢复/显示、`moveTop` 并聚焦，200ms 后恢复原置顶状态。任务完成、待审批和待回答共用同一通知点击路径，session/Agent/event 路由未改；单实例唤醒同步复用激活策略。版本号三处同步至 v2.15.53；定向测试 1 个文件、4 项通过；全量测试 84 个文件、594 项通过；`pnpm build` 通过，renderer 为 `assets/index-CFXBh8cX.js`；`pnpm knowledge:validate` 通过。
+- 未完成：等待 Windows 实机点击验收。
+- 阻塞：无。
+- 关键文件：`electron/windowActivation.ts`、`electron/main.ts`、`src/utils/__tests__/windowActivation.test.ts`。
+- 下一步：用户在 v2.15.53 将 Kimix 置于其他窗口后方并点击完成通知，确认窗口可靠置前并跳转到对应会话。
+
 ## 2026-07-14 v2.15.52 更新 Kimi Code 版本动态入口
 
 - 当前目标：将更新记录弹窗中 Kimi Code 的“浏览器查看”替换为更新更及时的官方 CLI Changelog 地址。

@@ -28,6 +28,7 @@ import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExten
 import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
+import { activateWindow } from "./windowActivation";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
 import type { ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
@@ -2293,10 +2294,7 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
+    activateWindow(mainWindow);
   });
 }
 
@@ -2419,12 +2417,12 @@ function showTurnCompleteNotification(title: string, body: string, fallbackBody:
     silent: false,
   });
   notification.on("click", () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+    const notificationWindow = mainWindow;
+    if (!activateWindow(notificationWindow)) return;
     clearTaskbarAttention();
-    if (target.sessionId) mainWindow.webContents.send("app:notification-clicked", target);
+    if (target.sessionId && !notificationWindow.isDestroyed()) {
+      notificationWindow.webContents.send("app:notification-clicked", target);
+    }
   });
   notification.show();
 }

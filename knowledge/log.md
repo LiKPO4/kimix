@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Windows notification clicks use an explicit foreground activation pulse**: Completion, approval, and question notifications restore the Kimix window, briefly elevate it before `moveTop` and `focus`, and then restore its prior always-on-top state; single-instance activation shares the same path. See [/project/kimix.md](/project/kimix.md).
+
 * **Built-app startup is fingerprinted and old Kimix instances are closed**: The canonical BAT launcher no longer treats a clean worktree as proof that `out/` is current; it rebuilds on missing or mismatched Git fingerprints, refuses to launch after a failed build, and clears current, compatibility-copy, and packaged Kimix processes before starting. Its no-BOM PowerShell helper keeps executable strings ASCII-safe for Windows PowerShell 5.1. See [/project/kimix.md](/project/kimix.md).
 
 * **Room identity overrides local UI and snapshot drift**: A missing room-gate record defaults open, explicit opt-out is persisted separately, existing collaboration sessions retain their controls and dispatch path, persistence blocks ordinary-snapshot downgrade, and unique official metadata can rebuild an already orphaned room before per-Agent history recovery. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
