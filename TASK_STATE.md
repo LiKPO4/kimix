@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 多 Agent 消息信息气泡降级诊断
+
+- 当前目标：定位已完成 Agent 消息的 Tokens/Context 信息气泡偶尔降级成“已完成 · 用时 N 分 N 秒”的触发链路。
+- 已完成：确认该文案只在当前轮没有可用最终 `status_update` 时由 `AssistantMessageFooter` 的兜底分支显示；`durationMs` 由终态事件与最近用户消息时间戳计算，因而会把迟到终态或历史回放间隔误显示为数小时。定向渲染测试 1 个文件、13 项通过，但仅覆盖“最终用量状态存在”的正常路径。会话诊断日志显示本次权限切换时 runtime 未运行、事件数未变且未恢复 runtime；Agent 选择只更新接收者/焦点元数据，均非直接改写上一轮消息的路径。
+- 未完成：补充“终态/用量状态乱序或缺失”以及“多 Agent 交替输出”覆盖，并修正页脚的错误时长降级策略。
+- 阻塞：目标会话当前已不在现行本地状态文件中，无法从落盘事件还原缺失最终状态的上游来源。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/eventMapper.ts`、`src/utils/kimiCodeEventMapper.ts`、`src/utils/__tests__/chatRenderItems.test.ts`。
+- 下一步：用户确认后，以一个最小增量固定每个 Agent turn 的最终信息归属，并避免把历史回放间隔展示为本轮耗时。
+
 ## 2026-07-14 v2.15.50 固定正文范围弹窗锚点
 
 - 当前目标：修复“本次补充正文”触发器按选项文字自适应宽度，导致上方弹窗左右移动的问题。
