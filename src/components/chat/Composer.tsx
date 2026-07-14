@@ -3800,7 +3800,7 @@ export function Composer() {
       )}
 
       <div
-        style={{ paddingLeft: 17, paddingRight: 17, paddingTop: 14, paddingBottom: 10 }}
+        style={{ paddingLeft: 17, paddingRight: 17, paddingTop: 14, paddingBottom: 10, containerType: "inline-size" }}
         className={`kimix-composer-surface kimix-composer-card relative flex min-w-0 flex-col overflow-visible border transition-colors ${
           isDragging
             ? "border-accent-blue"
@@ -3982,8 +3982,8 @@ export function Composer() {
           disabled={!canUseComposer}
         />
 
-        <div className="mt-2 flex h-9 min-w-0 flex-nowrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-1" style={{ marginLeft: -6 }}>
+        <div className="kimix-composer-toolbar mt-2 flex h-9 min-w-0 flex-nowrap items-center justify-between gap-3">
+          <div className="kimix-composer-toolbar-primary flex min-w-0 flex-1 items-center gap-1" style={{ marginLeft: -6 }}>
             <div ref={addBtnRef} className="relative">
               <button disabled={!canUseComposer} onClick={() => setShowAddMenu((value) => !value)} className={iconButtonClass} title="更多工具" aria-label="更多工具">
                 <Plus size={18} />
@@ -4150,7 +4150,7 @@ export function Composer() {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="kimix-composer-toolbar-secondary flex shrink-0 items-center gap-1.5">
             {activeSession && (
               <button
                 type="button"

@@ -610,6 +610,38 @@ body::before {
   scale: 0.96;
 }
 
+@container (max-width: 760px) {
+  .kimix-composer-toolbar {
+    height: auto !important;
+    min-height: 36px;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 8px;
+  }
+
+  .kimix-composer-toolbar-primary,
+  .kimix-composer-toolbar-secondary {
+    width: 100%;
+  }
+
+  .kimix-composer-toolbar-primary {
+    flex-basis: 100%;
+  }
+
+  .kimix-composer-toolbar-secondary {
+    justify-content: flex-end;
+  }
+}
+
+@container (max-width: 520px) {
+  .kimix-composer-toolbar-secondary {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 6px;
+  }
+}
+
 .kimix-chat-collapse-row {
   min-height: 34px;
   display: flex;
