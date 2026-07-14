@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T20:52:00+08:00"
+timestamp: "2026-07-14T21:06:23+08:00"
 ---
 
 # Collaboration Room Routing
@@ -48,6 +48,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Approval and structured-question responses resolve the explicit event `roomAgentId` before IPC, use only that Agent's runtime identity, and settle only its event partition. A room event without an owner or with an unavailable Agent/runtime is rejected instead of falling back to primary.
 * Stop and Steer resolve control targets from the Agent activity registry, falling back to persisted active delivery evidence only when an activity entry is absent. One target may execute directly; several targets require explicit user selection, and stop-all remains a collection of independent Agent cancellations with partial outcomes.
 * A room Steer event inherits the target delivery's `roomAgentId`, `roomMessageId`, and `agentTurnId`. Stopping one Agent settles only that partition and delivery/activity, so another running Agent and its queue remain untouched.
+* If every identity candidate owned by one Agent reports that its official session is inactive or missing, the runtime is definitively unavailable rather than still running. Periodic reconciliation and an explicit Stop both settle that Agent's open events, active delivery, and activity as interrupted without resuming or resending the prompt; transient transport failures remain non-terminal.
 * Session mutations resolve exactly one active recipient into a mutation owner and Agent-specific session view. Permission, Plan, Swarm, Goal, BTW, Skill registry, direct slash results, and canonical undo state are stored on that Agent; zero or several selected recipients are rejected before IPC.
 * `permissionMode` and `planMode` are durable Agent fields. The technical primary mirrors them to legacy Session fields, while a secondary mutation never changes the primary mirror or the application defaults used by unrelated sessions.
 * Composer, ContextBar, AppShell inspector actions, and SessionToolbar runtime actions resolve the same mutation owner. Model switching, Goal, BTW, Plan display, official rename, fork, visualization, and Kimi Web never infer primary when a room has zero or several recipients; busy checks use the target Agent activity rather than the legacy room-level running ID.

@@ -18,6 +18,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isWindows } from "@/utils/platform";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
+import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
@@ -2941,7 +2942,7 @@ export function Composer() {
     }
     try {
       const res = await window.api.cancelKimiCodeTurn({ sessionId: target.runtimeSessionId });
-      if (!res.success) return res.error;
+      if (!res.success && !isKimiCodeSessionUnavailableError(res.error)) return res.error;
       const stoppedAt = Date.now();
       updateSession(activeSession.id, (session) => settleStoppedRoomAgent(session, target, stoppedAt));
       setRoomAgentActivity({

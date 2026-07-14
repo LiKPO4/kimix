@@ -34,6 +34,10 @@ export function isKimiCodeSessionInactiveError(error: unknown) {
   return /Kimi (?:Code|Server) session is not active/i.test(message);
 }
 
+export function isKimiCodeSessionUnavailableError(error: unknown) {
+  return isKimiCodeSessionInactiveError(error) || isKimiCodeSessionMissingError(error);
+}
+
 type SessionMutationResponse = { success: true; data: unknown } | { success: false; error: string };
 type ResumeSessionResponse = {
   success: true;

@@ -18,7 +18,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
-import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
+import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCodeSessionUnavailableError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
@@ -91,6 +91,7 @@ import {
   recoverInterruptedRoomDeliveries,
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
+import { getRoomAgentControlTargets, settleStoppedRoomAgent } from "@/utils/roomAgentControl";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -3523,14 +3524,45 @@ function App() {
         ]));
         let resolvedRuntimeSessionId = runtimeSessionId;
         let response = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId });
+        let allCandidatesUnavailable = !response.success && isKimiCodeSessionUnavailableError(response.error);
         for (const candidate of runtimeCandidates.slice(1)) {
           if (response.success) break;
           const candidateResponse = await window.api.getKimiCodeStatus({ sessionId: candidate });
-          if (!candidateResponse.success) continue;
+          if (!candidateResponse.success) {
+            allCandidatesUnavailable = allCandidatesUnavailable && isKimiCodeSessionUnavailableError(candidateResponse.error);
+            continue;
+          }
           response = candidateResponse;
           resolvedRuntimeSessionId = candidate;
         }
-        if (disposed || !response.success) return;
+        if (disposed) return;
+        if (!response.success) {
+          if (!allCandidatesUnavailable) return;
+          const stoppedAt = Date.now();
+          const latestSession = useSessionStore.getState().sessions.find((item) => item.id === roomId) ?? session;
+          const currentActivity = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(roomId, roomAgentId)];
+          const controlTarget = getRoomAgentControlTargets(
+            latestSession,
+            Object.values(useAppStore.getState().roomAgentActivities),
+            "stop",
+          ).find((target) => target.roomAgentId === roomAgentId);
+          updateSession(roomId, (item) => settleStoppedRoomAgent(item, {
+            roomAgentId,
+            roomMessageId: currentActivity?.roomMessageId ?? controlTarget?.roomMessageId,
+          }, stoppedAt));
+          setRoomAgentActivity({
+            roomId,
+            roomAgentId,
+            runtimeSessionId,
+            status: "interrupted",
+            roomMessageId: currentActivity?.roomMessageId ?? controlTarget?.roomMessageId,
+            activeTurnId: currentActivity?.activeTurnId ?? controlTarget?.activeTurnId,
+            updatedAt: stoppedAt,
+          });
+          if (isPrimaryRoomAgent(latestSession, roomAgentId)) setRunningSessionId(null);
+          syncCurrentSessionFromStore(roomId);
+          return;
+        }
         if (resolvedRuntimeSessionId !== runtimeSessionId) {
           updateSession(session.id, (item) => bindRecoveredRoomAgentRuntime(item, roomAgentId, {
             sessionId: resolvedRuntimeSessionId,
