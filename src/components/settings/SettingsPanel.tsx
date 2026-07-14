@@ -45,7 +45,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.15.64";
+const KIMIX_VERSION = "2.16.0";
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -2123,14 +2123,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-copy">
                         <div className="kimix-settings-permission-label flex items-center" style={{ gap: 7 }}>
                           <Bot size={14} className="text-text-muted" />
-                          <span>多 Agent 房间（内部验收）</span>
+                          <span>多 Agent 房间</span>
                         </div>
                         <div className="kimix-settings-permission-desc">
                           在 Composer 的 + 菜单开放“添加 Agent”，默认开启。关闭后普通会话隐藏创建入口，已有房间仍可正常使用。
                         </div>
                       </div>
                       <span className={`rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
-                        {multiAgentRoomUiEnabled ? "验收中" : "关闭"}
+                        {multiAgentRoomUiEnabled ? "已开启" : "关闭"}
                       </span>
                     </button>
                   </div>

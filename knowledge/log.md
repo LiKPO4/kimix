@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **User-controlled multi-Agent rooms graduated in v2.16.0**: After runtime ownership, history partitioning, durable concurrent dispatch, recovery, catalog, and real-task acceptance gates passed, the room UI defaults on as a released feature while retaining a device-local opt-out for new-room creation. See [/decisions/user-controlled-multi-agent-rooms.md](/decisions/user-controlled-multi-agent-rooms.md) and [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Concurrent room dispatch waits for the durable coalesced snapshot**: Persistence callers queued behind an active write now share the drain result, so every Agent's `sending` identity is committed before its official prompt can start and one failed write reaches all waiting dispatches. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 
 * **Room turn duration cannot cross message identity**: A room Assistant uses only a same-Agent user anchor with the matching `roomMessageId`; when the prompt is absent from that partition, duration falls back to the current Assistant placeholder instead of an older user message. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

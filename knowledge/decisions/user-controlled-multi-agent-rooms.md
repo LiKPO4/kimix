@@ -3,14 +3,14 @@ type: Architecture Decision
 title: User-Controlled Multi-Agent Rooms
 description: Kimix upgrades ordinary conversations into user-routed rooms of independent Kimi Code sessions without adding a new provider or runtime system.
 tags: [decision, collaboration, multi-agent, session, provider]
-timestamp: "2026-07-14T11:00:43+08:00"
+timestamp: "2026-07-14T22:18:00+08:00"
 ---
 
 # User-Controlled Multi-Agent Rooms
 
 # Status
 
-Accepted for staged implementation behind an internal development gate until the concurrency, history, persistence, and catalog invariants pass.
+Accepted and released in Kimix v2.16.0 after the concurrency, history, persistence, catalog, recovery, and user-acceptance gates passed. The device-local switch remains an explicit opt-out for creating new rooms; it is not a data-compatibility gate and never disables an existing room.
 
 # Context
 
