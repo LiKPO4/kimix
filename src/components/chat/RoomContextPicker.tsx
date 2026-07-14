@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, MessageSquareText } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import type { RoomContextShareMode, RoomContextShareSelection, Session } from "@/types/ui";
 import { estimateRoomContextShare, getRoomContextTurns } from "@/utils/roomContextBridge";
 
@@ -61,19 +61,18 @@ export function RoomContextPicker({
   };
 
   return (
-    <div ref={rootRef} className="relative shrink-0" style={{ flex: "0 0 128px", width: 128 }}>
+    <div ref={rootRef} className="relative shrink-0" style={{ flex: "0 0 104px", width: 104 }}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
         className={`kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-40 ${invalidSelection ? "text-accent-warning" : ""}`}
-        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 8, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
+        style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, lineHeight: "20px" }}
         title="设置本次发送给 Agent 的房间正文范围；发送后恢复为上一轮"
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <MessageSquareText size={14} className="shrink-0" />
-        <span className="truncate" style={{ lineHeight: "20px" }}>{triggerLabel(selection)}</span>
+        <span className="min-w-0 flex-1 truncate" style={{ lineHeight: "20px" }}>{triggerLabel(selection)}</span>
         <ChevronDown size={12} className="shrink-0" />
       </button>
 

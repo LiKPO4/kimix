@@ -4015,7 +4015,7 @@ export function Composer() {
         />
 
         <div className="kimix-composer-toolbar mt-2 flex h-9 min-w-0 flex-nowrap items-center justify-between gap-3">
-          <div className="kimix-composer-toolbar-primary flex min-w-0 flex-1 items-center" style={{ gap: 8, marginLeft: -6 }}>
+          <div className="kimix-composer-toolbar-primary flex min-w-0 flex-1 items-center" style={{ gap: 6, marginLeft: -6 }}>
             <div ref={addBtnRef} className="relative shrink-0">
               <button disabled={!canUseComposer} onClick={() => setShowAddMenu((value) => !value)} className={iconButtonClass} title="更多工具" aria-label="更多工具">
                 <Plus size={18} />
@@ -4108,13 +4108,13 @@ export function Composer() {
             <div
               ref={permissionBtnRef}
               className="relative min-w-0 shrink-0"
-              style={{ flex: "0 0 124px", width: 124 }}
+              style={{ flex: "0 0 116px", width: 116 }}
             >
               <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={() => setShowPermissionMenu((v) => !v)}
                 className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
-                style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 7, paddingLeft: 12, paddingRight: 10 }}
+                style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12 }}
                 title={!hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
@@ -4169,14 +4169,19 @@ export function Composer() {
             )}
           </div>
 
-          <div className="kimix-composer-toolbar-secondary flex shrink-0 items-center gap-1.5">
+          <div className="kimix-composer-toolbar-secondary flex shrink-0 items-center" style={{ gap: 4 }}>
             {activeSession && (
               <button
                 type="button"
                 disabled={!canUseComposer || !hasUniqueMutationOwner}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
-                className="kimix-icon-text-button kimix-muted-action is-compact min-w-[104px] border disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-muted-action is-compact border disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
+                  width: 84,
+                  minWidth: 84,
+                  gap: 6,
+                  paddingLeft: 12,
+                  paddingRight: 12,
                   borderColor: swarmModeEnabled ? "var(--accent-primary-soft)" : "transparent",
                   backgroundColor: swarmModeEnabled ? "var(--accent-primary-light)" : "transparent",
                   color: swarmModeEnabled ? "var(--accent-primary-dark)" : undefined,
@@ -4191,14 +4196,19 @@ export function Composer() {
                 aria-pressed={swarmModeEnabled}
               >
                 <Zap size={14} className="shrink-0" />
-                <span>Swarm {swarmModeEnabled ? "开" : "关"}{swarmModePending ? " · 下轮" : ""}</span>
+                <span>Swarm</span>
               </button>
             )}
             <button
               disabled={!canTogglePlanMode}
               onClick={() => void handleTogglePlanMode()}
-              className="kimix-icon-text-button kimix-muted-action is-compact min-w-[92px] border disabled:cursor-not-allowed disabled:opacity-35"
-                style={{
+              className="kimix-icon-text-button kimix-muted-action is-compact border disabled:cursor-not-allowed disabled:opacity-35"
+              style={{
+                width: 72,
+                minWidth: 72,
+                gap: 6,
+                paddingLeft: 12,
+                paddingRight: 12,
                 borderColor: mutationPlanMode ? "var(--accent-primary-soft)" : "transparent",
                 backgroundColor: mutationPlanMode ? "var(--accent-primary-light)" : "transparent",
                 color: mutationPlanMode ? "var(--accent-primary-dark)" : undefined,
@@ -4208,7 +4218,7 @@ export function Composer() {
               aria-pressed={mutationPlanMode}
             >
               <ClipboardList size={14} className="shrink-0" />
-              <span>{mutationPlanMode ? "Plan 开" : "Plan 关"}</span>
+              <span>Plan</span>
             </button>
             <button
               disabled={!canUseComposer}
@@ -4220,8 +4230,13 @@ export function Composer() {
                   detail: next ? "思考 开" : "思考 关",
                 }));
               }}
-              className="kimix-icon-text-button kimix-muted-action is-compact min-w-[100px] border disabled:cursor-not-allowed disabled:opacity-35"
+              className="kimix-icon-text-button kimix-muted-action is-compact border disabled:cursor-not-allowed disabled:opacity-35"
               style={{
+                width: 76,
+                minWidth: 76,
+                gap: 6,
+                paddingLeft: 12,
+                paddingRight: 12,
                 borderColor: defaultThinking ? "var(--accent-primary-soft)" : "transparent",
                 backgroundColor: defaultThinking ? "var(--accent-primary-light)" : "transparent",
                 color: defaultThinking ? "var(--accent-primary-dark)" : undefined,
@@ -4231,7 +4246,7 @@ export function Composer() {
               aria-pressed={defaultThinking}
             >
               <Brain size={14} className="shrink-0" />
-              <span>{defaultThinking ? "思考 开" : "思考 关"}</span>
+              <span>思考</span>
             </button>
 
             <ContextRing />

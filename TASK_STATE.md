@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.57 输入区工具栏瘦身
+
+- 当前目标：减少多 Agent 房间输入区底部按钮的横向占用，避免携带正文按钮挤压右侧 Swarm 等工具。
+- 根因：左侧权限、Agents、携带正文三个固定槽位合计占用 388px，右侧 Swarm、Plan、思考三个按钮又锁定至少 296px；按钮同时重复展示图标、单位和“开/关”文字，使中等宽度下几乎没有弹性空间。
+- 已完成：左侧三个固定槽位收紧为合计 324px，移除 Agents 和携带正文入口的重复装饰信息；右侧三个模式按钮收紧为 84/72/76px，仅保留模式名称，状态继续由现有颜色、边框、悬浮提示及无障碍属性表达。按钮高度保持 34px、左右留白保持 12px，主次工具组间距改为 6px/4px。版本号三处同步至 v2.15.57；全量测试 85 个文件、604 项通过；`pnpm build` 通过，renderer 为 `assets/index-D0K0GKSg.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 未完成：提交并启动新构建后，等待用户在 v2.15.57 截图中验收窄窗口及多 Agent 状态。
+- 阻塞：无。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/components/chat/RoomAgentPicker.tsx`、`src/components/chat/RoomContextPicker.tsx`。
+- 下一步：完成门禁并启动 v2.15.57；用户确认携带正文与 Swarm 不再互相挤压，按钮文字及状态仍清晰。
+
 ## 2026-07-14 v2.15.56 房间投递稳定身份协议
 
 - 当前目标：从数据模型上消除多 Agent 房间单次输入被房间消息与 Agent 官方历史重复投影的问题，不再让新消息依赖正文和时间猜测归属。
