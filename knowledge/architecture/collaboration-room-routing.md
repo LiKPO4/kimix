@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-14T10:18:37+08:00"
+timestamp: "2026-07-14T11:00:43+08:00"
 ---
 
 # Collaboration Room Routing
@@ -41,6 +41,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Each delivery freezes its own visible-body share before `queued` persistence. The projection contains only user-visible user/Assistant bodies, never thinking, tools, command results, approvals, usage, or hidden instructions; simultaneous recipients cannot see unfinished sibling output from the same turn.
 * The recipient's stable `contextBridgeId` and accepted delivery `entryIds` form the read boundary. Default previous-turn sharing and one-shot recent-three, selected-message, all-body, or none scopes omit entries already known by that Agent; retry reuses the same frozen share instead of compiling a different prompt.
 * The hidden room-context envelope is length-delimited and stripped from official history before visible event reconciliation. A single recipient share above 48,000 characters is rejected with a visible error instead of truncation.
+* Every room delivery uses that hidden envelope to name the current recipient, even when no visible body is shared. The protocol states that room members are independent sessions rather than roles simulated by one model; shared entries identify user messages and independently authored peer-Agent messages, and peer conclusions must be attributed by Agent name instead of being claimed as the recipient's own history.
 * Lifecycle occupancy and runtime execution are separate projections. A dispatchable `queued` delivery still blocks archive or membership mutation so persisted intent cannot be orphaned, but it does not present the Agent as running or render a queue card; only a queued delivery blocked by earlier work is user-visible as waiting.
 * Official acceptance records prompt/message identities. A `sending` attempt whose result is unknown or whose persisted state cannot be reconciled with stable official or canonical room/turn evidence becomes `indeterminate` and is never automatically resent.
 * After official acceptance, runtime status is the delivery settlement authority: running, approval, question, completion, error, and interruption update only the matching `roomMessageId + roomAgentId` delivery. Accepted work remains lifecycle-active until that Agent reaches a terminal state.

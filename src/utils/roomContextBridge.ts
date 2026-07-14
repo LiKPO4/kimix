@@ -32,6 +32,7 @@ export interface RoomContextEntry {
   label: string;
   content: string;
   roomAgentId?: string;
+  mentionName?: string;
 }
 
 export interface RoomContextTurn {
@@ -44,6 +45,11 @@ export interface RoomContextShareEstimate {
   entryCount: number;
   maxContentChars: number;
   overLimitAgentNames: string[];
+}
+
+export interface RoomDeliveryAgentIdentity {
+  displayName: string;
+  mentionName: string;
 }
 
 export function roomContextBridgeId(roomAgentId: string) {
@@ -104,6 +110,7 @@ export function getRoomContextTurns(session: Session): RoomContextTurn[] {
       label: agent?.displayName ?? "Agent",
       content,
       roomAgentId: event.roomAgentId,
+      mentionName: agent?.mentionName,
     });
   }
   flush();
@@ -153,6 +160,10 @@ function selectedTurns(turns: RoomContextTurn[], selection: RoomContextShareSele
   return turns;
 }
 
+function compactIdentityLabel(value: string, fallback: string) {
+  return value.replace(/\s+/g, " ").trim() || fallback;
+}
+
 function formatSharedEntries(entries: RoomContextEntry[]) {
   const chunks: string[] = [];
   let previousTurnId = "";
@@ -161,7 +172,14 @@ function formatSharedEntries(entries: RoomContextEntry[]) {
       if (chunks.length > 0) chunks.push("---");
       previousTurnId = entry.turnId;
     }
-    chunks.push(`${entry.label}：\n${entry.content}`);
+    if (entry.kind === "user") {
+      chunks.push(`【用户消息】\n发言者：用户\n${entry.content}`);
+      continue;
+    }
+    const displayName = compactIdentityLabel(entry.label, "其他 Agent");
+    const mentionName = entry.mentionName ? compactIdentityLabel(entry.mentionName, "") : "";
+    const speaker = mentionName ? `${displayName}（@${mentionName}）` : displayName;
+    chunks.push(`【其他独立 Agent 消息】\n发言者：${speaker}\n归属：独立同伴的输出，不是当前 Agent 的历史经历\n${entry.content}`);
   }
   return chunks.join("\n\n");
 }
@@ -223,16 +241,34 @@ export function estimateRoomContextShare(
   return { entryCount, maxContentChars, overLimitAgentNames };
 }
 
-export function buildRoomDeliveryPrompt(currentPrompt: string, contextShare?: RoomDeliveryContextShare) {
-  if (!contextShare?.content.trim()) return currentPrompt;
+function roomIdentityInstruction(identity: RoomDeliveryAgentIdentity) {
+  const displayName = compactIdentityLabel(identity.displayName, "当前 Agent");
+  const mentionName = compactIdentityLabel(identity.mentionName, "agent");
+  return [
+    "你正在 Kimix 的用户控制多 Agent 房间中工作。房间成员拥有彼此独立的上下文和会话，不是由你扮演的多个角色。",
+    `当前接收者（也就是你）：${displayName}（@${mentionName}）。你只代表这个 Agent。`,
+    "历史中标为“其他独立 Agent 消息”或署有其他 Agent 名称的内容，均由独立同伴生成，不属于你的经历、操作或输出。",
+    "不得把同伴的发言说成“我之前说过”“我已经验证”或“我扮演了该角色”；引用时必须明确使用该 Agent 的名称进行归因。",
+    "如果用户说“他说”“上一个 Agent”或询问其他成员的结论，应按历史中的发言者理解；只以当前 Agent 身份回应当前消息。",
+  ].join("\n");
+}
+
+export function buildRoomDeliveryPrompt(
+  currentPrompt: string,
+  contextShare?: RoomDeliveryContextShare,
+  identity?: RoomDeliveryAgentIdentity,
+) {
+  const sharedContent = contextShare?.content.trim() ? contextShare.content : "";
+  if (!sharedContent && !identity) return currentPrompt;
   const prefix = [
     ROOM_CONTEXT_HEADER,
-    ROOM_CONTEXT_INSTRUCTION,
-    `${ROOM_CONTEXT_LENGTH_LABEL}${contextShare.content.length}`,
+    ...(identity ? [roomIdentityInstruction(identity)] : []),
+    ...(sharedContent ? [ROOM_CONTEXT_INSTRUCTION] : []),
+    `${ROOM_CONTEXT_LENGTH_LABEL}${sharedContent.length}`,
     "",
     "",
   ].join("\n");
-  return prefix + contextShare.content + ROOM_CONTEXT_ORIGINAL_MARKER + currentPrompt;
+  return prefix + sharedContent + ROOM_CONTEXT_ORIGINAL_MARKER + currentPrompt;
 }
 
 export function stripRoomContextFromPrompt(content: string) {

@@ -1150,6 +1150,10 @@ export function Composer() {
           const outboundPrompt = buildRoomDeliveryPrompt(
             message.outboundContent ?? message.content,
             delivery.contextShare,
+            {
+              displayName: agent.displayName,
+              mentionName: agent.mentionName,
+            },
           );
           let response = await sendKimiCodePromptWithRetry({
             sessionId: runtimeSessionId,

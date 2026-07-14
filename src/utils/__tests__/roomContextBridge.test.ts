@@ -61,6 +61,9 @@ describe("roomContextBridge", () => {
     expect(plan?.entryIds).toEqual(["user:room-message:u2", "assistant:a2"]);
     expect(plan?.content).toContain("用户问题 2");
     expect(plan?.content).toContain("Agent 正文 2");
+    expect(plan?.content).toContain("【用户消息】");
+    expect(plan?.content).toContain("【其他独立 Agent 消息】");
+    expect(plan?.content).toContain("不是当前 Agent 的历史经历");
     expect(buildRoomContextSharePlan(room, primary.id, { mode: "last" }, 300)).toBeUndefined();
   });
 
@@ -133,8 +136,14 @@ describe("roomContextBridge", () => {
   it("发送包裹只影响模型输入，能够还原当前用户消息", () => {
     const room = roomWithHistory(1);
     const plan = buildRoomContextSharePlan(room, "agent-2", { mode: "last" })!;
-    const prompt = buildRoomDeliveryPrompt("检查最新改动", plan);
+    const prompt = buildRoomDeliveryPrompt("检查最新改动", plan, {
+      displayName: "Reviewer",
+      mentionName: "reviewer",
+    });
     expect(prompt).toContain("Agent 正文 1");
+    expect(prompt).toContain("当前接收者（也就是你）：Reviewer（@reviewer）");
+    expect(prompt).toContain("不是由你扮演的多个角色");
+    expect(prompt).toContain("必须明确使用该 Agent 的名称进行归因");
     expect(stripRoomContextFromPrompt(prompt)).toBe("检查最新改动");
     expect(stripRoomContextFromPrompt(buildRoomDeliveryPrompt("当前任务", {
       ...plan,
@@ -142,6 +151,17 @@ describe("roomContextBridge", () => {
       contentChars: 30,
     }))).toBe("当前任务");
     expect(getRoomContextTurns(room)).toHaveLength(1);
+  });
+
+  it("即使不补充历史也会向房间 Agent 声明独立身份", () => {
+    const prompt = buildRoomDeliveryPrompt("只处理当前任务", undefined, {
+      displayName: "Implementer",
+      mentionName: "impl",
+    });
+    expect(prompt).toContain("当前接收者（也就是你）：Implementer（@impl）");
+    expect(prompt).toContain("房间成员拥有彼此独立的上下文和会话");
+    expect(prompt).toContain("正文字符数：0");
+    expect(stripRoomContextFromPrompt(prompt)).toBe("只处理当前任务");
   });
 
   it("正文超过安全上限时明确拒绝而不是静默截断", () => {

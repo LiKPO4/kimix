@@ -28,14 +28,18 @@ describe("mapStreamEvent", () => {
     const event = mapStreamEvent({
       type: "TurnBegin",
       payload: {
-        user_input: buildRoomDeliveryPrompt("请检查最新改动", {
-          mode: "last",
-          bridgeId: "room-context:agent-2",
-          entryIds: ["assistant:old"],
-          content: "旧 Agent：\n历史正文",
-          contentChars: 16,
-          createdAt: 1,
-        }),
+        user_input: buildRoomDeliveryPrompt(
+          "请检查最新改动",
+          {
+            mode: "last",
+            bridgeId: "room-context:agent-2",
+            entryIds: ["assistant:old"],
+            content: "旧 Agent：\n历史正文",
+            contentChars: 16,
+            createdAt: 1,
+          },
+          { displayName: "Reviewer", mentionName: "reviewer" },
+        ),
       },
     });
     expect(event).toMatchObject({ type: "user_message", content: "请检查最新改动" });
