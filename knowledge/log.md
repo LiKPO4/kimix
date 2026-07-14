@@ -2,6 +2,8 @@
 
 ## 2026-07-14
 
+* **Room history binds an identity-less acknowledgement only by a unique canonical match**: When the prompt API omits the official user-event ID, exact visible text and a 30-second Agent-local time window may recover one unclaimed delivery; repeated candidates remain separate instead of being guessed. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Windows notification clicks use an explicit foreground activation pulse**: Completion, approval, and question notifications restore the Kimix window, briefly elevate it before `moveTop` and `focus`, and then restore its prior always-on-top state; single-instance activation shares the same path. See [/project/kimix.md](/project/kimix.md).
 
 * **Built-app startup is fingerprinted and old Kimix instances are closed**: The canonical BAT launcher no longer treats a clean worktree as proof that `out/` is current; it rebuilds on missing or mismatched Git fingerprints, refuses to launch after a failed build, and clears current, compatibility-copy, and packaged Kimix processes before starting. Its no-BOM PowerShell helper keeps executable strings ASCII-safe for Windows PowerShell 5.1. See [/project/kimix.md](/project/kimix.md).

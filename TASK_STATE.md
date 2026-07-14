@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-14 v2.15.55 多 Agent 房间用户消息唯一绑定
+
+- 当前目标：修复 `session_5b681eb3-a77a-4c16-b25e-4e2b8bc06f22` 中单次输入在运行中出现多份、重启后仍显示两份的问题。
+- 根因：房间先持久化一条共享用户消息；Kimi Code 官方历史又为每个目标 Agent 保存一条 `turn.prompt`。发送接口没有返回 `officialUserEventId` 时，canonical history 的安全绑定只接受已有旧 ID，导致唯一对应的官方用户事件被保留为未归属事件，投影层同时渲染房间消息和官方消息；运行中 snapshot 重放会让临时重复更明显。官方 wire 只有一次真实 prompt 和一次 Assistant turn，不是重复投递给模型。
+- 已完成：缺少官方用户事件 ID 时，改为仅在同一 Agent 中冻结的官方投递正文完全一致、时间相差不超过 30 秒且候选唯一时绑定；`@Agent` 可见路由文字不会参与官方正文匹配，多个相同候选继续拒绝猜测。历史缓存版本提升至 5，已有房间会重新读取并归一化。版本号三处同步至 v2.15.55；官方会话文件、Agent runtime、投递状态和消息正文均不改写。定向测试 3 个文件、18 项通过；全量测试 85 个文件、600 项通过；`pnpm build` 通过，renderer 为 `assets/index-CqqYbyWg.js`；`pnpm knowledge:validate` 和 `git diff --check` 通过。
+- 未完成：提交后启动新构建，等待用户复测目标会话及新发一条 @ 消息。
+- 阻塞：无。
+- 关键文件：`src/utils/collaborationHistory.ts`、`src/utils/kimiHistoryCache.ts`、`src/utils/__tests__/collaborationHistory.test.ts`。
+- 下一步：提交并启动 v2.15.55；用户确认目标会话只显示一条原消息，新发送一次也只出现一条。
+
 ## 2026-07-14 v2.15.54 Kimi Web 长思考固定视口
 
 - 当前目标：让运行中的长思考达到 6 行后固定为内部滚动区域，并在最终正文开始时由结果接替主阅读区域。

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RoomAgent, Session, TimelineEvent } from "@/types/ui";
 import { createCollaborationStateFromSession } from "../collaborationRooms";
 import { reconcileAgentCanonicalHistory } from "../collaborationHistory";
+import { projectCollaborationTimeline } from "../collaborationTimeline";
 
 function room(): { session: Session; primaryId: string; secondaryId: string } {
   const base: Session = {
@@ -128,6 +129,45 @@ describe("reconcileAgentCanonicalHistory", () => {
     expect(result.events).toEqual([
       expect.objectContaining({ id: "canonical-user-a", roomMessageId: "room-message-a", agentTurnId: "turn-a" }),
       expect.objectContaining({ id: "canonical-assistant-a", roomMessageId: "room-message-a", agentTurnId: "turn-a" }),
+    ]);
+  });
+
+  it("binds a new room delivery to one unique canonical user event", () => {
+    const current = room();
+    current.session.collaboration!.messages = [{
+      id: "room-message-new",
+      content: "@mimo Review the changes",
+      outboundContent: "Review the changes",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          agentTurnId: "turn-new",
+        },
+      },
+      timestamp: 100,
+    }];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [
+        { id: "canonical-user-new", type: "user_message", timestamp: 101, content: "Review the changes" },
+        { id: "canonical-assistant-new", type: "assistant_message", timestamp: 102, content: "Done", isThinking: false, isComplete: true },
+      ],
+      reason: "startup",
+    });
+
+    expect(result.session.collaboration?.messages[0].deliveries[current.primaryId].officialUserEventId).toBe("canonical-user-new");
+    expect(result.events).toEqual([
+      expect.objectContaining({ id: "canonical-user-new", roomMessageId: "room-message-new", agentTurnId: "turn-new" }),
+      expect.objectContaining({ id: "canonical-assistant-new", roomMessageId: "room-message-new", agentTurnId: "turn-new" }),
+    ]);
+    expect(projectCollaborationTimeline(result.session).filter((event) => (
+      event.type === "user_message" && event.roomMessageId === "room-message-new"
+    ))).toEqual([
+      expect.objectContaining({ id: "room-message-new", content: "@mimo Review the changes" }),
     ]);
   });
 

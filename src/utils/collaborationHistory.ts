@@ -71,10 +71,11 @@ function bindCanonicalHistoryToRoomMessages(
       )
     ));
 
-    // Only repair a previously known delivery identity. New room deliveries must
-    // bind through explicit room/prompt metadata instead of text-and-time guessing.
-    if (reason !== "undo" && userIndex < 0 && delivery.officialUserEventId) {
-      const expectedText = normalizedMessageText(message.content);
+    // The prompt API does not always return an official user-event ID. In that
+    // case, bind only when content and time identify exactly one canonical event;
+    // repeated identical prompts remain deliberately unbound instead of guessed.
+    if (reason !== "undo" && userIndex < 0) {
+      const expectedText = normalizedMessageText(message.outboundContent ?? message.content);
       const candidates = userIndexes.filter((index) => {
         if (claimedUserIndexes.has(index)) return false;
         const event = canonicalEvents[index];
