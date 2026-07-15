@@ -535,10 +535,10 @@ export function buildRenderItems(
 ): RenderItem[] {
   const items: RenderItem[] = [];
 
-  const pushStandaloneTools = (tools: ToolCallEvent[], turnStartedAt?: number) => {
+  const pushStandaloneTools = (tools: ToolCallEvent[], turnStartedAt?: number, isTurnActive = false) => {
     if (tools.length === 0) return;
     if (sessionEngine === "kimi-code") {
-      items.push({ type: "event", event: createToolOnlyAssistantEvent(tools), turnStartedAt, leadingTools: tools, trailingStatuses: [] });
+      items.push({ type: "event", event: createToolOnlyAssistantEvent(tools, isTurnActive), turnStartedAt, leadingTools: tools, trailingStatuses: [] });
       return;
     }
     items.push({ type: "tool_group", id: tools[0].id, tools });
@@ -604,6 +604,9 @@ export function buildRenderItems(
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
+    const renderAssistantEvent = mergedAssistantEvent && !turnSettled && mergedAssistantEvent.isComplete
+      ? { ...mergedAssistantEvent, isComplete: false }
+      : mergedAssistantEvent;
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
     const trailingStatusEvents = turnSettled
@@ -644,15 +647,15 @@ export function buildRenderItems(
       if (event.type === "change_summary") continue;
       if (event.type === "diff") continue;
       if (event.type === "assistant_message") {
-        if (assistantAttached || !mergedAssistantEvent) continue;
-        const hasContent = mergedAssistantEvent.content.trim().length > 0;
+        if (assistantAttached || !renderAssistantEvent) continue;
+        const hasContent = renderAssistantEvent.content.trim().length > 0;
         const hasOwnProcessDetails = Boolean(
-          (mergedAssistantEvent.thinking?.trim() && !isKimixSyntheticThinking(mergedAssistantEvent.thinking)) ||
-          mergedAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0 && !isKimixSyntheticThinking(part.text))
+          (renderAssistantEvent.thinking?.trim() && !isKimixSyntheticThinking(renderAssistantEvent.thinking)) ||
+          renderAssistantEvent.thinkingParts?.some((part) => part.text.trim().length > 0 && !isKimixSyntheticThinking(part.text))
         );
         items.push({
           type: "event",
-          event: mergedAssistantEvent,
+          event: renderAssistantEvent,
           turnStartedAt,
           leadingTools: assistantAttached ? [] : tools,
           leadingSubagents: assistantAttached ? [] : subagents,
@@ -673,7 +676,7 @@ export function buildRenderItems(
       if (event.type === "user_message" || event.type === "todo") continue;
       if (!toolsAttached) {
         if (tools.length > 0) {
-          pushStandaloneTools(tools, turnStartedAt);
+          pushStandaloneTools(tools, turnStartedAt, !turnSettled);
           toolsAttached = true;
         }
       }
@@ -705,7 +708,7 @@ export function buildRenderItems(
       items.push({ type: "event", event });
     }
 
-    if (!toolsAttached) pushStandaloneTools(tools, turnStartedAt);
+    if (!toolsAttached) pushStandaloneTools(tools, turnStartedAt, !turnSettled);
     pushStandaloneSteers();
     if (mergedChangeSummary && !changeSummaryAttached) {
       items.push({ type: "event", event: mergedChangeSummary });

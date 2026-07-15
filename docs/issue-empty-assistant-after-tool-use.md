@@ -1,6 +1,6 @@
 # Issue：工具调用/子代理完成后助手正文缺失，需手动发送“继续”
 
-**状态**：已修复（v2.16.8 子代理正文提升到主时间线）  
+**状态**：持续修复（v2.16.8 提升子代理正文；v2.16.9 修复提前完成与运行中过程丢失）
 **严重度**：P1（功能丢失/用户体验）  
 **创建日期**：2026-07-15  
 **代码基线**：`2dc80ac7`（v2.16.6+）  
@@ -73,7 +73,7 @@ function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: Timeli
 | `mergeAssistantProcessEvents` 合并丢失 content | 排除 | 主时间线确实没有 contentful `assistant_message`；合并逻辑只会保留已有的内容 |
 | SDK/模型没有输出正文 | 排除 | 用户确认 Kimi 已输出正文；重开后可见 |
 | 需要自动继续 prompt | 排除 | 不是 turn 真的结束为空，而是正文被挂在子代理 scope 里 |
-| UI 状态判断错误（把运行中误判为完成） | 排除 | 第一张图中 `assistantFooterFallbackLabel` 显示“模型：...”，说明 `event.isComplete=true` 且 `roomAgentId` 存在，状态判断正确 |
+| UI 状态判断错误（把运行中误判为完成） | 已确认 | 真实 wire 中 `step.end(tool_use)` 后仍继续下一步；本地历史解析却把所有 `step.end` 映射成 `TurnEnd`，运行中快照可因此把 Assistant 提前标成完成 |
 
 ---
 
@@ -148,5 +148,7 @@ function collectSubagentAssistantOutput(subagents: SubagentEvent[]): { content: 
 ## 8. 备注
 
 - v2.16.8 已改为渲染层兜底：子代理 `events` 里的 `assistant_message` 内容会被提升到主时间线。
+- v2.16.9 根据真实会话 `session_57482f3b-a5e8-4f10-830d-765e27f4f0f7` 修正两条上游语义：只有 `step.end(end_turn)` 才是终态；运行中 Server snapshot 的过程事件少于本地时间线时禁止整表覆盖。
+- v2.16.9 的渲染层还让最新运行中回合服从 runtime 活跃状态，即使历史样本暂时带有完成标记，也不会显示“输出完成”。
 - 之前实现的自动继续兜底（`src/utils/autoContinue.ts`）已回滚，因为用户确认正文其实已被 Kimi 输出，不需要再发 prompt。
 - 若 v2.16.8 仍复现，下一步优先抓取该会话的 `events` 数组和主进程 SSE 日志，确认正文是否真的在 `subagent.events` 里。

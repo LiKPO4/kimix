@@ -245,6 +245,28 @@ describe("buildRenderItems usage footer", () => {
     expect(assistant?.type).toBe("event");
     if (assistant?.type !== "event") return;
     expect(assistant.trailingStatuses).toEqual([]);
+    expect(assistant.event.type === "assistant_message" && assistant.event.isComplete).toBe(false);
+  });
+
+  it("keeps a successful tool-only latest turn active while the runtime is still running", () => {
+    const items = buildRenderItems([{
+      id: "user-tool-only",
+      type: "user_message",
+      timestamp: 1,
+      content: "检查代码",
+    }, {
+      id: "tool-only",
+      type: "tool_call",
+      timestamp: 2,
+      toolCallId: "tool-only",
+      toolName: "Read",
+      status: "success",
+      arguments: {},
+    }], "kimi-code", undefined, true);
+    const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event" || assistant.event.type !== "assistant_message") return;
+    expect(assistant.event.isComplete).toBe(false);
   });
 
   it("shows only the final usage after the runtime turn settles", () => {

@@ -2,7 +2,7 @@ import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
 
-export function createToolOnlyAssistantEvent(tools: ToolCallEvent[]): Extract<TimelineEvent, { type: "assistant_message" }> {
+export function createToolOnlyAssistantEvent(tools: ToolCallEvent[], isTurnActive = false): Extract<TimelineEvent, { type: "assistant_message" }> {
   const first = tools[0];
   const last = tools[tools.length - 1] ?? first;
   const hasRunningTool = tools.some((tool) => tool.status === "running");
@@ -12,7 +12,7 @@ export function createToolOnlyAssistantEvent(tools: ToolCallEvent[]): Extract<Ti
     timestamp: first?.timestamp ?? Date.now(),
     content: "",
     isThinking: false,
-    isComplete: !hasRunningTool,
+    isComplete: !hasRunningTool && !isTurnActive,
     durationMs: last?.durationMs ?? Math.max(0, (last?.timestamp ?? first?.timestamp ?? 0) - (first?.timestamp ?? 0)),
     roomAgentId: first?.roomAgentId,
     roomMessageId: first?.roomMessageId,

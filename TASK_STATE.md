@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-15 v2.16.9 运行中提前完成与过程历史丢失
+
+- 当前目标：修复长工具链仍在运行时 Assistant 错误显示“输出完成”，以及运行中只剩最新思考/工具、旧过程突然消失的问题。
+- 根因：真实会话 `session_57482f3b-a5e8-4f10-830d-765e27f4f0f7` 的 wire 在同一 turn 内连续产生 `step.end(finishReason=tool_use)`；本地历史解析却把所有 `step.end` 都映射成整轮 `TurnEnd`。同时，4 秒静默期 Server snapshot 不包含完整工具调用，但 canonical 对账允许它仅因最新 thinking 不同覆盖本地更丰富时间线。
+- 已完成：只有 `end_turn` 才映射终态；canonical 过程事件数量少于本地时禁止破坏性替换；最新 runtime 活跃回合在渲染层强制保持未完成；工具-only 活跃回合同样不提前完成。版本号三处同步至 v2.16.9，并补充 wire 终态、过程倒退和运行中渲染回归测试。`pnpm typecheck` 通过；全量测试 89 个文件、673 项通过；`pnpm build` 通过，renderer 为 `assets/index-D_SuSWbp.js`；`pnpm knowledge:validate` 通过（9 个概念、17 个 Markdown、197 条链接）。
+- 未完成：等待用户真实长工具链复验。
+- 阻塞：无；不推送、不打 tag、不发布。
+- 关键文件：`electron/sessionHistory.ts`、`src/App.tsx`、`src/utils/kimiHistoryCache.ts`、`src/components/chat/ChatThread.tsx`、`src/utils/chatRenderItems.ts`、`docs/issue-empty-assistant-after-tool-use.md`。
+- 下一步：完成门禁并启动 v2.16.9；用户复测连续多工具场景，确认运行中不再显示完成且旧过程持续保留。
+
 ## 2026-07-15 v2.16.8 子代理正文提升到主时间线
 
 - 当前目标：修复"工具调用/子代理完成后，助手没有输出正文"的问题。

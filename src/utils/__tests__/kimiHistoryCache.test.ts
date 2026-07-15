@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { hasCanonicalKimiThinkingHistory, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasKimiProcessHistoryRegression, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
 
 const assistant: TimelineEvent = {
   id: "assistant",
@@ -42,6 +42,11 @@ describe("Kimi history cache migration", () => {
     expect(kimiHistoryProcessEventCount([assistant])).toBe(0);
     expect(kimiHistoryProcessEventCount([assistant, tool])).toBe(1);
     expect(hasRicherKimiProcessHistory([assistant], [assistant, tool])).toBe(true);
+  });
+
+  it("detects a partial canonical snapshot that would remove live process history", () => {
+    expect(hasKimiProcessHistoryRegression([assistant, tool], [assistant])).toBe(true);
+    expect(hasKimiProcessHistoryRegression([assistant], [assistant, tool])).toBe(false);
   });
 
   it("does not replace a richer local process timeline", () => {

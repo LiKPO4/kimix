@@ -460,7 +460,13 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
 
   // Loop events: content parts and step ends.
   if (record.type === "context.append_loop_event" && record.event && typeof record.event === "object") {
-    const event = record.event as { type?: unknown; part?: unknown; time?: unknown };
+    const event = record.event as {
+      type?: unknown;
+      part?: unknown;
+      time?: unknown;
+      finishReason?: unknown;
+      finish_reason?: unknown;
+    };
     if (event.type === "content.part" && event.part && typeof event.part === "object") {
       return { type: "ContentPart", payload: event.part, time: event.time ?? record.time };
     }
@@ -468,7 +474,16 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
       return { type: event.type, payload: event, time: event.time ?? record.time };
     }
     if (event.type === "step.end") {
-      return { type: "TurnEnd", payload: {}, time: event.time ?? record.time };
+      const finishReason = typeof event.finishReason === "string"
+        ? event.finishReason
+        : typeof event.finish_reason === "string"
+          ? event.finish_reason
+          : "";
+      // A tool_use step only separates two model/tool iterations inside the
+      // same turn. Treating it as TurnEnd makes the live card flash completed
+      // between tools and lets a partial history sample settle open work.
+      if (finishReason !== "end_turn") return null;
+      return { type: "TurnEnd", payload: { finishReason }, time: event.time ?? record.time };
     }
   }
 

@@ -31,6 +31,10 @@ export function hasRicherKimiProcessHistory(cached: TimelineEvent[], canonical: 
   return canonical.length > 0 && kimiHistoryProcessEventCount(canonical) > kimiHistoryProcessEventCount(cached);
 }
 
+export function hasKimiProcessHistoryRegression(cached: TimelineEvent[], canonical: TimelineEvent[]) {
+  return kimiHistoryProcessEventCount(canonical) < kimiHistoryProcessEventCount(cached);
+}
+
 function thinkingHistoryText(events: TimelineEvent[]) {
   return flattenTimelineEvents(events)
     .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")

@@ -60,7 +60,7 @@ import { useSettingsSync } from "@/hooks/useSettingsSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
-import { hasCanonicalKimiThinkingHistory, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasKimiProcessHistoryRegression, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { logError } from "@/utils/reportError";
 import {
   getRoomAgent,
@@ -244,6 +244,10 @@ function hasPossiblyLostUserImages(events: TimelineEvent[]) {
 
 function shouldReplaceWithCanonicalKimiHistory(cachedEvents: TimelineEvent[], canonicalEvents: TimelineEvent[]) {
   if (canonicalEvents.length === 0) return false;
+  // Server snapshots can contain the newest assistant text/thinking while
+  // omitting tool-call lifecycle frames. Never let such a partial snapshot
+  // destructively replace a richer live/local process timeline.
+  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents)) return false;
   const canonicalAssistantBody = assistantBodyText(canonicalEvents);
   const cachedAssistantBody = assistantBodyText(cachedEvents);
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);

@@ -171,6 +171,24 @@ describe("Kimi Code wire history", () => {
     ]);
   });
 
+  it("treats only end_turn step ends as terminal history events", () => {
+    expect(parseKimiCodeRecord({
+      type: "context.append_loop_event",
+      time: 100,
+      event: { type: "step.end", finishReason: "tool_use" },
+    })).toBeNull();
+
+    expect(parseKimiCodeRecord({
+      type: "context.append_loop_event",
+      time: 101,
+      event: { type: "step.end", finish_reason: "end_turn" },
+    })).toEqual({
+      type: "TurnEnd",
+      payload: { finishReason: "end_turn" },
+      time: 101,
+    });
+  });
+
   it("keeps history older than the former 2000-event parser limit", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-long-history-"));
     const workDir = path.join(home, "project");
