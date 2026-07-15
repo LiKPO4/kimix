@@ -21,6 +21,7 @@ import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCodeSessionUnavailableError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
+import { checkAutoContinueAfterEmptyTurn } from "@/utils/autoContinue";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
 import { selectStartupLocalSession, selectStartupProject } from "@/utils/startupContext";
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
@@ -1503,6 +1504,7 @@ function App() {
   const runtimeTerminalPollRef = useRef<Map<string, number>>(new Map());
   const runtimeLastStreamEventAtRef = useRef<Map<string, number>>(new Map());
   const runtimeHistoryRefreshAtRef = useRef<Map<string, number>>(new Map());
+  const autoContinuedTurnsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => window.api.onNotificationClick((payload) => {
     const sessionState = useSessionStore.getState();
@@ -2136,6 +2138,29 @@ function App() {
     });
     return true;
   };
+
+  const maybeAutoContinueAfterEmptyTurn = useCallback(async (uiSessionId: string, runtimeSessionId: string, roomAgentId?: string) => {
+    const session = useSessionStore.getState().sessions.find((s) => s.id === uiSessionId);
+    if (!session) return;
+    const appPermissionMode = useAppStore.getState().permissionMode;
+    const { shouldContinue, turnKey } = checkAutoContinueAfterEmptyTurn({
+      session,
+      roomAgentId,
+      appPermissionMode,
+      autoContinuedTurnKeys: autoContinuedTurnsRef.current,
+    });
+    if (!shouldContinue) return;
+
+    autoContinuedTurnsRef.current.add(turnKey);
+    console.log("[auto-continue] triggering empty-turn continuation", { uiSessionId, runtimeSessionId, roomAgentId });
+
+    setRunningSessionId(uiSessionId);
+    const res = await sendKimiCodePromptWithRetry({ sessionId: runtimeSessionId, content: "继续" });
+    if (!res.success) {
+      console.error("[auto-continue] failed", res.error);
+      setRunningSessionId(null);
+    }
+  }, [setRunningSessionId]);
 
   const dispatchNextPendingKimiMessage = async (uiSessionId: string, runtimeSessionId: string) => {
     if (pendingQueueDispatchRef.current.has(uiSessionId)) return false;
@@ -3027,6 +3052,17 @@ function App() {
         return;
       }
       enqueueStreamEvent(uiSessionId, mappedForRoom);
+      if (
+        mappedForRoom.type === "assistant_message" &&
+        mappedForRoom.isComplete &&
+        !mappedForRoom.content &&
+        !mappedForRoom.thinking &&
+        !targetSession?.longTask
+      ) {
+        setTimeout(() => {
+          void maybeAutoContinueAfterEmptyTurn(uiSessionId, payload.sessionId, roomAgentId);
+        }, 150);
+      }
       scheduleOfficialGoalRefresh(uiSessionId, payload.sessionId, roomAgentId);
       if ((mappedForRoom.type === "tool_call" || mappedForRoom.type === "tool_result") && roomAgentId) {
         updateSession(uiSessionId, (session) => {
@@ -3200,6 +3236,9 @@ function App() {
       runtimeHistoryRefreshAtRef.current.delete(statusRuntimeSessionId);
 
       flushStreamEvents();
+      if (terminalStatus === "completed") {
+        void maybeAutoContinueAfterEmptyTurn(uiSessionId, statusRuntimeSessionId, roomAgentId);
+      }
       void refreshOfficialGoalState(uiSessionId, statusRuntimeSessionId, roomAgentId);
       goalLastRefreshRef.current.set(`${uiSessionId}:${roomAgentId ?? "primary"}:${statusRuntimeSessionId}`, Date.now());
       const terminalActivity = roomAgentId
@@ -3523,7 +3562,7 @@ function App() {
     };
   // Runtime listeners own session continuity. Preference changes are read from
   // useAppStore at operation time and must never restart bootstrap or history recovery.
-  }, [setHandoffSessionId, setRunningSessionId, setRoomAgentActivity, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
+  }, [setHandoffSessionId, setRunningSessionId, setRoomAgentActivity, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode, maybeAutoContinueAfterEmptyTurn]);
 
   useEffect(() => {
     if (!runningSessionId && !activeRoomAgentActivitySignature && !activeRoomDeliverySignature) return;

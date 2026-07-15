@@ -1,14 +1,14 @@
 # Kimix 长程任务状态
 
-## 2026-07-15 工具调用/子代理后助手正文缺失（交接态）
+## 2026-07-15 v2.16.8 工具调用/子代理后空 turn 自动继续兜底
 
-- 当前目标：分析并记录"工具调用/子代理完成后，助手没有输出正文，用户必须手动发送'继续'才能继续生成"的问题，并把结论沉淀成可交接文档。
-- 根因（代码分析）：Kimi Code SDK 事件流与 Kimix 事件映射之间缺少"工具调用后必须产出正文"的兜底机制。`assistant.delta`/`ContentPart` 是 UI 正文的唯一来源；`TurnEnd` 被映射为 content 为空的 `assistant_message`；`mergeEvents` 在没有未完成 `assistant_message` 时会丢弃空 `TurnEnd`；主进程 `prompt()` 与 BTW 更新也只看 `assistant.delta`；`src/App.tsx` 事件流入口没有"空正文 + 已完成工具/子代理时自动继续"的兜底。
-- 已完成：读取关键代码路径并排除 UI 渲染、合并丢失、状态误判三种假设；写出问题文档 `docs/issue-empty-assistant-after-tool-use.md`；提交 `45e2345 docs: 记录工具调用后助手正文缺失问题（issue-empty-assistant-after-tool-use）`；工作区干净。
-- 未完成：未在主进程日志中复现并抓取 SSE 事件序列，确认 SDK 是否确实只发了 `tool.result` + `TurnEnd`；未导出"正文不显示"时的 `events` 数组快照；未对比关闭 Swarm 后是否仍复现；未实施任何代码修复。
-- 阻塞：无外部阻塞。下一步决策依赖复现并抓取主进程 SSE 日志，确认根因是 SDK/模型行为还是 Swarm 子代理归属错误。
-- 关键文件：`docs/issue-empty-assistant-after-tool-use.md`、`src/utils/eventMapper.ts`、`electron/kimiCodeHost.ts`、`src/App.tsx`。
-- 下一步：下一个 agent 优先在复现该问题时打开主进程调试日志，确认第一轮结束时 SDK 事件流里有没有 `assistant.delta` content。若只有 `tool.result` + `TurnEnd`，则根因是 SDK/模型行为；若正文出现在子代理 scope 里，则根因是 Swarm 归属问题。随后按文档第 6 节评估修复候选方案。
+- 当前目标：修复"工具调用/子代理完成后，助手没有输出正文，用户必须手动发送'继续'才能继续生成"的问题。
+- 根因：Kimi Code SDK 事件流与 Kimix 事件映射之间缺少"工具调用后必须产出正文"的兜底机制。`assistant.delta`/`ContentPart` 是 UI 正文的唯一来源；`TurnEnd` 被映射为 content 为空的 `assistant_message`；`mergeEvents` 在没有未完成 `assistant_message` 时会丢弃空 `TurnEnd`；主进程 `prompt()` 与 BTW 更新也只看 `assistant.delta`；`src/App.tsx` 事件流入口没有"空正文 + 已完成工具/子代理时自动继续"的兜底。
+- 已完成：实现渲染端自动继续兜底。新增 `src/utils/autoContinue.ts`，在 `auto`/`yolo` 权限模式下，当检测到当前 turn 已完成工具/子代理、没有助手正文/思考、没有待审批/待回答、且非长程任务时，自动向对应 runtime 发送"继续"，避免用户手动输入；同一 turn 只自动继续一次，防止无限循环。在 `onKimiCodeEvent` 收到空 `TurnEnd` 后延迟 150ms 检查，在 `onKimiCodeStatus` 收到 `completed` 后立即检查。新增 9 项单元测试覆盖手动权限、有正文、运行中、已完成工具、已完成子代理、重复继续、待审批、长程任务、非 Kimi Code 引擎等场景。版本号三处同步至 v2.16.8。`pnpm typecheck` 通过；全量测试 90 个文件、664 项通过；`pnpm build` 通过，renderer 为 `assets/index-D-17jiK2.js`；`pnpm knowledge:validate` 通过。
+- 未完成：未在主进程日志中复现并抓取 SSE 事件序列确认 SDK 是否确实只发了 `tool.result` + `TurnEnd`；未导出"正文不显示"时的 `events` 数组快照；未对比关闭 Swarm 后是否仍复现；未验证真实场景下兜底是否正确触发。
+- 阻塞：无外部阻塞。下一步依赖用户在真实场景复测，确认工具/子代理完成后是否仍出现空 turn。
+- 关键文件：`src/utils/autoContinue.ts`、`src/utils/__tests__/autoContinue.test.ts`、`src/App.tsx`、`docs/issue-empty-assistant-after-tool-use.md`。
+- 下一步：用户在 v2.16.8 复测相同提示词与工具链，确认工具/子代理完成后能自动继续并输出正文，无需手动发送"继续"；若仍复现，抓取主进程 SSE 日志和 `events` 快照进一步分析。本轮不推送、不打 tag、不发布。
 
 ## 2026-07-15 v2.16.7 renderer 重载启动恢复
 

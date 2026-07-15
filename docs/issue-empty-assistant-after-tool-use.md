@@ -1,6 +1,6 @@
 # Issue：工具调用/子代理完成后助手正文缺失，需手动发送“继续”
 
-**状态**：已确认（代码分析）  
+**状态**：已修复（v2.16.8 渲染端自动继续兜底）  
 **严重度**：P1（功能丢失/用户体验）  
 **创建日期**：2026-07-15  
 **代码基线**：`2dc80ac7`（v2.16.6+）  
@@ -140,17 +140,22 @@ BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kim
 
 ## 6. 修复候选方案
 
-### 方案 A：在 Kimix 侧加兜底自动继续（推荐先评估）
+### 方案 A：在 Kimix 侧加兜底自动继续（已实施 v2.16.8）
 
-在 `src/App.tsx` 处理 Kimi Code 事件流的位置，当检测到以下全部条件时，自动调用 `window.api.promptKimiCodeSession()` 发送一条轻量的继续提示：
+在 `src/App.tsx` 处理 Kimi Code 事件流的位置，当检测到以下全部条件时，自动调用 `sendKimiCodePromptWithRetry({ sessionId: runtimeSessionId, content: "继续" })` 发送一条轻量的继续提示：
 
 - 当前 turn 的 `assistant_message` content 为空；
 - 本轮存在已完成的工具调用或子代理；
 - 不是长程任务 / Goal 暂停 / 等待用户审批或澄清；
+- 权限模式为 `auto` 或 `yolo`（`manual` 模式下保留用户控制，不自动推进）；
 - 避免无限循环（记录本轮已自动继续一次）。
 
+实现位置：
+- `src/utils/autoContinue.ts`：纯函数 `checkAutoContinueAfterEmptyTurn`，负责条件判断。
+- `src/App.tsx`：`maybeAutoContinueAfterEmptyTurn` 在 `onKimiCodeEvent` 收到空 `TurnEnd` 后延迟 150ms 检查，在 `onKimiCodeStatus` 收到 `completed` 后立即检查。
+
 优点：不依赖 SDK/模型修复，立即可改善用户体验。  
-风险：可能改变模型原意；需要严格控制继续提示的措辞，避免把“故意分轮”也强制推进。
+风险：可能改变模型原意；当前实现通过权限模式、长程任务排除、待审批/待回答排除、单次循环保护来降低风险。若真实场景中仍误触发，可进一步收紧条件或改为仅显示“继续”按钮。
 
 ### 方案 B：SDK/模型层修复
 
@@ -179,6 +184,9 @@ BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kim
 | `src/utils/eventMapper.ts:597-610` | `attachScopedEventToSubagent`，子代理事件归属 |
 | `src/utils/eventMapper.ts:1298-1390` | `mergeEvents`，空 `TurnEnd` 丢弃逻辑 |
 | `src/App.tsx:2893-2999` | Kimi Code 事件流主入口 |
+| `src/App.tsx` | `maybeAutoContinueAfterEmptyTurn` 自动继续兜底 |
+| `src/utils/autoContinue.ts` | 空 turn 自动继续条件判断 |
+| `src/utils/__tests__/autoContinue.test.ts` | 自动继续单元测试 |
 | `src/components/chat/MessageBubble.tsx` | 消息渲染 |
 | `src/components/chat/MarkdownRenderer.tsx` | Markdown 正文渲染 |
 
@@ -186,6 +194,6 @@ BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kim
 
 ## 8. 备注
 
-- 当前工作区干净，无未提交改动。
-- 该问题尚未在主进程日志中复现确认，下一步优先复现并抓取 SSE 事件序列。
-- 若决定实施方案 A，建议先在小范围场景（非 Swarm、非长程任务）试点，并增加循环保护。
+- v2.16.8 已实现渲染端自动继续兜底。
+- 该问题尚未在主进程日志中复现确认；若 v2.16.8 仍复现，下一步仍优先抓取 SSE 事件序列，确认是 SDK/模型行为还是 Swarm 子代理归属问题。
+- 自动继续目前仅在 `auto`/`yolo` 权限模式下生效；`manual` 模式下用户需手动发送"继续"。
