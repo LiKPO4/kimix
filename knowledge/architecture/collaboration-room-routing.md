@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-15T17:17:56+08:00"
+timestamp: "2026-07-15T18:05:15+08:00"
 ---
 
 # Collaboration Room Routing
@@ -60,7 +60,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Cancel, steer, approval, question response, permission mutation, model mutation, Plan, Goal, Swarm, and slash session mutation require an explicit Agent/runtime owner.
 * A terminal event or Server-to-SDK migration for one Agent cannot clear or replace another Agent's activity or runtime binding.
 * Startup, background repair, running snapshots, and resume all derive an ordered runtime/official candidate list per Agent. A stale runtime may fall back only to another identity owned by the same Agent; recovery never borrows another participant's session.
-* Bootstrap delivery has replay-latest semantics in preload because the main process may emit its one-shot payload at `did-finish-load` before React registers a listener. Renderer bootstrap then waits until local session persistence has hydrated before selecting the saved active context. Room identity and secondary Agent bindings live in local state; missing the payload or selecting against an empty pre-hydration store may fall back to another project/new conversation and cannot be repaired by later catalog loading alone. Hydration failure still releases the gate so startup can degrade normally instead of hanging.
+* Bootstrap is a per-renderer-document recovery handshake rather than a process-lifetime one-shot event. The main process registers before loading the page and republishes on every `did-finish-load`, because a full reload recreates preload and its replay cache. Within one document, preload still replays the latest payload to late React subscribers; renderer then waits until local session persistence has hydrated before selecting the saved active context. Default-project preparation is scheduled once per app lifecycle only after the recovery payload has been sent, while recent-project persistence also runs after that send, skips an already remembered identity, and can retry after failure; neither may gate recovery. Room identity and secondary Agent bindings live in local state; a missing handshake leaves startup context unresolved, while selecting against an empty pre-hydration store would silently fall back to another project/new conversation and cannot be repaired by later catalog loading alone. Hydration failure still releases the gate so startup can degrade normally instead of hanging.
 * Server-to-SDK migration moves the target Agent's binding, activity, turn anchor, and polling ownership to the migrated runtime while leaving every other Agent unchanged.
 
 # Persistence and Catalog Authority

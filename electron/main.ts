@@ -30,9 +30,15 @@ import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import { activateWindow } from "./windowActivation";
+import {
+  createDeferredOnceTask,
+  createDistinctAsyncWriter,
+  publishStartupBootstrap,
+  registerStartupBootstrapPublisher,
+} from "./startupBootstrap";
 import * as longTaskService from "./longTaskService";
 import { parseReleaseAtom } from "./releaseFeed";
-import type { AppSettings, ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload } from "./types/ipc";
+import type { AppSettings, ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload, Project } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -2340,6 +2346,8 @@ function showMessageBoxSync(options: MessageBoxOptions) {
 }
 let isQuitting = false;
 let rendererReloadedAfterBlank = false;
+let rendererDocumentGeneration = 0;
+let rendererContentCheckTimer: NodeJS.Timeout | null = null;
 let taskbarAttentionActive = false;
 let taskbarOverlayIcon: Electron.NativeImage | null = null;
 let lastRendererHeartbeat: { receivedAt: number; payload: RendererHeartbeatPayload | null } | null = null;
@@ -2381,12 +2389,16 @@ const SKILL_SEARCH_IGNORES = new Set([
   ".cache",
 ]);
 
-function emitWindowState() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send("window:maximized-change", {
-    maximized: mainWindow.isMaximized(),
-    fullscreen: mainWindow.isFullScreen(),
+function emitWindowStateFor(win: BrowserWindow | null) {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send("window:maximized-change", {
+    maximized: win.isMaximized(),
+    fullscreen: win.isFullScreen(),
   });
+}
+
+function emitWindowState() {
+  emitWindowStateFor(mainWindow);
 }
 
 function getTaskbarOverlayIcon() {
@@ -2451,11 +2463,11 @@ function showTurnCompleteNotification(title: string, body: string, fallbackBody:
   notification.show();
 }
 
-function verifyRendererContent() {
-  const win = mainWindow;
-  if (!win || win.isDestroyed()) return;
-  setTimeout(() => {
-    if (!win || win.isDestroyed()) return;
+function verifyRendererContent(win: BrowserWindow, generation: number) {
+  if (rendererContentCheckTimer) clearTimeout(rendererContentCheckTimer);
+  rendererContentCheckTimer = setTimeout(() => {
+    rendererContentCheckTimer = null;
+    if (mainWindow !== win || win.isDestroyed() || generation !== rendererDocumentGeneration) return;
     win.webContents.executeJavaScript(`
       (() => {
         const root = document.getElementById("root");
@@ -2466,6 +2478,7 @@ function verifyRendererContent() {
         };
       })()
     `).then((result: { bodyTextLength: number; rootHtmlLength: number; rootChildCount: number }) => {
+      if (mainWindow !== win || win.isDestroyed() || generation !== rendererDocumentGeneration) return;
       if (result.rootHtmlLength === 0 && result.rootChildCount === 0 && !rendererReloadedAfterBlank) {
         rendererReloadedAfterBlank = true;
         console.log(`[RENDERER] content check rootHtml=${result.rootHtmlLength} bodyText=${result.bodyTextLength} children=${result.rootChildCount}`);
@@ -3801,25 +3814,10 @@ function mergeDirSync(src: string, dest: string) {
   }
 }
 
-function getDefaultProject() {
+function getDefaultProjectDescriptor(): Project {
   const packagedUserData = getPackagedUserDataDir();
   const workDir = path.join(packagedUserData, "default-project");
 
-  // Dev builds historically stored data under Electron's userData directory.
-  // One-time merge into the packaged Kimix location so dev and packaged builds share data.
-  if (!app.isPackaged) {
-    const devWorkDir = path.join(app.getPath("userData"), "default-project");
-    if (fs.existsSync(devWorkDir) && devWorkDir !== workDir) {
-      try {
-        fs.mkdirSync(packagedUserData, { recursive: true });
-        mergeDirSync(devWorkDir, workDir);
-      } catch {
-        // If merge fails, ensureDirectoryExists below still creates the target dir.
-      }
-    }
-  }
-
-  ensureDirectoryExists(workDir);
   return {
     id: DEFAULT_PROJECT_ID,
     path: workDir,
@@ -3828,8 +3826,48 @@ function getDefaultProject() {
   };
 }
 
+function getDefaultProject() {
+  const defaultProject = getDefaultProjectDescriptor();
+  const workDir = defaultProject.path;
+
+  // Dev builds historically stored data under Electron's userData directory.
+  // One-time merge into the packaged Kimix location so dev and packaged builds share data.
+  if (!app.isPackaged) {
+    const devWorkDir = path.join(app.getPath("userData"), "default-project");
+    const isSeparateDevDirectory = (
+      normalizePathForComparison(path.resolve(devWorkDir)) !==
+      normalizePathForComparison(path.resolve(workDir))
+    );
+    if (fs.existsSync(devWorkDir) && isSeparateDevDirectory) {
+      try {
+        fs.mkdirSync(path.dirname(workDir), { recursive: true });
+        mergeDirSync(devWorkDir, workDir);
+      } catch (error) {
+        console.warn("[startup-bootstrap] migrate-default-project failed:", error);
+        // If merge fails, ensureDirectoryExists below still creates the target dir.
+      }
+    }
+  }
+
+  ensureDirectoryExists(workDir);
+  return defaultProject;
+}
+
+const prepareDefaultProjectForStartup = createDeferredOnceTask(
+  () => { getDefaultProject(); },
+  (error) => {
+    console.warn("[startup-bootstrap] prepare-default-project failed:", error);
+  },
+);
+
+const rememberStartupProject = createDistinctAsyncWriter<Project>(
+  (project) => `${project.id}\0${normalizePathForComparison(path.resolve(project.path))}`,
+  projectService.addRecentProject,
+);
+
 function createWindow() {
   logMainStartup("createWindow:start");
+  rendererReloadedAfterBlank = false;
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -3859,30 +3897,43 @@ function createWindow() {
       mainWindow.webContents.send("kimi-code:status", payload);
     }
   });
-  if (DEV_SERVER_URL) {
-    logMainStartup("loadURL:start", DEV_SERVER_URL);
-    mainWindow.loadURL(DEV_SERVER_URL);
-  } else {
-    logMainStartup("loadFile:start");
-    mainWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
-  }
 
-  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
-    console.error(`[RENDERER] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
-  });
-  mainWindow.webContents.once("dom-ready", () => {
-    logMainStartup("dom-ready");
-  });
-  mainWindow.webContents.on("did-frame-finish-load", (_event, isMainFrame) => {
-    if (isMainFrame) logMainStartup("did-frame-finish-load");
-  });
-  mainWindow.webContents.once("did-finish-load", () => {
-    logMainStartup("did-finish-load");
-    void restoreLastContext();
-    emitWindowState();
-    verifyRendererContent();
+  const rendererWindow = mainWindow;
+  const disposeStartupBootstrap = registerStartupBootstrapPublisher({
+    add: (listener) => { rendererWindow.webContents.on("did-finish-load", listener); },
+    remove: (listener) => { rendererWindow.webContents.removeListener("did-finish-load", listener); },
+  }, () => {
+    rendererDocumentGeneration += 1;
+    const generation = rendererDocumentGeneration;
+    logMainStartup("did-finish-load", { generation });
+    void restoreLastContext(rendererWindow).catch((error) => {
+      console.error("[startup-bootstrap] failed to publish:", error);
+    });
+    // restoreLastContext sends synchronously before its first await. Directory
+    // migration is deliberately scheduled only after that recovery payload.
+    prepareDefaultProjectForStartup();
+    emitWindowStateFor(rendererWindow);
+    verifyRendererContent(rendererWindow, generation);
     startRendererWatchdog();
     scheduleKimiServerStartupAfterFirstPaint();
+  });
+
+  if (DEV_SERVER_URL) {
+    logMainStartup("loadURL:start", DEV_SERVER_URL);
+    rendererWindow.loadURL(DEV_SERVER_URL);
+  } else {
+    logMainStartup("loadFile:start");
+    rendererWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
+  }
+
+  rendererWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[RENDERER] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
+  });
+  rendererWindow.webContents.once("dom-ready", () => {
+    logMainStartup("dom-ready");
+  });
+  rendererWindow.webContents.on("did-frame-finish-load", (_event, isMainFrame) => {
+    if (isMainFrame) logMainStartup("did-frame-finish-load");
   });
 
   mainWindow.on("focus", clearTaskbarAttention);
@@ -3935,6 +3986,11 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => {
+    disposeStartupBootstrap();
+    if (rendererContentCheckTimer) {
+      clearTimeout(rendererContentCheckTimer);
+      rendererContentCheckTimer = null;
+    }
     stopRendererWatchdog();
     mainWindow = null;
     kimiCodeHost.setKimiCodeEventSink(null);
@@ -3962,28 +4018,41 @@ function scheduleKimiServerStartupAfterFirstPaint() {
   }, 2_000);
 }
 
-async function restoreLastContext() {
-  const recentProjects = projectService.getRecentProjects();
-  const defaultProject = getDefaultProject();
-  const recentProject = recentProjects[0];
-  const isDefaultProject = Boolean(recentProject && (
-    recentProject.id === DEFAULT_PROJECT_ID ||
-    path.resolve(recentProject.path) === path.resolve(defaultProject.path)
-  ));
-  const project = isDefaultProject
-    ? {
+async function restoreLastContext(rendererWindow: BrowserWindow) {
+  await publishStartupBootstrap({
+    resolveProject: () => {
+      const recentProjects = projectService.getRecentProjects();
+      const recentProject = recentProjects[0];
+      const defaultDescriptor = getDefaultProjectDescriptor();
+      const isDefaultProject = Boolean(recentProject && (
+        recentProject.id === DEFAULT_PROJECT_ID ||
+        path.resolve(recentProject.path) === path.resolve(defaultDescriptor.path)
+      ));
+      if (!recentProject) return defaultDescriptor;
+      if (!isDefaultProject) return recentProject;
+
+      return {
         ...recentProject,
         id: DEFAULT_PROJECT_ID,
-        path: defaultProject.path,
+        path: defaultDescriptor.path,
         name: DEFAULT_PROJECT_DISPLAY_NAME,
         lastOpenedAt: Date.now(),
-      }
-    : recentProject ?? defaultProject;
-
-  await projectService.addRecentProject(project);
-
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send("kimix:bootstrap", { project });
+      };
+    },
+    fallbackProject: getDefaultProjectDescriptor,
+    rememberProject: rememberStartupProject,
+    send: (payload) => {
+      if (
+        mainWindow !== rendererWindow ||
+        rendererWindow.isDestroyed() ||
+        rendererWindow.webContents.isDestroyed()
+      ) return;
+      rendererWindow.webContents.send("kimix:bootstrap", payload);
+    },
+    onError: (stage, error) => {
+      console.warn(`[startup-bootstrap] ${stage} failed:`, error);
+    },
+  });
 }
 
 // Project IPC handlers

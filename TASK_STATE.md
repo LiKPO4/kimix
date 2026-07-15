@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-15 v2.16.7 renderer 重载启动恢复
+
+- 当前目标：根治 Electron renderer 重载后侧栏已有项目和会话、主区却永久停在“正在准备默认项目”的启动握手断层。
+- 根因：主进程只用一次性 `did-finish-load` 发送 bootstrap；完整重载会重建 renderer 与 preload、清空 replay 缓存，但主进程不再发送。单实例 BAT 再次启动只激活旧窗口，因此开发热重载后的坏状态会被直接带回前台。
+- 已完成：bootstrap 监听改为在页面加载前注册，并对每个 renderer 文档重复发布；默认项目迁移/目录准备只在 bootstrap 已发送后按应用生命周期延后执行一次，Windows 下仅大小写不同的同一路径不再被误判为迁移源；最近项目写入移到发送之后，按项目身份合并并发写入、成功后跳过重复写盘、失败后允许重试；默认项目解析失败时仍发送安全描述；空白页检查按文档代次取消过期任务。版本号三处同步至 v2.16.7。定向测试 4 个文件、17 项通过；`pnpm typecheck` 通过；全量测试 89 个文件、655 项通过；`pnpm build` 通过，renderer 为 `assets/index-BzZlgYw2.js`；`pnpm knowledge:validate` 通过。最终 v2.16.7 dev 首次加载生成 bootstrap generation 1，并恢复到保存的 Project06 会话 `session_acb48323-ab73-44d8-9640-6304d2466a1f`；随后通过正式 Ctrl+R 路径完整重载，主进程生成 generation 2，renderer 再次恢复同一会话，现场检查确认 v2.16.7、Project06 和原消息流均正常，且重载前后 `projects.json` 的时间戳与 SHA-256 均未变化。
+- 未完成：等待用户从 BAT 再次启动或手动重载做最终使用侧验收。
+- 阻塞：无；不推送、不打 tag、不发布。
+- 关键文件：`electron/main.ts`、`electron/startupBootstrap.ts`、`src/utils/__tests__/startupBootstrapMain.test.ts`、`knowledge/architecture/collaboration-room-routing.md`、`docs/release-notes/v2.16.7.md`。
+- 下一步：提交本轮修复；用户确认 v2.16.7 再次启动、Ctrl+R 或开发热重载后不再停在“正在准备默认项目”。
+
 ## 2026-07-15 v2.16.6 房间用户消息投递身份根治
 
 - 当前目标：根治多 Agent 房间单次发送在运行中或重启后投影为两条相同用户消息的问题，不再用显示层去重掩盖底层身份丢失。
