@@ -291,6 +291,26 @@ describe("buildRenderItems usage footer", () => {
   });
 });
 
+describe("buildRenderItems completed turn cache", () => {
+  it("reuses a completed Assistant render item while rebuilding the active turn", () => {
+    const completedUser: TimelineEvent = { id: "user-1", type: "user_message", timestamp: 1, content: "第一轮" };
+    const completedAssistant: TimelineEvent = { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "稳定正文", isThinking: false, isComplete: true };
+    const activeUser: TimelineEvent = { id: "user-2", type: "user_message", timestamp: 3, content: "第二轮" };
+    const activeAssistant: TimelineEvent = { id: "assistant-2", type: "assistant_message", timestamp: 4, content: "流式", isThinking: false, isComplete: false };
+    const cache = new Map();
+    const first = buildRenderItems([completedUser, completedAssistant, activeUser, activeAssistant], "kimi-code", undefined, true, undefined, cache);
+    const updatedActiveAssistant: TimelineEvent = { ...activeAssistant, content: "流式增长" };
+    const second = buildRenderItems([completedUser, completedAssistant, activeUser, updatedActiveAssistant], "kimi-code", undefined, true, undefined, cache);
+    const firstCompleted = first.find((item) => item.type === "event" && item.event.id === completedAssistant.id);
+    const secondCompleted = second.find((item) => item.type === "event" && item.event.id === completedAssistant.id);
+    const firstActive = first.find((item) => item.type === "event" && item.event.id === activeAssistant.id);
+    const secondActive = second.find((item) => item.type === "event" && item.event.id === activeAssistant.id);
+
+    expect(secondCompleted).toBe(firstCompleted);
+    expect(secondActive).not.toBe(firstActive);
+  });
+});
+
 describe("filterStatusUpdates room isolation", () => {
   it("keeps the final status for every Agent turn in turn-end mode", () => {
     const statuses: TimelineEvent[] = [{

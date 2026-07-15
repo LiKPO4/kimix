@@ -35,11 +35,17 @@ import {
   type ChatProcessCollapseViewportDetail,
 } from "@/utils/chatViewportTransaction";
 
-type RenderItem =
+export type RenderItem =
   | { type: "event"; event: TimelineEvent; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
   | { type: "tool_group"; id: string; tools: ToolCallEvent[] }
   | { type: "plan_preview"; id: string; path: string; projectPath?: string }
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
+
+export interface CompletedTurnRenderCacheEntry {
+  events: TimelineEvent[];
+  items: RenderItem[];
+  sessionEngine?: "prompt" | "kimi-code";
+}
 
 type ViewportAnchor = { key: string; offsetTop: number };
 type ResizeViewportAnchor = ViewportAnchor & { userScrollGeneration: number };
@@ -532,8 +538,10 @@ export function buildRenderItems(
   attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
   isSessionRunning = false,
   activeRoomAgentIds?: ReadonlySet<string>,
+  completedTurnCache?: Map<string, CompletedTurnRenderCacheEntry>,
 ): RenderItem[] {
   const items: RenderItem[] = [];
+  const usedCompletedTurnCacheKeys = new Set<string>();
 
   const pushStandaloneTools = (tools: ToolCallEvent[], turnStartedAt?: number, isTurnActive = false) => {
     if (tools.length === 0) return;
@@ -746,8 +754,53 @@ export function buildRenderItems(
   let turnBody: TimelineEvent[] = [];
   let currentTurnStartedAt: number | undefined;
   let currentAgentTurnId: string | undefined;
+  const canCacheTurn = (turnEvents: TimelineEvent[], isLatestTurn: boolean) => {
+    if (!completedTurnCache || turnEvents.length === 0) return false;
+    if (isLatestTurn && isSessionRunning && !turnEvents.some((event) => event.roomAgentId)) return false;
+    if (turnEvents.some((event) => event.roomAgentId && activeRoomAgentIds?.has(event.roomAgentId))) return false;
+    return !turnEvents.some((event) => (
+      (event.type === "assistant_message" && !event.isComplete) ||
+      (event.type === "tool_call" && event.status === "running") ||
+      (event.type === "subagent" && (event.status === "queued" || event.status === "running" || event.status === "suspended")) ||
+      (event.type === "approval_request" && event.status === "pending") ||
+      (event.type === "question_request" && event.status === "pending") ||
+      (event.type === "steer_message" && (event.status === "sending" || event.status === "accepted")) ||
+      (event.type === "compaction" && event.phase === "begin")
+    ));
+  };
+  const completedTurnCacheKey = (turnEvents: TimelineEvent[]) => {
+    const first = turnEvents[0];
+    const agentTurnId = turnEvents.find((event) => event.agentTurnId)?.agentTurnId;
+    const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
+    return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${currentTurnStartedAt ?? first.timestamp}`;
+  };
+  const renderCachedTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false) => {
+    if (!canCacheTurn(turnEvents, isLatestTurn) || !completedTurnCache) {
+      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn);
+      return;
+    }
+    const cacheKey = completedTurnCacheKey(turnEvents);
+    usedCompletedTurnCacheKeys.add(cacheKey);
+    const cached = completedTurnCache.get(cacheKey);
+    if (
+      cached &&
+      cached.sessionEngine === sessionEngine &&
+      cached.events.length === turnEvents.length &&
+      cached.events.every((event, index) => event === turnEvents[index])
+    ) {
+      items.push(...cached.items);
+      return;
+    }
+    const itemStart = items.length;
+    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn);
+    completedTurnCache.set(cacheKey, {
+      events: [...turnEvents],
+      items: items.slice(itemStart),
+      sessionEngine,
+    });
+  };
   const flushTurn = (isLatestTurn = false) => {
-    renderTurnBody(turnBody, currentTurnStartedAt, isLatestTurn);
+    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn);
     turnBody = [];
     currentAgentTurnId = undefined;
   };
@@ -773,6 +826,11 @@ export function buildRenderItems(
     turnBody.push(event);
   }
   flushTurn(true);
+  if (completedTurnCache) {
+    for (const cacheKey of completedTurnCache.keys()) {
+      if (!usedCompletedTurnCacheKeys.has(cacheKey)) completedTurnCache.delete(cacheKey);
+    }
+  }
   return items;
 }
 
@@ -919,6 +977,8 @@ export const ChatThread = memo(function ChatThread() {
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const completedTurnRenderCacheRef = useRef(new Map<string, CompletedTurnRenderCacheEntry>());
+  const completedTurnRenderCacheSessionIdRef = useRef<string | undefined>(undefined);
 
   const roomTimeline = useMemo(() => session ? projectCollaborationTimeline(session) : [], [session]);
   const splitEvents = useMemo(
@@ -938,8 +998,12 @@ export const ChatThread = memo(function ChatThread() {
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   )));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
+  if (completedTurnRenderCacheSessionIdRef.current !== session?.id) {
+    completedTurnRenderCacheRef.current.clear();
+    completedTurnRenderCacheSessionIdRef.current = session?.id;
+  }
   const renderItems = useMemo(
-    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds),
+    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds, completedTurnRenderCacheRef.current),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds]
   );
   const latestProcessAssistantEventId = useMemo(() => {
