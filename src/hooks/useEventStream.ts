@@ -17,6 +17,38 @@ import {
 
 const STREAM_EVENT_FLUSH_MS = 80;
 
+function canCoalesceAssistantDelta(previous: TimelineEvent, incoming: TimelineEvent): boolean {
+  return previous.type === "assistant_message" &&
+    incoming.type === "assistant_message" &&
+    !previous.isComplete &&
+    !incoming.isComplete &&
+    previous.roomAgentId === incoming.roomAgentId &&
+    previous.roomMessageId === incoming.roomMessageId &&
+    previous.agentTurnId === incoming.agentTurnId &&
+    previous.dispatchAttemptId === incoming.dispatchAttemptId &&
+    previous.agentId === incoming.agentId &&
+    previous.agentRole === incoming.agentRole &&
+    previous.model === incoming.model;
+}
+
+export function coalesceStreamEventBatch(items: TimelineEvent[]): TimelineEvent[] {
+  const coalesced: TimelineEvent[] = [];
+  for (const item of items) {
+    const previous = coalesced.at(-1);
+    if (!previous || !canCoalesceAssistantDelta(previous, item)) {
+      coalesced.push(item);
+      continue;
+    }
+    const merged = mergeEvents([previous], item);
+    if (merged.length === 1 && merged[0].type === "assistant_message") {
+      coalesced[coalesced.length - 1] = merged[0];
+    } else {
+      coalesced.push(item);
+    }
+  }
+  return coalesced;
+}
+
 export function useEventStream() {
   const streamBatchRef = useRef<Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>>(new Map());
   const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -30,7 +62,7 @@ export function useEventStream() {
     batches.forEach(({ roomId, roomAgentId, items }) => {
       updateSession(roomId, (session) => {
         let events = getRoomAgentEvents(session, roomAgentId);
-        for (const item of items) {
+        for (const item of coalesceStreamEventBatch(items)) {
           events = mergeEvents(events, item);
         }
         const agent = getRoomAgent(session, roomAgentId);

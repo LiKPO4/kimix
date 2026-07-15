@@ -4,7 +4,7 @@
 
 - 当前目标：对齐官方 Kimi Web 的消息流关键优化，解决单轮 Assistant 正文持续增长时卡顿随内容长度明显放大的问题。
 - 对比结论：Kimix 已有 80ms 流事件批处理，主要瓶颈不是事件频率，而是批次内逐事件合并、完整时间线重复派生、运行中正文重复规范化、`react-markdown` 全文重解析，以及 `contentVersion`、`ResizeObserver`、`MutationObserver` 叠加触发布局跟随。官方 Web 使用稳定 `LiveMessage`、Streamdown 分块 Markdown 和 `react-virtuoso`；其中分块 Markdown 是单轮长消息的首要差异，虚拟列表主要改善长历史。
-- 已完成：完成 Kimix 与官方仓库 `MoonshotAI/kimi-cli@ded99b4` 的静态代码对比，确认官方 `ContentPart` 同样近似逐事件更新，但 Streamdown 会将流式 Markdown 切成稳定块，只重解析增长中的尾块。阶段 1 已在 v2.16.10 落地：运行中 Assistant 使用 `marked` Lexer 切分顶层 Markdown 块，各块继续复用现有 `ReactMarkdown`，已完成块由 memo 保持稳定、只让尾块随流更新；完成态仍走原渲染路径。直接引入 Streamdown 曾导致 137 个额外包及大量 Shiki/Mermaid chunk，已撤回并改为单依赖 `marked@16.2.1`。阶段 2 已在 v2.16.11 落地：Assistant 段落/表格/围栏修复统一移入 `MarkdownRenderer`，正文不再先后规范化两次；`.md` 文件卡片全文正则只在消息完成后运行。新增规范化路径回归；严格类型检查、90 个测试文件 675 项、生产构建和知识校验通过，renderer 为 `assets/index-CIRYgHTg.js`。
+- 已完成：完成 Kimix 与官方仓库 `MoonshotAI/kimi-cli@ded99b4` 的静态代码对比，确认官方 `ContentPart` 同样近似逐事件更新，但 Streamdown 会将流式 Markdown 切成稳定块，只重解析增长中的尾块。阶段 1 已在 v2.16.10 落地：运行中 Assistant 使用 `marked` Lexer 切分顶层 Markdown 块，各块继续复用现有 `ReactMarkdown`，已完成块由 memo 保持稳定、只让尾块随流更新；完成态仍走原渲染路径。直接引入 Streamdown 曾导致 137 个额外包及大量 Shiki/Mermaid chunk，已撤回并改为单依赖 `marked@16.2.1`。阶段 2 已在 v2.16.11 落地：Assistant 段落/表格/围栏修复统一移入 `MarkdownRenderer`，正文不再先后规范化两次；`.md` 文件卡片全文正则只在消息完成后运行。阶段 3 已在 v2.16.12 落地：同一 80ms 批次内、相同 Agent/turn/投递身份的相邻未完成正文与思考 delta 先在小数组中合并，再只对完整 Session 时间线执行一次 `mergeEvents`；终态、工具边界和不同 turn 保持独立。新增批次合并边界回归；严格类型检查、91 个测试文件 677 项、生产构建和知识校验通过，renderer 为 `assets/index-C_9vY8wZ.js`。
 - 待办与执行顺序：
   1. 为运行中的 Assistant 接入分块流式 Markdown 渲染，并保留完成态现有渲染作为首阶段回滚边界。
   2. 消除 `MessageBubble` 与 `MarkdownRenderer` 的重复正文规范化，将 `.md` 文件提取等非实时全文扫描延迟到消息完成后。
@@ -12,10 +12,10 @@
   4. 缓存已完成轮次的 `RenderItem`，只重建活动轮并保持历史 Assistant 对象引用稳定。
   5. 收敛 `contentVersion`、`ResizeObserver`、`MutationObserver` 的重复滚动与尺寸测量职责。
   6. 评估并接入消息列表虚拟化；明确它主要解决长历史，不作为单轮长正文的首要修复。
-- 未完成：阶段 3–6 待实施；每阶段单独验证、检查 diff 并提交。阶段 1–2 尚待用户用真实单轮长回复观察流畅度和完成瞬间样式切换。
+- 未完成：阶段 4–6 待实施；每阶段单独验证、检查 diff 并提交。阶段 1–3 尚待用户用真实单轮长回复观察流畅度和完成瞬间样式切换。
 - 阻塞：无；不推送、不打 tag、不发布。新增依赖必须说明理由与回滚方式。
 - 关键文件：`src/hooks/useEventStream.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/components/chat/MarkdownRenderer.tsx`。
-- 下一步：提交阶段 2；随后执行阶段 3，在 80ms flush 内合并连续正文/思考增量。
+- 下一步：提交阶段 3；随后执行阶段 4，缓存已完成轮次的 `RenderItem` 并保持历史 Assistant 引用稳定。
 
 ## 2026-07-15 v2.16.9 运行中提前完成与过程历史丢失
 
