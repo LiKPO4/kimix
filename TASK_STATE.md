@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-15 v2.16.3 完全访问短标签
+
+- 当前目标：缩短 Composer 的完全访问权限标签，避免窄工具栏中出现省略。
+- 根因：Composer 的权限菜单和当前按钮仍使用“完全访问权限”，与设置页、添加 Agent 弹窗已经采用的“完全访问”不一致。
+- 已完成：Composer 两处用户可见文案统一为“完全访问”，底层 `yolo` 模式、自动批准行为和风险提示保持不变；版本号三处同步至 v2.16.3。`pnpm typecheck` 通过；全量测试 87 个文件、622 项通过；`pnpm build` 通过，renderer 为 `assets/index-CElwOnN9.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。
+- 未完成：等待用户视觉验收。
+- 阻塞：无。
+- 关键文件：`src/components/chat/Composer.tsx`、`package.json`、`docs/release-notes/v2.16.3.md`。
+- 下一步：用户确认 v2.16.3 工具栏按钮和权限菜单均显示“完全访问”且不再省略；本轮不推送、不打 tag、不发布。
+
 ## 2026-07-14 v2.16.2 项目展开与启动上下文恢复
 
 - 当前目标：完整修复项目展开/折叠状态未持久化，以及启动时可能进入非退出前项目或会话的问题。
