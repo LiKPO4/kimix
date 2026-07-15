@@ -1969,13 +1969,15 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-preview-close,
+.kimix-preview-nav,
 .kimix-preview-toast {
   background: var(--surface-elevated);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
 }
 
-.kimix-preview-close:hover {
+.kimix-preview-close:hover,
+.kimix-preview-nav:hover:not(:disabled) {
   background: var(--surface-hover);
 }
 

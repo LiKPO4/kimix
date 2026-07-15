@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPreviewImageIndex, type PreviewImage } from "../ImagePreviewOverlay";
+import { findPreviewImageIndex, getPreviewImageNeighbor, type PreviewImage } from "../ImagePreviewOverlay";
 
 const img: PreviewImage = { name: "a.png", dataUrl: "data:a", id: "img-1" };
 const imgNoId: PreviewImage = { name: "b.png", dataUrl: "data:b" };
@@ -31,5 +31,38 @@ describe("findPreviewImageIndex", () => {
 
   it("returns -1 for an empty list", () => {
     expect(findPreviewImageIndex(img, [])).toBe(-1);
+  });
+});
+
+describe("getPreviewImageNeighbor", () => {
+  it("returns the previous image", () => {
+    expect(getPreviewImageNeighbor(list[1], list, -1)).toBe(list[0]);
+  });
+
+  it("returns the next image", () => {
+    expect(getPreviewImageNeighbor(list[0], list, 1)).toBe(list[1]);
+  });
+
+  it("returns null at the first image when going backward", () => {
+    expect(getPreviewImageNeighbor(list[0], list, -1)).toBeNull();
+  });
+
+  it("returns null at the last image when going forward", () => {
+    expect(getPreviewImageNeighbor(list[2], list, 1)).toBeNull();
+  });
+
+  it("returns null when current image is not in the list", () => {
+    const unknown: PreviewImage = { name: "x.png", dataUrl: "data:x" };
+    expect(getPreviewImageNeighbor(unknown, list, 1)).toBeNull();
+  });
+
+  it("returns null for an empty list", () => {
+    expect(getPreviewImageNeighbor(img, [], -1)).toBeNull();
+    expect(getPreviewImageNeighbor(img, [], 1)).toBeNull();
+  });
+
+  it("matches by dataUrl when id is not found", () => {
+    const orphan = { name: "d.png", dataUrl: "data:a", id: "img-missing" };
+    expect(getPreviewImageNeighbor(orphan, list, 1)).toBe(list[1]);
   });
 });

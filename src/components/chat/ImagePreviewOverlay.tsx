@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Copy, Palette, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Palette, X } from "lucide-react";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 
 export type PreviewImage = {
@@ -13,6 +13,18 @@ export function findPreviewImageIndex(current: PreviewImage, images: PreviewImag
   return images.findIndex((item) => (
     (current.id && item.id === current.id) || item.dataUrl === current.dataUrl
   ));
+}
+
+export function getPreviewImageNeighbor(
+  current: PreviewImage,
+  images: PreviewImage[],
+  direction: -1 | 1,
+): PreviewImage | null {
+  const index = findPreviewImageIndex(current, images);
+  if (index === -1) return null;
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= images.length) return null;
+  return images[nextIndex];
 }
 
 type ImagePreviewOverlayProps = {
@@ -28,6 +40,18 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
   const [contextMenu, setContextMenu] = useState<{ left: number; top: number } | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const previewImages = images?.length ? images : [image];
+  const canNavigate = previewImages.length > 1;
+  const currentIndex = findPreviewImageIndex(image, previewImages);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < previewImages.length - 1;
+
+  const navigate = (direction: -1 | 1) => {
+    if (!canNavigate) return;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= previewImages.length) return;
+    setContextMenu(null);
+    onNavigate?.(previewImages[nextIndex]);
+  };
 
   useEffect(() => {
     overlayRef.current?.focus();
@@ -41,7 +65,7 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
       onClose();
       return;
     }
-    if (previewImages.length < 2) return;
+    if (!canNavigate) return;
     const direction = event.key === "ArrowLeft" || event.key === "ArrowUp"
       ? -1
       : event.key === "ArrowRight" || event.key === "ArrowDown"
@@ -50,12 +74,7 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
     if (!direction) return;
     event.preventDefault();
     event.stopPropagation();
-    const currentIndex = findPreviewImageIndex(image, previewImages);
-    if (currentIndex === -1) return;
-    const nextIndex = currentIndex + direction;
-    if (nextIndex < 0 || nextIndex >= previewImages.length) return;
-    setContextMenu(null);
-    onNavigate?.(previewImages[nextIndex]);
+    navigate(direction as -1 | 1);
   };
 
   const handleCopyImage = async () => {
@@ -99,6 +118,38 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
             <X size={20} />
           </button>
         </div>
+        {canNavigate && (
+          <>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(-1);
+              }}
+              disabled={!hasPrev}
+              className="kimix-preview-nav absolute left-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+              style={{ left: 24 }}
+              title="上一张"
+              aria-label="上一张图片"
+            >
+              <ChevronLeft size={26} />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(1);
+              }}
+              disabled={!hasNext}
+              className="kimix-preview-nav absolute right-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+              style={{ right: 24 }}
+              title="下一张"
+              aria-label="下一张图片"
+            >
+              <ChevronRight size={26} />
+            </button>
+          </>
+        )}
         <div
           className="flex max-h-[88vh] max-w-[88vw] flex-col items-center"
           style={{ gap: 14 }}
