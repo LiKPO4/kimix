@@ -140,6 +140,209 @@ describe("collaborationRooms", () => {
     ]);
   });
 
+  it("preserves the primary delivery transaction when a newer legacy mirror has the same turn", () => {
+    const primaryEvent: TimelineEvent = {
+      id: "canonical-old",
+      type: "user_message",
+      timestamp: 100,
+      content: "Review",
+      roomMessageId: "message-stable",
+      agentTurnId: "turn-stable",
+      dispatchAttemptId: "attempt-stable",
+    };
+    const session = legacySession([primaryEvent]);
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const secondary = secondaryAgent();
+    const originalMessage = collaboration.messages[0];
+    const room: Session = {
+      ...session,
+      updatedAt: 500,
+      events: [{ ...primaryEvent, id: "canonical-latest", timestamp: 400 }],
+      collaboration: {
+        ...collaboration,
+        primaryMirrorUpdatedAt: 200,
+        agents: [primary, secondary],
+        messages: [{
+          ...originalMessage,
+          outboundContent: "Review",
+          recipientAgentIds: [secondary.id, primary.id],
+          deliveries: {
+            [secondary.id]: {
+              status: "completed",
+              agentTurnId: "turn-secondary",
+              officialUserEventId: "secondary-user",
+            },
+            [primary.id]: {
+              status: "running",
+              agentTurnId: "turn-stable",
+              dispatchAttemptId: "attempt-stable",
+              officialPromptId: "prompt-stable",
+              officialUserEventId: "canonical-old",
+              createdAt: 101,
+              updatedAt: 102,
+              previousAttempts: [{
+                dispatchAttemptId: "attempt-previous",
+                agentTurnId: "turn-previous",
+                status: "failed",
+                createdAt: 90,
+                updatedAt: 91,
+              }],
+              contextShare: {
+                mode: "last",
+                bridgeId: "bridge-stable",
+                entryIds: ["entry-1"],
+                content: "Context",
+                contentChars: 7,
+                createdAt: 99,
+              },
+            },
+          },
+        }],
+        agentEvents: {
+          [primary.id]: [primaryEvent],
+          [secondary.id]: [{
+            id: "secondary-user",
+            type: "user_message",
+            timestamp: 100,
+            content: "Review",
+            roomAgentId: secondary.id,
+          }],
+        },
+      },
+    };
+
+    const normalized = normalizeLoadedSessionCollaboration(room);
+    const message = normalized.collaboration?.messages[0];
+    expect(message?.recipientAgentIds).toEqual([secondary.id, primary.id]);
+    expect(message?.outboundContent).toBe("Review");
+    expect(message?.deliveries[primary.id]).toMatchObject({
+      status: "accepted",
+      agentTurnId: "turn-stable",
+      dispatchAttemptId: "attempt-stable",
+      officialPromptId: "prompt-stable",
+      officialUserEventId: "canonical-latest",
+      createdAt: 101,
+      updatedAt: 102,
+      previousAttempts: [expect.objectContaining({ dispatchAttemptId: "attempt-previous" })],
+      contextShare: expect.objectContaining({ bridgeId: "bridge-stable" }),
+    });
+    expect(message?.deliveries[secondary.id]).toMatchObject({ agentTurnId: "turn-secondary" });
+  });
+
+  it("repairs only one unambiguous attempt id and leaves conflicting attempts untouched", () => {
+    const primaryEvent: TimelineEvent = {
+      id: "canonical-user",
+      type: "user_message",
+      timestamp: 100,
+      content: "Repair",
+      roomMessageId: "message-repair",
+      agentTurnId: "turn-repair",
+      dispatchAttemptId: "attempt-repair",
+    };
+    const session = legacySession([primaryEvent]);
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const damagedMessage = {
+      ...collaboration.messages[0],
+      deliveries: {
+        [primary.id]: {
+          status: "completed" as const,
+          agentTurnId: "turn-repair",
+          officialUserEventId: "canonical-user",
+        },
+      },
+    };
+    const repaired = normalizeLoadedSessionCollaboration({
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [damagedMessage],
+        agentEvents: {
+          [primary.id]: [
+            primaryEvent,
+            { ...primaryEvent, id: "canonical-same-attempt-alias" },
+          ],
+        },
+      },
+    });
+    expect(repaired.collaboration?.messages[0].deliveries[primary.id].dispatchAttemptId)
+      .toBe("attempt-repair");
+
+    const conflicting = normalizeLoadedSessionCollaboration({
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [damagedMessage],
+        agentEvents: {
+          [primary.id]: [
+            primaryEvent,
+            { ...primaryEvent, id: "canonical-same-attempt-alias" },
+            { ...primaryEvent, id: "canonical-alias", dispatchAttemptId: "attempt-conflict" },
+          ],
+        },
+      },
+    });
+    expect(conflicting.collaboration?.messages[0].deliveries[primary.id].dispatchAttemptId)
+      .toBeUndefined();
+  });
+
+  it("does not carry attempt-specific metadata across an explicit attempt change", () => {
+    const oldEvent: TimelineEvent = {
+      id: "canonical-old-attempt",
+      type: "user_message",
+      timestamp: 100,
+      content: "Retry",
+      roomMessageId: "message-retry",
+      agentTurnId: "turn-retry",
+      dispatchAttemptId: "attempt-old",
+    };
+    const session = legacySession([oldEvent]);
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      updatedAt: 500,
+      events: [{ ...oldEvent, id: "canonical-new-attempt", dispatchAttemptId: "attempt-new" }],
+      collaboration: {
+        ...collaboration,
+        primaryMirrorUpdatedAt: 200,
+        messages: collaboration.messages.map((message) => ({
+          ...message,
+          deliveries: {
+            [primary.id]: {
+              ...message.deliveries[primary.id],
+              officialPromptId: "prompt-old",
+              error: "old attempt failed",
+              previousAttempts: [{
+                dispatchAttemptId: "attempt-previous",
+                agentTurnId: "turn-previous",
+                status: "failed",
+                createdAt: 90,
+                updatedAt: 91,
+              }],
+            },
+          },
+        })),
+      },
+    };
+
+    expect(normalizeLoadedSessionCollaboration(room).collaboration?.messages[0].deliveries[primary.id])
+      .toEqual({
+        status: "accepted",
+        agentTurnId: "turn-retry",
+        dispatchAttemptId: "attempt-new",
+        officialUserEventId: "canonical-new-attempt",
+        previousAttempts: [{
+          dispatchAttemptId: "attempt-previous",
+          agentTurnId: "turn-previous",
+          status: "failed",
+          createdAt: 90,
+          updatedAt: 91,
+        }],
+      });
+  });
+
   it("keeps future and invalid collaboration payloads opaque instead of downgrading them", () => {
     const session = legacySession();
     const futureRaw = { schemaVersion: 2, futureAgents: [{ id: "future" }] };

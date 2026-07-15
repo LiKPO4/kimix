@@ -2,6 +2,7 @@ import type {
   CollaborationState,
   PermissionMode,
   RoomAgent,
+  RoomAgentDelivery,
   RoomAgentDeliveryStatus,
   RoomUserMessage,
   Session,
@@ -462,11 +463,16 @@ function inferDeliveryStatus(events: TimelineEvent[], userEventIndex: number): R
   return "accepted";
 }
 
-function createLegacyRoomMessages(session: Session, primaryAgentId: string): RoomUserMessage[] {
+function createLegacyRoomMessages(
+  session: Session,
+  primaryAgentId: string,
+  existingMessages?: ReadonlyMap<string, RoomUserMessage>,
+): RoomUserMessage[] {
   return session.events.flatMap((event, index) => {
     if (event.type !== "user_message") return [];
     const roomMessageId = event.roomMessageId ?? `room-message:${event.id}`;
-    const agentTurnId = event.agentTurnId ?? `agent-turn:${primaryAgentId}:${event.id}`;
+    const currentDelivery = existingMessages?.get(roomMessageId)?.deliveries[primaryAgentId];
+    const agentTurnId = event.agentTurnId ?? currentDelivery?.agentTurnId ?? `agent-turn:${primaryAgentId}:${event.id}`;
     return [{
       id: roomMessageId,
       content: event.content,
@@ -476,12 +482,89 @@ function createLegacyRoomMessages(session: Session, primaryAgentId: string): Roo
         [primaryAgentId]: {
           status: inferDeliveryStatus(session.events, index),
           agentTurnId,
+          ...(event.dispatchAttemptId ? { dispatchAttemptId: event.dispatchAttemptId } : {}),
           officialUserEventId: event.id,
         },
       },
       timestamp: event.timestamp,
     }];
   });
+}
+
+function mergeLegacyPrimaryDelivery(
+  current: RoomAgentDelivery | undefined,
+  legacy: RoomAgentDelivery,
+): RoomAgentDelivery {
+  if (!current) return legacy;
+  const previousAttempts = current.previousAttempts;
+  if (current.agentTurnId !== legacy.agentTurnId) {
+    return previousAttempts?.length ? { ...legacy, previousAttempts } : legacy;
+  }
+  if (
+    current.dispatchAttemptId &&
+    legacy.dispatchAttemptId &&
+    current.dispatchAttemptId !== legacy.dispatchAttemptId
+  ) return previousAttempts?.length ? { ...legacy, previousAttempts } : legacy;
+  const merged: RoomAgentDelivery = {
+    ...current,
+    ...legacy,
+  };
+  if (!["failed", "indeterminate", "cancelled"].includes(merged.status)) delete merged.error;
+  return merged;
+}
+
+export function repairMissingRoomDeliveryAttemptIds(collaboration: CollaborationState): CollaborationState {
+  let changed = false;
+  const messages = collaboration.messages.map((message) => {
+    let deliveriesChanged = false;
+    const deliveries = { ...message.deliveries };
+
+    for (const roomAgentId of message.recipientAgentIds) {
+      const delivery = deliveries[roomAgentId];
+      if (!delivery || delivery.dispatchAttemptId) continue;
+      const matchingEvents = (collaboration.agentEvents[roomAgentId] ?? []).filter((event) => (
+        event.type === "user_message" &&
+        event.roomMessageId === message.id &&
+        event.agentTurnId === delivery.agentTurnId &&
+        Boolean(event.dispatchAttemptId)
+      ));
+      const attemptIds = Array.from(new Set(matchingEvents.flatMap((event) => (
+        event.dispatchAttemptId ? [event.dispatchAttemptId] : []
+      ))));
+      if (attemptIds.length !== 1) continue;
+      const candidateAttemptId = attemptIds[0];
+      const occupiedElsewhere = collaboration.messages.some((otherMessage) => (
+        Object.entries(otherMessage.deliveries).some(([otherAgentId, otherDelivery]) => {
+          if (otherMessage.id === message.id && otherAgentId === roomAgentId) {
+            return Boolean(otherDelivery.previousAttempts?.some((attempt) => (
+              attempt.dispatchAttemptId === candidateAttemptId
+            )));
+          }
+          return otherDelivery.dispatchAttemptId === candidateAttemptId ||
+            Boolean(otherDelivery.previousAttempts?.some((attempt) => (
+              attempt.dispatchAttemptId === candidateAttemptId
+            )));
+        })
+      ));
+      const eventIdentityOccupiedElsewhere = Object.entries(collaboration.agentEvents).some(([eventAgentId, events]) => (
+        events.some((event) => (
+          event.dispatchAttemptId === candidateAttemptId &&
+          (
+            eventAgentId !== roomAgentId ||
+            event.roomMessageId !== message.id ||
+            event.agentTurnId !== delivery.agentTurnId
+          )
+        ))
+      ));
+      if (occupiedElsewhere || eventIdentityOccupiedElsewhere) continue;
+      deliveries[roomAgentId] = { ...delivery, dispatchAttemptId: candidateAttemptId };
+      deliveriesChanged = true;
+      changed = true;
+    }
+
+    return deliveriesChanged ? { ...message, deliveries } : message;
+  });
+  return changed ? { ...collaboration, messages } : collaboration;
 }
 
 function reconcileLegacyPrimaryWrite(session: Session, collaboration: CollaborationState): CollaborationState {
@@ -509,29 +592,37 @@ function reconcileLegacyPrimaryWrite(session: Session, collaboration: Collaborat
     btwRounds: legacyPrimary.btwRounds,
   };
 
-  const withoutPrimary = collaboration.messages.flatMap((message): RoomUserMessage[] => {
-    if (!message.recipientAgentIds.includes(currentPrimary.id) && !message.deliveries[currentPrimary.id]) return [message];
+  const currentByMessageId = new Map(collaboration.messages.map((message) => [message.id, message]));
+  const legacyByMessageId = new Map(
+    createLegacyRoomMessages(session, currentPrimary.id, currentByMessageId).map((message) => [message.id, message]),
+  );
+  const messages = collaboration.messages.flatMap((message): RoomUserMessage[] => {
+    const legacyMessage = legacyByMessageId.get(message.id);
+    if (legacyMessage) {
+      legacyByMessageId.delete(message.id);
+      const legacyDelivery = legacyMessage.deliveries[currentPrimary.id];
+      return [{
+        ...message,
+        recipientAgentIds: Array.from(new Set([...message.recipientAgentIds, currentPrimary.id])),
+        deliveries: {
+          ...message.deliveries,
+          [currentPrimary.id]: mergeLegacyPrimaryDelivery(
+            message.deliveries[currentPrimary.id],
+            legacyDelivery,
+          ),
+        },
+      }];
+    }
+
+    if (!message.recipientAgentIds.includes(currentPrimary.id) && !message.deliveries[currentPrimary.id]) {
+      return [message];
+    }
     const recipientAgentIds = message.recipientAgentIds.filter((agentId) => agentId !== currentPrimary.id);
     const deliveries = { ...message.deliveries };
     delete deliveries[currentPrimary.id];
     return recipientAgentIds.length > 0 ? [{ ...message, recipientAgentIds, deliveries }] : [];
   });
-  const byMessageId = new Map(withoutPrimary.map((message) => [message.id, message]));
-  for (const legacyMessage of createLegacyRoomMessages(session, currentPrimary.id)) {
-    const existing = byMessageId.get(legacyMessage.id);
-    if (!existing) {
-      byMessageId.set(legacyMessage.id, legacyMessage);
-      continue;
-    }
-    byMessageId.set(legacyMessage.id, {
-      ...existing,
-      recipientAgentIds: [...existing.recipientAgentIds, currentPrimary.id],
-      deliveries: {
-        ...existing.deliveries,
-        [currentPrimary.id]: legacyMessage.deliveries[currentPrimary.id],
-      },
-    });
-  }
+  messages.push(...legacyByMessageId.values());
 
   const agents = [...collaboration.agents];
   agents[primaryIndex] = nextPrimary;
@@ -539,7 +630,7 @@ function reconcileLegacyPrimaryWrite(session: Session, collaboration: Collaborat
     ...collaboration,
     primaryMirrorUpdatedAt: session.updatedAt,
     agents,
-    messages: Array.from(byMessageId.values()).sort((left, right) => left.timestamp - right.timestamp),
+    messages: messages.sort((left, right) => left.timestamp - right.timestamp),
     agentEvents: {
       ...collaboration.agentEvents,
       [currentPrimary.id]: session.events.map((event) => scopeEventToRoomAgent(event, currentPrimary.id)),
@@ -579,9 +670,10 @@ export function normalizeLoadedSessionCollaboration(session: Session): Session {
       },
     };
   }
-  const collaboration = hadPrimaryMirrorMarker && session.updatedAt > normalized.primaryMirrorUpdatedAt
+  const reconciled = hadPrimaryMirrorMarker && session.updatedAt > normalized.primaryMirrorUpdatedAt
     ? reconcileLegacyPrimaryWrite(session, normalized)
     : normalized;
+  const collaboration = repairMissingRoomDeliveryAttemptIds(reconciled);
   const { unsupportedCollaboration: _unsupported, ...rest } = session;
   return { ...rest, collaboration };
 }

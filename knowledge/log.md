@@ -2,6 +2,8 @@
 
 ## 2026-07-15
 
+* **Legacy primary reconciliation preserves room delivery identity**: A newer top-level primary snapshot now updates matching room deliveries in place; damaged missing attempts self-heal only from one unoccupied Agent-scoped room-message/turn identity, while conflicting attempts and non-unique identity-less official IDs remain visible and unbound. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Thinking-to-final collapse is a viewport transaction**: The first final-content frame retains live-thinking geometry until capture; detached browsing restores a surviving DOM anchor, carries any browser-clamped scroll deficit as temporary tail compensation, and rejects anchors from an older explicit-input generation. See [/project/kimix.md](/project/kimix.md).
 
 ## 2026-07-14

@@ -5,6 +5,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, RoomAgent, Session, TimelineEvent } from "@/types/ui";
 import { createCollaborationStateFromSession, roomAgentActivityKey } from "@/utils/collaborationRooms";
+import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 
 const commitStateMock = vi.fn();
 const getAllImageIdsMock = vi.fn().mockResolvedValue([]);
@@ -364,6 +365,9 @@ describe("persistLocalConversationState", () => {
       type: "user_message",
       timestamp: 1,
       content: "旧房间消息",
+      roomMessageId: "guard-message",
+      agentTurnId: "guard-turn",
+      dispatchAttemptId: "guard-attempt",
     };
     const guardedBase: Session = {
       ...session,
@@ -371,19 +375,38 @@ describe("persistLocalConversationState", () => {
       events: [primaryEvent],
       updatedAt: 10,
     };
+    const guardedCollaboration = createCollaborationStateFromSession(guardedBase);
+    const guardedPrimaryId = guardedCollaboration.primaryAgentId;
+    const damagedDelivery = { ...guardedCollaboration.messages[0].deliveries[guardedPrimaryId] };
+    delete damagedDelivery.dispatchAttemptId;
     const guardedRoom: Session = {
       ...guardedBase,
-      collaboration: createCollaborationStateFromSession(guardedBase),
+      collaboration: {
+        ...guardedCollaboration,
+        messages: guardedCollaboration.messages.map((message) => ({
+          ...message,
+          deliveries: { ...message.deliveries, [guardedPrimaryId]: damagedDelivery },
+        })),
+      },
     };
     getStateItemMock.mockResolvedValue([guardedRoom]);
     const { loadLocalSessions, persistLocalConversationState } = await import("@/utils/persistence");
-    await loadLocalSessions();
+    const loaded = (await loadLocalSessions())[0];
+    expect(loaded.collaboration?.messages[0].deliveries[guardedPrimaryId].dispatchAttemptId)
+      .toBe("guard-attempt");
+    expect(projectCollaborationTimeline(loaded)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["guard-message"]);
 
     const newPrimaryEvent: TimelineEvent = {
       id: "guard-user-new",
       type: "user_message",
       timestamp: 20,
       content: "刷新后的主 Agent 消息",
+      roomMessageId: "guard-message",
+      agentTurnId: "guard-turn",
+      dispatchAttemptId: "guard-attempt",
     };
     const downgraded: Session = {
       ...guardedBase,
@@ -402,7 +425,17 @@ describe("persistLocalConversationState", () => {
     expect(stored.collaboration?.agentEvents[primaryId]).toEqual([
       expect.objectContaining({ id: "guard-user-new", content: "刷新后的主 Agent 消息" }),
     ]);
-    expect(useAppStore.getState().currentSession?.collaboration).toBeTruthy();
+    expect(stored.collaboration?.messages[0].deliveries[primaryId].dispatchAttemptId).toBe("guard-attempt");
+    expect(projectCollaborationTimeline(stored)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["guard-message"]);
+    const current = useAppStore.getState().currentSession;
+    expect(current?.collaboration?.messages[0].deliveries[primaryId].dispatchAttemptId).toBe("guard-attempt");
+    expect(projectCollaborationTimeline(current!)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["guard-message"]);
   });
 
   it("preserves an unknown future collaboration payload byte-for-byte on the next save", async () => {

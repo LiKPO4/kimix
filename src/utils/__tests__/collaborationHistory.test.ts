@@ -237,6 +237,258 @@ describe("reconcileAgentCanonicalHistory", () => {
       .toEqual(["b-old", "room-message-first", "room-message-second"]);
   });
 
+  it("restores a missing attempt id from the matching canonical delivery identity", () => {
+    const current = room();
+    current.session.collaboration!.messages = [{
+      id: "room-message-damaged",
+      content: "Only once",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          agentTurnId: "turn-damaged",
+          officialUserEventId: "live-user-alias",
+        },
+      },
+      timestamp: 100,
+    }];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [
+        {
+          id: "live-user-alias",
+          type: "user_message",
+          timestamp: 100,
+          content: "Only once",
+          roomMessageId: "room-message-damaged",
+          agentTurnId: "turn-damaged",
+        },
+        {
+          id: "canonical-user-damaged",
+          type: "user_message",
+          timestamp: 101,
+          content: "Only once",
+          roomMessageId: "room-message-damaged",
+          agentTurnId: "turn-damaged",
+          dispatchAttemptId: "attempt-damaged",
+        },
+      ],
+      reason: "startup",
+    });
+
+    expect(result.session.collaboration?.messages[0].deliveries[current.primaryId]).toMatchObject({
+      dispatchAttemptId: "attempt-damaged",
+      officialUserEventId: "canonical-user-damaged",
+    });
+    expect(projectCollaborationTimeline(result.session)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["b-old", "room-message-damaged"]);
+  });
+
+  it("does not bind one identity-less official event id to either competing delivery", () => {
+    const current = room();
+    current.session.collaboration!.messages = [
+      {
+        id: "room-message-first",
+        content: "First",
+        recipientAgentIds: [current.primaryId],
+        deliveries: {
+          [current.primaryId]: {
+            status: "completed",
+            agentTurnId: "turn-first",
+            officialUserEventId: "canonical-shared",
+          },
+        },
+        timestamp: 100,
+      },
+      {
+        id: "room-message-second",
+        content: "Second",
+        recipientAgentIds: [current.primaryId],
+        deliveries: {
+          [current.primaryId]: {
+            status: "completed",
+            agentTurnId: "turn-second",
+            officialUserEventId: "canonical-shared",
+          },
+        },
+        timestamp: 101,
+      },
+    ];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [
+        { id: "canonical-shared", type: "user_message", timestamp: 102, content: "First" },
+        { id: "canonical-result", type: "assistant_message", timestamp: 103, content: "Result", isThinking: false, isComplete: true },
+      ],
+      reason: "startup",
+    });
+
+    expect(result.events.every((event) => event.roomMessageId === undefined && event.agentTurnId === undefined))
+      .toBe(true);
+    expect(projectCollaborationTimeline(result.session)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["b-old", "room-message-first", "room-message-second", "canonical-shared"]);
+  });
+
+  it("keeps two real repeated prompts distinct while repairing both missing attempts", () => {
+    const current = room();
+    current.session.collaboration!.messages = [
+      {
+        id: "room-message-first",
+        content: "Repeat",
+        recipientAgentIds: [current.primaryId],
+        deliveries: {
+          [current.primaryId]: { status: "completed", agentTurnId: "turn-first" },
+        },
+        timestamp: 100,
+      },
+      {
+        id: "room-message-second",
+        content: "Repeat",
+        recipientAgentIds: [current.primaryId],
+        deliveries: {
+          [current.primaryId]: { status: "completed", agentTurnId: "turn-second" },
+        },
+        timestamp: 101,
+      },
+    ];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [
+        {
+          id: "canonical-first",
+          type: "user_message",
+          timestamp: 102,
+          content: "Repeat",
+          roomMessageId: "room-message-first",
+          agentTurnId: "turn-first",
+          dispatchAttemptId: "attempt-first",
+        },
+        {
+          id: "canonical-second",
+          type: "user_message",
+          timestamp: 103,
+          content: "Repeat",
+          roomMessageId: "room-message-second",
+          agentTurnId: "turn-second",
+          dispatchAttemptId: "attempt-second",
+        },
+      ],
+      reason: "startup",
+    });
+
+    expect(result.session.collaboration?.messages.map((message) => (
+      message.deliveries[current.primaryId].dispatchAttemptId
+    ))).toEqual(["attempt-first", "attempt-second"]);
+    expect(projectCollaborationTimeline(result.session)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["b-old", "room-message-first", "room-message-second"]);
+  });
+
+  it("does not recover a canonical attempt already owned by another delivery", () => {
+    const current = room();
+    current.session.collaboration!.messages = [
+      {
+        id: "room-message-target",
+        content: "Target",
+        recipientAgentIds: [current.primaryId],
+        deliveries: {
+          [current.primaryId]: { status: "completed", agentTurnId: "turn-target" },
+        },
+        timestamp: 100,
+      },
+      {
+        id: "room-message-owner",
+        content: "Owner",
+        recipientAgentIds: [current.secondaryId],
+        deliveries: {
+          [current.secondaryId]: {
+            status: "completed",
+            agentTurnId: "turn-owner",
+            dispatchAttemptId: "attempt-owned",
+          },
+        },
+        timestamp: 101,
+      },
+    ];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [{
+        id: "canonical-target",
+        type: "user_message",
+        timestamp: 102,
+        content: "Target",
+        roomMessageId: "room-message-target",
+        agentTurnId: "turn-target",
+        dispatchAttemptId: "attempt-owned",
+      }],
+      reason: "startup",
+    });
+
+    expect(result.session.collaboration?.messages[0].deliveries[current.primaryId].dispatchAttemptId)
+      .toBeUndefined();
+    expect(result.session.collaboration?.messages[0].deliveries[current.primaryId].officialUserEventId)
+      .toBe("canonical-target");
+  });
+
+  it("does not downgrade an explicit attempt conflict to text and time matching", () => {
+    const current = room();
+    current.session.collaboration!.messages = [{
+      id: "room-message-conflict",
+      content: "Same request",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          agentTurnId: "turn-conflict",
+          dispatchAttemptId: "attempt-current",
+          officialUserEventId: "legacy-missing",
+        },
+      },
+      timestamp: 100,
+    }];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [
+        { id: "canonical-identityless", type: "user_message", timestamp: 101, content: "Same request" },
+        {
+          id: "canonical-conflict",
+          type: "user_message",
+          timestamp: 102,
+          content: "Same request",
+          roomMessageId: "room-message-conflict",
+          agentTurnId: "turn-conflict",
+          dispatchAttemptId: "attempt-other",
+        },
+      ],
+      reason: "startup",
+    });
+
+    expect(result.events[0]).not.toHaveProperty("roomMessageId");
+    expect(result.events[0]).not.toHaveProperty("agentTurnId");
+    expect(result.session.collaboration?.messages[0].deliveries[current.primaryId].officialUserEventId)
+      .toBe("legacy-missing");
+  });
+
   it("does not guess between repeated canonical user messages", () => {
     const current = room();
     current.session.collaboration!.messages = [{

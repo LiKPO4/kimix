@@ -176,6 +176,371 @@ describe("projectCollaborationTimeline", () => {
     expect(projected.find((event) => event.id === "assistant-live")).toBeDefined();
   });
 
+  it("claims the canonical user event when a persisted delivery lost only its attempt id", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [{
+          id: "message-damaged",
+          content: "只发送一次",
+          recipientAgentIds: [primary.id],
+          deliveries: {
+            [primary.id]: {
+              status: "completed",
+              agentTurnId: "turn-damaged",
+              officialUserEventId: "canonical-user-damaged",
+            },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: [
+            {
+              id: "canonical-user-damaged",
+              type: "user_message",
+              timestamp: 20,
+              content: "只发送一次",
+              roomMessageId: "message-damaged",
+              agentTurnId: "turn-damaged",
+              dispatchAttemptId: "attempt-damaged",
+            },
+            {
+              id: "assistant-damaged",
+              type: "assistant_message",
+              timestamp: 21,
+              content: "收到",
+              isThinking: false,
+              isComplete: true,
+              roomMessageId: "message-damaged",
+              agentTurnId: "turn-damaged",
+            },
+          ],
+        },
+      },
+    };
+
+    const projected = projectCollaborationTimeline(room);
+    expect(projected.filter((event) => event.type === "user_message").map((event) => event.id))
+      .toEqual(["message-damaged"]);
+    expect(projected.find((event) => event.id === "assistant-damaged")).toMatchObject({
+      roomMessageId: "message-damaged",
+      agentTurnId: "turn-damaged",
+    });
+  });
+
+  it("keeps an explicitly conflicting attempt visible instead of swallowing it", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [{
+          id: "message-safe",
+          content: "Safe",
+          recipientAgentIds: [primary.id],
+          deliveries: {
+            [primary.id]: {
+              status: "completed",
+              agentTurnId: "turn-safe",
+              dispatchAttemptId: "attempt-current",
+              officialUserEventId: "canonical-conflict",
+            },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: [
+            {
+              id: "live-partial",
+              type: "user_message",
+              timestamp: 20,
+              content: "Safe",
+              roomMessageId: "message-safe",
+              agentTurnId: "turn-safe",
+            },
+            {
+              id: "canonical-conflict",
+              type: "user_message",
+              timestamp: 21,
+              content: "Safe",
+              roomMessageId: "message-safe",
+              agentTurnId: "turn-safe",
+              dispatchAttemptId: "attempt-other",
+            },
+            {
+              id: "assistant-conflict",
+              type: "assistant_message",
+              timestamp: 22,
+              content: "Other attempt result",
+              isThinking: false,
+              isComplete: true,
+              roomMessageId: "message-safe",
+              agentTurnId: "turn-safe",
+              dispatchAttemptId: "attempt-other",
+            },
+          ],
+        },
+      },
+    };
+
+    expect(projectCollaborationTimeline(room)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["message-safe", "live-partial", "canonical-conflict"]);
+    const projectedIds = projectCollaborationTimeline(room).map((event) => event.id);
+    expect(projectedIds.indexOf("assistant-conflict"))
+      .toBe(projectedIds.indexOf("canonical-conflict") + 1);
+  });
+
+  it("does not guess when a damaged delivery maps to multiple explicit attempts", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [{
+          id: "message-ambiguous",
+          content: "Repeat",
+          recipientAgentIds: [primary.id],
+          deliveries: {
+            [primary.id]: { status: "completed", agentTurnId: "turn-ambiguous" },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: [
+            {
+              id: "canonical-attempt-a",
+              type: "user_message",
+              timestamp: 21,
+              content: "Repeat",
+              roomMessageId: "message-ambiguous",
+              agentTurnId: "turn-ambiguous",
+              dispatchAttemptId: "attempt-a",
+            },
+            {
+              id: "canonical-attempt-b",
+              type: "user_message",
+              timestamp: 22,
+              content: "Repeat",
+              roomMessageId: "message-ambiguous",
+              agentTurnId: "turn-ambiguous",
+              dispatchAttemptId: "attempt-b",
+            },
+          ],
+        },
+      },
+    };
+
+    expect(projectCollaborationTimeline(room)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["message-ambiguous", "canonical-attempt-a", "canonical-attempt-b"]);
+  });
+
+  it("does not let two deliveries compete for one identity-less official event id", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [
+          {
+            id: "message-first",
+            content: "First",
+            recipientAgentIds: [primary.id],
+            deliveries: {
+              [primary.id]: {
+                status: "completed",
+                agentTurnId: "turn-first",
+                officialUserEventId: "canonical-shared",
+              },
+            },
+            timestamp: 20,
+          },
+          {
+            id: "message-second",
+            content: "Second",
+            recipientAgentIds: [primary.id],
+            deliveries: {
+              [primary.id]: {
+                status: "completed",
+                agentTurnId: "turn-second",
+                officialUserEventId: "canonical-shared",
+              },
+            },
+            timestamp: 21,
+          },
+        ],
+        agentEvents: {
+          [primary.id]: [
+            { id: "canonical-shared", type: "user_message", timestamp: 22, content: "First" },
+            { id: "canonical-result", type: "assistant_message", timestamp: 23, content: "Result", isThinking: false, isComplete: true },
+          ],
+        },
+      },
+    };
+
+    const projected = projectCollaborationTimeline(room);
+    expect(projected.filter((event) => event.type === "user_message").map((event) => event.id))
+      .toEqual(["message-first", "message-second", "canonical-shared"]);
+    expect(projected.find((event) => event.id === "canonical-result")?.agentTurnId)
+      .not.toBe("turn-first");
+    expect(projected.find((event) => event.id === "canonical-result")?.agentTurnId)
+      .not.toBe("turn-second");
+  });
+
+  it("requires an exact Agent turn for every identity-bearing user event", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [{
+          id: "message-partial",
+          content: "Partial",
+          recipientAgentIds: [primary.id],
+          deliveries: {
+            [primary.id]: {
+              status: "completed",
+              agentTurnId: "turn-partial",
+              officialUserEventId: "canonical-partial",
+            },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: [{
+            id: "canonical-partial",
+            type: "user_message",
+            timestamp: 21,
+            content: "Partial",
+            roomMessageId: "message-partial",
+            dispatchAttemptId: "attempt-partial",
+          }],
+        },
+      },
+    };
+
+    expect(projectCollaborationTimeline(room)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["message-partial", "canonical-partial"]);
+  });
+
+  it("scopes claimed event ids per Agent partition", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const secondary = secondaryAgent();
+    const eventFor = (roomAgentId: string, turnId: string, result: string): TimelineEvent[] => [
+      {
+        id: "shared-user-id",
+        type: "user_message",
+        timestamp: 20,
+        content: "Review",
+        roomAgentId,
+        roomMessageId: "message-shared",
+        agentTurnId: turnId,
+        dispatchAttemptId: `attempt-${turnId}`,
+      },
+      {
+        id: "shared-assistant-id",
+        type: "assistant_message",
+        timestamp: 21,
+        content: result,
+        isThinking: false,
+        isComplete: true,
+        roomAgentId,
+        roomMessageId: "message-shared",
+        agentTurnId: turnId,
+      },
+    ];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        agents: [primary, secondary],
+        messages: [{
+          id: "message-shared",
+          content: "Review",
+          recipientAgentIds: [primary.id, secondary.id],
+          deliveries: {
+            [primary.id]: { status: "completed", agentTurnId: "turn-a", dispatchAttemptId: "attempt-turn-a" },
+            [secondary.id]: { status: "completed", agentTurnId: "turn-b", dispatchAttemptId: "attempt-turn-b" },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: eventFor(primary.id, "turn-a", "A result"),
+          [secondary.id]: eventFor(secondary.id, "turn-b", "B result"),
+        },
+      },
+    };
+
+    expect(projectCollaborationTimeline(room)
+      .filter((event) => event.type === "assistant_message")
+      .map((event) => event.content))
+      .toEqual(["A result", "B result"]);
+  });
+
+  it("keeps a stale identity-less official alias visible when a transaction match exists", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [{
+          id: "message-transaction",
+          content: "Transaction",
+          recipientAgentIds: [primary.id],
+          deliveries: {
+            [primary.id]: {
+              status: "completed",
+              agentTurnId: "turn-transaction",
+              dispatchAttemptId: "attempt-transaction",
+              officialUserEventId: "stale-identityless",
+            },
+          },
+          timestamp: 20,
+        }],
+        agentEvents: {
+          [primary.id]: [
+            { id: "stale-identityless", type: "user_message", timestamp: 19, content: "Old alias" },
+            {
+              id: "canonical-transaction",
+              type: "user_message",
+              timestamp: 20,
+              content: "Transaction",
+              roomMessageId: "message-transaction",
+              agentTurnId: "turn-transaction",
+              dispatchAttemptId: "attempt-transaction",
+            },
+          ],
+        },
+      },
+    };
+
+    expect(projectCollaborationTimeline(room)
+      .filter((event) => event.type === "user_message")
+      .map((event) => event.id))
+      .toEqual(["stale-identityless", "message-transaction"]);
+  });
+
   it("keeps an unselected Agent history separate instead of attaching it to the room message", () => {
     const session = baseSession();
     const collaboration = createCollaborationStateFromSession(session);

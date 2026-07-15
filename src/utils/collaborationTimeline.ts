@@ -1,5 +1,9 @@
 import type { RoomAgentDelivery, RoomUserMessage, Session, TimelineEvent } from "@/types/ui";
 import { getRoomAgentEvents, getRoomAgents, scopeEventToRoomAgent } from "@/utils/collaborationRooms";
+import {
+  isOfficialUserEventIdUniqueToDelivery,
+  resolveRoomDeliveryUserEvents,
+} from "@/utils/roomDeliveryIdentity";
 
 const OPEN_DELIVERY_STATUSES = new Set<RoomAgentDelivery["status"]>([
   "queued",
@@ -10,46 +14,40 @@ const OPEN_DELIVERY_STATUSES = new Set<RoomAgentDelivery["status"]>([
   "waiting_question",
 ]);
 
-function findDeliveryUserIndex(
-  events: TimelineEvent[],
-  message: RoomUserMessage,
-  delivery: RoomAgentDelivery,
-): number {
-  return events.findIndex((event) => isDeliveryUserEvent(event, message, delivery));
-}
-
-function isDeliveryUserEvent(
-  event: TimelineEvent,
-  message: RoomUserMessage,
-  delivery: RoomAgentDelivery,
-): boolean {
-  if (event.type !== "user_message") return false;
-  const hasDeliveryIdentity = Boolean(event.roomMessageId || event.agentTurnId || event.dispatchAttemptId);
-  if (!hasDeliveryIdentity) return event.id === delivery.officialUserEventId;
-  const expectedDispatchAttemptId = delivery.dispatchAttemptId ?? `legacy:${delivery.agentTurnId}`;
-  return event.roomMessageId === message.id &&
-    (!event.agentTurnId || event.agentTurnId === delivery.agentTurnId) &&
-    (!event.dispatchAttemptId || event.dispatchAttemptId === expectedDispatchAttemptId);
-}
-
 function deliveryEvents(
   session: Session,
   message: RoomUserMessage,
   roomAgentId: string,
   delivery: RoomAgentDelivery,
-): { events: TimelineEvent[]; claimedEventIds: string[] } {
+  claimedEventKeys: ReadonlySet<string>,
+): { events: TimelineEvent[]; claimedEventKeys: string[] } {
   const events = getRoomAgentEvents(session, roomAgentId);
-  const startIndex = findDeliveryUserIndex(events, message, delivery);
-  const matchingUserEventIds = events.flatMap((event) => (
-    isDeliveryUserEvent(event, message, delivery) ? [event.id] : []
-  ));
-  const explicitlyBound = events.filter((event) => event.agentTurnId === delivery.agentTurnId);
+  const officialIdIsUnique = isOfficialUserEventIdUniqueToDelivery(
+    session.collaboration?.messages ?? [],
+    roomAgentId,
+    delivery.officialUserEventId,
+  );
+  const resolution = resolveRoomDeliveryUserEvents(events, message, delivery, officialIdIsUnique);
+  const matchingUserIndexes = [
+    ...resolution.transactionIndexes,
+    ...resolution.legacyOfficialIndexes,
+  ].filter((index) => !claimedEventKeys.has(roomAgentEventClaimKey(roomAgentId, events[index].id)));
+  const startIndex = matchingUserIndexes[0] ?? -1;
+  const matchingUserEventIds = matchingUserIndexes.map((index) => events[index].id);
+  const explicitlyBound = resolution.hasTransactionConflict
+    ? []
+    : events.filter((event) => (
+        !claimedEventKeys.has(roomAgentEventClaimKey(roomAgentId, event.id)) &&
+        event.agentTurnId === delivery.agentTurnId
+      ));
   const source = explicitlyBound.length > 0
     ? explicitlyBound.filter((event) => event.type !== "user_message")
     : (() => {
         if (startIndex < 0) return [];
         const nextUserIndex = events.findIndex((event, index) => index > startIndex && event.type === "user_message");
-        return events.slice(startIndex + 1, nextUserIndex < 0 ? events.length : nextUserIndex);
+        return events
+          .slice(startIndex + 1, nextUserIndex < 0 ? events.length : nextUserIndex)
+          .filter((event) => !claimedEventKeys.has(roomAgentEventClaimKey(roomAgentId, event.id)));
       })();
 
   return {
@@ -58,12 +56,16 @@ function deliveryEvents(
       roomMessageId: message.id,
       agentTurnId: delivery.agentTurnId,
     })),
-    claimedEventIds: Array.from(new Set([
+    claimedEventKeys: Array.from(new Set([
       ...matchingUserEventIds,
       ...(startIndex >= 0 ? [events[startIndex].id] : []),
       ...source.map((event) => event.id),
-    ])),
+    ].map((eventId) => roomAgentEventClaimKey(roomAgentId, eventId)))),
   };
+}
+
+function roomAgentEventClaimKey(roomAgentId: string, eventId: string): string {
+  return JSON.stringify([roomAgentId, eventId]);
 }
 
 function deliveryFallbackEvents(
@@ -104,7 +106,7 @@ export function projectCollaborationTimeline(session: Session): TimelineEvent[] 
   const collaboration = session.collaboration;
   if (!collaboration) return session.events;
 
-  const claimedEventIds = new Set<string>();
+  const claimedEventKeys = new Set<string>();
   const groups: Array<{ timestamp: number; order: number; events: TimelineEvent[] }> = [];
   let order = 0;
   for (const message of collaboration.messages) {
@@ -121,8 +123,8 @@ export function projectCollaborationTimeline(session: Session): TimelineEvent[] 
     for (const roomAgentId of message.recipientAgentIds) {
       const delivery = message.deliveries[roomAgentId];
       if (!delivery) continue;
-      const projection = deliveryEvents(session, message, roomAgentId, delivery);
-      projection.claimedEventIds.forEach((id) => claimedEventIds.add(id));
+      const projection = deliveryEvents(session, message, roomAgentId, delivery, claimedEventKeys);
+      projection.claimedEventKeys.forEach((key) => claimedEventKeys.add(key));
       events.push(...(projection.events.length > 0
         ? projection.events
         : deliveryFallbackEvents(message, roomAgentId, delivery)));
@@ -131,7 +133,9 @@ export function projectCollaborationTimeline(session: Session): TimelineEvent[] 
   }
 
   for (const agent of getRoomAgents(session)) {
-    const unclaimed = getRoomAgentEvents(session, agent.id).filter((event) => !claimedEventIds.has(event.id));
+    const unclaimed = getRoomAgentEvents(session, agent.id).filter((event) => (
+      !claimedEventKeys.has(roomAgentEventClaimKey(agent.id, event.id))
+    ));
     let segment: TimelineEvent[] = [];
     const flushSegment = () => {
       if (segment.length === 0) return;

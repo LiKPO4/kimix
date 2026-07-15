@@ -3,6 +3,7 @@ import {
   getPrimaryRoomAgent,
   getRoomAgent,
   getRoomAgentEvents,
+  repairMissingRoomDeliveryAttemptIds,
   scopeEventToRoomAgent,
   updateRoomAgent,
   updateRoomAgentEvents,
@@ -12,6 +13,10 @@ import { reconcileRunningKimiSnapshot } from "@/utils/kimiCodeSnapshotReplay";
 import { applyCanonicalUndoHistory } from "@/utils/undoHistory";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import {
+  isOfficialUserEventIdUniqueToDelivery,
+  resolveRoomDeliveryUserEvents,
+} from "@/utils/roomDeliveryIdentity";
 
 export type AgentCanonicalHistoryReason = "startup" | "running-sample" | "undo" | "repair";
 
@@ -59,45 +64,72 @@ function bindCanonicalHistoryToRoomMessages(
   ));
   const claimedUserIndexes = new Set<number>();
   const bindings: Array<{ messageId: string; agentTurnId: string; userIndex: number }> = [];
+  const targetMessages = session.collaboration.messages.filter((message) => (
+    message.recipientAgentIds.includes(roomAgentId) && Boolean(message.deliveries[roomAgentId])
+  ));
+  const identityLessTextCandidates = new Map(targetMessages.map((message) => {
+    const expectedText = normalizedMessageText(message.outboundContent ?? message.content);
+    const candidates = userIndexes.filter((index) => {
+      const event = canonicalEvents[index];
+      return event.type === "user_message" &&
+        !event.roomMessageId &&
+        !event.agentTurnId &&
+        !event.dispatchAttemptId &&
+        normalizedMessageText(event.content) === expectedText &&
+        Math.abs(event.timestamp - message.timestamp) <= 30_000;
+    });
+    return [message.id, candidates] as const;
+  }));
   let messages = session.collaboration.messages.map((message) => {
     if (!message.recipientAgentIds.includes(roomAgentId)) return message;
     const delivery = message.deliveries[roomAgentId];
     if (!delivery) return message;
-    const expectedDispatchAttemptId = delivery.dispatchAttemptId ?? `legacy:${delivery.agentTurnId}`;
-
-    let userIndex = canonicalEvents.findIndex((event) => {
-      if (event.type !== "user_message") return false;
-      const hasDeliveryIdentity = Boolean(event.roomMessageId || event.agentTurnId || event.dispatchAttemptId);
-      if (hasDeliveryIdentity) {
-        return event.roomMessageId === message.id &&
-          (!event.agentTurnId || event.agentTurnId === delivery.agentTurnId) &&
-          (!event.dispatchAttemptId || event.dispatchAttemptId === expectedDispatchAttemptId);
-      }
-      return event.id === delivery.officialUserEventId;
-    });
+    const officialIdIsUnique = isOfficialUserEventIdUniqueToDelivery(
+      session.collaboration!.messages,
+      roomAgentId,
+      delivery.officialUserEventId,
+    );
+    const resolution = resolveRoomDeliveryUserEvents(
+      canonicalEvents,
+      message,
+      delivery,
+      officialIdIsUnique,
+    );
+    const transactionIndexes = resolution.transactionIndexes.filter((index) => !claimedUserIndexes.has(index));
+    const legacyOfficialIndexes = resolution.legacyOfficialIndexes.filter((index) => !claimedUserIndexes.has(index));
+    const transactionWithAttempt = transactionIndexes.filter((index) => (
+      Boolean(canonicalEvents[index].dispatchAttemptId)
+    ));
+    let userIndex = transactionWithAttempt.at(-1) ??
+      transactionIndexes.find((index) => canonicalEvents[index].id === delivery.officialUserEventId) ??
+      transactionIndexes[0] ??
+      legacyOfficialIndexes[0] ??
+      -1;
 
     // The prompt API does not always return an official user-event ID. In that
     // case, bind only when content and time identify exactly one canonical event;
     // repeated identical prompts remain deliberately unbound instead of guessed.
-    if (reason !== "undo" && userIndex < 0) {
-      const expectedText = normalizedMessageText(message.outboundContent ?? message.content);
-      const candidates = userIndexes.filter((index) => {
-        if (claimedUserIndexes.has(index)) return false;
-        const event = canonicalEvents[index];
-        return event.type === "user_message" &&
-          !event.roomMessageId &&
-          !event.agentTurnId &&
-          !event.dispatchAttemptId &&
-          normalizedMessageText(event.content) === expectedText &&
-          Math.abs(event.timestamp - message.timestamp) <= 30_000;
-      });
-      if (candidates.length === 1) userIndex = candidates[0];
+    if (
+      reason !== "undo" &&
+      userIndex < 0 &&
+      !resolution.hasTransactionConflict &&
+      (!delivery.officialUserEventId || officialIdIsUnique)
+    ) {
+      const candidates = (identityLessTextCandidates.get(message.id) ?? [])
+        .filter((index) => !claimedUserIndexes.has(index));
+      if (candidates.length === 1) {
+        const reverseOwners = targetMessages.filter((candidateMessage) => (
+          (identityLessTextCandidates.get(candidateMessage.id) ?? []).includes(candidates[0])
+        ));
+        if (reverseOwners.length === 1) userIndex = candidates[0];
+      }
     }
 
     if (userIndex < 0 || claimedUserIndexes.has(userIndex)) return message;
     claimedUserIndexes.add(userIndex);
     bindings.push({ messageId: message.id, agentTurnId: delivery.agentTurnId, userIndex });
-    const officialUserEventId = canonicalEvents[userIndex].id;
+    const canonicalUserEvent = canonicalEvents[userIndex];
+    const officialUserEventId = canonicalUserEvent.id;
     if (delivery.officialUserEventId === officialUserEventId) return message;
     return {
       ...message,
@@ -175,12 +207,13 @@ export function reconcileAgentCanonicalHistory({
 
   let next = updateRoomAgentEvents(session, roomAgentId, () => events);
   if (next.collaboration && boundCanonical.messages) {
+    const collaboration = repairMissingRoomDeliveryAttemptIds({
+      ...next.collaboration,
+      messages: boundCanonical.messages,
+    });
     next = {
       ...next,
-      collaboration: {
-        ...next.collaboration,
-        messages: boundCanonical.messages,
-      },
+      collaboration,
     };
   }
   const model = getLastUsedModelFromEvents(events);
