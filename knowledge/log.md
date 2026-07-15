@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-15
+
+* **Thinking-to-final collapse is a viewport transaction**: The first final-content frame retains live-thinking geometry until capture; detached browsing restores a surviving DOM anchor, carries any browser-clamped scroll deficit as temporary tail compensation, and rejects anchors from an older explicit-input generation. See [/project/kimix.md](/project/kimix.md).
+
 ## 2026-07-14
 
 * **Startup navigation has one writer and sidebar expansion is durable**: Settings hydration only populates recent projects; active-context writes wait for startup resolution, a saved empty project does not fall through to another project's latest conversation, and path-keyed project expansion preserves explicit collapse across restart. See [/project/kimix.md](/project/kimix.md).

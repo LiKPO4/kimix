@@ -22,6 +22,7 @@ export function shouldResumeAutoFollowAtBottom({
   autoFollow,
   userScroll,
   bottomIntentUntil,
+  suppressUntil = 0,
   now,
   threshold = BOTTOM_FOLLOW_THRESHOLD_PX,
 }: {
@@ -29,9 +30,11 @@ export function shouldResumeAutoFollowAtBottom({
   autoFollow: boolean;
   userScroll: boolean;
   bottomIntentUntil: number;
+  suppressUntil?: number;
   now: number;
   threshold?: number;
 }) {
+  if (now < suppressUntil) return false;
   if (distance > threshold) return false;
   if (autoFollow && !userScroll) return true;
   return bottomIntentUntil >= now;

@@ -82,4 +82,15 @@ describe("scroll intent", () => {
       now: 2000,
     })).toBe(false);
   });
+
+  it("does not treat a programmatic layout restore as reaching the bottom", () => {
+    expect(shouldResumeAutoFollowAtBottom({
+      distance: 0,
+      autoFollow: false,
+      userScroll: true,
+      bottomIntentUntil: 2500,
+      suppressUntil: 2300,
+      now: 2000,
+    })).toBe(false);
+  });
 });

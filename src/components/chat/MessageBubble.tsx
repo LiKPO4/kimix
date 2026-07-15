@@ -41,6 +41,10 @@ import {
   shouldFollowLiveThinkingViewport,
   shouldUseLiveThinkingViewport,
 } from "@/utils/liveThinkingViewport";
+import {
+  CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT,
+  type ChatProcessCollapseViewportDetail,
+} from "@/utils/chatViewportTransaction";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -1708,7 +1712,7 @@ function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: b
   }
 }
 
-function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent }: { items: ProcessItem[]; isActiveAssistant: boolean; hasFinalContent: boolean }) {
+function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupProcessItems(items), [items]);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
@@ -1722,6 +1726,7 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent }: { ite
             isThinkingGroup: group.type === "thinking",
             isActiveAssistant,
             hasFinalContent,
+            preserveDuringFinalTransition,
           })}
         />
       ))}
@@ -1729,13 +1734,15 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent }: { ite
   );
 }
 
-function AssistantProcessSummary({ event, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false }: { event: AssistantEvent; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean }) {
   const isKimiWeb = displayMode === "kimi-web";
   const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent;
   const [expanded, setExpanded] = useState(defaultExpanded);
   const previousHasFinalContentRef = useRef(hasFinalContent);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
+  const processDetailRef = useRef<HTMLDivElement>(null);
+  const pendingAutoCollapseTransactionRef = useRef<string | null>(null);
   const pendingToggleAnchorRef = useRef<{
     scrollNode: HTMLElement;
     viewportTop: number;
@@ -1761,17 +1768,50 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
     subagents.length > 0 ? `${subagents.length} 个子代理` : "",
     approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
   ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
+  const isFinalContentTransition = shouldCollapseKimiWebProcessOnFinalContent({
+    previousHasFinalContent: previousHasFinalContentRef.current,
+    hasFinalContent,
+    isKimiWeb,
+    expanded,
+  });
+
+  const dispatchProcessCollapseViewport = (
+    phase: ChatProcessCollapseViewportDetail["phase"],
+    transactionId: string,
+  ) => {
+    window.dispatchEvent(new CustomEvent<ChatProcessCollapseViewportDetail>(CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT, {
+      detail: {
+        phase,
+        transactionId,
+        sessionId: sessionId ?? "",
+        eventId: event.id,
+        agentTurnId: event.agentTurnId,
+        roomAgentId: event.roomAgentId,
+        summaryAnchor: summaryAnchorRef.current,
+        contentAnchor: contentAnchorRef.current,
+        collapsingNode: processDetailRef.current,
+      },
+    }));
+  };
 
   useLayoutEffect(() => {
-    const shouldCollapse = shouldCollapseKimiWebProcessOnFinalContent({
-      previousHasFinalContent: previousHasFinalContentRef.current,
-      hasFinalContent,
-      isKimiWeb,
-      expanded,
-    });
     previousHasFinalContentRef.current = hasFinalContent;
-    if (shouldCollapse) setExpanded(false);
-  }, [expanded, hasFinalContent, isKimiWeb]);
+    if (!isFinalContentTransition) return;
+
+    // Keep the live viewport mounted for this commit, snapshot the outer chat,
+    // then remove the whole process detail in one protected layout transaction.
+    const transactionId = `${sessionId ?? "unknown"}:${event.roomAgentId ?? "single"}:${event.agentTurnId ?? event.id}:${event.id}:final-content`;
+    pendingAutoCollapseTransactionRef.current = transactionId;
+    dispatchProcessCollapseViewport("before", transactionId);
+    setExpanded(false);
+  }, [event.agentTurnId, event.id, event.roomAgentId, hasFinalContent, isFinalContentTransition, sessionId]);
+
+  useLayoutEffect(() => {
+    const transactionId = pendingAutoCollapseTransactionRef.current;
+    if (expanded || !transactionId) return;
+    pendingAutoCollapseTransactionRef.current = null;
+    dispatchProcessCollapseViewport("after", transactionId);
+  }, [expanded]);
 
   const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
     const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
@@ -1840,12 +1880,13 @@ function AssistantProcessSummary({ event, tools, subagents, approvals, label, di
         <div className="w-full border-b border-[var(--kimix-panel-divider)]" style={{ paddingBottom: 8 }} />
       )}
       {expanded && hasDetails && (
-        <div className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
+        <div ref={processDetailRef} className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
           {isKimiWeb ? (
             <KimiWebProcessList
               items={items}
               isActiveAssistant={isActiveAssistant}
               hasFinalContent={hasFinalContent}
+              preserveDuringFinalTransition={isFinalContentTransition}
             />
           ) : <ProcessDetailList items={items} />}
           {!isKimiWeb && (
@@ -2079,6 +2120,7 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
         {!hideProcessSummary && (
           <AssistantProcessSummary
             event={event}
+            sessionId={sessionId}
             tools={leadingTools}
             subagents={leadingSubagents}
             approvals={leadingApprovals}

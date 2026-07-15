@@ -25,6 +25,15 @@ import { bottomScrollTop, distanceFromBottom, scrollTopPreservingBottomDistance,
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
+import {
+  canReleaseViewportTailCompensation,
+  CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT,
+  isProcessCollapseAnchorUnstable,
+  isViewportAnchorGenerationCurrent,
+  planDetachedViewportRestore,
+  requiredViewportTailCompensation,
+  type ChatProcessCollapseViewportDetail,
+} from "@/utils/chatViewportTransaction";
 
 type RenderItem =
   | { type: "event"; event: TimelineEvent; turnStartedAt?: number; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] }
@@ -33,6 +42,14 @@ type RenderItem =
   | { type: "change_group"; id: string; changes: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[] };
 
 type ViewportAnchor = { key: string; offsetTop: number };
+type ResizeViewportAnchor = ViewportAnchor & { userScrollGeneration: number };
+type ProcessCollapseViewportSnapshot = {
+  anchorElement: HTMLElement | null;
+  anchorViewportTop?: number;
+  scrollTop: number;
+  autoFollow: boolean;
+  userScroll: boolean;
+};
 type PermissionModeDiagDetail = {
   traceId?: string;
   stage?: string;
@@ -867,7 +884,7 @@ export const ChatThread = memo(function ChatThread() {
   const pendingOlderItemsScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingTailExpandScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
-  const resizeScrollAnchorRef = useRef<{ key: string; offsetTop: number } | null>(null);
+  const resizeScrollAnchorRef = useRef<ResizeViewportAnchor | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const lastScrollHeightRef = useRef<number | null>(null);
@@ -884,11 +901,16 @@ export const ChatThread = memo(function ChatThread() {
   const touchStartYRef = useRef<number | null>(null);
   const userInputLockUntilRef = useRef(0);
   const userBottomIntentUntilRef = useRef(0);
+  const userScrollGenerationRef = useRef(0);
+  const scrollbarPointerActiveRef = useRef(false);
   const lastUserScrollAtRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
   const lastManualAnchorRestoreAtRef = useRef(0);
   const bottomTrackerFrameRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
+  const processCollapseViewportSnapshotsRef = useRef(new Map<string, ProcessCollapseViewportSnapshot>());
+  const detachedViewportMinimumScrollHeightRef = useRef<number | null>(null);
+  const detachedTailCompensationRef = useRef(0);
   const [olderItemsPage, setOlderItemsPage] = useState(0);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
@@ -952,6 +974,42 @@ export const ChatThread = memo(function ChatThread() {
     button.setAttribute("aria-hidden", value ? "false" : "true");
   };
 
+  const setDetachedTailCompensation = (value: number) => {
+    const nextValue = Math.max(0, value);
+    if (Math.abs(detachedTailCompensationRef.current - nextValue) <= 0.01) return;
+    detachedTailCompensationRef.current = nextValue;
+    streamContentRef.current?.style.setProperty(
+      "--kimix-detached-tail-compensation",
+      `${nextValue}px`,
+    );
+  };
+
+  const clearDetachedViewportCompensation = () => {
+    detachedViewportMinimumScrollHeightRef.current = null;
+    setDetachedTailCompensation(0);
+  };
+
+  const reconcileDetachedViewportCompensation = (node: HTMLElement) => {
+    const minimumScrollHeight = detachedViewportMinimumScrollHeightRef.current;
+    if (minimumScrollHeight === null) return;
+    // Keep only the exact scroll-range debt that real final content has not yet
+    // replaced. This avoids a later jump without reserving message-level height.
+    const naturalScrollHeight = Math.max(0, node.scrollHeight - detachedTailCompensationRef.current);
+    const nextCompensation = requiredViewportTailCompensation({
+      minimumScrollHeight,
+      naturalScrollHeight,
+    });
+    setDetachedTailCompensation(nextCompensation);
+    if (nextCompensation <= 0.01) {
+      detachedViewportMinimumScrollHeightRef.current = null;
+    }
+  };
+
+  const naturalDistanceFromBottom = (node: HTMLElement) => Math.max(
+    0,
+    node.scrollHeight - detachedTailCompensationRef.current - node.scrollTop - node.clientHeight,
+  );
+
   const clearSessionAutoBottomTimer = () => {
     if (sessionAutoBottomTimerRef.current === null) return;
     window.clearTimeout(sessionAutoBottomTimerRef.current);
@@ -967,6 +1025,9 @@ export const ChatThread = memo(function ChatThread() {
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     const node = scrollRef.current;
     if (!node) return;
+    if (autoFollowRef.current && !userScrollRef.current) {
+      clearDetachedViewportCompensation();
+    }
     const locked = Date.now() < userInputLockUntilRef.current;
     const beforeScrollTop = node.scrollTop;
     const beforeScrollHeight = node.scrollHeight;
@@ -1079,9 +1140,16 @@ export const ChatThread = memo(function ChatThread() {
     });
   };
 
+  const recordExplicitUserScrollIntent = () => {
+    userScrollGenerationRef.current += 1;
+    resizeScrollAnchorRef.current = null;
+    lastUserScrollAtRef.current = Date.now();
+    scheduleIdleAnchorCapture();
+  };
+
   const pauseAutoFollowForUser = () => {
     cancelSessionAutoBottom();
-    lastUserScrollAtRef.current = Date.now();
+    recordExplicitUserScrollIntent();
     userBottomIntentUntilRef.current = 0;
     userScrollRef.current = true;
     scrollTokenRef.current += 1;
@@ -1101,10 +1169,23 @@ export const ChatThread = memo(function ChatThread() {
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.button === 1 || event.clientX >= rect.right - 20) {
+      scrollbarPointerActiveRef.current = true;
       lockScrollForUserInput();
       pauseAutoFollowForUser();
       userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
+  };
+
+  const handlePointerMove = () => {
+    if (!scrollbarPointerActiveRef.current) return;
+    lockScrollForUserInput();
+    recordExplicitUserScrollIntent();
+  };
+
+  const handlePointerEnd = () => {
+    if (!scrollbarPointerActiveRef.current) return;
+    scrollbarPointerActiveRef.current = false;
+    recordExplicitUserScrollIntent();
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -1113,6 +1194,7 @@ export const ChatThread = memo(function ChatThread() {
       pauseAutoFollowForUser();
       if (isInitialTailOnly) expandInitialTail();
     } else if (event.deltaY > 0) {
+      recordExplicitUserScrollIntent();
       userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
@@ -1129,6 +1211,7 @@ export const ChatThread = memo(function ChatThread() {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
     } else if (startY - currentY > 10) {
+      recordExplicitUserScrollIntent();
       userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
@@ -1138,6 +1221,7 @@ export const ChatThread = memo(function ChatThread() {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
     } else if (["PageDown", "ArrowDown", "End"].includes(event.key)) {
+      recordExplicitUserScrollIntent();
       userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
   };
@@ -1156,6 +1240,7 @@ export const ChatThread = memo(function ChatThread() {
     resizeScrollAnchorRef.current = {
       key: anchor.dataset.kimixRenderKey ?? "",
       offsetTop: anchor.getBoundingClientRect().top - containerRect.top,
+      userScrollGeneration: userScrollGenerationRef.current,
     };
   };
 
@@ -1163,6 +1248,10 @@ export const ChatThread = memo(function ChatThread() {
     const node = scrollRef.current;
     const anchor = resizeScrollAnchorRef.current;
     if (!node || !anchor?.key) return false;
+    if (!isViewportAnchorGenerationCurrent({
+      capturedGeneration: anchor.userScrollGeneration,
+      currentGeneration: userScrollGenerationRef.current,
+    })) return false;
     const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&");
     const target = node.querySelector<HTMLElement>(`[data-kimix-render-key="${escaped}"]`);
     if (!target) return false;
@@ -1183,9 +1272,13 @@ export const ChatThread = memo(function ChatThread() {
     const node = scrollRef.current;
     if (!node || !userScrollRef.current) return false;
     const anchor = resizeScrollAnchorRef.current;
+    const hasCurrentAnchor = Boolean(anchor && isViewportAnchorGenerationCurrent({
+      capturedGeneration: anchor.userScrollGeneration,
+      currentGeneration: userScrollGenerationRef.current,
+    }));
     const beforeScrollTop = node.scrollTop;
     const beforeDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
-    const target = anchor?.key
+    const target = hasCurrentAnchor && anchor?.key
       ? node.querySelector<HTMLElement>(`[data-kimix-render-key="${globalThis.CSS?.escape ? globalThis.CSS.escape(anchor.key) : anchor.key.replace(/["\\]/g, "\\$&")}"]`)
       : null;
     const containerRect = node.getBoundingClientRect();
@@ -1216,6 +1309,9 @@ export const ChatThread = memo(function ChatThread() {
           runtimeSessionId: session ? getRuntimeSessionId(session) : undefined,
           runningSessionId,
           anchorKey: anchor?.key,
+          anchorGeneration: anchor?.userScrollGeneration,
+          userScrollGeneration: userScrollGenerationRef.current,
+          hasCurrentAnchor,
           targetFound: Boolean(target),
           userScroll: userScrollRef.current,
           autoFollow: autoFollowRef.current,
@@ -1331,12 +1427,148 @@ export const ChatThread = memo(function ChatThread() {
       scrollTokenRef.current += 1;
       autoFollowRef.current = false;
       userScrollRef.current = true;
+      userScrollGenerationRef.current += 1;
+      resizeScrollAnchorRef.current = null;
+      lastUserScrollAtRef.current = Date.now();
       ignoreScrollUntilRef.current = Date.now() + 240;
       updateAutoFollow(false);
     };
     window.addEventListener("kimix:intentional-chat-resize", handleIntentionalResize);
     return () => window.removeEventListener("kimix:intentional-chat-resize", handleIntentionalResize);
   }, []);
+
+  useEffect(() => {
+    const clearScrollbarPointer = () => {
+      scrollbarPointerActiveRef.current = false;
+    };
+    window.addEventListener("pointerup", clearScrollbarPointer);
+    window.addEventListener("pointercancel", clearScrollbarPointer);
+    window.addEventListener("blur", clearScrollbarPointer);
+    return () => {
+      window.removeEventListener("pointerup", clearScrollbarPointer);
+      window.removeEventListener("pointercancel", clearScrollbarPointer);
+      window.removeEventListener("blur", clearScrollbarPointer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const selectStableAnchor = (
+      node: HTMLElement,
+      detail: ChatProcessCollapseViewportDetail,
+    ) => {
+      const containerRect = node.getBoundingClientRect();
+      const sampleY = containerRect.top + Math.min(Math.max(node.clientHeight * 0.24, 96), 220);
+      const sampleX = containerRect.left + Math.max(1, Math.min(containerRect.width - 1, containerRect.width * 0.5));
+      const contentAnchor = detail.contentAnchor?.isConnected && node.contains(detail.contentAnchor)
+        ? detail.contentAnchor
+        : null;
+      if (contentAnchor && contentAnchor.getBoundingClientRect().top <= sampleY + 0.5) {
+        return contentAnchor;
+      }
+      const hit = typeof document.elementFromPoint === "function"
+        ? document.elementFromPoint(sampleX, sampleY)
+        : null;
+      let anchor = hit instanceof HTMLElement ? hit : hit?.parentElement ?? null;
+      const isUnstableAnchor = isProcessCollapseAnchorUnstable({
+        anchor,
+        scrollNode: node,
+        streamNode: streamContentRef.current,
+        collapsingNode: detail.collapsingNode ?? null,
+      });
+
+      if (isUnstableAnchor) {
+        const summaryAnchor = detail.summaryAnchor?.isConnected && node.contains(detail.summaryAnchor)
+          ? detail.summaryAnchor
+          : null;
+        if (summaryAnchor && summaryAnchor.getBoundingClientRect().top <= sampleY + 0.5) {
+          anchor = summaryAnchor;
+        } else {
+          anchor = null;
+        }
+      }
+
+      return anchor && node.contains(anchor) ? anchor : null;
+    };
+
+    const handleProcessCollapseViewport = (event: Event) => {
+      const detail = (event as CustomEvent<ChatProcessCollapseViewportDetail>).detail;
+      if (!detail?.transactionId || detail.sessionId !== session?.id) return;
+      const node = scrollRef.current;
+      if (!node) return;
+      intentionalResizeRestoreUntilRef.current = Date.now() + 600;
+
+      if (detail.phase === "before") {
+        const isDetached = userScrollRef.current || !autoFollowRef.current;
+        if (isDetached) userBottomIntentUntilRef.current = 0;
+        const anchorElement = isDetached ? selectStableAnchor(node, detail) : null;
+        processCollapseViewportSnapshotsRef.current.set(detail.transactionId, {
+          anchorElement,
+          anchorViewportTop: anchorElement?.getBoundingClientRect().top,
+          scrollTop: node.scrollTop,
+          autoFollow: autoFollowRef.current,
+          userScroll: userScrollRef.current,
+        });
+        return;
+      }
+
+      const snapshot = processCollapseViewportSnapshotsRef.current.get(detail.transactionId);
+      processCollapseViewportSnapshotsRef.current.delete(detail.transactionId);
+      if (!snapshot) return;
+
+      if (snapshot.autoFollow && !snapshot.userScroll && autoFollowRef.current && !userScrollRef.current) {
+        clearDetachedViewportCompensation();
+        scrollToBottom("auto");
+        return;
+      }
+
+      const currentAnchorViewportTop = snapshot.anchorElement?.isConnected && node.contains(snapshot.anchorElement)
+        ? snapshot.anchorElement.getBoundingClientRect().top
+        : undefined;
+      const naturalScrollHeight = Math.max(0, node.scrollHeight - detachedTailCompensationRef.current);
+      // The browser may already have clamped scrollTop after the shrink. Rebuild
+      // the intended position from a surviving reading-line element, then add
+      // temporary tail range only when the natural maximum cannot reach it.
+      const plan = planDetachedViewportRestore({
+        previousScrollTop: snapshot.scrollTop,
+        previousAnchorViewportTop: snapshot.anchorViewportTop,
+        currentScrollTop: node.scrollTop,
+        currentAnchorViewportTop,
+        naturalScrollHeight,
+        clientHeight: node.clientHeight,
+      });
+
+      detachedViewportMinimumScrollHeightRef.current = plan.tailCompensation > 0.01
+        ? plan.minimumScrollHeight
+        : null;
+      setDetachedTailCompensation(plan.tailCompensation);
+      const compensatedScrollHeight = node.scrollHeight;
+      ignoreScrollUntilRef.current = Date.now() + 240;
+      node.scrollTop = plan.targetScrollTop;
+      resizeScrollAnchorRef.current = null;
+      cancelPendingAnchorCapture();
+      scheduleAnchorCapture();
+      updateShowScrollToBottom(naturalDistanceFromBottom(node) > 80);
+      window.api.writeDiag?.({
+        message: "[ChatThread] processCollapseViewport",
+        data: {
+          transactionId: detail.transactionId,
+          eventId: detail.eventId,
+          agentTurnId: detail.agentTurnId,
+          roomAgentId: detail.roomAgentId,
+          previousScrollTop: snapshot.scrollTop,
+          nextScrollTop: node.scrollTop,
+          targetScrollTop: plan.targetScrollTop,
+          naturalScrollHeight,
+          compensatedScrollHeight,
+          tailCompensation: plan.tailCompensation,
+          anchorSurvived: currentAnchorViewportTop !== undefined,
+        },
+      }).catch(logError("writeDiag"));
+    };
+
+    window.addEventListener(CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT, handleProcessCollapseViewport);
+    return () => window.removeEventListener(CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT, handleProcessCollapseViewport);
+  }, [session?.id]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -1377,12 +1609,16 @@ export const ChatThread = memo(function ChatThread() {
     pendingOlderItemsScrollAnchorRef.current = null;
     pendingTailExpandScrollAnchorRef.current = null;
     resizeScrollAnchorRef.current = null;
+    processCollapseViewportSnapshotsRef.current.clear();
+    clearDetachedViewportCompensation();
     lastScrollSizeRef.current = null;
     lastScrollTopRef.current = null;
     lastScrollHeightRef.current = null;
     touchStartYRef.current = null;
     userInputLockUntilRef.current = 0;
     userBottomIntentUntilRef.current = 0;
+    userScrollGenerationRef.current = 0;
+    scrollbarPointerActiveRef.current = false;
     lastUserScrollAtRef.current = 0;
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
@@ -1453,6 +1689,7 @@ export const ChatThread = memo(function ChatThread() {
       const current = scrollRef.current;
       if (!current) return;
       const previousSize = lastScrollSizeRef.current;
+      reconcileDetachedViewportCompensation(current);
       const nextSize = readScrollSize(current);
       lastScrollSizeRef.current = nextSize;
       if (
@@ -1471,7 +1708,7 @@ export const ChatThread = memo(function ChatThread() {
         scheduleAnchorCapture();
         const activeNode = scrollRef.current;
         if (activeNode) {
-          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          const distance = naturalDistanceFromBottom(activeNode);
           updateShowScrollToBottom(distance > 80);
         }
         return;
@@ -1487,14 +1724,13 @@ export const ChatThread = memo(function ChatThread() {
       // touch gesture, then restore the same rendered item after layout settles.
       if (userScrollRef.current) {
         const isRecentUserScroll = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
-        if (isRecentUserScroll) scheduleIdleAnchorCapture();
-        else {
+        if (!isRecentUserScroll) {
           restoreResizeScrollAnchor();
           scheduleAnchorCapture();
         }
         const activeNode = scrollRef.current;
         if (activeNode) {
-          const distance = activeNode.scrollHeight - activeNode.scrollTop - activeNode.clientHeight;
+          const distance = naturalDistanceFromBottom(activeNode);
           updateShowScrollToBottom(distance > 80);
         }
         return;
@@ -1503,7 +1739,7 @@ export const ChatThread = memo(function ChatThread() {
       scheduleAnchorCapture();
       const nodeAfterRestore = scrollRef.current;
       if (!nodeAfterRestore) return;
-      const distance = nodeAfterRestore.scrollHeight - nodeAfterRestore.scrollTop - nodeAfterRestore.clientHeight;
+      const distance = naturalDistanceFromBottom(nodeAfterRestore);
       updateShowScrollToBottom(distance > 80);
     };
 
@@ -1570,18 +1806,20 @@ export const ChatThread = memo(function ChatThread() {
     }
     const node = scrollRef.current;
     if (!node) return;
+    if (Date.now() < intentionalResizeRestoreUntilRef.current) {
+      updateShowScrollToBottom(naturalDistanceFromBottom(node) > 80);
+      return;
+    }
     if (userScrollRef.current) {
       const isRecentUserScroll = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS;
       if (isRecentUserScroll) {
-        scheduleIdleAnchorCapture();
-        const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+        const distance = naturalDistanceFromBottom(node);
         updateShowScrollToBottom(distance > 80);
         return;
       }
       const now = Date.now();
       if (now - lastManualAnchorRestoreAtRef.current < 350) {
-        scheduleIdleAnchorCapture();
-        const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+        const distance = naturalDistanceFromBottom(node);
         updateShowScrollToBottom(distance > 80);
         return;
       }
@@ -1590,7 +1828,7 @@ export const ChatThread = memo(function ChatThread() {
         return;
       }
     }
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const distance = naturalDistanceFromBottom(node);
     updateShowScrollToBottom(distance > 80);
   }, [contentVersion]);
 
@@ -1753,13 +1991,25 @@ export const ChatThread = memo(function ChatThread() {
     const previousScrollHeight = lastScrollHeightRef.current;
     lastScrollTopRef.current = node.scrollTop;
     lastScrollHeightRef.current = node.scrollHeight;
-    const distance = distanceFromBottom(node);
+    if (canReleaseViewportTailCompensation({
+      tailCompensation: detachedTailCompensationRef.current,
+      scrollTop: node.scrollTop,
+      naturalScrollHeight: Math.max(0, node.scrollHeight - detachedTailCompensationRef.current),
+      clientHeight: node.clientHeight,
+    })) {
+      clearDetachedViewportCompensation();
+    }
+    const geometricDistance = distanceFromBottom(node);
+    const distance = detachedTailCompensationRef.current > 0
+      ? naturalDistanceFromBottom(node)
+      : geometricDistance;
     const now = Date.now();
     if (shouldResumeAutoFollowAtBottom({
       distance,
       autoFollow: autoFollowRef.current,
       userScroll: userScrollRef.current,
       bottomIntentUntil: userBottomIntentUntilRef.current,
+      suppressUntil: ignoreScrollUntilRef.current,
       now,
     })) {
       userScrollRef.current = false;
@@ -1768,13 +2018,12 @@ export const ChatThread = memo(function ChatThread() {
       lastUserScrollAtRef.current = 0;
       cancelPendingAnchorCapture();
       resizeScrollAnchorRef.current = null;
+      clearDetachedViewportCompensation();
+      lastScrollTopRef.current = node.scrollTop;
+      lastScrollHeightRef.current = node.scrollHeight;
       updateAutoFollow(true);
     }
     updateShowScrollToBottom(distance > 80);
-    if (userScrollRef.current) {
-      lastUserScrollAtRef.current = now;
-      scheduleIdleAnchorCapture();
-    }
     if (
       previousScrollTop !== null &&
       previousScrollTop > Math.max(160, node.clientHeight * 0.5) &&
@@ -2095,6 +2344,10 @@ export const ChatThread = memo(function ChatThread() {
         }}
         onScroll={handleScroll}
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onLostPointerCapture={handlePointerEnd}
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -2105,7 +2358,7 @@ export const ChatThread = memo(function ChatThread() {
           className="kimix-chat-stream-column flex min-h-full w-full flex-col"
           style={{
             gap: 22,
-            paddingBottom: CHAT_BOTTOM_SPACER_HEIGHT,
+            paddingBottom: `calc(${CHAT_BOTTOM_SPACER_HEIGHT}px + var(--kimix-detached-tail-compensation, 0px))`,
           }}
         >
           {isInitialTailOnly && initialTailHiddenCount > 0 && <FoldedHistoryNotice count={initialTailHiddenCount} onExpand={() => { pauseAutoFollowForUser(); expandInitialTail(); }} />}

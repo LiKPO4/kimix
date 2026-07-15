@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-15 v2.16.5 思考转正文视口稳定
+
+- 当前目标：修复 Agent 长思考在最终正文出现后收起时，用户手动浏览会话流发生页面上跳。
+- 根因：首段正文到达的一次 React 提交中，思考区先退出 144px live 视口，随后自动折叠再次移除过程详情；通用滚动锚点只记录整条 Assistant 外壳，且普通 `scroll` 会把程序恢复和浏览器高度钳制误记成用户输入，导致旧锚点可循环恢复。靠近底部时，新滚动上限还会先夹低 `scrollTop`，仅恢复坐标无法保持视口。
+- 已完成：最终正文过渡帧继续保留 live 思考几何，再按 Agent turn 执行专用 before/after 折叠事务；手动浏览态采样视口内存活 DOM 锚点并按需建立临时尾部补偿，补偿随真实正文增长消化、回到底部或切换会话时清零；明确用户输入使用 generation 使旧锚点失效，流式布局不再重置空闲采集计时。版本号三处同步至 v2.16.5。定向测试 3 个文件、21 项通过；`pnpm typecheck` 通过；全量测试 88 个文件、631 项通过；`pnpm build` 通过，renderer 为 `assets/index-32-Vq1Ti.js`；`pnpm knowledge:validate` 与 `git diff --check` 通过。
+- 未完成：用户真实长思考视觉验收。
+- 阻塞：无。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/chatViewportTransaction.ts`、`src/utils/liveThinkingViewport.ts`、`knowledge/project/kimix.md`、`docs/release-notes/v2.16.5.md`。
+- 下一步：启动 v2.16.5 新构建；用户在手动浏览旧消息、当前 Agent 正文及多 Agent 并行三种场景复测思考转正文。本轮不推送、不打 tag、不发布。
+
 ## 2026-07-15 v2.16.4 上下文压缩气泡居中
 
 - 当前目标：修正上下文压缩状态气泡中文字和动画点组合的视觉居中。

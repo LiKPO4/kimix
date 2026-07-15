@@ -36,15 +36,16 @@ export function shouldUseLiveThinkingViewport({
   isThinkingGroup,
   isActiveAssistant,
   hasFinalContent,
+  preserveDuringFinalTransition = false,
 }: {
   groupIndex: number;
   groupCount: number;
   isThinkingGroup: boolean;
   isActiveAssistant: boolean;
   hasFinalContent: boolean;
+  preserveDuringFinalTransition?: boolean;
 }) {
-  return isActiveAssistant &&
-    !hasFinalContent &&
+  return (preserveDuringFinalTransition || (isActiveAssistant && !hasFinalContent)) &&
     isThinkingGroup &&
     groupIndex === groupCount - 1;
 }

@@ -55,6 +55,12 @@ describe("liveThinkingViewport", () => {
     expect(shouldUseLiveThinkingViewport({ ...base, groupIndex: 1 })).toBe(false);
     expect(shouldUseLiveThinkingViewport({ ...base, isActiveAssistant: false })).toBe(false);
     expect(shouldUseLiveThinkingViewport({ ...base, hasFinalContent: true })).toBe(false);
+    expect(shouldUseLiveThinkingViewport({
+      ...base,
+      isActiveAssistant: false,
+      hasFinalContent: true,
+      preserveDuringFinalTransition: true,
+    })).toBe(true);
   });
 
   it("collapses the Kimi Web process exactly when final output starts", () => {
