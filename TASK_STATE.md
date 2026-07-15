@@ -4,11 +4,11 @@
 
 - 当前目标：根治多 Agent 房间单次发送在运行中或重启后投影为两条相同用户消息的问题，不再用显示层去重掩盖底层身份丢失。
 - 根因：现场官方 `wire.jsonl` 每条只有一次 `turn.prompt`，不是重复发送；旧主会话兼容回写会先删除 primary delivery，再从 legacy events 重建，因而丢失 `dispatchAttemptId` 及事务字段。房间合成消息随后无法认领仍带真实 attempt 的 canonical user event，两者被同时投影。
-- 已完成：兼容回写改为按原 room message 增量合并，同一事务保留 attempt、prompt、context share、时间戳、previous attempts 和接收者顺序；显式新事务仅重置 attempt 专属字段并保留审计账本。legacy 新建直接继承事件 attempt；加载时仅按同 Agent 精确 `roomMessageId + agentTurnId` 的唯一、未占用 attempt 修复旧损坏 delivery，冲突数据保持未绑定。时间线与 canonical history 共用事务优先解析，identity-less official ID 仅在 Agent 内唯一时绑定，正文/时间迁移要求消息与事件双向唯一且显式冲突永不降级；事件认领按 Agent 作用域隔离。版本号三处同步至 v2.16.6。定向测试 4 个文件、46 项通过；`pnpm typecheck` 通过；全量测试 88 个文件、646 项通过；`pnpm build` 通过，renderer 为 `assets/index-VWA6NIrc.js`；`pnpm knowledge:validate` 通过。
-- 未完成：启动 v2.16.6 新构建并等待用户对既有受损会话及新消息做真实回归。
+- 已完成：兼容回写改为按原 room message 增量合并，同一事务保留 attempt、prompt、context share、时间戳、previous attempts 和接收者顺序；显式新事务仅重置 attempt 专属字段并保留审计账本。legacy 新建直接继承事件 attempt；加载时仅按同 Agent 精确 `roomMessageId + agentTurnId` 的唯一、未占用 attempt 修复旧损坏 delivery，冲突数据保持未绑定。时间线与 canonical history 共用事务优先解析，identity-less official ID 仅在 Agent 内唯一时绑定，正文/时间迁移要求消息与事件双向唯一且显式冲突永不降级；事件认领按 Agent 作用域隔离。版本号三处同步至 v2.16.6。定向测试 4 个文件、46 项通过；`pnpm typecheck` 通过；全量测试 88 个文件、646 项通过；`pnpm build` 通过，renderer 为 `assets/index-VWA6NIrc.js`；`pnpm knowledge:validate` 通过。提交 `408575c` 已生成；旧 v2.16.5 dev 进程已按项目进程树关闭，v2.16.6 dev 完成 DOM 加载并保持运行。
+- 未完成：等待用户对既有受损会话及新消息做真实回归。
 - 阻塞：无；不推送、不打 tag、不发布。
 - 关键文件：`src/utils/collaborationRooms.ts`、`src/utils/roomDeliveryIdentity.ts`、`src/utils/collaborationTimeline.ts`、`src/utils/collaborationHistory.ts`、`src/utils/__tests__/persistence.test.ts`、`knowledge/architecture/collaboration-room-routing.md`、`docs/release-notes/v2.16.6.md`。
-- 下一步：提交后启动 v2.16.6；用户先确认左下角版本，再打开目标房间检查旧重复气泡已归一，并连续发送单 Agent、多 Agent 与相同正文消息，确认一次投递只显示一次、两次真实投递仍显示两次。
+- 下一步：用户先确认左下角版本为 v2.16.6，再打开目标房间检查旧重复气泡已归一，并连续发送单 Agent、多 Agent 与相同正文消息，确认一次投递只显示一次、两次真实投递仍显示两次。
 
 ## 2026-07-15 v2.16.5 思考转正文视口稳定
 
