@@ -67,6 +67,15 @@ function useAnimatedDots(active: boolean) {
   return ".".repeat(count);
 }
 
+function AnimatedDotsSlot({ dots }: { dots: string }) {
+  return (
+    <span className="relative inline-block text-left" aria-hidden="true">
+      <span className="invisible">...</span>
+      <span className="absolute inset-0">{dots}</span>
+    </span>
+  );
+}
+
 function SessionHistoryLoadingState() {
   return (
     <div
@@ -252,14 +261,14 @@ function CompactionLabel({
     return (
       <>
         上下文压缩耗时较长
-        <span className="inline-block w-[1.5em] text-left">{dots}</span>
+        <AnimatedDotsSlot dots={dots} />
       </>
     );
   }
   return (
     <>
       上下文压缩中
-      <span className="inline-block w-[1.5em] text-left">{dots}</span>
+      <AnimatedDotsSlot dots={dots} />
     </>
   );
 }
