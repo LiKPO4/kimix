@@ -8,6 +8,8 @@
 
 * **Completed turns reuse stable render items**: Active turns rebuild normally, while unchanged historical turns reuse cached derived items based on original event references so merged Assistant props stay stable without serializing long bodies. See [/project/kimix.md](/project/kimix.md).
 
+* **Auto-follow has one geometry observer**: ResizeObserver owns streamed-content and viewport size changes; content-version work no longer serializes the full timeline or performs a second automatic bottom scroll, while manual anchor recovery remains intact. See [/project/kimix.md](/project/kimix.md).
+
 * **Running history reconciliation is process-monotonic**: Intermediate `tool_use` step ends no longer settle a turn, and a Server snapshot with fewer tool/process events cannot replace a richer live timeline merely because its latest thinking differs. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Startup bootstrap is renewed for every renderer document**: Full reload recreates preload and its replay cache, so the main process republishes active project context on every completed document load; recent-project persistence and stale blank-page checks can no longer block or corrupt that handshake. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

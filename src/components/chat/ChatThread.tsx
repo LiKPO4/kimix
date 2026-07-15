@@ -967,7 +967,6 @@ export const ChatThread = memo(function ChatThread() {
   const lastUserScrollAtRef = useRef(0);
   const lastScrollDiagRef = useRef(0);
   const lastManualAnchorRestoreAtRef = useRef(0);
-  const bottomTrackerFrameRef = useRef(0);
   const intentionalResizeRestoreUntilRef = useRef(0);
   const processCollapseViewportSnapshotsRef = useRef(new Map<string, ProcessCollapseViewportSnapshot>());
   const detachedViewportMinimumScrollHeightRef = useRef<number | null>(null);
@@ -1015,13 +1014,8 @@ export const ChatThread = memo(function ChatThread() {
     return item?.type === "event" ? item.event.id : undefined;
   }, [renderItems]);
   const contentVersion = useMemo(() => {
-    return roomTimeline.map((event) => {
-      if (event.type === "assistant_message") {
-        return `${event.id}:${event.roomAgentId ?? ""}:${event.agentTurnId ?? ""}:${event.content.length}:${event.thinking?.length ?? 0}:${event.isComplete ? 1 : 0}`;
-      }
-      return `${event.id}:${event.type}:${event.roomAgentId ?? ""}:${event.agentTurnId ?? ""}`;
-    }).join("|");
-  }, [roomTimeline]);
+    return `${session?.id ?? ""}:${session?.updatedAt ?? 0}:${roomTimeline.length}`;
+  }, [roomTimeline.length, session?.id, session?.updatedAt]);
   contentVersionRef.current = contentVersion;
 
   const updateAutoFollow = (value: boolean) => {
@@ -1690,7 +1684,6 @@ export const ChatThread = memo(function ChatThread() {
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
-    let mutationObserver: MutationObserver | null = null;
     if (session?.id) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       sessionAutoBottomStableRef.current = null;
@@ -1699,20 +1692,6 @@ export const ChatThread = memo(function ChatThread() {
         node.scrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
       }
       settleSessionAtBottom();
-      const contentNode = streamContentRef.current;
-      if (contentNode) {
-        mutationObserver = new MutationObserver(() => {
-          if (!autoFollowRef.current || userScrollRef.current) return;
-          if (Date.now() >= sessionAutoBottomUntilRef.current && !isAutoFollowRef.current) return;
-          if (bottomTrackerFrameRef.current) return;
-          bottomTrackerFrameRef.current = window.requestAnimationFrame(() => {
-            bottomTrackerFrameRef.current = 0;
-            if (!autoFollowRef.current || userScrollRef.current) return;
-            scrollToBottom("auto");
-          });
-        });
-        mutationObserver.observe(contentNode, { childList: true, subtree: true });
-      }
       const primingSessionId = session.id;
       window.requestAnimationFrame(() => {
         settleSessionAtBottom();
@@ -1729,11 +1708,6 @@ export const ChatThread = memo(function ChatThread() {
     return () => {
       cancelSessionAutoBottom();
       cancelPendingAnchorCapture();
-      if (bottomTrackerFrameRef.current) {
-        window.cancelAnimationFrame(bottomTrackerFrameRef.current);
-        bottomTrackerFrameRef.current = 0;
-      }
-      mutationObserver?.disconnect();
     };
   }, [session?.id]);
 
@@ -1859,18 +1833,7 @@ export const ChatThread = memo(function ChatThread() {
   }, [contentVersion, session?.id]);
 
   useLayoutEffect(() => {
-    const remaining = sessionAutoBottomUntilRef.current - Date.now();
-    const isSettlingOpenedSession = remaining > 0 && !userScrollRef.current;
-    if (isSettlingOpenedSession) {
-      autoFollowRef.current = true;
-      updateAutoFollow(true);
-      scrollToBottom("auto");
-      return;
-    }
-    if (isAutoFollowRef.current) {
-      scrollToBottom("auto");
-      return;
-    }
+    if (isAutoFollowRef.current) return;
     const node = scrollRef.current;
     if (!node) return;
     if (Date.now() < intentionalResizeRestoreUntilRef.current) {
