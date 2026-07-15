@@ -1,5 +1,22 @@
 # Kimix 长程任务状态
 
+## 2026-07-15 Web 模式单轮长消息流性能改造
+
+- 当前目标：对齐官方 Kimi Web 的消息流关键优化，解决单轮 Assistant 正文持续增长时卡顿随内容长度明显放大的问题。
+- 对比结论：Kimix 已有 80ms 流事件批处理，主要瓶颈不是事件频率，而是批次内逐事件合并、完整时间线重复派生、运行中正文重复规范化、`react-markdown` 全文重解析，以及 `contentVersion`、`ResizeObserver`、`MutationObserver` 叠加触发布局跟随。官方 Web 使用稳定 `LiveMessage`、Streamdown 分块 Markdown 和 `react-virtuoso`；其中分块 Markdown 是单轮长消息的首要差异，虚拟列表主要改善长历史。
+- 已完成：完成 Kimix 与官方仓库 `MoonshotAI/kimi-cli@ded99b4` 的静态代码对比，确认官方 `ContentPart` 同样近似逐事件更新，但 Streamdown 会将流式 Markdown 切成稳定块，只重解析增长中的尾块。
+- 待办与执行顺序：
+  1. 为运行中的 Assistant 接入分块流式 Markdown 渲染，并保留完成态现有渲染作为首阶段回滚边界。
+  2. 消除 `MessageBubble` 与 `MarkdownRenderer` 的重复正文规范化，将 `.md` 文件提取等非实时全文扫描延迟到消息完成后。
+  3. 在 80ms flush 内合并连续正文/思考增量，减少 `mergeEvents` 的完整数组扫描与复制次数。
+  4. 缓存已完成轮次的 `RenderItem`，只重建活动轮并保持历史 Assistant 对象引用稳定。
+  5. 收敛 `contentVersion`、`ResizeObserver`、`MutationObserver` 的重复滚动与尺寸测量职责。
+  6. 评估并接入消息列表虚拟化；明确它主要解决长历史，不作为单轮长正文的首要修复。
+- 未完成：以上六阶段均待实施；每阶段单独验证、检查 diff 并提交。
+- 阻塞：无；不推送、不打 tag、不发布。新增依赖必须说明理由与回滚方式。
+- 关键文件：`src/hooks/useEventStream.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/components/chat/MarkdownRenderer.tsx`。
+- 下一步：执行阶段 1，仅替换运行中 Assistant 的 Markdown 渲染路径，补充针对稳定块与流式尾块的回归验证。
+
 ## 2026-07-15 v2.16.9 运行中提前完成与过程历史丢失
 
 - 当前目标：修复长工具链仍在运行时 Assistant 错误显示“输出完成”，以及运行中只剩最新思考/工具、旧过程突然消失的问题。
