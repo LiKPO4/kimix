@@ -95,9 +95,7 @@ describe("Kimi history cache migration", () => {
     expect(hasCanonicalKimiThinkingHistory(cached, canonical)).toBe(true);
   });
 
-  it("ignores subagent-internal thinking when deciding top-level thinking migration", () => {
-    // 顶层 assistant 无思考；子代理内部有思考。当前实现只扫描顶层
-    // assistant_message，因此不触发迁移判断（整体替换仍会带走子代理）。
+  it("counts subagent-internal thinking when deciding thinking migration", () => {
     const cachedWithSubagentThought: TimelineEvent[] = [{
       ...assistant,
       content: "",
@@ -111,12 +109,37 @@ describe("Kimi history cache migration", () => {
       events: [{
         ...assistant,
         id: "sub-assistant",
-        thinking: "sub thought",
-        thinkingParts: [{ id: "sub-think", timestamp: 2, text: "sub thought" }],
+        thinking: "cached sub thought",
+        thinkingParts: [{ id: "sub-think", timestamp: 2, text: "cached sub thought" }],
       }],
     }];
-    const canonicalEmpty: TimelineEvent[] = [{ ...assistant, content: "" }];
+    const canonicalWithDifferentThought: TimelineEvent[] = [{
+      ...assistant,
+      content: "",
+      thinking: "canonical thought",
+      thinkingParts: [{ id: "canonical-think", timestamp: 2, text: "canonical thought" }],
+    }];
 
-    expect(hasCanonicalKimiThinkingHistory(cachedWithSubagentThought, canonicalEmpty)).toBe(false);
+    expect(hasCanonicalKimiThinkingHistory(cachedWithSubagentThought, canonicalWithDifferentThought)).toBe(true);
+  });
+
+  it("counts subagent-internal process events when comparing process history richness", () => {
+    const cachedWithSubagentTool: TimelineEvent[] = [{
+      ...assistant,
+    }, {
+      id: "sub",
+      type: "subagent",
+      timestamp: 2,
+      agentId: "agent-1",
+      agentName: "子代理",
+      status: "completed",
+      events: [{
+        ...tool,
+        id: "sub-tool",
+      }],
+    }];
+
+    expect(kimiHistoryProcessEventCount(cachedWithSubagentTool)).toBe(2);
+    expect(hasRicherKimiProcessHistory([assistant], cachedWithSubagentTool)).toBe(true);
   });
 });

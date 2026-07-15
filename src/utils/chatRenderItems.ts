@@ -23,14 +23,27 @@ export function createToolOnlyAssistantEvent(tools: ToolCallEvent[]): Extract<Ti
 function collectSubagentAssistantOutput(subagents: SubagentEvent[]): { content: string; thinking?: string } {
   const contents: string[] = [];
   const thinkings: string[] = [];
-  for (const subagent of subagents) {
-    for (const event of subagent.events) {
-      if (event.type !== "assistant_message") continue;
-      const content = event.content?.trim();
-      const thinking = event.thinking?.trim();
-      if (content) contents.push(content);
-      if (thinking) thinkings.push(thinking);
+
+  function walk(events: TimelineEvent[]) {
+    for (const event of events) {
+      if (event.type === "assistant_message") {
+        const content = event.content?.trim();
+        const thinking = event.thinking?.trim();
+        if (content) contents.push(content);
+        if (thinking) thinkings.push(thinking);
+        // thinkingParts 可能承载 thinking 正文，thinking 字段为空时也要收集
+        for (const part of event.thinkingParts ?? []) {
+          const partText = part.text?.trim();
+          if (partText) thinkings.push(partText);
+        }
+      } else if (event.type === "subagent") {
+        walk(event.events);
+      }
     }
+  }
+
+  for (const subagent of subagents) {
+    walk(subagent.events);
   }
   return {
     content: contents.join("\n\n"),

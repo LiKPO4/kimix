@@ -197,14 +197,25 @@ function isSameLocalProjectPath(a: string | undefined, b: string | undefined) {
   return isSamePath(a, b);
 }
 
+function flattenTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
+  const result: TimelineEvent[] = [];
+  for (const event of events) {
+    result.push(event);
+    if (event.type === "subagent") {
+      result.push(...flattenTimelineEvents(event.events));
+    }
+  }
+  return result;
+}
+
 function assistantBodySize(events: TimelineEvent[]) {
-  return events
+  return flattenTimelineEvents(events)
     .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
     .reduce((sum, event) => sum + event.content.trim().length, 0);
 }
 
 function assistantBodyText(events: TimelineEvent[]) {
-  return events
+  return flattenTimelineEvents(events)
     .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
     .map((event) => event.content)
     .filter((content) => content.trim().length > 0)
@@ -234,10 +245,13 @@ function hasPossiblyLostUserImages(events: TimelineEvent[]) {
 function shouldReplaceWithCanonicalKimiHistory(cachedEvents: TimelineEvent[], canonicalEvents: TimelineEvent[]) {
   if (canonicalEvents.length === 0) return false;
   const canonicalAssistantBody = assistantBodyText(canonicalEvents);
-  return assistantBodySize(canonicalEvents) > assistantBodySize(cachedEvents) ||
+  const cachedAssistantBody = assistantBodyText(cachedEvents);
+  const canonicalAssistantSize = assistantBodySize(canonicalEvents);
+  const cachedAssistantSize = assistantBodySize(cachedEvents);
+  return canonicalAssistantSize > cachedAssistantSize ||
     displayableUserImageCount(canonicalEvents) > displayableUserImageCount(cachedEvents) ||
     (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
-    (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== assistantBodyText(cachedEvents)) ||
+    (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
     (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
     hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
     hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);

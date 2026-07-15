@@ -590,7 +590,8 @@ function mergeSubagentLifecycle(
     swarmIndex: incoming.swarmIndex ?? current.swarmIndex,
     resultSummary: incoming.resultSummary ?? current.resultSummary,
     error: incoming.error ?? current.error,
-    events: incoming.events.length > 0 ? incoming.events : current.events,
+    // 增量合并子代理内部事件，避免迟到/历史补发的 subagent 事件用不完整 events 覆盖本地已收到的流式内容
+    events: incoming.events.reduce<TimelineEvent[]>((merged, event) => mergeEvents(merged, event), current.events),
   };
 }
 

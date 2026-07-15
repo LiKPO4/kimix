@@ -1380,6 +1380,87 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).events).toHaveLength(1);
   });
 
+  it("does not replace existing subagent events when incoming subagent carries empty events", () => {
+    const existing: TimelineEvent[] = [{
+      id: "agent-running",
+      type: "subagent",
+      timestamp: 10,
+      agentId: "agent-7",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "child-output",
+        type: "assistant_message",
+        timestamp: 11,
+        content: "子代理正文",
+        isThinking: false,
+        isComplete: true,
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "agent-completed",
+      type: "subagent",
+      timestamp: 12,
+      agentId: "agent-7",
+      agentName: "coder",
+      status: "completed",
+      events: [],
+    };
+
+    const result = mergeEvents(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ type: "subagent", status: "completed" });
+    expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).events).toHaveLength(1);
+    expect(((result[0] as Extract<TimelineEvent, { type: "subagent" }>).events[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("子代理正文");
+  });
+
+  it("merges incoming subagent events into existing events instead of replacing them", () => {
+    const existing: TimelineEvent[] = [{
+      id: "agent-running",
+      type: "subagent",
+      timestamp: 10,
+      agentId: "agent-8",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "child-output-1",
+        type: "assistant_message",
+        timestamp: 11,
+        content: "已有正文",
+        isThinking: false,
+        isComplete: true,
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "agent-completed",
+      type: "subagent",
+      timestamp: 12,
+      agentId: "agent-8",
+      agentName: "coder",
+      status: "completed",
+      events: [{
+        id: "child-output-2",
+        type: "assistant_message",
+        timestamp: 13,
+        content: "新增正文",
+        isThinking: false,
+        isComplete: true,
+      }],
+    };
+
+    const result = mergeEvents(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    const subagent = result[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(subagent.events).toHaveLength(2);
+    const contents = subagent.events
+      .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
+      .map((event) => event.content);
+    expect(contents).toContain("已有正文");
+    expect(contents).toContain("新增正文");
+  });
+
   it("appends change_summary after moving last status_update before it", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "status_update", timestamp: 1, tokenCount: 10, inputTokenCount: 5, contextSize: 100, contextLimit: 256000 },

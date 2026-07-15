@@ -12,8 +12,19 @@ const PROCESS_EVENT_TYPES = new Set<TimelineEvent["type"]>([
   "hook",
 ]);
 
+function flattenTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
+  const result: TimelineEvent[] = [];
+  for (const event of events) {
+    result.push(event);
+    if (event.type === "subagent") {
+      result.push(...flattenTimelineEvents(event.events));
+    }
+  }
+  return result;
+}
+
 export function kimiHistoryProcessEventCount(events: TimelineEvent[]) {
-  return events.reduce((count, event) => count + (PROCESS_EVENT_TYPES.has(event.type) ? 1 : 0), 0);
+  return flattenTimelineEvents(events).reduce((count, event) => count + (PROCESS_EVENT_TYPES.has(event.type) ? 1 : 0), 0);
 }
 
 export function hasRicherKimiProcessHistory(cached: TimelineEvent[], canonical: TimelineEvent[]) {
@@ -21,7 +32,7 @@ export function hasRicherKimiProcessHistory(cached: TimelineEvent[], canonical: 
 }
 
 function thinkingHistoryText(events: TimelineEvent[]) {
-  return events
+  return flattenTimelineEvents(events)
     .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
     .map((event) => {
       const parts = event.thinkingParts?.map((part) => part.text).join("") ?? "";

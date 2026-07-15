@@ -142,6 +142,61 @@ describe("createSubagentOnlyAssistantEvent", () => {
     const event = createSubagentOnlyAssistantEvent(subagents);
     expect(event.thinking).toBe("思考内容");
   });
+
+  it("collects content from nested subagent events", () => {
+    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
+      {
+        id: "s1",
+        type: "subagent",
+        timestamp: 1,
+        agentId: "a1",
+        agentName: "coder",
+        status: "completed",
+        events: [
+          {
+            id: "s2",
+            type: "subagent",
+            timestamp: 2,
+            agentId: "a2",
+            agentName: "reviewer",
+            status: "completed",
+            events: [
+              { id: "a2", type: "assistant_message", timestamp: 3, content: "嵌套子代理正文", isThinking: false, isComplete: true },
+            ],
+          },
+        ],
+      },
+    ];
+    const event = createSubagentOnlyAssistantEvent(subagents);
+    expect(event.content).toBe("嵌套子代理正文");
+  });
+
+  it("collects thinking from thinkingParts when thinking field is empty", () => {
+    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
+      {
+        id: "s1",
+        type: "subagent",
+        timestamp: 1,
+        agentId: "a1",
+        agentName: "coder",
+        status: "completed",
+        events: [
+          {
+            id: "a1",
+            type: "assistant_message",
+            timestamp: 2,
+            content: "",
+            thinking: "",
+            thinkingParts: [{ id: "tp1", timestamp: 2, text: "分段思考", signature: "sig1" }],
+            isThinking: false,
+            isComplete: true,
+          },
+        ],
+      },
+    ];
+    const event = createSubagentOnlyAssistantEvent(subagents);
+    expect(event.thinking).toBe("分段思考");
+  });
 });
 
 describe("buildRenderItems compaction placement", () => {
