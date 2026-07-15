@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-15 工具调用/子代理后助手正文缺失（交接态）
+
+- 当前目标：分析并记录"工具调用/子代理完成后，助手没有输出正文，用户必须手动发送'继续'才能继续生成"的问题，并把结论沉淀成可交接文档。
+- 根因（代码分析）：Kimi Code SDK 事件流与 Kimix 事件映射之间缺少"工具调用后必须产出正文"的兜底机制。`assistant.delta`/`ContentPart` 是 UI 正文的唯一来源；`TurnEnd` 被映射为 content 为空的 `assistant_message`；`mergeEvents` 在没有未完成 `assistant_message` 时会丢弃空 `TurnEnd`；主进程 `prompt()` 与 BTW 更新也只看 `assistant.delta`；`src/App.tsx` 事件流入口没有"空正文 + 已完成工具/子代理时自动继续"的兜底。
+- 已完成：读取关键代码路径并排除 UI 渲染、合并丢失、状态误判三种假设；写出问题文档 `docs/issue-empty-assistant-after-tool-use.md`；提交 `45e2345 docs: 记录工具调用后助手正文缺失问题（issue-empty-assistant-after-tool-use）`；工作区干净。
+- 未完成：未在主进程日志中复现并抓取 SSE 事件序列，确认 SDK 是否确实只发了 `tool.result` + `TurnEnd`；未导出"正文不显示"时的 `events` 数组快照；未对比关闭 Swarm 后是否仍复现；未实施任何代码修复。
+- 阻塞：无外部阻塞。下一步决策依赖复现并抓取主进程 SSE 日志，确认根因是 SDK/模型行为还是 Swarm 子代理归属错误。
+- 关键文件：`docs/issue-empty-assistant-after-tool-use.md`、`src/utils/eventMapper.ts`、`electron/kimiCodeHost.ts`、`src/App.tsx`。
+- 下一步：下一个 agent 优先在复现该问题时打开主进程调试日志，确认第一轮结束时 SDK 事件流里有没有 `assistant.delta` content。若只有 `tool.result` + `TurnEnd`，则根因是 SDK/模型行为；若正文出现在子代理 scope 里，则根因是 Swarm 归属问题。随后按文档第 6 节评估修复候选方案。
+
 ## 2026-07-15 v2.16.7 renderer 重载启动恢复
 
 - 当前目标：根治 Electron renderer 重载后侧栏已有项目和会话、主区却永久停在“正在准备默认项目”的启动握手断层。
