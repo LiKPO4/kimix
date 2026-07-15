@@ -86,6 +86,62 @@ describe("createSubagentOnlyAssistantEvent", () => {
 
     expect(event.isComplete).toBe(true);
   });
+
+  it("surfaces assistant content from subagent events when the main timeline has none", () => {
+    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
+      {
+        id: "agent-1",
+        type: "subagent",
+        timestamp: 1,
+        agentId: "a1",
+        agentName: "coder",
+        status: "completed",
+        events: [
+          { id: "a1", type: "assistant_message", timestamp: 2, content: "剩余小债务", isThinking: false, isComplete: true },
+        ],
+      },
+    ];
+    const event = createSubagentOnlyAssistantEvent(subagents);
+    expect(event.content).toBe("剩余小债务");
+    expect(event.isComplete).toBe(true);
+  });
+
+  it("joins content from multiple subagent assistant messages", () => {
+    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
+      {
+        id: "s1",
+        type: "subagent",
+        timestamp: 1,
+        agentId: "a1",
+        agentName: "coder",
+        status: "completed",
+        events: [
+          { id: "a1", type: "assistant_message", timestamp: 2, content: "第一部分", isThinking: false, isComplete: true },
+          { id: "a2", type: "assistant_message", timestamp: 3, content: "第二部分", isThinking: false, isComplete: true },
+        ],
+      },
+    ];
+    const event = createSubagentOnlyAssistantEvent(subagents);
+    expect(event.content).toBe("第一部分\n\n第二部分");
+  });
+
+  it("collects thinking from subagent events", () => {
+    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
+      {
+        id: "s1",
+        type: "subagent",
+        timestamp: 1,
+        agentId: "a1",
+        agentName: "coder",
+        status: "completed",
+        events: [
+          { id: "a1", type: "assistant_message", timestamp: 2, content: "", thinking: "思考内容", isThinking: false, isComplete: true },
+        ],
+      },
+    ];
+    const event = createSubagentOnlyAssistantEvent(subagents);
+    expect(event.thinking).toBe("思考内容");
+  });
 });
 
 describe("buildRenderItems compaction placement", () => {

@@ -1,14 +1,14 @@
 # Kimix 长程任务状态
 
-## 2026-07-15 v2.16.8 工具调用/子代理后空 turn 自动继续兜底
+## 2026-07-15 v2.16.8 子代理正文提升到主时间线
 
-- 当前目标：修复"工具调用/子代理完成后，助手没有输出正文，用户必须手动发送'继续'才能继续生成"的问题。
-- 根因：Kimi Code SDK 事件流与 Kimix 事件映射之间缺少"工具调用后必须产出正文"的兜底机制。`assistant.delta`/`ContentPart` 是 UI 正文的唯一来源；`TurnEnd` 被映射为 content 为空的 `assistant_message`；`mergeEvents` 在没有未完成 `assistant_message` 时会丢弃空 `TurnEnd`；主进程 `prompt()` 与 BTW 更新也只看 `assistant.delta`；`src/App.tsx` 事件流入口没有"空正文 + 已完成工具/子代理时自动继续"的兜底。
-- 已完成：实现渲染端自动继续兜底。新增 `src/utils/autoContinue.ts`，在 `auto`/`yolo` 权限模式下，当检测到当前 turn 已完成工具/子代理、没有助手正文/思考、没有待审批/待回答、且非长程任务时，自动向对应 runtime 发送"继续"，避免用户手动输入；同一 turn 只自动继续一次，防止无限循环。在 `onKimiCodeEvent` 收到空 `TurnEnd` 后延迟 150ms 检查，在 `onKimiCodeStatus` 收到 `completed` 后立即检查。新增 9 项单元测试覆盖手动权限、有正文、运行中、已完成工具、已完成子代理、重复继续、待审批、长程任务、非 Kimi Code 引擎等场景。版本号三处同步至 v2.16.8。`pnpm typecheck` 通过；全量测试 90 个文件、664 项通过；`pnpm build` 通过，renderer 为 `assets/index-D-17jiK2.js`；`pnpm knowledge:validate` 通过。
-- 未完成：未在主进程日志中复现并抓取 SSE 事件序列确认 SDK 是否确实只发了 `tool.result` + `TurnEnd`；未导出"正文不显示"时的 `events` 数组快照；未对比关闭 Swarm 后是否仍复现；未验证真实场景下兜底是否正确触发。
-- 阻塞：无外部阻塞。下一步依赖用户在真实场景复测，确认工具/子代理完成后是否仍出现空 turn。
-- 关键文件：`src/utils/autoContinue.ts`、`src/utils/__tests__/autoContinue.test.ts`、`src/App.tsx`、`docs/issue-empty-assistant-after-tool-use.md`。
-- 下一步：用户在 v2.16.8 复测相同提示词与工具链，确认工具/子代理完成后能自动继续并输出正文，无需手动发送"继续"；若仍复现，抓取主进程 SSE 日志和 `events` 快照进一步分析。本轮不推送、不打 tag、不发布。
+- 当前目标：修复"工具调用/子代理完成后，助手没有输出正文"的问题。
+- 根因：Kimi 已经生成了正文，但这段 `assistant_message` 被挂到了子代理的 `events` 里，主时间线没有独立的 contentful `assistant_message`。`ChatThread.tsx` 渲染时走到 `createSubagentOnlyAssistantEvent`，生成空的占位卡片，导致用户看不到实际输出；重新打开软件后官方历史/投影把正文归位到主时间线，正文才显示出来。
+- 已完成：在 `src/utils/chatRenderItems.ts` 的 `createSubagentOnlyAssistantEvent` 中，遍历子代理 `events` 里的 `assistant_message`，把 content 和 thinking 提升到主时间线的占位卡片里。新增 `src/utils/__tests__/chatRenderItems.test.ts`，覆盖空子代理、单条正文、多条正文、thinking、运行中子代理等场景。回滚了之前错误的自动继续兜底（已删除 `src/utils/autoContinue.ts` 及其测试，并还原 `src/App.tsx` 改动）。版本号保持 v2.16.8。`pnpm typecheck` 通过；全量测试 89 个文件、642 项通过；`pnpm build` 通过，renderer 为 `assets/index-CpTI7uaH.js`；`pnpm knowledge:validate` 通过。
+- 未完成：未在真实场景中验证主时间线为空时子代理 events 是否确实包含正文；未抓取问题发生时的 `events` 数组快照确认根因；未验证多子代理同时有内容时的拼接效果。
+- 阻塞：无外部阻塞。下一步依赖用户在真实场景复测，确认工具/子代理完成后正文是否直接显示。
+- 关键文件：`src/utils/chatRenderItems.ts`、`src/utils/__tests__/chatRenderItems.test.ts`、`src/components/chat/ChatThread.tsx`、`docs/issue-empty-assistant-after-tool-use.md`。
+- 下一步：用户在 v2.16.8 复测相同提示词与工具链，确认工具/子代理完成后主时间线直接显示正文；若仍复现，抓取当前会话的 `events` 数组和主进程 SSE 日志进一步分析。本轮不推送、不打 tag、不发布。
 
 ## 2026-07-15 v2.16.7 renderer 重载启动恢复
 

@@ -1,6 +1,6 @@
 # Issue：工具调用/子代理完成后助手正文缺失，需手动发送“继续”
 
-**状态**：已修复（v2.16.8 渲染端自动继续兜底）  
+**状态**：已修复（v2.16.8 子代理正文提升到主时间线）  
 **严重度**：P1（功能丢失/用户体验）  
 **创建日期**：2026-07-15  
 **代码基线**：`2dc80ac7`（v2.16.6+）  
@@ -18,101 +18,50 @@
 4. **但助手没有输出任何正文**，界面直接进入“等待用户输入”状态。
 5. 用户再手动发送一条“继续”后，助手才输出本应一次性给出的总结正文（如“剩余小债务”）。
 
-截图中的“继续”不是 UI 自动提示按钮，而是用户手动输入的消息；发送后新一轮 prompt 才把缺失的正文补上。
+实际上 Kimi 已经生成了正文，但当前会话的 UI 没有把它渲染出来。重新打开软件（或官方历史同步后），同一段正文会正常显示。
 
 ---
 
 ## 2. 根因分析
 
-这不是 UI 渲染 bug，而是 **Kimi Code SDK 事件流与 Kimix 事件映射之间缺少“工具调用后必须产出正文”的兜底机制**。
+这是 **子代理输出被挂到子代理内部事件流，主时间线没有把它提升到 UI** 导致的渲染缺失。
 
-### 2.1 事件映射：正文只能来自 `assistant.delta` / `ContentPart`
+### 2.1 正文实际存在，但不在主时间线
 
-`src/utils/eventMapper.ts:845` 对 `assistant.delta` 的处理：
+用户重新打开软件后正文能正常显示，说明 Kimi 已经生成了内容并且已经持久化。问题出在当前会话的渲染层：主时间线（`session.events` 或房间投影后的时间线）里找不到这段 `assistant_message` content，因此 `ChatThread.tsx` 的 `mergeAssistantProcessEvents` 返回 `undefined`，最终只渲染了“子代理已完成”的占位卡片。
 
-```ts
-case "assistant.delta": {
-  const delta = payloadString(payload, source, "delta");
-  if (!delta) return null;
-  return {
-    id: generateId(),
-    type: "assistant_message",
-    timestamp: eventTimestamp,
-    agentId: payloadString(payload, source, "agentId"),
-    content: delta,
-    model: payloadString(payload, source, "model")?.trim() || undefined,
-    isThinking: false,
-    isComplete: false,
-  };
-}
-```
+### 2.2 子代理事件归属
 
-`src/utils/eventMapper.ts:982` 对 `ContentPart` 的处理 likewise 生成带 `content` 的 `assistant_message`。
-
-而 `TurnEnd` 的处理（`src/utils/eventMapper.ts:1257`）固定生成 **content 为空**的完成事件：
+`src/utils/eventMapper.ts:597-610` 的 `attachScopedEventToSubagent` 会把带 `agentId` 的事件挂到对应 `subagent` 的 `events` 数组里：
 
 ```ts
-case "TurnEnd": {
-  return {
-    id: generateId(),
-    type: "assistant_message",
-    timestamp: eventTimestamp,
-    content: "",
-    model: payloadString(payload, source, "model")?.trim() || undefined,
-    isThinking: false,
-    isComplete: true,
-  };
-}
-```
-
-也就是说：如果 SDK 在一轮末尾只发了 `tool.result` + `TurnEnd`，没有发 `assistant.delta`，Kimix 没有任何事件来源可以“造”出正文。
-
-### 2.2 合并逻辑会丢弃没有正文的 `TurnEnd`
-
-`src/utils/eventMapper.ts:1352` 的 `mergeEvents` 在收到空 `assistant_message` 且 `isComplete=true` 时：
-
-```ts
-if (incoming.isComplete && !incoming.content && !incoming.thinking) {
-  const latestOpenIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
+function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] | null {
+  const agentId = scopedAgentId(incoming);
+  if (!agentId || incoming.type === "subagent") return null;
+  const subagentIndex = existing.findLastIndex((event) => event.type === "subagent" && event.agentId === agentId);
   // ...
-  if (latestOpenIndex === -1) {
-    return base;   // 没有未完成的 assistant_message，直接忽略这个 TurnEnd
-  }
-```
-
-如果本轮完全没有流式正文，连空白的 `assistant_message` 都不会出现在时间线上。界面自然看不到任何助手输出。
-
-### 2.3 主进程侧同样只累积 `assistant.delta`
-
-`electron/kimiCodeHost.ts:2262` 在 `prompt()` 内部收集正文：
-
-```ts
-if (event.type === "assistant.delta") {
-  if (typeof event.delta === "string") parts.push(event.delta);
+  result[subagentIndex] = {
+    ...subagent,
+    events: mergeEvents(subagent.events, stripAgentScope(incoming)),
+  };
+  return result;
 }
 ```
 
-BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kimiCodeHost.ts:2717`）同样只读 `assistant.delta`。
+在 Swarm 或某些工具链场景下，Agent 的最终总结输出可能被打上子代理的 `agentId`，从而被吞进 `subagent.events`。主时间线只剩一个空的 `TurnEnd`，`ChatThread.tsx` 便认为本轮没有正文。
 
-主进程没有检测“一轮结束但正文为空”并自动续写的逻辑。
+### 2.3 重新打开后为什么能显示
 
-### 2.4 当前没有“自动继续”兜底
-
-在 `src/App.tsx:2893-2999` 的 Kimi Code 事件流主入口中：
-
-- 只负责把 SDK 事件映射为 UI 事件并合并。
-- 没有任何逻辑检查：本轮结束时，如果 `assistant_message` 为空、但存在已完成的工具/子代理，则自动触发下一轮 prompt。
-
-因此当模型/SKD 决定“这一轮我先不生成正文”时，用户必须手动再发一条消息才能推进。
+重新打开软件时会从本地持久化 + 官方历史重新构建/投影时间线。官方历史里的正文通常不带子代理 `agentId`，因此能被正确归位到主时间线；或者 `projectCollaborationTimeline` 在冷启动时的投影路径与流式事件路径不同，从而把正文暴露出来。
 
 ---
 
-## 3. 最可能的触发条件
+## 3. 触发条件
 
-结合截图，有两种可能：
-
-1. **SDK/模型行为**：在 tool use 后，Kimi Code SDK 或模型把当前 turn 标记为结束，把总结留到下一轮。这在某些模型或长工具链后可能出现。
-2. **Swarm 子代理归属错误**：`src/utils/eventMapper.ts:597-610` 的 `attachScopedEventToSubagent` 按 `scopedAgentId` 把事件挂到子代理内部。如果主 Agent 的总结输出被错误归属到子代理 scope，或子代理结束事件提前关闭了主对话的 turn，都会导致主对话缺少正文。
+- 本轮包含子代理（尤其是 Swarm 子代理）。
+- 子代理的 `events` 数组里存在 `assistant_message` content。
+- 主时间线在同一 turn 内没有产生独立的 `assistant_message` content（只有空的 `TurnEnd` 或没有主 agent 正文）。
+- 渲染时走到 `createSubagentOnlyAssistantEvent`，生成空的占位卡片。
 
 ---
 
@@ -120,8 +69,10 @@ BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kim
 
 | 假设 | 结论 | 依据 |
 |------|------|------|
-| `MarkdownRenderer` 延迟渲染导致正文不显示 | 排除 | 第一张截图中没有任何正文区域，说明 `event.content` 当时就是空字符串 |
-| `mergeAssistantProcessEvents` 合并丢失 content | 排除 | `ChatThread.tsx:547-568` 会保留所有非空 content，不会丢弃 |
+| `MarkdownRenderer` 延迟渲染导致正文不显示 | 排除 | 重新打开软件后同一段正文能显示，说明不是渲染器本身的问题 |
+| `mergeAssistantProcessEvents` 合并丢失 content | 排除 | 主时间线确实没有 contentful `assistant_message`；合并逻辑只会保留已有的内容 |
+| SDK/模型没有输出正文 | 排除 | 用户确认 Kimi 已输出正文；重开后可见 |
+| 需要自动继续 prompt | 排除 | 不是 turn 真的结束为空，而是正文被挂在子代理 scope 里 |
 | UI 状态判断错误（把运行中误判为完成） | 排除 | 第一张图中 `assistantFooterFallbackLabel` 显示“模型：...”，说明 `event.isComplete=true` 且 `roomAgentId` 存在，状态判断正确 |
 
 ---
@@ -142,34 +93,37 @@ BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kim
 
 ### 方案 A：在 Kimix 侧加兜底自动继续（已实施 v2.16.8）
 
-在 `src/App.tsx` 处理 Kimi Code 事件流的位置，当检测到以下全部条件时，自动调用 `sendKimiCodePromptWithRetry({ sessionId: runtimeSessionId, content: "继续" })` 发送一条轻量的继续提示：
+在 `src/utils/chatRenderItems.ts` 的 `createSubagentOnlyAssistantEvent` 中，当主时间线没有正文、但子代理 `events` 里存在 `assistant_message` 时，把 content/thinking 提升到生成的占位卡片里：
 
-- 当前 turn 的 `assistant_message` content 为空；
-- 本轮存在已完成的工具调用或子代理；
-- 不是长程任务 / Goal 暂停 / 等待用户审批或澄清；
-- 权限模式为 `auto` 或 `yolo`（`manual` 模式下保留用户控制，不自动推进）；
-- 避免无限循环（记录本轮已自动继续一次）。
+```ts
+function collectSubagentAssistantOutput(subagents: SubagentEvent[]): { content: string; thinking?: string } {
+  const contents: string[] = [];
+  const thinkings: string[] = [];
+  for (const subagent of subagents) {
+    for (const event of subagent.events) {
+      if (event.type !== "assistant_message") continue;
+      const content = event.content?.trim();
+      const thinking = event.thinking?.trim();
+      if (content) contents.push(content);
+      if (thinking) thinkings.push(thinking);
+    }
+  }
+  return {
+    content: contents.join("\n\n"),
+    thinking: thinkings.join("") || undefined,
+  };
+}
+```
 
-实现位置：
-- `src/utils/autoContinue.ts`：纯函数 `checkAutoContinueAfterEmptyTurn`，负责条件判断。
-- `src/App.tsx`：`maybeAutoContinueAfterEmptyTurn` 在 `onKimiCodeEvent` 收到空 `TurnEnd` 后延迟 150ms 检查，在 `onKimiCodeStatus` 收到 `completed` 后立即检查。
+这样用户无需展开子代理也能在主时间线看到实际输出。该改动只影响渲染层，不改变事件持久化或子代理归属逻辑。
 
-优点：不依赖 SDK/模型修复，立即可改善用户体验。  
-风险：可能改变模型原意；当前实现通过权限模式、长程任务排除、待审批/待回答排除、单次循环保护来降低风险。若真实场景中仍误触发，可进一步收紧条件或改为仅显示“继续”按钮。
+### 方案 B：修复子代理归属逻辑（未实施）
 
-### 方案 B：SDK/模型层修复
+在 `attachScopedEventToSubagent` 中更严格地区分“子代理内部事件”和“主 Agent 总结输出”，避免把最终 `assistant_message` 挂到子代理里。这是更上游的根因修复，但需要确认 SDK `agentId` 的语义才能安全改动。
 
-如果确认是 SDK 在 tool use 后错误地发送 `TurnEnd` 而没有正文，则需要在 Kimi Code SDK 或模型调用层修复：确保每个 turn 在结束时至少包含一个 `assistant.delta` 或 `ContentPart`。
+### 方案 C：UI 明确提示用户展开子代理（未实施）
 
-优点：根因修复。  
-风险：Kimix 无法直接控制上游 SDK 发布节奏。
-
-### 方案 C：UI 明确提示用户“本轮无正文，可发送继续”
-
-如果判定这是模型/SDK 的正常分轮行为，Kimix 可以在检测到空正文 + 已完成工具/子代理时，显示一个非侵入式提示（如“助手本轮未生成回复，发送消息继续”）。
-
-优点：避免无限循环风险，用户知情权高。  
-缺点：没有真正解决“需要手动继续”的打断感。
+如果认为子代理输出就应当待在子代理内部，可以在主时间线显示提示“子代理已返回结果，点击展开查看”。但这没有解决用户期望在主流程看到总结的问题。
 
 ---
 
@@ -177,23 +131,22 @@ BTW（between-turn worker）模式下的 `updateBtwRunFromEvent`（`electron/kim
 
 | 文件 | 作用 |
 |------|------|
-| `electron/kimiCodeHost.ts` | SDK 调用入口，`prompt()` 实现；只累积 `assistant.delta` |
+| `src/utils/chatRenderItems.ts` | `createSubagentOnlyAssistantEvent`，子代理正文提升到主时间线 |
+| `src/utils/__tests__/chatRenderItems.test.ts` | 渲染项单元测试 |
 | `src/utils/eventMapper.ts:845-855` | `assistant.delta` → `assistant_message` |
 | `src/utils/eventMapper.ts:982-1010` | `ContentPart` → `assistant_message` |
 | `src/utils/eventMapper.ts:1257-1267` | `TurnEnd` → 空 `assistant_message` |
 | `src/utils/eventMapper.ts:597-610` | `attachScopedEventToSubagent`，子代理事件归属 |
 | `src/utils/eventMapper.ts:1298-1390` | `mergeEvents`，空 `TurnEnd` 丢弃逻辑 |
 | `src/App.tsx:2893-2999` | Kimi Code 事件流主入口 |
-| `src/App.tsx` | `maybeAutoContinueAfterEmptyTurn` 自动继续兜底 |
-| `src/utils/autoContinue.ts` | 空 turn 自动继续条件判断 |
-| `src/utils/__tests__/autoContinue.test.ts` | 自动继续单元测试 |
-| `src/components/chat/MessageBubble.tsx` | 消息渲染 |
+| `src/components/chat/ChatThread.tsx` | 消息时间线渲染 |
+| `src/components/chat/MessageBubble.tsx` | 消息气泡渲染 |
 | `src/components/chat/MarkdownRenderer.tsx` | Markdown 正文渲染 |
 
 ---
 
 ## 8. 备注
 
-- v2.16.8 已实现渲染端自动继续兜底。
-- 该问题尚未在主进程日志中复现确认；若 v2.16.8 仍复现，下一步仍优先抓取 SSE 事件序列，确认是 SDK/模型行为还是 Swarm 子代理归属问题。
-- 自动继续目前仅在 `auto`/`yolo` 权限模式下生效；`manual` 模式下用户需手动发送"继续"。
+- v2.16.8 已改为渲染层兜底：子代理 `events` 里的 `assistant_message` 内容会被提升到主时间线。
+- 之前实现的自动继续兜底（`src/utils/autoContinue.ts`）已回滚，因为用户确认正文其实已被 Kimi 输出，不需要再发 prompt。
+- 若 v2.16.8 仍复现，下一步优先抓取该会话的 `events` 数组和主进程 SSE 日志，确认正文是否真的在 `subagent.events` 里。
