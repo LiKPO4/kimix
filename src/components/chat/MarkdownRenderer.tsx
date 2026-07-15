@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "katex/dist/katex.min.css";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
-import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
+import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreAssistantProgressParagraphs, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
 import { truncateMarkdownForPreview } from "@/utils/markdownTruncate";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
@@ -21,6 +21,7 @@ interface MarkdownRendererProps {
   deferOffscreen?: boolean;
   collapsibleThreshold?: number;
   streaming?: boolean;
+  normalizeAssistantProgress?: boolean;
 }
 
 // Module-level ref-counted theme link
@@ -64,6 +65,11 @@ export function splitStreamingMarkdownBlocks(content: string): string[] {
     .map((token) => token.raw)
     .filter((block) => block.length > 0);
   return blocks.length > 0 ? blocks : [content];
+}
+
+export function normalizeMarkdownContent(content: string, normalizeAssistantProgress = false): string {
+  if (normalizeAssistantProgress) return restoreAssistantProgressParagraphs(content);
+  return restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content))));
 }
 
 const StreamingMarkdownBlock = React.memo(function StreamingMarkdownBlock({
@@ -214,14 +220,14 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   );
 }
 
-export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false, collapsibleThreshold = DEFAULT_COLLAPSIBLE_THRESHOLD, streaming = false }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false, collapsibleThreshold = DEFAULT_COLLAPSIBLE_THRESHOLD, streaming = false, normalizeAssistantProgress = false }: MarkdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(!deferOffscreen);
   const [isExpanded, setIsExpanded] = useState(false);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const normalizedContent = useMemo(
-    () => restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content)))),
-    [content],
+    () => normalizeMarkdownContent(content, normalizeAssistantProgress),
+    [content, normalizeAssistantProgress],
   );
   const isCollapsible = collapsibleThreshold > 0 && normalizedContent.length > collapsibleThreshold;
   const displayContent = useMemo(() => {

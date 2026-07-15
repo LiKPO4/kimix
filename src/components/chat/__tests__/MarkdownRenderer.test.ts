@@ -3,7 +3,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MarkdownRenderer } from "../MarkdownRenderer";
+import { MarkdownRenderer, normalizeMarkdownContent } from "../MarkdownRenderer";
 
 describe("MarkdownRenderer streaming blocks", () => {
   let container: HTMLDivElement;
@@ -45,5 +45,12 @@ describe("MarkdownRenderer streaming blocks", () => {
     const updatedStreamRoot = container.querySelector(".kimix-streaming-markdown");
     expect(updatedStreamRoot?.firstElementChild).toBe(firstBlock);
     expect(updatedStreamRoot?.textContent).toContain("第二段继续增长");
+  });
+
+  it("applies assistant progress restoration inside the renderer", () => {
+    const content = `先${"检查状态".repeat(12)}。现在${"继续构建".repeat(12)}。然后${"运行验证".repeat(12)}。下一步整理结果。`;
+    expect(normalizeMarkdownContent(content, true)).toContain("。\n\n现在");
+    expect(normalizeMarkdownContent(content, true)).toContain("。\n\n然后");
+    expect(normalizeMarkdownContent(content, false)).toBe(content);
   });
 });

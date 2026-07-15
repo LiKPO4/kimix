@@ -2,7 +2,7 @@
 
 ## 2026-07-15
 
-* **Running Markdown keeps completed blocks stable**: A growing Assistant reply is split with the official-Web-style `marked` Lexer; completed blocks remain memoized while only the tail reparses, without importing Streamdown's unrelated Shiki and Mermaid runtime. See [/project/kimix.md](/project/kimix.md).
+* **Running Markdown keeps completed blocks stable**: A growing Assistant reply is split with the official-Web-style `marked` Lexer; completed blocks remain memoized while only the tail reparses, paragraph recovery runs once inside the renderer, and file-artifact discovery waits for completion without importing Streamdown's unrelated Shiki and Mermaid runtime. See [/project/kimix.md](/project/kimix.md).
 
 * **Running history reconciliation is process-monotonic**: Intermediate `tool_use` step ends no longer settle a turn, and a Server snapshot with fewer tool/process events cannot replace a richer live timeline merely because its latest thinking differs. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 

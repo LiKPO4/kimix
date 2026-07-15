@@ -5,7 +5,6 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { TimelineEvent, UserMessageImage, ProcessDisplayMode } from "@/types/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { restoreAssistantProgressParagraphs } from "@/utils/assistantParagraphs";
 import { FileCard } from "./FileCard";
 import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
@@ -2037,12 +2036,15 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
       Object.values(roomAgentActivities),
     )
   );
-  const displayContent = restoreAssistantProgressParagraphs(event.content);
-  const hasContent = displayContent.trim().length > 0;
-  const changedSet = new Set(changedFiles.map((f) => normalizePathForComparison(f)));
-  const mdArtifacts = Array.from(new Set(
-    displayContent.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
-  )).filter((path) => changedSet.has(normalizePathForComparison(path))).slice(0, 3);
+  const hasContent = event.content.trim().length > 0;
+  const changedFilesSignature = changedFiles.join("\u001f");
+  const mdArtifacts = useMemo(() => {
+    if (!event.isComplete) return [];
+    const changedSet = new Set(changedFiles.map((filePath) => normalizePathForComparison(filePath)));
+    return Array.from(new Set(
+      event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
+    )).filter((filePath) => changedSet.has(normalizePathForComparison(filePath))).slice(0, 3);
+  }, [changedFilesSignature, event.content, event.isComplete]);
   const isRunningThisSession = Boolean(sessionId && (
     runningSessionId === sessionId ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
@@ -2144,9 +2146,10 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
                   <MarkdownRenderer
-                    content={displayContent}
+                    content={event.content}
                     streaming={isActiveAssistant}
-                    deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && displayContent.length > 1200}
+                    normalizeAssistantProgress
+                    deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && event.content.length > 1200}
                   />
                 </div>
                 {mdArtifacts.length > 0 && (
