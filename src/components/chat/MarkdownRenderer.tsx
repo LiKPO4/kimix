@@ -1,5 +1,6 @@
 import React from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
+import { Lexer } from "marked";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
@@ -19,6 +20,7 @@ interface MarkdownRendererProps {
   wrapLongLines?: boolean;
   deferOffscreen?: boolean;
   collapsibleThreshold?: number;
+  streaming?: boolean;
 }
 
 // Module-level ref-counted theme link
@@ -55,6 +57,59 @@ function estimateMarkdownHeight(content: string) {
 const DEFAULT_COLLAPSIBLE_THRESHOLD = 50_000;
 
 const DEFERRED_RENDER_MARGIN = 1800;
+
+export function splitStreamingMarkdownBlocks(content: string): string[] {
+  if (!content) return [];
+  const blocks = Lexer.lex(content, { gfm: true })
+    .map((token) => token.raw)
+    .filter((block) => block.length > 0);
+  return blocks.length > 0 ? blocks : [content];
+}
+
+const StreamingMarkdownBlock = React.memo(function StreamingMarkdownBlock({
+  content,
+  components,
+  remarkPlugins,
+  rehypePlugins,
+}: {
+  content: string;
+  components: Components;
+  remarkPlugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>;
+  rehypePlugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>;
+}) {
+  return (
+    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+      {content}
+    </ReactMarkdown>
+  );
+});
+
+function StreamingMarkdown({
+  content,
+  components,
+  remarkPlugins,
+  rehypePlugins,
+}: {
+  content: string;
+  components: Components;
+  remarkPlugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>;
+  rehypePlugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>;
+}) {
+  const blocks = useMemo(() => splitStreamingMarkdownBlocks(content), [content]);
+  return (
+    <div className="kimix-streaming-markdown">
+      {blocks.map((block, index) => (
+        <StreamingMarkdownBlock
+          key={index}
+          content={block}
+          components={components}
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+        />
+      ))}
+    </div>
+  );
+}
 
 function isNearViewport(node: HTMLElement, margin = DEFERRED_RENDER_MARGIN) {
   const rect = node.getBoundingClientRect();
@@ -159,7 +214,7 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   );
 }
 
-export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false, collapsibleThreshold = DEFAULT_COLLAPSIBLE_THRESHOLD }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscreen = false, collapsibleThreshold = DEFAULT_COLLAPSIBLE_THRESHOLD, streaming = false }: MarkdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(!deferOffscreen);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -395,9 +450,18 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       ref={containerRef}
       className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
     >
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-        {displayContent}
-      </ReactMarkdown>
+      {streaming ? (
+        <StreamingMarkdown
+          content={displayContent}
+          components={components}
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+        />
+      ) : (
+        <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+          {displayContent}
+        </ReactMarkdown>
+      )}
       {isCollapsible && !isExpanded && (
         <div className="flex justify-center" style={{ paddingTop: 12, paddingBottom: 8 }}>
           <button

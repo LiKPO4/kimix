@@ -2143,7 +2143,11 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             {hasContent && (
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-                  <MarkdownRenderer content={displayContent} deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && displayContent.length > 1200} />
+                  <MarkdownRenderer
+                    content={displayContent}
+                    streaming={isActiveAssistant}
+                    deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && displayContent.length > 1200}
+                  />
                 </div>
                 {mdArtifacts.length > 0 && (
                   <div className="flex flex-col" style={{ gap: 12 }}>

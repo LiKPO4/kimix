@@ -2,6 +2,8 @@
 
 ## 2026-07-15
 
+* **Running Markdown keeps completed blocks stable**: A growing Assistant reply is split with the official-Web-style `marked` Lexer; completed blocks remain memoized while only the tail reparses, without importing Streamdown's unrelated Shiki and Mermaid runtime. See [/project/kimix.md](/project/kimix.md).
+
 * **Running history reconciliation is process-monotonic**: Intermediate `tool_use` step ends no longer settle a turn, and a Server snapshot with fewer tool/process events cannot replace a richer live timeline merely because its latest thinking differs. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Startup bootstrap is renewed for every renderer document**: Full reload recreates preload and its replay cache, so the main process republishes active project context on every completed document load; recent-project persistence and stale blank-page checks can no longer block or corrupt that handshake. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.16.9",
+  "version": "2.16.10",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -41,6 +41,7 @@
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",
     "lucide-react": "latest",
+    "marked": "16.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
