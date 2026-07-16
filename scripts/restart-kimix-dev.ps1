@@ -7,6 +7,7 @@ $env:Path = "$nodePath;$pnpmPath;$env:Path"
 $fullClean = $args -contains "--clean"
 $hotReloadDev = $args -contains "--dev"
 $fastLaunch = $args -contains "--fast"
+$runtimeTokenPath = Join-Path $workspace "out\.kimix-runtime-token"
 
 function Test-InWorkspace {
   param([string]$Path)
@@ -52,7 +53,26 @@ function Write-BuildFingerprint {
   Set-Content -LiteralPath $stampPath -Value $head -NoNewline -Encoding UTF8
 }
 
+function Get-RuntimeToken {
+  if (-not (Test-Path -LiteralPath $runtimeTokenPath)) { return $null }
+  return (Get-Content -LiteralPath $runtimeTokenPath -Raw).Trim()
+}
+
+function Set-RuntimeToken {
+  param([string]$Token)
+  $outDir = Join-Path $workspace "out"
+  if (-not (Test-Path -LiteralPath $outDir)) {
+    New-Item -ItemType Directory -Path $outDir | Out-Null
+  }
+  Set-Content -LiteralPath $runtimeTokenPath -Value $Token -NoNewline -Encoding UTF8
+}
+
+function New-RuntimeToken {
+  return [Guid]::NewGuid().ToString("N")
+}
+
 function Stop-KimixProcessTree {
+  $oldToken = Get-RuntimeToken
   $all = Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe", "Kimix.exe", "electron.exe", "node.exe", "esbuild.exe") }
   $targetIds = New-Object "System.Collections.Generic.HashSet[int]"
   $protectedIds = New-Object "System.Collections.Generic.HashSet[int]"
@@ -70,6 +90,13 @@ function Stop-KimixProcessTree {
     $commandLine = [string]$process.CommandLine
     $processIdentity = @([string]$process.ExecutablePath, $commandLine) -join " "
     $isProtected = $protectedIds.Contains([int]$process.ProcessId)
+
+    # Primary matching: a dedicated runtime token written by the previous launch.
+    # This avoids killing unrelated Electron/Node processes on the same machine.
+    $hasRuntimeToken = $oldToken -and (Test-ContainsIgnoreCase $commandLine "--kimix-runtime-token=$oldToken")
+
+    # Fallback path-based heuristics for backward compatibility when no token
+    # file exists (first run after this change) or a process lost its args.
     $inKnownKimixPath = (Test-ContainsIgnoreCase $processIdentity $workspace) -or
       (Test-ContainsIgnoreCase $processIdentity "kimix-pre-dev-compat") -or
       ($processIdentity -match "(?i)[\\/]kimix(?:-[^\\/\s]+)?[\\/]")
@@ -90,7 +117,7 @@ function Stop-KimixProcessTree {
     )
     $isKimixEsbuild = $process.Name -eq "esbuild.exe" -and $inKnownKimixPath
 
-    if (-not $isProtected -and ($isKimixElectron -or $isKimixPackaged -or $isKimixShell -or $isKimixNode -or $isKimixEsbuild)) {
+    if (-not $isProtected -and ($hasRuntimeToken -or $isKimixElectron -or $isKimixPackaged -or $isKimixShell -or $isKimixNode -or $isKimixEsbuild)) {
       [void]$targetIds.Add([int]$process.ProcessId)
     }
   }
@@ -127,6 +154,12 @@ function Stop-KimixProcessTree {
 Set-Location $workspace
 Stop-KimixProcessTree
 
+# Generate a fresh runtime token for this launch and make it available to the
+# child process tree via both the command line and the environment.
+$script:RuntimeToken = New-RuntimeToken
+Set-RuntimeToken $script:RuntimeToken
+$env:KIMIX_RUNTIME_TOKEN = $script:RuntimeToken
+
 function Test-BuildOutputComplete {
   $mainBundle = Join-Path $workspace "out\main\index.cjs"
   $rendererIndex = Join-Path $workspace "out\renderer\index.html"
@@ -139,7 +172,7 @@ function Start-KimixBuiltApp {
     # Fallback to the npm wrapper if the direct binary is missing.
     $electronBin = Join-Path $workspace "node_modules\.bin\electron.cmd"
   }
-  Start-Process -FilePath $electronBin -ArgumentList "." -WorkingDirectory $workspace
+  Start-Process -FilePath $electronBin -ArgumentList ". --kimix-runtime-token=$($script:RuntimeToken)" -WorkingDirectory $workspace
 }
 
 function Invoke-KimixBuild {
@@ -152,7 +185,10 @@ function Invoke-KimixBuild {
 
 if ($hotReloadDev) {
   Write-Host "Starting dev server with hot reload..."
-  pnpm dev
+  # Use node directly so the runtime token appears in the top-level command line
+  # and is forwarded by scripts/dev.cjs to the Electron process tree.
+  $devScript = Join-Path $workspace "scripts\dev.cjs"
+  Start-Process -FilePath "node" -ArgumentList "$devScript --kimix-runtime-token=$($script:RuntimeToken)" -WorkingDirectory $workspace -Wait
   return
 }
 

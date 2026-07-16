@@ -9,7 +9,12 @@ const path = require("path");
 // Use node directly to run electron-vite to avoid shell env issues on Windows
 const electronVite = path.join(__dirname, "..", "node_modules", "electron-vite", "bin", "electron-vite.js");
 
-const child = spawn("node", [electronVite, "dev"], {
+const runtimeToken = process.env.KIMIX_RUNTIME_TOKEN;
+const args = [electronVite, "dev"];
+if (runtimeToken) {
+  args.push(`--kimix-runtime-token=${runtimeToken}`);
+}
+const child = spawn("node", args, {
   stdio: "inherit",
   env: process.env,
 });
