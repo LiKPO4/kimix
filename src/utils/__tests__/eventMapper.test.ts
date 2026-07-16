@@ -1767,4 +1767,88 @@ describe("mergeEvents subagent lifecycle instrumentation", () => {
     mergeEvents(existing, incoming);
     expect(logEventSpy).not.toHaveBeenCalled();
   });
+
+  it("drops incoming subagent events whose id conflicts with a different existing event", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const existing: TimelineEvent[] = [{
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "assistant-1",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "local body",
+        isThinking: false,
+        isComplete: true,
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 3,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "completed",
+      events: [{
+        id: "assistant-1",
+        type: "assistant_message",
+        timestamp: 4,
+        content: "different body from history replay",
+        isThinking: false,
+        isComplete: true,
+      }],
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    const subagent = result[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(subagent.events).toHaveLength(1);
+    expect((subagent.events[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("local body");
+    expect(logEventSpy).toHaveBeenCalledWith(
+      "eventMapper.subagentEventIdConflict",
+      expect.objectContaining({ eventId: "assistant-1", eventType: "assistant_message" }),
+    );
+  });
+
+  it("still merges incoming subagent events when the same id carries equivalent content", () => {
+    const existing: TimelineEvent[] = [{
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "assistant-1",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "same body",
+        isThinking: false,
+        isComplete: true,
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 3,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "completed",
+      events: [{
+        id: "assistant-1",
+        type: "assistant_message",
+        timestamp: 4,
+        content: "same body",
+        isThinking: false,
+        isComplete: true,
+      }],
+    };
+    const result = mergeEvents(existing, incoming);
+    const subagent = result[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(subagent.events).toHaveLength(1);
+    expect((subagent.events[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("same body");
+  });
 });

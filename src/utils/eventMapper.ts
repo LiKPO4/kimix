@@ -606,8 +606,93 @@ function mergeSubagentLifecycle(
     resultSummary: incoming.resultSummary ?? current.resultSummary,
     error: incoming.error ?? current.error,
     // 增量合并子代理内部事件，避免迟到/历史补发的 subagent 事件用不完整 events 覆盖本地已收到的流式内容
-    events: incoming.events.reduce<TimelineEvent[]>((merged, event) => mergeEvents(merged, event), current.events),
+    events: filterConflictingSubagentEvents(current, incoming.events)
+      .reduce<TimelineEvent[]>((merged, event) => mergeEvents(merged, event), current.events),
   };
+}
+
+function isSubagentEventContentEquivalent(a: TimelineEvent, b: TimelineEvent): boolean {
+  if (a.type !== b.type) return false;
+  switch (a.type) {
+    case "assistant_message": {
+      const other = b as Extract<TimelineEvent, { type: "assistant_message" }>;
+      return a.content === other.content &&
+        a.thinking === other.thinking &&
+        a.isComplete === other.isComplete &&
+        a.isThinking === other.isThinking &&
+        a.agentRole === other.agentRole &&
+        a.model === other.model;
+    }
+    case "tool_call": {
+      const other = b as Extract<TimelineEvent, { type: "tool_call" }>;
+      return a.toolName === other.toolName &&
+        a.status === other.status &&
+        JSON.stringify(a.arguments) === JSON.stringify(other.arguments) &&
+        a.rawArguments === other.rawArguments &&
+        JSON.stringify(a.result) === JSON.stringify(other.result);
+    }
+    case "tool_result": {
+      const other = b as Extract<TimelineEvent, { type: "tool_result" }>;
+      return a.toolCallId === other.toolCallId &&
+        JSON.stringify(a.result) === JSON.stringify(other.result);
+    }
+    case "user_message": {
+      const other = b as Extract<TimelineEvent, { type: "user_message" }>;
+      return a.content === other.content;
+    }
+    case "status_update": {
+      const other = b as Extract<TimelineEvent, { type: "status_update" }>;
+      return a.message === other.message &&
+        a.step === other.step &&
+        a.totalSteps === other.totalSteps;
+    }
+    default:
+      return false;
+  }
+}
+
+function filterConflictingSubagentEvents(
+  current: Extract<TimelineEvent, { type: "subagent" }>,
+  incomingEvents: TimelineEvent[],
+): TimelineEvent[] {
+  if (incomingEvents.length === 0) return incomingEvents;
+  const currentById = new Map(current.events.map((event) => [event.id, event]));
+  return incomingEvents.filter((event) => {
+    if (!event.id) return true;
+    const existing = currentById.get(event.id);
+    if (!existing) return true;
+
+    // assistant_message 由 mergeEvents 按"未完成"状态合并；只要本地尚未完成，
+    // 就允许流式更新继续追加。若本地已完成，同名事件无论是重复还是不同内容，
+    // 都不应再被追加或覆盖。
+    if (event.type === "assistant_message") {
+      const existingAssistant = existing as Extract<TimelineEvent, { type: "assistant_message" }>;
+      if (existingAssistant.isComplete) {
+        if (!isSubagentEventContentEquivalent(existing, event)) {
+          logEvent("eventMapper.subagentEventIdConflict", {
+            agentId: current.agentId,
+            agentName: current.agentName,
+            eventId: event.id,
+            eventType: event.type,
+          });
+        }
+        return false;
+      }
+      return true;
+    }
+
+    // 非 assistant_message 事件（tool_call / tool_result / user_message 等）
+    // 通常按 id 或工具键匹配；若相同 id 已存在且内容不同，保留本地版本，
+    // 避免迟到/补发事件覆盖已渲染内容。
+    if (isSubagentEventContentEquivalent(existing, event)) return true;
+    logEvent("eventMapper.subagentEventIdConflict", {
+      agentId: current.agentId,
+      agentName: current.agentName,
+      eventId: event.id,
+      eventType: event.type,
+    });
+    return false;
+  });
 }
 
 function attachScopedEventToSubagent(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] | null {
