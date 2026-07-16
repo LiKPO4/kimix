@@ -1,5 +1,4 @@
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-import { logEvent } from "@/utils/reportError";
 
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
 
@@ -67,17 +66,6 @@ export function createSubagentOnlyAssistantEvent(subagents: SubagentEvent[]): Ex
   // 当主时间线没有产生助手正文时，把子代理内部的 assistant_message 内容提升到主时间线，
   // 避免用户只看到“子代理已完成”却看不到实际输出（ reopen 后官方历史通常会正确归位）。
   const { content, thinking } = collectSubagentAssistantOutput(subagents);
-  if (content.trim().length > 0 || thinking?.trim().length) {
-    logEvent("chatRenderItems.subagentContentSurfaced", {
-      agentTurnId: first?.agentTurnId,
-      roomAgentId: first?.roomAgentId,
-      roomMessageId: first?.roomMessageId,
-      subagentCount: subagents.length,
-      hasActiveSubagent,
-      contentLength: content.length,
-      thinkingLength: thinking?.length ?? 0,
-    });
-  }
   return {
     id: first?.agentTurnId ? `assistant:${first.agentTurnId}:subagents` : `assistant-subagents-${subagents.map((subagent) => subagent.id).join(":")}`,
     type: "assistant_message",

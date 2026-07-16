@@ -7024,27 +7024,35 @@ function getProjectDiagLogPath() {
   return path.join(process.cwd(), "diag.log");
 }
 
-function trimLogFile(filePath: string) {
+async function trimLogFile(filePath: string) {
   try {
-    const stat = fs.statSync(filePath);
+    const stat = await fs.promises.stat(filePath);
     if (stat.size > 2 * 1024 * 1024) {
-      const buf = fs.readFileSync(filePath);
+      const buf = await fs.promises.readFile(filePath);
       const tail = buf.slice(Math.max(0, buf.length - 512 * 1024));
-      fs.writeFileSync(filePath, tail);
+      await fs.promises.writeFile(filePath, tail);
     }
   } catch { /* file may not exist yet */ }
 }
 
-function appendDiagLine(line: string) {
+async function appendDiagLine(line: string) {
   const targets = [getDiagLogPath(), getProjectDiagLogPath()];
   for (const filePath of targets) {
     try {
-      trimLogFile(filePath);
-      fs.appendFileSync(filePath, line + "\n", "utf8");
+      await trimLogFile(filePath);
+      await fs.promises.appendFile(filePath, line + "\n", "utf8");
     } catch (error) {
       console.warn("[diag] failed to append diag.log:", error);
     }
   }
+}
+
+let diagWriteQueue = Promise.resolve();
+
+function enqueueDiagLine(line: string) {
+  const queued = diagWriteQueue.then(() => appendDiagLine(line));
+  diagWriteQueue = queued.catch(() => {});
+  return queued;
 }
 
 ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
@@ -7052,7 +7060,7 @@ ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
   const msg = typeof req.message === "string" ? req.message : typeof request === "string" ? request : "";
   if (!msg) return { success: false, error: "empty message" };
   const dataPart = req.data !== undefined ? ` ${JSON.stringify(req.data)}` : "";
-  appendDiagLine(`[${new Date().toISOString()}] ${msg}${dataPart}`);
+  await enqueueDiagLine(`[${new Date().toISOString()}] ${msg}${dataPart}`);
   return { success: true, data: undefined };
 });
 

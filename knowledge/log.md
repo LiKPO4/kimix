@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-16
+
+* **Diagnostic writes cannot block streaming**: Subagent-content surfacing logs once per rendered event instead of once per render derivation, and renderer diagnostic IPC drains through an asynchronous serialized file queue rather than synchronous main-process filesystem calls. See [/project/kimix.md](/project/kimix.md).
+
 ## 2026-07-15
 
 * **Running Markdown keeps completed blocks stable**: A growing Assistant reply is split with the official-Web-style `marked` Lexer; completed blocks remain memoized while only the tail reparses, paragraph recovery runs once inside the renderer, and file-artifact discovery waits for completion without importing Streamdown's unrelated Shiki and Mermaid runtime. See [/project/kimix.md](/project/kimix.md).

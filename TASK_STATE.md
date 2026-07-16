@@ -3,10 +3,10 @@
 ## 2026-07-16 提交审查问题修复与优化
 
 - 当前目标：按 `a33dc2a..eca6c2ed` 全量 Review 结论，依次修复功能回归、消息流性能与诊断隐私问题，并收敛低优先级代码质量风险。
-- 已完成：完成 16 个提交的静态审查；`pnpm typecheck`、758 项测试、生产构建、`pnpm knowledge:validate` 通过。第 1 项已完成：runtime token 改为放在 electron-vite 的 `--` 参数边界之后，真实 CLI 已进入 Electron 启动阶段，新增参数构造回归测试；定向 4 项测试和 typecheck 通过。
+- 已完成：完成 16 个提交的静态审查。第 1 项已完成：runtime token 改为放在 electron-vite 的 `--` 参数边界之后，真实 CLI 已进入 Electron 启动阶段。第 2 项已完成：子代理正文提升日志从渲染派生函数移到组件 effect，同一渲染事件只记录一次；主进程诊断文件改为异步串行队列，不再同步阻塞事件循环。第 2 项定向 37 项测试、typecheck、生产构建通过。
 - 待办与执行顺序：
   1. [已完成] 修复 `scripts/dev.cjs` 向 electron-vite 传参方式，并增加真实 CLI 链回归测试。
-  2. 将子代理正文提升诊断移出渲染热路径，按 turn 去重/节流；主进程诊断落盘改为异步串行队列，避免同步 I/O 阻塞。
+  2. [已完成] 将子代理正文提升诊断移出渲染热路径，按 turn 去重/节流；主进程诊断落盘改为异步串行队列，避免同步 I/O 阻塞。
   3. 诊断日志默认脱敏：不记录 Assistant 正文片段、完整事件正文、工具结果、文件路径或图片 base64；完整快照改为显式诊断开关。
   4. 修复通知切换到其他会话时 pending timeline focus 被 session reset 清空，并补跨会话通知聚焦测试。
   5. 修正 canonical thinking 纠错策略：允许更短但结构正确的官方 thinking 替换重复/损坏的本地 thinking，同时保留过程历史防倒退门禁。
@@ -16,10 +16,10 @@
   9. 房间投递身份诊断面板在会话或数据集变化时清理无效筛选，避免新会话误显示空列表。
   10. 清理 `eventMapper.test.ts` 的整文件行尾/尾随空白噪声，恢复可读 diff 与 blame。
   11. 核实长程任务 reviewer 双运行时流程是否正式废弃；若仍需支持，恢复为可达架构；若确认废弃，补稳定知识说明，避免未来误恢复死代码。
-- 未完成：第 2-11 项尚待按顺序执行、验证和独立提交。
+- 未完成：第 3-11 项尚待按顺序执行、验证和独立提交。
 - 阻塞：第 11 项涉及产品能力取舍；先完成不依赖产品决策的 1-10 项，最后基于仓库现状给出证据并在必要时请用户裁决。
 - 关键文件：`scripts/dev.cjs`、`scripts/restart-kimix-dev.ps1`、`src/utils/chatRenderItems.ts`、`src/utils/reportError.ts`、`electron/main.ts`、`src/hooks/useChatViewport/useEventFocus.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`。
-- 下一步：执行第 2 项，移除子代理正文提升诊断的流式热路径同步落盘。
+- 下一步：执行第 3 项，默认脱敏诊断内容并把完整事件快照置于显式开关之后。
 
 ## 2026-07-15 Web 模式单轮长消息流性能改造
 

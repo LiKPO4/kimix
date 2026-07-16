@@ -1,13 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildRenderItems, filterStatusUpdates } from "@/components/chat/ChatThread";
 import { assistantFooterFallbackLabel, timelineEventMemoKey } from "@/components/chat/MessageBubble";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "../chatRenderItems";
-import * as reportError from "@/utils/reportError";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-
-beforeEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("createToolOnlyAssistantEvent", () => {
   it("creates a completed assistant header for pure completed tool turns", () => {
@@ -203,54 +198,6 @@ describe("createSubagentOnlyAssistantEvent", () => {
     expect(event.thinking).toBe("分段思考");
   });
 
-  it("logs when subagent content is surfaced to the main timeline", () => {
-    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "s1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        roomAgentId: "room-a",
-        roomMessageId: "rm-1",
-        agentTurnId: "turn-1",
-        events: [
-          { id: "a1", type: "assistant_message", timestamp: 2, content: "surfaced", isThinking: false, isComplete: true },
-        ],
-      },
-    ];
-    createSubagentOnlyAssistantEvent(subagents);
-    expect(logEventSpy).toHaveBeenCalledTimes(1);
-    expect(logEventSpy).toHaveBeenCalledWith(
-      "chatRenderItems.subagentContentSurfaced",
-      expect.objectContaining({
-        agentTurnId: "turn-1",
-        roomAgentId: "room-a",
-        roomMessageId: "rm-1",
-        subagentCount: 1,
-        contentLength: "surfaced".length,
-      }),
-    );
-  });
-
-  it("does not log when subagent has no displayable content", () => {
-    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "s1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        events: [],
-      },
-    ];
-    createSubagentOnlyAssistantEvent(subagents);
-    expect(logEventSpy).not.toHaveBeenCalled();
-  });
 });
 
 describe("buildRenderItems compaction placement", () => {

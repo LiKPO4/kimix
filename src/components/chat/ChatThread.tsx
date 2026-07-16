@@ -22,7 +22,7 @@ import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { hasMetricStatus, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
-import { logError } from "@/utils/reportError";
+import { logError, logEvent } from "@/utils/reportError";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import type { LongTaskSessionMeta, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
@@ -1000,6 +1000,35 @@ export const ChatThread = memo(function ChatThread() {
     () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds, completedTurnRenderCacheRef.current),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds]
   );
+  const surfacedSubagentContentKeysRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!session) return;
+    for (const item of renderItems) {
+      if (
+        item.type !== "event" ||
+        item.event.type !== "assistant_message" ||
+        !item.leadingSubagents?.length ||
+        (!item.event.content.trim() && !item.event.thinking?.trim())
+      ) continue;
+      const key = `${session.id}:${item.event.id}`;
+      if (surfacedSubagentContentKeysRef.current.has(key)) continue;
+      surfacedSubagentContentKeysRef.current.add(key);
+      logEvent("chatRenderItems.subagentContentSurfaced", {
+        sessionId: session.id,
+        agentTurnId: item.event.agentTurnId,
+        roomAgentId: item.event.roomAgentId,
+        roomMessageId: item.event.roomMessageId,
+        subagentCount: item.leadingSubagents.length,
+        hasActiveSubagent: item.leadingSubagents.some((subagent) => (
+          subagent.status === "queued" ||
+          subagent.status === "running" ||
+          subagent.status === "suspended"
+        )),
+        contentLength: item.event.content.length,
+        thinkingLength: item.event.thinking?.length ?? 0,
+      });
+    }
+  }, [renderItems, session]);
   const exportedSubagentRegressionSnapshotsRef = useRef(new Set<string>());
   useEffect(() => {
     if (!session) return;
