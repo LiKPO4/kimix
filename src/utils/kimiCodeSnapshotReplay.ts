@@ -71,9 +71,18 @@ export function reconcileRunningKimiSnapshot(
     const alreadyMounted = events.some((local) => {
       if (local.type !== event.type) return false;
       if (local.type === "assistant_message" && event.type === "assistant_message") {
-        return local.isComplete === event.isComplete &&
+        if (local.isComplete === event.isComplete &&
           local.content === event.content &&
-          (local.thinking ?? "") === (event.thinking ?? "");
+          (local.thinking ?? "") === (event.thinking ?? "")) return true;
+        // Kimi Code 0.24+（agent-core-v2）会把进行中轮次已提交的步骤文本作为 complete
+        // 助手带进快照；本地未完成助手已覆盖同文内容时跳过合并，否则它会被提前关闭
+        // （“输出完成”假象），后续增量被迫另起新段，表现为过程周期折叠、内容先“消失”。
+        if (event.isComplete && !local.isComplete) {
+          const localText = normalizeText([local.thinking ?? "", local.content].filter(Boolean).join("\n"));
+          const eventText = normalizeText([event.thinking ?? "", event.content].filter(Boolean).join("\n"));
+          if (eventText.length > 0 && localText.includes(eventText)) return true;
+        }
+        return false;
       }
       if (local.type === "tool_call" && event.type === "tool_call") {
         return Boolean(local.toolCallId) && local.toolCallId === event.toolCallId && local.status === event.status;

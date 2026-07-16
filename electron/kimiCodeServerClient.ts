@@ -441,6 +441,8 @@ export class KimiCodeServerClient {
     resolve: (frame: ServerFrame) => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
+    resetOnSessionId?: string;
+    idleTimeoutMs?: number;
   }>();
   private nextId = 0;
   private closing = false;
@@ -710,7 +712,7 @@ export class KimiCodeServerClient {
       body: JSON.stringify({ content, ...controls }),
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
-    await this.waitFor((frame) => {
+    await this.waitForSessionEvent(sessionId, (frame) => {
       if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
       const payload = frame.payload as { promptId?: unknown; prompt_id?: unknown } | undefined;
       return (payload?.promptId ?? payload?.prompt_id) === result.prompt_id;
@@ -960,6 +962,10 @@ export class KimiCodeServerClient {
     }
     for (const listener of this.listeners) listener(frame);
     for (const waiter of this.waiters) {
+      // 活跃度感知等待：目标会话的任何帧都证明流转未死，重置空闲计时。
+      if (waiter.resetOnSessionId !== undefined && frame.session_id === waiter.resetOnSessionId) {
+        this.armIdleTimeout(waiter);
+      }
       if (!waiter.match(frame)) continue;
       this.waiters.delete(waiter);
       clearTimeout(waiter.timer);
@@ -1062,6 +1068,30 @@ export class KimiCodeServerClient {
           reject(new Error(`Kimi Server WebSocket 等待超时（${timeoutMs}ms）`));
         }, timeoutMs),
       };
+      this.waiters.add(waiter);
+    });
+  }
+
+  private armIdleTimeout(waiter: { reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; idleTimeoutMs?: number }) {
+    clearTimeout(waiter.timer);
+    waiter.timer = setTimeout(() => {
+      this.waiters.delete(waiter as Parameters<typeof this.waiters.delete>[0]);
+      waiter.reject(new Error(`Kimi Server WebSocket 等待超时（会话空闲 ${waiter.idleTimeoutMs ?? 0}ms）`));
+    }, waiter.idleTimeoutMs ?? 0);
+  }
+
+  /** 等待目标帧，期间目标会话的任何帧都重置空闲计时——长轮次（实测 10 分钟以上）不再被硬上限误杀。 */
+  private waitForSessionEvent(sessionId: string, match: (frame: ServerFrame) => boolean, idleTimeoutMs: number): Promise<ServerFrame> {
+    const queuedIndex = this.queued.findIndex(match);
+    if (queuedIndex >= 0) return Promise.resolve(this.queued.splice(queuedIndex, 1)[0]!);
+    return new Promise((resolve, reject) => {
+      const waiter = {
+        match, resolve, reject,
+        timer: setTimeout(() => undefined),
+        resetOnSessionId: sessionId,
+        idleTimeoutMs,
+      };
+      this.armIdleTimeout(waiter);
       this.waiters.add(waiter);
     });
   }

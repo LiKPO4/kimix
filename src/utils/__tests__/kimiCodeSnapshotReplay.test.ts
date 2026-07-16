@@ -116,4 +116,33 @@ describe("reconcileRunningKimiSnapshot", () => {
     }];
     expect(reconcileRunningKimiSnapshot(local, snapshot)).toEqual(local);
   });
+
+  it("v2 快照把进行中轮次的已提交文本作为 complete 助手带回时，不得提前关闭本地未完成助手", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 1, content: "读三个文件",
+    }, {
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "我先读第一个文件。",
+      thinking: "先想一下。",
+      thinkingParts: [{ id: "tp-1", timestamp: 2, text: "先想一下。" }],
+      isThinking: true,
+      isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 1, content: "读三个文件",
+    }, {
+      id: "official-assistant-1",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "我先读第一个文件。",
+      thinking: "先想一下。",
+      isThinking: false,
+      isComplete: true,
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const assistant = result.find((event) => event.type === "assistant_message");
+    expect(assistant).toMatchObject({ id: "assistant-live", isComplete: false });
+  });
 });
