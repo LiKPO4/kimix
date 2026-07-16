@@ -118,6 +118,35 @@
 4. 风险与回滚
 5. 下一步最小行动
 
+## 根因快照流程
+
+> 处理“工具调用/子代理结束后助手正文缺失”“消息归属错误”“状态机异常”等需要区分 SDK/模型行为与 Kimix 渲染/归属逻辑的问题时，必须先抓快照，再写兜底。
+
+### 强制顺序
+
+1. **抓主进程 SSE / 事件流快照**
+   - 开启主进程调试日志，记录从用户发送消息到问题出现的完整 SDK 事件序列。
+   - 重点确认：是否有 `assistant.delta` content、是否有 `tool.result` / `turn_end` / `subagent.completed`、事件顺序与 scope。
+   - 快照保存为 `docs/issue-<name>-events-snapshot.md` 或临时 JSON，至少包含事件类型、event_id / turn_id、agent scope、时间戳、content 长度。
+
+2. **抓 UI 层 events / renderItems 快照**
+   - 在 `App.tsx` 事件流主入口或 `ChatThread` 渲染前导出 `events` / `renderItems` / `roomTimeline` 数组。
+   - 确认：正文是否已存在于顶层时间线、是否被子代理 scope 吞掉、是否被合并逻辑丢弃。
+
+3. **写诊断与最小复现**
+   - 用快照说明根因是“SDK/模型未发正文”还是“Kimix 渲染/归属错误”。
+   - 如果根因是 Kimix 渲染/归属错误，先写最小复现 fixture 或单元测试，再修复。
+
+4. **最后才写自动 prompt 兜底**
+   - 只有在确认 SDK/模型确实偶尔只发 `tool.result` + `TurnEnd`、且无法通过渲染修复时，才在协议层增加“无正文时自动继续”的兜底。
+   - 兜底必须带计数/上限，避免无限循环，并记录触发条件与回滚方式。
+
+### 反模式
+
+- 未抓快照就直接加“继续生成”prompt 兜底。
+- 用 UI 截图代替事件流证据判断根因。
+- 把“渲染没显示”直接等同于“模型没输出”。
+
 ## 长程状态
 
 长期任务维护 `TASK_STATE.md`，只记录会影响后续工作的内容：
