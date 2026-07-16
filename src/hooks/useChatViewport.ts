@@ -30,6 +30,7 @@ import { useViewportTailCompensation } from "./useChatViewport/useViewportTailCo
 import { useScrollAnchor } from "./useChatViewport/useScrollAnchor";
 import { useAutoFollow } from "./useChatViewport/useAutoFollow";
 import { useEventFocus } from "./useChatViewport/useEventFocus";
+import type { TimelineFocusAlignment } from "./useChatViewport/useEventFocus";
 import { useResizeObserver } from "./useChatViewport/useResizeObserver";
 
 export type { ViewportAnchor, ResizeViewportAnchor, ProcessCollapseViewportSnapshot };
@@ -69,7 +70,7 @@ export interface UseChatViewportResult {
   eagerMarkdown: boolean;
   enableAutoFollow: () => void;
   pauseAutoFollowForUser: () => void;
-  focusTimelineEvent: (eventId: string, searchText?: string) => boolean;
+  focusTimelineEvent: (eventId: string, searchText?: string, alignment?: TimelineFocusAlignment) => boolean;
   prepareInitialTailExpand: () => void;
   prepareOlderItemsExpand: () => void;
   prepareOlderItemsExpandToEnd: () => void;

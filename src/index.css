@@ -589,6 +589,53 @@ body::before {
   margin-right: auto;
 }
 
+.kimix-chat-navigation-hit {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kimix-chat-navigation-mark {
+  display: block;
+  width: 11px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--text-primary);
+  opacity: 0.72;
+  transform: translateY(-50%);
+  transform-origin: right center;
+  transition-property: opacity, box-shadow;
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.kimix-chat-navigation-hit[data-kind="user"] .kimix-chat-navigation-mark {
+  background: var(--accent-primary);
+}
+
+.kimix-chat-navigation-hit:hover .kimix-chat-navigation-mark,
+.kimix-chat-navigation-hit:focus-visible .kimix-chat-navigation-mark,
+.kimix-chat-navigation-hit[data-active="true"] .kimix-chat-navigation-mark {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent-primary-light);
+}
+
+.kimix-chat-navigation-hit:focus-visible {
+  outline: none;
+}
+
+.kimix-chat-navigation-hit:focus-visible .kimix-chat-navigation-mark {
+  box-shadow: 0 0 0 2px var(--accent-primary-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kimix-chat-navigation-mark {
+    transition-duration: 0ms;
+  }
+}
+
 /* ── Buttons & Actions ── */
 
 .kimix-icon-text-button {

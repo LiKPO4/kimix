@@ -17,9 +17,11 @@ export interface UseEventFocusOptions {
 }
 
 export type UseEventFocusResult = {
-  focusTimelineEvent: (eventId: string, searchText?: string) => boolean;
+  focusTimelineEvent: (eventId: string, searchText?: string, alignment?: TimelineFocusAlignment) => boolean;
   resetForNewSession: (nextSessionId?: string) => void;
 };
+
+export type TimelineFocusAlignment = "center" | "start-center";
 
 const MAX_FOCUS_RECURSIVE_ATTEMPTS = 10;
 const MAX_FOCUS_DURATION_MS = 2_000;
@@ -105,7 +107,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     return true;
   }, [scrollRef]);
 
-  const focusTimelineEvent = useCallback((eventId: string, searchText?: string): boolean => {
+  const focusTimelineEvent = useCallback((eventId: string, searchText?: string, alignment: TimelineFocusAlignment = "center"): boolean => {
     cancelSessionAutoBottom();
     const now = Date.now();
     const state = focusTimelineEventStateRef.current;
@@ -136,7 +138,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       if (hasMoreOlderItems) {
         onExpandOlderItemsToEnd();
         window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText));
+          window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText, alignment));
         });
       }
       return false;
@@ -149,14 +151,22 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     updateAutoFollow(false);
     const didSelectText = selectTextInNode(target, searchText);
     if (!didSelectText) {
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      const scrollNode = scrollRef.current;
+      if (alignment === "start-center" && scrollNode) {
+        const scrollRect = scrollNode.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const targetTop = scrollNode.scrollTop + targetRect.top - scrollRect.top - scrollNode.clientHeight / 2;
+        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      } else {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     }
     onHighlightEvent?.(eventId);
     window.setTimeout(() => {
       onHighlightEvent?.(null);
     }, 2200);
     return true;
-  }, [cancelSessionAutoBottom, findRenderedEventNode, hasMoreOlderItems, onExpandOlderItemsToEnd, onHighlightEvent, selectTextInNode, autoFollowRef, userScrollRef, updateAutoFollow, scrollTokenRef]);
+  }, [cancelSessionAutoBottom, findRenderedEventNode, hasMoreOlderItems, onExpandOlderItemsToEnd, onHighlightEvent, selectTextInNode, autoFollowRef, userScrollRef, updateAutoFollow, scrollTokenRef, scrollRef]);
 
   useEffect(() => {
     const handler = (event: Event) => {

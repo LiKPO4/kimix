@@ -8,6 +8,7 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import { useChatRenderCache } from "@/hooks/useChatRenderCache";
 import { useChatViewport } from "@/hooks/useChatViewport";
 import { EmptyState } from "./EmptyState";
+import { ChatNavigationRail } from "./ChatNavigationRail";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
 import { ChangeCard } from "./ChangeCard";
@@ -24,6 +25,7 @@ import { hasMetricStatus, shouldRenderStandaloneStatusUpdate } from "@/utils/ses
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError, logEvent } from "@/utils/reportError";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
+import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
 import type { LongTaskSessionMeta, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
@@ -1441,15 +1443,13 @@ export const ChatThread = memo(function ChatThread() {
             <div
               key={renderItemKey(item)}
               data-kimix-render-key={renderItemKey(item)}
-              data-kimix-event-id={item.type === "event" ? item.event.id : undefined}
+              data-kimix-event-id={chatNavigationTargetId(item)}
               data-kimix-event-ids={item.type === "event" ? item.event.id.split(":").join(" ") : item.type === "tool_group" ? item.tools.map((tool) => tool.id).join(" ") : undefined}
               style={{
                 borderRadius: 12,
-                outline: item.type === "event" && highlightedEventId === item.event.id
+                outline: chatNavigationContainsEventId(item, highlightedEventId)
                   ? "2px solid var(--accent-primary)"
-                  : item.type === "tool_group" && item.tools.some((tool) => tool.id === highlightedEventId)
-                    ? "2px solid var(--accent-primary)"
-                    : "2px solid transparent",
+                  : "2px solid transparent",
                 outlineOffset: 4,
                 transition: "outline-color 160ms ease",
               }}
@@ -1464,6 +1464,20 @@ export const ChatThread = memo(function ChatThread() {
               }
             </div>
           ))}
+        </div>
+      </div>
+      <div className="kimix-content-x pointer-events-none absolute inset-0 z-10">
+        <div className="kimix-chat-stream-column relative h-full">
+          <ChatNavigationRail
+            items={visibleRenderItems}
+            scrollRef={viewport.scrollRef}
+            contentRef={viewport.streamContentRef}
+            onNavigate={(eventId, kind) => viewport.focusTimelineEvent(
+              eventId,
+              undefined,
+              kind === "user" ? "center" : "start-center",
+            )}
+          />
         </div>
       </div>
       <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-20" style={{ bottom: 24 }}>

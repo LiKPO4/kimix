@@ -217,6 +217,25 @@ describe("useChatViewport", () => {
     expect(onHighlight).toHaveBeenCalledWith("b");
   });
 
+  it("can place an Agent item header at the vertical center", () => {
+    const { viewport, scroll } = renderTest({ renderItems: [eventRenderItem("a"), eventRenderItem("b")] });
+    const target = scroll.querySelector<HTMLElement>("[data-kimix-event-id='b']")!;
+    const scrollTo = vi.fn();
+    Object.defineProperties(scroll, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollTop: { configurable: true, writable: true, value: 100 },
+      scrollTo: { configurable: true, value: scrollTo },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue({ top: 20 } as DOMRect);
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ top: 600 } as DOMRect);
+
+    act(() => {
+      viewport().focusTimelineEvent("b", undefined, "start-center");
+    });
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 380, behavior: "smooth" });
+  });
+
   it("preserves a pending focus request while switching to its target session", async () => {
     const onHighlight = vi.fn();
     const { rerender } = renderTest({
