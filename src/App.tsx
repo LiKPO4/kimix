@@ -60,7 +60,8 @@ import { useSettingsSync } from "@/hooks/useSettingsSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
-import { hasCanonicalKimiThinkingHistory, hasKimiProcessHistoryRegression, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { hasLegacyKimiClarificationWrapper, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { hasPossiblyLostUserImages, shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
 import { logError } from "@/utils/reportError";
 import {
   getRoomAgent,
@@ -195,70 +196,6 @@ function normalizeLocalProjectPath(projectPath: string | undefined) {
 
 function isSameLocalProjectPath(a: string | undefined, b: string | undefined) {
   return isSamePath(a, b);
-}
-
-function flattenTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
-  const result: TimelineEvent[] = [];
-  for (const event of events) {
-    result.push(event);
-    if (event.type === "subagent") {
-      result.push(...flattenTimelineEvents(event.events));
-    }
-  }
-  return result;
-}
-
-function assistantBodySize(events: TimelineEvent[]) {
-  return flattenTimelineEvents(events)
-    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
-    .reduce((sum, event) => sum + event.content.trim().length, 0);
-}
-
-function assistantBodyText(events: TimelineEvent[]) {
-  return flattenTimelineEvents(events)
-    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
-    .map((event) => event.content)
-    .filter((content) => content.trim().length > 0)
-    .join("\n\n");
-}
-
-function displayableUserImageCount(events: TimelineEvent[]) {
-  return events
-    .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
-      event.type === "user_message" || event.type === "steer_message"
-    ))
-    .reduce((sum, event) => sum + (event.images ?? []).filter((image) => (
-      typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")
-    )).length, 0);
-}
-
-function hasPossiblyLostUserImages(events: TimelineEvent[]) {
-  return events.some((event) => {
-    if (event.type !== "user_message" && event.type !== "steer_message") return false;
-    return (event.images ?? []).some((image) => (
-      !image.filePath &&
-      !(typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/"))
-    ));
-  });
-}
-
-function shouldReplaceWithCanonicalKimiHistory(cachedEvents: TimelineEvent[], canonicalEvents: TimelineEvent[]) {
-  if (canonicalEvents.length === 0) return false;
-  // Server snapshots can contain the newest assistant text/thinking while
-  // omitting tool-call lifecycle frames. Never let such a partial snapshot
-  // destructively replace a richer live/local process timeline.
-  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents)) return false;
-  const canonicalAssistantBody = assistantBodyText(canonicalEvents);
-  const cachedAssistantBody = assistantBodyText(cachedEvents);
-  const canonicalAssistantSize = assistantBodySize(canonicalEvents);
-  const cachedAssistantSize = assistantBodySize(cachedEvents);
-  return canonicalAssistantSize > cachedAssistantSize ||
-    displayableUserImageCount(canonicalEvents) > displayableUserImageCount(cachedEvents) ||
-    (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
-    (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
-    (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
-    hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
-    hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
 }
 
 function roomAgentNeedsKimiCodeHistoryRepair(session: Session, roomAgentId: string) {
