@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { findSubagentContentRegressionSnapshots, type RenderItem } from "@/components/chat/ChatThread";
+import { buildContentVersion, findSubagentContentRegressionSnapshots, type RenderItem } from "@/components/chat/ChatThread";
 
 function sessionStub(events: TimelineEvent[] = []): Session {
   return {
@@ -84,5 +84,54 @@ describe("findSubagentContentRegressionSnapshots", () => {
     const snapshots = findSubagentContentRegressionSnapshots(items, sessionStub());
     expect(snapshots).toHaveLength(2);
     expect(new Set(snapshots.map((s) => s.key)).size).toBe(1);
+  });
+});
+
+describe("buildContentVersion", () => {
+  it("includes session, timeline length, render items length and last item key", () => {
+    const session = sessionStub([assistantEvent("hello")]);
+    const event = assistantEvent("hello", { id: "assistant-1" });
+    const items: RenderItem[] = [{ type: "event", event }];
+    expect(buildContentVersion(session, session.events, items)).toBe(
+      `session-1:0:1:1:assistant-1:5:0`
+    );
+  });
+
+  it("changes when the last assistant message content grows", () => {
+    const session = sessionStub();
+    const base = assistantEvent("hi", { id: "assistant-1", isComplete: false });
+    const itemsBefore: RenderItem[] = [{ type: "event", event: base }];
+    const itemsAfter: RenderItem[] = [{ type: "event", event: { ...base, content: "hi there" } }];
+    const before = buildContentVersion(session, session.events, itemsBefore);
+    const after = buildContentVersion(session, session.events, itemsAfter);
+    expect(after).not.toBe(before);
+  });
+
+  it("changes when the last assistant message thinking grows", () => {
+    const session = sessionStub();
+    const base = assistantEvent("", { id: "assistant-1", isComplete: false, isThinking: true });
+    const itemsBefore: RenderItem[] = [{ type: "event", event: { ...base, thinking: "t" } }];
+    const itemsAfter: RenderItem[] = [{ type: "event", event: { ...base, thinking: "thought" } }];
+    const before = buildContentVersion(session, session.events, itemsBefore);
+    const after = buildContentVersion(session, session.events, itemsAfter);
+    expect(after).not.toBe(before);
+  });
+
+  it("changes when renderItems length changes even if timeline length stays the same", () => {
+    const session = sessionStub([assistantEvent("hello", { id: "a" }), assistantEvent("world", { id: "b" })]);
+    const singleItem: RenderItem[] = [{ type: "event", event: session.events[0] as Extract<TimelineEvent, { type: "assistant_message" }> }];
+    const twoItems: RenderItem[] = [
+      { type: "event", event: session.events[0] as Extract<TimelineEvent, { type: "assistant_message" }> },
+      { type: "event", event: session.events[1] as Extract<TimelineEvent, { type: "assistant_message" }> },
+    ];
+    const before = buildContentVersion(session, session.events, singleItem);
+    const after = buildContentVersion(session, session.events, twoItems);
+    expect(after).not.toBe(before);
+  });
+
+  it("stays stable for identical inputs", () => {
+    const session = sessionStub([assistantEvent("hello")]);
+    const items: RenderItem[] = [{ type: "event", event: session.events[0] as Extract<TimelineEvent, { type: "assistant_message" }> }];
+    expect(buildContentVersion(session, session.events, items)).toBe(buildContentVersion(session, session.events, items));
   });
 });

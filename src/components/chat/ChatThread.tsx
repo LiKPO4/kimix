@@ -56,6 +56,31 @@ type PermissionModeDiagDetail = {
 function renderItemKey(item: RenderItem) {
   return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
 }
+
+export function buildContentVersion(
+  session: { id?: string; updatedAt?: number } | null | undefined,
+  roomTimeline: TimelineEvent[],
+  renderItems: RenderItem[],
+): string {
+  const lastItem = renderItems[renderItems.length - 1];
+  const lastKey = lastItem ? renderItemKey(lastItem) : "";
+  const lastAssistantContentLength = lastItem?.type === "event" && lastItem.event.type === "assistant_message"
+    ? lastItem.event.content.length
+    : undefined;
+  const lastAssistantThinkingLength = lastItem?.type === "event" && lastItem.event.type === "assistant_message"
+    ? (lastItem.event.thinking?.length ?? 0)
+    : undefined;
+  return [
+    session?.id ?? "",
+    session?.updatedAt ?? 0,
+    roomTimeline.length,
+    renderItems.length,
+    lastKey,
+    lastAssistantContentLength ?? "",
+    lastAssistantThinkingLength ?? "",
+  ].join(":");
+}
+
 export interface SubagentContentRegressionSnapshot {
   key: string;
   sessionId: string;
@@ -1005,9 +1030,10 @@ export const ChatThread = memo(function ChatThread() {
     ));
     return item?.type === "event" ? item.event.id : undefined;
   }, [renderItems]);
-  const contentVersion = useMemo(() => {
-    return `${session?.id ?? ""}:${session?.updatedAt ?? 0}:${roomTimeline.length}`;
-  }, [roomTimeline.length, session?.id, session?.updatedAt]);
+  const contentVersion = useMemo(
+    () => buildContentVersion(session, roomTimeline, renderItems),
+    [session, roomTimeline, renderItems]
+  );
 
   const hasMoreOlderItems = renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT + olderItemsPage * OLDER_ITEMS_BATCH_SIZE;
 
