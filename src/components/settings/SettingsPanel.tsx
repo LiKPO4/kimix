@@ -22,6 +22,7 @@ import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog } from 
 import { usePresence } from "@/hooks/usePresence";
 import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/roomAgentProvisioning";
 import { APP_VERSION } from "@/utils/appVersion";
+import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
 
 type FreezeReport = {
   at: string;
@@ -489,6 +490,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
+  const [roomDeliveryInspectorOpen, setRoomDeliveryInspectorOpen] = useState(false);
 
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
@@ -2135,6 +2137,16 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       </span>
                     </button>
                   </div>
+                  <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 14, paddingTop: 14 }}>
+                    <button
+                      type="button"
+                      onClick={() => setRoomDeliveryInspectorOpen(true)}
+                      className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+                    >
+                      <Bot size={14} />
+                      房间投递身份诊断
+                    </button>
+                  </div>
                   <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
                     {experimentalSettingsMessage || "读取工具加载设置中..."}
                   </div>
@@ -2700,17 +2712,27 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       </div>
   );
 
-  if (variant === "workspace") return content;
+  if (variant === "workspace") {
+    return (
+      <>
+        {content}
+        <RoomDeliveryIdentityInspector open={roomDeliveryInspectorOpen} onClose={() => setRoomDeliveryInspectorOpen(false)} />
+      </>
+    );
+  }
 
   return (
-    <div
-      className={`kimix-presence-overlay fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] ${settingsPresence.visible ? "is-visible" : ""}`}
-      onClick={() => setSettingsOpen(false)}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
-      {content}
-    </div>
+    <>
+      <div
+        className={`kimix-presence-overlay fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] ${settingsPresence.visible ? "is-visible" : ""}`}
+        onClick={() => setSettingsOpen(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
+        {content}
+      </div>
+      <RoomDeliveryIdentityInspector open={roomDeliveryInspectorOpen} onClose={() => setRoomDeliveryInspectorOpen(false)} />
+    </>
   );
 }
