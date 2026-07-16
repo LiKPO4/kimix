@@ -419,6 +419,19 @@ describe("KimiCodeServerClient protocol adapters", () => {
           },
         }),
       },
+      {
+        // Kimi Code 0.24+（agent-core-v2）的 create 路由不消费 agent_config，
+        // 同一配置必须经 profile 端点再应用一次（旧版本上是幂等冗余）。
+        url: "http://127.0.0.1:58627/api/v1/sessions/session-1/profile",
+        method: "POST",
+        body: JSON.stringify({
+          agent_config: {
+            model: "kimi-code/kimi-for-coding",
+            permission_mode: "auto",
+            plan_mode: false,
+          },
+        }),
+      },
     ]);
   });
 

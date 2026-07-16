@@ -466,7 +466,7 @@ export class KimiCodeServerClient {
       permission_mode: input.permission ?? "manual",
       plan_mode: input.planMode ?? false,
     };
-    return this.request("/api/v1/sessions", {
+    const session = await this.request("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({
         id: input.id,
@@ -474,7 +474,11 @@ export class KimiCodeServerClient {
         metadata: { ...input.metadata, cwd: workspace.root },
         agent_config: agentConfig,
       }),
-    });
+    }) as ServerSession;
+    // Kimi Code 0.24+（agent-core-v2）的 create 路由不再消费 agent_config（会话会停留在
+    // 无模型状态，首个 prompt 以 model.not_configured 失败）；同一配置必须经 profile 端点
+    // 显式应用。旧版本 create 已消费 agent_config，profile 重复应用是幂等的。
+    return this.updateSession(session.id, agentConfig);
   }
 
   createWorkspace(root: string, name?: string): Promise<ServerWorkspace> {
@@ -899,8 +903,11 @@ export class KimiCodeServerClient {
     this.closing = false;
     const reconnecting = this.reconnectAttempt > 0;
     const token = readServerToken();
+    // Kimi Code 0.24+（agent-core-v2）的 WS upgrade 只认 Authorization 头或
+    // `kimi-code.bearer.<token>` 子协议，不再读取 ?token= 查询参数；保留查询参数以兼容 0.23 及更早的 v1 网关。
     const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
-    const socket = new WebSocket(`${this.endpoint.replace(/^http/, "ws")}/api/v1/ws${tokenQuery}`);
+    const protocols = token ? [`kimi-code.bearer.${token}`] : undefined;
+    const socket = new WebSocket(`${this.endpoint.replace(/^http/, "ws")}/api/v1/ws${tokenQuery}`, protocols);
     this.socket = socket;
     socket.addEventListener("message", (event) => {
       try {

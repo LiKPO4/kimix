@@ -12,6 +12,12 @@
 
 * **Cross-session notification focus survives navigation reset**: Session changes reset focus recursion state without deleting a pending request whose target is the incoming session, allowing notification clicks to locate the intended event after the new timeline renders. See [/project/kimix.md](/project/kimix.md).
 
+* **Server v2 breaks WS auth, create-time agent_config, and Host probing**: Kimi Code 0.24+ requires the bearer subprotocol (not `?token=`) on WS upgrade, ignores `agent_config` at session create (profile endpoint is the only application path), and gates every `/api/*` plus both meta documents, so the Host probe must carry the server token. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+* **Single-instance lock is host-managed on Windows**: Server 0.24+ locks one instance via `server/lock`; upstream pid-liveness misreads dead pids on Windows, so Kimix attaches to live recorded instances and removes positively dead locks before spawning. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+* **Vendored fallback SDK tracks 0.26.0**: The self-contained bundle is regenerated from tag `@moonshot-ai/kimi-code@0.26.0` (node-sdk 0.13.4, commit `36b05820`), with the MCP startup-timeout patch, image-compression exports, managed usage, and session export re-validated by host probes. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Diagnostics are metadata-only by default**: Main-process logging redacts message bodies, tool payloads, paths, stacks, snapshots, and base64 data; a bounded full event snapshot is serialized only when launch explicitly sets `KIMIX_DETAILED_DIAGNOSTICS=1`. See [/project/kimix.md](/project/kimix.md).
 
 * **Diagnostic writes cannot block streaming**: Subagent-content surfacing logs once per rendered event instead of once per render derivation, and renderer diagnostic IPC drains through an asynchronous serialized file queue rather than synchronous main-process filesystem calls. See [/project/kimix.md](/project/kimix.md).

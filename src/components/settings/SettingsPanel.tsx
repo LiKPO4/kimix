@@ -2231,7 +2231,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                                     <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
                                       {[
                                         model.capabilities.includes("thinking") ? "思考" : null,
-                                        model.capabilities.includes("select_tools") ? "按需工具" : null,
+                                        // 0.23.6 起能力名由 select_tools 改为 dynamically_loaded_tools，两种都认。
+                                        model.capabilities.some((capability) => capability === "select_tools" || capability === "dynamically_loaded_tools") ? "按需工具" : null,
                                       ].filter(Boolean).join(" / ") || "标准"}
                                     </span>
                                   </div>

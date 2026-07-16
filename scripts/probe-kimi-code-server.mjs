@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -13,6 +14,25 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const apiBase = `${baseUrl}/api/v1`;
 const reportPath = path.join(repoRoot, "docs", "kimi-code-server-probe-result.md");
 const scenarioTimeoutMs = Number(process.env.KIMIX_KIMI_SERVER_SCENARIO_TIMEOUT_MS ?? 240_000);
+
+// Kimi Code Server 0.23+ 默认要求 token 鉴权，与 electron/kimiCodeServerClient.ts 保持一致：
+// REST 走 authorization/x-kimi-server-token 头，WebSocket 走 ?token= 查询参数。
+function readServerToken() {
+  try {
+    const token = readFileSync(path.join(os.homedir(), ".kimi-code", "server.token"), "utf8").trim();
+    return token || "";
+  } catch {
+    return "";
+  }
+}
+
+const serverToken = readServerToken();
+const authHeaders = serverToken
+  ? { authorization: `Bearer ${serverToken}`, "x-kimi-server-token": serverToken }
+  : {};
+const wsTokenQuery = serverToken ? `?token=${encodeURIComponent(serverToken)}` : "";
+// 0.24+（agent-core-v2）WS upgrade 只认 Authorization 头或 bearer 子协议；保留查询参数兼容旧 v1 网关。
+const wsProtocols = serverToken ? [`kimi-code.bearer.${serverToken}`] : undefined;
 
 const results = [];
 let server;
@@ -62,6 +82,7 @@ async function request(relativePath, options = {}) {
     ...options,
     headers: {
       accept: "application/json",
+      ...authHeaders,
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),
       ...(options.headers ?? {}),
     },
@@ -78,6 +99,7 @@ async function requestEnvelope(relativePath, options = {}) {
     ...options,
     headers: {
       accept: "application/json",
+      ...authHeaders,
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),
       ...(options.headers ?? {}),
     },
@@ -110,7 +132,7 @@ function waitForSocketFrame(queue, waiters, match, timeoutMs = 60_000) {
 }
 
 async function openProbeSocket(sessionId) {
-  const socket = new WebSocket(`${baseUrl.replace(/^http/, "ws")}/api/v1/ws`);
+  const socket = new WebSocket(`${baseUrl.replace(/^http/, "ws")}/api/v1/ws${wsTokenQuery}`, wsProtocols);
   const queue = [];
   const waiters = [];
   socket.addEventListener("message", (event) => {
@@ -138,7 +160,7 @@ async function openProbeSocket(sessionId) {
   }));
   const ack = await waitFor((frame) => frame.type === "ack" && frame.id === helloId, 5_000);
   if (ack.code !== 0) throw new Error(`probe client_hello rejected: ${ack.msg ?? ack.code}`);
-  return { socket, waitFor };
+  return { socket, waitFor, drain: () => { queue.length = 0; } };
 }
 
 function isRecord(value) {
@@ -245,8 +267,8 @@ async function stopServer() {
 async function probeContracts() {
   const meta = await request("/meta");
   const auth = await request("/auth");
-  const openapi = await fetch(`${baseUrl}/openapi.json`).then((response) => response.json());
-  const asyncapi = await fetch(`${baseUrl}/asyncapi.json`).then((response) => response.json());
+  const openapi = await fetch(`${baseUrl}/openapi.json`, { headers: authHeaders }).then((response) => response.json());
+  const asyncapi = await fetch(`${baseUrl}/asyncapi.json`, { headers: authHeaders }).then((response) => response.json());
   const openapiPaths = Object.keys(openapi.paths ?? {});
   record("health/meta/auth + OpenAPI/AsyncAPI", true, {
     serverId: meta.server_id,
@@ -282,6 +304,7 @@ async function probeKimixSnapshotReplayAdapter() {
       method: "POST",
       body: JSON.stringify({ title: "Kimix snapshot replay probe", metadata: { cwd: repoRoot, source: "kimix-snapshot-replay-probe" } }),
     });
+    await applyProbeProfile(session.id);
     const ws = await openProbeSocket(session.id);
     socket = ws.socket;
     const prompt = await request(`/sessions/${encodeURIComponent(session.id)}/prompts`, {
@@ -344,6 +367,32 @@ async function probeKimixSnapshotReplayAdapter() {
   }
 }
 
+let probeModelPromise;
+async function pickProbeModel() {
+  probeModelPromise ??= (async () => {
+    const catalog = await request("/models");
+    const items = Array.isArray(catalog?.items) ? catalog.items : [];
+    const ids = items.map((item) => item?.model).filter((value) => typeof value === "string");
+    return ids.find((id) => id === "kimi-code/kimi-for-coding")
+      ?? ids.find((id) => id.startsWith("kimi-code/"))
+      ?? ids[0]
+      ?? null;
+  })();
+  return probeModelPromise;
+}
+
+// Kimi Code 0.24+（agent-core-v2）的 create 路由不消费 agent_config，会话必须经
+// profile 端点设置模型，否则首个 prompt 以 model.not_configured 失败。
+async function applyProbeProfile(sessionId, extra = {}) {
+  const model = await pickProbeModel();
+  if (!model) throw new Error("no catalog model available for probe profile");
+  await request(`/sessions/${encodeURIComponent(sessionId)}/profile`, {
+    method: "POST",
+    body: JSON.stringify({ agent_config: { model, ...extra } }),
+  });
+  return model;
+}
+
 async function probeKimixBtwAdapter() {
   let session;
   let socket;
@@ -352,8 +401,20 @@ async function probeKimixBtwAdapter() {
       method: "POST",
       body: JSON.stringify({ title: "Kimix Server BTW probe", metadata: { cwd: repoRoot, source: "kimix-btw-probe" } }),
     });
+    await applyProbeProfile(session.id);
     const ws = await openProbeSocket(session.id);
     socket = ws.socket;
+    // 0.24+ 主 agent 惰性引导，:btw 要求 source agent 已存在；先跑一个真实主 turn。
+    const bootPrompt = await request(`/sessions/${encodeURIComponent(session.id)}/prompts`, {
+      method: "POST",
+      body: JSON.stringify({ content: [{ type: "text", text: "Reply with exactly: KIMIX_BTW_BOOT_OK" }] }),
+    });
+    await ws.waitFor((frame) => {
+      if (frame.type !== "prompt.completed" || frame.session_id !== session.id) return false;
+      const payload = isRecord(frame.payload) ? frame.payload : {};
+      return (payload.prompt_id ?? payload.promptId) === bootPrompt.prompt_id;
+    }, 120_000);
+    ws.drain();
     const started = await request(`/sessions/${encodeURIComponent(session.id)}:btw`, { method: "POST", body: "{}" });
     const marker = `KIMIX_SERVER_BTW_${Date.now()}`;
     const prompt = await request(`/sessions/${encodeURIComponent(session.id)}/prompts`, {
@@ -484,6 +545,8 @@ async function probeKimixTaskAdapter() {
         },
       }),
     });
+    // create 的 agent_config 在 0.24+ 被忽略，经 profile 实际应用。
+    await applyProbeProfile(session.id, { thinking: "off", permission_mode: "yolo", plan_mode: false });
     const ws = await openProbeSocket(session.id);
     socket = ws.socket;
     const marker = `KIMIX_TASK_PROBE_${Date.now()}`;
@@ -569,6 +632,11 @@ async function probeKimixTaskAdapter() {
 }
 
 async function runScenario(file, coverage) {
+  // 官方 0.24 起移除 v1 server 包与 @moonshot-ai/server-e2e；包不存在时显式记录跳过而不是失败。
+  if (!existsSync(path.join(researchRepo, "packages", "server-e2e"))) {
+    record(file, true, { skipped: true, coverage, reason: "upstream removed @moonshot-ai/server-e2e (agent-core-v2 default since 0.24)" });
+    return;
+  }
   const result = await run("pnpm", ["--filter", "@moonshot-ai/server-e2e", "exec", "tsx", `scenarios/${file}`], {
     cwd: researchRepo,
     env: { KIMI_SERVER_URL: baseUrl },
@@ -578,19 +646,27 @@ async function runScenario(file, coverage) {
 }
 
 async function writeReport() {
+  const cliVersionText = String(
+    results.find((item) => item.name === "installed CLI version")?.detail?.stdout ?? "",
+  ).trim() || "unknown";
+  const isSkipped = (item) => item.detail?.skipped === true;
+  const passedCount = results.filter((item) => item.ok && !isSkipped(item)).length;
+  const failedCount = results.filter((item) => !item.ok).length;
+  const skippedCount = results.filter(isSkipped).length;
+  const scenariosSkipped = results.some((item) => isSkipped(item));
   const lines = [
-    "# Kimi Code 0.17.1 Server P1 探针结果",
+    `# Kimi Code ${cliVersionText} Server 探针结果`,
     "",
     `- 生成时间：${new Date().toISOString()}`,
     `- CLI：${kimiExecutable}`,
     `- Server：${baseUrl}`,
     `- 官方源码：${researchRepo}`,
-    `- 结果：${results.filter((item) => item.ok).length} 通过 / ${results.filter((item) => !item.ok).length} 失败`,
+    `- 结果：${passedCount} 通过 / ${failedCount} 失败 / ${skippedCount} 跳过`,
     "",
     "## 明细",
     "",
     ...results.flatMap((item) => [
-      `### ${item.ok ? "通过" : "失败"}：${item.name}`,
+      `### ${isSkipped(item) ? "跳过" : item.ok ? "通过" : "失败"}：${item.name}`,
       "",
       "```json",
       JSON.stringify(item.detail, null, 2),
@@ -599,21 +675,14 @@ async function writeReport() {
     ]),
     "## 结论",
     "",
-    "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
+    scenariosSkipped
+      ? "- 官方 0.24+ 已移除 @moonshot-ai/server-e2e 场景包；刷新重放、pending 闭环、队列 steer、cancel 语义改由 Kimix 自有回归与适配器检查覆盖。"
+      : "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
     "- Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。",
     "- Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。",
     "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
-    "- 当前 0.17.1 native CLI 的 `/meta` 与 OpenAPI 自报版本为 `0.0.0`；P2 必须按 endpoint / contract capability 探测，不能只按 server_version 判断。",
-    "- P2 可在实验开关后新增 Kimix Server Host；现有 vendored SDK Host 继续作为默认与回滚路径。",
+    "- REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 ?token= 查询参数）；`/meta` 自报 server_version、capabilities 与 backend 字段。",
     "",
-    "## P3 Kimix 接入复验（2026-06-18）",
-    "",
-    "- 跨工作区会话：实验路由下 `listSessions({})` 改走 Server 全局列表，现有 UI 的“全部工作目录”入口可复用。",
-    "- 官方 fork / 子会话：fork、children list/create 已接入主进程与 preload API。",
-    "- 任务管理：Server task list/get/cancel 已接入现有 Kimix 后台任务接口；主探针会真实启动、读取、取消一个 running bash 后台任务，并复验重复停止的 already-finished 语义。",
-    "- 终端管理：terminal list 真实读取通过，create/list/close 与 WS attach/detach/input/resize 已接入主进程与 preload API。",
-    "- Windows 限制：本机 0.17.1 CLI 调用 terminal create 时返回 `Failed to load native module: conpty.node`，说明接口存在但当前安装包缺少可加载的 Windows ConPTY native 模块；Kimix 将该上游错误归一为可读中文提示并保留原始错误，不伪装为成功。",
-    "- 断线重放：Kimix 客户端携带 cursor 重连并触发 snapshot 恢复；history replay 已增加去重补偿，in-flight replay 用于恢复断线中正在生成的正文。",
   ];
   await writeFile(reportPath, `${lines.join("\n")}\n`, "utf8");
 }
@@ -641,8 +710,9 @@ async function main() {
   const summary = {
     ok: results.every((item) => item.ok),
     reportPath,
-    passed: results.filter((item) => item.ok).length,
+    passed: results.filter((item) => item.ok && !item.detail?.skipped).length,
     failed: results.filter((item) => !item.ok).length,
+    skipped: results.filter((item) => item.detail?.skipped === true).length,
   };
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.ok) process.exitCode = 1;

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 
 const DEFAULT_PORT = 58_627;
 const START_TIMEOUT_MS = 20_000;
@@ -77,6 +77,61 @@ function contractIsUsable(capabilities: KimiCodeServerCapabilities) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+// Kimi Code 0.24+（agent-core-v2）对全部 /api/* 与 /openapi.json、/asyncapi.json 强制
+// bearer 鉴权；与 electron/kimiCodeServerClient.ts 保持同一 token 来源。
+function readServerToken() {
+  try {
+    const token = fs.readFileSync(path.join(os.homedir(), ".kimi-code", "server.token"), "utf-8").trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
+function serverAuthHeaders(): Record<string, string> {
+  const token = readServerToken();
+  return token ? { authorization: `Bearer ${token}`, "x-kimi-server-token": token } : {};
+}
+
+type ServerLockContents = { pid: number; port: number; host?: string; started_at?: string };
+
+function serverLockPath() {
+  return path.join(os.homedir(), ".kimi-code", "server", "lock");
+}
+
+function readServerLock(): ServerLockContents | undefined {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(serverLockPath(), "utf-8")) as Partial<ServerLockContents> | undefined;
+    if (typeof parsed?.pid === "number" && typeof parsed?.port === "number") return parsed as ServerLockContents;
+  } catch {
+    // 锁缺失或不可读时按无锁处理。
+  }
+  return undefined;
+}
+
+/**
+ * Kimi Code 0.24+ 单例锁的存活判定（上游 lock.ts 用 process.kill(pid, 0)；Windows 上死 pid
+ * 可能被误判存活，导致 server 永久拒绝启动）。Windows 用 tasklist 做确定性确认；无法判定时
+ * 按存活处理，避免误删他人锁。
+ */
+function isLockOwnerAlive(pid: number): Promise<boolean> {
+  if (process.platform === "win32") {
+    return new Promise((resolve) => {
+      execFile("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], (error, stdout) => {
+        if (error) return resolve(true);
+        const alive = stdout.split(/\r?\n/).some((line) => line.startsWith('"') && line.split('","')[1] === String(pid));
+        resolve(alive);
+      });
+    });
+  }
+  try {
+    process.kill(pid, 0);
+    return Promise.resolve(true);
+  } catch (error) {
+    return Promise.resolve((error as NodeJS.ErrnoException)?.code !== "ESRCH");
+  }
 }
 
 export class KimiCodeServerHost {
@@ -156,6 +211,32 @@ export class KimiCodeServerHost {
       // No compatible server is listening; start the installed CLI below.
     }
 
+    // Kimi Code 0.24+ 单例锁：锁记录的活实例无法被第二个 server 取代，改为直连该实例；
+    // 死 pid 残留锁（上游 lock.ts 在 Windows 上可能误判存活）清理后再走正常启动。
+    const lock = readServerLock();
+    if (lock) {
+      if (await isLockOwnerAlive(lock.pid)) {
+        const lockEndpoint = `http://${lock.host ?? "127.0.0.1"}:${lock.port}`;
+        try {
+          const capabilities = await this.probe(lockEndpoint);
+          this.status = { ...this.status, state: "attached", managed: false, endpoint: lockEndpoint, capabilities };
+        } catch (error) {
+          this.status = {
+            ...this.status,
+            state: "fallback",
+            managed: false,
+            error: `检测到运行中的 Kimi Server（pid ${lock.pid}，${lockEndpoint}），但能力探测失败：${errorMessage(error)}`,
+          };
+        }
+        return this.getStatus();
+      }
+      try {
+        fs.unlinkSync(serverLockPath());
+      } catch {
+        // 清理失败时让 spawn 的错误原样上报，不掩盖真实原因。
+      }
+    }
+
     try {
       const executable = this.resolveExecutable();
       const port = new URL(this.status.endpoint).port || String(DEFAULT_PORT);
@@ -208,29 +289,31 @@ export class KimiCodeServerHost {
   }
 
   async stop(): Promise<void> {
-    if (this.child && this.child.exitCode === null) {
+    const child = this.child;
+    if (child && child.exitCode === null) {
       try {
         await this.fetchEnvelope<unknown>("/api/v1/shutdown", { method: "POST", body: "{}" });
       } catch {
-        this.child.kill();
+        child.kill();
       }
       await Promise.race([
-        new Promise<void>((resolve) => this.child?.once("close", () => resolve())),
+        new Promise<void>((resolve) => child.once("close", () => resolve())),
         new Promise<void>((resolve) => setTimeout(resolve, 3_000)),
       ]);
-      if (this.child.exitCode === null) this.child.kill();
+      // close 回调会把 this.child 置空；这里只操作局部引用，避免 shutdown 成功后的空指针。
+      if (child.exitCode === null) child.kill();
       await this.waitUntilStopped();
     }
     this.child = null;
     this.status = { ...this.status, state: this.status.enabled ? "stopped" : "disabled", managed: false };
   }
 
-  private async probe(): Promise<KimiCodeServerCapabilities> {
+  private async probe(endpoint = this.status.endpoint): Promise<KimiCodeServerCapabilities> {
     const [health, meta, openapi, asyncapi] = await Promise.all([
-      this.fetchEnvelope<{ ok?: boolean }>("/api/v1/healthz"),
-      this.fetchEnvelope<{ server_id?: unknown; server_version?: unknown }>("/api/v1/meta"),
-      this.fetchJson<{ info?: { version?: unknown }; paths?: Record<string, unknown> }>("/openapi.json"),
-      this.fetchJson<{ info?: { version?: unknown }; channels?: Record<string, unknown> }>("/asyncapi.json"),
+      this.fetchEnvelope<{ ok?: boolean }>("/api/v1/healthz", undefined, endpoint),
+      this.fetchEnvelope<{ server_id?: unknown; server_version?: unknown }>("/api/v1/meta", undefined, endpoint),
+      this.fetchJson<{ info?: { version?: unknown }; paths?: Record<string, unknown> }>("/openapi.json", undefined, endpoint),
+      this.fetchJson<{ info?: { version?: unknown }; channels?: Record<string, unknown> }>("/asyncapi.json", undefined, endpoint),
     ]);
     if (health.ok !== true) throw new Error("Kimi Server healthz 未就绪");
     const capabilities = inspectKimiCodeServerContract(meta, openapi, asyncapi);
@@ -251,17 +334,18 @@ export class KimiCodeServerHost {
     throw new Error("Kimi Server 启动超时");
   }
 
-  private async fetchEnvelope<T>(pathname: string, options?: RequestInit): Promise<T> {
-    const envelope = await this.fetchJson<ServerEnvelope<T>>(pathname, options);
+  private async fetchEnvelope<T>(pathname: string, options?: RequestInit, endpoint = this.status.endpoint): Promise<T> {
+    const envelope = await this.fetchJson<ServerEnvelope<T>>(pathname, options, endpoint);
     if (envelope.code !== 0) throw new Error(`${pathname}: ${envelope.msg ?? `code=${envelope.code}`}`);
     return envelope.data;
   }
 
-  private async fetchJson<T>(pathname: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.status.endpoint}${pathname}`, {
+  private async fetchJson<T>(pathname: string, options?: RequestInit, endpoint = this.status.endpoint): Promise<T> {
+    const response = await fetch(`${endpoint}${pathname}`, {
       ...options,
       headers: {
         accept: "application/json",
+        ...serverAuthHeaders(),
         ...(options?.body === undefined ? {} : { "content-type": "application/json" }),
         ...(options?.headers ?? {}),
       },
