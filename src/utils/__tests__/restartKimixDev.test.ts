@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const scriptPath = resolve(__dirname, "../../../scripts/restart-kimix-dev.ps1");
+const devScriptPath = resolve(__dirname, "../../../scripts/dev.cjs");
+const require = createRequire(import.meta.url);
 
 describe("restart-kimix-dev.ps1", () => {
   it("exists and contains runtime-token helpers", () => {
@@ -24,5 +27,22 @@ describe("restart-kimix-dev.ps1", () => {
         timeout: 30_000,
       });
     }).not.toThrow();
+  });
+});
+
+describe("scripts/dev.cjs", () => {
+  it("forwards the runtime token after the electron-vite option boundary", () => {
+    const { buildElectronViteArgs } = require(devScriptPath) as {
+      buildElectronViteArgs: (runtimeToken?: string) => string[];
+    };
+    const args = buildElectronViteArgs("review-probe");
+    expect(args.slice(-2)).toEqual(["--", "--kimix-runtime-token=review-probe"]);
+  });
+
+  it("does not add an Electron option boundary when no token is present", () => {
+    const { buildElectronViteArgs } = require(devScriptPath) as {
+      buildElectronViteArgs: (runtimeToken?: string) => string[];
+    };
+    expect(buildElectronViteArgs("")).not.toContain("--");
   });
 });
