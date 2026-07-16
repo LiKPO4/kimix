@@ -1705,7 +1705,8 @@ describe("mergeEvents subagent lifecycle instrumentation", () => {
       timestamp: 2,
       content: "streaming body",
       isThinking: false,
-      isComplete: false,    };
+      isComplete: false,
+    };
     const existing: TimelineEvent[] = [{
       id: "sub-1",
       type: "subagent",
@@ -1713,7 +1714,8 @@ describe("mergeEvents subagent lifecycle instrumentation", () => {
       agentId: "agent-1",
       agentName: "coder",
       status: "running",
-      events: [openAssistant],    }];
+      events: [openAssistant],
+    }];
     const incoming: TimelineEvent = {
       id: "sub-1",
       type: "subagent",
@@ -1721,7 +1723,8 @@ describe("mergeEvents subagent lifecycle instrumentation", () => {
       agentId: "agent-1",
       agentName: "coder",
       status: "completed",
-      events: [],    };
+      events: [],
+    };
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(1);
     expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).status).toBe("completed");
