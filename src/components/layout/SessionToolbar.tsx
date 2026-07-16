@@ -88,7 +88,6 @@ interface SessionToolbarProps {
 export function SessionToolbar({
   title,
   longTaskMeta,
-  longTaskStatusTone,
   isCurrentSessionRunning,
   onOpenLongTaskInspector,
   projectPath,

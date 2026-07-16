@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity } from "@/types/ui";
-import { DEFAULT_CUSTOM_THEME_PALETTE, DEFAULT_KIMI_THEME_PRESETS, DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
+import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 

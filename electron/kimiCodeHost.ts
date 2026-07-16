@@ -6,7 +6,7 @@ import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
-import * as settingsService from "./settingsService";
+
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
@@ -2758,13 +2758,6 @@ function getEventAgentId(event: unknown): string | undefined {
   if (typeof direct === "string" && direct) return direct;
   const agent = (event as { agent?: { id?: unknown } }).agent;
   return typeof agent?.id === "string" && agent.id ? agent.id : undefined;
-}
-
-function getLoopEvent(event: unknown): Record<string, unknown> | undefined {
-  if (!event || typeof event !== "object") return undefined;
-  const record = event as { type?: unknown; event?: unknown };
-  if (record.type !== "context.append_loop_event" || !record.event || typeof record.event !== "object") return undefined;
-  return record.event as Record<string, unknown>;
 }
 
 function normalizeSteerText(text: string): string {

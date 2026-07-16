@@ -150,14 +150,6 @@ const COMPACTION_LONG_RUNNING_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const OLDER_ITEMS_BATCH_SIZE = CHAT_FULL_RENDER_ITEM_LIMIT;
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
-const SESSION_OPEN_BOTTOM_MAX_WAIT_MS = 3_500;
-const USER_SUBMIT_BOTTOM_MAX_WAIT_MS = 6_000;
-const SESSION_LAYOUT_STABLE_MS = 80;
-const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
-const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
-const USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS = 700;
-const MAX_RESIZE_ANCHOR_RESTORE_PX = 300;
-
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   drafting: "需求澄清",
   planning: "计划设计",
@@ -617,7 +609,6 @@ export function buildRenderItems(
     let toolsAttached = false;
     let assistantAttached = false;
     const mergedAssistantEvent = mergeAssistantProcessEvents(assistantEvents);
-    const assistantEventIds = new Set(assistantEvents.map((assistantEvent) => assistantEvent.id));
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
@@ -672,7 +663,7 @@ export function buildRenderItems(
       steerEvents.forEach((event) => items.push({ type: "event", event }));
       steerAttached = true;
     };
-    for (const [eventIndex, event] of turnEvents.entries()) {
+    for (const [, event] of turnEvents.entries()) {
       if (event.type === "compaction") continue;
       if (event.type === "steer_message") continue;
       if (event.type === "tool_call" || event.type === "tool_result") continue;

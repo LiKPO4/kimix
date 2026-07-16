@@ -3,7 +3,7 @@ import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, Shie
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, UserMessageImage, RoomContextShareSelection } from "@/types/ui";
+import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -361,7 +361,6 @@ type CompletionItem = {
   kind: "agent" | "plugin" | "file" | "slash" | "skill" | "plugin-command";
 };
 
-const skillCommandPattern = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/;
 const slashCommandPattern = /^\/([a-zA-Z][\w:-]*)(?:\s+([\s\S]*))?$/;
 function summarizeImportPlan(items: { kind: string; action: string }[]) {
   const active = items.filter((item) => item.action !== "skip");

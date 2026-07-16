@@ -6,7 +6,7 @@ import { getLastUsedModelFromEventsAfter } from "@/utils/modelDisplay";
 import type { TimelineEvent } from "@/types/ui";
 import {
   getEventRoomAgentId,
-  getPrimaryRoomAgent,
+
   getRoomAgent,
   getRoomAgentEvents,
   isPrimaryRoomAgent,

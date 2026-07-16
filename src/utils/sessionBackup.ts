@@ -192,11 +192,6 @@ function mergeTimelineEvents(localEvents: TimelineEvent[], importedEvents: Timel
   return { events, added };
 }
 
-function countUniqueTimelineEvents(sourceEvents: TimelineEvent[], targetEvents: TimelineEvent[]) {
-  const targetKeys = new Set(targetEvents.map(timelineEventKey));
-  return sourceEvents.reduce((count, event) => count + (targetKeys.has(timelineEventKey(event)) ? 0 : 1), 0);
-}
-
 function sameStringSet(left: string[], right: string[]) {
   return left.length === right.length && left.every((value) => right.includes(value));
 }

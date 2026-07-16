@@ -8,7 +8,7 @@
  * The same wire.jsonl format is used by both old prompt-mode and new kimi-code sessions.
  */
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
@@ -543,10 +543,6 @@ async function parseSessionEventsFromShareDir(
     }
   }
   return events;
-}
-
-async function readPromptModeSessionModelFromWire(wireFile: string) {
-  return readKimiCodeSessionModelFromWire(wireFile);
 }
 
 // ---------------------------------------------------------------------------

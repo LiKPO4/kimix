@@ -15,7 +15,6 @@ import {
   ClipboardList,
   ExternalLink,
   FileText,
-  LucideIcon,
   MessageSquarePlus,
   Target,
 } from "lucide-react";
@@ -28,7 +27,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
 import { type DownloadProgressInfo } from "@/utils/format";
-import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
+import { isSamePath } from "@/utils/pathCase";
 import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
 import { sendDocumentCommand, deleteSelection } from "@/utils/dom";
 import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
@@ -74,10 +73,6 @@ const EMPTY_BTW_TRANSIENT_STATE: BtwTransientState = {
   loading: false,
   error: null,
 };
-
-function normalizeProjectPath(path: string | undefined) {
-  return normalizePathForComparison(path);
-}
 
 function isSameProjectPath(a: string | undefined, b: string | undefined) {
   return isSamePath(a, b);

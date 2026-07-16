@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download, FolderOpen, GitBranch, Loader2, LogIn, PauseCircle, Radio, Search, Settings2, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download, FolderOpen, GitBranch, Loader2, PauseCircle, Radio, Search, Settings2, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -238,7 +238,6 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const [usageOpen, setUsageOpen] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
-  const [usageLoginState, setUsageLoginState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [now, setNow] = useState(Date.now());
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -406,7 +405,6 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     const requestId = usageRequestIdRef.current + 1;
     usageRequestIdRef.current = requestId;
     if (!background) setUsageLoading(true);
-    setUsageLoginState("idle");
     try {
       const res = await window.api.getKimiCodeAccountUsage();
       if (usageRequestIdRef.current !== requestId) return;
@@ -441,18 +439,6 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }
   };
 
-  const loginForUsage = async () => {
-    setUsageLoginState("running");
-    const res = await window.api.loginKimi();
-    if (!res.success) {
-      setUsageLoginState("error");
-      setUsageData((current) => current ? { ...current, message: res.error } : current);
-      return;
-    }
-    setUsageLoginState("done");
-    window.dispatchEvent(new CustomEvent(KIMI_AUTH_CHANGED_EVENT));
-    await loadUsage();
-  };
   const toggleUsage = () => {
     const next = !usageOpen;
     setModelMenuOpen(false);

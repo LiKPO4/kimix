@@ -248,7 +248,7 @@ function usageInput(usage: unknown): number | undefined {
   return total > 0 ? total : undefined;
 }
 
-function statusMessageForStep(type: string, event: Record<string, unknown>): string {
+function statusMessageForStep(type: string, _event: Record<string, unknown>): string {
   if (type === "turn.step.retrying") {
     return "正在重试";
   }

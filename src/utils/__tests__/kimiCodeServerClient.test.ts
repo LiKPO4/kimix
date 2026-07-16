@@ -90,7 +90,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
   });
 
   it("uploads files through the official multipart route", async () => {
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
       code: 0,
       data: { id: "file-1", name: "shot.png", media_type: "image/png", size: 1 },
     }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -250,7 +250,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
       models: { "openai/gpt": { provider: "openai", model: "gpt", max_context_size: 128000, adaptive_thinking: true, overrides: { max_output_size: 32768, support_efforts: ["low", "high"], default_effort: "high" } } },
       experimental: { "tool-select": true },
     });
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
       code: 0, data: { providers: {}, default_model: "openai/gpt" },
     }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
@@ -319,7 +319,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
   });
 
   it("reads text through the official session-scoped filesystem route", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
       code: 0,
       data: {
         path: "README.md",

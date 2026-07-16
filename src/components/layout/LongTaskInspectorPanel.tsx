@@ -47,7 +47,6 @@ import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { displayProjectName } from "@/utils/projectDisplay";
-import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 
