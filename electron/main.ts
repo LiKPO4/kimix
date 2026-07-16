@@ -3902,7 +3902,12 @@ function createWindow() {
   const rendererWindow = mainWindow;
   const disposeStartupBootstrap = registerStartupBootstrapPublisher({
     add: (listener) => { rendererWindow.webContents.on("did-finish-load", listener); },
-    remove: (listener) => { rendererWindow.webContents.removeListener("did-finish-load", listener); },
+    // "closed" 触发处置时 webContents 已销毁；Electron 35 对销毁后的访问会抛错，先判活。
+    remove: (listener) => {
+      if (!rendererWindow.isDestroyed() && !rendererWindow.webContents.isDestroyed()) {
+        rendererWindow.webContents.removeListener("did-finish-load", listener);
+      }
+    },
   }, () => {
     rendererDocumentGeneration += 1;
     const generation = rendererDocumentGeneration;
