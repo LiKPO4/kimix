@@ -122,8 +122,6 @@ export function shouldReplaceWithCanonicalKimiHistory(
       ...context,
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,
-      localBody: cachedAssistantBody.slice(0, 200),
-      canonicalBody: canonicalAssistantBody.slice(0, 200),
     });
   }
 

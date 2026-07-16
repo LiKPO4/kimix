@@ -19,7 +19,7 @@ export function reportError(error: unknown, options: ReportOptions = {}): void {
 
   if (userVisible) {
     console.error(`${prefix} ${message}`, error);
-    (window.api?.writeDiag?.({ message: `${prefix} user-visible error`, data: { message, stack: error instanceof Error ? error.stack : undefined } }) ?? Promise.resolve())
+    (window.api?.writeDiag?.({ message: `${prefix} user-visible error`, data: { message } }) ?? Promise.resolve())
       .catch(() => {});
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: message }));
   } else {

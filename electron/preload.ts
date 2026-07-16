@@ -188,6 +188,7 @@ ipcRenderer.on("kimix:bootstrap", (_event, payload: BootstrapPayload) => {
 
 const api = {
   platform: process.platform,
+  detailedDiagnosticsEnabled: process.env.KIMIX_DETAILED_DIAGNOSTICS === "1",
 
   // Project
   openProject: (req?: OpenProjectRequest): Promise<OpenProjectResponse> =>

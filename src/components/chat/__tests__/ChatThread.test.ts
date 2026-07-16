@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { buildContentVersion, findSubagentContentRegressionSnapshots, type RenderItem } from "@/components/chat/ChatThread";
+import { buildContentVersion, buildSubagentRegressionDiagnosticData, findSubagentContentRegressionSnapshots, type RenderItem } from "@/components/chat/ChatThread";
 
 function sessionStub(events: TimelineEvent[] = []): Session {
   return {
@@ -84,6 +84,43 @@ describe("findSubagentContentRegressionSnapshots", () => {
     const snapshots = findSubagentContentRegressionSnapshots(items, sessionStub());
     expect(snapshots).toHaveLength(2);
     expect(new Set(snapshots.map((s) => s.key)).size).toBe(1);
+  });
+});
+
+describe("buildSubagentRegressionDiagnosticData", () => {
+  it("exports only structural metadata by default", () => {
+    Object.defineProperty(window, "api", {
+      value: { detailedDiagnosticsEnabled: false },
+      configurable: true,
+    });
+    const sourceEvents = [assistantEvent("private body"), subagentStub()];
+    const data = buildSubagentRegressionDiagnosticData({
+      key: "k",
+      sessionId: "session-1",
+      eventId: "assistant-1",
+      topLevelAssistantSize: 12,
+      sourceEvents,
+    });
+    expect(data).toMatchObject({
+      sourceEventCount: 2,
+      sourceEventTypes: { assistant_message: 1, subagent: 1 },
+    });
+    expect(data).not.toHaveProperty("snapshot");
+  });
+
+  it("includes the bounded event snapshot only after explicit opt-in", () => {
+    Object.defineProperty(window, "api", {
+      value: { detailedDiagnosticsEnabled: true },
+      configurable: true,
+    });
+    const data = buildSubagentRegressionDiagnosticData({
+      key: "k",
+      sessionId: "session-1",
+      eventId: "assistant-1",
+      topLevelAssistantSize: 12,
+      sourceEvents: [assistantEvent("private body")],
+    });
+    expect(data).toHaveProperty("snapshot", expect.stringContaining("private body"));
   });
 });
 

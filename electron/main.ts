@@ -30,6 +30,7 @@ import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import { activateWindow } from "./windowActivation";
+import { redactDiagnosticData } from "../src/utils/diagnosticRedaction";
 import {
   createDeferredOnceTask,
   createDistinctAsyncWriter,
@@ -7059,7 +7060,10 @@ ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
   const req = request && typeof request === "object" ? (request as { message?: string; data?: unknown }) : {};
   const msg = typeof req.message === "string" ? req.message : typeof request === "string" ? request : "";
   if (!msg) return { success: false, error: "empty message" };
-  const dataPart = req.data !== undefined ? ` ${JSON.stringify(req.data)}` : "";
+  const diagnosticData = process.env.KIMIX_DETAILED_DIAGNOSTICS === "1"
+    ? req.data
+    : redactDiagnosticData(req.data);
+  const dataPart = diagnosticData !== undefined ? ` ${JSON.stringify(diagnosticData)}` : "";
   await enqueueDiagLine(`[${new Date().toISOString()}] ${msg}${dataPart}`);
   return { success: true, data: undefined };
 });

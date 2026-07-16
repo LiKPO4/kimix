@@ -91,6 +91,25 @@ export interface SubagentContentRegressionSnapshot {
   sourceEvents: TimelineEvent[];
 }
 
+export function buildSubagentRegressionDiagnosticData(snapshot: SubagentContentRegressionSnapshot) {
+  const eventTypes = snapshot.sourceEvents.reduce<Record<string, number>>((counts, event) => {
+    counts[event.type] = (counts[event.type] ?? 0) + 1;
+    return counts;
+  }, {});
+  return {
+    sessionId: snapshot.sessionId,
+    roomAgentId: snapshot.roomAgentId,
+    agentTurnId: snapshot.agentTurnId,
+    eventId: snapshot.eventId,
+    topLevelAssistantSize: snapshot.topLevelAssistantSize,
+    sourceEventCount: snapshot.sourceEvents.length,
+    sourceEventTypes: eventTypes,
+    ...(window.api.detailedDiagnosticsEnabled
+      ? { snapshot: JSON.stringify(snapshot.sourceEvents.slice(-200)) }
+      : {}),
+  };
+}
+
 export function findSubagentContentRegressionSnapshots(
   renderItems: RenderItem[],
   session: Session,
@@ -1039,14 +1058,7 @@ export const ChatThread = memo(function ChatThread() {
       exportedSubagentRegressionSnapshotsRef.current.add(key);
       window.api.writeDiag?.({
         message: "ChatThread.subagentContentRegressionSnapshot",
-        data: {
-          sessionId: snapshot.sessionId,
-          roomAgentId: snapshot.roomAgentId,
-          agentTurnId: snapshot.agentTurnId,
-          eventId: snapshot.eventId,
-          topLevelAssistantSize: snapshot.topLevelAssistantSize,
-          snapshot: JSON.stringify(snapshot.sourceEvents.slice(-200)),
-        },
+        data: buildSubagentRegressionDiagnosticData(snapshot),
       }).catch(logError("writeDiag"));
     }
   }, [renderItems, session]);
