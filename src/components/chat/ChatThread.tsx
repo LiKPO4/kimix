@@ -5,6 +5,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { useLiveSession } from "@/hooks/useLiveSession";
+import { useChatRenderCache } from "@/hooks/useChatRenderCache";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
@@ -1020,8 +1021,7 @@ export const ChatThread = memo(function ChatThread() {
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
-  const completedTurnRenderCacheRef = useRef(new Map<string, CompletedTurnRenderCacheEntry>());
-  const completedTurnRenderCacheSessionIdRef = useRef<string | undefined>(undefined);
+  const completedTurnRenderCacheRef = useChatRenderCache(session?.id);
 
   const roomTimeline = useMemo(() => session ? projectCollaborationTimeline(session) : [], [session]);
   const splitEvents = useMemo(
@@ -1041,10 +1041,6 @@ export const ChatThread = memo(function ChatThread() {
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   )));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
-  if (completedTurnRenderCacheSessionIdRef.current !== session?.id) {
-    completedTurnRenderCacheRef.current.clear();
-    completedTurnRenderCacheSessionIdRef.current = session?.id;
-  }
   const renderItems = useMemo(
     () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds, completedTurnRenderCacheRef.current),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds]
