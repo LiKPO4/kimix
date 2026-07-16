@@ -2,6 +2,8 @@
 
 ## 2026-07-16
 
+* **Cross-session notification focus survives navigation reset**: Session changes reset focus recursion state without deleting a pending request whose target is the incoming session, allowing notification clicks to locate the intended event after the new timeline renders. See [/project/kimix.md](/project/kimix.md).
+
 * **Diagnostics are metadata-only by default**: Main-process logging redacts message bodies, tool payloads, paths, stacks, snapshots, and base64 data; a bounded full event snapshot is serialized only when launch explicitly sets `KIMIX_DETAILED_DIAGNOSTICS=1`. See [/project/kimix.md](/project/kimix.md).
 
 * **Diagnostic writes cannot block streaming**: Subagent-content surfacing logs once per rendered event instead of once per render derivation, and renderer diagnostic IPC drains through an asynchronous serialized file queue rather than synchronous main-process filesystem calls. See [/project/kimix.md](/project/kimix.md).

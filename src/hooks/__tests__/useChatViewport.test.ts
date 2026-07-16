@@ -217,6 +217,30 @@ describe("useChatViewport", () => {
     expect(onHighlight).toHaveBeenCalledWith("b");
   });
 
+  it("preserves a pending focus request while switching to its target session", async () => {
+    const onHighlight = vi.fn();
+    const { rerender } = renderTest({
+      sessionId: "session-1",
+      renderItems: [eventRenderItem("a")],
+      onHighlightEvent: onHighlight,
+    });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("kimix:focus-timeline-event", {
+        detail: { sessionId: "session-2", eventId: "target-event" },
+      }));
+    });
+    rerender({
+      sessionId: "session-2",
+      renderItems: [eventRenderItem("target-event")],
+    });
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+
+    expect(onHighlight).toHaveBeenCalledWith("target-event");
+  });
+
   it("prepare expand helpers capture anchors without throwing", () => {
     const { viewport } = renderTest({ renderItems: [eventRenderItem("a"), eventRenderItem("b")] });
 

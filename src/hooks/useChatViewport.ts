@@ -671,7 +671,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     userScrollRef.current = false;
     setUserHasScrolled(false);
     resetScrollAnchor();
-    resetEventFocus();
+    resetEventFocus(sessionId);
     processCollapseViewportSnapshotsRef.current.clear();
     clearDetachedViewportCompensation();
     lastScrollTopRef.current = null;

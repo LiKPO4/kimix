@@ -18,7 +18,7 @@ export interface UseEventFocusOptions {
 
 export type UseEventFocusResult = {
   focusTimelineEvent: (eventId: string, searchText?: string) => boolean;
-  resetForNewSession: () => void;
+  resetForNewSession: (nextSessionId?: string) => void;
 };
 
 const MAX_FOCUS_RECURSIVE_ATTEMPTS = 10;
@@ -186,8 +186,10 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     });
   }, [sessionId, renderItems.length, focusTimelineEvent]);
 
-  const resetForNewSession = useCallback(() => {
-    pendingFocusEventRef.current = null;
+  const resetForNewSession = useCallback((nextSessionId?: string) => {
+    if (pendingFocusEventRef.current?.sessionId !== nextSessionId) {
+      pendingFocusEventRef.current = null;
+    }
     focusTimelineEventStateRef.current = null;
   }, []);
 
