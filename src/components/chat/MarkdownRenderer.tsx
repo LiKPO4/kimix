@@ -67,6 +67,16 @@ export function splitStreamingMarkdownBlocks(content: string): string[] {
   return blocks.length > 0 ? blocks : [content];
 }
 
+/**
+ * Normalize assistant markdown content before rendering.
+ *
+ * Design choice: streaming / active assistant messages use only
+ * `restoreAssistantProgressParagraphs` so that each incoming delta does
+ * not re-trigger expensive fixes (nested code blocks, indented fenced
+ * blocks, table restoration, inline headings). Those heavier
+ * normalizations are deferred to the completed message path, where the
+ * full content is stable and the cost is paid once.
+ */
 export function normalizeMarkdownContent(content: string, normalizeAssistantProgress = false): string {
   if (normalizeAssistantProgress) return restoreAssistantProgressParagraphs(content);
   return restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content))));
