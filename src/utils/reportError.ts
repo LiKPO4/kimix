@@ -19,15 +19,22 @@ export function reportError(error: unknown, options: ReportOptions = {}): void {
 
   if (userVisible) {
     console.error(`${prefix} ${message}`, error);
-    window.api.writeDiag?.({ message: `${prefix} user-visible error`, data: { message, stack: error instanceof Error ? error.stack : undefined } })
+    (window.api?.writeDiag?.({ message: `${prefix} user-visible error`, data: { message, stack: error instanceof Error ? error.stack : undefined } }) ?? Promise.resolve())
       .catch(() => {});
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: message }));
   } else {
     console.warn(`${prefix} ${message}`);
-    window.api.writeDiag?.({ message: `${prefix} background error`, data: { message } })
+    (window.api?.writeDiag?.({ message: `${prefix} background error`, data: { message } }) ?? Promise.resolve())
       .catch(() => {});
   }
 }
 
 /** 用于替换 background 类 catch 的 shorthand */
 export const logError = (context: string) => (error: unknown) => reportError(error, { context });
+
+/** 记录结构化诊断事件，不视为错误 */
+export function logEvent(context: string, data: Record<string, unknown>): void {
+  // eslint-disable-next-line no-console
+  console.log(`[${context}]`, data);
+  (window.api?.writeDiag?.({ message: context, data }) ?? Promise.resolve()).catch(logError("writeDiag"));
+}

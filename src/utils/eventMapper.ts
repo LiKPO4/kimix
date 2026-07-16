@@ -2,6 +2,7 @@ import type { TimelineEvent, TodoItem } from "@/types/ui";
 import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
+import { logEvent } from "@/utils/reportError";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -579,6 +580,20 @@ function mergeSubagentLifecycle(
   current: Extract<TimelineEvent, { type: "subagent" }>,
   incoming: Extract<TimelineEvent, { type: "subagent" }>,
 ): Extract<TimelineEvent, { type: "subagent" }> {
+  const hasOpenAssistantMessage = (events: TimelineEvent[]) => events.some((event) => (
+    event.type === "assistant_message" && !event.isComplete
+  ));
+  if (
+    (incoming.status === "completed" || incoming.status === "error") &&
+    hasOpenAssistantMessage(current.events)
+  ) {
+    logEvent("eventMapper.subagentCompletedWithOpenAssistant", {
+      agentId: current.agentId,
+      agentName: current.agentName,
+      incomingStatus: incoming.status,
+      openAssistantCount: current.events.filter((event) => event.type === "assistant_message" && !event.isComplete).length,
+    });
+  }
   return {
     ...current,
     ...incoming,

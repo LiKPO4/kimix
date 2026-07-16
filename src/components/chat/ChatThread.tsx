@@ -23,8 +23,9 @@ import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUs
 import { logError } from "@/utils/reportError";
 import { bottomScrollTop, distanceFromBottom, scrollTopPreservingBottomDistance, shouldResumeAutoFollowAtBottom, USER_SCROLL_INTENT_MS } from "@/utils/scrollIntent";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
-import type { LongTaskSessionMeta, TimelineEvent, ToolCallEvent } from "@/types/ui";
+import type { LongTaskSessionMeta, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
+import { getRoomAgentEvents } from "@/utils/collaborationRooms";
 import {
   canReleaseViewportTailCompensation,
   CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT,
@@ -72,6 +73,49 @@ type PermissionModeDiagDetail = {
 function renderItemKey(item: RenderItem) {
   return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
 }
+export interface SubagentContentRegressionSnapshot {
+  key: string;
+  sessionId: string;
+  roomAgentId?: string;
+  agentTurnId?: string;
+  eventId: string;
+  topLevelAssistantSize: number;
+  sourceEvents: TimelineEvent[];
+}
+
+export function findSubagentContentRegressionSnapshots(
+  renderItems: RenderItem[],
+  session: Session,
+): SubagentContentRegressionSnapshot[] {
+  const regressions = renderItems.filter((item) => (
+    item.type === "event" &&
+    item.event.type === "assistant_message" &&
+    item.leadingSubagents &&
+    item.leadingSubagents.length > 0 &&
+    item.event.content.trim().length > 0 &&
+    item.event.isComplete
+  ));
+  return regressions
+    .map((item) => {
+      if (item.type !== "event" || item.event.type !== "assistant_message") return null;
+      const assistantEvent = item.event;
+      const key = `${session.id}:${assistantEvent.roomAgentId ?? "primary"}:${assistantEvent.agentTurnId ?? assistantEvent.id}`;
+      const sourceEvents = session.collaboration && assistantEvent.roomAgentId
+        ? getRoomAgentEvents(session, assistantEvent.roomAgentId)
+        : session.events;
+      return {
+        key,
+        sessionId: session.id,
+        roomAgentId: assistantEvent.roomAgentId,
+        agentTurnId: assistantEvent.agentTurnId,
+        eventId: assistantEvent.id,
+        topLevelAssistantSize: assistantEvent.content.length,
+        sourceEvents,
+      } as SubagentContentRegressionSnapshot;
+    })
+    .filter((snapshot): snapshot is SubagentContentRegressionSnapshot => snapshot !== null);
+}
+
 
 function useAnimatedDots(active: boolean) {
   const [count, setCount] = useState(0);
@@ -1005,6 +1049,28 @@ export const ChatThread = memo(function ChatThread() {
     () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds, completedTurnRenderCacheRef.current),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds]
   );
+  const exportedSubagentRegressionSnapshotsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!session) return;
+    const snapshots = findSubagentContentRegressionSnapshots(renderItems, session);
+    for (const snapshot of snapshots) {
+      const { key } = snapshot;
+      if (exportedSubagentRegressionSnapshotsRef.current.has(key)) continue;
+      exportedSubagentRegressionSnapshotsRef.current.add(key);
+      window.api.writeDiag?.({
+        message: "ChatThread.subagentContentRegressionSnapshot",
+        data: {
+          sessionId: snapshot.sessionId,
+          roomAgentId: snapshot.roomAgentId,
+          agentTurnId: snapshot.agentTurnId,
+          eventId: snapshot.eventId,
+          topLevelAssistantSize: snapshot.topLevelAssistantSize,
+          snapshot: JSON.stringify(snapshot.sourceEvents.slice(-200)),
+        },
+      }).catch(logError("writeDiag"));
+    }
+  }, [renderItems, session]);
+
   const latestProcessAssistantEventId = useMemo(() => {
     const item = renderItems.findLast((candidate) => (
       candidate.type === "event" &&

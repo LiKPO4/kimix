@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory } from "../eventMapper";
+import * as reportError from "@/utils/reportError";
 import type { TimelineEvent } from "@/types/ui";
 import { buildRoomDeliveryPrompt } from "../roomContextBridge";
 
@@ -1688,5 +1689,82 @@ describe("preserveLocalUserMediaInCanonicalHistory", () => {
     const result = preserveLocalUserMediaInCanonicalHistory(local, canonical);
     expect(result[0]).toMatchObject({ images: [{ filePath: "C:\\tmp\\1.txt" }] });
     expect(result[1]).toMatchObject({ images: [{ filePath: "C:\\tmp\\0.txt" }] });
+  });
+});
+
+describe("mergeEvents subagent lifecycle instrumentation", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("logs when a subagent completes while an inner assistant_message is still open", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const openAssistant: TimelineEvent = {
+      id: "assistant-1",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "streaming body",
+      isThinking: false,
+      isComplete: false,    };
+    const existing: TimelineEvent[] = [{
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "running",
+      events: [openAssistant],    }];
+    const incoming: TimelineEvent = {
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 3,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "completed",
+      events: [],    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).status).toBe("completed");
+    expect(logEventSpy).toHaveBeenCalledTimes(1);
+    expect(logEventSpy).toHaveBeenCalledWith(
+      "eventMapper.subagentCompletedWithOpenAssistant",
+      expect.objectContaining({
+        agentId: "agent-1",
+        agentName: "coder",
+        incomingStatus: "completed",
+        openAssistantCount: 1,
+      }),
+    );
+  });
+
+  it("does not log when the subagent completes with no open assistant_message", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const existing: TimelineEvent[] = [{
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "assistant-1",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "done",
+        isThinking: false,
+        isComplete: true,
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 3,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "completed",
+      events: [],
+    };
+    mergeEvents(existing, incoming);
+    expect(logEventSpy).not.toHaveBeenCalled();
   });
 });

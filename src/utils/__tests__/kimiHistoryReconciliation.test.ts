@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
+import * as reportError from "@/utils/reportError";
 import { shouldReplaceWithCanonicalKimiHistory } from "../kimiHistoryReconciliation";
 
 const userMessage: TimelineEvent = {
@@ -44,6 +45,10 @@ function toolCall(name = "ReadFile"): TimelineEvent {
     arguments: {},
   };
 }
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("shouldReplaceWithCanonicalKimiHistory", () => {
   it("replaces when canonical has more assistant body text", () => {
@@ -134,5 +139,56 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
   it("does not replace when canonical is identical", () => {
     const events = [userMessage, assistant("same body")];
     expect(shouldReplaceWithCanonicalKimiHistory(events, events)).toBe(false);
+  });
+});
+
+describe("shouldReplaceWithCanonicalKimiHistory instrumentation", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("logs accepted reconciliation with context", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const context = { sessionId: "s-1", roomAgentId: "agent-a", reason: "history-load" };
+    const local = [userMessage, assistant("short")];
+    const canonical = [userMessage, assistant("much longer canonical body text")];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical, context)).toBe(true);
+    expect(logEventSpy).toHaveBeenCalledTimes(1);
+    expect(logEventSpy).toHaveBeenCalledWith(
+      "kimiHistoryReconciliation.accepted",
+      expect.objectContaining({
+        sessionId: "s-1",
+        roomAgentId: "agent-a",
+        reason: "history-load",
+        localSize: "short".length,
+        canonicalSize: "much longer canonical body text".length,
+      }),
+    );
+  });
+
+  it("logs rejected reconciliation when canonical has fewer process events", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const context = { sessionId: "s-1", roomAgentId: "agent-a" };
+    const local = [userMessage, toolCall(), assistant("body")];
+    const canonical = [userMessage, assistant("body")];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical, context)).toBe(false);
+    expect(logEventSpy).toHaveBeenCalledTimes(1);
+    expect(logEventSpy).toHaveBeenCalledWith(
+      "kimiHistoryReconciliation.rejected",
+      expect.objectContaining({
+        sessionId: "s-1",
+        roomAgentId: "agent-a",
+        reason: "process-history-regression",
+        localProcessEvents: 1,
+        canonicalProcessEvents: 0,
+      }),
+    );
+  });
+
+  it("does not log when no decision is made", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const events = [userMessage, assistant("same body")];
+    expect(shouldReplaceWithCanonicalKimiHistory(events, events)).toBe(false);
+    expect(logEventSpy).not.toHaveBeenCalled();
   });
 });

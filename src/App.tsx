@@ -278,7 +278,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               Date.now(),
               new Set([target.roomAgentId]),
             );
-            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events)) {
+            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" })) {
               applied = recoveredDeliveries !== item;
               return recoveredDeliveries;
             }
@@ -492,7 +492,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
         )) {
           deliveryEvidence.set(attemptId, evidence);
         }
-        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events);
+        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery" });
         const hydratedEvents = localEvents.length > 0 && !shouldUseCanonicalHistory
           ? (result.runtimeIsActive ? localEvents : settleInactiveEvents(localEvents))
           : reconciliation.events;
@@ -2582,7 +2582,7 @@ function App() {
                   reason: "startup",
                 });
                 const shouldUseCanonicalHistory = reconciliation.applied &&
-                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events);
+                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup" });
                 const hydratedEvents = localAgentEvents.length > 0 && !shouldUseCanonicalHistory
                   ? (runtimeIsActive ? localAgentEvents : settleInactiveEvents(localAgentEvents))
                   : reconciliation.events;
@@ -3585,7 +3585,7 @@ function App() {
                 canonicalEvents: canonicalSnapshotEvents,
                 reason: "running-sample",
               });
-              if (!reconciliation.applied || !shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events)) {
+              if (!reconciliation.applied || !shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason: "running-sample" })) {
                 return item;
               }
               applied = true;

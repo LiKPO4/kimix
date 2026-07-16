@@ -5,7 +5,9 @@ import {
   hasKimiProcessHistoryRegression,
   hasLegacyKimiClarificationWrapper,
   hasRicherKimiProcessHistory,
+  kimiHistoryProcessEventCount,
 } from "@/utils/kimiHistoryCache";
+import { logEvent } from "@/utils/reportError";
 
 function thinkingHistorySize(events: TimelineEvent[]): number {
   return flattenTimelineEvents(events)
@@ -85,24 +87,45 @@ export function hasPossiblyLostUserImages(events: TimelineEvent[]): boolean {
 export function shouldReplaceWithCanonicalKimiHistory(
   cachedEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
+  context?: { sessionId?: string; roomAgentId?: string; reason?: string },
 ): boolean {
   if (canonicalEvents.length === 0) return false;
 
   // Server snapshots can contain the newest assistant text/thinking while
   // omitting tool-call lifecycle frames. Never let such a partial snapshot
   // destructively replace a richer live/local process timeline.
-  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents)) return false;
+  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents)) {
+    logEvent("kimiHistoryReconciliation.rejected", {
+      ...context,
+      reason: "process-history-regression",
+      localProcessEvents: kimiHistoryProcessEventCount(cachedEvents),
+      canonicalProcessEvents: kimiHistoryProcessEventCount(canonicalEvents),
+    });
+    return false;
+  }
 
   const canonicalAssistantBody = assistantBodyText(canonicalEvents);
   const cachedAssistantBody = assistantBodyText(cachedEvents);
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);
   const cachedAssistantSize = assistantBodySize(cachedEvents);
 
-  return canonicalAssistantSize > cachedAssistantSize ||
+  const shouldReplace = canonicalAssistantSize > cachedAssistantSize ||
     displayableUserImageCount(canonicalEvents) > displayableUserImageCount(cachedEvents) ||
     (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
     (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
     (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
     hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
     (hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents) && thinkingHistorySize(canonicalEvents) >= thinkingHistorySize(cachedEvents));
+
+  if (shouldReplace) {
+    logEvent("kimiHistoryReconciliation.accepted", {
+      ...context,
+      localSize: cachedAssistantSize,
+      canonicalSize: canonicalAssistantSize,
+      localBody: cachedAssistantBody.slice(0, 200),
+      canonicalBody: canonicalAssistantBody.slice(0, 200),
+    });
+  }
+
+  return shouldReplace;
 }
