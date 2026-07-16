@@ -126,6 +126,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   const pendingOlderItemsScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingTailExpandScrollAnchorRef = useRef<ViewportAnchor | null>(null);
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
+  const focusTimelineEventStateRef = useRef<{ eventId: string; attemptCount: number; startTime: number } | null>(null);
   const resizeScrollAnchorRef = useRef<ResizeViewportAnchor | null>(null);
   const lastScrollSizeRef = useRef<{ width: number; height: number; scrollHeight: number } | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
@@ -593,8 +594,35 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     return true;
   }, []);
 
+  const MAX_FOCUS_RECURSIVE_ATTEMPTS = 10;
+  const MAX_FOCUS_DURATION_MS = 2_000;
+
   const focusTimelineEvent = useCallback((eventId: string, searchText?: string): boolean => {
     cancelSessionAutoBottom();
+    const now = Date.now();
+    const state = focusTimelineEventStateRef.current;
+    if (!state || state.eventId !== eventId) {
+      focusTimelineEventStateRef.current = { eventId, attemptCount: 1, startTime: now };
+    } else {
+      state.attemptCount += 1;
+    }
+    const currentState = focusTimelineEventStateRef.current!;
+    const shouldAbort = currentState.attemptCount > MAX_FOCUS_RECURSIVE_ATTEMPTS ||
+      (now - currentState.startTime) > MAX_FOCUS_DURATION_MS;
+    if (shouldAbort) {
+      window.api?.writeDiag?.({
+        message: "[useChatViewport] focusTimelineEvent aborted",
+        data: {
+          eventId,
+          attemptCount: currentState.attemptCount,
+          elapsedMs: now - currentState.startTime,
+          hasMoreOlderItems,
+        },
+      }).catch(logError("writeDiag"));
+      focusTimelineEventStateRef.current = null;
+      return false;
+    }
+
     const target = findRenderedEventNode(eventId);
     if (!target) {
       if (hasMoreOlderItems) {
@@ -605,6 +633,8 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       }
       return false;
     }
+
+    focusTimelineEventStateRef.current = null;
     scrollTokenRef.current += 1;
     autoFollowRef.current = false;
     userScrollRef.current = true;
@@ -999,6 +1029,8 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     setUserHasScrolled(false);
     pendingOlderItemsScrollAnchorRef.current = null;
     pendingTailExpandScrollAnchorRef.current = null;
+    pendingFocusEventRef.current = null;
+    focusTimelineEventStateRef.current = null;
     resizeScrollAnchorRef.current = null;
     processCollapseViewportSnapshotsRef.current.clear();
     clearDetachedViewportCompensation();

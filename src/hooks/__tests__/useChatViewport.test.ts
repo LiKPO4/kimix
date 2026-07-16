@@ -226,4 +226,56 @@ describe("useChatViewport", () => {
       viewport().prepareOlderItemsExpandToEnd();
     }).not.toThrow();
   });
+
+  it("aborts recursive focusTimelineEvent after too many attempts", async () => {
+    const onExpand = vi.fn();
+    const { viewport } = renderTest({
+      hasMoreOlderItems: true,
+      onExpandOlderItemsToEnd: onExpand,
+      renderItems: [eventRenderItem("a")],
+    });
+
+    act(() => {
+      viewport().focusTimelineEvent("missing");
+    });
+
+    // Each recursive attempt schedules two rAFs before expanding again.
+    // Wait enough frames for the guard to hit MAX_FOCUS_RECURSIVE_ATTEMPTS.
+    for (let i = 0; i < 18; i++) {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+      });
+    }
+
+    expect(onExpand).toHaveBeenCalledTimes(10);
+  });
+
+  it("resets focus recursion state when the session changes", () => {
+    const onExpand = vi.fn();
+    const { viewport, rerender } = renderTest({
+      sessionId: "session-1",
+      hasMoreOlderItems: true,
+      onExpandOlderItemsToEnd: onExpand,
+      renderItems: [eventRenderItem("a")],
+    });
+
+    for (let i = 0; i < 10; i++) {
+      act(() => {
+        viewport().focusTimelineEvent("missing");
+      });
+    }
+    expect(onExpand).toHaveBeenCalledTimes(10);
+
+    rerender({ sessionId: "session-2" });
+    onExpand.mockClear();
+
+    for (let i = 0; i < 5; i++) {
+      act(() => {
+        viewport().focusTimelineEvent("missing");
+      });
+    }
+    expect(onExpand).toHaveBeenCalledTimes(5);
+  });
 });
