@@ -6268,6 +6268,7 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
     }
     return { success: true, data: { sessionId: engineSession.sessionId, workDir: engineSession.workDir, model: selectedModelAlias ?? null, slashCommands: [] as const } };
   } catch (err) {
+    console.error(`[kimi-code:startRuntime] failed for ${request?.workDir}:`, err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });

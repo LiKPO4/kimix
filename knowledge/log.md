@@ -18,6 +18,8 @@
 
 * **Vendored fallback SDK tracks 0.26.0**: The self-contained bundle is regenerated from tag `@moonshot-ai/kimi-code@0.26.0` (node-sdk 0.13.4, commit `36b05820`), with the MCP startup-timeout patch, image-compression exports, managed usage, and session export re-validated by host probes. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
+* **v2 exclude_empty filters fresh sessions, so absence is not removal**: Server 0.24+ drops a just-created empty session from the filtered catalog immediately; Kimix's archive sweep now exempts mirrors inside the creation grace period unless the official archived catalog names them, ending the create-then-vanish loop. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Diagnostics are metadata-only by default**: Main-process logging redacts message bodies, tool payloads, paths, stacks, snapshots, and base64 data; a bounded full event snapshot is serialized only when launch explicitly sets `KIMIX_DETAILED_DIAGNOSTICS=1`. See [/project/kimix.md](/project/kimix.md).
 
 * **Diagnostic writes cannot block streaming**: Subagent-content surfacing logs once per rendered event instead of once per render derivation, and renderer diagnostic IPC drains through an asynchronous serialized file queue rather than synchronous main-process filesystem calls. See [/project/kimix.md](/project/kimix.md).

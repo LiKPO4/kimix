@@ -581,6 +581,7 @@ export function AppShell() {
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
         setCurrentSession(previousSession?.id === placeholder.id ? null : previousSession);
+        showToast(`创建会话失败：${sessionRes.error ?? "未知错误"}`);
         return;
       }
       const session = {

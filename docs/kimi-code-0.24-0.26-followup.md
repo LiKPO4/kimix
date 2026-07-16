@@ -59,6 +59,12 @@
 - `prompt_id` 采用 `msg_` 前缀；`prompt.completed` 载荷为 camelCase `promptId`。
 - resume 不再误刷 `updated_at`（0.26.0 #1784），与 Kimix 既有"按真实活动排序"不变量方向一致。
 
+### 6. exclude_empty 语义收紧导致新建会话秒消
+
+- v2 的 `exclude_empty=true` 会**立即**滤出刚创建的空会话（v1 不过滤）；Kimix 对账把"不在官方列表"的 Server 镜像一律本地归档，新建会话存活约 1 秒即被隐藏（创建宽限期在 Server 权威分支被绕过）。
+- 修复：`sessionCatalog.ts` 归档扫描对创建宽限期（5 分钟）内的镜像豁免，仅凭显式归档证据（官方归档目录）处理；新增 2 个回归测试。
+- 顺带：创建会话失败此前被静默吞掉，现在渲染层直接 toast 真实错误；`kimi-code:startRuntime` 失败写主进程日志。
+
 ## 遗留跟进项
 
 1. **任意文件附件（0.25.0，功能候选）**：官方支持任意文件上传（模型不能内联消费的文件上传为服务端文件路径）。Kimix Composer 目前仅图片，可另起一轮扩展到文档类附件，走 `/files` 官方链路。

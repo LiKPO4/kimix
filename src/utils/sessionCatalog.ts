@@ -384,6 +384,9 @@ export function reconcileOfficialSessionCatalog(
       const referencesVisibleSession = officialSessionIds(session).some((id) => visibleOfficialIds.has(id));
       const explicitlyArchived = officialSessionIds(session).some((id) => archivedOfficialIds.has(id));
       const supersededByTransparentFork = officialSessionIds(session).some((id) => supersededOfficialIds.has(id));
+      // Kimi Code 0.24+（agent-core-v2）的 exclude_empty 会把刚创建的空会话立即滤出官方目录；
+      // “不在列表里”不等于“已被官方移除”，创建宽限期内只凭显式归档证据处理。
+      if (!explicitlyArchived && Date.now() - session.createdAt < EMPTY_SESSION_CREATION_GRACE_MS) return;
       if (!serverAuthoritative && !referencesVisibleSession && !explicitlyArchived && !supersededByTransparentFork && !isAbandonedEmptyMirror(session, projectPath)) return;
       if (next === sessions) next = [...sessions];
       next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };

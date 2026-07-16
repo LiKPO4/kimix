@@ -544,6 +544,43 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].archivedAt).toBeTypeOf("number");
   });
 
+  it("v2 exclude_empty 语义下，创建宽限期内的空镜像不因 Server 列表缺失而归档", () => {
+    const fresh = localSession({
+      id: "official-fresh",
+      officialSessionId: "official-fresh",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    const stale = localSession({
+      id: "official-stale",
+      officialSessionId: "official-stale",
+      createdAt: Date.now() - 10 * 60 * 1000,
+      updatedAt: Date.now() - 10 * 60 * 1000,
+    });
+    const result = reconcileOfficialSessionCatalog([fresh, stale], [], "D:\\work\\demo", { source: "server" });
+
+    expect(result.find((session) => session.id === "official-fresh")?.archivedAt).toBeUndefined();
+    expect(result.find((session) => session.id === "official-stale")?.archivedAt).toBeTypeOf("number");
+  });
+
+  it("创建宽限期内的镜像有显式官方归档证据时仍归档", () => {
+    const fresh = localSession({
+      id: "official-fresh",
+      officialSessionId: "official-fresh",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    const result = reconcileOfficialSessionCatalog([fresh], [{
+      id: "official-fresh",
+      workDir: "D:\\work\\demo",
+      updatedAt: Date.now(),
+      archived: true,
+      source: "server",
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
   it("SDK 明确返回已归档时归档带正文的本地镜像", () => {
     const local = localSession({
       id: "official-archived",
