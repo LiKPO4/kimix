@@ -3,7 +3,7 @@
 ## 2026-07-16 提交审查问题修复与优化
 
 - 当前目标：按 `a33dc2a..eca6c2ed` 全量 Review 结论，依次修复功能回归、消息流性能与诊断隐私问题，并收敛低优先级代码质量风险。
-- 已完成：完成 16 个提交的静态审查。第 1-5 项已完成。第 6 项已完成：子代理嵌套事件先按事件类型和工具调用身份判断真冲突；同 eventId、同 toolCallId 的工具允许状态、结果和时长合法演进，`mergeEvents` 会原位写入终态而非保留 running 或追加重复事件。第 6 项 eventMapper 93 项测试和 typecheck 通过。
+- 已完成：完成 16 个提交的静态审查。第 1-6 项已完成。第 7 项已完成：`contentVersion` 增加受当前 28 项渲染窗口约束的事件对象身份签名，不扫描或 hash 超长正文；同长度 canonical 替换、非末项事件对象变化和 thinkingParts 更新均可触发视口恢复。第 7 项定向 25 项测试和 typecheck 通过。
 - 待办与执行顺序：
   1. [已完成] 修复 `scripts/dev.cjs` 向 electron-vite 传参方式，并增加真实 CLI 链回归测试。
   2. [已完成] 将子代理正文提升诊断移出渲染热路径，按 turn 去重/节流；主进程诊断落盘改为异步串行队列，避免同步 I/O 阻塞。
@@ -11,15 +11,15 @@
   4. [已完成] 修复通知切换到其他会话时 pending timeline focus 被 session reset 清空，并补跨会话通知聚焦测试。
   5. [已完成] 修正 canonical thinking 纠错策略：允许更短但结构正确的官方 thinking 替换重复/损坏的本地 thinking，同时保留过程历史防倒退门禁。
   6. [已完成] 修正子代理 eventId 冲突检测，区分真正身份冲突与工具状态/结果的合法演进，并补工具生命周期测试。
-  7. 加固 `contentVersion`：覆盖同长度正文纠正、`thinkingParts` 和非末项活动内容变化，同时保持常量级或受控计算成本。
+  7. [已完成] 加固 `contentVersion`：覆盖同长度正文纠正、`thinkingParts` 和非末项活动内容变化，同时保持常量级或受控计算成本。
   8. 将 `RenderItem` 与缓存类型移出 `ChatThread` 组件模块，消除 Hook 到组件模块的类型边界倒置。
   9. 房间投递身份诊断面板在会话或数据集变化时清理无效筛选，避免新会话误显示空列表。
   10. 清理 `eventMapper.test.ts` 的整文件行尾/尾随空白噪声，恢复可读 diff 与 blame。
   11. 核实长程任务 reviewer 双运行时流程是否正式废弃；若仍需支持，恢复为可达架构；若确认废弃，补稳定知识说明，避免未来误恢复死代码。
-- 未完成：第 7-11 项尚待按顺序执行、验证和独立提交。
+- 未完成：第 8-11 项尚待按顺序执行、验证和独立提交。
 - 阻塞：第 11 项涉及产品能力取舍；先完成不依赖产品决策的 1-10 项，最后基于仓库现状给出证据并在必要时请用户裁决。
 - 关键文件：`scripts/dev.cjs`、`scripts/restart-kimix-dev.ps1`、`src/utils/chatRenderItems.ts`、`src/utils/reportError.ts`、`electron/main.ts`、`src/hooks/useChatViewport/useEventFocus.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`。
-- 下一步：执行第 7 项，加固 contentVersion 对同长度纠错和非末项活动内容变化的识别。
+- 下一步：执行第 8 项，将 RenderItem 类型从 ChatThread 组件模块移到独立类型模块。
 
 ## 2026-07-15 Web 模式单轮长消息流性能改造
 

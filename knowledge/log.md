@@ -2,6 +2,8 @@
 
 ## 2026-07-16
 
+* **Content-version tracks bounded event identity, not body length alone**: The viewport signature includes object revisions across the bounded render window, catching same-length canonical corrections, non-tail activity, and thinking-part changes without scanning long message text. See [/project/kimix.md](/project/kimix.md).
+
 * **Subagent event identity permits tool lifecycle evolution**: Same-ID nested events reject type/tool identity collisions, while the same tool call may update running state, result, display, and duration in place during replay. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Canonical thinking correction is not length-monotonic**: A non-empty official thinking history may replace a longer local mirror when the bodies differ, because duplicated or malformed local thinking can be longer than the authoritative correction; process-event regression protection remains separate. Cache mapping version 6 forces stale mirrors through the unified rule. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

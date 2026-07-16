@@ -57,6 +57,26 @@ function renderItemKey(item: RenderItem) {
   return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
 }
 
+const contentVersionObjectIds = new WeakMap<object, number>();
+let nextContentVersionObjectId = 1;
+
+function contentVersionObjectId(value: object) {
+  const existing = contentVersionObjectIds.get(value);
+  if (existing) return existing;
+  const next = nextContentVersionObjectId++;
+  contentVersionObjectIds.set(value, next);
+  return next;
+}
+
+function renderItemIdentityVersion(item: RenderItem) {
+  if (item.type === "event") return `e${contentVersionObjectId(item.event)}`;
+  if (item.type === "tool_group") {
+    const lastTool = item.tools[item.tools.length - 1];
+    return `t${item.tools.length}:${lastTool ? contentVersionObjectId(lastTool) : 0}`;
+  }
+  return `${item.type}:${item.id}`;
+}
+
 export function buildContentVersion(
   session: { id?: string; updatedAt?: number } | null | undefined,
   roomTimeline: TimelineEvent[],
@@ -70,6 +90,7 @@ export function buildContentVersion(
   const lastAssistantThinkingLength = lastItem?.type === "event" && lastItem.event.type === "assistant_message"
     ? (lastItem.event.thinking?.length ?? 0)
     : undefined;
+  const renderIdentityVersion = renderItems.map(renderItemIdentityVersion).join(",");
   return [
     session?.id ?? "",
     session?.updatedAt ?? 0,
@@ -78,6 +99,7 @@ export function buildContentVersion(
     lastKey,
     lastAssistantContentLength ?? "",
     lastAssistantThinkingLength ?? "",
+    renderIdentityVersion,
   ].join(":");
 }
 

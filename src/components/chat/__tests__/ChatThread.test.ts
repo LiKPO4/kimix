@@ -129,8 +129,8 @@ describe("buildContentVersion", () => {
     const session = sessionStub([assistantEvent("hello")]);
     const event = assistantEvent("hello", { id: "assistant-1" });
     const items: RenderItem[] = [{ type: "event", event }];
-    expect(buildContentVersion(session, session.events, items)).toBe(
-      `session-1:0:1:1:assistant-1:5:0`
+    expect(buildContentVersion(session, session.events, items)).toMatch(
+      /^session-1:0:1:1:assistant-1:5:0:e\d+$/
     );
   });
 
@@ -164,6 +164,24 @@ describe("buildContentVersion", () => {
     const before = buildContentVersion(session, session.events, singleItem);
     const after = buildContentVersion(session, session.events, twoItems);
     expect(after).not.toBe(before);
+  });
+
+  it("changes when same-length assistant content is corrected with a new event object", () => {
+    const session = sessionStub();
+    const beforeEvent = assistantEvent("abc", { id: "assistant-1" });
+    const afterEvent = { ...beforeEvent, content: "xyz" };
+    expect(buildContentVersion(session, [], [{ type: "event", event: beforeEvent }])).not.toBe(
+      buildContentVersion(session, [], [{ type: "event", event: afterEvent }]),
+    );
+  });
+
+  it("changes when a non-last rendered event object changes", () => {
+    const session = sessionStub();
+    const first = assistantEvent("first", { id: "assistant-1" });
+    const last = assistantEvent("last", { id: "assistant-2" });
+    const before: RenderItem[] = [{ type: "event", event: first }, { type: "event", event: last }];
+    const after: RenderItem[] = [{ type: "event", event: { ...first, thinkingParts: [{ id: "p", timestamp: 1, text: "updated" }] } }, { type: "event", event: last }];
+    expect(buildContentVersion(session, [], before)).not.toBe(buildContentVersion(session, [], after));
   });
 
   it("stays stable for identical inputs", () => {
