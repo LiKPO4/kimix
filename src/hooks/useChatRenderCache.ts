@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import type { CompletedTurnRenderCacheEntry } from "@/components/chat/ChatThread";
+import type { CompletedTurnRenderCacheEntry } from "@/types/chatRender";
 
 /**
  * Stable cache for completed turn render items.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { buildContentVersion, buildSubagentRegressionDiagnosticData, findSubagentContentRegressionSnapshots, type RenderItem } from "@/components/chat/ChatThread";
+import { buildContentVersion, buildSubagentRegressionDiagnosticData, findSubagentContentRegressionSnapshots } from "@/components/chat/ChatThread";
+import type { RenderItem } from "@/types/chatRender";
 
 function sessionStub(events: TimelineEvent[] = []): Session {
   return {

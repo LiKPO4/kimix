@@ -4,7 +4,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import React, { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { useChatViewport, type UseChatViewportOptions } from "@/hooks/useChatViewport";
-import type { RenderItem } from "@/components/chat/ChatThread";
+import type { RenderItem } from "@/types/chatRender";
 
 const defaultOptions: UseChatViewportOptions = {
   sessionId: "session-1",

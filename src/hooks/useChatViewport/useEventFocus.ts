@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from "react";
 import { logError } from "@/utils/reportError";
-import type { RenderItem } from "@/components/chat/ChatThread";
+import type { RenderItem } from "@/types/chatRender";
 
 export interface UseEventFocusOptions {
   scrollRef: React.RefObject<HTMLDivElement | null>;

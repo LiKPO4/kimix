@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { useChatRenderCache } from "@/hooks/useChatRenderCache";
-import type { CompletedTurnRenderCacheEntry } from "@/components/chat/ChatThread";
+import type { CompletedTurnRenderCacheEntry } from "@/types/chatRender";
 
 function renderHook<T, P>(callback: (props: P) => T, options: { initialProps: P }) {
   const result = { current: null as T };

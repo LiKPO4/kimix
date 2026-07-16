@@ -12,7 +12,7 @@ import {
   shouldResumeAutoFollowAtBottom,
   USER_SCROLL_INTENT_MS,
 } from "@/utils/scrollIntent";
-import type { RenderItem } from "@/components/chat/ChatThread";
+import type { RenderItem } from "@/types/chatRender";
 import {
   canReleaseViewportTailCompensation,
   CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT,
