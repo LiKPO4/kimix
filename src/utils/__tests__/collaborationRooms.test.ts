@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RoomAgent, Session, TimelineEvent } from "@/types/ui";
+import type { RoomAgent, RoomAgentDeliveryAttempt, RoomUserMessage, Session, TimelineEvent } from "@/types/ui";
 import {
   createCollaborationStateFromSession,
   getEventRoomAgentId,
@@ -10,6 +10,7 @@ import {
   getSyntheticPrimaryAgentId,
   mirrorPrimaryAgentToLegacySession,
   normalizeLoadedSessionCollaboration,
+  repairMissingRoomDeliveryAttemptIds,
   replaceRoomAgentEvents,
   resolveRoomRuntimeOwner,
   scopeEventToRoomAgent,
@@ -532,5 +533,170 @@ describe("collaborationRooms", () => {
     expect(secondaryEvents.find((event) => event.type === "assistant_message")).toMatchObject({ content: "B" });
     expect(primaryEvents.find((event) => event.type === "tool_call")).toMatchObject({ status: "success", result: "A done" });
     expect(secondaryEvents.find((event) => event.type === "tool_call")).toMatchObject({ status: "running" });
+  });
+});
+
+describe("repairMissingRoomDeliveryAttemptIds", () => {
+  function collaborationStub(
+    messages: RoomUserMessage[] = [],
+    agentEvents: Record<string, TimelineEvent[]> = {},
+  ) {
+    return {
+      schemaVersion: 1 as const,
+      primaryMirrorUpdatedAt: 0,
+      primaryAgentId: "agent-primary",
+      defaultRecipientIds: ["agent-primary"],
+      focusedAgentId: "agent-primary",
+      agents: [secondaryAgent()],
+      messages,
+      agentEvents,
+    };
+  }
+
+  function roomMessage(
+    id: string,
+    recipientAgentIds: string[],
+    deliveries: Record<string, { status: RoomUserMessage["deliveries"][string]["status"]; agentTurnId: string; dispatchAttemptId?: string; previousAttempts?: RoomAgentDeliveryAttempt[] }>,
+  ): RoomUserMessage {
+    return {
+      id,
+      content: "hello",
+      recipientAgentIds,
+      deliveries: deliveries as RoomUserMessage["deliveries"],
+      timestamp: 1,
+    };
+  }
+
+  function deliveryAttempt(dispatchAttemptId: string, agentTurnId = "turn-1"): RoomAgentDeliveryAttempt {
+    return {
+      dispatchAttemptId,
+      agentTurnId,
+      status: "accepted",
+      createdAt: 1,
+      updatedAt: 1,
+    };
+  }
+
+  function userEvent(
+    id: string,
+    roomMessageId: string,
+    agentTurnId: string,
+    dispatchAttemptId: string,
+    roomAgentId = "agent-primary",
+  ): TimelineEvent {
+    return {
+      id,
+      type: "user_message",
+      timestamp: 1,
+      content: "hello",
+      roomMessageId,
+      agentTurnId,
+      dispatchAttemptId,
+      roomAgentId,
+    };
+  }
+
+  it("fills missing dispatchAttemptId from a matching user_message event", () => {
+    const message = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-1" },
+    });
+    const collaboration = collaborationStub([message], {
+      "agent-primary": [userEvent("user-1", "msg-1", "turn-1", "attempt-1")],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next).not.toBe(collaboration);
+    expect(next.messages[0].deliveries["agent-primary"].dispatchAttemptId).toBe("attempt-1");
+  });
+
+  it("does nothing when the delivery already has a dispatchAttemptId", () => {
+    const message = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-1", dispatchAttemptId: "attempt-existing" },
+    });
+    const collaboration = collaborationStub([message], {
+      "agent-primary": [userEvent("user-1", "msg-1", "turn-1", "attempt-1")],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next).toBe(collaboration);
+  });
+
+  it("skips when multiple matching events have different attemptIds", () => {
+    const message = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-1" },
+    });
+    const collaboration = collaborationStub([message], {
+      "agent-primary": [
+        userEvent("user-1", "msg-1", "turn-1", "attempt-1"),
+        userEvent("user-2", "msg-1", "turn-1", "attempt-2"),
+      ],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next).toBe(collaboration);
+  });
+
+  it("skips when the attemptId is already used by another delivery", () => {
+    const message1 = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-1" },
+    });
+    const message2 = roomMessage("msg-2", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-2", dispatchAttemptId: "attempt-1" },
+    });
+    const collaboration = collaborationStub([message1, message2], {
+      "agent-primary": [userEvent("user-1", "msg-1", "turn-1", "attempt-1")],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next).toBe(collaboration);
+  });
+
+  it("skips when the attemptId is in the delivery's previousAttempts", () => {
+    const message = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": {
+        status: "accepted",
+        agentTurnId: "turn-1",
+        previousAttempts: [deliveryAttempt("attempt-1")],
+      },
+    });
+    const collaboration = collaborationStub([message], {
+      "agent-primary": [userEvent("user-1", "msg-1", "turn-1", "attempt-1")],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next).toBe(collaboration);
+  });
+
+  it("skips when the attemptId is used by an event with a different identity", () => {
+    const message = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-1" },
+    });
+    const collaboration = collaborationStub([message], {
+      "agent-primary": [userEvent("user-1", "msg-2", "turn-2", "attempt-1")],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next).toBe(collaboration);
+  });
+
+  it("fills the attemptId when the only matching event has the same identity", () => {
+    const message = roomMessage("msg-1", ["agent-primary"], {
+      "agent-primary": { status: "accepted", agentTurnId: "turn-1" },
+    });
+    const collaboration = collaborationStub([message], {
+      "agent-primary": [
+        userEvent("user-1", "msg-1", "turn-1", "attempt-1"),
+      ],
+    });
+
+    const next = repairMissingRoomDeliveryAttemptIds(collaboration);
+
+    expect(next.messages[0].deliveries["agent-primary"].dispatchAttemptId).toBe("attempt-1");
   });
 });

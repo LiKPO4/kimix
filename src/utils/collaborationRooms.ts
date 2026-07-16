@@ -513,7 +513,55 @@ function mergeLegacyPrimaryDelivery(
   return merged;
 }
 
+type RoomDeliveryAttemptIndexes = {
+  deliveryAttemptOwnership: Map<string, Set<string>>;
+  eventAttemptIdentities: Map<string, Set<string>>;
+  agentEventsByIdentity: Map<string, TimelineEvent[]>;
+};
+
+function buildRoomDeliveryAttemptIndexes(collaboration: CollaborationState): RoomDeliveryAttemptIndexes {
+  const deliveryAttemptOwnership = new Map<string, Set<string>>();
+  const eventAttemptIdentities = new Map<string, Set<string>>();
+  const agentEventsByIdentity = new Map<string, TimelineEvent[]>();
+
+  for (const message of collaboration.messages) {
+    const messageId = message.id;
+    for (const [agentId, delivery] of Object.entries(message.deliveries)) {
+      const ownershipKey = `${messageId}:${agentId}`;
+      if (delivery.dispatchAttemptId) {
+        const set = deliveryAttemptOwnership.get(delivery.dispatchAttemptId) ?? new Set<string>();
+        set.add(ownershipKey);
+        deliveryAttemptOwnership.set(delivery.dispatchAttemptId, set);
+      }
+      for (const attempt of delivery.previousAttempts ?? []) {
+        if (!attempt.dispatchAttemptId) continue;
+        const set = deliveryAttemptOwnership.get(attempt.dispatchAttemptId) ?? new Set<string>();
+        set.add(ownershipKey);
+        deliveryAttemptOwnership.set(attempt.dispatchAttemptId, set);
+      }
+    }
+  }
+
+  for (const [agentId, events] of Object.entries(collaboration.agentEvents)) {
+    for (const event of events) {
+      const identityKey = `${agentId}:${event.roomMessageId ?? ""}:${event.agentTurnId ?? ""}`;
+      if (event.type === "user_message") {
+        const list = agentEventsByIdentity.get(identityKey) ?? [];
+        list.push(event);
+        agentEventsByIdentity.set(identityKey, list);
+      }
+      if (!event.dispatchAttemptId) continue;
+      const set = eventAttemptIdentities.get(event.dispatchAttemptId) ?? new Set<string>();
+      set.add(identityKey);
+      eventAttemptIdentities.set(event.dispatchAttemptId, set);
+    }
+  }
+
+  return { deliveryAttemptOwnership, eventAttemptIdentities, agentEventsByIdentity };
+}
+
 export function repairMissingRoomDeliveryAttemptIds(collaboration: CollaborationState): CollaborationState {
+  const { deliveryAttemptOwnership, eventAttemptIdentities, agentEventsByIdentity } = buildRoomDeliveryAttemptIndexes(collaboration);
   let changed = false;
   const messages = collaboration.messages.map((message) => {
     let deliveriesChanged = false;
@@ -522,40 +570,16 @@ export function repairMissingRoomDeliveryAttemptIds(collaboration: Collaboration
     for (const roomAgentId of message.recipientAgentIds) {
       const delivery = deliveries[roomAgentId];
       if (!delivery || delivery.dispatchAttemptId) continue;
-      const matchingEvents = (collaboration.agentEvents[roomAgentId] ?? []).filter((event) => (
-        event.type === "user_message" &&
-        event.roomMessageId === message.id &&
-        event.agentTurnId === delivery.agentTurnId &&
-        Boolean(event.dispatchAttemptId)
-      ));
+      const identityKey = `${roomAgentId}:${message.id}:${delivery.agentTurnId}`;
+      const matchingEvents = agentEventsByIdentity.get(identityKey) ?? [];
       const attemptIds = Array.from(new Set(matchingEvents.flatMap((event) => (
         event.dispatchAttemptId ? [event.dispatchAttemptId] : []
       ))));
       if (attemptIds.length !== 1) continue;
       const candidateAttemptId = attemptIds[0];
-      const occupiedElsewhere = collaboration.messages.some((otherMessage) => (
-        Object.entries(otherMessage.deliveries).some(([otherAgentId, otherDelivery]) => {
-          if (otherMessage.id === message.id && otherAgentId === roomAgentId) {
-            return Boolean(otherDelivery.previousAttempts?.some((attempt) => (
-              attempt.dispatchAttemptId === candidateAttemptId
-            )));
-          }
-          return otherDelivery.dispatchAttemptId === candidateAttemptId ||
-            Boolean(otherDelivery.previousAttempts?.some((attempt) => (
-              attempt.dispatchAttemptId === candidateAttemptId
-            )));
-        })
-      ));
-      const eventIdentityOccupiedElsewhere = Object.entries(collaboration.agentEvents).some(([eventAgentId, events]) => (
-        events.some((event) => (
-          event.dispatchAttemptId === candidateAttemptId &&
-          (
-            eventAgentId !== roomAgentId ||
-            event.roomMessageId !== message.id ||
-            event.agentTurnId !== delivery.agentTurnId
-          )
-        ))
-      ));
+      const occupiedElsewhere = deliveryAttemptOwnership.has(candidateAttemptId);
+      const identities = eventAttemptIdentities.get(candidateAttemptId);
+      const eventIdentityOccupiedElsewhere = identities ? Array.from(identities).some((identity) => identity !== identityKey) : false;
       if (occupiedElsewhere || eventIdentityOccupiedElsewhere) continue;
       deliveries[roomAgentId] = { ...delivery, dispatchAttemptId: candidateAttemptId };
       deliveriesChanged = true;
