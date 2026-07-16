@@ -22,6 +22,7 @@ import { getHiddenHandoffSessionIds } from "@/utils/persistence";
 import { persistSidebarExpandedProjectPaths, readSidebarExpandedProjectPaths } from "@/utils/sidebarProjectExpansion";
 import { getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
 import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
+import { APP_VERSION } from "@/utils/appVersion";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -1029,7 +1030,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
-          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v2.16.14</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v{APP_VERSION}</span>
         </button>
       </div>
     </aside>

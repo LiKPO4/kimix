@@ -21,6 +21,7 @@ import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/s
 import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog } from "@electron/types/ipc";
 import { usePresence } from "@/hooks/usePresence";
 import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/roomAgentProvisioning";
+import { APP_VERSION } from "@/utils/appVersion";
 
 type FreezeReport = {
   at: string;
@@ -45,7 +46,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
-const KIMIX_VERSION = "2.16.14";
+
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 type SettingsSectionId =
@@ -300,7 +301,7 @@ function buildFreezeReportExport(report: FreezeReport, reports: FreezeReport[]) 
   const relatedSession = sessionState.sessions.find((session) => session.id === report.sessionId);
   return {
     exportedAt: new Date().toISOString(),
-    appVersion: KIMIX_VERSION,
+    appVersion: APP_VERSION,
     report,
     relatedReports: reports
       .filter((item) => item.sessionId === report.sessionId || item.runningSessionId === report.runningSessionId)
@@ -1115,7 +1116,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setMigrationBusy("export");
     setMigrationMessage("正在准备会话快照...");
     try {
-      const snapshot = buildSessionBackupSnapshot(KIMIX_VERSION);
+      const snapshot = buildSessionBackupSnapshot(APP_VERSION);
       const res = await window.api.exportSessionBackup({
         snapshot,
         suggestedName: "Kimix 会话快照",
@@ -2694,7 +2695,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v{KIMIX_VERSION} · 设置将自动保存到本地</div>
+          <div className="kimix-settings-footer">Kimix v{APP_VERSION} · 设置将自动保存到本地</div>
         </div>
       </div>
   );
