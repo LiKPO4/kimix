@@ -1851,4 +1851,102 @@ describe("mergeEvents subagent lifecycle instrumentation", () => {
     expect(subagent.events).toHaveLength(1);
     expect((subagent.events[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("same body");
   });
+
+  it("accepts a same-id tool lifecycle update and applies its terminal status", () => {
+    const existing: TimelineEvent[] = [{
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "tool-event-1",
+        type: "tool_call",
+        timestamp: 2,
+        toolCallId: "tool-call-1",
+        toolName: "Read",
+        status: "running",
+        arguments: { path: "a.ts" },
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 3,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "completed",
+      events: [{
+        id: "tool-event-1",
+        type: "tool_call",
+        timestamp: 4,
+        toolCallId: "tool-call-1",
+        toolName: "Read",
+        status: "success",
+        arguments: { path: "a.ts" },
+        result: "done",
+      }],
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const subagent = result[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(subagent.events).toHaveLength(1);
+    expect(subagent.events[0]).toMatchObject({
+      id: "tool-event-1",
+      type: "tool_call",
+      status: "success",
+      result: "done",
+    });
+  });
+
+  it("drops a same-id subagent event when its event type changes", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const existing: TimelineEvent[] = [{
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 1,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "running",
+      events: [{
+        id: "collision-1",
+        type: "tool_call",
+        timestamp: 2,
+        toolCallId: "tool-call-1",
+        toolName: "Read",
+        status: "running",
+        arguments: {},
+      }],
+    }];
+    const incoming: TimelineEvent = {
+      id: "sub-1",
+      type: "subagent",
+      timestamp: 3,
+      agentId: "agent-1",
+      agentName: "coder",
+      status: "completed",
+      events: [{
+        id: "collision-1",
+        type: "assistant_message",
+        timestamp: 4,
+        content: "wrongly reused id",
+        isThinking: false,
+        isComplete: true,
+      }],
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const subagent = result[0] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(subagent.events).toHaveLength(1);
+    expect(subagent.events[0].type).toBe("tool_call");
+    expect(logEventSpy).toHaveBeenCalledWith(
+      "eventMapper.subagentEventIdConflict",
+      expect.objectContaining({
+        eventId: "collision-1",
+        existingEventType: "tool_call",
+        eventType: "assistant_message",
+      }),
+    );
+  });
 });

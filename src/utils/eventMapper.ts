@@ -662,6 +662,17 @@ function filterConflictingSubagentEvents(
     const existing = currentById.get(event.id);
     if (!existing) return true;
 
+    if (existing.type !== event.type) {
+      logEvent("eventMapper.subagentEventIdConflict", {
+        agentId: current.agentId,
+        agentName: current.agentName,
+        eventId: event.id,
+        existingEventType: existing.type,
+        eventType: event.type,
+      });
+      return false;
+    }
+
     // assistant_message 由 mergeEvents 按"未完成"状态合并；只要本地尚未完成，
     // 就允许流式更新继续追加。若本地已完成，同名事件无论是重复还是不同内容，
     // 都不应再被追加或覆盖。
@@ -678,6 +689,19 @@ function filterConflictingSubagentEvents(
         }
         return false;
       }
+      return true;
+    }
+
+    if (event.type === "tool_call" && existing.type === "tool_call") {
+      const sameToolIdentity = existing.toolCallId === event.toolCallId && (
+        existing.toolName === event.toolName ||
+        existing.toolName === "unknown" ||
+        event.toolName === "unknown"
+      );
+      if (sameToolIdentity) return true;
+    }
+
+    if (event.type === "tool_result" && existing.type === "tool_result" && existing.toolCallId === event.toolCallId) {
       return true;
     }
 
@@ -1547,8 +1571,17 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const sameCallIndex = partialWithoutId
       ? -1
       : existing.findLastIndex((e) => e.type === "tool_call" && e.status === "running" && e.toolCallId === incoming.toolCallId);
+    const sameEventIndex = partialWithoutId
+      ? -1
+      : existing.findLastIndex((e) => e.type === "tool_call" && e.id === incoming.id && e.toolCallId === incoming.toolCallId);
     const latestCallIndex = existing.findLastIndex((e) => e.type === "tool_call" && e.status === "running");
-    const targetIndex = sameCallIndex !== -1 ? sameCallIndex : partialWithoutId ? latestCallIndex : -1;
+    const targetIndex = sameCallIndex !== -1
+      ? sameCallIndex
+      : sameEventIndex !== -1
+        ? sameEventIndex
+        : partialWithoutId
+          ? latestCallIndex
+          : -1;
 
     if (targetIndex !== -1) {
       const last = existing[targetIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
@@ -1562,6 +1595,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         description: incoming.description ?? last.description,
         display: incoming.display ?? last.display,
         result: mergeToolResult(last.result, incoming.result),
+        status: incoming.status === "running" ? last.status : incoming.status,
+        durationMs: incoming.durationMs ?? last.durationMs,
       };
       const result = [...existing];
       result[targetIndex] = updated;
