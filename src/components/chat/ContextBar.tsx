@@ -277,7 +277,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     sessionModel: displaySession?.switchedToModel || (displaySession?.model && displaySession.model !== "Kimi Code SDK" ? displaySession.model : null),
     modelSwitchedAt: displaySession?.modelSwitchedAt,
   });
-  const displayModel = displaySession ? sessionModel ?? defaultModel ?? FALLBACK_KIMI_MODEL : "选择一个 Agent";
+  const displayModel = (displaySession ? sessionModel : null) ?? defaultModel ?? FALLBACK_KIMI_MODEL;
   const compactDisplayModel = compactModelDisplayName(displayModel);
   const modelDisplayFontSize = compactDisplayModel.length > 28 ? 11 : compactDisplayModel.length > 20 ? 12 : 13;
   const modelTitle = mutationOwnerError
@@ -475,7 +475,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   };
 
   const toggleModelMenu = () => {
-    if (!mutationOwner) {
+    // 无会话的欢迎屏允许直接打开：此时选中项会写入全局默认模型，供下一个新会话使用。
+    if (!mutationOwner && activeSession) {
       showToast(mutationOwnerError || "请先选择一个 Agent。");
       return;
     }
@@ -490,7 +491,31 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   };
 
   const handleSelectModel = async (model: string) => {
-    if (!activeSession || activeSession.isLoading || switchingModel) return;
+    // 欢迎屏（无会话）：写入全局默认模型，下一个新会话将使用它。
+    if (!activeSession) {
+      if (switchingModel) return;
+      if (model === defaultModel) {
+        setModelMenuOpen(false);
+        return;
+      }
+      setSwitchingModel(model);
+      let res;
+      try {
+        res = await window.api.setKimiDefaultModel({ modelAlias: model });
+      } catch (error) {
+        res = { success: false as const, error: error instanceof Error ? error.message : String(error) };
+      }
+      setSwitchingModel(null);
+      if (!res.success) {
+        showToast(`切换默认模型失败：${res.error ?? "未知错误"}`);
+        return;
+      }
+      setDefaultModel(model);
+      setModelMenuOpen(false);
+      showToast(`默认模型已切换为 ${model}`);
+      return;
+    }
+    if (activeSession.isLoading || switchingModel) return;
     if (!mutationOwner) {
       showToast(mutationOwnerError || "请先选择一个 Agent。");
       return;
