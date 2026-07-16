@@ -2,6 +2,8 @@
 
 ## 2026-07-16
 
+* **Long tasks have one runtime; reviewer identity is legacy compatibility**: New tasks bind reviewer and executor IDs to one session and defer review to the user-facing queue; older distinct reviewer sessions remain readable for lifecycle cleanup but cannot restore the retired auto-review dispatcher. See [/project/kimix.md](/project/kimix.md).
+
 * **Content-version tracks bounded event identity, not body length alone**: The viewport signature includes object revisions across the bounded render window, catching same-length canonical corrections, non-tail activity, and thinking-part changes without scanning long message text. See [/project/kimix.md](/project/kimix.md).
 
 * **Subagent event identity permits tool lifecycle evolution**: Same-ID nested events reject type/tool identity collisions, while the same tool call may update running state, result, display, and duration in place during replay. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

@@ -3,7 +3,7 @@
 ## 2026-07-16 提交审查问题修复与优化
 
 - 当前目标：按 `a33dc2a..eca6c2ed` 全量 Review 结论，依次修复功能回归、消息流性能与诊断隐私问题，并收敛低优先级代码质量风险。
-- 已完成：完成 16 个提交的静态审查。第 1-9 项已完成。第 10 项已完成：`eventMapper.test.ts` 从 1672 个 CRLF + 280 个 LF 的混合行尾统一为 LF，并清除尾随空白；归一化前后逻辑文本 SHA-256 一致，eventMapper 93 项测试和 typecheck 通过。
+- 已完成：第 1-10 项全部完成。第 11 项核实完成：自 v2.8.345 起新长程任务只创建一个 runtime，`reviewerSessionId === executorSessionId`，reviewer prompt 明确声明独立审查停用；旧 distinct reviewer 分支仅保留归档、状态和失败收尾兼容。已删除永远不会写入的 reviewer-dispatch 去重集合，并将单 runtime 边界写入知识库。
 - 待办与执行顺序：
   1. [已完成] 修复 `scripts/dev.cjs` 向 electron-vite 传参方式，并增加真实 CLI 链回归测试。
   2. [已完成] 将子代理正文提升诊断移出渲染热路径，按 turn 去重/节流；主进程诊断落盘改为异步串行队列，避免同步 I/O 阻塞。
@@ -15,11 +15,11 @@
   8. [已完成] 将 `RenderItem` 与缓存类型移出 `ChatThread` 组件模块，消除 Hook 到组件模块的类型边界倒置。
   9. [已完成] 房间投递身份诊断面板在会话或数据集变化时清理无效筛选，避免新会话误显示空列表。
   10. [已完成] 清理 `eventMapper.test.ts` 的整文件行尾/尾随空白噪声，恢复可读 diff 与 blame。
-  11. 核实长程任务 reviewer 双运行时流程是否正式废弃；若仍需支持，恢复为可达架构；若确认废弃，补稳定知识说明，避免未来误恢复死代码。
-- 未完成：第 11 项尚待核实并收尾。
-- 阻塞：第 11 项涉及产品能力取舍；先完成不依赖产品决策的 1-10 项，最后基于仓库现状给出证据并在必要时请用户裁决。
+  11. [已完成] 核实长程任务 reviewer 双运行时流程是否正式废弃；确认新任务为单 runtime，保留旧任务读取/收尾兼容并记录稳定知识。
+- 未完成：代码事项已全部完成；剩余全量门禁和用户实机验收。
+- 阻塞：无；不推送、不打 tag、不发布。
 - 关键文件：`scripts/dev.cjs`、`scripts/restart-kimix-dev.ps1`、`src/utils/chatRenderItems.ts`、`src/utils/reportError.ts`、`electron/main.ts`、`src/hooks/useChatViewport/useEventFocus.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`。
-- 下一步：执行第 11 项，核实长程任务 reviewer 双运行时流程的当前产品与架构状态。
+- 下一步：运行全量测试、typecheck、生产构建、知识校验和最终 Git 审查。
 
 ## 2026-07-15 Web 模式单轮长消息流性能改造
 

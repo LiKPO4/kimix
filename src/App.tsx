@@ -908,7 +908,6 @@ function cleanupRuntimeRefs(
   refs: {
     notifiedQuestionRequest: Set<string>;
     hiddenLongTaskEvents: Map<string, TimelineEvent[]>;
-    longTaskReviewDispatch: Set<string>;
   },
 ) {
   // 仅 error/interrupted 清理 question 去重记录；completed 保留以保护新轮去重
@@ -920,11 +919,6 @@ function cleanupRuntimeRefs(
     }
   }
   refs.hiddenLongTaskEvents.delete(runtimeSessionId);
-  for (const key of refs.longTaskReviewDispatch) {
-    if (key.includes(`:${runtimeSessionId}:`)) {
-      refs.longTaskReviewDispatch.delete(key);
-    }
-  }
 }
 
 function isLongTaskRuntimeHiddenFromChat(session: Session | undefined, runtimeSessionId: string) {
@@ -1308,7 +1302,6 @@ function App() {
   const bootstrapDoneRef = useRef(false);
   const [startupContextResolved, setStartupContextResolved] = useState(false);
   const handoffJobRef = useRef<HandoffJob | null>(null);
-  const longTaskReviewDispatchRef = useRef<Set<string>>(new Set());
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
@@ -2722,13 +2715,11 @@ function App() {
         cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
           notifiedQuestionRequest: notifiedQuestionRequestRef.current,
           hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
-          longTaskReviewDispatch: longTaskReviewDispatchRef.current,
         });
       }
       cleanupRuntimeRefs(statusRuntimeSessionId, payload.status as "completed" | "error" | "interrupted", {
         notifiedQuestionRequest: notifiedQuestionRequestRef.current,
         hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
-        longTaskReviewDispatch: longTaskReviewDispatchRef.current,
       });
       runtimeLastStreamEventAtRef.current.delete(statusRuntimeSessionId);
       runtimeHistoryRefreshAtRef.current.delete(statusRuntimeSessionId);
@@ -2860,7 +2851,6 @@ function App() {
       cleanupRuntimeRefs(payload.sessionId, payload.status as "completed" | "error" | "interrupted", {
         notifiedQuestionRequest: notifiedQuestionRequestRef.current,
         hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
-        longTaskReviewDispatch: longTaskReviewDispatchRef.current,
       });
 
       const uiSessionId = statusUiSessionId;
