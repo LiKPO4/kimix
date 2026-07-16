@@ -67,17 +67,27 @@ export function reconcileRunningKimiSnapshot(
   canonicalEvents: TimelineEvent[],
 ): TimelineEvent[] {
   const snapshotEvents = preserveLocalUserMediaInCanonicalHistory(localEvents, canonicalEvents);
-  return snapshotEvents.reduce((events, event) => {
+  // Kimi Code 0.24+（agent-core-v2）会把进行中轮次已提交的内容作为 isComplete: true 的
+  // 助手带回快照。只要本地还有未完成助手，当前轮次（最后一条用户消息之后）的 canonical
+  // 助手一律按未完成合并：完成态只能由真实 turn 结束事件授予，否则活助手会被反复提前
+  // 关闭（“输出完成”假象、过程折叠、后续工具期彻底没有消息头）。
+  const lastLocalUserTs = localEvents.reduce((max, event) => (
+    event.type === "user_message" ? Math.max(max, event.timestamp) : max
+  ), 0);
+  const hasOpenLocalAssistant = localEvents.some((event) => event.type === "assistant_message" && !event.isComplete);
+  return snapshotEvents.reduce((events, rawEvent) => {
+    const event = hasOpenLocalAssistant &&
+      rawEvent.type === "assistant_message" && rawEvent.isComplete && rawEvent.timestamp >= lastLocalUserTs
+      ? { ...rawEvent, isComplete: false as const }
+      : rawEvent;
     const alreadyMounted = events.some((local) => {
       if (local.type !== event.type) return false;
       if (local.type === "assistant_message" && event.type === "assistant_message") {
         if (local.isComplete === event.isComplete &&
           local.content === event.content &&
           (local.thinking ?? "") === (event.thinking ?? "")) return true;
-        // Kimi Code 0.24+（agent-core-v2）会把进行中轮次已提交的步骤文本作为 complete
-        // 助手带进快照；本地未完成助手已覆盖同文内容时跳过合并，否则它会被提前关闭
-        // （“输出完成”假象），后续增量被迫另起新段，表现为过程周期折叠、内容先“消失”。
-        if (event.isComplete && !local.isComplete) {
+        // 内容已被本地覆盖的 canonical 助手（同文不同完成态）同样视为已挂载，跳过合并。
+        if (!local.isComplete) {
           const localText = normalizeText([local.thinking ?? "", local.content].filter(Boolean).join("\n"));
           const eventText = normalizeText([event.thinking ?? "", event.content].filter(Boolean).join("\n"));
           if (eventText.length > 0 && localText.includes(eventText)) return true;

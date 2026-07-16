@@ -145,4 +145,57 @@ describe("reconcileRunningKimiSnapshot", () => {
     const assistant = result.find((event) => event.type === "assistant_message");
     expect(assistant).toMatchObject({ id: "assistant-live", isComplete: false });
   });
+
+  it("canonical 当前轮内容更长时按未完成补齐合并，绝不提前关闭；完成态只来自真实 turn 结束", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 100, content: "继续",
+    }, {
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 200,
+      content: "我先读第一个文件。",
+      thinking: "先想一下。",
+      isThinking: true,
+      isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 100, content: "继续",
+    }, {
+      id: "official-assistant-1",
+      type: "assistant_message",
+      timestamp: 300,
+      content: "我先读第一个文件。现在读第二个。",
+      thinking: "先想一下。再想一下。",
+      isThinking: false,
+      isComplete: true,
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const assistants = result.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({ id: "assistant-live", isComplete: false });
+    expect(assistants[0].content).toContain("现在读第二个");
+    expect(assistants[0].thinking).toContain("再想一下");
+  });
+
+  it("旧轮次（最后用户消息之前）的 canonical complete 助手保持历史完成态", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 50, content: "第一个问题",
+    }, {
+      id: "assistant-old-live", type: "assistant_message", timestamp: 60, content: "旧回答", isThinking: false, isComplete: true,
+    }, {
+      id: "user-new", type: "user_message", timestamp: 1000, content: "继续",
+    }, {
+      id: "assistant-new-live", type: "assistant_message", timestamp: 1100, content: "", isThinking: false, isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 50, content: "第一个问题",
+    }, {
+      id: "official-old", type: "assistant_message", timestamp: 60, content: "旧回答", isThinking: false, isComplete: true,
+    }, {
+      id: "user-new", type: "user_message", timestamp: 1000, content: "继续",
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const old = result.find((event) => event.type === "assistant_message" && event.content === "旧回答");
+    expect(old).toMatchObject({ isComplete: true });
+  });
 });
