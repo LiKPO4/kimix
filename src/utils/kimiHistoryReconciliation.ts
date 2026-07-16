@@ -9,15 +9,6 @@ import {
 } from "@/utils/kimiHistoryCache";
 import { logEvent } from "@/utils/reportError";
 
-function thinkingHistorySize(events: TimelineEvent[]): number {
-  return flattenTimelineEvents(events)
-    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
-    .reduce((sum, event) => {
-      const text = event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "";
-      return sum + text.trim().length;
-    }, 0);
-}
-
 /**
  * Flatten a timeline so that events nested inside subagent.events are also
  * included in top-down order. This lets body/process/thinking statistics see
@@ -115,7 +106,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
     (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
     (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
     hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
-    (hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents) && thinkingHistorySize(canonicalEvents) >= thinkingHistorySize(cachedEvents));
+    hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
 
   if (shouldReplace) {
     logEvent("kimiHistoryReconciliation.accepted", {

@@ -3,23 +3,23 @@
 ## 2026-07-16 提交审查问题修复与优化
 
 - 当前目标：按 `a33dc2a..eca6c2ed` 全量 Review 结论，依次修复功能回归、消息流性能与诊断隐私问题，并收敛低优先级代码质量风险。
-- 已完成：完成 16 个提交的静态审查。第 1 项已修复 dev 参数链；第 2 项已移除诊断同步写盘热路径；第 3 项已实现默认诊断脱敏和显式完整快照开关。第 4 项已完成：session reset 只重置 focus 递归状态，目标为新会话的 pending focus 会保留到新时间线渲染后消费；新增通知式跨会话聚焦回归测试。第 4 项定向 11 项测试和 typecheck 通过。
+- 已完成：完成 16 个提交的静态审查。第 1-4 项已完成。第 5 项已完成：统一 reconciliation 删除 canonical thinking 长度门槛，与侧栏历史加载保持一致；官方非空且不同的 thinking 可纠正更长的重复本地内容，过程事件防倒退门禁不变；缓存版本提升到 6。第 5 项定向 26 项测试和 typecheck 通过。
 - 待办与执行顺序：
   1. [已完成] 修复 `scripts/dev.cjs` 向 electron-vite 传参方式，并增加真实 CLI 链回归测试。
   2. [已完成] 将子代理正文提升诊断移出渲染热路径，按 turn 去重/节流；主进程诊断落盘改为异步串行队列，避免同步 I/O 阻塞。
   3. [已完成] 诊断日志默认脱敏：不记录 Assistant 正文片段、完整事件正文、工具结果、文件路径或图片 base64；完整快照改为显式诊断开关。
   4. [已完成] 修复通知切换到其他会话时 pending timeline focus 被 session reset 清空，并补跨会话通知聚焦测试。
-  5. 修正 canonical thinking 纠错策略：允许更短但结构正确的官方 thinking 替换重复/损坏的本地 thinking，同时保留过程历史防倒退门禁。
+  5. [已完成] 修正 canonical thinking 纠错策略：允许更短但结构正确的官方 thinking 替换重复/损坏的本地 thinking，同时保留过程历史防倒退门禁。
   6. 修正子代理 eventId 冲突检测，区分真正身份冲突与工具状态/结果的合法演进，并补工具生命周期测试。
   7. 加固 `contentVersion`：覆盖同长度正文纠正、`thinkingParts` 和非末项活动内容变化，同时保持常量级或受控计算成本。
   8. 将 `RenderItem` 与缓存类型移出 `ChatThread` 组件模块，消除 Hook 到组件模块的类型边界倒置。
   9. 房间投递身份诊断面板在会话或数据集变化时清理无效筛选，避免新会话误显示空列表。
   10. 清理 `eventMapper.test.ts` 的整文件行尾/尾随空白噪声，恢复可读 diff 与 blame。
   11. 核实长程任务 reviewer 双运行时流程是否正式废弃；若仍需支持，恢复为可达架构；若确认废弃，补稳定知识说明，避免未来误恢复死代码。
-- 未完成：第 5-11 项尚待按顺序执行、验证和独立提交。
+- 未完成：第 6-11 项尚待按顺序执行、验证和独立提交。
 - 阻塞：第 11 项涉及产品能力取舍；先完成不依赖产品决策的 1-10 项，最后基于仓库现状给出证据并在必要时请用户裁决。
 - 关键文件：`scripts/dev.cjs`、`scripts/restart-kimix-dev.ps1`、`src/utils/chatRenderItems.ts`、`src/utils/reportError.ts`、`electron/main.ts`、`src/hooks/useChatViewport/useEventFocus.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`。
-- 下一步：执行第 5 项，允许结构正确的较短 canonical thinking 纠正重复本地 thinking。
+- 下一步：执行第 6 项，区分子代理 eventId 真冲突与工具事件合法状态演进。
 
 ## 2026-07-15 Web 模式单轮长消息流性能改造
 

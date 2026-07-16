@@ -130,10 +130,10 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
-  it("does not replace when canonical has different but shorter thinking", () => {
+  it("replaces when canonical has different but shorter corrective thinking", () => {
     const local = [userMessage, assistant("body", { thinking: "a much longer local thought here" })];
     const canonical = [userMessage, assistant("body", { thinking: "short" })];
-    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
   it("does not replace when canonical is identical", () => {

@@ -22,8 +22,8 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 5 for canonical room binding and history repair across every entry point", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(5);
+  it("uses cache version 6 for shorter canonical thinking correction across every entry point", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(6);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {
