@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bot, Download, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { usePresence } from "@/hooks/usePresence";
@@ -90,6 +90,12 @@ export function RoomDeliveryIdentityInspector({ open, onClose }: { open: boolean
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
   const inspection = useMemo(() => (currentSession ? inspectSession(currentSession) : null), [currentSession]);
+
+  useEffect(() => {
+    if (!selectedMessageId) return;
+    const selectionStillExists = inspection?.deliveries.some((item) => item.roomMessageId === selectedMessageId) ?? false;
+    if (!selectionStillExists) setSelectedMessageId(null);
+  }, [inspection, selectedMessageId]);
 
   if (!presence.mounted) return null;
 

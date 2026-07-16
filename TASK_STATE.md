@@ -3,7 +3,7 @@
 ## 2026-07-16 提交审查问题修复与优化
 
 - 当前目标：按 `a33dc2a..eca6c2ed` 全量 Review 结论，依次修复功能回归、消息流性能与诊断隐私问题，并收敛低优先级代码质量风险。
-- 已完成：完成 16 个提交的静态审查。第 1-7 项已完成。第 8 项已完成：`RenderItem` 与 `CompletedTurnRenderCacheEntry` 移入 `src/types/chatRender.ts`，viewport/render-cache Hook 和测试不再从组件模块导入类型，消除类型边界倒置。第 8 项定向 57 项测试和 typecheck 通过。
+- 已完成：完成 16 个提交的静态审查。第 1-8 项已完成。第 9 项已完成：房间投递身份诊断面板在当前 inspection 数据不再包含所选 roomMessageId 时自动清空筛选，避免切换会话后误显示空列表；有效筛选保持不变。
 - 待办与执行顺序：
   1. [已完成] 修复 `scripts/dev.cjs` 向 electron-vite 传参方式，并增加真实 CLI 链回归测试。
   2. [已完成] 将子代理正文提升诊断移出渲染热路径，按 turn 去重/节流；主进程诊断落盘改为异步串行队列，避免同步 I/O 阻塞。
@@ -13,13 +13,13 @@
   6. [已完成] 修正子代理 eventId 冲突检测，区分真正身份冲突与工具状态/结果的合法演进，并补工具生命周期测试。
   7. [已完成] 加固 `contentVersion`：覆盖同长度正文纠正、`thinkingParts` 和非末项活动内容变化，同时保持常量级或受控计算成本。
   8. [已完成] 将 `RenderItem` 与缓存类型移出 `ChatThread` 组件模块，消除 Hook 到组件模块的类型边界倒置。
-  9. 房间投递身份诊断面板在会话或数据集变化时清理无效筛选，避免新会话误显示空列表。
+  9. [已完成] 房间投递身份诊断面板在会话或数据集变化时清理无效筛选，避免新会话误显示空列表。
   10. 清理 `eventMapper.test.ts` 的整文件行尾/尾随空白噪声，恢复可读 diff 与 blame。
   11. 核实长程任务 reviewer 双运行时流程是否正式废弃；若仍需支持，恢复为可达架构；若确认废弃，补稳定知识说明，避免未来误恢复死代码。
-- 未完成：第 9-11 项尚待按顺序执行、验证和独立提交。
+- 未完成：第 10-11 项尚待按顺序执行、验证和独立提交。
 - 阻塞：第 11 项涉及产品能力取舍；先完成不依赖产品决策的 1-10 项，最后基于仓库现状给出证据并在必要时请用户裁决。
 - 关键文件：`scripts/dev.cjs`、`scripts/restart-kimix-dev.ps1`、`src/utils/chatRenderItems.ts`、`src/utils/reportError.ts`、`electron/main.ts`、`src/hooks/useChatViewport/useEventFocus.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`。
-- 下一步：执行第 9 项，清理房间投递诊断面板跨会话残留筛选。
+- 下一步：执行第 10 项，统一 eventMapper 测试文件行尾并清理尾随空白噪声。
 
 ## 2026-07-15 Web 模式单轮长消息流性能改造
 
