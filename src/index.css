@@ -603,7 +603,7 @@ body::before {
   height: 2px;
   border-radius: 999px;
   background: var(--text-primary);
-  opacity: 0.72;
+  opacity: 0.24;
   transform: translateY(-50%);
   transform-origin: right center;
   transition-property: opacity, box-shadow;
@@ -615,11 +615,8 @@ body::before {
   background: var(--accent-primary);
 }
 
-.kimix-chat-navigation-hit:hover .kimix-chat-navigation-mark,
-.kimix-chat-navigation-hit:focus-visible .kimix-chat-navigation-mark,
-.kimix-chat-navigation-hit[data-active="true"] .kimix-chat-navigation-mark {
-  opacity: 1;
-  box-shadow: 0 0 0 2px var(--accent-primary-light);
+.kimix-chat-navigation-hit:hover .kimix-chat-navigation-mark {
+  opacity: 0.62;
 }
 
 .kimix-chat-navigation-hit:focus-visible {
@@ -627,11 +624,50 @@ body::before {
 }
 
 .kimix-chat-navigation-hit:focus-visible .kimix-chat-navigation-mark {
+  opacity: 0.86;
   box-shadow: 0 0 0 2px var(--accent-primary-soft);
+}
+
+.kimix-chat-navigation-hit[data-active="true"] .kimix-chat-navigation-mark,
+.kimix-chat-navigation-hit[data-active="true"]:hover .kimix-chat-navigation-mark,
+.kimix-chat-navigation-hit[data-active="true"]:focus-visible .kimix-chat-navigation-mark {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent-primary-light);
+}
+
+.kimix-chat-navigation-preview {
+  border-radius: 14px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-overlay);
+  opacity: 0;
+  filter: blur(2px);
+  transform: translateY(-5px) scale(0.985);
+  padding: 16px 18px;
+  transition-property: opacity, filter, transform;
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.kimix-chat-navigation-preview[data-visible="true"] {
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0) scale(1);
+}
+
+.kimix-chat-navigation-preview-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  text-wrap: pretty;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .kimix-chat-navigation-mark {
+    transition-duration: 0ms;
+  }
+
+  .kimix-chat-navigation-preview {
     transition-duration: 0ms;
   }
 }
