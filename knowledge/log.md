@@ -2,6 +2,8 @@
 
 ## 2026-07-17
 
+* **Active user turns derive their process header**: A lost optimistic Assistant placeholder no longer removes “消息处理中”; while the latest user turn is runtime-active, the renderer derives a stable render-only header from that user event, without reopening the completed response above. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
+
 * **Chat turn and viewport ownership are explicit**: A session-level running flag cannot reopen a completed prior response; rail/search navigation enters detached mode through the same user-intent transaction, invalidates the previous anchor, and disables Chromium's competing native anchoring. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
 
 * **Server completion is prompt-scoped**: Successful Server `turn.ended` and `turn.step.completed` events are intermediate boundaries inside one prompt; only `prompt.completed` settles runtime status and Assistant display, while SDK completion remains turn-scoped. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

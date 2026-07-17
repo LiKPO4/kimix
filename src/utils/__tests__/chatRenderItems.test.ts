@@ -249,6 +249,27 @@ describe("buildRenderItems usage footer", () => {
     expect(assistant.event.type === "assistant_message" && assistant.event.isComplete).toBe(true);
   });
 
+  it("derives the active Assistant header when the latest user turn has lost its placeholder", () => {
+    const nextUser: TimelineEvent = {
+      id: "user-next",
+      type: "user_message",
+      timestamp: 5,
+      content: "继续检查",
+    };
+    const items = buildRenderItems([...events, nextUser], "kimi-code", undefined, true);
+    const nextUserIndex = items.findIndex((item) => item.type === "event" && item.event.id === nextUser.id);
+    const activeAssistant = items.slice(nextUserIndex + 1).find((item) => (
+      item.type === "event" && item.event.type === "assistant_message"
+    ));
+
+    expect(nextUserIndex).toBeGreaterThanOrEqual(0);
+    expect(activeAssistant?.type).toBe("event");
+    if (activeAssistant?.type !== "event" || activeAssistant.event.type !== "assistant_message") return;
+    expect(activeAssistant.event.id).toBe("assistant-pending-user-next");
+    expect(activeAssistant.event.content).toBe("");
+    expect(activeAssistant.event.isComplete).toBe(false);
+  });
+
   it("keeps a successful tool-only latest turn active while the runtime is still running", () => {
     const items = buildRenderItems([{
       id: "user-tool-only",

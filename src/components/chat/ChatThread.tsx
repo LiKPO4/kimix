@@ -656,7 +656,7 @@ export function buildRenderItems(
     } satisfies Extract<TimelineEvent, { type: "assistant_message" }>;
   };
 
-  const renderTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false) => {
+  const renderTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false, turnUserEventId?: string) => {
     turnEvents
       .filter((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction")
       .forEach((event) => items.push({ type: "event", event }));
@@ -682,7 +682,6 @@ export function buildRenderItems(
       (event): event is Extract<TimelineEvent, { type: "approval_request" }> =>
         event.type === "approval_request" && event.status !== "pending"
     );
-    const foldApprovals = Boolean(mergedAssistantEvent) && resolvedApprovals.length > 0;
     const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
     const isRoomAgentRunning = Boolean(roomAgentId && activeRoomAgentIds?.has(roomAgentId));
     const hasCompletedAssistantOutput = assistantEvents.some((event) => event.isComplete && Boolean(
@@ -697,6 +696,7 @@ export function buildRenderItems(
     const isRuntimeAwaitingTurnOutput = Boolean(
       !roomAgentId && isLatestTurn && isSessionRunning && !hasCompletedAssistantOutput
     );
+    const foldApprovals = Boolean(mergedAssistantEvent || isRuntimeAwaitingTurnOutput) && resolvedApprovals.length > 0;
     const turnSettled = (
       !isRoomAgentRunning &&
       !isRuntimeAwaitingTurnOutput &&
@@ -737,6 +737,43 @@ export function buildRenderItems(
       steerEvents.forEach((event) => items.push({ type: "event", event }));
       steerAttached = true;
     };
+    // The optimistic Assistant event is transport bookkeeping, not the source
+    // of truth for whether an active user turn needs a visible process header.
+    // Snapshot reconciliation, reload recovery, or a slow first model delta can
+    // legitimately leave an active latest turn with no Assistant event. Derive
+    // one stable render-only placeholder from the user turn so the header never
+    // depends on event arrival timing.
+    if (!renderAssistantEvent && isRuntimeAwaitingTurnOutput && turnUserEventId) {
+      const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
+      const pendingAssistantEvent: Extract<TimelineEvent, { type: "assistant_message" }> = {
+        id: `assistant-pending-${turnUserEventId}`,
+        type: "assistant_message",
+        timestamp: turnStartedAt ?? identityEvent?.timestamp ?? Date.now(),
+        content: "",
+        isThinking: false,
+        isComplete: false,
+        roomAgentId: identityEvent?.roomAgentId,
+        roomMessageId: identityEvent?.roomMessageId,
+        agentTurnId: identityEvent?.agentTurnId,
+      };
+      items.push({
+        type: "event",
+        event: pendingAssistantEvent,
+        turnStartedAt,
+        leadingTools: tools,
+        leadingSubagents: subagents,
+        leadingHooks: hooks,
+        leadingApprovals: resolvedApprovals,
+        attachedSteers: getAttachedSteers(),
+        activeStatus: activeStatusEvent,
+        changedFiles: Array.from(changedFiles),
+        changeSummary: mergedChangeSummary ?? undefined,
+        trailingStatuses: [],
+      });
+      assistantAttached = true;
+      toolsAttached = true;
+      if (mergedChangeSummary) changeSummaryAttached = true;
+    }
     for (const [, event] of turnEvents.entries()) {
       if (event.type === "compaction") continue;
       if (event.type === "steer_message") continue;
@@ -845,6 +882,7 @@ export function buildRenderItems(
 
   let turnBody: TimelineEvent[] = [];
   let currentTurnStartedAt: number | undefined;
+  let currentTurnUserEventId: string | undefined;
   let currentAgentTurnId: string | undefined;
   const canCacheTurn = (turnEvents: TimelineEvent[], isLatestTurn: boolean) => {
     if (!completedTurnCache || turnEvents.length === 0) return false;
@@ -866,9 +904,9 @@ export function buildRenderItems(
     const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
     return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${currentTurnStartedAt ?? first.timestamp}`;
   };
-  const renderCachedTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false) => {
+  const renderCachedTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false, turnUserEventId?: string) => {
     if (!canCacheTurn(turnEvents, isLatestTurn) || !completedTurnCache) {
-      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn);
+      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEventId);
       return;
     }
     const cacheKey = completedTurnCacheKey(turnEvents);
@@ -884,7 +922,7 @@ export function buildRenderItems(
       return;
     }
     const itemStart = items.length;
-    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn);
+    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEventId);
     completedTurnCache.set(cacheKey, {
       events: [...turnEvents],
       items: items.slice(itemStart),
@@ -892,7 +930,7 @@ export function buildRenderItems(
     });
   };
   const flushTurn = (isLatestTurn = false) => {
-    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn);
+    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEventId);
     turnBody = [];
     currentAgentTurnId = undefined;
   };
@@ -902,6 +940,7 @@ export function buildRenderItems(
       flushTurn(false);
       items.push({ type: "event", event, attachedUserStatuses: attachedUserStatuses?.get(event.id) });
       currentTurnStartedAt = event.timestamp;
+      currentTurnUserEventId = event.id;
       continue;
     }
     if (event.type === "steer_message") {

@@ -4,7 +4,7 @@ title: Chat Viewport State
 description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-17T15:25:00+08:00"
+timestamp: "2026-07-17T15:45:00+08:00"
 ---
 
 # Chat Viewport State
@@ -19,6 +19,11 @@ its own incomplete Assistant, running tool/subagent, room activity identity, or
 an output-less latest turn that is still waiting for its first authoritative
 event. This prevents the previous bubble from flashing back to “消息处理中” during
 the short state-ordering gap before the next optimistic user event is rendered.
+The optimistic Assistant event is not presentation authority: if reload,
+snapshot reconciliation, or a slow first model event leaves an active latest
+user turn without that event, the renderer derives one stable process header
+from the user event identity. A busy runtime therefore cannot remove the new
+turn's header or attach it to the completed turn above.
 
 ## Viewport ownership
 
