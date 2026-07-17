@@ -270,6 +270,54 @@ describe("buildRenderItems usage footer", () => {
     expect(activeAssistant.event.isComplete).toBe(false);
   });
 
+  it("keeps a superseded turn's final usage settled when its Assistant completion flag is stale", () => {
+    const items = buildRenderItems([{
+      id: "user-previous",
+      type: "user_message",
+      timestamp: 1,
+      content: "上一轮",
+    }, {
+      id: "assistant-stale-open",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "上一轮已经输出完成",
+      isThinking: false,
+      isComplete: false,
+    }, {
+      id: "usage-previous",
+      type: "status_update",
+      timestamp: 3,
+      inputTokenCount: 320_550,
+      tokenCount: 3_160,
+      contextSize: 0.0574,
+    }, {
+      id: "user-current",
+      type: "user_message",
+      timestamp: 4,
+      content: "新一轮",
+    }, {
+      id: "assistant-current",
+      type: "assistant_message",
+      timestamp: 5,
+      content: "",
+      isThinking: true,
+      isComplete: false,
+    }], "kimi-code", undefined, true);
+    const previousAssistant = items.find((item) => (
+      item.type === "event" && item.event.id === "assistant-stale-open"
+    ));
+
+    expect(previousAssistant?.type).toBe("event");
+    if (previousAssistant?.type !== "event" || previousAssistant.event.type !== "assistant_message") return;
+    expect(previousAssistant.event.isComplete).toBe(true);
+    expect(previousAssistant.isAssistantActive).toBe(false);
+    expect(previousAssistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-previous"]);
+    const currentAssistant = items.find((item) => (
+      item.type === "event" && item.event.id === "assistant-current"
+    ));
+    expect(currentAssistant?.type === "event" ? currentAssistant.isAssistantActive : undefined).toBe(true);
+  });
+
   it("keeps a successful tool-only latest turn active while the runtime is still running", () => {
     const items = buildRenderItems([{
       id: "user-tool-only",

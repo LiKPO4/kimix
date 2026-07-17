@@ -32,3 +32,31 @@ Before the fix, no Assistant item follows `user-next`. The invariant is now:
   or without a persisted optimistic Assistant placeholder.
 - The derived placeholder is render-only and has the stable identity
   `assistant-pending-<userEventId>`; the first real Assistant event replaces it.
+
+## v2.16.41 follow-up: previous footer reactivation
+
+The v2.16.41 acceptance screenshot confirmed that the derived current-turn
+header was present, but also exposed a separate ownership violation. The
+previous response's final model/Tokens/Context footer changed to
+“消息处理中” while the new turn ran, then recovered after completion.
+
+The reproducing event sequence is:
+
+| Order | Event | State |
+| --- | --- | --- |
+| 1 | `user_message:user-previous` | Previous prompt. |
+| 2 | `assistant_message:assistant-stale-open` | Durable body exists, but a reconciled segment leaves `isComplete=false`. |
+| 3 | `status_update:usage-previous` | Final input/output/context metrics exist. |
+| 4 | `user_message:user-current` | Hard single-Agent turn boundary. |
+| 5 | `assistant_message:assistant-current` | New active placeholder; session runtime is running. |
+
+Two independent computations caused the regression. `buildRenderItems` did not
+treat the next user message as a hard settlement boundary when an old Assistant
+or tool flag remained open. `AssistantMessageBubble` then read the global
+`runningSessionId` and reactivated that historical row.
+
+Activity is now resolved once by the turn projection and passed explicitly to
+the bubble. In a single-Agent session, a later user message settles the previous
+turn for display, preserves its final usage, and normalizes stale Assistant
+completion state. Historical bubbles no longer subscribe to session-global
+runtime activity.

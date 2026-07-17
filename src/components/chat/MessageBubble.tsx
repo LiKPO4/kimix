@@ -11,7 +11,6 @@ import { ChangeCard } from "./ChangeCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs } from "@/utils/duration";
-import { hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents } from "@/utils/sessionActivity";
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
@@ -50,6 +49,7 @@ interface MessageBubbleProps {
   sessionId?: string;
   runtimeSessionId?: string;
   turnStartedAt?: number;
+  isAssistantActive?: boolean;
   leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[];
   leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[];
@@ -206,6 +206,7 @@ function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubblePr
     prev.runtimeSessionId === next.runtimeSessionId &&
     prev.onDeleteUserMessage === next.onDeleteUserMessage &&
     prev.turnStartedAt === next.turnStartedAt &&
+    prev.isAssistantActive === next.isAssistantActive &&
     prev.hideProcessSummary === next.hideProcessSummary &&
     prev.expandProcessByDefault === next.expandProcessByDefault &&
     prev.eagerMarkdown === next.eagerMarkdown &&
@@ -2018,10 +2019,9 @@ export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { typ
   return event.isComplete ? "已完成" : "消息处理中";
 }
 
-function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; runtimeSessionId?: string; turnStartedAt?: number; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
-  const runningSessionId = useAppStore((s) => s.runningSessionId);
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
@@ -2048,16 +2048,9 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
       event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
     )).filter((filePath) => changedSet.has(normalizePathForComparison(filePath))).slice(0, 3);
   }, [changedFilesSignature, event.content, event.isComplete]);
-  const isRunningThisSession = Boolean(sessionId && (
-    runningSessionId === sessionId ||
-    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
-  ));
-  const hasRunningProcess = leadingTools.some((tool) => tool.status === "running") ||
-    leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended");
-  const processEvents = [event, ...leadingTools, ...leadingSubagents];
-  const hasRecentTimelineActivity = hasActiveTimelineWorkEvents(processEvents);
-  const hasOpenTimelineActivity = hasOpenTimelineWorkEvents(processEvents);
-  const isActiveAssistant = Boolean((isRunningThisSession || hasRecentTimelineActivity || hasOpenTimelineActivity) && (!event.isComplete || hasRunningProcess));
+  // Activity ownership is resolved once in ChatThread's turn projection. A
+  // historical bubble must never read session-global runtime state on its own.
+  const isActiveAssistant = Boolean(isAssistantActive);
   const hasActualThinking = Boolean(
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
@@ -2188,12 +2181,12 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ event, sessionId, runtimeSessionId, turnStartedAt, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, eagerMarkdown, onDeleteUserMessage }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, eagerMarkdown, onDeleteUserMessage }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} onDelete={onDeleteUserMessage} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} />;
 }, messageBubblePropsEqual);

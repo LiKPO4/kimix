@@ -2,7 +2,7 @@
 
 ## 2026-07-17
 
-* **Active user turns derive their process header**: A lost optimistic Assistant placeholder no longer removes “消息处理中”; while the latest user turn is runtime-active, the renderer derives a stable render-only header from that user event, without reopening the completed response above. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
+* **Assistant activity has one turn-level owner**: A lost optimistic placeholder still derives the latest turn's process header, but historical bubbles no longer read session-global runtime state. In single-Agent timelines, the next user message hard-settles stale incomplete display state and preserves the previous model/Tokens/Context footer. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
 
 * **Chat turn and viewport ownership are explicit**: A session-level running flag cannot reopen a completed prior response; rail/search navigation enters detached mode through the same user-intent transaction, invalidates the previous anchor, and disables Chromium's competing native anchoring. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
 

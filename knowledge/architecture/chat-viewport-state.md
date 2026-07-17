@@ -4,7 +4,7 @@ title: Chat Viewport State
 description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-17T15:45:00+08:00"
+timestamp: "2026-07-17T16:08:00+08:00"
 ---
 
 # Chat Viewport State
@@ -24,6 +24,15 @@ snapshot reconciliation, or a slow first model event leaves an active latest
 user turn without that event, the renderer derives one stable process header
 from the user event identity. A busy runtime therefore cannot remove the new
 turn's header or attach it to the completed turn above.
+
+Assistant activity is decided once by the turn projection and passed as an
+explicit render property. Individual bubbles never consume session-global
+runtime state. In a single-Agent timeline, the next `user_message` is a hard
+display settlement boundary: it preserves the previous turn's final usage and
+normalizes stale incomplete Assistant/process flags instead of allowing the new
+runtime to reactivate that footer. Room activity remains scoped by room Agent
+and delivery identity because later queued room messages do not necessarily
+settle an earlier Agent delivery.
 
 ## Viewport ownership
 
