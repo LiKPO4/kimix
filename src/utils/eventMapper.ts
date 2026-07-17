@@ -1423,6 +1423,11 @@ function isKimixSyntheticThinking(text: string) {
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
+    // Snapshot/replay ids are deterministic; a stable id is a hard duplicate
+    // even when the same message arrives many turns later out of order.
+    if (incoming.id && existing.some((event) => event.type === "user_message" && event.id === incoming.id)) {
+      return existing;
+    }
     const deliveryIdentity = incoming.roomMessageId && incoming.agentTurnId && incoming.dispatchAttemptId
       ? `${incoming.roomMessageId}\n${incoming.agentTurnId}\n${incoming.dispatchAttemptId}`
       : null;
@@ -1799,4 +1804,42 @@ export function mapHistoryEvents(events: unknown[]): TimelineEvent[] {
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 11);
+}
+
+/**
+ * Idempotent cleanup for histories damaged by replay duplication. Replay
+ * paths historically re-appended the whole user history on every restore
+ * because the echo guard only compared against the latest user message.
+ * Duplicate rules:
+ * - identical non-empty event id keeps the first copy;
+ * - two user messages with identical normalized content within 10s keep the
+ *   copy that carries richer room identity (roomMessageId/agentTurnId).
+ */
+export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
+  const seenIds = new Set<string>();
+  const result: TimelineEvent[] = [];
+  const seenUsers: Array<{ index: number; content: string; timestamp: number; hasIdentity: boolean }> = [];
+  for (const event of events) {
+    if (event.id && seenIds.has(event.id)) continue;
+    if (event.type === "user_message") {
+      const content = normalizeUserContent(event.content ?? "");
+      const hasIdentity = Boolean(event.roomMessageId || event.agentTurnId);
+      const duplicateIndex = content
+        ? seenUsers.findIndex((seen) => seen.content === content && Math.abs(seen.timestamp - event.timestamp) <= 10_000)
+        : -1;
+      if (duplicateIndex >= 0) {
+        const seen = seenUsers[duplicateIndex];
+        if (hasIdentity && !seen.hasIdentity) {
+          result[seen.index] = event;
+          seenUsers[duplicateIndex] = { index: seen.index, content, timestamp: event.timestamp, hasIdentity };
+          if (event.id) seenIds.add(event.id);
+        }
+        continue;
+      }
+      seenUsers.push({ index: result.length, content, timestamp: event.timestamp, hasIdentity });
+    }
+    if (event.id) seenIds.add(event.id);
+    result.push(event);
+  }
+  return result;
 }

@@ -4,6 +4,7 @@ import type { Project, Session, TimelineEvent, UserMessageImage } from "@/types/
 import type { PendingMessage } from "@/stores/sessionStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { isSamePath } from "@/utils/pathCase";
+import { deduplicateTimelineEvents } from "@/utils/eventMapper";
 import {
   getPrimaryRoomAgent,
   getRoomAgentRuntimeId,
@@ -573,7 +574,19 @@ export async function loadLocalSessions(): Promise<Session[]> {
   const refs = new Set<string>();
   raw.forEach((session) => collectImageRefs(session, refs));
   const dataUrlById = await loadImages(Array.from(refs));
-  return hydrateSessions(raw, dataUrlById);
+  // Replay duplication repair: histories written before the snapshot user
+  // dedup guards may contain repeated user messages; clean once on load.
+  return hydrateSessions(raw, dataUrlById).map((session) => {
+    const events = deduplicateTimelineEvents(session.events);
+    if (!session.collaboration) {
+      return events.length === session.events.length ? session : { ...session, events };
+    }
+    const agentEntries = Object.entries(session.collaboration.agentEvents);
+    const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, deduplicateTimelineEvents(list)]));
+    const changed = events.length !== session.events.length ||
+      agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
+    return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
+  });
 }
 
 export async function loadLocalPendingMessages(): Promise<PendingMessage[]> {

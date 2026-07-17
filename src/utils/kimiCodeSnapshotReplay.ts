@@ -83,6 +83,19 @@ export function reconcileRunningKimiSnapshot(
       : rawEvent;
     const alreadyMounted = events.some((local) => {
       if (local.type !== event.type) return false;
+      if (local.type === "user_message" && event.type === "user_message") {
+        // Snapshot user ids are deterministic (snapshot:<messageId>:user:<n>),
+        // so an identical id is a hard duplicate. A local optimistic send and
+        // its official snapshot echo share content within seconds. Without
+        // this branch every replay re-appended the full user history — after a
+        // few restarts the duplicated users flooded the render window and
+        // pushed every assistant reply out of view.
+        if (local.id === event.id) return true;
+        const localText = normalizeText(local.content ?? "");
+        const eventText = normalizeText(event.content ?? "");
+        return eventText.length > 0 && localText === eventText &&
+          Math.abs(local.timestamp - event.timestamp) <= 10_000;
+      }
       if (local.type === "assistant_message" && event.type === "assistant_message") {
         if (local.isComplete === event.isComplete &&
           local.content === event.content &&

@@ -224,3 +224,36 @@ describe("reconcileRunningKimiSnapshot", () => {
     expect(old).toMatchObject({ isComplete: true });
   });
 });
+
+describe("reconcileRunningKimiSnapshot user replay dedup", () => {
+  it("does not re-append snapshot user history on repeated replays", () => {
+    // Replay ids are deterministic; before the guard, every replay appended the
+    // full user history again and eventually flooded the render window.
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:msg_u1:user:0", type: "user_message", timestamp: 100, content: "第一个问题",
+    }, {
+      id: "snapshot:msg_u2:user:0", type: "user_message", timestamp: 5000, content: "第二个问题",
+    }, {
+      id: "assistant-1", type: "assistant_message", timestamp: 5100, content: "回答", isThinking: false, isComplete: true,
+    }];
+    const once = reconcileRunningKimiSnapshot([], snapshot);
+    const twice = reconcileRunningKimiSnapshot(once, snapshot);
+    const thrice = reconcileRunningKimiSnapshot(twice, snapshot);
+    expect(thrice.filter((event) => event.type === "user_message")).toHaveLength(2);
+    expect(thrice.filter((event) => event.type === "assistant_message")).toHaveLength(1);
+  });
+
+  it("does not duplicate a local optimistic user when its snapshot echo arrives", () => {
+    const live: TimelineEvent[] = [{
+      id: "local-user", type: "user_message", timestamp: 1000, content: "本地发送的问题",
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:msg_u9:user:0", type: "user_message", timestamp: 1001, content: "本地发送的问题",
+    }, {
+      id: "assistant-1", type: "assistant_message", timestamp: 1100, content: "回答", isThinking: false, isComplete: true,
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    expect(result.filter((event) => event.type === "user_message")).toHaveLength(1);
+    expect(result.filter((event) => event.type === "user_message")[0].id).toBe("local-user");
+  });
+});

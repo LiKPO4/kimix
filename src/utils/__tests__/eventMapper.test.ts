@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory } from "../eventMapper";
+import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory, deduplicateTimelineEvents } from "../eventMapper";
 import * as reportError from "@/utils/reportError";
 import type { TimelineEvent } from "@/types/ui";
 import { buildRoomDeliveryPrompt } from "../roomContextBridge";
@@ -1951,5 +1951,48 @@ describe("mergeEvents subagent lifecycle instrumentation", () => {
         eventType: "assistant_message",
       }),
     );
+  });
+});
+
+describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
+  it("skips a replayed user message with an identical stable id", () => {
+    const existing: TimelineEvent[] = [{
+      id: "snapshot:msg_u1:user:0", type: "user_message", timestamp: 100, content: "问题",
+    }];
+    const incoming: TimelineEvent = {
+      id: "snapshot:msg_u1:user:0", type: "user_message", timestamp: 100, content: "问题",
+    };
+    expect(mergeEvents(existing, incoming)).toHaveLength(1);
+  });
+
+  it("deduplicateTimelineEvents removes replay duplicates and keeps the identity-rich user copy", () => {
+    const damaged: TimelineEvent[] = [{
+      id: "snapshot:msg_u1:user:0", type: "user_message", timestamp: 1000, content: "同一个问题",
+    }, {
+      id: "assistant-1", type: "assistant_message", timestamp: 1100, content: "回答一", isThinking: false, isComplete: true,
+    }, {
+      id: "local-u1", type: "user_message", timestamp: 1001, content: "同一个问题", roomMessageId: "local-u1", agentTurnId: "turn-1",
+    }, {
+      id: "snapshot:msg_u1:user:0", type: "user_message", timestamp: 1000, content: "同一个问题",
+    }, {
+      id: "assistant-2", type: "assistant_message", timestamp: 1200, content: "回答二", isThinking: false, isComplete: true,
+    }];
+    const result = deduplicateTimelineEvents(damaged);
+    expect(result.filter((event) => event.type === "user_message")).toHaveLength(1);
+    expect(result.filter((event) => event.type === "user_message")[0].id).toBe("local-u1");
+    expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(2);
+  });
+
+  it("deduplicateTimelineEvents is idempotent and keeps distinct users", () => {
+    const events: TimelineEvent[] = [{
+      id: "u1", type: "user_message", timestamp: 1000, content: "问题一",
+    }, {
+      id: "u2", type: "user_message", timestamp: 5000, content: "问题二",
+    }, {
+      id: "a1", type: "assistant_message", timestamp: 6000, content: "回答", isThinking: false, isComplete: true,
+    }];
+    const once = deduplicateTimelineEvents(events);
+    expect(once).toHaveLength(3);
+    expect(deduplicateTimelineEvents(once)).toHaveLength(3);
   });
 });
