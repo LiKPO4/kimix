@@ -5,6 +5,7 @@ import { execFile, spawn } from "node:child_process";
 
 const DEFAULT_PORT = 58_627;
 const START_TIMEOUT_MS = 20_000;
+const SERVER_LOCK_STARTUP_GRACE_MS = 30_000;
 const REQUIRED_PATHS = [
   "/api/v1/sessions",
   "/api/v1/sessions/{session_id}/snapshot",
@@ -96,6 +97,14 @@ function serverAuthHeaders(): Record<string, string> {
 }
 
 type ServerLockContents = { pid: number; port: number; host?: string; started_at?: string };
+
+export function shouldClearUnresponsiveServerLock(
+  lock: Pick<ServerLockContents, "started_at">,
+  now = Date.now(),
+) {
+  const startedAt = Date.parse(lock.started_at ?? "");
+  return Number.isFinite(startedAt) && now - startedAt >= SERVER_LOCK_STARTUP_GRACE_MS;
+}
 
 function serverLockPath() {
   return path.join(os.homedir(), ".kimi-code", "server", "lock");
@@ -220,20 +229,35 @@ export class KimiCodeServerHost {
         try {
           const capabilities = await this.probe(lockEndpoint);
           this.status = { ...this.status, state: "attached", managed: false, endpoint: lockEndpoint, capabilities };
+          return this.getStatus();
         } catch (error) {
-          this.status = {
-            ...this.status,
-            state: "fallback",
-            managed: false,
-            error: `检测到运行中的 Kimi Server（pid ${lock.pid}，${lockEndpoint}），但能力探测失败：${errorMessage(error)}`,
-          };
+          if (!shouldClearUnresponsiveServerLock(lock)) {
+            this.status = {
+              ...this.status,
+              state: "fallback",
+              managed: false,
+              error: `检测到运行中的 Kimi Server（pid ${lock.pid}，${lockEndpoint}），但能力探测失败：${errorMessage(error)}`,
+            };
+            return this.getStatus();
+          }
+          try {
+            fs.unlinkSync(serverLockPath());
+          } catch (unlinkError) {
+            this.status = {
+              ...this.status,
+              state: "fallback",
+              managed: false,
+              error: `Kimi Server 陈旧锁无法清理（${serverLockPath()}）：${errorMessage(unlinkError)}`,
+            };
+            return this.getStatus();
+          }
         }
-        return this.getStatus();
-      }
-      try {
-        fs.unlinkSync(serverLockPath());
-      } catch {
-        // 清理失败时让 spawn 的错误原样上报，不掩盖真实原因。
+      } else {
+        try {
+          fs.unlinkSync(serverLockPath());
+        } catch {
+          // 清理失败时让 spawn 的错误原样上报，不掩盖真实原因。
+        }
       }
     }
 

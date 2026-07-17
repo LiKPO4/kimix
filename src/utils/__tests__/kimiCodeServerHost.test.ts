@@ -3,6 +3,7 @@ import {
   inspectKimiCodeServerContract,
   isKimiCodeServerExperimentEnabled,
   KimiCodeServerHost,
+  shouldClearUnresponsiveServerLock,
 } from "../../../electron/kimiCodeServerHost";
 import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
@@ -49,6 +50,18 @@ describe("kimiCodeServerHost", () => {
       managed: false,
       error: "fetch failed",
     });
+  });
+
+  it("clears only an old unresponsive server lock after the startup grace period", () => {
+    const now = Date.parse("2026-07-17T12:00:00.000Z");
+    expect(shouldClearUnresponsiveServerLock({
+      started_at: "2026-07-17T11:59:00.000Z",
+    }, now)).toBe(true);
+    expect(shouldClearUnresponsiveServerLock({
+      started_at: "2026-07-17T11:59:45.000Z",
+    }, now)).toBe(false);
+    expect(shouldClearUnresponsiveServerLock({}, now)).toBe(false);
+    expect(shouldClearUnresponsiveServerLock({ started_at: "invalid" }, now)).toBe(false);
   });
 
   it("drops a managed server out of ready state after the child exits", () => {
