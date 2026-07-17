@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 const scriptPath = resolve(__dirname, "../../../scripts/restart-kimix-dev.ps1");
 const devScriptPath = resolve(__dirname, "../../../scripts/dev.cjs");
@@ -27,6 +28,36 @@ describe("restart-kimix-dev.ps1", () => {
         timeout: 30_000,
       });
     }).not.toThrow();
+  });
+
+  it("quotes the dev script path and scopes packaged-process matching", () => {
+    const content = readFileSync(scriptPath, "utf-8");
+    expect(content).toContain('$devArguments = "`"$devScript`" --kimix-runtime-token=');
+    expect(content).toContain('$isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inKnownKimixPath)');
+  });
+
+  it.runIf(process.platform === "win32")("preserves a script path containing spaces across Start-Process argv", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kimix argv probe "));
+    try {
+      const probePath = join(directory, "probe script.cjs");
+      const outputPath = join(directory, "argv output.json");
+      writeFileSync(probePath, "require('node:fs').writeFileSync(process.argv[2], JSON.stringify(process.argv.slice(3)))");
+      const escapePowerShell = (value: string) => value.replace(/'/g, "''");
+      const command = [
+        `$probe='${escapePowerShell(probePath)}'`,
+        `$output='${escapePowerShell(outputPath)}'`,
+        '$arguments="`"$probe`" `"$output`" --kimix-runtime-token=review-probe"',
+        '$process=Start-Process -FilePath "node" -ArgumentList $arguments -Wait -PassThru',
+        'exit $process.ExitCode',
+      ].join("; ");
+      execFileSync("powershell", ["-NoProfile", "-Command", command], {
+        windowsHide: true,
+        timeout: 30_000,
+      });
+      expect(JSON.parse(readFileSync(outputPath, "utf-8"))).toEqual(["--kimix-runtime-token=review-probe"]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 

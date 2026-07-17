@@ -103,7 +103,7 @@ function Stop-KimixProcessTree {
     $isKimixElectron = $process.Name -eq "electron.exe" -and (
       $inKnownKimixPath
     )
-    $isKimixPackaged = $process.Name -eq "Kimix.exe"
+    $isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inKnownKimixPath)
     $isKimixShell = $process.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe") -and $inKnownKimixPath -and (
       (Test-ContainsIgnoreCase $commandLine "start-kimix.bat") -or
       (Test-ContainsIgnoreCase $commandLine "restart-kimix-dev.ps1")
@@ -188,7 +188,8 @@ if ($hotReloadDev) {
   # Use node directly so the runtime token appears in the top-level command line
   # and is forwarded by scripts/dev.cjs to the Electron process tree.
   $devScript = Join-Path $workspace "scripts\dev.cjs"
-  Start-Process -FilePath "node" -ArgumentList "$devScript --kimix-runtime-token=$($script:RuntimeToken)" -WorkingDirectory $workspace -Wait
+  $devArguments = "`"$devScript`" --kimix-runtime-token=$($script:RuntimeToken)"
+  Start-Process -FilePath "node" -ArgumentList $devArguments -WorkingDirectory $workspace -Wait
   return
 }
 
@@ -210,6 +211,9 @@ if ($fullClean) {
       Remove-Item -LiteralPath $target -Recurse -Force
     }
   }
+
+  # out/ contains the runtime-token handoff file, so restore it after cleanup.
+  Set-RuntimeToken $script:RuntimeToken
 
   Write-Host "Clean rebuild..."
   Invoke-KimixBuild
