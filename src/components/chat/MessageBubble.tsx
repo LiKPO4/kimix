@@ -1738,6 +1738,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent;
   const [expanded, setExpanded] = useState(defaultExpanded);
   const previousHasFinalContentRef = useRef(hasFinalContent);
+  const manuallyExpandedRef = useRef(false);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
   const contentAnchorRef = useRef<HTMLSpanElement>(null);
   const processDetailRef = useRef<HTMLDivElement>(null);
@@ -1772,6 +1773,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     hasFinalContent,
     isKimiWeb,
     expanded,
+    manuallyExpanded: manuallyExpandedRef.current,
   });
 
   const dispatchProcessCollapseViewport = (
@@ -1813,6 +1815,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   }, [expanded]);
 
   const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
+    manuallyExpandedRef.current = nextExpanded;
     const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
     const scrollNode = anchor?.closest<HTMLElement>(".kimix-chat-scroll-area");
     if (anchor && scrollNode) {

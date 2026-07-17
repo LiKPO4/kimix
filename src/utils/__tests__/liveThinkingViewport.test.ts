@@ -69,6 +69,7 @@ describe("liveThinkingViewport", () => {
       hasFinalContent: true,
       isKimiWeb: true,
       expanded: true,
+      manuallyExpanded: false,
     };
     expect(shouldCollapseKimiWebProcessOnFinalContent(base)).toBe(true);
     expect(shouldCollapseKimiWebProcessOnFinalContent({
@@ -78,6 +79,10 @@ describe("liveThinkingViewport", () => {
     expect(shouldCollapseKimiWebProcessOnFinalContent({
       ...base,
       isKimiWeb: false,
+    })).toBe(false);
+    expect(shouldCollapseKimiWebProcessOnFinalContent({
+      ...base,
+      manuallyExpanded: true,
     })).toBe(false);
   });
 });

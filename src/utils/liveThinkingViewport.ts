@@ -55,11 +55,13 @@ export function shouldCollapseKimiWebProcessOnFinalContent({
   hasFinalContent,
   isKimiWeb,
   expanded,
+  manuallyExpanded,
 }: {
   previousHasFinalContent: boolean;
   hasFinalContent: boolean;
   isKimiWeb: boolean;
   expanded: boolean;
+  manuallyExpanded: boolean;
 }) {
-  return isKimiWeb && expanded && !previousHasFinalContent && hasFinalContent;
+  return isKimiWeb && expanded && !manuallyExpanded && !previousHasFinalContent && hasFinalContent;
 }
