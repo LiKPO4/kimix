@@ -578,7 +578,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
         clientHeight: node.clientHeight,
       });
 
-      setDetachedTailCompensation(plan.tailCompensation);
+      setDetachedTailCompensation(plan.tailCompensation, plan.minimumScrollHeight);
       const compensatedScrollHeight = node.scrollHeight;
       ignoreScrollUntilRef.current = Date.now() + 240;
       node.scrollTop = plan.targetScrollTop;

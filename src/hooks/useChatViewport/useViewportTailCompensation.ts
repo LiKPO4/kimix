@@ -8,7 +8,7 @@ export interface UseViewportTailCompensationResult {
   detachedTailCompensationRef: React.MutableRefObject<number>;
   /** Read the current compensation value without accessing the ref from outside. */
   getDetachedTailCompensation: () => number;
-  setDetachedTailCompensation: (value: number) => void;
+  setDetachedTailCompensation: (value: number, minimumScrollHeight?: number) => void;
   clearDetachedViewportCompensation: () => void;
   reconcileDetachedViewportCompensation: (node: HTMLElement) => void;
   naturalDistanceFromBottom: (node: HTMLElement) => number;
@@ -20,8 +20,13 @@ export function useViewportTailCompensation(
   const detachedViewportMinimumScrollHeightRef = useRef<number | null>(null);
   const detachedTailCompensationRef = useRef(0);
 
-  const setDetachedTailCompensation = useCallback((value: number) => {
+  const setDetachedTailCompensation = useCallback((value: number, minimumScrollHeight?: number) => {
     const nextValue = Math.max(0, value);
+    if (minimumScrollHeight !== undefined) {
+      detachedViewportMinimumScrollHeightRef.current = nextValue > 0.01
+        ? Math.max(0, minimumScrollHeight)
+        : null;
+    }
     if (Math.abs(detachedTailCompensationRef.current - nextValue) <= 0.01) return;
     detachedTailCompensationRef.current = nextValue;
     streamContentRef.current?.style.setProperty(
