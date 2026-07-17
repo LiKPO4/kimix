@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-17 提前"输出完成"与消息头消失根治（渲染派生层）
+
+- 当前目标：根治两个多轮未修复的问题——(1) 发送后到 k3 思考中之间消息头消失；(2) 运行中头部提前显示"输出完成"而底部仍"运行中"。
+- 根因证据（diag.log + 代码）：事件流层干净——`stream.flush.openAssistantChanged` 全程只有 `0→1`(116) 与真实轮末 `1→0`(3)，未完成助手数运行期间稳定为 1；`reconcile.runningSample.applied` 0 次，排除历史采样替换路径。真正根因在 `buildRenderItems` 渲染派生层：头部用 turn 级 `turnSettled`（依赖 per-event `isComplete` + `activeRoomAgentTurn` 精确 turn-id 匹配），底部用 session 级 `hasActiveTurn`，两套真相源背离。agent-core-v2 一轮内会先提交带内容的 `isComplete:true` 完成分步（`step.end` finishReason=end_turn），使 `hasCompletedAssistantOutput=true` → `!hasCompletedAssistantOutput` 门槛把 `isRuntimeAwaitingTurnOutput` 打成 false → `isTurnActive` 只剩 `activeRoomAgentTurn` 兜底；而事件回填的 `agentTurnId` 来自 activity `activeTurnId`，在 status 转换 `previous` 丢失时变 undefined，精确匹配失败 → `isTurnActive=false`：有内容则 `turnSettled=true` 提前"输出完成"(P2)，无内容则 pending 头也不生成、消息头消失(P1)。之前多轮补在快照回放/历史对账层，补错了层。
+- 修复：`isRuntimeAwaitingTurnOutput` 的 `!hasCompletedAssistantOutput` 门槛仅对遗留非房间轮次保留；房间轮次（现全部真实场景）改为 `Boolean(roomAgentId) || !hasCompletedAssistantOutput`。安全前提已核实：Composer 发送路径 user_message 先于 `setRunningSessionId` 写入，`isLatestTurn && isSessionRunning` 无歧义指向运行中那一轮；终态处理器同 tick 清 `runningSessionId` 且置 activity 终态，轮次在真实结束点才 settle。单处修复同时解决 P1/P2。
+- 验证：v2.16.44；定向 `chatRenderItems.test.ts` 35 项通过（新增 2 项精确复现 P1/P2）；严格类型检查通过；全量 103 个测试文件、813 项通过；OKF 严格校验通过（10 概念、18 Markdown、228 链接）；生产构建通过，renderer 为 `assets/index-B0QiYBan.js`。已还原上一轮遗留的 useEventStream/App.tsx 诊断脚手架。
+- 阻塞：无；不推送、不打 tag、不发布。等待用户实机截图验收。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/utils/__tests__/chatRenderItems.test.ts`。
+- 下一步：用户在真实长工具链复验——发送后消息头不再消失、运行中头部不再提前"输出完成"、真实结束时才显示完成。
+
 ## 2026-07-17 运行中假完成、过程折叠与消息闪断专项
 
 - 当前目标：修复 Kimi Web 会话仍在运行时错误显示“输出完成”、用户手动展开的思考/命令被自动折叠、Agent 消息头瞬间消失再出现，以及旧过程内容在运行中暂时丢失的问题。
@@ -13,6 +23,16 @@
 - 阻塞：无；不推送、不打 tag、不发布。当前工作树另有导航轨道与诊断改动，本专项必须按文件/补丁精确提交，不得混入。
 - 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`、`src/App.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/liveThinkingViewport.ts`、`src/components/chat/ChatThread.tsx`。
 - 下一步：用户在真实长工具链中复验运行期间不再提前显示完成、显式展开不被收起、消息头不闪断且旧过程持续可见。
+
+## 2026-07-16 Kimi Code 0.24–0.26 跟进（v2 引擎断代修复）
+
+- 当前目标：补齐 0.23.5→0.26.0 的上游评审，修复 Server v2 引擎切换造成的生产断代。
+- 已完成：四项 P0 断代修复并实测——(1) WS 鉴权改 `kimi-code.bearer` 子协议（保留 `?token=` 兼容旧 v1）；(2) `createSession` 后经 profile 端点重放 agent_config（v2 create 静默丢弃，首轮必 `model.not_configured`）；(3) Host 能力探测携带 server token（v2 全量 `/api/*` 与 meta 文档强制鉴权）；(4) Host 单例锁感知启动（活实例直连 attach、Windows 死 pid 清锁后 spawn）并修复 `stop()` 空指针。vendored SDK 重新打包到 0.26.0（node-sdk 0.13.4，commit `36b05820`）。设置页"按需工具"徽章兼容 `dynamically_loaded_tools` 新能力名。
+- 验证：主探针 6 通过/0 失败/4 跳过（`docs/kimi-code-server-probe-result.md`）；子代理/工具事件探针 10/10（`docs/kimi-code-0.26-subagent-probe.md`）；Host 锁两路径实测通过；`pnpm typecheck` 通过；全量 vitest 101 文件 777 项通过；宿主冒烟与会话导出探针通过。
+- 未完成：用户视觉/功能验收（重点是 Server 路由端到端聊天）；0.25.0 任意文件附件仅记录为功能候选（`docs/kimi-code-0.24-0.26-followup.md` 遗留项）。
+- 阻塞：无；不推送、不打 tag、不发布。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeServerHost.ts`、`vendor/kimi-code-sdk/`、`scripts/probe-kimi-code-server.mjs`、`scripts/probe-kimi-code-server-subagent.mjs`。
+- 下一步：提交本轮；用户验收 Server 路由聊天、审批/问题卡片与后台任务面板。
 
 ## 2026-07-16 对话导航轨道悬停预览
 
