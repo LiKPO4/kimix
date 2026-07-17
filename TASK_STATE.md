@@ -9,7 +9,7 @@
   2. [已完成] 区分默认展开与用户手动展开，最终正文开始时不得覆盖用户显式展开意图，并补状态判断测试。
   3. [已完成] 稳定同一轮合并 Assistant 的渲染 ID，避免流式追加导致 React 重挂载，并补渲染身份回归测试。
   4. [已完成] 运行三组定向测试、严格类型检查、知识库校验和组合回归；等待用户实机会话验收。
-- 验证：三项定向回归 3 个测试文件、44 项通过；全量 101 个测试文件、784 项通过；严格类型检查通过；OKF 严格校验通过（10 个概念、18 个 Markdown、216 条链接）；生产构建通过，renderer 为 `assets/index-OAiNo92b.js`。
+- 验证：v2.16.33；三项定向回归 3 个测试文件、44 项通过；全量 101 个测试文件、784 项通过；版本读取测试 2 项通过；严格类型检查通过；OKF 严格校验通过（10 个概念、18 个 Markdown、216 条链接）；生产构建通过，renderer 为 `assets/index-5DbRpzMR.js`。
 - 阻塞：无；不推送、不打 tag、不发布。当前工作树另有导航轨道与诊断改动，本专项必须按文件/补丁精确提交，不得混入。
 - 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`、`src/App.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/liveThinkingViewport.ts`、`src/components/chat/ChatThread.tsx`。
 - 下一步：用户在真实长工具链中复验运行期间不再提前显示完成、显式展开不被收起、消息头不闪断且旧过程持续可见。
