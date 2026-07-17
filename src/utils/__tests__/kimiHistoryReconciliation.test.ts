@@ -63,6 +63,21 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
   });
 
+  it("does not replace shorter assistant body when canonical thinking differs", () => {
+    const local = [userMessage, assistant("local complete answer", { thinking: "local thought" })];
+    const canonical = [userMessage, assistant("short", { thinking: "different canonical thought" })];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+  });
+
+  it("does not replace shorter assistant body just because canonical has an extra image", () => {
+    const local = [userMessage, assistant("local complete answer")];
+    const canonical: TimelineEvent[] = [{
+      ...userMessage,
+      images: [{ name: "img.png", dataUrl: "data:image/png;base64,abc" }],
+    }, assistant("short")];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+  });
+
   it("replaces when body text differs and canonical is longer", () => {
     const local = [userMessage, assistant("local body")];
     const canonical = [userMessage, assistant("canonical body text")];
@@ -130,10 +145,16 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
-  it("replaces when canonical has different but shorter corrective thinking", () => {
+  it("does not replace when canonical has shorter thinking history", () => {
     const local = [userMessage, assistant("body", { thinking: "a much longer local thought here" })];
     const canonical = [userMessage, assistant("body", { thinking: "short" })];
-    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+  });
+
+  it("does not replace richer body when doing so would shrink thinking history", () => {
+    const local = [userMessage, assistant("body", { thinking: "a much longer local thought here" })];
+    const canonical = [userMessage, assistant("a richer canonical body", { thinking: "short" })];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
   });
 
   it("does not replace when canonical is identical", () => {
@@ -181,6 +202,22 @@ describe("shouldReplaceWithCanonicalKimiHistory instrumentation", () => {
         reason: "process-history-regression",
         localProcessEvents: 1,
         canonicalProcessEvents: 0,
+      }),
+    );
+  });
+
+  it("logs rejected reconciliation when canonical assistant body regresses", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const local = [userMessage, assistant("local complete answer")];
+    const canonical = [userMessage, assistant("short", { thinking: "different thought" })];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical, { sessionId: "s-1" })).toBe(false);
+    expect(logEventSpy).toHaveBeenCalledWith(
+      "kimiHistoryReconciliation.rejected",
+      expect.objectContaining({
+        sessionId: "s-1",
+        reason: "assistant-body-regression",
+        localSize: "local complete answer".length,
+        canonicalSize: "short".length,
       }),
     );
   });

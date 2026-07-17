@@ -45,6 +45,15 @@ export function assistantBodyText(events: TimelineEvent[]): string {
     .join("\n\n");
 }
 
+function thinkingHistorySize(events: TimelineEvent[]): number {
+  return flattenTimelineEvents(events)
+    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
+    .reduce((sum, event) => {
+      const text = event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "";
+      return sum + text.trim().length;
+    }, 0);
+}
+
 function displayableUserImageCount(events: TimelineEvent[]): number {
   return events
     .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
@@ -99,9 +108,40 @@ export function shouldReplaceWithCanonicalKimiHistory(
   const cachedAssistantBody = assistantBodyText(cachedEvents);
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);
   const cachedAssistantSize = assistantBodySize(cachedEvents);
+  const canonicalThinkingSize = thinkingHistorySize(canonicalEvents);
+  const cachedThinkingSize = thinkingHistorySize(cachedEvents);
+  const canonicalImageCount = displayableUserImageCount(canonicalEvents);
+  const cachedImageCount = displayableUserImageCount(cachedEvents);
+
+  const regression = canonicalAssistantSize < cachedAssistantSize
+    ? {
+        reason: "assistant-body-regression",
+        localSize: cachedAssistantSize,
+        canonicalSize: canonicalAssistantSize,
+      }
+    : canonicalThinkingSize < cachedThinkingSize
+      ? {
+          reason: "thinking-history-regression",
+          localThinkingSize: cachedThinkingSize,
+          canonicalThinkingSize,
+        }
+      : canonicalImageCount < cachedImageCount
+        ? {
+            reason: "user-image-regression",
+            localImageCount: cachedImageCount,
+            canonicalImageCount,
+          }
+        : null;
+  if (regression) {
+    logEvent("kimiHistoryReconciliation.rejected", {
+      ...context,
+      ...regression,
+    });
+    return false;
+  }
 
   const shouldReplace = canonicalAssistantSize > cachedAssistantSize ||
-    displayableUserImageCount(canonicalEvents) > displayableUserImageCount(cachedEvents) ||
+    canonicalImageCount > cachedImageCount ||
     (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
     (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
     (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
