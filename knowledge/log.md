@@ -2,6 +2,8 @@
 
 ## 2026-07-17
 
+* **Development restart does not own the installed Kimix app**: Packaged-process cleanup now requires the previous runtime token or an explicit current-workspace path; the broad compatibility `\Kimix\` matcher cannot terminate `%LocalAppData%\Programs\Kimix`. See [/project/kimix.md](/project/kimix.md).
+
 * **Canonical history replacement is dimension-monotonic**: Whole-partition replacement now rejects shorter Assistant bodies, thinking history, process history, or fewer displayable user images even when another dimension is richer; shrink corrections require an identity-aware merge. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Runtime reconciliation requires a runnable target and emits recovered completion**: Runtime-less `creating` evidence no longer suppresses the primary fallback, all lifecycle-active statuses share one predicate, and a terminal status plus snapshot recovery emits explicit `prompt.completed` instead of waiting for renderer polling. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
@@ -88,7 +90,7 @@
 
 * **Windows notification clicks use an explicit foreground activation pulse**: Completion, approval, and question notifications restore the Kimix window, briefly elevate it before `moveTop` and `focus`, and then restore its prior always-on-top state; single-instance activation shares the same path. See [/project/kimix.md](/project/kimix.md).
 
-* **Built-app startup is fingerprinted and old Kimix instances are closed**: The canonical BAT launcher no longer treats a clean worktree as proof that `out/` is current; it rebuilds on missing or mismatched Git fingerprints, refuses to launch after a failed build, and clears current, compatibility-copy, and packaged Kimix processes before starting. Its no-BOM PowerShell helper keeps executable strings ASCII-safe for Windows PowerShell 5.1. See [/project/kimix.md](/project/kimix.md).
+* **Built-app startup is fingerprinted and owned old instances are closed**: The canonical BAT launcher no longer treats a clean worktree as proof that `out/` is current; it rebuilds on missing or mismatched Git fingerprints, refuses to launch after a failed build, and clears token- or workspace-owned compatibility and packaged processes before starting. Its no-BOM PowerShell helper keeps executable strings ASCII-safe for Windows PowerShell 5.1. See [/project/kimix.md](/project/kimix.md).
 
 * **Room identity overrides local UI and snapshot drift**: A missing room-gate record defaults open, explicit opt-out is persisted separately, existing collaboration sessions retain their controls and dispatch path, persistence blocks ordinary-snapshot downgrade, and unique official metadata can rebuild an already orphaned room before per-Agent history recovery. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 * **Composer no longer rewrites prompts for local clarification mode**: The retired three-state UI, renderer state, settings, and IPC fields are removed; official structured questions remain available, while local hydration and canonical history strip both generations of legacy wrappers and cache mapping version 4 actively repairs polluted user bubbles. See [/project/kimix.md](/project/kimix.md).
