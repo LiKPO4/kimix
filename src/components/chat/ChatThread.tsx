@@ -560,7 +560,12 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
                   },
                 }));
               }
-            : onRetryError}
+            : async () => {
+                if (!onRetryError) return;
+                await onRetryError();
+                // 重试已成功派发后移除错误卡，避免旧错误一直留在消息链里。
+                onDismissError?.(event.id);
+              }}
           onDismiss={onDismissError ? () => onDismissError(event.id) : undefined}
         />
       );

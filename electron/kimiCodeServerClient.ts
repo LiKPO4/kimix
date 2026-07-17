@@ -712,11 +712,28 @@ export class KimiCodeServerClient {
       body: JSON.stringify({ content, ...controls }),
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
-    await this.waitForSessionEvent(sessionId, (frame) => {
-      if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
-      const payload = frame.payload as { promptId?: unknown; prompt_id?: unknown } | undefined;
-      return (payload?.promptId ?? payload?.prompt_id) === result.prompt_id;
-    }, 180_000);
+    // 长静默不等于死亡：v2 轮次在超长工具/无增量阶段可能数分钟无帧（实测单轮 616s）。
+    // 空闲超时时先查官方 status——仍运行就继续等；已不运行说明 prompt.completed 丢失，
+    // 用快照补齐时间线后按完成收口，而不是给用户报错卡。
+    for (;;) {
+      try {
+        await this.waitForSessionEvent(sessionId, (frame) => {
+          if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
+          const payload = frame.payload as { promptId?: unknown; prompt_id?: unknown } | undefined;
+          return (payload?.promptId ?? payload?.prompt_id) === result.prompt_id;
+        }, 180_000);
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("会话空闲")) throw error;
+        const status = await this.getSessionStatus(sessionId).catch(() => undefined);
+        const stillActive = status?.status === "running" || status?.status === "awaiting_approval" || status?.status === "awaiting_question";
+        if (stillActive) continue;
+        console.warn(`[KimiCodeServerClient] prompt ${result.prompt_id} 完成帧未到达且会话已空闲，改用快照补齐：${message}`);
+        await this.recoverSnapshot(sessionId).catch(() => undefined);
+        break;
+      }
+    }
     return result;
   }
 

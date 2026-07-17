@@ -22,6 +22,8 @@
 
 * **Running snapshots must not close the live assistant**: v2 carries the in-progress turn's committed text as complete assistant history; reconciliation now skips canonical complete assistants already covered by a local incomplete one, and prompt completion waits reset on any session frame because turns routinely exceed the old 180s ceiling. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
+* **Idle silence is not death; retry clears the error card**: A 180s frame silence now triggers an official status check — busy sessions keep waiting, finished ones recover via snapshot instead of an error card; a successful retry dismisses the error event. Dev and installed Kimix share one profile and one Kimi Server singleton, so acceptance runs must kill the installed app first. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Diagnostics are metadata-only by default**: Main-process logging redacts message bodies, tool payloads, paths, stacks, snapshots, and base64 data; a bounded full event snapshot is serialized only when launch explicitly sets `KIMIX_DETAILED_DIAGNOSTICS=1`. See [/project/kimix.md](/project/kimix.md).
 
 * **Diagnostic writes cannot block streaming**: Subagent-content surfacing logs once per rendered event instead of once per render derivation, and renderer diagnostic IPC drains through an asynchronous serialized file queue rather than synchronous main-process filesystem calls. See [/project/kimix.md](/project/kimix.md).
