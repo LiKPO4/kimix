@@ -1,5 +1,35 @@
 # Kimix 长程任务状态
 
+## 2026-07-17 会话回复被重复 user 消息淹没（snapshot 回放去重）
+
+- 当前目标：修复会话（session_8723c487）agent 回复全部"消失"——实际是被 66 条重复 user 消息挤出 28 项渲染窗口（官方仅 16 条 user）。
+- 根因证据（CDP 直读 IndexedDB）：snapshot 历史回放的 user 消息 id 是确定性的（`snapshot:<messageId>:user:<n>`），但 `reconcileRunningKimiSnapshot.alreadyMounted` 对 user_message 恒返回 false、`mergeEvents` 的 user 去重只看"最后一条 user 的 10 秒窗口"；历史回放按时间顺序到来时任意相邻两条 user 都间隔 >10s，于是**每次回放把全部历史 user 复制一遍**。该会话回放 4 次 → 52 条重复 user 淹没窗口，assistant 被挤出可视区；重启后渲染高度 16944px→5122px。
+- 修复三层：(1) `reconcileRunningKimiSnapshot.alreadyMounted` 对 user_message 按稳定 id 与"同内容+10s"跳过；(2) `mergeEvents` user 分支加全局稳定 id 查重；(3) 新增 `deduplicateTimelineEvents`（同 id 去重 + user 同内容近时保留身份更全副本），`loadLocalSessions` 启动时幂等清理已损坏历史（含 collaboration.agentEvents）。
+- 验证：新增 5 项回归（重复回放不追加/本地乐观 user 不重复/id 查重/损坏历史清理/幂等）；typecheck 通过；全量回归见提交记录。
+- 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验该会话回复恢复、不再新增重复。
+- 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`、`src/utils/eventMapper.ts`、`src/utils/persistence.ts`。
+- 下一步：用户复验；与 busy/视口修复一并提交。
+
+## 2026-07-17 视口跳动与启动不置底（overflow-anchor 条件化）
+
+- 当前目标：修复 v2.16.46 起两个视口回归——(1) 启动进入会话停在中间而非底部；(2) 流式期间视口反复上跳、点击置底按钮后仍跳。
+- 根因：f7b5d13c 为防止 detached 模式下 Chromium 隐式锚定与 Kimix 显式锚定竞争，在 `.kimix-chat-scroll-area` **全局**设置 `overflow-anchor: none`。但同一提交的 issue 快照不变量只要求 "While detached" 禁用——实现过度。跟随模式下原生锚定本是"上方内容异步撑开时保持视口"的第一道防线（kimix.md 旧不变量），全局禁用后每次流式 reflow 都先漂移再由 ResizeObserver 事后纠正，视觉即"一跳一跳"；启动时异步内容（图片/高亮/Markdown settle）撑开后 scrollTop 停在原位即"悬在中间"。
+- 修复：overflow-anchor 按模式条件化——跟随模式恢复原生锚定，仅 detached 模式禁用。`useAutoFollow.updateAutoFollow`（isAutoFollowRef 唯一写入点）同步响应式 `isFollowing` state；会话切换重置同步置 true；ChatThread 滚动容器在非跟随时加 `--detached` class。
+- 验证：新增 useChatViewport 响应式跟随状态回归（pause/resume/会话切换）；全量 103 文件 816 项通过；typecheck 通过。
+- 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验启动置底与流式不跳。
+- 关键文件：`src/index.css`、`src/hooks/useChatViewport.ts`、`src/hooks/useChatViewport/useAutoFollow.ts`、`src/components/chat/ChatThread.tsx`。
+- 下一步：用户复验；视口与 busy 两批修复验收后移除探针并同步知识库（f7b5d13c 改写的 kimix.md 锚定不变量需按条件化结果再修订）。
+
+## 2026-07-17 运行中闪"输出完成"根治（v2 busy 权威信号）
+
+- 当前目标：根治 v2.16.46 后仍偶发的"闪过一下输出完成"（头部与底部"已连接"同闪后自行恢复）。
+- 根因证据：agent-core-v2 的 `/api/v1/sessions/{id}/status` 只返回 `busy`（整个 prompt 期间含 step 间隙保持 true），**没有 `status` 字符串字段**（vendor/kimi-code-sdk SessionService.getStatus 实读确认）；Kimix `mapServerStatus(undefined)` 兜底返回 "idle"，于是 (1) `reconcileAgentRuntime` 轮询把 step 间隙运行中会话误判为终态，连续两次即 `settleTerminalRoomAgent` + 清 `runningSessionId`；(2) `prompt()` 180s 空闲判活的 `status.status === "running"` 恒 false，误走"已结束"快照收口。两条路径同源。
+- 修复：`resolveServerEngineStatus`（busy=true 一律 running，缺失时回退 v1 status 字符串）统一替换 register/snapshot/getStatus 三处映射；`prompt()` 判活加 `busy === true` 分支。`ServerSession`/`ServerSessionStatus` 类型补 `busy`。
+- 验证：新增 resolveServerEngineStatus 三组回归（busy 优先/真结束/旧兼容）；typecheck 通过；全量回归见本行更新时的测试输出。
+- 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验"不再闪输出完成"。
+- 关键文件：`electron/kimiCodeHost.ts`、`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerHost.test.ts`。
+- 下一步：用户复验后移除 footerRenderDivergence 探针并同步知识库运行不变量。
+
 ## 2026-07-17 提前"输出完成"与消息头消失根治（渲染派生层）
 
 - 当前目标：根治两个多轮未修复的问题——(1) 发送后到 k3 思考中之间消息头消失；(2) 运行中头部提前显示"输出完成"而底部仍"运行中"。
