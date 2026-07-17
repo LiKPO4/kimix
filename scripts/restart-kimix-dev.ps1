@@ -97,13 +97,17 @@ function Stop-KimixProcessTree {
 
     # Fallback path-based heuristics for backward compatibility when no token
     # file exists (first run after this change) or a process lost its args.
-    $inKnownKimixPath = (Test-ContainsIgnoreCase $processIdentity $workspace) -or
+    $inWorkspacePath = Test-ContainsIgnoreCase $processIdentity $workspace
+    $inKnownKimixPath = $inWorkspacePath -or
       (Test-ContainsIgnoreCase $processIdentity "kimix-pre-dev-compat") -or
       ($processIdentity -match "(?i)[\\/]kimix(?:-[^\\/\s]+)?[\\/]")
     $isKimixElectron = $process.Name -eq "electron.exe" -and (
       $inKnownKimixPath
     )
-    $isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inKnownKimixPath)
+    # A normal installed build lives under Programs\Kimix and also matches the
+    # broad compatibility regex above. Never stop it unless this launch token
+    # owns it or its executable/command line points into the current workspace.
+    $isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inWorkspacePath)
     $isKimixShell = $process.Name -in @("cmd.exe", "powershell.exe", "pwsh.exe") -and $inKnownKimixPath -and (
       (Test-ContainsIgnoreCase $commandLine "start-kimix.bat") -or
       (Test-ContainsIgnoreCase $commandLine "restart-kimix-dev.ps1")

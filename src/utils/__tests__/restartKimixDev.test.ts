@@ -30,10 +30,12 @@ describe("restart-kimix-dev.ps1", () => {
     }).not.toThrow();
   });
 
-  it("quotes the dev script path and scopes packaged-process matching", () => {
+  it("quotes the dev script path and restricts packaged processes to this workspace", () => {
     const content = readFileSync(scriptPath, "utf-8");
     expect(content).toContain('$devArguments = "`"$devScript`" --kimix-runtime-token=');
-    expect(content).toContain('$isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inKnownKimixPath)');
+    expect(content).toContain('$inWorkspacePath = Test-ContainsIgnoreCase $processIdentity $workspace');
+    expect(content).toContain('$isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inWorkspacePath)');
+    expect(content).not.toContain('$isKimixPackaged = $process.Name -eq "Kimix.exe" -and ($hasRuntimeToken -or $inKnownKimixPath)');
   });
 
   it.runIf(process.platform === "win32")("preserves a script path containing spaces across Start-Process argv", () => {
