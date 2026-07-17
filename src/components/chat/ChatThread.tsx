@@ -645,7 +645,7 @@ export function buildRenderItems(
     const last = visible[visible.length - 1];
     return {
       ...first,
-      id: first.agentTurnId ? `assistant:${first.agentTurnId}` : visible.map((event) => event.id).join(":"),
+      id: first.agentTurnId ? `assistant:${first.agentTurnId}` : first.id,
       timestamp: first.timestamp,
       content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
       thinking: visible.map((event) => event.thinking ?? "").filter((thinking) => thinking.trim()).join(""),

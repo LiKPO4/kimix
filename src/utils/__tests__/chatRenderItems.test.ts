@@ -312,6 +312,45 @@ describe("buildRenderItems completed turn cache", () => {
   });
 });
 
+describe("buildRenderItems assistant identity", () => {
+  it("keeps the merged Assistant render id stable when another stream segment is appended", () => {
+    const user: TimelineEvent = {
+      id: "user-live",
+      type: "user_message",
+      timestamp: 1,
+      content: "继续检查",
+    };
+    const firstSegment: TimelineEvent = {
+      id: "assistant-first",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "已经完成第一步。",
+      isThinking: false,
+      isComplete: true,
+    };
+    const nextSegment: TimelineEvent = {
+      id: "assistant-next",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "继续执行第二步。",
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const before = buildRenderItems([user, firstSegment], "kimi-code", undefined, true)
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const after = buildRenderItems([user, firstSegment, nextSegment], "kimi-code", undefined, true)
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+
+    expect(before?.type).toBe("event");
+    expect(after?.type).toBe("event");
+    if (before?.type !== "event" || after?.type !== "event") return;
+    expect(before.event.id).toBe("assistant-first");
+    expect(after.event.id).toBe(before.event.id);
+    expect(after.event.type === "assistant_message" ? after.event.content : "").toContain("继续执行第二步");
+  });
+});
+
 describe("filterStatusUpdates room isolation", () => {
   it("keeps the final status for every Agent turn in turn-end mode", () => {
     const statuses: TimelineEvent[] = [{
