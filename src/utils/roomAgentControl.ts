@@ -40,6 +40,7 @@ const STEERABLE_STATUSES = new Set<RoomAgentActivityStatus | RoomAgentDeliverySt
 ]);
 
 const RECONCILABLE_STATUSES = new Set<RoomAgentActivityStatus | RoomAgentDeliveryStatus>([
+  "creating",
   "queued",
   "sending",
   "accepted",
@@ -48,6 +49,12 @@ const RECONCILABLE_STATUSES = new Set<RoomAgentActivityStatus | RoomAgentDeliver
   "waiting_question",
   "indeterminate",
 ]);
+
+export function isRoomAgentReconciliationStatus(
+  status: RoomAgentActivityStatus | RoomAgentDeliveryStatus,
+): boolean {
+  return RECONCILABLE_STATUSES.has(status);
+}
 
 function actionStatuses(action: RoomAgentControlAction) {
   return action === "stop" ? STOPPABLE_STATUSES : STEERABLE_STATUSES;

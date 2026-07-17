@@ -20,3 +20,12 @@ Captured on 2026-07-17 while diagnosing false archive blockers and a reappearing
 
 1. Runtime reconciliation must include every persisted lifecycle-active delivery and settle the delivery when the official runtime is terminal.
 2. A Server active-catalog row can restore an archived local mirror only when that row was updated after the local archive timestamp.
+
+## Follow-up snapshot after v2.16.39
+
+- The still-visible room `session_200eea74-3dfb-461a-99b4-73580a295190` had 284 events, no open timeline events, and only `completed` or `cancelled` deliveries.
+- Its footer reported connected and the global `runningSessionId` was already clear, so persisted conversation data was no longer the archive blocker.
+- `creating` was still a lifecycle-active archive blocker, but it was absent from both the runtime reconciliation target set and the activity signature that schedules reconciliation.
+- A stale `creating` activity for an Agent whose official runtime was already bound could therefore survive indefinitely in memory and block archive until the app restarted.
+
+3. `creating` activities with a bound official runtime must enter terminal runtime reconciliation just like queued or running work.

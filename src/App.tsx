@@ -91,7 +91,7 @@ import {
   recoverInterruptedRoomDeliveries,
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
-import { getRoomAgentReconciliationTargets, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
+import { getRoomAgentReconciliationTargets, isRoomAgentReconciliationStatus, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -1282,7 +1282,7 @@ function App() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const activeRoomAgentActivitySignature = Object.values(roomAgentActivities)
-    .filter((activity) => ["queued", "sending", "accepted", "running", "waiting_approval", "waiting_question", "indeterminate"].includes(activity.status))
+    .filter((activity) => isRoomAgentReconciliationStatus(activity.status))
     .map((activity) => `${activity.roomId}:${activity.roomAgentId}:${activity.runtimeSessionId ?? ""}:${activity.status}`)
     .sort()
     .join("|");

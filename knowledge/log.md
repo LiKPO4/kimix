@@ -2,7 +2,7 @@
 
 ## 2026-07-17
 
-* **Archive gates reconcile persisted deliveries; stale catalogs cannot restore**: Terminal room polling now settles lifecycle-active delivery records even after the activity registry clears, while a Server active row restores a local archive only when its official update is newer than the archive action. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Archive gates reconcile persisted deliveries and creating activities; stale catalogs cannot restore**: Terminal room polling now settles lifecycle-active delivery records even after the activity registry clears and reconciles `creating` once an official runtime exists, while a Server active row restores a local archive only when its official update is newer than the archive action. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Footer runtime status is authoritative, not timeline-derived**: Recent incomplete timeline residue may still drive recovery and sidebar safeguards, but only the tracked runtime identity (or room activity registry) may make the active conversation footer report `运行中`. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 

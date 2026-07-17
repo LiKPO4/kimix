@@ -6,6 +6,7 @@ import {
   getRoomAgentControlTargets,
   getPersistedRoomAgentControlTargets,
   getRoomAgentReconciliationTargets,
+  isRoomAgentReconciliationStatus,
   resolveRoomAgentControlTarget,
   settleStoppedRoomAgent,
   settleTerminalRoomAgent,
@@ -250,6 +251,25 @@ describe("roomAgentControl", () => {
 
     expect(getRoomAgentReconciliationTargets(room, []).map((target) => target.status))
       .toEqual(["queued", "indeterminate"]);
+  });
+
+  it("reconciles a creating activity after the Agent already has an official runtime", () => {
+    const room = roomFixture();
+    const creatingActivity: RoomAgentActivity = {
+      roomId: room.id,
+      roomAgentId: "agent-secondary",
+      status: "creating",
+      updatedAt: 10,
+    };
+
+    expect(getRoomAgentReconciliationTargets(room, [creatingActivity])
+      .find((target) => target.roomAgentId === "agent-secondary"))
+      .toMatchObject({
+        roomAgentId: "agent-secondary",
+        runtimeSessionId: "runtime-secondary",
+        status: "creating",
+      });
+    expect(isRoomAgentReconciliationStatus("creating")).toBe(true);
   });
 
   it("settles the persisted delivery when the official runtime is terminal", () => {
