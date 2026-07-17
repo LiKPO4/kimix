@@ -18,6 +18,7 @@ export interface UseAutoFollowOptions {
   userBottomIntentUntilRef: React.MutableRefObject<number>;
   userInputLockUntilRef: React.MutableRefObject<number>;
   updateShowScrollToBottom: (value: boolean) => void;
+  setIsFollowing: (value: boolean) => void;
   clearDetachedViewportCompensation: () => void;
   cancelPendingAnchorCapture: () => void;
   clearResizeAnchor: () => void;
@@ -48,6 +49,7 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
     userBottomIntentUntilRef,
     userInputLockUntilRef,
     updateShowScrollToBottom,
+    setIsFollowing,
     clearDetachedViewportCompensation,
     cancelPendingAnchorCapture,
     clearResizeAnchor,
@@ -62,7 +64,9 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
   const updateAutoFollow = useCallback((value: boolean) => {
     if (isAutoFollowRef.current === value) return;
     isAutoFollowRef.current = value;
-  }, [isAutoFollowRef]);
+    // 响应式镜像：overflow-anchor 按跟随/分离模式条件化（detached 才禁用原生锚定）。
+    setIsFollowing(value);
+  }, [isAutoFollowRef, setIsFollowing]);
 
   const clearSessionAutoBottomTimer = useCallback(() => {
     if (sessionAutoBottomTimerRef.current === null) return;

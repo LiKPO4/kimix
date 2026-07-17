@@ -66,6 +66,7 @@ export interface UseChatViewportResult {
     onKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
   };
   userHasScrolled: boolean;
+  isFollowing: boolean;
   isSessionScrollPrimed: boolean;
   eagerMarkdown: boolean;
   enableAutoFollow: () => void;
@@ -146,6 +147,8 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
 
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const [primedSessionId, setPrimedSessionId] = useState<string | null>(null);
+  // 跟随模式的响应式镜像（isAutoFollowRef 的 state 版），用于按模式条件化 overflow-anchor。
+  const [isFollowing, setIsFollowing] = useState(true);
 
   contentVersionRef.current = contentVersion;
 
@@ -223,6 +226,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     userBottomIntentUntilRef,
     userInputLockUntilRef,
     updateShowScrollToBottom,
+    setIsFollowing,
     clearDetachedViewportCompensation,
     cancelPendingAnchorCapture,
     clearResizeAnchor,
@@ -667,6 +671,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     autoFollowRef.current = true;
     userScrollRef.current = false;
     setUserHasScrolled(false);
+    setIsFollowing(true);
     resetScrollAnchor();
     resetEventFocus(sessionId);
     processCollapseViewportSnapshotsRef.current.clear();
@@ -788,6 +793,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       onKeyDown: handleKeyDown,
     },
     userHasScrolled,
+    isFollowing,
     isSessionScrollPrimed,
     eagerMarkdown,
     enableAutoFollow,

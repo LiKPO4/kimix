@@ -364,4 +364,26 @@ describe("useChatViewport", () => {
     }
     expect(onExpand).toHaveBeenCalledTimes(5);
   });
+
+  it("exposes a reactive following state that flips with pause/resume and resets per session", () => {
+    // overflow-anchor is only disabled in detached mode; the reactive mirror keeps
+    // the scroll container's class in sync so following mode retains native anchoring.
+    if (!Element.prototype.scrollTo) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Element.prototype.scrollTo = vi.fn() as any;
+    }
+    const { viewport, rerender } = renderTest({ sessionId: "session-1" });
+    expect(viewport().isFollowing).toBe(true);
+
+    act(() => viewport().pauseAutoFollowForUser());
+    expect(viewport().isFollowing).toBe(false);
+
+    act(() => viewport().enableAutoFollow());
+    expect(viewport().isFollowing).toBe(true);
+
+    act(() => viewport().pauseAutoFollowForUser());
+    expect(viewport().isFollowing).toBe(false);
+    rerender({ sessionId: "session-2" });
+    expect(viewport().isFollowing).toBe(true);
+  });
 });

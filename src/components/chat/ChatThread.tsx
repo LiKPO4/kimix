@@ -1662,7 +1662,7 @@ export const ChatThread = memo(function ChatThread() {
       )}
       <div
         ref={viewport.scrollRef}
-        className="kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto"
+        className={`kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto${viewport.isFollowing ? "" : " kimix-chat-scroll-area--detached"}`}
         style={{
           paddingTop: session.longTask ? 124 : 42,
           paddingBottom: 0,

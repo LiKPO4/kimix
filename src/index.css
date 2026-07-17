@@ -410,8 +410,13 @@ body::before {
 .kimix-chat-scroll-area {
   padding-right: 8px;
   overflow-x: hidden;
-  /* The viewport hook owns anchoring. Chromium's implicit anchor otherwise
-     races the explicit detached-mode anchor during streaming reflow. */
+}
+
+/* Only detached mode disables Chromium's implicit anchor: it otherwise races
+   Kimix's explicit detached-mode anchor during streaming reflow. In following
+   mode native anchoring stays enabled as the first-line stabilizer; disabling
+   it globally made the tail viewport jump on every streamed reflow. */
+.kimix-chat-scroll-area--detached {
   overflow-anchor: none;
 }
 
