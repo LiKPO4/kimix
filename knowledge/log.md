@@ -2,6 +2,14 @@
 
 ## 2026-07-17
 
+* **Canonical history replacement is dimension-monotonic**: Whole-partition replacement now rejects shorter Assistant bodies, thinking history, process history, or fewer displayable user images even when another dimension is richer; shrink corrections require an identity-aware merge. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+* **Runtime reconciliation requires a runnable target and emits recovered completion**: Runtime-less `creating` evidence no longer suppresses the primary fallback, all lifecycle-active statuses share one predicate, and a terminal status plus snapshot recovery emits explicit `prompt.completed` instead of waiting for renderer polling. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+* **Detached viewport compensation retains its minimum height**: Process-collapse restoration stores the minimum scroll height together with temporary tail space, allowing natural final-content growth to consume the compensation instead of leaving phantom padding. See [/project/kimix.md](/project/kimix.md).
+
+* **Server lock recovery distinguishes fresh startup from PID reuse**: A responsive lock still attaches, a fresh unresponsive lock remains protected, and an old unresponsive lock whose pid was reused is cleared after the startup grace so managed Server routing can recover. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Archive gates reconcile persisted deliveries and creating activities; stale catalogs cannot restore**: Terminal room polling now settles lifecycle-active delivery records even after the activity registry clears and reconciles `creating` once an official runtime exists, while a Server active row restores a local archive only when its official update is newer than the archive action. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Footer runtime status is authoritative, not timeline-derived**: Recent incomplete timeline residue may still drive recovery and sidebar safeguards, but only the tracked runtime identity (or room activity registry) may make the active conversation footer report `运行中`. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
@@ -16,7 +24,7 @@
 
 * **Subagent event identity permits tool lifecycle evolution**: Same-ID nested events reject type/tool identity collisions, while the same tool call may update running state, result, display, and duration in place during replay. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
-* **Canonical thinking correction is not length-monotonic**: A non-empty official thinking history may replace a longer local mirror when the bodies differ, because duplicated or malformed local thinking can be longer than the authoritative correction; process-event regression protection remains separate. Cache mapping version 6 forces stale mirrors through the unified rule. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Canonical thinking correction previously allowed shrink replacement**: Cache mapping version 6 unified correction handling, but whole-partition shrink replacement was superseded on 2026-07-17 by dimension-monotonic reconciliation. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Cross-session notification focus survives navigation reset**: Session changes reset focus recursion state without deleting a pending request whose target is the incoming session, allowing notification clicks to locate the intended event after the new timeline renders. See [/project/kimix.md](/project/kimix.md).
 
