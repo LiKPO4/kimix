@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-17
+
+* **Live runtime owns completion and interaction identity**: A history snapshot's synthetic `turn.ended` / `TurnEnd` is ignored while the target runtime remains active, including after thinking or body content already exists; merged Assistant rows keep the first visible event ID when no official turn ID exists, and final-content auto-collapse cannot override an explicit user expansion. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-16
 
 * **Long tasks have one runtime; reviewer identity is legacy compatibility**: New tasks bind reviewer and executor IDs to one session and defer review to the user-facing queue; older distinct reviewer sessions remain readable for lifecycle cleanup but cannot restore the retired auto-review dispatcher. See [/project/kimix.md](/project/kimix.md).
