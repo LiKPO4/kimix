@@ -9,7 +9,7 @@ import type { Session } from "@/types/ui";
 import { compactModelDisplayName, getSessionModelForDisplay } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
-import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { isSessionRuntimeTracked } from "@/utils/sessionActivity";
 import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { normalizePathForComparison } from "@/utils/pathCase";
@@ -311,7 +311,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const latestError = [...statusEvents].sort((left, right) => right.timestamp - left.timestamp).find((event) => event.type === "error");
   const isSessionRunning = Boolean(activeSession?.collaboration
     ? roomHasExecutingAgentWork(activeSession, Object.values(roomAgentActivities))
-    : isSessionRuntimeRunning(activeSession ?? undefined, runningSessionId));
+    : isSessionRuntimeTracked(activeSession ?? undefined, runningSessionId));
   // Only block model switching when the active session is the one currently
   // tracked as running. A session with stale open timeline work should not
   // prevent the user from switching models in a different session.

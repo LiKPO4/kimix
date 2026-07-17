@@ -97,6 +97,13 @@ export function isSessionRuntimeRunning(session: Session | null | undefined, run
     hasActiveTimelineWork(session, now);
 }
 
+export function isSessionRuntimeTracked(session: Session | null | undefined, runningSessionId: string | null) {
+  if (!session || !runningSessionId) return false;
+  const runtimeSessionId = getRuntimeSessionId(session);
+  return runningSessionId === session.id ||
+    Boolean(runtimeSessionId && runningSessionId === runtimeSessionId);
+}
+
 export function isSessionSidebarBusy(
   session: Session,
   runningSessionId: string | null,

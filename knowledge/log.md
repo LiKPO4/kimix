@@ -2,6 +2,8 @@
 
 ## 2026-07-17
 
+* **Footer runtime status is authoritative, not timeline-derived**: Recent incomplete timeline residue may still drive recovery and sidebar safeguards, but only the tracked runtime identity (or room activity registry) may make the active conversation footer report `运行中`. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Live runtime owns completion and interaction identity**: A history snapshot's synthetic `turn.ended` / `TurnEnd` is ignored while the target runtime remains active, including after thinking or body content already exists; merged Assistant rows keep the first visible event ID when no official turn ID exists, and final-content auto-collapse cannot override an explicit user expansion. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-16

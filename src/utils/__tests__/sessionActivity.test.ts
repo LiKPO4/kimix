@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { compareSessionsByRecentConversation, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { compareSessionsByRecentConversation, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -43,6 +43,16 @@ describe("sessionActivity", () => {
       { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
     ]), null, 1)).toBe(true);
     expect(isSessionRuntimeRunning(session(), null)).toBe(false);
+  });
+
+  it("does not treat timeline residue as an authoritative tracked runtime", () => {
+    const withResidue = session([
+      { id: "assistant-residue", type: "assistant_message", timestamp: 1, content: "Done", isThinking: false, isComplete: false },
+    ]);
+
+    expect(isSessionRuntimeTracked(withResidue, null)).toBe(false);
+    expect(isSessionRuntimeTracked(withResidue, "ui-1")).toBe(true);
+    expect(isSessionRuntimeTracked(withResidue, "runtime-1")).toBe(true);
   });
 
   it("does not keep stale timeline residue running forever", () => {
