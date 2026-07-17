@@ -79,6 +79,31 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
       snapshotRole: "assistant",
     }, events)).toBe(true);
   });
+
+  it("does not let a historical turn end close a non-empty assistant while the runtime is active", () => {
+    const events: TimelineEvent[] = [{
+      id: "user-live",
+      type: "user_message",
+      timestamp: 8,
+      content: "继续检查",
+    }, {
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 10,
+      content: "已经完成第一步。",
+      thinking: "继续读取剩余文件。",
+      isThinking: true,
+      isComplete: false,
+    }];
+
+    const historicalTurnEnd = {
+      type: "turn.ended",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+    };
+    expect(shouldSkipKimiCodeSnapshotReplay(historicalTurnEnd, events, true)).toBe(true);
+    expect(shouldSkipKimiCodeSnapshotReplay(historicalTurnEnd, events, false)).toBe(false);
+  });
 });
 
 describe("reconcileRunningKimiSnapshot", () => {

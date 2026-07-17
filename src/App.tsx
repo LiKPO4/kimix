@@ -2434,6 +2434,12 @@ function App() {
       const targetAgentSession = targetSession && roomAgentId
         ? getRoomAgentSessionView(targetSession, roomAgentId)
         : targetSession;
+      const roomActivity = targetSession && roomAgentId
+        ? useAppStore.getState().roomAgentActivities[roomAgentActivityKey(targetSession.id, roomAgentId)]
+        : undefined;
+      const runtimeActive = targetSession?.collaboration && roomAgentId
+        ? Boolean(roomActivity && ["sending", "running", "waiting_approval", "waiting_question"].includes(roomActivity.status))
+        : isSessionRuntimeRunning(targetAgentSession, useAppStore.getState().runningSessionId);
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
@@ -2453,7 +2459,7 @@ function App() {
         }));
         syncCurrentSessionFromStore(uiSessionId);
       }
-      if (shouldSkipKimiCodeSnapshotReplay(rawEvent, targetAgentSession?.events)) return;
+      if (shouldSkipKimiCodeSnapshotReplay(rawEvent, targetAgentSession?.events, runtimeActive)) return;
       const mapped = rawEvent?.type === "kimix.approval.request"
         ? mapKimiCodeApprovalRequest({
             ...(rawEvent.request && typeof rawEvent.request === "object" && !Array.isArray(rawEvent.request) ? rawEvent.request as Record<string, unknown> : {}),
@@ -2468,9 +2474,6 @@ function App() {
       if (!mapped) return;
       const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
       const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
-      const roomActivity = targetSession && roomAgentId
-        ? useAppStore.getState().roomAgentActivities[roomAgentActivityKey(targetSession.id, roomAgentId)]
-        : undefined;
       const roomScopedEvent = targetSession?.longTask || !roomAgentId
         ? mappedWithRole
         : scopeEventToRoomAgent(mappedWithRole, roomAgentId);

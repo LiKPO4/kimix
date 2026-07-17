@@ -30,12 +30,13 @@ function hasPendingLocalPromptPlaceholder(events: readonly TimelineEvent[]): boo
 export function shouldSkipKimiCodeSnapshotReplay(
   rawEvent: Record<string, unknown> | null,
   events: readonly TimelineEvent[] = [],
+  runtimeActive = false,
 ): boolean {
   if (rawEvent?.snapshotReplay !== "history") return false;
   const rawType = isString(rawEvent.type) ? rawEvent.type : "";
   if (
     (rawType === "turn.ended" || rawType === "TurnEnd") &&
-    hasPendingLocalPromptPlaceholder(events)
+    (runtimeActive || hasPendingLocalPromptPlaceholder(events))
   ) {
     return true;
   }
