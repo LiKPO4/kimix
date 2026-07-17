@@ -7,6 +7,16 @@ export type RestoredSidebarProjectExpansion = {
   paths: Set<string>;
 };
 
+export type SidebarProjectClickAction = "create-session" | "expand" | "collapse";
+
+export function getSidebarProjectClickAction(
+  availableSessionCount: number,
+  isExpanded: boolean,
+): SidebarProjectClickAction {
+  if (availableSessionCount <= 0) return "create-session";
+  return isExpanded ? "collapse" : "expand";
+}
+
 export function readSidebarExpandedProjectPaths(): RestoredSidebarProjectExpansion {
   try {
     const raw = localStorage.getItem(SIDEBAR_EXPANDED_PROJECT_PATHS_KEY);

@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  getSidebarProjectClickAction,
   persistSidebarExpandedProjectPaths,
   readSidebarExpandedProjectPaths,
   SIDEBAR_EXPANDED_PROJECT_PATHS_KEY,
@@ -41,5 +42,12 @@ describe("sidebar project expansion persistence", () => {
     expect(readSidebarExpandedProjectPaths()).toMatchObject({
       hasSavedState: false,
     });
+  });
+
+  it("creates a conversation when a clicked project has no available sessions", () => {
+    expect(getSidebarProjectClickAction(0, false)).toBe("create-session");
+    expect(getSidebarProjectClickAction(0, true)).toBe("create-session");
+    expect(getSidebarProjectClickAction(1, false)).toBe("expand");
+    expect(getSidebarProjectClickAction(1, true)).toBe("collapse");
   });
 });

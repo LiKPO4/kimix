@@ -19,7 +19,7 @@ import { reportError } from "@/utils/reportError";
 import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { getHiddenHandoffSessionIds } from "@/utils/persistence";
-import { persistSidebarExpandedProjectPaths, readSidebarExpandedProjectPaths } from "@/utils/sidebarProjectExpansion";
+import { getSidebarProjectClickAction, persistSidebarExpandedProjectPaths, readSidebarExpandedProjectPaths } from "@/utils/sidebarProjectExpansion";
 import { getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
 import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 import { APP_VERSION } from "@/utils/appVersion";
@@ -581,6 +581,31 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const projectSessions = (projectPath: string) =>
     sessionsByProjectPath.get(normalizeProjectPath(projectPath)) ?? [];
 
+  const handleProjectClick = async (project: Project, availableSessions: Session[], isExpanded: boolean) => {
+    setProjectActionFocusId(null);
+    const projectPathKey = normalizeProjectPath(project.path);
+    const action = getSidebarProjectClickAction(availableSessions.length, isExpanded);
+
+    if (action === "create-session") {
+      if (useAppStore.getState().creatingSessionProjectPath) return;
+      lastAutoExpandedProjectPath.current = projectPathKey;
+      setCurrentProject(project);
+      setCurrentSession(null);
+      setWorkspaceView("chat");
+      setExpandedProjectPaths((current) => new Set([...current, projectPathKey]));
+      await createSessionForProject(project);
+      return;
+    }
+
+    if (action === "collapse") lastAutoExpandedProjectPath.current = projectPathKey;
+    setExpandedProjectPaths((current) => {
+      const next = new Set(current);
+      if (next.has(projectPathKey)) next.delete(projectPathKey);
+      else next.add(projectPathKey);
+      return next;
+    });
+  };
+
   const loadSessionWithSkillParentFallback = async (session: Session) => {
     let loaded = await window.api.loadKimiCodeSession({
       workDir: session.projectPath,
@@ -778,16 +803,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           }`}
                         >
                           <button
-                            onClick={() => {
-                              setProjectActionFocusId(null);
-                              if (isExpanded) lastAutoExpandedProjectPath.current = projectPathKey;
-                              setExpandedProjectPaths((current) => {
-                                const next = new Set(current);
-                                if (next.has(projectPathKey)) next.delete(projectPathKey);
-                                else next.add(projectPathKey);
-                                return next;
-                              });
-                            }}
+                            onClick={() => void handleProjectClick(project, pSessions, isExpanded)}
+                            disabled={pSessions.length === 0 && Boolean(creatingSessionProjectPath)}
                             className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                           >
                             <FolderOpen size={16} className="shrink-0 text-text-muted" />
