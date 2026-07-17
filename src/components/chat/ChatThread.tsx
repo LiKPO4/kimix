@@ -30,6 +30,8 @@ import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, To
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 import { getPrimaryRoomAgent, getRoomAgentEvents } from "@/utils/collaborationRooms";
+import { roomHasExecutingAgentWork } from "@/utils/sessionArchive";
+import { isSessionRuntimeTracked } from "@/utils/sessionActivity";
 
 type PermissionModeDiagDetail = {
   traceId?: string;
@@ -636,6 +638,17 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
+// TEMP PROBE (v2.16.46): buildRenderItems writes the latest turn's decision
+// vector here (ungated); the component-level effect reads it and logs once per
+// distinct divergence. Remove together with the probe effect.
+const turnSettledProbeSeen = new Set<string>();
+let latestTurnProbeSlot: Record<string, unknown> | null = null;
+function readLatestTurnProbeSlot(): Record<string, unknown> | null {
+  const slot = latestTurnProbeSlot;
+  latestTurnProbeSlot = null;
+  return slot;
+}
+
 export function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
@@ -730,8 +743,20 @@ export function buildRenderItems(
     // during that gap; runtime state may keep only an output-less/tool-only
     // latest turn active until its first authoritative event arrives.
     const isPrimaryRoomAgentTurn = !roomAgentId || roomAgentId === primaryRoomAgentId;
+    // agent-core-v2 commits content-bearing, isComplete:true assistant steps
+    // mid-turn (step.end finishReason=end_turn) while the turn keeps running.
+    // For a room turn, the send path always writes the user_message before it
+    // flips the session-running flag, so the latest running turn is
+    // unambiguously the one the runtime is still working on. The completed
+    // output of an intermediate step must not settle it — otherwise the process
+    // header shows "输出完成" (or loses its header entirely) while the footer
+    // still says "运行中". The terminal-status handler clears the running flag
+    // and marks the activity terminal in the same tick, so the turn settles at
+    // the true end. Only the legacy non-room path keeps the completed-output
+    // gate, which guards the pre-user-event gap it was written for.
     const isRuntimeAwaitingTurnOutput = Boolean(
-      isPrimaryRoomAgentTurn && isLatestTurn && isSessionRunning && !hasCompletedAssistantOutput
+      isPrimaryRoomAgentTurn && isLatestTurn && isSessionRunning &&
+      (Boolean(roomAgentId) || !hasCompletedAssistantOutput)
     );
     const isTurnActive = Boolean(activeRoomAgentTurn || isRuntimeAwaitingTurnOutput);
     const foldApprovals = Boolean(mergedAssistantEvent || isTurnActive) && resolvedApprovals.length > 0;
@@ -752,6 +777,36 @@ export function buildRenderItems(
           ? { ...mergedAssistantEvent, isComplete: false }
           : mergedAssistantEvent
       : undefined;
+    // TEMP PROBE (v2.16.46): record the latest turn's full decision vector into
+    // a module-level slot, WITHOUT gating on any running signal (the previous
+    // probe gated itself on isSessionRunning, the very flag suspected of being
+    // wrong, so it never fired). The component-level effect reads this slot and
+    // logs once when it detects the header/footer divergence, using the footer's
+    // own running predicate as the independent reference.
+    if (isLatestTurn) {
+      latestTurnProbeSlot = {
+        isSessionRunning,
+        isPrimaryRoomAgentTurn,
+        roomAgentId: roomAgentId ?? null,
+        primaryRoomAgentId: primaryRoomAgentId ?? null,
+        roomAgentIdMatchesPrimary: roomAgentId === primaryRoomAgentId,
+        agentTurnId: agentTurnId ?? null,
+        roomMessageId: roomMessageId ?? null,
+        activeRoomAgentTurnMatched: Boolean(activeRoomAgentTurn),
+        activeTurnIdOnActivity: activeRoomAgentTurn?.activeTurnId ?? null,
+        activityStatus: activeRoomAgentTurn?.status ?? null,
+        hasCompletedAssistantOutput,
+        isRuntimeAwaitingTurnOutput,
+        isTurnActive,
+        turnSettled,
+        hasOpenAssistant: assistantEvents.some((event) => !event.isComplete),
+        assistantCount: assistantEvents.length,
+        mergedIsComplete: mergedAssistantEvent?.isComplete ?? null,
+        renderAssistantIsComplete: renderAssistantEvent?.isComplete ?? null,
+        renderAssistantIsUndefined: !renderAssistantEvent,
+        runningToolCount: tools.filter((event) => event.status === "running").length,
+      };
+    }
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
     const trailingStatusEvents = turnSettled
@@ -937,7 +992,15 @@ export function buildRenderItems(
     turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
   ) => {
     if (!completedTurnCache || turnEvents.length === 0) return false;
-    if (isLatestTurn && isSessionRunning && !turnEvents.some((event) => event.roomAgentId)) return false;
+    // The latest turn of a running session must never be cached. Every session
+    // now flows through projectCollaborationTimeline, which stamps roomAgentId
+    // onto every event, so the old `!turnEvents.some(e => e.roomAgentId)` clause
+    // made this guard a no-op — the live turn got cached, and once a transient
+    // isSessionRunning=false render settled it, the cache replayed that stale
+    // settled/headerless result on every subsequent render (cached.events
+    // identity-match short-circuits renderTurnBody). That is why prior fixes to
+    // the settle logic had no effect: the cache bypassed them entirely.
+    if (isLatestTurn && isSessionRunning) return false;
     const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
     const roomAgentId = identityEvent?.roomAgentId ?? turnUserEvent?.roomAgentId;
     const roomMessageId = identityEvent?.roomMessageId ?? turnUserEvent?.roomMessageId;
@@ -1161,6 +1224,66 @@ export const ChatThread = memo(function ChatThread() {
     ),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, sessionRoomAgentActivities, primaryRoomAgentId]
   );
+  // TEMP PROBE (v2.16.45): the footer and the render layer use two independent
+  // "is running" signals. Capture, at the component level, the moment the footer
+  // says running while the render layer's latest turn is settled or headerless.
+  // This is NOT gated on the render-layer running signal, so it fires even when
+  // that signal is the one that (wrongly) went false.
+  useEffect(() => {
+    if (!session) return;
+    const footerRunning = session.collaboration
+      ? roomHasExecutingAgentWork(session, sessionRoomAgentActivities)
+      : isSessionRuntimeTracked(session, runningSessionId);
+    // Find the latest user render item and whatever assistant follows it.
+    let lastUserIndex = -1;
+    for (let i = renderItems.length - 1; i >= 0; i--) {
+      const item = renderItems[i];
+      if (item.type === "event" && item.event.type === "user_message") { lastUserIndex = i; break; }
+    }
+    const tail = lastUserIndex >= 0 ? renderItems.slice(lastUserIndex + 1) : renderItems;
+    const latestAssistant = tail.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const latestAssistantActive = latestAssistant?.type === "event" ? Boolean(latestAssistant.isAssistantActive) : false;
+    const latestAssistantComplete = latestAssistant?.type === "event" && latestAssistant.event.type === "assistant_message"
+      ? latestAssistant.event.isComplete
+      : null;
+    const headerless = !latestAssistant;
+    const settledWhileFooterRunning = footerRunning && Boolean(latestAssistant) && !latestAssistantActive;
+    if (footerRunning && (headerless || settledWhileFooterRunning)) {
+      const signature = [
+        session.id,
+        latestAssistant?.type === "event" ? latestAssistant.event.id : "none",
+        headerless ? "headerless" : "settled",
+      ].join("|");
+      if (!turnSettledProbeSeen.has(signature)) {
+        turnSettledProbeSeen.add(signature);
+        const deliveries = session.collaboration
+          ? session.collaboration.messages.flatMap((message) => Object.values(message.deliveries).map((d) => d.status))
+          : [];
+        logEvent("footerRenderDivergence.probe", {
+          problem: headerless ? "P1-headerless" : "P2-settled-while-footer-running",
+          sessionId: session.id,
+          engine: session.engine ?? null,
+          isCollaboration: Boolean(session.collaboration),
+          footerRunning,
+          hasActiveTurn,
+          runningSessionId: runningSessionId ?? null,
+          runtimeSessionId: runtimeSessionId ?? null,
+          primaryRoomAgentId: primaryRoomAgentId ?? null,
+          activityCount: sessionRoomAgentActivities.length,
+          activityStatuses: sessionRoomAgentActivities.map((a) => a.status),
+          activityTurnIds: sessionRoomAgentActivities.map((a) => a.activeTurnId ?? null),
+          deliveryStatuses: deliveries,
+          latestAssistantId: latestAssistant?.type === "event" ? latestAssistant.event.id : null,
+          latestAssistantActive,
+          latestAssistantComplete,
+          headerless,
+          // Render-layer internal decision vector for the latest turn, captured
+          // inside buildRenderItems this same render.
+          renderLayer: readLatestTurnProbeSlot(),
+        });
+      }
+    }
+  }, [renderItems, session, sessionRoomAgentActivities, hasActiveTurn, runningSessionId, runtimeSessionId, primaryRoomAgentId]);
   const surfacedSubagentContentKeysRef = useRef(new Set<string>());
   useEffect(() => {
     if (!session) return;

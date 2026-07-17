@@ -363,6 +363,92 @@ describe("buildRenderItems usage footer", () => {
     expect(header.isAssistantActive).toBe(true);
   });
 
+  it("keeps a primary room turn running after a completed step when no activity matches it", () => {
+    // agent-core-v2 commits a content-bearing, isComplete:true assistant step
+    // mid-turn while the runtime keeps working. The room activity turn id can
+    // momentarily fail to match the rendered turn (activeTurnId lost across a
+    // status transition), so activeRoomAgentTurn is undefined here. The session
+    // is still running, so the turn must NOT settle: the process header must not
+    // say "输出完成" while the footer still says "运行中".
+    const primaryAgentId = "room-agent:primary";
+    const items = buildRenderItems([{
+      id: "user-room-midturn",
+      type: "user_message",
+      timestamp: 1,
+      content: "整理所有奇遇",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-midturn",
+      agentTurnId: "turn-room-midturn",
+      recipientAgentIds: [primaryAgentId],
+    }, {
+      id: "assistant-room-committed-step",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "我先读剧情文本规范和现有机制清单，确保设计方案贴合项目写法与可实现的效果类型。",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-midturn",
+      agentTurnId: "turn-room-midturn",
+    }], "kimi-code", undefined, true, [], undefined, primaryAgentId);
+    const header = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message"
+    ));
+
+    expect(header?.type).toBe("event");
+    if (header?.type !== "event" || header.event.type !== "assistant_message") return;
+    expect(header.event.isComplete).toBe(false);
+    expect(header.isAssistantActive).toBe(true);
+  });
+
+  it("keeps the primary room Assistant header during the send-to-thinking gap after a completed step closes the placeholder", () => {
+    // The optimistic placeholder can close (isComplete flips / gets replaced)
+    // before the first thinking delta of the next step arrives. With a
+    // content-bearing completed step already present but no matching activity,
+    // the old completed-output gate removed the header entirely during this
+    // window ("消息头消失"). The latest running room turn must always keep a
+    // visible active header.
+    const primaryAgentId = "room-agent:primary";
+    const items = buildRenderItems([{
+      id: "user-room-gap2",
+      type: "user_message",
+      timestamp: 1,
+      content: "继续",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-gap2",
+      agentTurnId: "turn-room-gap2",
+      recipientAgentIds: [primaryAgentId],
+    }, {
+      id: "assistant-room-gap2-step",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "第一步已完成。",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-gap2",
+      agentTurnId: "turn-room-gap2",
+    }, {
+      id: "tool-room-gap2",
+      type: "tool_call",
+      timestamp: 3,
+      toolCallId: "tool-room-gap2",
+      toolName: "Read",
+      status: "success",
+      arguments: {},
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-gap2",
+      agentTurnId: "turn-room-gap2",
+    }], "kimi-code", undefined, true, [], undefined, primaryAgentId);
+    const activeHeader = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.isAssistantActive
+    ));
+
+    expect(activeHeader?.type).toBe("event");
+    if (activeHeader?.type !== "event" || activeHeader.event.type !== "assistant_message") return;
+    expect(activeHeader.event.isComplete).toBe(false);
+  });
+
   it("does not reopen an older primary room turn when the next turn becomes active", () => {
     const primaryAgentId = "room-agent:primary";
     const items = buildRenderItems([{
