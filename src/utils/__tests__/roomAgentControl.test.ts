@@ -5,8 +5,10 @@ import {
   appendRoomAgentSteerEvent,
   getRoomAgentControlTargets,
   getPersistedRoomAgentControlTargets,
+  getRoomAgentReconciliationTargets,
   resolveRoomAgentControlTarget,
   settleStoppedRoomAgent,
+  settleTerminalRoomAgent,
 } from "../roomAgentControl";
 
 function roomFixture(): Session {
@@ -239,5 +241,27 @@ describe("roomAgentControl", () => {
         status: "running",
       }),
     ]);
+  });
+
+  it("reconciles queued and indeterminate deliveries that are not user-stoppable yet", () => {
+    const room = roomFixture();
+    room.collaboration!.messages[0].deliveries[room.collaboration!.primaryAgentId].status = "queued";
+    room.collaboration!.messages[1].deliveries["agent-secondary"].status = "indeterminate";
+
+    expect(getRoomAgentReconciliationTargets(room, []).map((target) => target.status))
+      .toEqual(["queued", "indeterminate"]);
+  });
+
+  it("settles the persisted delivery when the official runtime is terminal", () => {
+    const room = roomFixture();
+    const target = getRoomAgentReconciliationTargets(room, [])
+      .find((candidate) => candidate.roomAgentId === "agent-secondary")!;
+    const next = settleTerminalRoomAgent(room, target, "completed", 100);
+
+    expect(next.collaboration?.messages[1].deliveries["agent-secondary"].status).toBe("completed");
+    expect(next.collaboration?.agentEvents["agent-secondary"]?.[0]).toMatchObject({
+      id: "secondary-assistant",
+      isComplete: true,
+    });
   });
 });

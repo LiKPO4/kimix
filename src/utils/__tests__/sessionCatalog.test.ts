@@ -517,6 +517,27 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].updatedAt).toBe(200);
   });
 
+  it("归档后的旧活跃目录快照不会把 Skill 会话重新复活", () => {
+    const archived = localSession({
+      id: "skill-leaf",
+      officialSessionId: "skill-leaf",
+      runtimeSessionId: "skill-leaf",
+      skillForkParentSessionId: "session-parent",
+      archivedAt: 300,
+      updatedAt: 300,
+    });
+    const result = reconcileOfficialSessionCatalog([archived], [{
+      id: "skill-leaf",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      title: "/skill:game-development",
+      source: "server",
+      metadata: { source: "kimix-fork", forkedFrom: "session-parent" },
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBe(300);
+  });
+
   it("忽略其他项目的目录项", () => {
     const result = reconcileOfficialSessionCatalog([], [
       { id: "other", workDir: "D:\\work\\other", updatedAt: 200, brief: "其他项目" },

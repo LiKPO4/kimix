@@ -91,7 +91,7 @@ import {
   recoverInterruptedRoomDeliveries,
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
-import { getPersistedRoomAgentControlTargets, getRoomAgentControlTargets, settleStoppedRoomAgent } from "@/utils/roomAgentControl";
+import { getRoomAgentReconciliationTargets, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -1282,7 +1282,7 @@ function App() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const activeRoomAgentActivitySignature = Object.values(roomAgentActivities)
-    .filter((activity) => ["running", "waiting_approval", "waiting_question"].includes(activity.status))
+    .filter((activity) => ["queued", "sending", "accepted", "running", "waiting_approval", "waiting_question", "indeterminate"].includes(activity.status))
     .map((activity) => `${activity.roomId}:${activity.roomAgentId}:${activity.runtimeSessionId ?? ""}:${activity.status}`)
     .sort()
     .join("|");
@@ -1290,7 +1290,9 @@ function App() {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const updateSession = useSessionStore((s) => s.updateSession);
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
-  const activeRoomDeliverySignature = useSessionStore((s) => getPersistedRoomAgentControlTargets(s.sessions, "stop")
+  const activeRoomDeliverySignature = useSessionStore((s) => s.sessions.flatMap((session) => (
+    getRoomAgentReconciliationTargets(session, []).map((target) => ({ ...target, roomId: session.id }))
+  ))
     .map((target) => `${target.roomId}:${target.roomAgentId}:${target.runtimeSessionId ?? ""}:${target.status}`)
     .sort()
     .join("|"));
@@ -3090,10 +3092,9 @@ function App() {
           const stoppedAt = Date.now();
           const latestSession = useSessionStore.getState().sessions.find((item) => item.id === roomId) ?? session;
           const currentActivity = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(roomId, roomAgentId)];
-          const controlTarget = getRoomAgentControlTargets(
+          const controlTarget = getRoomAgentReconciliationTargets(
             latestSession,
             Object.values(useAppStore.getState().roomAgentActivities),
-            "stop",
           ).find((target) => target.roomAgentId === roomAgentId);
           updateSession(roomId, (item) => settleStoppedRoomAgent(item, {
             roomAgentId,
@@ -3179,16 +3180,21 @@ function App() {
 
         const active = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(session.id, roomAgentId)];
         const latestRunningId = useAppStore.getState().runningSessionId;
+        const latestSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
+        const persistedTarget = getRoomAgentReconciliationTargets(latestSession, [])
+          .find((target) => target.roomAgentId === roomAgentId);
         if (
           !active &&
           latestRunningId !== session.id &&
-          latestRunningId !== runtimeSessionId
+          latestRunningId !== runtimeSessionId &&
+          !persistedTarget
         ) return;
         flushStreamEvents();
-        updateSession(session.id, (item) => {
-          const next = updateRoomAgentEvents(item, roomAgentId, settleInactiveEvents);
-          return { ...next, updatedAt: Date.now() };
-        });
+        const settledAt = Date.now();
+        updateSession(session.id, (item) => settleTerminalRoomAgent(item, {
+          roomAgentId,
+          roomMessageId: active?.roomMessageId ?? persistedTarget?.roomMessageId,
+        }, terminalStatus, settledAt));
         syncCurrentSessionFromStore(session.id);
         setRoomAgentActivity({
           roomId: session.id,
@@ -3212,23 +3218,12 @@ function App() {
     const reconcileRuntimeStatus = async () => {
       if (disposed) return;
       const state = useAppStore.getState();
-      const activeActivities = Object.values(state.roomAgentActivities).filter((activity) => (
-        ["running", "waiting_approval", "waiting_question"].includes(activity.status)
+      const roomActivities = Object.values(state.roomAgentActivities);
+      const reconciliationTargets = useSessionStore.getState().sessions.flatMap((session) => (
+        getRoomAgentReconciliationTargets(session, roomActivities).map((target) => ({ ...target, roomId: session.id }))
       ));
-      if (activeActivities.length > 0) {
-        await Promise.all(activeActivities.map(async (activity) => {
-          const session = useSessionStore.getState().sessions.find((item) => item.id === activity.roomId);
-          if (!session) return;
-          const runtimeId = activity.runtimeSessionId ?? getRoomAgentRuntimeId(session, activity.roomAgentId);
-          if (!runtimeId) return;
-          await reconcileAgentRuntime(activity.roomId, activity.roomAgentId, runtimeId);
-        }));
-        return;
-      }
-
-      const persistedTargets = getPersistedRoomAgentControlTargets(useSessionStore.getState().sessions, "stop");
-      if (persistedTargets.length > 0) {
-        await Promise.all(persistedTargets.map(async (target) => {
+      if (reconciliationTargets.length > 0) {
+        await Promise.all(reconciliationTargets.map(async (target) => {
           if (!target.runtimeSessionId) return;
           await reconcileAgentRuntime(target.roomId, target.roomAgentId, target.runtimeSessionId);
         }));

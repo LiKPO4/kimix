@@ -9,7 +9,7 @@ import {
   getRoomAgentRuntimeId,
   updateRoomAgentEvents,
 } from "@/utils/collaborationRooms";
-import { settleFailedEvents } from "@/utils/eventHelpers";
+import { settleFailedEvents, settleInactiveEvents } from "@/utils/eventHelpers";
 import { applyRoomDeliveryRuntimeStatus } from "@/utils/roomDelivery";
 
 export type RoomAgentControlAction = "stop" | "steer";
@@ -39,6 +39,16 @@ const STEERABLE_STATUSES = new Set<RoomAgentActivityStatus | RoomAgentDeliverySt
   "running",
 ]);
 
+const RECONCILABLE_STATUSES = new Set<RoomAgentActivityStatus | RoomAgentDeliveryStatus>([
+  "queued",
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+  "indeterminate",
+]);
+
 function actionStatuses(action: RoomAgentControlAction) {
   return action === "stop" ? STOPPABLE_STATUSES : STEERABLE_STATUSES;
 }
@@ -46,9 +56,8 @@ function actionStatuses(action: RoomAgentControlAction) {
 function latestControllableDelivery(
   session: Session,
   roomAgentId: string,
-  action: RoomAgentControlAction,
+  statuses: ReadonlySet<RoomAgentActivityStatus | RoomAgentDeliveryStatus>,
 ) {
-  const statuses = actionStatuses(action);
   for (let index = (session.collaboration?.messages.length ?? 0) - 1; index >= 0; index -= 1) {
     const message = session.collaboration?.messages[index];
     const delivery = message?.deliveries[roomAgentId];
@@ -59,13 +68,13 @@ function latestControllableDelivery(
   return null;
 }
 
-export function getRoomAgentControlTargets(
+function getRoomAgentTargets(
   session: Session,
   activities: Iterable<RoomAgentActivity>,
-  action: RoomAgentControlAction,
+  statuses: ReadonlySet<RoomAgentActivityStatus | RoomAgentDeliveryStatus>,
+  fallbackWhenActivityDoesNotMatch = false,
 ): RoomAgentControlTarget[] {
   if (!session.collaboration) return [];
-  const statuses = actionStatuses(action);
   const activitiesByAgent = new Map<string, RoomAgentActivity>();
   for (const activity of activities) {
     if (activity.roomId === session.id) activitiesByAgent.set(activity.roomAgentId, activity);
@@ -74,18 +83,36 @@ export function getRoomAgentControlTargets(
   return session.collaboration.agents.flatMap((agent): RoomAgentControlTarget[] => {
     if (agent.removedAt || agent.archivedAt) return [];
     const activity = activitiesByAgent.get(agent.id);
-    const activityIsControllable = Boolean(activity && statuses.has(activity.status));
-    const fallback = activity ? null : latestControllableDelivery(session, agent.id, action);
-    if (!activityIsControllable && !fallback) return [];
+    const activityMatches = Boolean(activity && statuses.has(activity.status));
+    const fallback = activityMatches || (activity && !fallbackWhenActivityDoesNotMatch)
+      ? null
+      : latestControllableDelivery(session, agent.id, statuses);
+    if (!activityMatches && !fallback) return [];
     return [{
       roomAgentId: agent.id,
       displayName: agent.displayName,
       runtimeSessionId: activity?.runtimeSessionId ?? getRoomAgentRuntimeId(session, agent.id) ?? undefined,
-      status: activityIsControllable ? activity!.status : fallback!.delivery.status,
-      roomMessageId: activity?.roomMessageId ?? fallback?.message.id,
-      activeTurnId: activity?.activeTurnId ?? fallback?.delivery.agentTurnId,
+      status: activityMatches ? activity!.status : fallback!.delivery.status,
+      roomMessageId: activityMatches ? activity?.roomMessageId : fallback?.message.id,
+      activeTurnId: activityMatches ? activity?.activeTurnId : fallback?.delivery.agentTurnId,
     }];
   });
+}
+
+export function getRoomAgentControlTargets(
+  session: Session,
+  activities: Iterable<RoomAgentActivity>,
+  action: RoomAgentControlAction,
+): RoomAgentControlTarget[] {
+  const statuses = actionStatuses(action);
+  return getRoomAgentTargets(session, activities, statuses);
+}
+
+export function getRoomAgentReconciliationTargets(
+  session: Session,
+  activities: Iterable<RoomAgentActivity>,
+) {
+  return getRoomAgentTargets(session, activities, RECONCILABLE_STATUSES, true);
 }
 
 export function getPersistedRoomAgentControlTargets(
@@ -153,5 +180,22 @@ export function settleStoppedRoomAgent(
     return event;
   }));
   next = applyRoomDeliveryRuntimeStatus(next, target.roomMessageId, target.roomAgentId, "interrupted", now);
+  return { ...next, updatedAt: now };
+}
+
+export function settleTerminalRoomAgent(
+  session: Session,
+  target: Pick<RoomAgentControlTarget, "roomAgentId" | "roomMessageId">,
+  status: "completed" | "interrupted" | "error" | "idle",
+  now = Date.now(),
+): Session {
+  let next = updateRoomAgentEvents(session, target.roomAgentId, (events) => settleInactiveEvents(events, now));
+  next = applyRoomDeliveryRuntimeStatus(
+    next,
+    target.roomMessageId,
+    target.roomAgentId,
+    status === "idle" ? "completed" : status,
+    now,
+  );
   return { ...next, updatedAt: now };
 }

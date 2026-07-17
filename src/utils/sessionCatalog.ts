@@ -285,6 +285,9 @@ export function reconcileOfficialSessionCatalog(
     if (archivedMirrorIndex >= 0) {
       if (!serverAuthoritative) continue;
       const existing = next[archivedMirrorIndex];
+      // The active catalog can lag behind a successful archive mutation. Only a
+      // catalog row updated after the local archive is evidence of a real restore.
+      if ((official.updatedAt || 0) <= (existing.archivedAt ?? 0)) continue;
       const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);
       const officialSessionId = official.id;
       const runtimeSessionId = lineageIds.size > 1 ? official.id : existing.runtimeSessionId;
