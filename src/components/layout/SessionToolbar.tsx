@@ -427,10 +427,10 @@ export function SessionToolbar({
       style={{ gridTemplateColumns: "minmax(0, 1fr) auto", minWidth: 0, width: "100%", maxWidth: "100%", paddingLeft: 30, paddingRight: 12 }}
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="min-w-0 max-w-[300px] flex-1 truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">
+        <div className="min-w-0 max-w-[300px] truncate text-[14px] font-medium text-[var(--kimix-panel-text)]" title={title}>
           {title}
         </div>
-        <div ref={sessionMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
+        <div ref={sessionMenuRef} className="relative shrink-0" onMouseDown={(e) => e.stopPropagation()}>
           <button
             onClick={() => setSessionMenuOpen((open) => !open)}
             className={`kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg ${sessionMenuOpen ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : ""}`}
