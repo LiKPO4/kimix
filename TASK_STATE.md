@@ -14,6 +14,16 @@
 - 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`、`src/App.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/liveThinkingViewport.ts`、`src/components/chat/ChatThread.tsx`。
 - 下一步：用户在真实长工具链中复验运行期间不再提前显示完成、显式展开不被收起、消息头不闪断且旧过程持续可见。
 
+## 2026-07-16 对话导航轨道悬停预览
+
+- 当前目标：在已验收并提交的导航轨道上增加悬停消息预览，强化当前位置层级、优化连续扫动跟手性，并保证刻度位置、密度与实际消息导航一致。
+- 已完成：第一阶段提交为 `b3644fc`，悬停预览与密度收口提交为 `08ec3cd`。预览摘要直接从 `RenderItem` 生成有界纯文本；首次悬停为 110ms，连续切换为 16ms，离开关闭为 90ms。非当前位置刻度为 24% 不透明度，悬停为 62%，键盘焦点为 86%；只有当前位置保持 100% 身份色和高亮光圈。中间区域使用视口垂直中线判定当前位置；考虑浏览器在首尾限制滚动坐标，使用 3px 物理边界门槛。刻度与左侧边界约保留 14px，轨道相对初版向左移动 6px；刻度节距最大 14px、最小 6px，在视口上下各保留 24px 后按刻度数量自适应压缩，刻度组仍保持垂直居中。
+- 验证：v2.16.35 定向 2 个测试文件 11 项、严格类型检查和生产构建通过，renderer 为 `assets/index-CiTqwGG3.js`。
+- 未完成：用户视觉验收。
+- 阻塞：无；不推送、不打 tag、不发布。
+- 关键文件：`src/components/chat/ChatNavigationRail.tsx`、`src/components/chat/ChatNavigationPreview.tsx`、`src/utils/chatNavigation.ts`、`src/index.css`。
+- 下一步：用户在 v2.16.35 重点验收左侧边界增加 2px 后的距离、悬停预览跟手性，以及到顶、到底和中间点击后的当前刻度。
+
 ## 2026-07-16 对话导航轨道第一阶段
 
 - 当前目标：稳定接入截图所示的对话语义导航轨道，当前按用户反馈使用固定节距、统一宽度、用户蓝色与 Agent 黑色，并让 Agent 节点跳转后以消息头部对齐视口垂直中线；不引入悬停预览、完整历史估算或键盘快捷键。
