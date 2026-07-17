@@ -3,7 +3,7 @@ import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, Shie
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
+import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -1331,12 +1331,22 @@ export function Composer() {
       });
     }
 
+    const primaryAgentId = getPrimaryRoomAgent(targetSession).id;
+    const previousPrimaryActivity = useAppStore.getState().roomAgentActivities[
+      roomAgentActivityKey(targetSession.id, primaryAgentId)
+    ];
+    const userEventId = genId();
+    const primaryAgentTurnId = `agent-turn:${genId()}`;
     const userEvent: TimelineEvent = {
-      id: genId(),
+      id: userEventId,
       type: "user_message",
       timestamp: Date.now(),
       content,
       images: toUserAttachments(images),
+      roomAgentId: primaryAgentId,
+      roomMessageId: userEventId,
+      agentTurnId: primaryAgentTurnId,
+      recipientAgentIds: [primaryAgentId],
     };
     const responsePlaceholder: TimelineEvent = {
       id: genId(),
@@ -1345,6 +1355,9 @@ export function Composer() {
       content: "",
       isThinking: defaultThinking,
       isComplete: false,
+      roomAgentId: primaryAgentId,
+      roomMessageId: userEvent.id,
+      agentTurnId: primaryAgentTurnId,
     };
     const postUserStatusEvent: TimelineEvent | null = options?.postUserStatusMessage
       ? {
@@ -1355,6 +1368,9 @@ export function Composer() {
           source: "slash",
           tone: "info",
           parentEventId: userEvent.id,
+          roomAgentId: primaryAgentId,
+          roomMessageId: userEvent.id,
+          agentTurnId: primaryAgentTurnId,
         }
       : null;
     const linkStatusEvent: TimelineEvent = {
@@ -1365,6 +1381,9 @@ export function Composer() {
       source: "ipc",
       tone: "info",
       parentEventId: userEvent.id,
+      roomAgentId: primaryAgentId,
+      roomMessageId: userEvent.id,
+      agentTurnId: primaryAgentTurnId,
     };
 
     const shouldAddUserEvent = options?.addUserEvent !== false;
@@ -1390,6 +1409,29 @@ export function Composer() {
     const effectiveEngine = "kimi-code";
     const contentWithAttachments = buildAttachmentPromptContent(content, images);
     const outboundContent = options?.outboundContent ?? contentWithAttachments;
+    const writePrimaryPromptActivity = (
+      status: RoomAgentActivity["status"],
+      runtimeSessionId = getRuntimeSessionId(targetSession) ?? undefined,
+      updatedAt = Date.now(),
+    ) => {
+      setRoomAgentActivity({
+        roomId: targetSession.id,
+        roomAgentId: primaryAgentId,
+        runtimeSessionId,
+        status,
+        roomMessageId: userEvent.id,
+        activeTurnId: primaryAgentTurnId,
+        startedAt: userEvent.timestamp,
+        updatedAt,
+      });
+    };
+    const currentActivityOwnsPrompt = () => {
+      const current = useAppStore.getState().roomAgentActivities[
+        roomAgentActivityKey(targetSession.id, primaryAgentId)
+      ];
+      return current?.activeTurnId === primaryAgentTurnId || current?.roomMessageId === userEvent.id;
+    };
+    writePrimaryPromptActivity("sending");
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = toPromptImages(images);
@@ -1428,7 +1470,6 @@ export function Composer() {
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
-        const primaryAgentId = getPrimaryRoomAgent(targetSession).id;
         const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
         if (!roomAgentCanResume(targetSession, primaryAgentId)) {
           const issue = getPrimaryRoomAgent(targetSession).recoveryIssue;
@@ -1508,7 +1549,7 @@ export function Composer() {
 
       try {
         let kimiCodeSessionId = await ensureKimiCodeRuntime();
-        const markPromptDispatchStarted = () => {
+        const markPromptDispatchStarted = (runtimeSessionId: string) => {
           const startedAt = Date.now();
           updateSession(targetSession.id, (session) => ({
             ...session,
@@ -1519,9 +1560,10 @@ export function Composer() {
             updatedAt: startedAt,
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+          writePrimaryPromptActivity("sending", runtimeSessionId, startedAt);
         };
         updateLinkStatus("消息发送中", "info");
-        markPromptDispatchStarted();
+        markPromptDispatchStarted(kimiCodeSessionId);
         let res = await sendKimiCodePromptWithRetry({
           sessionId: kimiCodeSessionId,
           content: outboundContent,
@@ -1531,7 +1573,7 @@ export function Composer() {
           updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
           targetSession = { ...targetSession, runtimeSessionId: undefined };
           kimiCodeSessionId = await ensureKimiCodeRuntime();
-          markPromptDispatchStarted();
+          markPromptDispatchStarted(kimiCodeSessionId);
           res = await sendKimiCodePromptWithRetry({
             sessionId: kimiCodeSessionId,
             content: outboundContent,
@@ -1539,12 +1581,27 @@ export function Composer() {
           });
         }
         if (!res.success) throw new Error(res.error);
+        if (currentActivityOwnsPrompt()) {
+          const current = useAppStore.getState().roomAgentActivities[
+            roomAgentActivityKey(targetSession.id, primaryAgentId)
+          ];
+          if (!current || !["completed", "interrupted", "error"].includes(current.status)) {
+            const status = current && ["running", "waiting_approval", "waiting_question"].includes(current.status)
+              ? current.status
+              : "accepted";
+            writePrimaryPromptActivity(status, kimiCodeSessionId);
+          }
+        }
         updateLinkStatus(kimiCodeRouteStatus(res.data.route), "success");
         return true;
       } catch (err) {
         console.error("Kimi Code send failed:", err);
         const message = err instanceof Error ? err.message : String(err);
         if (isKimiActiveTurnError(message)) {
+          if (currentActivityOwnsPrompt()) {
+            removeRoomAgentActivity(targetSession.id, primaryAgentId);
+            if (previousPrimaryActivity) setRoomAgentActivity(previousPrimaryActivity);
+          }
           const afterEvents = removeLocalSendAttempt(targetSession.events, userEvent.id, responsePlaceholder.id, shouldAddUserEvent);
           setRunningSessionId(targetSession.id);
           updateSession(targetSession.id, (session) => ({
@@ -1559,6 +1616,7 @@ export function Composer() {
           return false;
         }
         setRunningSessionId(null);
+        if (currentActivityOwnsPrompt()) writePrimaryPromptActivity("error");
         updateSession(targetSession.id, (session) => ({
           ...session,
           events: [
@@ -1572,6 +1630,9 @@ export function Composer() {
               timestamp: Date.now(),
               message,
               source: "ipc",
+              roomAgentId: primaryAgentId,
+              roomMessageId: userEvent.id,
+              agentTurnId: primaryAgentTurnId,
             },
           ],
           updatedAt: Date.now(),

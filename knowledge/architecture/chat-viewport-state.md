@@ -4,7 +4,7 @@ title: Chat Viewport State
 description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-17T16:08:00+08:00"
+timestamp: "2026-07-17T17:20:00+08:00"
 ---
 
 # Chat Viewport State
@@ -30,9 +30,15 @@ explicit render property. Individual bubbles never consume session-global
 runtime state. In a single-Agent timeline, the next `user_message` is a hard
 display settlement boundary: it preserves the previous turn's final usage and
 normalizes stale incomplete Assistant/process flags instead of allowing the new
-runtime to reactivate that footer. Room activity remains scoped by room Agent
-and delivery identity because later queued room messages do not necessarily
-settle an earlier Agent delivery.
+runtime to reactivate that footer. A legacy/non-collaboration session still has
+a synthetic primary room Agent at the live-event boundary, so its Composer must
+create a concrete `roomMessageId + agentTurnId` before prompt dispatch. Sending,
+accepted, running, approval/question waits, and terminal updates preserve that
+identity. The renderer matches activity by turn identity rather than Agent ID:
+an intermediate `tool_use` step may close its streamed segment, but cannot mark
+the prompt complete or reactivate another turn owned by the same Agent. Room
+activity uses the same identity rule because later queued room messages do not
+necessarily settle an earlier Agent delivery.
 
 ## Viewport ownership
 

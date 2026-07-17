@@ -60,3 +60,43 @@ the bubble. In a single-Agent session, a later user message settles the previous
 turn for display, preserves its final usage, and normalizes stale Assistant
 completion state. Historical bubbles no longer subscribe to session-global
 runtime activity.
+
+## v2.16.42 follow-up: synthetic-primary ownership was still missing
+
+The v2.16.42 screenshots and the matching official Server journal disproved the
+remaining assumption in the earlier fixtures. The affected session has no
+`collaboration` state, but all live Server events are still scoped by Kimix to a
+synthetic primary identity (`room-agent:<ui-session-id>`). The ordinary Composer
+set only `runningSessionId`; it did not create a `RoomAgentActivity` or bind the
+optimistic user/Assistant events to a stable `roomMessageId + agentTurnId`.
+
+The captured prompt had this lifecycle (identifiers and bodies omitted):
+
+| Official order | Time | Meaning |
+| --- | --- | --- |
+| `turn.started`, `turn.step.started(step=1)` | 16:41:13 | Prompt and first model step started. |
+| `turn.step.completed(step=1, finishReason=tool_use)` | 16:41:44 | Only the first tool-use step ended. The runtime remained busy. |
+| `turn.step.started/completed(step=2..11, tool_use)` | 16:41:44–16:45:52 | More model/tool steps continued. |
+| `turn.step.started(step=12)` | 16:45:52 | Final model step started. |
+| `turn.step.completed(step=12, end_turn)`, `turn.ended`, `prompt.completed` | 16:46:32 | The prompt became terminal for the first time. |
+
+At every intermediate step boundary, the renderer store briefly contained no
+open Assistant (`openBefore=0`) and the next model segment opened another one.
+That is valid step-level streaming, not prompt completion. The UI projection
+failed in two ways:
+
+1. A scoped synthetic-primary event disabled the old `!roomAgentId` latest-turn
+   fallback, so the header could disappear between sending and the first delta.
+2. Agent-level activity had no concrete message/turn identity. When no matching
+   activity existed at a `tool_use` boundary, a complete step fragment was
+   presented as `输出完成` even though the prompt and footer were still running.
+
+The required invariant is stronger than a session or Agent busy flag:
+
+- An ordinary primary prompt establishes its stable `roomMessageId` and
+  `agentTurnId` before dispatch and keeps them through sending, accepted,
+  running, approval/question waits, and terminal status.
+- Render activity matches those identities. It may keep the current step
+  visually open, but it may not reopen another turn owned by the same Agent.
+- `tool_use` is only a step boundary. The Assistant becomes complete only after
+  the prompt activity becomes terminal (`prompt.completed` on Server routing).

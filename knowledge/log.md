@@ -2,6 +2,8 @@
 
 ## 2026-07-17
 
+* **Synthetic primary prompts own a concrete turn before dispatch**: Legacy/non-collaboration sessions still scope live events to a synthetic room Agent; ordinary sends now bind `roomMessageId + agentTurnId` through sending, accepted, running, waits, and terminal status. Renderer activity matches that turn identity, so a `tool_use` step cannot remove the current header, claim `输出完成`, or reactivate an older response. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
+
 * **Assistant activity has one turn-level owner**: A lost optimistic placeholder still derives the latest turn's process header, but historical bubbles no longer read session-global runtime state. In single-Agent timelines, the next user message hard-settles stale incomplete display state and preserves the previous model/Tokens/Context footer. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
 
 * **Chat turn and viewport ownership are explicit**: A session-level running flag cannot reopen a completed prior response; rail/search navigation enters detached mode through the same user-intent transaction, invalidates the previous anchor, and disables Chromium's competing native anchoring. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).

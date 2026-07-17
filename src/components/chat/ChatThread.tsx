@@ -26,10 +26,10 @@ import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUs
 import { logError, logEvent } from "@/utils/reportError";
 import { selectInitialChatTail } from "@/utils/chatTailWindow";
 import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
-import type { LongTaskSessionMeta, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
+import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
-import { getRoomAgentEvents } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgentEvents } from "@/utils/collaborationRooms";
 
 type PermissionModeDiagDetail = {
   traceId?: string;
@@ -46,6 +46,29 @@ type PermissionModeDiagDetail = {
 
 function renderItemKey(item: RenderItem) {
   return item.type === "event" ? item.event.id : item.type === "tool_group" ? item.id : item.type === "plan_preview" ? item.id : item.id;
+}
+
+const RENDER_ACTIVE_ROOM_AGENT_STATUSES = new Set<RoomAgentActivity["status"]>([
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+]);
+
+function isRenderActivityActive(activity: RoomAgentActivity): boolean {
+  return RENDER_ACTIVE_ROOM_AGENT_STATUSES.has(activity.status);
+}
+
+function roomAgentActivityMatchesTurn(
+  activity: RoomAgentActivity,
+  identity: Pick<TimelineEvent, "roomAgentId" | "roomMessageId" | "agentTurnId">,
+  isLatestTurn: boolean,
+): boolean {
+  if (!isRenderActivityActive(activity) || activity.roomAgentId !== identity.roomAgentId) return false;
+  if (activity.activeTurnId && identity.agentTurnId) return activity.activeTurnId === identity.agentTurnId;
+  if (activity.roomMessageId && identity.roomMessageId) return activity.roomMessageId === identity.roomMessageId;
+  return isLatestTurn && !activity.activeTurnId && !activity.roomMessageId;
 }
 
 const contentVersionObjectIds = new WeakMap<object, number>();
@@ -618,8 +641,9 @@ export function buildRenderItems(
   sessionEngine?: "prompt" | "kimi-code",
   attachedUserStatuses?: Map<string, Extract<TimelineEvent, { type: "status_update" }>[]>,
   isSessionRunning = false,
-  activeRoomAgentIds?: ReadonlySet<string>,
+  roomAgentActivities?: readonly RoomAgentActivity[],
   completedTurnCache?: Map<string, CompletedTurnRenderCacheEntry>,
+  primaryRoomAgentId?: string,
 ): RenderItem[] {
   const items: RenderItem[] = [];
   const usedCompletedTurnCacheKeys = new Set<string>();
@@ -656,7 +680,13 @@ export function buildRenderItems(
     } satisfies Extract<TimelineEvent, { type: "assistant_message" }>;
   };
 
-  const renderTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false, turnUserEventId?: string, hasLaterUserBoundary = false) => {
+  const renderTurnBody = (
+    turnEvents: TimelineEvent[],
+    turnStartedAt?: number,
+    isLatestTurn = false,
+    turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
+    hasLaterUserBoundary = false,
+  ) => {
     turnEvents
       .filter((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction")
       .forEach((event) => items.push({ type: "event", event }));
@@ -682,8 +712,14 @@ export function buildRenderItems(
       (event): event is Extract<TimelineEvent, { type: "approval_request" }> =>
         event.type === "approval_request" && event.status !== "pending"
     );
-    const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
-    const isRoomAgentRunning = Boolean(roomAgentId && activeRoomAgentIds?.has(roomAgentId));
+    const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
+    const roomAgentId = identityEvent?.roomAgentId ?? turnUserEvent?.roomAgentId;
+    const roomMessageId = identityEvent?.roomMessageId ?? turnUserEvent?.roomMessageId;
+    const agentTurnId = identityEvent?.agentTurnId ?? turnUserEvent?.agentTurnId;
+    const turnIdentity = { roomAgentId, roomMessageId, agentTurnId };
+    const activeRoomAgentTurn = roomAgentId
+      ? roomAgentActivities?.find((activity) => roomAgentActivityMatchesTurn(activity, turnIdentity, isLatestTurn))
+      : undefined;
     const hasCompletedAssistantOutput = assistantEvents.some((event) => event.isComplete && Boolean(
       event.content.trim() ||
       event.thinking?.trim() ||
@@ -693,17 +729,18 @@ export function buildRenderItems(
     // reaches this timeline. Do not reopen the previous completed response
     // during that gap; runtime state may keep only an output-less/tool-only
     // latest turn active until its first authoritative event arrives.
+    const isPrimaryRoomAgentTurn = !roomAgentId || roomAgentId === primaryRoomAgentId;
     const isRuntimeAwaitingTurnOutput = Boolean(
-      !roomAgentId && isLatestTurn && isSessionRunning && !hasCompletedAssistantOutput
+      isPrimaryRoomAgentTurn && isLatestTurn && isSessionRunning && !hasCompletedAssistantOutput
     );
-    const foldApprovals = Boolean(mergedAssistantEvent || isRuntimeAwaitingTurnOutput) && resolvedApprovals.length > 0;
+    const isTurnActive = Boolean(activeRoomAgentTurn || isRuntimeAwaitingTurnOutput);
+    const foldApprovals = Boolean(mergedAssistantEvent || isTurnActive) && resolvedApprovals.length > 0;
     // The next user message is a hard ownership boundary for a single-Agent
     // session. Stale incomplete flags from the previous turn must not consume
     // the next turn's session-level runtime state.
-    const isSupersededSingleAgentTurn = !roomAgentId && hasLaterUserBoundary;
-    const turnSettled = isSupersededSingleAgentTurn || (
-      !isRoomAgentRunning &&
-      !isRuntimeAwaitingTurnOutput &&
+    const isSupersededPrimaryTurn = isPrimaryRoomAgentTurn && hasLaterUserBoundary && !activeRoomAgentTurn;
+    const turnSettled = isSupersededPrimaryTurn || (
+      !isTurnActive &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
@@ -751,18 +788,17 @@ export function buildRenderItems(
     // legitimately leave an active latest turn with no Assistant event. Derive
     // one stable render-only placeholder from the user turn so the header never
     // depends on event arrival timing.
-    if (!renderAssistantEvent && isRuntimeAwaitingTurnOutput && turnUserEventId) {
-      const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
+    if (!renderAssistantEvent && isTurnActive && turnUserEvent) {
       const pendingAssistantEvent: Extract<TimelineEvent, { type: "assistant_message" }> = {
-        id: `assistant-pending-${turnUserEventId}`,
+        id: `assistant-pending-${turnUserEvent.id}`,
         type: "assistant_message",
         timestamp: turnStartedAt ?? identityEvent?.timestamp ?? Date.now(),
         content: "",
         isThinking: false,
         isComplete: false,
-        roomAgentId: identityEvent?.roomAgentId,
-        roomMessageId: identityEvent?.roomMessageId,
-        agentTurnId: identityEvent?.agentTurnId,
+        roomAgentId,
+        roomMessageId,
+        agentTurnId,
       };
       items.push({
         type: "event",
@@ -893,12 +929,24 @@ export function buildRenderItems(
 
   let turnBody: TimelineEvent[] = [];
   let currentTurnStartedAt: number | undefined;
-  let currentTurnUserEventId: string | undefined;
+  let currentTurnUserEvent: Extract<TimelineEvent, { type: "user_message" }> | undefined;
   let currentAgentTurnId: string | undefined;
-  const canCacheTurn = (turnEvents: TimelineEvent[], isLatestTurn: boolean) => {
+  const canCacheTurn = (
+    turnEvents: TimelineEvent[],
+    isLatestTurn: boolean,
+    turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
+  ) => {
     if (!completedTurnCache || turnEvents.length === 0) return false;
     if (isLatestTurn && isSessionRunning && !turnEvents.some((event) => event.roomAgentId)) return false;
-    if (turnEvents.some((event) => event.roomAgentId && activeRoomAgentIds?.has(event.roomAgentId))) return false;
+    const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
+    const roomAgentId = identityEvent?.roomAgentId ?? turnUserEvent?.roomAgentId;
+    const roomMessageId = identityEvent?.roomMessageId ?? turnUserEvent?.roomMessageId;
+    const agentTurnId = identityEvent?.agentTurnId ?? turnUserEvent?.agentTurnId;
+    if (roomAgentId && roomAgentActivities?.some((activity) => roomAgentActivityMatchesTurn(
+      activity,
+      { roomAgentId, roomMessageId, agentTurnId },
+      isLatestTurn,
+    ))) return false;
     return !turnEvents.some((event) => (
       (event.type === "assistant_message" && !event.isComplete) ||
       (event.type === "tool_call" && event.status === "running") ||
@@ -915,9 +963,15 @@ export function buildRenderItems(
     const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
     return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${currentTurnStartedAt ?? first.timestamp}`;
   };
-  const renderCachedTurnBody = (turnEvents: TimelineEvent[], turnStartedAt?: number, isLatestTurn = false, turnUserEventId?: string, hasLaterUserBoundary = false) => {
-    if (!canCacheTurn(turnEvents, isLatestTurn) || !completedTurnCache) {
-      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEventId, hasLaterUserBoundary);
+  const renderCachedTurnBody = (
+    turnEvents: TimelineEvent[],
+    turnStartedAt?: number,
+    isLatestTurn = false,
+    turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
+    hasLaterUserBoundary = false,
+  ) => {
+    if (!canCacheTurn(turnEvents, isLatestTurn, turnUserEvent) || !completedTurnCache) {
+      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary);
       return;
     }
     const cacheKey = completedTurnCacheKey(turnEvents);
@@ -933,7 +987,7 @@ export function buildRenderItems(
       return;
     }
     const itemStart = items.length;
-    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEventId, hasLaterUserBoundary);
+    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary);
     completedTurnCache.set(cacheKey, {
       events: [...turnEvents],
       items: items.slice(itemStart),
@@ -941,7 +995,7 @@ export function buildRenderItems(
     });
   };
   const flushTurn = (isLatestTurn = false, hasLaterUserBoundary = false) => {
-    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEventId, hasLaterUserBoundary);
+    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEvent, hasLaterUserBoundary);
     turnBody = [];
     currentAgentTurnId = undefined;
   };
@@ -951,7 +1005,7 @@ export function buildRenderItems(
       flushTurn(false, true);
       items.push({ type: "event", event, attachedUserStatuses: attachedUserStatuses?.get(event.id) });
       currentTurnStartedAt = event.timestamp;
-      currentTurnUserEventId = event.id;
+      currentTurnUserEvent = event;
       continue;
     }
     if (event.type === "steer_message") {
@@ -1087,17 +1141,25 @@ export const ChatThread = memo(function ChatThread() {
     [splitEvents.events, statusUpdateDisplay]
   );
   const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
-  const activeRoomAgentIds = useMemo(() => new Set(Object.values(roomAgentActivities)
-    .filter((activity) => activity.roomId === session?.id && ["running", "waiting_approval", "waiting_question"].includes(activity.status))
-    .map((activity) => activity.roomAgentId)), [roomAgentActivities, session?.id]);
-  const hasActiveTurn = Boolean(session && (activeRoomAgentIds.size > 0 || (
+  const sessionRoomAgentActivities = useMemo(() => Object.values(roomAgentActivities)
+    .filter((activity) => activity.roomId === session?.id), [roomAgentActivities, session?.id]);
+  const primaryRoomAgentId = session ? getPrimaryRoomAgent(session).id : undefined;
+  const hasActiveTurn = Boolean(session && (sessionRoomAgentActivities.some(isRenderActivityActive) || (
     runningSessionId === session.id ||
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId)
   )));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(
-    () => buildRenderItems(visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds, completedTurnRenderCacheRef.current),
-    [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, activeRoomAgentIds]
+    () => buildRenderItems(
+      visibleEvents,
+      session?.engine,
+      splitEvents.attachedByUserId,
+      hasActiveTurn,
+      sessionRoomAgentActivities,
+      completedTurnRenderCacheRef.current,
+      primaryRoomAgentId,
+    ),
+    [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, sessionRoomAgentActivities, primaryRoomAgentId]
   );
   const surfacedSubagentContentKeysRef = useRef(new Set<string>());
   useEffect(() => {

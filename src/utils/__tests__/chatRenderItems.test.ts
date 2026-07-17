@@ -2,7 +2,23 @@ import { describe, expect, it } from "vitest";
 import { buildRenderItems, filterStatusUpdates } from "@/components/chat/ChatThread";
 import { assistantFooterFallbackLabel, timelineEventMemoKey } from "@/components/chat/MessageBubble";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "../chatRenderItems";
-import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
+import type { RoomAgentActivity, TimelineEvent, ToolCallEvent } from "@/types/ui";
+
+function activeRoomTurn(
+  roomAgentId: string,
+  activeTurnId: string,
+  roomMessageId = "room-message",
+  status: RoomAgentActivity["status"] = "running",
+): RoomAgentActivity {
+  return {
+    roomId: "room",
+    roomAgentId,
+    status,
+    roomMessageId,
+    activeTurnId,
+    updatedAt: 10,
+  };
+}
 
 describe("createToolOnlyAssistantEvent", () => {
   it("creates a completed assistant header for pure completed tool turns", () => {
@@ -268,6 +284,128 @@ describe("buildRenderItems usage footer", () => {
     expect(activeAssistant.event.id).toBe("assistant-pending-user-next");
     expect(activeAssistant.event.content).toBe("");
     expect(activeAssistant.event.isComplete).toBe(false);
+  });
+
+  it("keeps the Assistant header during the primary room send-to-first-model-event gap", () => {
+    const primaryAgentId = "room-agent:primary";
+    const items = buildRenderItems([{
+      id: "user-room-gap",
+      type: "user_message",
+      timestamp: 1,
+      content: "整理完整列表",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-gap",
+      recipientAgentIds: [primaryAgentId],
+    }, {
+      id: "status-room-gap",
+      type: "status_update",
+      timestamp: 2,
+      message: "消息已发送",
+      source: "ipc",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-gap",
+      agentTurnId: "turn-room-gap",
+    }], "kimi-code", undefined, true, [
+      activeRoomTurn(primaryAgentId, "turn-room-gap", "room-message-gap", "sending"),
+    ], undefined, primaryAgentId);
+    const header = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message"
+    ));
+
+    expect(header?.type).toBe("event");
+    if (header?.type !== "event" || header.event.type !== "assistant_message") return;
+    expect(header.event.id).toBe("assistant-pending-user-room-gap");
+    expect(header.event.isComplete).toBe(false);
+    expect(header.isAssistantActive).toBe(true);
+  });
+
+  it("does not mark a primary room tool-use step complete while its prompt is still running", () => {
+    const primaryAgentId = "room-agent:primary";
+    const items = buildRenderItems([{
+      id: "user-room-running",
+      type: "user_message",
+      timestamp: 1,
+      content: "整理所有奇遇",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-running",
+      recipientAgentIds: [primaryAgentId],
+    }, {
+      id: "assistant-room-step-one",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "我先查看奇遇事件的定义结构，再整理完整列表。",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-running",
+      agentTurnId: "turn-room-running",
+    }, {
+      id: "tool-room-step-one",
+      type: "tool_call",
+      timestamp: 3,
+      toolCallId: "tool-room-step-one",
+      toolName: "Read",
+      status: "success",
+      arguments: {},
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-running",
+      agentTurnId: "turn-room-running",
+    }], "kimi-code", undefined, true, [
+      activeRoomTurn(primaryAgentId, "turn-room-running", "room-message-running"),
+    ], undefined, primaryAgentId);
+    const header = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message"
+    ));
+
+    expect(header?.type).toBe("event");
+    if (header?.type !== "event" || header.event.type !== "assistant_message") return;
+    expect(header.event.isComplete).toBe(false);
+    expect(header.isAssistantActive).toBe(true);
+  });
+
+  it("does not reopen an older primary room turn when the next turn becomes active", () => {
+    const primaryAgentId = "room-agent:primary";
+    const items = buildRenderItems([{
+      id: "user-room-previous",
+      type: "user_message",
+      timestamp: 1,
+      content: "上一轮",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-previous",
+      agentTurnId: "turn-room-previous",
+    }, {
+      id: "assistant-room-previous",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "上一轮已经完成",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-previous",
+      agentTurnId: "turn-room-previous",
+    }, {
+      id: "user-room-current",
+      type: "user_message",
+      timestamp: 3,
+      content: "当前轮",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-current",
+      agentTurnId: "turn-room-current",
+    }], "kimi-code", undefined, true, [
+      activeRoomTurn(primaryAgentId, "turn-room-current", "room-message-current", "accepted"),
+    ], undefined, primaryAgentId);
+    const previous = items.find((item) => (
+      item.type === "event" && item.event.id === "assistant:turn-room-previous"
+    ));
+    const current = items.find((item) => (
+      item.type === "event" && item.event.id === "assistant-pending-user-room-current"
+    ));
+
+    expect(previous?.type).toBe("event");
+    if (previous?.type !== "event" || previous.event.type !== "assistant_message") return;
+    expect(previous.event.isComplete).toBe(true);
+    expect(previous.isAssistantActive).toBe(false);
+    expect(current?.type === "event" ? current.isAssistantActive : undefined).toBe(true);
   });
 
   it("keeps a superseded turn's final usage settled when its Assistant completion flag is stale", () => {
@@ -571,7 +709,9 @@ describe("buildRenderItems room Agent turns", () => {
   });
 
   it("uses the Agent activity set instead of treating only the last response as running", () => {
-    const rendered = buildRenderItems(events, "kimi-code", undefined, false, new Set(["agent-a"]));
+    const rendered = buildRenderItems(events, "kimi-code", undefined, false, [
+      activeRoomTurn("agent-a", "turn-a"),
+    ]);
     const assistantA = rendered.find((item) => item.type === "event" && item.event.id === "assistant:turn-a");
     expect(assistantA?.type).toBe("event");
     if (assistantA?.type !== "event") return;
@@ -579,7 +719,9 @@ describe("buildRenderItems room Agent turns", () => {
   });
 
   it("settles one Agent footer while another Agent in the room is still running", () => {
-    const rendered = buildRenderItems(events, "kimi-code", undefined, true, new Set(["agent-a"]));
+    const rendered = buildRenderItems(events, "kimi-code", undefined, true, [
+      activeRoomTurn("agent-a", "turn-a"),
+    ]);
     const assistantB = rendered.find((item) => item.type === "event" && item.event.id === "assistant:turn-b");
     expect(assistantB?.type).toBe("event");
     if (assistantB?.type !== "event") return;
@@ -596,7 +738,9 @@ describe("buildRenderItems room Agent turns", () => {
       roomMessageId: "room-message",
       agentTurnId: "turn-b",
     }], "turn_end");
-    const rendered = buildRenderItems(visibleEvents, "kimi-code", undefined, true, new Set(["agent-b"]));
+    const rendered = buildRenderItems(visibleEvents, "kimi-code", undefined, true, [
+      activeRoomTurn("agent-b", "turn-b"),
+    ]);
     const assistantA = rendered.find((item) => item.type === "event" && item.event.id === "assistant:turn-a");
     expect(assistantA?.type).toBe("event");
     if (assistantA?.type !== "event") return;
