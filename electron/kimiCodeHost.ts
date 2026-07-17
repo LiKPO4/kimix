@@ -2431,7 +2431,7 @@ async function registerServerSession(
   const managed: ServerManagedSession = {
     session,
     workDir,
-    status: mapServerStatus(session.status),
+    status: resolveServerEngineStatus(session),
     model: typeof config.model === "string" ? config.model : options.model,
     thinking: typeof config.thinking === "string" ? config.thinking : options.thinking,
     permission: config.permission_mode === "auto" || config.permission_mode === "yolo"
@@ -2499,7 +2499,7 @@ function handleServerFrame(frame: ServerFrame) {
     const managed = serverSessions.get(sessionId);
     if (session && managed) {
       managed.session = session;
-      setStatus(sessionId, mapServerStatus(session.status));
+      setStatus(sessionId, resolveServerEngineStatus(session));
     }
     for (const replayFrame of snapshotMessagesToServerFrames(snapshot, sessionId)) {
       handleServerFrame(replayFrame);
@@ -2584,7 +2584,7 @@ export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<st
 
 function serverStatusToKimiCodeStatus(status: ServerSessionStatus, usage: unknown): KimiCodeSessionStatus {
   return {
-    engineStatus: mapServerStatus(status.status),
+    engineStatus: resolveServerEngineStatus(status),
     model: status.model,
     thinkingLevel: status.thinking_level,
     permission: status.permission === "manual" || status.permission === "auto" || status.permission === "yolo"
@@ -2648,6 +2648,18 @@ function mapServerStatus(status: string): KimiCodeEngineStatus {
   if (status === "awaiting_question") return "waiting_question";
   if (status === "aborted") return "interrupted";
   return "idle";
+}
+
+/**
+ * agent-core-v2 的权威运行信号是 busy：整个 prompt 期间（含 step 间隙）保持 true，
+ * 且 v2 的 /status 响应不再携带 status 字符串字段。busy=true 一律视为 running，
+ * 否则 v2 的缺失 status 会被 mapServerStatus 兜底成 idle，把仍在 step 间隙运行的
+ * 会话误判为终态（头部闪"输出完成"、底部闪"已连接"）。busy 缺失（v1/旧 Server）
+ * 时回退到 status 字符串映射。
+ */
+export function resolveServerEngineStatus(source: { status?: string; busy?: boolean }): KimiCodeEngineStatus {
+  if (source.busy === true) return "running";
+  return mapServerStatus(source.status ?? "");
 }
 
 function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSession {

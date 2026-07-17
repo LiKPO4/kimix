@@ -5,6 +5,7 @@ import {
   KimiCodeServerHost,
   shouldClearUnresponsiveServerLock,
 } from "../../../electron/kimiCodeServerHost";
+import { resolveServerEngineStatus } from "../../../electron/kimiCodeHost";
 import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
@@ -100,5 +101,27 @@ describe("kimiCodeServerHost", () => {
     expect(isKimiCodeSessionAlreadyExistsError(error)).toBe(true);
     expect(getKimiCodeSessionAlreadyExistsId(error)).toBe("session_30c60f3b-e2cc-4295-9540-fffcbfe2c7c");
     expect(isKimiCodeSessionAlreadyExistsError(new Error("fetch failed"))).toBe(false);
+  });
+});
+
+describe("resolveServerEngineStatus", () => {
+  it("treats v2 busy as running even when the status string is absent or misleading", () => {
+    // agent-core-v2 /status 只返回 busy；整个 prompt 期间（含 step 间隙）busy=true。
+    // 此前缺失的 status 被兜底成 idle，轮询据此把运行中会话误判为终态，
+    // 表现为头部闪“输出完成”、底部闪“已连接”。
+    expect(resolveServerEngineStatus({ busy: true })).toBe("running");
+    expect(resolveServerEngineStatus({ busy: true, status: "idle" })).toBe("running");
+  });
+
+  it("keeps terminal mapping when the turn is truly finished", () => {
+    expect(resolveServerEngineStatus({ busy: false })).toBe("idle");
+    expect(resolveServerEngineStatus({ busy: false, status: "aborted" })).toBe("interrupted");
+  });
+
+  it("falls back to the v1 status string when busy is absent", () => {
+    expect(resolveServerEngineStatus({ status: "running" })).toBe("running");
+    expect(resolveServerEngineStatus({ status: "awaiting_approval" })).toBe("waiting_approval");
+    expect(resolveServerEngineStatus({ status: "awaiting_question" })).toBe("waiting_question");
+    expect(resolveServerEngineStatus({ status: "unknown-future-state" })).toBe("idle");
   });
 });

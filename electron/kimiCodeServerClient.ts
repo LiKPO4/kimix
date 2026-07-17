@@ -40,6 +40,7 @@ export type ServerSession = {
   created_at?: string;
   updated_at?: string;
   status: string;
+  busy?: boolean;
   archived?: boolean;
   metadata?: Record<string, unknown>;
   agent_config?: Record<string, unknown>;
@@ -80,6 +81,9 @@ export type ServerFsReadResult = {
 
 export type ServerSessionStatus = {
   status: string;
+  // agent-core-v2 的权威运行信号：整个 prompt 期间（含 step 间隙）保持 true。
+  // v2 的 /status 响应没有 status 字符串字段，只有 busy。
+  busy?: boolean;
   model?: string;
   thinking_level: string;
   permission: string;
@@ -744,7 +748,7 @@ export class KimiCodeServerClient {
         const message = error instanceof Error ? error.message : String(error);
         if (!message.includes("会话空闲")) throw error;
         const status = await this.getSessionStatus(sessionId).catch(() => undefined);
-        const stillActive = status?.status === "running" || status?.status === "awaiting_approval" || status?.status === "awaiting_question";
+        const stillActive = status?.busy === true || status?.status === "running" || status?.status === "awaiting_approval" || status?.status === "awaiting_question";
         if (stillActive) continue;
         console.warn(`[KimiCodeServerClient] prompt ${result.prompt_id} 完成帧未到达且会话已空闲，改用快照补齐：${message}`);
         await this.recoverSnapshot(sessionId).catch(() => undefined);
