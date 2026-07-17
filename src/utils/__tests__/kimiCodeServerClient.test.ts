@@ -5,6 +5,7 @@ import {
   KimiCodeServerClient,
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
+  recoveredPromptCompletedFrame,
   snapshotMessagesToServerFrames,
   snapshotToHistoryFrames,
   toServerConfigPatch,
@@ -144,6 +145,19 @@ describe("KimiCodeServerClient protocol adapters", () => {
       session_id: "s1",
       payload: { delta: "hi", agentId: "main" },
     })).toEqual({ type: "assistant.delta", delta: "hi", agentId: "main", seq: 7 });
+  });
+
+  it("emits an authoritative completion frame after snapshot recovery", () => {
+    expect(recoveredPromptCompletedFrame("session-1", "prompt-1", { seq: 7, epoch: "epoch-1" })).toEqual({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 7,
+      epoch: "epoch-1",
+      payload: {
+        prompt_id: "prompt-1",
+        recovered_from_snapshot: true,
+      },
+    });
   });
 
   it("uses official P3 REST routes for fork, children, tasks and terminals", async () => {

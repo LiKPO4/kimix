@@ -122,6 +122,14 @@ export function getRoomAgentReconciliationTargets(
   return getRoomAgentTargets(session, activities, RECONCILABLE_STATUSES, true);
 }
 
+export function getRunnableRoomAgentReconciliationTargets<T extends RoomAgentControlTarget>(
+  targets: Iterable<T>,
+): Array<T & { runtimeSessionId: string }> {
+  return Array.from(targets).filter((target): target is T & { runtimeSessionId: string } => (
+    typeof target.runtimeSessionId === "string" && target.runtimeSessionId.length > 0
+  ));
+}
+
 export function getPersistedRoomAgentControlTargets(
   sessions: Session[],
   action: RoomAgentControlAction,

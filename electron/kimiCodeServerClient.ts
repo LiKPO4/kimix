@@ -382,6 +382,23 @@ export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> 
   return { type: frame.type, ...payload, seq: frame.seq };
 }
 
+export function recoveredPromptCompletedFrame(
+  sessionId: string,
+  promptId: string,
+  cursor?: { seq: number; epoch?: string },
+): ServerFrame {
+  return {
+    type: "prompt.completed",
+    session_id: sessionId,
+    seq: cursor?.seq,
+    epoch: cursor?.epoch,
+    payload: {
+      prompt_id: promptId,
+      recovered_from_snapshot: true,
+    },
+  };
+}
+
 export function mergeServerRelatedSessions(parentId: string, children: ServerSession[], sessions: ServerSession[]): ServerSession[] {
   const related = new Map(children.map((session) => [session.id, session]));
   for (const session of sessions) {
@@ -731,6 +748,8 @@ export class KimiCodeServerClient {
         if (stillActive) continue;
         console.warn(`[KimiCodeServerClient] prompt ${result.prompt_id} 完成帧未到达且会话已空闲，改用快照补齐：${message}`);
         await this.recoverSnapshot(sessionId).catch(() => undefined);
+        const completion = recoveredPromptCompletedFrame(sessionId, result.prompt_id, this.cursors.get(sessionId));
+        for (const listener of this.listeners) listener(completion);
         break;
       }
     }

@@ -91,7 +91,7 @@ import {
   recoverInterruptedRoomDeliveries,
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
-import { getRoomAgentReconciliationTargets, isRoomAgentReconciliationStatus, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
+import { getRoomAgentReconciliationTargets, getRunnableRoomAgentReconciliationTargets, isRoomAgentReconciliationStatus, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -2440,7 +2440,7 @@ function App() {
         ? useAppStore.getState().roomAgentActivities[roomAgentActivityKey(targetSession.id, roomAgentId)]
         : undefined;
       const runtimeActive = targetSession?.collaboration && roomAgentId
-        ? Boolean(roomActivity && ["sending", "running", "waiting_approval", "waiting_question"].includes(roomActivity.status))
+        ? Boolean(roomActivity && isRoomAgentReconciliationStatus(roomActivity.status))
         : isSessionRuntimeRunning(targetAgentSession, useAppStore.getState().runningSessionId);
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
@@ -3222,9 +3222,9 @@ function App() {
       const reconciliationTargets = useSessionStore.getState().sessions.flatMap((session) => (
         getRoomAgentReconciliationTargets(session, roomActivities).map((target) => ({ ...target, roomId: session.id }))
       ));
-      if (reconciliationTargets.length > 0) {
-        await Promise.all(reconciliationTargets.map(async (target) => {
-          if (!target.runtimeSessionId) return;
+      const runnableReconciliationTargets = getRunnableRoomAgentReconciliationTargets(reconciliationTargets);
+      if (runnableReconciliationTargets.length > 0) {
+        await Promise.all(runnableReconciliationTargets.map(async (target) => {
           await reconcileAgentRuntime(target.roomId, target.roomAgentId, target.runtimeSessionId);
         }));
         return;

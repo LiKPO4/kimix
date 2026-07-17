@@ -6,6 +6,7 @@ import {
   getRoomAgentControlTargets,
   getPersistedRoomAgentControlTargets,
   getRoomAgentReconciliationTargets,
+  getRunnableRoomAgentReconciliationTargets,
   isRoomAgentReconciliationStatus,
   resolveRoomAgentControlTarget,
   settleStoppedRoomAgent,
@@ -270,6 +271,24 @@ describe("roomAgentControl", () => {
         status: "creating",
       });
     expect(isRoomAgentReconciliationStatus("creating")).toBe(true);
+  });
+
+  it("does not let a creating target without a runtime suppress the primary fallback", () => {
+    const room = roomFixture();
+    const secondary = room.collaboration!.agents.find((agent) => agent.id === "agent-secondary")!;
+    delete secondary.runtimeSessionId;
+    delete secondary.officialSessionId;
+    const creatingActivity: RoomAgentActivity = {
+      roomId: room.id,
+      roomAgentId: "agent-secondary",
+      status: "creating",
+      updatedAt: 10,
+    };
+    const targets = getRoomAgentReconciliationTargets(room, [creatingActivity]);
+    const creatingTarget = targets.find((target) => target.roomAgentId === "agent-secondary");
+
+    expect(creatingTarget).toMatchObject({ status: "creating", runtimeSessionId: undefined });
+    expect(getRunnableRoomAgentReconciliationTargets([creatingTarget!])).toEqual([]);
   });
 
   it("settles the persisted delivery when the official runtime is terminal", () => {
