@@ -1,44 +1,54 @@
 ---
 type: Architecture
 title: Chat Viewport State
-description: Why ChatThread.contentVersion is intentionally coarse and how the viewport hook uses it without coupling to render item rebuilds.
+description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-16T02:30:00+08:00"
+timestamp: "2026-07-17T15:25:00+08:00"
 ---
 
 # Chat Viewport State
 
-## `contentVersion` is intentionally coarse
+## Turn ownership
 
-`ChatThread` computes `contentVersion` as:
+Runtime state and timeline state answer different questions. `runningSessionId`
+means the runtime is busy; it does not identify which already-rendered Assistant
+bubble owns that work. A completed Assistant with durable body or thinking stays
+complete when a later prompt starts. The active turn remains open only through
+its own incomplete Assistant, running tool/subagent, room activity identity, or
+an output-less latest turn that is still waiting for its first authoritative
+event. This prevents the previous bubble from flashing back to “消息处理中” during
+the short state-ordering gap before the next optimistic user event is rendered.
 
-```ts
-const contentVersion = useMemo(() => {
-  return `${session?.id ?? ""}:${session?.updatedAt ?? 0}:${roomTimeline.length}`;
-}, [roomTimeline.length, session?.id, session?.updatedAt]);
-```
+## Viewport ownership
 
-This is deliberately **not** derived from `renderItems` or any other derived timeline
-view. The viewport hook uses `contentVersion` as a stable change signal for
-scroll/resize effects. If it were tied to `renderItems`, every streaming delta
-would rebuild `renderItems`, invalidate `contentVersion`, and re-trigger the
-viewport effects, causing jank and fighting the user’s scroll position.
+The chat viewport has two modes:
 
-By anchoring `contentVersion` to:
+- Following mode owns the canonical tail and may write the bottom position when
+  content or viewport geometry changes.
+- Detached mode belongs to explicit user intent. Wheel, touch, scrollbar,
+  navigation keys, rail navigation, and search focus atomically cancel tail
+  settlement, invalidate the old anchor generation, and capture a new rendered
+  message anchor after the move. Streaming may preserve that anchor but may not
+  resume following without explicit downward intent reaching the tail.
 
-- `session.id` — clears when the session changes
-- `session.updatedAt` — advances when the session model is mutated
-- `roomTimeline.length` — advances when events are appended/removed
+Rail/search navigation uses an immediate scroll transaction. A smooth animation
+would expose multiple intermediate `scrollTop` values while streaming commits
+are also trying to preserve an anchor, so it is not a stable ownership boundary.
+Chromium native scroll anchoring is disabled on the chat scroll area; Kimix's
+rendered-message anchor is the only reflow writer in detached mode.
 
-we get a change signal that is stable during intra-turn streaming but still
-reacts to meaningful conversation changes.
+## Content revisions
 
-### Consequences
+`contentVersion` is a bounded structural revision token. It contains session
+identity/recency, timeline and render-item counts, the last render key, bounded
+Assistant lengths, and object-identity revisions for already-bounded render
+items. It never serializes or hashes full message bodies. The viewport uses it
+to detect same-length canonical corrections, process updates, and other layout
+changes that may need detached-anchor recovery.
 
-- Viewport effects that depend on `contentVersion` must **not** assume that every
-  render-item change is reflected in it.
-- Any effect that needs to react to render-item-level changes should depend on
-  `renderItems.length` directly, not on `contentVersion`.
-- This design was introduced in `a3ab47d3` and preserved during the P0-3
-  `useChatViewport` extraction.
+`ResizeObserver` owns asynchronous content and viewport geometry changes.
+`contentVersion` participates in synchronous detached-anchor recovery but never
+creates another tail-follow loop. Process-collapse transactions may temporarily
+add exact tail compensation when content shrink would otherwise clamp the saved
+anchor beyond the new scroll range.

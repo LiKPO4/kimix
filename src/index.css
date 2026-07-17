@@ -410,6 +410,9 @@ body::before {
 .kimix-chat-scroll-area {
   padding-right: 8px;
   overflow-x: hidden;
+  /* The viewport hook owns anchoring. Chromium's implicit anchor otherwise
+     races the explicit detached-mode anchor during streaming reflow. */
+  overflow-anchor: none;
 }
 
 @media (min-width: 1024px) {

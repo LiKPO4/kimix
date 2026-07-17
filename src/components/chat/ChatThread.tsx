@@ -685,9 +685,21 @@ export function buildRenderItems(
     const foldApprovals = Boolean(mergedAssistantEvent) && resolvedApprovals.length > 0;
     const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
     const isRoomAgentRunning = Boolean(roomAgentId && activeRoomAgentIds?.has(roomAgentId));
+    const hasCompletedAssistantOutput = assistantEvents.some((event) => event.isComplete && Boolean(
+      event.content.trim() ||
+      event.thinking?.trim() ||
+      event.thinkingParts?.some((part) => part.text.trim())
+    ));
+    // A session-level running flag can switch before the optimistic user event
+    // reaches this timeline. Do not reopen the previous completed response
+    // during that gap; runtime state may keep only an output-less/tool-only
+    // latest turn active until its first authoritative event arrives.
+    const isRuntimeAwaitingTurnOutput = Boolean(
+      !roomAgentId && isLatestTurn && isSessionRunning && !hasCompletedAssistantOutput
+    );
     const turnSettled = (
       !isRoomAgentRunning &&
-      !(!roomAgentId && isLatestTurn && isSessionRunning) &&
+      !isRuntimeAwaitingTurnOutput &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")

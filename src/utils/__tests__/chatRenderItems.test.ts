@@ -240,13 +240,13 @@ describe("buildRenderItems usage footer", () => {
     id: "usage-2", type: "status_update", timestamp: 4, inputTokenCount: 120, tokenCount: 30,
   }];
 
-  it("hides interim usage while the latest runtime turn is still active", () => {
+  it("does not reopen a completed Assistant while the next runtime turn is starting", () => {
     const assistant = buildRenderItems(events, "kimi-code", undefined, true)
       .find((item) => item.type === "event" && item.event.type === "assistant_message");
     expect(assistant?.type).toBe("event");
     if (assistant?.type !== "event") return;
-    expect(assistant.trailingStatuses).toEqual([]);
-    expect(assistant.event.type === "assistant_message" && assistant.event.isComplete).toBe(false);
+    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
+    expect(assistant.event.type === "assistant_message" && assistant.event.isComplete).toBe(true);
   });
 
   it("keeps a successful tool-only latest turn active while the runtime is still running", () => {

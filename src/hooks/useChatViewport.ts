@@ -241,11 +241,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     hasMoreOlderItems,
     onExpandOlderItemsToEnd,
     onHighlightEvent,
-    autoFollowRef,
-    userScrollRef,
-    updateAutoFollow,
-    scrollTokenRef,
-    cancelSessionAutoBottom,
+    pauseAutoFollowForUser,
   });
 
   useResizeObserver({

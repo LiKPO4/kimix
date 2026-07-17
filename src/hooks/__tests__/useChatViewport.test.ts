@@ -118,6 +118,7 @@ describe("useChatViewport", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).api;
     latestViewport = null;
@@ -233,7 +234,49 @@ describe("useChatViewport", () => {
       viewport().focusTimelineEvent("b", undefined, "start-center");
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 380, behavior: "smooth" });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 380, behavior: "auto" });
+  });
+
+  it("invalidates the old viewport anchor before navigation so streaming cannot pull it back", () => {
+    const { viewport, scroll, rerender } = renderTest({
+      contentVersion: "v1",
+      renderItems: [eventRenderItem("a"), eventRenderItem("b")],
+    });
+    const first = scroll.querySelector<HTMLElement>("[data-kimix-event-id='a']")!;
+    const target = scroll.querySelector<HTMLElement>("[data-kimix-event-id='b']")!;
+    Object.defineProperties(scroll, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+      scrollTo: {
+        configurable: true,
+        value: vi.fn(({ top }: ScrollToOptions) => {
+          scroll.scrollTop = Number(top ?? 0);
+        }),
+      },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockImplementation(() => ({ top: 0 } as DOMRect));
+    vi.spyOn(first, "getBoundingClientRect").mockImplementation(() => ({
+      top: 100 - scroll.scrollTop,
+      bottom: 200 - scroll.scrollTop,
+    } as DOMRect));
+    vi.spyOn(target, "getBoundingClientRect").mockImplementation(() => ({
+      top: 700 - scroll.scrollTop,
+      bottom: 800 - scroll.scrollTop,
+    } as DOMRect));
+
+    act(() => {
+      viewport().captureResizeAnchor();
+      viewport().focusTimelineEvent("b", undefined, "start-center");
+    });
+    expect(scroll.scrollTop).toBe(600);
+
+    rerender({ contentVersion: "v2" });
+
+    expect(scroll.scrollTop).toBe(600);
+    expect(viewport().getScrollDiagSnapshot()).toMatchObject({
+      autoFollow: false,
+      userScroll: true,
+    });
   });
 
   it("preserves a pending focus request while switching to its target session", async () => {

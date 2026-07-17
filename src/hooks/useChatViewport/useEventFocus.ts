@@ -9,11 +9,7 @@ export interface UseEventFocusOptions {
   hasMoreOlderItems: boolean;
   onExpandOlderItemsToEnd: () => void;
   onHighlightEvent?: (eventId: string | null) => void;
-  autoFollowRef: React.MutableRefObject<boolean>;
-  userScrollRef: React.MutableRefObject<boolean>;
-  updateAutoFollow: (value: boolean) => void;
-  scrollTokenRef: React.MutableRefObject<number>;
-  cancelSessionAutoBottom: () => void;
+  pauseAutoFollowForUser: () => void;
 }
 
 export type UseEventFocusResult = {
@@ -34,11 +30,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     hasMoreOlderItems,
     onExpandOlderItemsToEnd,
     onHighlightEvent,
-    autoFollowRef,
-    userScrollRef,
-    updateAutoFollow,
-    scrollTokenRef,
-    cancelSessionAutoBottom,
+    pauseAutoFollowForUser,
   } = options;
 
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
@@ -100,19 +92,22 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     if (node && rect.height > 0) {
       const containerRect = node.getBoundingClientRect();
       const targetTop = node.scrollTop + rect.top - containerRect.top - Math.max(80, node.clientHeight * 0.28);
-      node.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      node.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
     } else {
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.scrollIntoView({ behavior: "auto", block: "center" });
     }
     return true;
   }, [scrollRef]);
 
   const focusTimelineEvent = useCallback((eventId: string, searchText?: string, alignment: TimelineFocusAlignment = "center"): boolean => {
-    cancelSessionAutoBottom();
     const now = Date.now();
     const state = focusTimelineEventStateRef.current;
     if (!state || state.eventId !== eventId) {
       focusTimelineEventStateRef.current = { eventId, attemptCount: 1, startTime: now };
+      // Navigation is an explicit detached-mode transaction. This atomically
+      // cancels tail following, invalidates the pre-navigation anchor, and
+      // suppresses restoration until the new anchor has been captured.
+      pauseAutoFollowForUser();
     } else {
       state.attemptCount += 1;
     }
@@ -145,10 +140,6 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     }
 
     focusTimelineEventStateRef.current = null;
-    scrollTokenRef.current += 1;
-    autoFollowRef.current = false;
-    userScrollRef.current = true;
-    updateAutoFollow(false);
     const didSelectText = selectTextInNode(target, searchText);
     if (!didSelectText) {
       const scrollNode = scrollRef.current;
@@ -156,9 +147,9 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
         const scrollRect = scrollNode.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const targetTop = scrollNode.scrollTop + targetRect.top - scrollRect.top - scrollNode.clientHeight / 2;
-        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
       } else {
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.scrollIntoView({ behavior: "auto", block: "center" });
       }
     }
     onHighlightEvent?.(eventId);
@@ -166,7 +157,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       onHighlightEvent?.(null);
     }, 2200);
     return true;
-  }, [cancelSessionAutoBottom, findRenderedEventNode, hasMoreOlderItems, onExpandOlderItemsToEnd, onHighlightEvent, selectTextInNode, autoFollowRef, userScrollRef, updateAutoFollow, scrollTokenRef, scrollRef]);
+  }, [findRenderedEventNode, hasMoreOlderItems, onExpandOlderItemsToEnd, onHighlightEvent, pauseAutoFollowForUser, selectTextInNode, scrollRef]);
 
   useEffect(() => {
     const handler = (event: Event) => {
