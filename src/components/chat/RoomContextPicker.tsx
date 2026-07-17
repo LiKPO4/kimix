@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { RoomContextShareMode, RoomContextShareSelection, Session } from "@/types/ui";
 import { estimateRoomContextShare, getRoomContextTurns } from "@/utils/roomContextBridge";
+import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 
 const MODES: Array<{ value: RoomContextShareMode; label: string; title: string }> = [
   { value: "last", label: "上一轮", title: "补入上一条用户消息及其下各 Agent 最终正文" },
@@ -77,11 +78,7 @@ export function RoomContextPicker({
       </button>
 
       {open && (
-        <div
-          className="kimix-floating-panel absolute bottom-full right-0 z-40 rounded-2xl"
-          style={{ width: "min(372px, calc(100vw - 40px))", marginBottom: 8, padding: 16 }}
-          role="menu"
-        >
+        <ComposerToolbarPopover align="start" width={372} role="menu">
           <div style={{ paddingLeft: 2, paddingRight: 2 }}>
             <div className="text-[13.5px] font-medium text-[var(--kimix-panel-text)]">本次补充正文</div>
             <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>
@@ -170,7 +167,7 @@ export function RoomContextPicker({
                   ? `最多为单个 Agent 补入 ${estimate.entryCount} 条，约 ${estimate.maxContentChars.toLocaleString()} 字。`
                   : "所选目标已经读过这些正文，本次不会重复补入。"}
           </div>
-        </div>
+        </ComposerToolbarPopover>
       )}
     </div>
   );

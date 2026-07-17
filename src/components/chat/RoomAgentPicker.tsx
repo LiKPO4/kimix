@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, Pencil, RefreshCw, UserMinus } from "lucide-react";
 import type { RoomAgent, RoomAgentActivity, Session } from "@/types/ui";
 import { getPrimaryRoomAgent, roomAgentActivityKey } from "@/utils/collaborationRooms";
+import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 
 const ACTIVE_ACTIVITY_STATUSES = new Set([
   "creating",
@@ -102,11 +103,7 @@ export function RoomAgentPicker({
       </button>
 
       {open && (
-        <div
-          className="kimix-floating-panel absolute bottom-full left-0 z-40 w-[336px] rounded-2xl"
-          style={{ marginBottom: 8, padding: 14 }}
-          role="menu"
-        >
+        <ComposerToolbarPopover align="start" width={336} role="menu">
           <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, paddingLeft: 2, paddingRight: 2 }}>
             <div className="min-w-0">
               <div className="text-[13.5px] font-medium text-[var(--kimix-panel-text)]">本轮接收者</div>
@@ -216,7 +213,7 @@ export function RoomAgentPicker({
               运行中的 Agent 会独立排队；编辑、重试和移出成员仍需等待房间空闲。
             </div>
           )}
-        </div>
+        </ComposerToolbarPopover>
       )}
     </div>
   );

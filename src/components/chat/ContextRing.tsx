@@ -4,6 +4,7 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import { getSessionContextUsages, getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 
 function formatK(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;
@@ -156,10 +157,7 @@ export function ContextRing() {
         <CircularProgress percent={percent} size={18} strokeWidth={2.5} />
       </button>
       {showTooltip && (
-        <div
-          className="absolute bottom-full right-0 z-[90] rounded-xl border border-border-subtle bg-surface-elevated shadow-floating-token"
-          style={{ width: 320, marginBottom: 8, padding: "18px 20px" }}
-        >
+        <ComposerToolbarPopover align="end" width={320}>
           <div
             style={{
               display: "grid",
@@ -263,7 +261,7 @@ export function ContextRing() {
               </div>
             </div>
           )}
-        </div>
+        </ComposerToolbarPopover>
       )}
     </div>
   );

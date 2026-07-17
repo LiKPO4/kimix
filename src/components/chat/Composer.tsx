@@ -14,6 +14,7 @@ import { AddRoomAgentDialog } from "./AddRoomAgentDialog";
 import { EditRoomAgentDialog } from "./EditRoomAgentDialog";
 import { RoomAgentPicker } from "./RoomAgentPicker";
 import { RoomContextPicker } from "./RoomContextPicker";
+import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isWindows } from "@/utils/platform";
@@ -4023,7 +4024,7 @@ export function Composer() {
                 <Plus size={18} />
               </button>
               {showAddMenu && (
-                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[260px] rounded-xl" style={{ padding: "14px 14px 14px" }}>
+                <ComposerToolbarPopover align="start" width={260}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
                     {multiAgentRoomUiAvailable && (
                       <section>
@@ -4103,7 +4104,7 @@ export function Composer() {
                     </section>
 
                   </div>
-                </div>
+                </ComposerToolbarPopover>
               )}
             </div>
 
@@ -4131,18 +4132,18 @@ export function Composer() {
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (
-                <div className="kimix-floating-panel absolute bottom-full left-0 z-30 mb-2 w-[216px] rounded-xl" style={{ paddingTop: 12, paddingBottom: 12 }}>
+                <ComposerToolbarPopover align="start" width={216} role="menu">
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 13, paddingBottom: 13, minHeight: 40 }} className={`flex w-full items-center gap-3.5 text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ gap: 12, minHeight: 40, paddingLeft: 12, paddingRight: 12, paddingTop: 11, paddingBottom: 11, borderRadius: 10 }} className={`flex w-full items-center text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                         <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
-                        {(mutationPermissionMode ?? permissionMode) === opt.value && <Check size={13} className="mr-1 shrink-0 text-[var(--kimix-panel-text)]" />}
+                        {(mutationPermissionMode ?? permissionMode) === opt.value && <Check size={13} className="shrink-0 text-[var(--kimix-panel-text)]" />}
                       </button>
                     );
                   })}
-                </div>
+                </ComposerToolbarPopover>
               )}
             </div>
 
@@ -4273,13 +4274,10 @@ export function Composer() {
 
             <div ref={roomControlMenuRef} className="relative flex shrink-0 items-center" style={{ gap: 8 }}>
               {roomControlRequest && activeSession?.collaboration && (
-                <div
-                  className="kimix-floating-panel absolute right-0 z-30 rounded-[14px]"
-                  style={{ bottom: 42, width: 268, padding: 10 }}
-                >
+                <ComposerToolbarPopover align="end" width={268}>
                   <div
                     className="grid items-center"
-                    style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, paddingLeft: 8, paddingRight: 4, paddingTop: 4, paddingBottom: 8 }}
+                    style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, paddingLeft: 2, paddingRight: 0, paddingTop: 0, paddingBottom: 12 }}
                   >
                     <span className="truncate text-[13px] font-medium text-[var(--kimix-panel-text)]">{roomControlTitle}</span>
                     <button
@@ -4323,7 +4321,7 @@ export function Composer() {
                       <span>停止全部运行 Agent</span>
                     </button>
                   )}
-                </div>
+                </ComposerToolbarPopover>
               )}
 
               {shouldShowStopButton ? (
