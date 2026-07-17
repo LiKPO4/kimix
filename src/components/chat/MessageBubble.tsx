@@ -2148,8 +2148,8 @@ function AssistantMessageBubble({ event, sessionId, runtimeSessionId, turnStarte
             {hasContent && (
               <>
                 <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-                  {/* Active assistant messages only run the lightweight progress-paragraph
-                      normalization; the full markdown fix-up stack runs once the turn completes. */}
+                  {/* Assistant progress normalization includes the structural Markdown repair
+                      stack and additionally restores flattened progress paragraphs. */}
                   <MarkdownRenderer
                     content={event.content}
                     streaming={isActiveAssistant}

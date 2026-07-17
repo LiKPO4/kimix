@@ -53,4 +53,22 @@ describe("MarkdownRenderer streaming blocks", () => {
     expect(normalizeMarkdownContent(content, true)).toContain("。\n\n然后");
     expect(normalizeMarkdownContent(content, false)).toBe(content);
   });
+
+  it("repairs broken tables in both progress and default normalization modes", () => {
+    const content = [
+      "| 优先级 | 事项 |",
+      "|",
+      "",
+      "----------|------|",
+      "| P1 | 修复 |",
+    ].join("\n");
+
+    const repaired = [
+      "| 优先级 | 事项 |",
+      "|----------|------|",
+      "| P1 | 修复 |",
+    ].join("\n");
+    expect(normalizeMarkdownContent(content, true)).toBe(repaired);
+    expect(normalizeMarkdownContent(content, false)).toBe(repaired);
+  });
 });
