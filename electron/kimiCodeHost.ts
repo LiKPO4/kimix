@@ -2543,7 +2543,7 @@ function handleServerFrame(frame: ServerFrame) {
   const managed = serverSessions.get(sessionId);
   if (managed && consumeBtwEvent(managed.btwRuns, event)) return;
   eventSink?.({ sessionId, event });
-  updateStatusFromEvent(sessionId, event);
+  updateStatusFromEvent(sessionId, event, "prompt");
   if (frame.type === "prompt.completed") {
     const currentStatus = serverSessions.get(sessionId)?.status;
     if (currentStatus !== "interrupted" && currentStatus !== "error") setStatus(sessionId, "completed");
@@ -2923,8 +2923,8 @@ function settlePendingForSession(sessionId: string, reason: "cancelled" | "close
   }
 }
 
-function updateStatusFromEvent(sessionId: string, event: unknown) {
-  statusSequencer.handle(sessionId, event);
+function updateStatusFromEvent(sessionId: string, event: unknown, terminalScope: "turn" | "prompt" = "turn") {
+  statusSequencer.handle(sessionId, event, terminalScope);
 }
 
 function setStatus(sessionId: string, status: KimiCodeEngineStatus) {

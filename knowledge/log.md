@@ -2,6 +2,8 @@
 
 ## 2026-07-17
 
+* **Server completion is prompt-scoped**: Successful Server `turn.ended` and `turn.step.completed` events are intermediate boundaries inside one prompt; only `prompt.completed` settles runtime status and Assistant display, while SDK completion remains turn-scoped. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Development restart does not own the installed Kimix app**: Packaged-process cleanup now requires the previous runtime token or an explicit current-workspace path; the broad compatibility `\Kimix\` matcher cannot terminate `%LocalAppData%\Programs\Kimix`. See [/project/kimix.md](/project/kimix.md).
 
 * **Canonical history replacement is dimension-monotonic**: Whole-partition replacement now rejects shorter Assistant bodies, thinking history, process history, or fewer displayable user images even when another dimension is richer; shrink corrections require an identity-aware merge. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

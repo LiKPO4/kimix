@@ -144,7 +144,13 @@ describe("KimiCodeServerClient protocol adapters", () => {
       seq: 7,
       session_id: "s1",
       payload: { delta: "hi", agentId: "main" },
-    })).toEqual({ type: "assistant.delta", delta: "hi", agentId: "main", seq: 7 });
+    })).toEqual({
+      type: "assistant.delta",
+      delta: "hi",
+      agentId: "main",
+      seq: 7,
+      kimixTerminalScope: "prompt",
+    });
   });
 
   it("emits an authoritative completion frame after snapshot recovery", () => {

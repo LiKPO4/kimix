@@ -73,4 +73,19 @@ describe("KimiCodeStatusSequencer", () => {
     sequencer.handle("cancelled", { type: "turn.ended", reason: "cancelled" });
     expect(emitted).toEqual(["failed:error", "cancelled:interrupted"]);
   });
+
+  it("does not complete a prompt-scoped Server run at intermediate turn boundaries", () => {
+    vi.useFakeTimers();
+    const emitted: string[] = [];
+    const sequencer = new KimiCodeStatusSequencer((sessionId, status) => {
+      emitted.push(`${sessionId}:${status}`);
+    });
+
+    sequencer.handle("server", { type: "turn.started" }, "prompt");
+    sequencer.handle("server", { type: "turn.ended", reason: "completed" }, "prompt");
+    sequencer.handle("server", { type: "usage.record", usageScope: "turn" }, "prompt");
+    vi.advanceTimersByTime(1_000);
+
+    expect(emitted).toEqual(["server:running"]);
+  });
 });

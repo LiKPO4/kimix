@@ -1,4 +1,5 @@
 export type KimiCodeTerminalStatus = "completed" | "error" | "interrupted";
+export type KimiCodeTerminalScope = "turn" | "prompt";
 
 type StatusEmitter = (sessionId: string, status: "running" | KimiCodeTerminalStatus) => void;
 
@@ -28,7 +29,7 @@ export class KimiCodeStatusSequencer {
     private readonly completedFallbackMs = 120,
   ) {}
 
-  handle(sessionId: string, event: unknown): void {
+  handle(sessionId: string, event: unknown, terminalScope: KimiCodeTerminalScope = "turn"): void {
     const record = eventRecord(event);
     const type = record?.type;
 
@@ -39,6 +40,7 @@ export class KimiCodeStatusSequencer {
     }
 
     if (type === "usage.record" && record?.usageScope === "turn") {
+      if (terminalScope === "prompt") return;
       if (!this.pendingCompleted.has(sessionId)) return;
       this.clear(sessionId);
       this.emit(sessionId, "completed");
@@ -53,7 +55,7 @@ export class KimiCodeStatusSequencer {
       } else if (reason === "failed" || reason === "error") {
         this.clear(sessionId);
         this.emit(sessionId, "error");
-      } else {
+      } else if (terminalScope === "turn") {
         this.scheduleCompleted(sessionId);
       }
       return;
@@ -61,7 +63,7 @@ export class KimiCodeStatusSequencer {
 
     const loopEvent = loopEventRecord(record);
     if (loopEvent?.type === "step.end" && loopEvent.finishReason === "end_turn") {
-      this.scheduleCompleted(sessionId);
+      if (terminalScope === "turn") this.scheduleCompleted(sessionId);
       return;
     }
 

@@ -174,6 +174,7 @@ function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, 
       ...event.event,
       agentId: isString(event.event.agentId) ? event.event.agentId : event.agentId,
       time: isNumber(event.event.time) ? event.event.time : event.time,
+      kimixTerminalScope: event.kimixTerminalScope,
     };
   }
   return event;
@@ -405,6 +406,7 @@ export function mapKimiCodeEvent(
           canDismiss: true,
         };
       }
+      if (event.kimixTerminalScope === "prompt") return null;
       return {
         id: getId(options),
         type: "assistant_message",
@@ -418,7 +420,7 @@ export function mapKimiCodeEvent(
 
     case "step.end": {
       const finishReason = isString(event.finishReason) ? event.finishReason : "";
-      if (finishReason !== "end_turn") return null;
+      if (finishReason !== "end_turn" || event.kimixTerminalScope === "prompt") return null;
       return {
         id: getId(options),
         type: "assistant_message",
@@ -536,7 +538,7 @@ export function mapKimiCodeEvent(
         : isString(event.finish_reason)
           ? event.finish_reason
           : "";
-      if (finishReason !== "end_turn") return null;
+      if (finishReason !== "end_turn" || event.kimixTerminalScope === "prompt") return null;
       return {
         id: getId(options),
         type: "assistant_message",

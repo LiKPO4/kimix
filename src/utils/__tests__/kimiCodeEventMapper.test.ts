@@ -184,6 +184,23 @@ describe("mapKimiCodeEvent", () => {
     expect((error as Extract<TimelineEvent, { type: "error" }>).source).toBe("sdk");
   });
 
+  it("keeps Server assistant output open across prompt-internal turn boundaries", () => {
+    const options = testOptions();
+    const turnEnded = mapKimiCodeEvent({
+      type: "turn.ended",
+      reason: "completed",
+      kimixTerminalScope: "prompt",
+    }, options);
+    const stepCompleted = mapKimiCodeEvent({
+      type: "turn.step.completed",
+      finishReason: "end_turn",
+      kimixTerminalScope: "prompt",
+    }, options);
+
+    expect(turnEnded).toBeNull();
+    expect(stepCompleted).toBeNull();
+  });
+
   it("maps official turn.steer as the steer success marker", () => {
     const steer = mapKimiCodeEvent({
       type: "turn.steer",

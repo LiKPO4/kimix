@@ -379,7 +379,7 @@ export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> 
   const payload = frame.payload && typeof frame.payload === "object"
     ? frame.payload as Record<string, unknown>
     : {};
-  return { type: frame.type, ...payload, seq: frame.seq };
+  return { type: frame.type, ...payload, seq: frame.seq, kimixTerminalScope: "prompt" };
 }
 
 export function recoveredPromptCompletedFrame(
