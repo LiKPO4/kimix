@@ -218,6 +218,56 @@ describe("useChatViewport", () => {
     expect(onHighlight).toHaveBeenCalledWith("b");
   });
 
+  it("lets a later click focus a target that mounted after a terminal miss", () => {
+    vi.useFakeTimers();
+    const onHighlight = vi.fn();
+    const { viewport, rerender } = renderTest({
+      renderItems: [eventRenderItem("a")],
+      onHighlightEvent: onHighlight,
+    });
+
+    let firstResult = true;
+    act(() => {
+      firstResult = viewport().focusTimelineEvent("later");
+    });
+    expect(firstResult).toBe(false);
+
+    act(() => {
+      vi.advanceTimersByTime(2_500);
+    });
+    rerender({ renderItems: [eventRenderItem("a"), eventRenderItem("later")] });
+
+    let secondResult = false;
+    act(() => {
+      secondResult = viewport().focusTimelineEvent("later");
+    });
+    expect(secondResult).toBe(true);
+    expect(onHighlight).toHaveBeenCalledWith("later");
+  });
+
+  it("keeps the latest navigation highlight for its full lease", () => {
+    vi.useFakeTimers();
+    const onHighlight = vi.fn();
+    const { viewport } = renderTest({
+      renderItems: [eventRenderItem("a"), eventRenderItem("b")],
+      onHighlightEvent: onHighlight,
+    });
+    onHighlight.mockClear();
+
+    act(() => {
+      viewport().focusTimelineEvent("a");
+      vi.advanceTimersByTime(1_000);
+      viewport().focusTimelineEvent("b");
+      vi.advanceTimersByTime(1_201);
+    });
+    expect(onHighlight.mock.calls).toEqual([["a"], ["b"]]);
+
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+    expect(onHighlight.mock.calls).toEqual([["a"], ["b"], [null]]);
+  });
+
   it("can place an Agent item header at the vertical center", () => {
     const { viewport, scroll } = renderTest({ renderItems: [eventRenderItem("a"), eventRenderItem("b")] });
     const target = scroll.querySelector<HTMLElement>("[data-kimix-event-id='b']")!;

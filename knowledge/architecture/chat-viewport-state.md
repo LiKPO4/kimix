@@ -4,7 +4,7 @@ title: Chat Viewport State
 description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-17T17:20:00+08:00"
+timestamp: "2026-07-18T12:45:00+08:00"
 ---
 
 # Chat Viewport State
@@ -55,8 +55,15 @@ The chat viewport has two modes:
 Rail/search navigation uses an immediate scroll transaction. A smooth animation
 would expose multiple intermediate `scrollTop` values while streaming commits
 are also trying to preserve an anchor, so it is not a stable ownership boundary.
-Chromium native scroll anchoring is disabled on the chat scroll area; Kimix's
-rendered-message anchor is the only reflow writer in detached mode.
+Navigation retry state exists only while older rendered history can still be
+expanded. A terminal miss clears that attempt immediately so an asynchronously
+mounted target is focusable on the next click. Highlight expiry is a replaceable
+lease owned by the latest target: focusing another marker cancels the previous
+timer, which may never clear the newer highlight.
+
+Chromium native scroll anchoring remains enabled in following mode as the first
+line of tail stabilization. It is disabled only in detached mode, where Kimix's
+rendered-message anchor must be the sole reflow writer.
 
 ## Content revisions
 

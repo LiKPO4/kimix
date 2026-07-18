@@ -35,6 +35,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
 
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
   const focusTimelineEventStateRef = useRef<{ eventId: string; attemptCount: number; startTime: number } | null>(null);
+  const highlightClearTimerRef = useRef<number | null>(null);
 
   const findRenderedEventNode = useCallback((eventId: string): HTMLElement | null => {
     const node = scrollRef.current;
@@ -135,6 +136,10 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText, alignment));
         });
+      } else {
+        // This attempt has no remaining expansion path. Do not poison a later
+        // click if the target is mounted by an asynchronous render afterward.
+        focusTimelineEventStateRef.current = null;
       }
       return false;
     }
@@ -152,8 +157,12 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
         target.scrollIntoView({ behavior: "auto", block: "center" });
       }
     }
+    if (highlightClearTimerRef.current !== null) {
+      window.clearTimeout(highlightClearTimerRef.current);
+    }
     onHighlightEvent?.(eventId);
-    window.setTimeout(() => {
+    highlightClearTimerRef.current = window.setTimeout(() => {
+      highlightClearTimerRef.current = null;
       onHighlightEvent?.(null);
     }, 2200);
     return true;
@@ -192,6 +201,17 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       pendingFocusEventRef.current = null;
     }
     focusTimelineEventStateRef.current = null;
+    if (highlightClearTimerRef.current !== null) {
+      window.clearTimeout(highlightClearTimerRef.current);
+      highlightClearTimerRef.current = null;
+    }
+    onHighlightEvent?.(null);
+  }, [onHighlightEvent]);
+
+  useEffect(() => () => {
+    if (highlightClearTimerRef.current !== null) {
+      window.clearTimeout(highlightClearTimerRef.current);
+    }
   }, []);
 
   return { focusTimelineEvent, resetForNewSession };
