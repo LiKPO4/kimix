@@ -330,6 +330,53 @@ async function probeContracts() {
   }
 }
 
+function windowsWorkspaceIdentity(root) {
+  return root.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+}
+
+async function probeWindowsWorkspaceAliases() {
+  const probeName = "Windows workspace path aliases";
+  if (process.platform !== "win32") {
+    record(probeName, true, { skipped: true, reason: "Windows-only path identity contract" });
+    return;
+  }
+
+  try {
+    const canonicalRoot = repoRoot;
+    const aliasRoot = `${repoRoot.replaceAll("\\", "/").toLowerCase()}/`;
+    const canonical = await request("/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ root: canonicalRoot }),
+    });
+    const alias = await request("/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ root: aliasRoot }),
+    });
+    const listed = await request("/workspaces");
+    const identity = windowsWorkspaceIdentity(canonicalRoot);
+    const equivalentItems = (Array.isArray(listed?.items) ? listed.items : [])
+      .filter((item) => typeof item?.root === "string" && windowsWorkspaceIdentity(item.root) === identity);
+    const ok = Boolean(
+      canonical?.id &&
+      canonical.id === alias?.id &&
+      canonical.root === alias?.root &&
+      equivalentItems.length === 1 &&
+      equivalentItems[0]?.id === canonical.id,
+    );
+
+    record(probeName, ok, {
+      canonicalRoot,
+      aliasRoot,
+      canonicalWorkspaceId: canonical?.id,
+      aliasWorkspaceId: alias?.id,
+      returnedRootStable: canonical?.root === alias?.root,
+      equivalentListEntries: equivalentItems.map((item) => ({ id: item.id, root: item.root })),
+    });
+  } catch (error) {
+    record(probeName, false, { error: summarizeError(error) });
+  }
+}
+
 async function probeKimixSnapshotReplayAdapter() {
   let session;
   let socket;
@@ -697,6 +744,7 @@ async function writeReport() {
         "- Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。",
         "- Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。",
         "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
+        "- Windows 工作区以大小写、斜杠方向和尾随分隔符不同的路径重复注册时，必须复用同一 workspace_id，列表中也只能保留一个等价条目。",
         "- REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 bearer 子协议）；`/meta` 自报 server_version、capabilities 与 backend 字段。",
       ];
   const lines = [
@@ -732,6 +780,7 @@ async function main() {
     record("installed CLI version", cliVersion.code === 0 && !cliVersion.timedOut, cliVersion);
     await startServer();
     await probeContracts();
+    await probeWindowsWorkspaceAliases();
     await probeKimixSnapshotReplayAdapter();
     await probeKimixBtwAdapter();
     await probeKimixTaskAdapter();

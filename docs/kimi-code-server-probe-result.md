@@ -1,10 +1,10 @@
 # Kimi Code 0.27.0 Server 探针结果
 
-- 生成时间：2026-07-18T07:25:16.153Z
+- 生成时间：2026-07-18T07:41:16.874Z
 - CLI：C:\Users\Administrator\.kimi-code\bin\kimi.exe
 - Server：http://127.0.0.1:58627
 - 官方源码：C:\Users\Administrator\AppData\Local\Temp\kimix-kimi-code-research
-- 结果：7 通过 / 0 失败 / 4 跳过
+- 结果：8 通过 / 0 失败 / 4 跳过
 
 ## 明细
 
@@ -14,7 +14,7 @@
 {
   "code": 0,
   "timedOut": false,
-  "durationMs": 536,
+  "durationMs": 617,
   "stdout": "0.27.0\n",
   "stderr": ""
 }
@@ -51,7 +51,7 @@
 
 ```json
 {
-  "sessionId": "session_a3bf481b-ed59-4ec3-93db-0eb181108874",
+  "sessionId": "session_8ac41ae6-4e85-4c22-a188-4ad6e77538ef",
   "snapshotKeys": [
     "as_of_seq",
     "epoch",
@@ -65,12 +65,30 @@
 }
 ```
 
+### 通过：Windows workspace path aliases
+
+```json
+{
+  "canonicalRoot": "D:\\WORKS\\Android Project\\kimix",
+  "aliasRoot": "d:/works/android project/kimix/",
+  "canonicalWorkspaceId": "wd_kimix_90b5212d0d7e",
+  "aliasWorkspaceId": "wd_kimix_90b5212d0d7e",
+  "returnedRootStable": true,
+  "equivalentListEntries": [
+    {
+      "id": "wd_kimix_90b5212d0d7e",
+      "root": "D:/WORKS/Android Project/kimix"
+    }
+  ]
+}
+```
+
 ### 通过：Kimix snapshot replay + session status adapter
 
 ```json
 {
-  "sessionId": "session_8ef6a457-e41f-4517-93ae-d84555f6dabd",
-  "promptId": "msg_01KXT1TCXX08J4N4QCFRZ9BACG",
+  "sessionId": "session_72ef9348-4d9c-4764-9f0c-a3a14bead951",
+  "promptId": "msg_01KXT2QVBG1JZRBBCQ0J6X856F",
   "snapshotKeys": [
     "as_of_seq",
     "epoch",
@@ -86,16 +104,16 @@
   "assistantReplay": {
     "snapshotReplay": "history",
     "snapshotRole": "assistant",
-    "snapshotMessageId": "msg_session_8ef6a457-e41f-4517-93ae-d84555f6dabd_000001",
-    "textLength": 129,
+    "snapshotMessageId": "msg_session_72ef9348-4d9c-4764-9f0c-a3a14bead951_000001",
+    "textLength": 115,
     "containsMarker": true
   },
   "skipExisting": true,
   "keepMissing": true,
   "sessionStatus": {
-    "contextTokens": 26827,
+    "contextTokens": 26825,
     "maxContextTokens": 262144,
-    "contextUsage": 0.10233688354492188,
+    "contextUsage": 0.10232925415039062,
     "contextFieldsValid": true
   }
 }
@@ -105,9 +123,9 @@
 
 ```json
 {
-  "sessionId": "session_5c568155-51b4-4453-90eb-1b3fa1c0fbde",
-  "promptId": "msg_01KXT1TKXTJAH691RBE4EM1BET",
-  "agentId": "agent-0",
+  "sessionId": "session_a8761e3a-2b90-4482-9dcd-0a8a8285b84c",
+  "promptId": "msg_01KXT2R0KCXRP5JE8NBWHBAXX0",
+  "agentId": "agent-2",
   "frameCount": 28,
   "btwFrameCount": 25,
   "mainContentFrameCount": 0,
@@ -120,17 +138,17 @@
 
 ```json
 {
-  "sessionId": "session_cf531e49-bdf8-4cb4-aa9e-7129e9273cf3",
-  "promptId": "msg_01KXT1TQK0QEVH984GQT585A87",
-  "taskId": "bash-y8o05voc",
+  "sessionId": "session_bc27ec1d-cb3c-4697-9841-fe8552a13e01",
+  "promptId": "msg_01KXT2R30FP2M6VG6SKFVY25RB",
+  "taskId": "bash-sb4w7ld0",
   "kind": "bash",
   "approvedBashRequests": 0,
   "promptCompletedAfterCancel": true,
   "runningListCount": 1,
   "beforeCancel": {
     "status": "running",
-    "outputBytes": 0,
-    "hasOutputPreview": false
+    "outputBytes": 33,
+    "hasOutputPreview": true
   },
   "firstCancel": {
     "httpStatus": 200,
@@ -139,8 +157,8 @@
   },
   "afterCancel": {
     "status": "cancelled",
-    "outputBytes": 0,
-    "hasOutputPreview": false
+    "outputBytes": 33,
+    "hasOutputPreview": true
   },
   "secondCancel": {
     "httpStatus": 200,
@@ -196,5 +214,6 @@
 - Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。
 - Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。
 - Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。
+- Windows 工作区以大小写、斜杠方向和尾随分隔符不同的路径重复注册时，必须复用同一 workspace_id，列表中也只能保留一个等价条目。
 - REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 bearer 子协议）；`/meta` 自报 server_version、capabilities 与 backend 字段。
 
