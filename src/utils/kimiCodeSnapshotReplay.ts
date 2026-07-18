@@ -138,12 +138,13 @@ export function reconcileRunningKimiSnapshot(
   // 助手带回快照。只要本地还有未完成助手，当前轮次（最后一条用户消息之后）的 canonical
   // 助手一律按未完成合并：完成态只能由真实 turn 结束事件授予，否则活助手会被反复提前
   // 关闭（“输出完成”假象、过程折叠、后续工具期彻底没有消息头）。
-  const lastLocalUserTs = localEvents.reduce((max, event) => (
-    event.type === "user_message" ? Math.max(max, event.timestamp) : max
-  ), 0);
+  const lastLocalUserTs = localEvents.reduce<number | undefined>((latest, event) => {
+    if (event.type !== "user_message") return latest;
+    return latest === undefined ? event.timestamp : Math.max(latest, event.timestamp);
+  }, undefined);
   const hasOpenLocalAssistant = localEvents.some((event) => event.type === "assistant_message" && !event.isComplete);
   const merged = snapshotEvents.reduce((events, rawEvent) => {
-    const event = hasOpenLocalAssistant &&
+    const event = lastLocalUserTs !== undefined && hasOpenLocalAssistant &&
       rawEvent.type === "assistant_message" && rawEvent.isComplete && rawEvent.timestamp >= lastLocalUserTs
       ? { ...rawEvent, isComplete: false as const }
       : rawEvent;
@@ -205,7 +206,7 @@ export function reconcileRunningKimiSnapshot(
     // merge would append them into the current turn's open placeholder,
     // polluting it with unrelated older content. They are appended as
     // independent history entries instead.
-    if (!alreadyMounted && event.type === "assistant_message" && event.timestamp < lastLocalUserTs) {
+    if (!alreadyMounted && lastLocalUserTs !== undefined && event.type === "assistant_message" && event.timestamp < lastLocalUserTs) {
       return [...events, event];
     }
     return alreadyMounted ? events : mergeEvents(events, event);

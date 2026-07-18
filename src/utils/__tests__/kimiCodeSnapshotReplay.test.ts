@@ -382,3 +382,27 @@ describe("reconcileRunningKimiSnapshot chronological order", () => {
     expect(result[2].id).toBe("user-new");
   });
 });
+
+describe("reconcileRunningKimiSnapshot missing user boundary", () => {
+  it("does not downgrade a canonical completed Assistant into an orphan placeholder", () => {
+    const local: TimelineEvent[] = [{
+      id: "local-complete", type: "assistant_message", timestamp: 100,
+      content: "已完成回答", isThinking: false, isComplete: true,
+    }, {
+      id: "orphan-placeholder", type: "assistant_message", timestamp: 200,
+      content: "", isThinking: false, isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:msg-complete:assistant:0", type: "assistant_message", timestamp: 100,
+      content: "已完成回答", isThinking: false, isComplete: true,
+    }];
+
+    const result = reconcileRunningKimiSnapshot(local, snapshot);
+    expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(2);
+    expect(result.find((event) => event.id === "local-complete")).toMatchObject({ isComplete: true });
+    expect(result.find((event) => event.id === "orphan-placeholder")).toMatchObject({
+      content: "",
+      isComplete: false,
+    });
+  });
+});

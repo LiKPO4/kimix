@@ -2,6 +2,8 @@
 
 ## 2026-07-18
 
+* **Running snapshot downgrade requires a real user boundary**: Assistant-only imported or damaged histories no longer interpret timestamp zero as a current user turn, so a canonical completed reply cannot be downgraded and merged into an orphan placeholder. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Timeline navigation owns retry and highlight leases**: A focus miss with no remaining history expansion clears its recursion guard immediately, while each new rail/search target cancels the previous highlight timer; following mode retains native anchoring and only detached mode disables it. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
 
 * **Server silence cannot manufacture completion from uncertainty**: Server status now has one active/terminal/unknown classifier across prompt recovery and Host mapping; missing/future/query-failed states keep waiting, and a recovered `prompt.completed` is emitted only after terminal evidence plus successful snapshot application. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
