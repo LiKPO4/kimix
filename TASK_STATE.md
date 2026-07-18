@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-17 回放乱序与损坏会话重建（一次性）
+
+- 当前目标：根治会话显示错乱——snapshot 回放把旧轮事件追加到 events 数组末尾，渲染按数组顺序分组把旧轮 assistant 错配进最新轮拼接显示；叠加历史 mergeEvents 跨轮合并，该会话多轮回复被拼进单个 assistant。
+- 根因：reconcile/回放合并只做尾部 append，不维护 events 时间序；renderItems 分轮依赖数组顺序而非时间戳。数据修复删除单条污染 placeholder 不足以解决（乱序 + 拼接仍在）。
+- 修复：`reconcileRunningKimiSnapshot` 合并后按 timestamp 稳定排序（已有序时间线不受影响），运行中乱序根治；旧轮 assistant 不合并 placeholder、已完成包含即跳过（前次）。数据侧：清空该会话本地 events，经恢复路径从 Server 拉取官方干净历史重建（官方快照实证无错乱）。
+- 验证：新增排序回归（回放旧轮回到时间序位置）；typecheck 通过。
+- 阻塞：无；不推送、不打 tag、不发布。等待用户实机验收该会话重建后显示正确。
+- 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`。
+- 下一步：用户验收；提交后移除探针并同步知识库回放幂等/乱序不变量。
+
 ## 2026-07-17 轮次内容混入（回放跨轮合并 placeholder）
 
 - 当前目标：修复会话回复"一轮夹杂多轮"——14:24 轮 placeholder 内容被旧轮回放 assistant 污染成摸底，与官方剧情回复（i=158）被 mergeAssistantProcessEvents 拼成一条显示。

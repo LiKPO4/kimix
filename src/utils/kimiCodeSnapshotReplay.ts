@@ -76,7 +76,7 @@ export function reconcileRunningKimiSnapshot(
     event.type === "user_message" ? Math.max(max, event.timestamp) : max
   ), 0);
   const hasOpenLocalAssistant = localEvents.some((event) => event.type === "assistant_message" && !event.isComplete);
-  return snapshotEvents.reduce((events, rawEvent) => {
+  const merged = snapshotEvents.reduce((events, rawEvent) => {
     const event = hasOpenLocalAssistant &&
       rawEvent.type === "assistant_message" && rawEvent.isComplete && rawEvent.timestamp >= lastLocalUserTs
       ? { ...rawEvent, isComplete: false as const }
@@ -127,4 +127,9 @@ export function reconcileRunningKimiSnapshot(
     }
     return alreadyMounted ? events : mergeEvents(events, event);
   }, [...localEvents]);
+  // Replay and runtime-sample merges append older history at the tail of the
+  // array; rendering groups turns by array order, so an out-of-order tail
+  // folds older turns into the latest one. Restore chronological order with a
+  // stable sort — already-ordered timelines are unaffected.
+  return merged.slice().sort((a, b) => a.timestamp - b.timestamp);
 }

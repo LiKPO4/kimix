@@ -295,3 +295,24 @@ describe("reconcileRunningKimiSnapshot cross-turn pollution guard", () => {
     expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(1);
   });
 });
+
+describe("reconcileRunningKimiSnapshot chronological order", () => {
+  it("reorders replayed older history into chronological position instead of the tail", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-new", type: "user_message", timestamp: 1000, content: "新问题",
+    }, {
+      id: "placeholder", type: "assistant_message", timestamp: 1001, content: "", isThinking: false, isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:msg_u:user:0", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
+      id: "snapshot:msg_a:assistant:0", type: "assistant_message", timestamp: 110, content: "旧回答", isThinking: false, isComplete: true,
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const timestamps = result.map((event) => event.timestamp);
+    expect([...timestamps].sort((a, b) => a - b)).toEqual(timestamps);
+    expect(result[0].id).toBe("snapshot:msg_u:user:0");
+    expect(result[1].id).toBe("snapshot:msg_a:assistant:0");
+    expect(result[2].id).toBe("user-new");
+  });
+});
