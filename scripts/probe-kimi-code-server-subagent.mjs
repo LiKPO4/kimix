@@ -1,6 +1,6 @@
-// Kimi Code 0.26.0 子代理/工具事件探针：验证 coder 子代理扩展（后台任务/嵌套 agent/Todo）后，
+// Kimi Code 子代理/工具事件探针：验证 coder 子代理扩展（后台任务/嵌套 agent/Todo）后，
 // 官方 Server 事件流仍满足 Kimix 子代理投影与工具渲染的字段假设（runtime-routing 18c/18d、35）。
-// 证据写入 docs/kimi-code-0.26-subagent-probe.md。
+// 证据写入 docs/kimi-code-subagent-probe-result.md。
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -8,15 +8,32 @@ import os from "node:os";
 import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const port = Number(process.env.KIMIX_KIMI_SUBAGENT_PROBE_PORT ?? 58_731);
-const baseUrl = `http://127.0.0.1:${port}`;
 const kimi = path.join(os.homedir(), ".kimi-code", "bin", process.platform === "win32" ? "kimi.exe" : "kimi");
+const lockPath = path.join(os.homedir(), ".kimi-code", "server", "lock");
+
+function readServerLock() {
+  try {
+    const lock = JSON.parse(readFileSync(lockPath, "utf8"));
+    if (!Number.isInteger(lock?.port) || lock.port <= 0 || lock.port > 65_535) return undefined;
+    const host = typeof lock.host === "string" && /^(?:127\.0\.0\.1|localhost|::1)$/.test(lock.host)
+      ? lock.host
+      : "127.0.0.1";
+    return { ...lock, host };
+  } catch {
+    return undefined;
+  }
+}
+
+const existingServerLock = readServerLock();
+const port = Number(process.env.KIMIX_KIMI_SUBAGENT_PROBE_PORT ?? existingServerLock?.port ?? 58_731);
+const host = process.env.KIMIX_KIMI_SUBAGENT_PROBE_HOST ?? existingServerLock?.host ?? "127.0.0.1";
+const baseUrl = `http://${host.includes(":") ? `[${host}]` : host}:${port}`;
 const token = readFileSync(path.join(os.homedir(), ".kimi-code", "server.token"), "utf8").trim();
 const authHeaders = { authorization: `Bearer ${token}`, "x-kimi-server-token": token };
 
-const server = spawn(kimi, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
-  stdio: ["ignore", "ignore", "pipe"], windowsHide: true, shell: false,
-});
+let server;
+let ownsServer = false;
+let serverVersion = existingServerLock?.host_version;
 
 async function req(p, options = {}) {
   const r = await fetch(`${baseUrl}/api/v1${p}`, {
@@ -33,6 +50,24 @@ const checks = [];
 function check(name, ok, detail) { checks.push({ name, ok, detail }); }
 const countByType = (list) => list.reduce((acc, f) => { acc[f.type] = (acc[f.type] ?? 0) + 1; return acc; }, {});
 
+async function startServer() {
+  try {
+    const health = await req("/healthz");
+    if (health?.ok === true) {
+      check("server startup mode", true, { mode: "attached", pid: existingServerLock?.pid, port });
+      return;
+    }
+  } catch {
+    // No compatible singleton is listening; start an isolated probe instance.
+  }
+
+  ownsServer = true;
+  server = spawn(kimi, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
+    stdio: ["ignore", "ignore", "pipe"], windowsHide: true, shell: false,
+  });
+  check("server startup mode", true, { mode: "spawned", pid: server.pid, port });
+}
+
 async function waitMainCompleted(sessionId, promptId, timeoutMs = 240_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -44,10 +79,17 @@ async function waitMainCompleted(sessionId, promptId, timeoutMs = 240_000) {
 }
 
 async function main() {
+  await startServer();
   for (let i = 0; i < 40; i++) {
+    if (server?.exitCode !== null && server?.exitCode !== undefined) {
+      throw new Error(`server exited early with code ${server.exitCode}`);
+    }
     try { const h = await req("/healthz"); if (h?.ok) break; } catch {}
     await new Promise((r) => setTimeout(r, 500));
   }
+  const meta = await req("/meta");
+  serverVersion = meta?.server_version ?? serverVersion;
+  check("server version", typeof serverVersion === "string", { serverVersion });
   const models = await req("/models");
   const ids = (models?.items ?? []).map((m) => m?.model).filter((v) => typeof v === "string");
   const model = ids.find((id) => id === "kimi-code/kimi-for-coding") ?? ids.find((id) => id.startsWith("kimi-code/")) ?? ids[0];
@@ -59,7 +101,7 @@ async function main() {
   });
   await req(`/sessions/${session.id}/profile`, { method: "POST", body: JSON.stringify({ agent_config: { model, permission_mode: "yolo" } }) });
 
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/api/v1/ws`, [`kimi-code.bearer.${token}`]);
+  const ws = new WebSocket(`${baseUrl.replace(/^http/, "ws")}/api/v1/ws`, [`kimi-code.bearer.${token}`]);
   ws.addEventListener("message", (e) => frames.push(JSON.parse(String(e.data))));
   await new Promise((res, rej) => { ws.addEventListener("open", res, { once: true }); ws.addEventListener("error", rej, { once: true }); });
   ws.send(JSON.stringify({ type: "client_hello", id: "h1", payload: { client_id: "kimix-subagent-probe", subscriptions: [session.id] } }));
@@ -128,11 +170,13 @@ try {
 } catch (error) {
   check("probe run", false, { error: String(error?.message ?? error) });
 } finally {
-  try { await req("/shutdown", { method: "POST", body: "{}" }); } catch { server.kill(); }
-  await new Promise((r) => setTimeout(r, 1_500));
-  server.kill();
+  if (ownsServer) {
+    try { await req("/shutdown", { method: "POST", body: "{}" }); } catch { server?.kill(); }
+    await new Promise((r) => setTimeout(r, 1_500));
+    server?.kill();
+  }
   const lines = [
-    "# Kimi Code 0.26.0 子代理/工具事件探针",
+    `# Kimi Code ${serverVersion ?? "unknown"} 子代理/工具事件探针`,
     "",
     `- 生成时间：${new Date().toISOString()}`,
     `- 帧总数：${frames.length}`,
@@ -141,7 +185,7 @@ try {
     ...checks.map((c) => `- ${c.ok ? "通过" : "失败"}：${c.name}${c.detail && Object.keys(c.detail).length ? ` — \`${JSON.stringify(c.detail)}\`` : ""}`),
     "",
   ];
-  await writeFile(path.join(repoRoot, "docs", "kimi-code-0.26-subagent-probe.md"), `${lines.join("\n")}\n`, "utf8");
+  await writeFile(path.join(repoRoot, "docs", "kimi-code-subagent-probe-result.md"), `${lines.join("\n")}\n`, "utf8");
   console.log(JSON.stringify(checksSummary()));
   if (!checksSummary().ok) process.exitCode = 1;
 }

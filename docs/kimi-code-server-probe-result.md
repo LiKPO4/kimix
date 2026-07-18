@@ -1,10 +1,10 @@
-# Kimi Code 0.26.0 Server 探针结果
+# Kimi Code 0.27.0 Server 探针结果
 
-- 生成时间：2026-07-16T14:14:21.833Z
+- 生成时间：2026-07-18T07:25:16.153Z
 - CLI：C:\Users\Administrator\.kimi-code\bin\kimi.exe
-- Server：http://127.0.0.1:58639
+- Server：http://127.0.0.1:58627
 - 官方源码：C:\Users\Administrator\AppData\Local\Temp\kimix-kimi-code-research
-- 结果：6 通过 / 0 失败 / 4 跳过
+- 结果：7 通过 / 0 失败 / 4 跳过
 
 ## 明细
 
@@ -14,9 +14,20 @@
 {
   "code": 0,
   "timedOut": false,
-  "durationMs": 553,
-  "stdout": "0.26.0\n",
+  "durationMs": 536,
+  "stdout": "0.27.0\n",
   "stderr": ""
+}
+```
+
+### 通过：server startup mode
+
+```json
+{
+  "mode": "attached",
+  "pid": 24640,
+  "port": 58627,
+  "hostVersion": "0.27.0"
 }
 ```
 
@@ -24,12 +35,12 @@
 
 ```json
 {
-  "serverId": "01KXNME19ENHZ9AWPJKJVZGFQ5",
-  "serverVersion": "0.26.0",
+  "serverId": "01KXSC88N00J5Y9ZVP0AY1JVS8",
+  "serverVersion": "0.27.0",
   "authReady": true,
-  "openapiVersion": "0.26.0",
+  "openapiVersion": "0.27.0",
   "openapiPathCount": 66,
-  "asyncapiVersion": "0.26.0",
+  "asyncapiVersion": "0.27.0",
   "asyncapiChannels": [
     "kimiCodeWebSocket"
   ]
@@ -40,7 +51,7 @@
 
 ```json
 {
-  "sessionId": "session_a706ceff-0e75-43c1-b698-70724eb6dea9",
+  "sessionId": "session_a3bf481b-ed59-4ec3-93db-0eb181108874",
   "snapshotKeys": [
     "as_of_seq",
     "epoch",
@@ -58,8 +69,8 @@
 
 ```json
 {
-  "sessionId": "session_244b36b0-cbec-46bc-b2c7-5ee4c4952eb9",
-  "promptId": "msg_01KXNME2V36K39GKYHF4HXX4BP",
+  "sessionId": "session_8ef6a457-e41f-4517-93ae-d84555f6dabd",
+  "promptId": "msg_01KXT1TCXX08J4N4QCFRZ9BACG",
   "snapshotKeys": [
     "as_of_seq",
     "epoch",
@@ -75,16 +86,16 @@
   "assistantReplay": {
     "snapshotReplay": "history",
     "snapshotRole": "assistant",
-    "snapshotMessageId": "msg_session_244b36b0-cbec-46bc-b2c7-5ee4c4952eb9_000001",
-    "textLength": 135,
+    "snapshotMessageId": "msg_session_8ef6a457-e41f-4517-93ae-d84555f6dabd_000001",
+    "textLength": 129,
     "containsMarker": true
   },
   "skipExisting": true,
   "keepMissing": true,
   "sessionStatus": {
-    "contextTokens": 26804,
+    "contextTokens": 26827,
     "maxContextTokens": 262144,
-    "contextUsage": 0.1022491455078125,
+    "contextUsage": 0.10233688354492188,
     "contextFieldsValid": true
   }
 }
@@ -94,11 +105,11 @@
 
 ```json
 {
-  "sessionId": "session_3b58f67d-e771-4ed2-b158-456ab47e5f74",
-  "promptId": "msg_01KXNME7JNH2DDGESTHQ0ZVA62",
+  "sessionId": "session_5c568155-51b4-4453-90eb-1b3fa1c0fbde",
+  "promptId": "msg_01KXT1TKXTJAH691RBE4EM1BET",
   "agentId": "agent-0",
-  "frameCount": 27,
-  "btwFrameCount": 24,
+  "frameCount": 28,
+  "btwFrameCount": 25,
   "mainContentFrameCount": 0,
   "containsMarker": true,
   "ended": true
@@ -109,9 +120,9 @@
 
 ```json
 {
-  "sessionId": "session_ae80003a-4838-44d0-b5af-b1f01289acf5",
-  "promptId": "msg_01KXNME9Z9EAPBVMHK1T6SS3D3",
-  "taskId": "bash-kslbezt4",
+  "sessionId": "session_cf531e49-bdf8-4cb4-aa9e-7129e9273cf3",
+  "promptId": "msg_01KXT1TQK0QEVH984GQT585A87",
+  "taskId": "bash-y8o05voc",
   "kind": "bash",
   "approvedBashRequests": 0,
   "promptCompletedAfterCancel": true,
@@ -185,5 +196,5 @@
 - Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。
 - Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。
 - Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。
-- REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 ?token= 查询参数）；`/meta` 自报 server_version、capabilities 与 backend 字段。
+- REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 bearer 子协议）；`/meta` 自报 server_version、capabilities 与 backend 字段。
 

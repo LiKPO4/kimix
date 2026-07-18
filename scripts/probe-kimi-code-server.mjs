@@ -9,8 +9,25 @@ const researchRepo = process.env.KIMIX_KIMI_CODE_RESEARCH_REPO ??
   path.join(os.homedir(), "AppData", "Local", "Temp", "kimix-kimi-code-research");
 const kimiExecutable = process.env.KIMIX_KIMI_EXECUTABLE ??
   path.join(os.homedir(), ".kimi-code", "bin", process.platform === "win32" ? "kimi.exe" : "kimi");
-const port = Number(process.env.KIMIX_KIMI_SERVER_PROBE_PORT ?? 58_639);
-const baseUrl = `http://127.0.0.1:${port}`;
+const serverLockPath = path.join(os.homedir(), ".kimi-code", "server", "lock");
+
+function readServerLock() {
+  try {
+    const lock = JSON.parse(readFileSync(serverLockPath, "utf8"));
+    if (!Number.isInteger(lock?.port) || lock.port <= 0 || lock.port > 65_535) return undefined;
+    const host = typeof lock.host === "string" && /^(?:127\.0\.0\.1|localhost|::1)$/.test(lock.host)
+      ? lock.host
+      : "127.0.0.1";
+    return { ...lock, host };
+  } catch {
+    return undefined;
+  }
+}
+
+const existingServerLock = readServerLock();
+const port = Number(process.env.KIMIX_KIMI_SERVER_PROBE_PORT ?? existingServerLock?.port ?? 58_639);
+const host = process.env.KIMIX_KIMI_SERVER_PROBE_HOST ?? existingServerLock?.host ?? "127.0.0.1";
+const baseUrl = `http://${host.includes(":") ? `[${host}]` : host}:${port}`;
 const apiBase = `${baseUrl}/api/v1`;
 const reportPath = path.join(repoRoot, "docs", "kimi-code-server-probe-result.md");
 const scenarioTimeoutMs = Number(process.env.KIMIX_KIMI_SERVER_SCENARIO_TIMEOUT_MS ?? 240_000);
@@ -36,6 +53,7 @@ const wsProtocols = serverToken ? [`kimi-code.bearer.${serverToken}`] : undefine
 
 const results = [];
 let server;
+let ownsServer = false;
 let serverStdout = "";
 let serverStderr = "";
 
@@ -236,6 +254,22 @@ async function waitForServer() {
 }
 
 async function startServer() {
+  try {
+    const health = await request("/healthz");
+    if (health?.ok === true) {
+      record("server startup mode", true, {
+        mode: "attached",
+        pid: existingServerLock?.pid,
+        port,
+        hostVersion: existingServerLock?.host_version,
+      });
+      return;
+    }
+  } catch {
+    // No compatible instance is listening at the selected endpoint; spawn one below.
+  }
+
+  ownsServer = true;
   server = spawn(kimiExecutable, [
     "server", "run", "--foreground", "--port", String(port), "--debug-endpoints", "--log-level", "warn",
   ], {
@@ -251,7 +285,7 @@ async function startServer() {
 }
 
 async function stopServer() {
-  if (!server || server.exitCode !== null) return;
+  if (!ownsServer || !server || server.exitCode !== null) return;
   try {
     await request("/shutdown", { method: "POST", body: "{}" });
   } catch {
@@ -654,6 +688,17 @@ async function writeReport() {
   const failedCount = results.filter((item) => !item.ok).length;
   const skippedCount = results.filter(isSkipped).length;
   const scenariosSkipped = results.some((item) => isSkipped(item));
+  const conclusionLines = failedCount > 0
+    ? ["- 探针存在失败项；本报告不能作为 Server 主链路兼容通过的证据，请先处理上方失败明细。"]
+    : [
+        scenariosSkipped
+          ? "- 官方 0.24+ 已移除 @moonshot-ai/server-e2e 场景包；刷新重放、pending 闭环、队列 steer、cancel 语义改由 Kimix 自有回归与适配器检查覆盖。"
+          : "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
+        "- Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。",
+        "- Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。",
+        "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
+        "- REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 bearer 子协议）；`/meta` 自报 server_version、capabilities 与 backend 字段。",
+      ];
   const lines = [
     `# Kimi Code ${cliVersionText} Server 探针结果`,
     "",
@@ -675,13 +720,7 @@ async function writeReport() {
     ]),
     "## 结论",
     "",
-    scenariosSkipped
-      ? "- 官方 0.24+ 已移除 @moonshot-ai/server-e2e 场景包；刷新重放、pending 闭环、队列 steer、cancel 语义改由 Kimix 自有回归与适配器检查覆盖。"
-      : "- Server REST、WebSocket、事件重放、快照、prompt、steer、cancel、approval 和 question 均由官方 server-e2e 场景验证。",
-    "- Kimix snapshot replay 与 session status adapter 已用真实 Server session / prompt 验证：history replay 可去重补偿，context tokens/limit/usage 可回填现有 ContextRing。",
-    "- Kimix Server BTW adapter 已用真实 Server session 验证：`:btw` 返回独立 agent_id，prompt 事件只归属该子 Agent，可按 Agent ID 隔离并汇总而不污染主对话。",
-    "- Kimix Server task adapter 已用真实 Server session / Bash background task 验证：list/get/cancel、输出元数据和 already-finished 幂等停止均可被 Kimix 现有后台任务接口承接。",
-    "- REST 与 WebSocket 默认要求 `~/.kimi-code/server.token` 鉴权（REST 走 authorization 头，WS 走 ?token= 查询参数）；`/meta` 自报 server_version、capabilities 与 backend 字段。",
+    ...conclusionLines,
     "",
   ];
   await writeFile(reportPath, `${lines.join("\n")}\n`, "utf8");
