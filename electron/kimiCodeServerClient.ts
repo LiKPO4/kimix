@@ -51,8 +51,10 @@ export type ServerWorkspace = {
   id: string;
   root: string;
   name: string;
-  is_git_repo: boolean;
-  branch: string | null;
+  // Kimi Code <=0.26 supplied these Git decorations; 0.27 removed them from
+  // both /workspaces and /fs::browse. Keep them optional for older servers.
+  is_git_repo?: boolean;
+  branch?: string | null;
   created_at: string;
   last_opened_at: string;
   session_count: number;
