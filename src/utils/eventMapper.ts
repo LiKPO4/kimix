@@ -1879,16 +1879,33 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
   };
 
   const seenIds = new Map<string, number>();
-  const userRecords: UserRecord[] = [];
+  const userRecordsByContent = new Map<string, UserRecord[]>();
   const userRecordByResultIndex = new Map<number, UserRecord>();
   const userRecordByDelivery = new Map<string, UserRecord>();
   const result: TimelineEvent[] = [];
 
+  const moveRecordToContentBucket = (record: UserRecord, previousContent: string) => {
+    if (previousContent === record.content) return;
+    if (previousContent) {
+      const previousBucket = userRecordsByContent.get(previousContent);
+      const previousIndex = previousBucket?.indexOf(record) ?? -1;
+      if (previousBucket && previousIndex >= 0) previousBucket.splice(previousIndex, 1);
+      if (previousBucket?.length === 0) userRecordsByContent.delete(previousContent);
+    }
+    if (record.content) {
+      const nextBucket = userRecordsByContent.get(record.content) ?? [];
+      nextBucket.push(record);
+      userRecordsByContent.set(record.content, nextBucket);
+    }
+  };
+
   const mergeIntoRecord = (record: UserRecord, incoming: UserEvent, echoMatch: boolean) => {
+    const previousContent = record.content;
     const merged = mergeUserCopies(record.event, incoming);
     result[record.resultIndex] = merged;
     record.event = merged;
     record.content = normalizeUserContent(merged.content ?? "");
+    moveRecordToContentBucket(record, previousContent);
     record.echoMatched ||= echoMatch;
     if (incoming.id) seenIds.set(incoming.id, record.resultIndex);
     const deliveryKey = completeDeliveryKey(incoming);
@@ -1916,11 +1933,10 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
       let echoRecord: UserRecord | undefined;
       let closestEchoDistance = Number.POSITIVE_INFINITY;
       if (content) {
-        for (const seen of userRecords) {
+        for (const seen of userRecordsByContent.get(content) ?? []) {
           const distance = Math.abs(seen.event.timestamp - event.timestamp);
           if (
             seen.echoMatched ||
-            seen.content !== content ||
             hasDeliveryIdentity(seen.event) === hasIdentity ||
             distance > 10_000 ||
             distance >= closestEchoDistance
@@ -1940,7 +1956,11 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
         content,
         echoMatched: false,
       };
-      userRecords.push(record);
+      if (content) {
+        const bucket = userRecordsByContent.get(content) ?? [];
+        bucket.push(record);
+        userRecordsByContent.set(content, bucket);
+      }
       userRecordByResultIndex.set(record.resultIndex, record);
       if (deliveryKey) userRecordByDelivery.set(deliveryKey, record);
       if (event.id) seenIds.set(event.id, record.resultIndex);

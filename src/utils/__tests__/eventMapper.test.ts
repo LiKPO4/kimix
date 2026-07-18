@@ -2043,6 +2043,31 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
     })]);
   });
 
+  it("deduplicateTimelineEvents indexes a long unique history by normalized content", () => {
+    const events: TimelineEvent[] = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `legacy-${index}`,
+      type: "user_message" as const,
+      timestamp: index * 20_000,
+      content: `问题 ${index}`,
+    }));
+    events.push({
+      id: "rich-999",
+      type: "user_message",
+      timestamp: 999 * 20_000 + 1,
+      content: "问题 999",
+      roomMessageId: "room-message-999",
+      agentTurnId: "turn-999",
+    });
+
+    const result = deduplicateTimelineEvents(events);
+    expect(result).toHaveLength(1_000);
+    expect(result.at(-1)).toMatchObject({
+      id: "rich-999",
+      roomMessageId: "room-message-999",
+      agentTurnId: "turn-999",
+    });
+  });
+
   it("deduplicateTimelineEvents is idempotent and keeps distinct users", () => {
     const events: TimelineEvent[] = [{
       id: "u1", type: "user_message", timestamp: 1000, content: "问题一",
