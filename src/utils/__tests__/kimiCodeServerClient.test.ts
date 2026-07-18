@@ -672,6 +672,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
       payload: {
         snapshotReplay: "history",
         snapshotMessageId: "msg-user",
+        snapshotMessageIdStable: true,
         snapshotMessageText: "用户历史问题",
         created_at: "2026-07-01T20:15:00+08:00",
         user_input: [{ type: "text", text: "用户历史问题" }],
@@ -682,6 +683,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
       payload: {
         snapshotReplay: "history",
         snapshotMessageId: "msg-history",
+        snapshotMessageIdStable: true,
         snapshotMessageText: "历史消息可按需补偿",
         created_at: "2026-07-01T20:16:00+08:00",
         part: { type: "text", text: "历史消息可按需补偿" },
@@ -697,6 +699,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
         payload: {
           snapshotReplay: "in_flight",
           snapshotMessageId: "msg-active",
+          snapshotMessageIdStable: true,
           snapshotMessageText: "先分析\n最终回答",
           snapshotRole: "assistant",
           part: { type: "think", think: "先分析", signature: "sig-history" },
@@ -710,6 +713,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
         payload: {
           snapshotReplay: "in_flight",
           snapshotMessageId: "msg-active",
+          snapshotMessageIdStable: true,
           snapshotMessageText: "先分析\n最终回答",
           snapshotRole: "assistant",
           part: { type: "text", text: "最终回答" },
@@ -726,6 +730,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
           output: "工具输出",
           snapshotReplay: "in_flight",
           snapshotMessageId: "tool:工具输出",
+          snapshotMessageIdStable: false,
           snapshotMessageText: "工具输出",
           snapshotRole: "tool",
         },

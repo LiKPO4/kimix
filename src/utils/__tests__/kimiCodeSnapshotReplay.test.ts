@@ -8,6 +8,8 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
       id: "assistant-1",
       type: "assistant_message",
       timestamp: 1,
+      snapshotMessageId: "msg-assistant-1",
+      snapshotMessageIdStable: true,
       content: "已经恢复的回答",
       isThinking: false,
       isComplete: true,
@@ -16,6 +18,8 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
     expect(shouldSkipKimiCodeSnapshotReplay({
       snapshotReplay: "history",
       snapshotRole: "assistant",
+      snapshotMessageId: "msg-assistant-1",
+      snapshotMessageIdStable: true,
       snapshotMessageText: "已经恢复的回答",
     }, events)).toBe(true);
   });
@@ -31,6 +35,43 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
       snapshotRole: "assistant",
       snapshotMessageText: "正在恢复的回答",
     }, [])).toBe(false);
+  });
+
+  it("does not skip a later-turn assistant merely because an older turn contains the same text", () => {
+    const events: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
+      id: "assistant-old", type: "assistant_message", timestamp: 200,
+      content: "前文。可以。后文。", isThinking: false, isComplete: true,
+    }, {
+      id: "user-new", type: "user_message", timestamp: 1000, content: "新问题",
+    }];
+
+    expect(shouldSkipKimiCodeSnapshotReplay({
+      type: "assistant.delta",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+      snapshotMessageId: "msg-new-assistant",
+      snapshotMessageText: "可以。",
+      created_at: 1100,
+    }, events)).toBe(false);
+  });
+
+  it("does not trust a body-derived snapshot id without a turn timestamp", () => {
+    const events: TimelineEvent[] = [{
+      id: "assistant-old", type: "assistant_message", timestamp: 200,
+      snapshotMessageId: "assistant:可以。", snapshotMessageIdStable: false,
+      content: "可以。", isThinking: false, isComplete: true,
+    }];
+
+    expect(shouldSkipKimiCodeSnapshotReplay({
+      type: "assistant.delta",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+      snapshotMessageId: "assistant:可以。",
+      snapshotMessageIdStable: false,
+      snapshotMessageText: "可以。",
+    }, events)).toBe(false);
   });
 
   it("skips historical tool results with the same tool call and output", () => {
@@ -284,15 +325,40 @@ describe("reconcileRunningKimiSnapshot cross-turn pollution guard", () => {
 
   it("skips a clean replay body already contained in a locally complete assistant", () => {
     const live: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
       id: "assistant-merged", type: "assistant_message", timestamp: 110,
       content: "开场白。最终总结全文。", isThinking: false, isComplete: true,
     }];
     const snapshot: TimelineEvent[] = [{
+      id: "snapshot:user-old:user:0", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
       id: "snapshot:msg_a:assistant:0", type: "assistant_message", timestamp: 120,
       content: "最终总结全文。", isThinking: false, isComplete: true,
     }];
     const result = reconcileRunningKimiSnapshot(live, snapshot);
     expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(1);
+  });
+
+  it("preserves a later-turn short assistant even when an older assistant contains its body", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
+      id: "assistant-old", type: "assistant_message", timestamp: 200,
+      content: "前文。可以。后文。", isThinking: false, isComplete: true,
+    }, {
+      id: "user-new", type: "user_message", timestamp: 1000, content: "新问题",
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:user-new:user:0", type: "user_message", timestamp: 1000, content: "新问题",
+    }, {
+      id: "snapshot:assistant-new:assistant:0", type: "assistant_message", timestamp: 1100,
+      content: "可以。", isThinking: false, isComplete: true,
+    }];
+
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    expect(result.filter((event) => event.type === "assistant_message").map((event) => event.content))
+      .toEqual(["前文。可以。后文。", "可以。"]);
   });
 });
 

@@ -1174,6 +1174,7 @@ function snapshotMessageToServerFrames(
   if (!isRecord(message)) return [];
   const role = typeof message.role === "string" ? message.role : "";
   const messageTimestamp = snapshotMessageTimestamp(message);
+  const messageIdentity = snapshotMessageIdentity(message, role);
   if (role === "user") {
     const messageText = contentToText(message.content);
     if (replayMode === "history" && messageText) {
@@ -1182,24 +1183,23 @@ function snapshotMessageToServerFrames(
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ user_input: message.content }, replayMode, snapshotMessageId(message, role), messageText, role, messageTimestamp),
+        payload: snapshotReplayPayload({ user_input: message.content }, replayMode, messageIdentity, messageText, role, messageTimestamp),
       }];
     }
     return replayMode === "in_flight"
       ? [{ type: "turn.started", session_id: sessionId, seq, epoch, payload: { type: "turn.started" } }]
       : [];
   }
-  const messageId = snapshotMessageId(message, role);
   if (role === "assistant") {
     const messageText = contentToText(message.content);
-    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageId, messageText, messageTimestamp);
+    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageIdentity, messageText, messageTimestamp);
     if (frames.length > 0 && replayMode === "history") {
       frames.push({
         type: "turn.ended",
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ type: "turn.ended" }, replayMode, messageId, messageText, role, messageTimestamp),
+        payload: snapshotReplayPayload({ type: "turn.ended" }, replayMode, messageIdentity, messageText, role, messageTimestamp),
       });
     }
     return frames;
@@ -1216,7 +1216,7 @@ function snapshotMessageToServerFrames(
       session_id: sessionId,
       seq,
       epoch,
-      payload: snapshotReplayPayload({ type: "tool.result", toolCallId, output }, replayMode, messageId, output, role, messageTimestamp),
+      payload: snapshotReplayPayload({ type: "tool.result", toolCallId, output }, replayMode, messageIdentity, output, role, messageTimestamp),
     }];
   }
   return [];
@@ -1228,7 +1228,7 @@ function contentPartsToFrames(
   seq: number,
   epoch: string | undefined,
   replayMode: "history" | "in_flight",
-  messageId: string,
+  messageIdentity: SnapshotMessageIdentity,
   messageText: string,
   messageTimestamp: unknown,
 ): ServerFrame[] {
@@ -1238,7 +1238,7 @@ function contentPartsToFrames(
       session_id: sessionId,
       seq,
       epoch,
-      payload: snapshotReplayPayload({ delta: content }, replayMode, messageId, messageText, "assistant", messageTimestamp),
+      payload: snapshotReplayPayload({ delta: content }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
     }] : [];
   }
   if (!Array.isArray(content)) return [];
@@ -1251,7 +1251,7 @@ function contentPartsToFrames(
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ part: { type: "text", text: part.text } }, replayMode, messageId, messageText, "assistant", messageTimestamp),
+        payload: snapshotReplayPayload({ part: { type: "text", text: part.text } }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
       }];
     }
     if ((type === "think" || type === "thinking") && typeof (part.think ?? part.thinking ?? part.text) === "string") {
@@ -1262,7 +1262,7 @@ function contentPartsToFrames(
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ part: { type: "think", think, ...(signature ? { signature } : {}) } }, replayMode, messageId, messageText, "assistant", messageTimestamp),
+        payload: snapshotReplayPayload({ part: { type: "think", think, ...(signature ? { signature } : {}) } }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
       }] : [];
     }
     return [];
@@ -1299,11 +1299,18 @@ function firstContentStringField(record: Record<string, unknown>, key: string): 
   return undefined;
 }
 
-function snapshotMessageId(message: Record<string, unknown>, role: string): string {
-  return stringField(message, "id") ??
+interface SnapshotMessageIdentity {
+  id: string;
+  stable: boolean;
+}
+
+function snapshotMessageIdentity(message: Record<string, unknown>, role: string): SnapshotMessageIdentity {
+  const stableId = stringField(message, "id") ??
     stringField(message, "message_id") ??
-    stringField(message, "messageId") ??
-    `${role}:${contentToText(message.content).slice(0, 512)}`;
+    stringField(message, "messageId");
+  return stableId
+    ? { id: stableId, stable: true }
+    : { id: `${role}:${contentToText(message.content).slice(0, 512)}`, stable: false };
 }
 
 function snapshotMessageTimestamp(message: Record<string, unknown>): unknown {
@@ -1313,7 +1320,7 @@ function snapshotMessageTimestamp(message: Record<string, unknown>): unknown {
 function snapshotReplayPayload(
   payload: Record<string, unknown>,
   replayMode: "history" | "in_flight",
-  messageId: string,
+  messageIdentity: SnapshotMessageIdentity,
   messageText: string,
   role: string,
   messageTimestamp: unknown,
@@ -1322,7 +1329,8 @@ function snapshotReplayPayload(
     ...payload,
     ...(messageTimestamp !== undefined && messageTimestamp !== null ? { created_at: messageTimestamp } : {}),
     snapshotReplay: replayMode,
-    snapshotMessageId: messageId,
+    snapshotMessageId: messageIdentity.id,
+    snapshotMessageIdStable: messageIdentity.stable,
     snapshotMessageText: messageText,
     snapshotRole: role,
   };

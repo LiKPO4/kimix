@@ -1551,6 +1551,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       }
       const updated: typeof last = {
         ...last,
+        snapshotMessageId: last.snapshotMessageId ?? incoming.snapshotMessageId,
+        snapshotMessageIdStable: last.snapshotMessageIdStable ?? incoming.snapshotMessageIdStable,
         agentRole: incoming.agentRole ?? last.agentRole,
         model: incoming.model ?? last.model,
         content: appendAssistantContent(last.content, incoming.content),
@@ -1766,6 +1768,7 @@ function stableSnapshotEvent(
   const payload = isRecord(source.payload) ? source.payload : {};
   const replay = payload.snapshotReplay;
   const messageId = payload.snapshotMessageId;
+  const messageIdStable = payload.snapshotMessageIdStable === true;
   if ((replay !== "history" && replay !== "in_flight") || !isString(messageId) || !messageId) return mapped;
   const kind = mapped.type === "assistant_message"
     ? "assistant"
@@ -1782,11 +1785,19 @@ function stableSnapshotEvent(
   const prefix = `snapshot:${encodeURIComponent(messageId)}:${encodeURIComponent(kind)}`;
   const id = `${prefix}:${partIndex}`;
   if (mapped.type !== "assistant_message" || !mapped.thinkingParts?.length) {
-    return { ...mapped, id };
+    return {
+      ...mapped,
+      id,
+      ...(mapped.type === "assistant_message"
+        ? { snapshotMessageId: messageId, snapshotMessageIdStable: messageIdStable }
+        : {}),
+    };
   }
   return {
     ...mapped,
     id,
+    snapshotMessageId: messageId,
+    snapshotMessageIdStable: messageIdStable,
     thinkingParts: mapped.thinkingParts.map((part, index) => ({
       ...part,
       id: `${id}:thinking:${index}`,

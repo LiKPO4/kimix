@@ -1635,7 +1635,12 @@ describe("mapHistoryEvents", () => {
     expect(second.map((event) => event.id)).toEqual(first.map((event) => event.id));
     expect(first[0].id).toContain("msg-user-1");
     expect(first[1].id).toContain("msg-assistant-1");
-    expect(first[1]).toMatchObject({ type: "assistant_message", content: "官方历史回答", isComplete: true });
+    expect(first[1]).toMatchObject({
+      type: "assistant_message",
+      snapshotMessageId: "msg-assistant-1",
+      content: "官方历史回答",
+      isComplete: true,
+    });
   });
 });
 

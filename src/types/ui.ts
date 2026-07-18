@@ -396,6 +396,10 @@ export interface AssistantMessageEvent {
   id: string;
   type: "assistant_message";
   timestamp: number;
+  /** Official snapshot message identity, retained across replay and persistence. */
+  snapshotMessageId?: string;
+  /** False when the snapshot identity had to fall back to role + body text. */
+  snapshotMessageIdStable?: boolean;
   agentId?: string;
   agentRole?: "executor" | "reviewer";
   content: string;

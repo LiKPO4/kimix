@@ -175,6 +175,12 @@ function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, 
       agentId: isString(event.event.agentId) ? event.event.agentId : event.agentId,
       time: isNumber(event.event.time) ? event.event.time : event.time,
       kimixTerminalScope: event.kimixTerminalScope,
+      snapshotMessageId: isString(event.event.snapshotMessageId)
+        ? event.event.snapshotMessageId
+        : event.snapshotMessageId,
+      snapshotMessageIdStable: typeof event.event.snapshotMessageIdStable === "boolean"
+        ? event.event.snapshotMessageIdStable
+        : event.snapshotMessageIdStable,
     };
   }
   return event;
@@ -182,6 +188,18 @@ function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, 
 
 function getAgentId(event: Record<string, unknown>): string | undefined {
   return isString(event.agentId) && event.agentId !== "main" ? event.agentId : undefined;
+}
+
+function getSnapshotMessageId(event: Record<string, unknown>): string | undefined {
+  return isString(event.snapshotMessageId) && event.snapshotMessageId
+    ? event.snapshotMessageId
+    : undefined;
+}
+
+function getSnapshotMessageIdStable(event: Record<string, unknown>): boolean | undefined {
+  return typeof event.snapshotMessageIdStable === "boolean"
+    ? event.snapshotMessageIdStable
+    : undefined;
 }
 
 function getContentPart(event: Record<string, unknown>): Record<string, unknown> {
@@ -304,6 +322,8 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        snapshotMessageId: getSnapshotMessageId(event),
+        snapshotMessageIdStable: getSnapshotMessageIdStable(event),
         agentId: getAgentId(event),
         content: delta,
         model: isString(event.model) ? event.model : undefined,
@@ -321,6 +341,8 @@ export function mapKimiCodeEvent(
           id: getId(options),
           type: "assistant_message",
           timestamp,
+          snapshotMessageId: getSnapshotMessageId(event),
+          snapshotMessageIdStable: getSnapshotMessageIdStable(event),
           agentId: getAgentId(event),
           content: text,
           model: isString(event.model) ? event.model : undefined,
@@ -340,6 +362,8 @@ export function mapKimiCodeEvent(
           id: getId(options),
           type: "assistant_message",
           timestamp,
+          snapshotMessageId: getSnapshotMessageId(event),
+          snapshotMessageIdStable: getSnapshotMessageIdStable(event),
           agentId: getAgentId(event),
           content: "",
           thinking: think,
@@ -360,6 +384,8 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        snapshotMessageId: getSnapshotMessageId(event),
+        snapshotMessageIdStable: getSnapshotMessageIdStable(event),
         agentId: getAgentId(event),
         content: "",
         thinking: delta,

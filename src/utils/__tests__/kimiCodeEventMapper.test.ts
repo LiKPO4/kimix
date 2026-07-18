@@ -23,7 +23,12 @@ describe("mapKimiCodeEvent", () => {
   it("maps assistant and thinking deltas to assistant_message chunks", () => {
     const options = testOptions();
     const thinking = mapKimiCodeEvent({ type: "thinking.delta", delta: "思考中", signature: "sig-delta" }, options);
-    const assistant = mapKimiCodeEvent({ type: "assistant.delta", delta: "完成" }, options);
+    const assistant = mapKimiCodeEvent({
+      type: "assistant.delta",
+      delta: "完成",
+      snapshotMessageId: "msg-assistant-1",
+      snapshotMessageIdStable: true,
+    }, options);
 
     expect(thinking?.type).toBe("assistant_message");
     expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinking).toBe("思考中");
@@ -31,6 +36,8 @@ describe("mapKimiCodeEvent", () => {
     expect((thinking as Extract<TimelineEvent, { type: "assistant_message" }>).thinkingParts?.[0].signature).toBe("sig-delta");
     expect(assistant?.type).toBe("assistant_message");
     expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("完成");
+    expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).snapshotMessageId).toBe("msg-assistant-1");
+    expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).snapshotMessageIdStable).toBe(true);
   });
 
   it("maps Kimi Code wire content parts to assistant_message chunks", () => {
@@ -43,6 +50,8 @@ describe("mapKimiCodeEvent", () => {
     const assistant = mapKimiCodeEvent({
       type: "context.append_loop_event",
       time: 3000,
+      snapshotMessageId: "msg-nested-assistant",
+      snapshotMessageIdStable: true,
       event: { type: "content.part", part: { type: "text", text: "正文结果" } },
     }, options);
 
@@ -52,6 +61,8 @@ describe("mapKimiCodeEvent", () => {
     expect(thinking?.timestamp).toBe(2000);
     expect(assistant?.type).toBe("assistant_message");
     expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("正文结果");
+    expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).snapshotMessageId).toBe("msg-nested-assistant");
+    expect((assistant as Extract<TimelineEvent, { type: "assistant_message" }>).snapshotMessageIdStable).toBe(true);
     expect(assistant?.timestamp).toBe(3000);
   });
 

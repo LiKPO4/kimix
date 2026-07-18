@@ -13,6 +13,51 @@ function snapshotText(rawEvent: Record<string, unknown>): string {
   return isString(rawEvent.snapshotMessageText) ? normalizeText(rawEvent.snapshotMessageText) : "";
 }
 
+type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
+
+function snapshotTimestamp(rawEvent: Record<string, unknown>): number | undefined {
+  const value = rawEvent.created_at ?? rawEvent.createdAt ?? rawEvent.timestamp ?? rawEvent.time;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (!isString(value) || !value.trim()) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function userTurnAnchor(events: readonly TimelineEvent[], timestamp: number): number | undefined {
+  let anchor: number | undefined;
+  for (const event of events) {
+    if (event.type !== "user_message" || event.timestamp > timestamp) continue;
+    if (anchor === undefined || event.timestamp > anchor) anchor = event.timestamp;
+  }
+  return anchor;
+}
+
+function sharesUserTurn(
+  events: readonly TimelineEvent[],
+  leftTimestamp: number,
+  rightTimestamp: number,
+): boolean {
+  const leftAnchor = userTurnAnchor(events, leftTimestamp);
+  const rightAnchor = userTurnAnchor(events, rightTimestamp);
+  return leftAnchor !== undefined && leftAnchor === rightAnchor;
+}
+
+function snapshotMessageIdFromEvent(event: AssistantEvent): string | undefined {
+  if (event.snapshotMessageId) return event.snapshotMessageId;
+  const match = /^snapshot:(.+):assistant:\d+$/.exec(event.id);
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
+}
+
+function assistantContainsSnapshotText(event: AssistantEvent, text: string): boolean {
+  const content = normalizeText([event.thinking, event.content].filter(isString).join("\n"));
+  return content.includes(text);
+}
+
 function hasPendingLocalPromptPlaceholder(events: readonly TimelineEvent[]): boolean {
   const assistantIndex = events.findLastIndex((event) => event.type === "assistant_message" && !event.isComplete);
   if (assistantIndex === -1) return false;
@@ -52,11 +97,32 @@ export function shouldSkipKimiCodeSnapshotReplay(
     });
   }
 
-  return events.some((event) => {
-    if (event.type !== "assistant_message") return false;
-    const content = normalizeText([event.thinking, event.content].filter(isString).join("\n"));
-    return content.includes(text);
-  });
+  const assistants = events.filter((event): event is AssistantEvent => event.type === "assistant_message");
+  const messageId = isString(rawEvent.snapshotMessageId) && rawEvent.snapshotMessageId
+    ? rawEvent.snapshotMessageId
+    : undefined;
+  const messageIdStable = rawEvent.snapshotMessageIdStable === true;
+  const timestamp = snapshotTimestamp(rawEvent);
+  const identityMatches = messageId && messageIdStable
+    ? assistants.filter((event) => (
+      event.snapshotMessageIdStable === true && snapshotMessageIdFromEvent(event) === messageId
+    ))
+    : [];
+  if (identityMatches.some((event) => (
+    (timestamp === undefined ||
+      userTurnAnchor(events, timestamp) === undefined ||
+      sharesUserTurn(events, event.timestamp, timestamp)) &&
+    assistantContainsSnapshotText(event, text)
+  ))) return true;
+
+  // Old persisted rows do not carry snapshotMessageId. Their fallback is
+  // intentionally limited to the user-bounded turn selected by the official
+  // message timestamp; global substring matching can delete a later real turn.
+  if (timestamp === undefined || userTurnAnchor(events, timestamp) === undefined) return false;
+  return assistants.some((event) => (
+    sharesUserTurn(events, event.timestamp, timestamp) &&
+    assistantContainsSnapshotText(event, text)
+  ));
 }
 
 /**
@@ -97,6 +163,23 @@ export function reconcileRunningKimiSnapshot(
           Math.abs(local.timestamp - event.timestamp) <= 10_000;
       }
       if (local.type === "assistant_message" && event.type === "assistant_message") {
+        const localSnapshotId = snapshotMessageIdFromEvent(local);
+        const eventSnapshotId = snapshotMessageIdFromEvent(event);
+        const sameSnapshotMessage = Boolean(
+          localSnapshotId &&
+          eventSnapshotId &&
+          local.snapshotMessageIdStable === true &&
+          event.snapshotMessageIdStable === true &&
+          localSnapshotId === eventSnapshotId &&
+          (
+            userTurnAnchor(events, local.timestamp) === undefined ||
+            userTurnAnchor(events, event.timestamp) === undefined ||
+            sharesUserTurn(events, local.timestamp, event.timestamp)
+          )
+        );
+        const sameTurn = sharesUserTurn(events, local.timestamp, event.timestamp);
+        const exactLegacyTimestamp = local.timestamp === event.timestamp;
+        if (!sameSnapshotMessage && !sameTurn && !exactLegacyTimestamp) return false;
         if (local.isComplete === event.isComplete &&
           local.content === event.content &&
           (local.thinking ?? "") === (event.thinking ?? "")) return true;
