@@ -1811,34 +1811,134 @@ function generateId(): string {
  * paths historically re-appended the whole user history on every restore
  * because the echo guard only compared against the latest user message.
  * Duplicate rules:
- * - identical non-empty event id keeps the first copy;
- * - two user messages with identical normalized content within 10s keep the
- *   copy that carries richer room identity (roomMessageId/agentTurnId).
+ * - an identical non-empty event id or complete delivery identity is a hard
+ *   duplicate, and the richer/later copy wins;
+ * - text/time matching is only a one-to-one bridge between an identity-less
+ *   replay echo and an identity-bearing optimistic event;
+ * - two identity-bearing or two identity-less messages are never collapsed
+ *   by content because repeated prompts are valid user input.
  */
 export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
-  const seenIds = new Set<string>();
+  type UserEvent = Extract<TimelineEvent, { type: "user_message" }>;
+  type UserRecord = {
+    resultIndex: number;
+    event: UserEvent;
+    content: string;
+    echoMatched: boolean;
+  };
+
+  const hasDeliveryIdentity = (event: UserEvent) => Boolean(
+    event.roomMessageId || event.agentTurnId || event.dispatchAttemptId
+  );
+  const completeDeliveryKey = (event: UserEvent) => (
+    event.roomMessageId && event.agentTurnId && event.dispatchAttemptId
+      ? JSON.stringify([event.roomMessageId, event.agentTurnId, event.dispatchAttemptId])
+      : null
+  );
+  const richness = (event: UserEvent) => {
+    let score = 0;
+    if (event.roomMessageId) score += 16;
+    if (event.agentTurnId) score += 16;
+    if (event.dispatchAttemptId) score += 16;
+    if (event.roomAgentId) score += 4;
+    score += Math.min(event.recipientAgentIds?.length ?? 0, 4);
+    for (const image of event.images ?? []) {
+      score += 1;
+      if (image.id) score += 1;
+      if (image.kind) score += 1;
+      if (image.dataUrl) score += 2;
+      if (image.filePath) score += 2;
+    }
+    return score;
+  };
+  const mergeUserCopies = (current: UserEvent, incoming: UserEvent): UserEvent => {
+    const preferIncoming = richness(incoming) >= richness(current);
+    const preferred = preferIncoming ? incoming : current;
+    const fallback = preferIncoming ? current : incoming;
+    return {
+      ...fallback,
+      ...preferred,
+      images: mergeUserMedia(fallback.images, preferred.images),
+      roomAgentId: preferred.roomAgentId ?? fallback.roomAgentId,
+      roomMessageId: preferred.roomMessageId ?? fallback.roomMessageId,
+      agentTurnId: preferred.agentTurnId ?? fallback.agentTurnId,
+      dispatchAttemptId: preferred.dispatchAttemptId ?? fallback.dispatchAttemptId,
+      recipientAgentIds: preferred.recipientAgentIds ?? fallback.recipientAgentIds,
+    };
+  };
+
+  const seenIds = new Map<string, number>();
+  const userRecords: UserRecord[] = [];
+  const userRecordByResultIndex = new Map<number, UserRecord>();
+  const userRecordByDelivery = new Map<string, UserRecord>();
   const result: TimelineEvent[] = [];
-  const seenUsers: Array<{ index: number; content: string; timestamp: number; hasIdentity: boolean }> = [];
+
+  const mergeIntoRecord = (record: UserRecord, incoming: UserEvent, echoMatch: boolean) => {
+    const merged = mergeUserCopies(record.event, incoming);
+    result[record.resultIndex] = merged;
+    record.event = merged;
+    record.content = normalizeUserContent(merged.content ?? "");
+    record.echoMatched ||= echoMatch;
+    if (incoming.id) seenIds.set(incoming.id, record.resultIndex);
+    const deliveryKey = completeDeliveryKey(incoming);
+    if (deliveryKey) userRecordByDelivery.set(deliveryKey, record);
+  };
+
   for (const event of events) {
-    if (event.id && seenIds.has(event.id)) continue;
     if (event.type === "user_message") {
-      const content = normalizeUserContent(event.content ?? "");
-      const hasIdentity = Boolean(event.roomMessageId || event.agentTurnId);
-      const duplicateIndex = content
-        ? seenUsers.findIndex((seen) => seen.content === content && Math.abs(seen.timestamp - event.timestamp) <= 10_000)
-        : -1;
-      if (duplicateIndex >= 0) {
-        const seen = seenUsers[duplicateIndex];
-        if (hasIdentity && !seen.hasIdentity) {
-          result[seen.index] = event;
-          seenUsers[duplicateIndex] = { index: seen.index, content, timestamp: event.timestamp, hasIdentity };
-          if (event.id) seenIds.add(event.id);
-        }
+      const sameIdIndex = event.id ? seenIds.get(event.id) : undefined;
+      if (sameIdIndex !== undefined) {
+        const sameIdRecord = userRecordByResultIndex.get(sameIdIndex);
+        if (sameIdRecord) mergeIntoRecord(sameIdRecord, event, false);
         continue;
       }
-      seenUsers.push({ index: result.length, content, timestamp: event.timestamp, hasIdentity });
+
+      const deliveryKey = completeDeliveryKey(event);
+      const sameDeliveryRecord = deliveryKey ? userRecordByDelivery.get(deliveryKey) : undefined;
+      if (sameDeliveryRecord) {
+        mergeIntoRecord(sameDeliveryRecord, event, false);
+        continue;
+      }
+
+      const content = normalizeUserContent(event.content ?? "");
+      const hasIdentity = hasDeliveryIdentity(event);
+      let echoRecord: UserRecord | undefined;
+      let closestEchoDistance = Number.POSITIVE_INFINITY;
+      if (content) {
+        for (const seen of userRecords) {
+          const distance = Math.abs(seen.event.timestamp - event.timestamp);
+          if (
+            seen.echoMatched ||
+            seen.content !== content ||
+            hasDeliveryIdentity(seen.event) === hasIdentity ||
+            distance > 10_000 ||
+            distance >= closestEchoDistance
+          ) continue;
+          echoRecord = seen;
+          closestEchoDistance = distance;
+        }
+      }
+      if (echoRecord) {
+        mergeIntoRecord(echoRecord, event, true);
+        continue;
+      }
+
+      const record: UserRecord = {
+        resultIndex: result.length,
+        event,
+        content,
+        echoMatched: false,
+      };
+      userRecords.push(record);
+      userRecordByResultIndex.set(record.resultIndex, record);
+      if (deliveryKey) userRecordByDelivery.set(deliveryKey, record);
+      if (event.id) seenIds.set(event.id, record.resultIndex);
+      result.push(event);
+      continue;
     }
-    if (event.id) seenIds.add(event.id);
+
+    if (event.id && seenIds.has(event.id)) continue;
+    if (event.id) seenIds.set(event.id, result.length);
     result.push(event);
   }
   return result;

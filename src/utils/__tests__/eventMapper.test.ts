@@ -1983,6 +1983,61 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
     expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(2);
   });
 
+  it("deduplicateTimelineEvents preserves intentional repeated prompts with distinct delivery identities", () => {
+    const events: TimelineEvent[] = [{
+      id: "local-u1", type: "user_message", timestamp: 1000, content: "继续",
+      roomMessageId: "room-message-1", agentTurnId: "turn-1", dispatchAttemptId: "attempt-1",
+    }, {
+      id: "local-u2", type: "user_message", timestamp: 2000, content: "继续",
+      roomMessageId: "room-message-2", agentTurnId: "turn-2", dispatchAttemptId: "attempt-2",
+    }];
+
+    expect(deduplicateTimelineEvents(events).map((event) => event.id)).toEqual(["local-u1", "local-u2"]);
+  });
+
+  it("deduplicateTimelineEvents preserves repeated identity-less prompts with distinct ids", () => {
+    const events: TimelineEvent[] = [{
+      id: "legacy-u1", type: "user_message", timestamp: 1000, content: "继续",
+    }, {
+      id: "legacy-u2", type: "user_message", timestamp: 2000, content: "继续",
+    }];
+
+    expect(deduplicateTimelineEvents(events).map((event) => event.id)).toEqual(["legacy-u1", "legacy-u2"]);
+  });
+
+  it("deduplicateTimelineEvents pairs replay echoes one-to-one across repeated prompts", () => {
+    const events: TimelineEvent[] = [{
+      id: "local-u1", type: "user_message", timestamp: 1000, content: "继续",
+      roomMessageId: "room-message-1", agentTurnId: "turn-1",
+    }, {
+      id: "local-u2", type: "user_message", timestamp: 5000, content: "继续",
+      roomMessageId: "room-message-2", agentTurnId: "turn-2",
+    }, {
+      id: "snapshot:msg_u1:user:0", type: "user_message", timestamp: 1001, content: "继续",
+    }, {
+      id: "snapshot:msg_u2:user:0", type: "user_message", timestamp: 5001, content: "继续",
+    }];
+
+    const result = deduplicateTimelineEvents(events);
+    expect(result.map((event) => event.id)).toEqual(["local-u1", "local-u2"]);
+  });
+
+  it("deduplicateTimelineEvents replaces an identical-id user copy with richer later metadata", () => {
+    const events: TimelineEvent[] = [{
+      id: "stable-user", type: "user_message", timestamp: 1000, content: "问题",
+    }, {
+      id: "stable-user", type: "user_message", timestamp: 1001, content: "问题",
+      roomMessageId: "room-message-1", agentTurnId: "turn-1", dispatchAttemptId: "attempt-1",
+    }];
+
+    expect(deduplicateTimelineEvents(events)).toEqual([expect.objectContaining({
+      id: "stable-user",
+      roomMessageId: "room-message-1",
+      agentTurnId: "turn-1",
+      dispatchAttemptId: "attempt-1",
+    })]);
+  });
+
   it("deduplicateTimelineEvents is idempotent and keeps distinct users", () => {
     const events: TimelineEvent[] = [{
       id: "u1", type: "user_message", timestamp: 1000, content: "问题一",

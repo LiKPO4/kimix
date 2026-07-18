@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-18
+
+* **Persisted user-message repair is identity-safe and one-to-one**: Stable event IDs and complete delivery identities remain hard duplicate keys; text/time repair may pair only one identity-less replay echo with one identity-bearing optimistic event, so intentional repeated prompts and distinct legacy messages cannot be deleted on load. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 ## 2026-07-17
 
 * **Synthetic primary prompts own a concrete turn before dispatch**: Legacy/non-collaboration sessions still scope live events to a synthetic room Agent; ordinary sends now bind `roomMessageId + agentTurnId` through sending, accepted, running, waits, and terminal status. Renderer activity matches that turn identity, so a `tool_use` step cannot remove the current header, claim `输出完成`, or reactivate an older response. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
