@@ -381,6 +381,31 @@ describe("reconcileRunningKimiSnapshot chronological order", () => {
     expect(result[1].id).toBe("snapshot:msg_a:assistant:0");
     expect(result[2].id).toBe("user-new");
   });
+
+  it("interleaves older replay rows without reordering mounted local causality", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-current", type: "user_message", timestamp: 1000, content: "当前问题",
+    }, {
+      // A recovered timestamp may regress even though this row causally follows
+      // the user message. Local array order must remain authoritative.
+      id: "assistant-current", type: "assistant_message", timestamp: 900,
+      content: "当前回答", isThinking: false, isComplete: true,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:user-old:user:0", type: "user_message", timestamp: 950, content: "旧问题",
+    }, {
+      id: "snapshot:assistant-old:assistant:0", type: "assistant_message", timestamp: 960,
+      content: "旧回答", isThinking: false, isComplete: true,
+    }];
+
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    expect(result.map((event) => event.id)).toEqual([
+      "snapshot:user-old:user:0",
+      "snapshot:assistant-old:assistant:0",
+      "user-current",
+      "assistant-current",
+    ]);
+  });
 });
 
 describe("reconcileRunningKimiSnapshot missing user boundary", () => {

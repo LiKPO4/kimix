@@ -2,6 +2,8 @@
 
 ## 2026-07-18
 
+* **Replay chronology preserves mounted causality**: Older snapshot rows are inserted by user-turn time without globally sorting the timeline, so clock-skewed or recovered timestamps cannot move an already-mounted Assistant/tool ahead of its user message. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Running snapshot downgrade requires a real user boundary**: Assistant-only imported or damaged histories no longer interpret timestamp zero as a current user turn, so a canonical completed reply cannot be downgraded and merged into an orphan placeholder. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Timeline navigation owns retry and highlight leases**: A focus miss with no remaining history expansion clears its recursion guard immediately, while each new rail/search target cancels the previous highlight timer; following mode retains native anchoring and only detached mode disables it. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).

@@ -125,6 +125,71 @@ export function shouldSkipKimiCodeSnapshotReplay(
   ));
 }
 
+function interleaveReplayEventsWithoutReorderingLocal(
+  localEvents: readonly TimelineEvent[],
+  mergedEvents: readonly TimelineEvent[],
+): TimelineEvent[] {
+  const remainingLocalIds = new Map<string, number>();
+  for (const event of localEvents) {
+    remainingLocalIds.set(event.id, (remainingLocalIds.get(event.id) ?? 0) + 1);
+  }
+  const result: TimelineEvent[] = [];
+  const replayEvents: TimelineEvent[] = [];
+  for (const event of mergedEvents) {
+    const remaining = remainingLocalIds.get(event.id) ?? 0;
+    if (remaining > 0) {
+      result.push(event);
+      remainingLocalIds.set(event.id, remaining - 1);
+    } else {
+      replayEvents.push(event);
+    }
+  }
+  if (localEvents.length === 0) return [...mergedEvents];
+  if (replayEvents.length === 0) return result;
+
+  for (const event of replayEvents) {
+    if (!Number.isFinite(event.timestamp)) {
+      result.push(event);
+      continue;
+    }
+    if (event.type === "user_message") {
+      const nextUserIndex = result.findIndex((candidate) => (
+        candidate.type === "user_message" &&
+        Number.isFinite(candidate.timestamp) &&
+        candidate.timestamp > event.timestamp
+      ));
+      result.splice(nextUserIndex >= 0 ? nextUserIndex : result.length, 0, event);
+      continue;
+    }
+
+    let userAnchorIndex = -1;
+    let userAnchorTimestamp = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < result.length; index += 1) {
+      const candidate = result[index];
+      if (
+        candidate.type === "user_message" &&
+        Number.isFinite(candidate.timestamp) &&
+        candidate.timestamp <= event.timestamp &&
+        candidate.timestamp >= userAnchorTimestamp
+      ) {
+        userAnchorIndex = index;
+        userAnchorTimestamp = candidate.timestamp;
+      }
+    }
+    const nextUserIndex = result.findIndex((candidate, index) => (
+      index > userAnchorIndex && candidate.type === "user_message"
+    ));
+    const groupEnd = nextUserIndex >= 0 ? nextUserIndex : result.length;
+    let insertAt = userAnchorIndex + 1;
+    for (let index = insertAt; index < groupEnd; index += 1) {
+      const timestamp = result[index]?.timestamp;
+      if (Number.isFinite(timestamp) && timestamp <= event.timestamp) insertAt = index + 1;
+    }
+    result.splice(insertAt, 0, event);
+  }
+  return result;
+}
+
 /**
  * Running history is an additive progress sample. Merge it into the live
  * timeline so mounted rows keep their local identities and interaction state.
@@ -211,9 +276,9 @@ export function reconcileRunningKimiSnapshot(
     }
     return alreadyMounted ? events : mergeEvents(events, event);
   }, [...localEvents]);
-  // Replay and runtime-sample merges append older history at the tail of the
-  // array; rendering groups turns by array order, so an out-of-order tail
-  // folds older turns into the latest one. Restore chronological order with a
-  // stable sort — already-ordered timelines are unaffected.
-  return merged.slice().sort((a, b) => a.timestamp - b.timestamp);
+  // Replay and runtime-sample merges append older history at the tail. Insert
+  // only those newly mounted replay rows by time; never sort already-mounted
+  // local rows, whose array order is the live causal order even when clocks or
+  // recovered timestamps regress.
+  return interleaveReplayEventsWithoutReorderingLocal(localEvents, merged);
 }
