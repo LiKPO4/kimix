@@ -2,6 +2,8 @@
 
 ## 2026-07-18
 
+* **Vendored fallback tracks Kimi Code 0.27 source, not package version alone**: The private Node SDK still reports 0.13.4, but the regenerated `5cc1949` bundle incorporates workspace `agent-core` fixes for interrupted tool-call closure, FetchURL SSRF defense, and Windows workspace identity; singleton-aware Server and subagent probes validate 0.27 without stopping an already-owned runtime. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Replay chronology preserves mounted causality**: Older snapshot rows are inserted by user-turn time without globally sorting the timeline, so clock-skewed or recovered timestamps cannot move an already-mounted Assistant/tool ahead of its user message. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Running snapshot downgrade requires a real user boundary**: Assistant-only imported or damaged histories no longer interpret timestamp zero as a current user turn, so a canonical completed reply cannot be downgraded and merged into an orphan placeholder. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
