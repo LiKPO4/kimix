@@ -229,6 +229,18 @@ const COMPACTION_STALE_MS = 15 * 60 * 1000;
 const COMPACTION_LONG_RUNNING_MS = 5 * 60 * 1000;
 const CHAT_FULL_RENDER_ITEM_LIMIT = 28;
 const OLDER_ITEMS_BATCH_SIZE = CHAT_FULL_RENDER_ITEM_LIMIT;
+const MAX_RENDER_DIAGNOSTIC_KEYS = 512;
+
+function rememberRenderDiagnosticKey(keys: Set<string>, key: string): boolean {
+  if (keys.has(key)) return false;
+  keys.add(key);
+  while (keys.size > MAX_RENDER_DIAGNOSTIC_KEYS) {
+    const oldest = keys.values().next().value;
+    if (oldest === undefined) break;
+    keys.delete(oldest);
+  }
+  return true;
+}
 const CHAT_BOTTOM_SPACER_HEIGHT = 60;
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   drafting: "需求澄清",
@@ -1182,6 +1194,11 @@ export const ChatThread = memo(function ChatThread() {
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, sessionRoomAgentActivities, primaryRoomAgentId]
   );
   const surfacedSubagentContentKeysRef = useRef(new Set<string>());
+  const exportedSubagentRegressionSnapshotsRef = useRef(new Set<string>());
+  useEffect(() => {
+    surfacedSubagentContentKeysRef.current.clear();
+    exportedSubagentRegressionSnapshotsRef.current.clear();
+  }, [session?.id]);
   useEffect(() => {
     if (!session) return;
     for (const item of renderItems) {
@@ -1192,8 +1209,7 @@ export const ChatThread = memo(function ChatThread() {
         (!item.event.content.trim() && !item.event.thinking?.trim())
       ) continue;
       const key = `${session.id}:${item.event.id}`;
-      if (surfacedSubagentContentKeysRef.current.has(key)) continue;
-      surfacedSubagentContentKeysRef.current.add(key);
+      if (!rememberRenderDiagnosticKey(surfacedSubagentContentKeysRef.current, key)) continue;
       logEvent("chatRenderItems.subagentContentSurfaced", {
         sessionId: session.id,
         agentTurnId: item.event.agentTurnId,
@@ -1210,14 +1226,12 @@ export const ChatThread = memo(function ChatThread() {
       });
     }
   }, [renderItems, session]);
-  const exportedSubagentRegressionSnapshotsRef = useRef(new Set<string>());
   useEffect(() => {
     if (!session) return;
     const snapshots = findSubagentContentRegressionSnapshots(renderItems, session);
     for (const snapshot of snapshots) {
       const { key } = snapshot;
-      if (exportedSubagentRegressionSnapshotsRef.current.has(key)) continue;
-      exportedSubagentRegressionSnapshotsRef.current.add(key);
+      if (!rememberRenderDiagnosticKey(exportedSubagentRegressionSnapshotsRef.current, key)) continue;
       window.api.writeDiag?.({
         message: "ChatThread.subagentContentRegressionSnapshot",
         data: buildSubagentRegressionDiagnosticData(snapshot),
