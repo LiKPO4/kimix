@@ -2,6 +2,8 @@
 
 ## 2026-07-18
 
+* **Server silence cannot manufacture completion from uncertainty**: Server status now has one active/terminal/unknown classifier across prompt recovery and Host mapping; missing/future/query-failed states keep waiting, and a recovered `prompt.completed` is emitted only after terminal evidence plus successful snapshot application. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Snapshot Assistant deduplication is message- and turn-scoped**: Official `snapshotMessageId` and its stability flag survive event mapping, merge, and persistence; role/body-derived IDs and legacy body matching remain confined to the timestamp-selected user turn, so an older long answer cannot swallow a later valid short or repeated answer. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Persisted user-message repair is identity-safe and one-to-one**: Stable event IDs and complete delivery identities remain hard duplicate keys; text/time repair may pair only one identity-less replay echo with one identity-bearing optimistic event, so intentional repeated prompts and distinct legacy messages cannot be deleted on load. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).

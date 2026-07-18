@@ -39,7 +39,7 @@ export type ServerSession = {
   title?: string;
   created_at?: string;
   updated_at?: string;
-  status: string;
+  status?: string;
   busy?: boolean;
   archived?: boolean;
   metadata?: Record<string, unknown>;
@@ -80,7 +80,7 @@ export type ServerFsReadResult = {
 };
 
 export type ServerSessionStatus = {
-  status: string;
+  status?: string;
   // agent-core-v2 的权威运行信号：整个 prompt 期间（含 step 间隙）保持 true。
   // v2 的 /status 响应没有 status 字符串字段，只有 busy。
   busy?: boolean;
@@ -93,6 +93,70 @@ export type ServerSessionStatus = {
   max_context_tokens: number;
   context_usage: number;
 };
+
+export type ServerSessionActivity = "active" | "terminal" | "unknown";
+
+const ACTIVE_SERVER_SESSION_STATUSES = new Set([
+  "running",
+  "awaiting_approval",
+  "awaiting_question",
+]);
+const TERMINAL_SERVER_SESSION_STATUSES = new Set([
+  "idle",
+  "completed",
+  "aborted",
+  "interrupted",
+  "error",
+  "failed",
+  "cancelled",
+  "canceled",
+]);
+
+/**
+ * `busy` is authoritative on agent-core-v2. Older Servers expose only `status`.
+ * Missing, malformed, and future status values remain unknown instead of being
+ * collapsed into a terminal state.
+ */
+export function classifyServerSessionActivity(
+  source: { status?: unknown; busy?: unknown } | null | undefined,
+): ServerSessionActivity {
+  if (source?.busy === true) return "active";
+  if (source?.busy === false) return "terminal";
+  const status = typeof source?.status === "string" ? source.status.trim().toLowerCase() : "";
+  if (ACTIVE_SERVER_SESSION_STATUSES.has(status)) return "active";
+  if (TERMINAL_SERVER_SESSION_STATUSES.has(status)) return "terminal";
+  return "unknown";
+}
+
+type ServerSessionActivityStatus = Pick<ServerSessionStatus, "status" | "busy">;
+
+export type ServerPromptIdleResolution =
+  | { action: "wait"; activity: "active"; status: ServerSessionActivityStatus }
+  | { action: "wait"; activity: "unknown"; status?: ServerSessionActivityStatus; statusError?: unknown }
+  | { action: "recovered"; activity: "terminal"; status: ServerSessionActivityStatus };
+
+/**
+ * A silent prompt may synthesize completion only after an authoritative
+ * terminal status and a successfully applied snapshot. Status-query failures,
+ * future statuses, and failed snapshot recovery never become completion.
+ */
+export async function resolveServerPromptIdleTimeout(
+  readStatus: () => Promise<ServerSessionActivityStatus>,
+  recoverSnapshot: () => Promise<void>,
+): Promise<ServerPromptIdleResolution> {
+  let status: ServerSessionActivityStatus;
+  try {
+    status = await readStatus();
+  } catch (statusError) {
+    return { action: "wait", activity: "unknown", statusError };
+  }
+  const activity = classifyServerSessionActivity(status);
+  if (activity === "terminal") {
+    await recoverSnapshot();
+    return { action: "recovered", activity, status };
+  }
+  return { action: "wait", activity, status };
+}
 
 export type ServerSkill = {
   name: string;
@@ -240,6 +304,13 @@ export type ServerSnapshot = {
 const CONTROL_TIMEOUT_MS = 5_000;
 const PROMPT_TIMEOUT_MS = 120_000;
 const UPLOAD_TIMEOUT_MS = 300_000;
+
+class ServerSessionIdleTimeoutError extends Error {
+  constructor(readonly idleTimeoutMs: number) {
+    super(`Kimi Server WebSocket 等待超时（会话空闲 ${idleTimeoutMs}ms）`);
+    this.name = "ServerSessionIdleTimeoutError";
+  }
+}
 
 export function isKimiCodeServerSessionRoutingEnabled(
   env: NodeJS.ProcessEnv = process.env,
@@ -455,7 +526,7 @@ export class KimiCodeServerClient {
   private readonly listeners = new Set<FrameListener>();
   private readonly subscribed = new Set<string>();
   private readonly cursors = new Map<string, ServerCursor>();
-  private readonly recoveringSnapshots = new Set<string>();
+  private readonly recoveringSnapshots = new Map<string, Promise<void>>();
   private readonly queued: ServerFrame[] = [];
   private readonly waiters = new Set<{
     match: (frame: ServerFrame) => boolean;
@@ -734,8 +805,8 @@ export class KimiCodeServerClient {
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
     // 长静默不等于死亡：v2 轮次在超长工具/无增量阶段可能数分钟无帧（实测单轮 616s）。
-    // 空闲超时时先查官方 status——仍运行就继续等；已不运行说明 prompt.completed 丢失，
-    // 用快照补齐时间线后按完成收口，而不是给用户报错卡。
+    // 空闲超时时先查官方 status。只有明确终态且快照成功补齐后，才能合成
+    // prompt.completed；查询失败、未知状态或快照失败都不能伪装成完成。
     for (;;) {
       try {
         await this.waitForSessionEvent(sessionId, (frame) => {
@@ -745,13 +816,21 @@ export class KimiCodeServerClient {
         }, 180_000);
         break;
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes("会话空闲")) throw error;
-        const status = await this.getSessionStatus(sessionId).catch(() => undefined);
-        const stillActive = status?.busy === true || status?.status === "running" || status?.status === "awaiting_approval" || status?.status === "awaiting_question";
-        if (stillActive) continue;
-        console.warn(`[KimiCodeServerClient] prompt ${result.prompt_id} 完成帧未到达且会话已空闲，改用快照补齐：${message}`);
-        await this.recoverSnapshot(sessionId).catch(() => undefined);
+        if (!(error instanceof ServerSessionIdleTimeoutError)) throw error;
+        const resolution = await resolveServerPromptIdleTimeout(
+          () => this.getSessionStatus(sessionId),
+          () => this.recoverSnapshot(sessionId),
+        );
+        if (resolution.action === "wait") {
+          if (resolution.activity === "unknown") {
+            console.warn(
+              `[KimiCodeServerClient] prompt ${result.prompt_id} 空闲超时后的会话状态不确定，继续等待，禁止合成完成。`,
+              resolution.statusError ?? resolution.status,
+            );
+          }
+          continue;
+        }
+        console.warn(`[KimiCodeServerClient] prompt ${result.prompt_id} 完成帧未到达；权威状态已终止且快照恢复成功，补发完成帧。`);
         const completion = recoveredPromptCompletedFrame(sessionId, result.prompt_id, this.cursors.get(sessionId));
         for (const listener of this.listeners) listener(completion);
         break;
@@ -1070,10 +1149,12 @@ export class KimiCodeServerClient {
   }
 
   private async recoverSnapshot(sessionId: string) {
-    if (!this.subscribed.has(sessionId)) return;
-    if (this.recoveringSnapshots.has(sessionId)) return;
-    this.recoveringSnapshots.add(sessionId);
-    try {
+    if (!this.subscribed.has(sessionId)) {
+      throw new Error(`Kimi Server snapshot 恢复失败：会话 ${sessionId} 未订阅。`);
+    }
+    const inFlight = this.recoveringSnapshots.get(sessionId);
+    if (inFlight) return inFlight;
+    const recovery = (async () => {
       const snapshot = await this.request<ServerSnapshot>(
         `/api/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       );
@@ -1092,8 +1173,14 @@ export class KimiCodeServerClient {
         cursors: this.cursorPayload([sessionId]),
       });
       if (ack.code !== 0) throw new Error(`Kimi Server snapshot 重订阅失败：${ack.msg ?? ack.code}`);
+    })();
+    this.recoveringSnapshots.set(sessionId, recovery);
+    try {
+      await recovery;
     } finally {
-      this.recoveringSnapshots.delete(sessionId);
+      if (this.recoveringSnapshots.get(sessionId) === recovery) {
+        this.recoveringSnapshots.delete(sessionId);
+      }
     }
   }
 
@@ -1116,7 +1203,7 @@ export class KimiCodeServerClient {
     clearTimeout(waiter.timer);
     waiter.timer = setTimeout(() => {
       this.waiters.delete(waiter as Parameters<typeof this.waiters.delete>[0]);
-      waiter.reject(new Error(`Kimi Server WebSocket 等待超时（会话空闲 ${waiter.idleTimeoutMs ?? 0}ms）`));
+      waiter.reject(new ServerSessionIdleTimeoutError(waiter.idleTimeoutMs ?? 0));
     }, waiter.idleTimeoutMs ?? 0);
   }
 

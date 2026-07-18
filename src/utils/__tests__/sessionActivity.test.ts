@@ -21,6 +21,7 @@ describe("sessionActivity", () => {
     expect(isTerminalKimiCodeEngineStatus("idle")).toBe(true);
     expect(isTerminalKimiCodeEngineStatus("running")).toBe(false);
     expect(isTerminalKimiCodeEngineStatus("waiting_question")).toBe(false);
+    expect(isTerminalKimiCodeEngineStatus("unknown")).toBe(false);
   });
 
   it("recognizes official states that must keep a restored session busy", () => {
@@ -28,6 +29,7 @@ describe("sessionActivity", () => {
     expect(isActiveKimiCodeEngineStatus("waiting_approval")).toBe(true);
     expect(isActiveKimiCodeEngineStatus("waiting_question")).toBe(true);
     expect(isActiveKimiCodeEngineStatus("completed")).toBe(false);
+    expect(isActiveKimiCodeEngineStatus("unknown")).toBe(false);
     expect(isActiveKimiCodeEngineStatus(undefined)).toBe(false);
   });
 

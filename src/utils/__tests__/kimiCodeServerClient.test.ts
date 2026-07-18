@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  classifyServerSessionActivity,
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   recoveredPromptCompletedFrame,
+  resolveServerPromptIdleTimeout,
   snapshotMessagesToServerFrames,
   snapshotToHistoryFrames,
   toServerConfigPatch,
@@ -151,6 +153,51 @@ describe("KimiCodeServerClient protocol adapters", () => {
       seq: 7,
       kimixTerminalScope: "prompt",
     });
+  });
+
+  it("classifies Server activity without collapsing missing or future states into terminal", () => {
+    expect(classifyServerSessionActivity({ busy: true })).toBe("active");
+    expect(classifyServerSessionActivity({ busy: false })).toBe("terminal");
+    expect(classifyServerSessionActivity({ status: "running" })).toBe("active");
+    expect(classifyServerSessionActivity({ status: "awaiting_question" })).toBe("active");
+    expect(classifyServerSessionActivity({ status: "idle" })).toBe("terminal");
+    expect(classifyServerSessionActivity({ status: "aborted" })).toBe("terminal");
+    expect(classifyServerSessionActivity({ status: "future-paused-state" })).toBe("unknown");
+    expect(classifyServerSessionActivity({})).toBe("unknown");
+    expect(classifyServerSessionActivity(undefined)).toBe("unknown");
+  });
+
+  it("keeps silent prompts open when status is active, unknown, or unavailable", async () => {
+    const recoverSnapshot = vi.fn(async () => undefined);
+
+    await expect(resolveServerPromptIdleTimeout(
+      async () => ({ busy: true }),
+      recoverSnapshot,
+    )).resolves.toMatchObject({ action: "wait", activity: "active" });
+    await expect(resolveServerPromptIdleTimeout(
+      async () => ({ status: "future-paused-state" }),
+      recoverSnapshot,
+    )).resolves.toMatchObject({ action: "wait", activity: "unknown" });
+    await expect(resolveServerPromptIdleTimeout(
+      async () => { throw new Error("status unavailable"); },
+      recoverSnapshot,
+    )).resolves.toMatchObject({ action: "wait", activity: "unknown" });
+    expect(recoverSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("reports idle recovery only after terminal status and successful snapshot application", async () => {
+    const status = async () => ({ busy: false });
+    const recoverSnapshot = vi.fn(async () => undefined);
+    await expect(resolveServerPromptIdleTimeout(status, recoverSnapshot)).resolves.toMatchObject({
+      action: "recovered",
+      activity: "terminal",
+    });
+    expect(recoverSnapshot).toHaveBeenCalledTimes(1);
+
+    await expect(resolveServerPromptIdleTimeout(
+      status,
+      async () => { throw new Error("snapshot unavailable"); },
+    )).rejects.toThrow("snapshot unavailable");
   });
 
   it("emits an authoritative completion frame after snapshot recovery", () => {

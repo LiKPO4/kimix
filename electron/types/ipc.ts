@@ -1499,6 +1499,7 @@ export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
 
 export type KimiCodeEngineStatus =
   | "idle"
+  | "unknown"
   | "running"
   | "waiting_approval"
   | "waiting_question"

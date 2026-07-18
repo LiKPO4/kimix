@@ -122,6 +122,13 @@ describe("resolveServerEngineStatus", () => {
     expect(resolveServerEngineStatus({ status: "running" })).toBe("running");
     expect(resolveServerEngineStatus({ status: "awaiting_approval" })).toBe("waiting_approval");
     expect(resolveServerEngineStatus({ status: "awaiting_question" })).toBe("waiting_question");
-    expect(resolveServerEngineStatus({ status: "unknown-future-state" })).toBe("idle");
+    expect(resolveServerEngineStatus({ status: "unknown-future-state" })).toBe("unknown");
+    expect(resolveServerEngineStatus({})).toBe("unknown");
+  });
+
+  it("uses terminal busy=false without trusting a contradictory active status", () => {
+    expect(resolveServerEngineStatus({ busy: false, status: "running" })).toBe("idle");
+    expect(resolveServerEngineStatus({ busy: false, status: "completed" })).toBe("completed");
+    expect(resolveServerEngineStatus({ busy: false, status: "failed" })).toBe("error");
   });
 });

@@ -11,6 +11,7 @@ import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
 import {
+  classifyServerSessionActivity,
   flattenServerEvent,
   getKimiCodeSessionAlreadyExistsId,
   isKimiCodeSessionAlreadyExistsError,
@@ -141,6 +142,7 @@ export type KimiCodePromptPart =
 
 export type KimiCodeEngineStatus =
   | "idle"
+  | "unknown"
   | "running"
   | "waiting_approval"
   | "waiting_question"
@@ -2642,24 +2644,26 @@ function toServerQuestionAnswers(
   }));
 }
 
-function mapServerStatus(status: string): KimiCodeEngineStatus {
-  if (status === "running") return "running";
-  if (status === "awaiting_approval") return "waiting_approval";
-  if (status === "awaiting_question") return "waiting_question";
-  if (status === "aborted") return "interrupted";
-  return "idle";
-}
-
 /**
  * agent-core-v2 的权威运行信号是 busy：整个 prompt 期间（含 step 间隙）保持 true，
- * 且 v2 的 /status 响应不再携带 status 字符串字段。busy=true 一律视为 running，
- * 否则 v2 的缺失 status 会被 mapServerStatus 兜底成 idle，把仍在 step 间隙运行的
- * 会话误判为终态（头部闪"输出完成"、底部闪"已连接"）。busy 缺失（v1/旧 Server）
- * 时回退到 status 字符串映射。
+ * 且 v2 的 /status 响应不再携带 status 字符串字段。busy 缺失时回退到 v1 status；
+ * 缺失、畸形或未来状态保持 unknown，不能伪装成 idle/完成。
  */
-export function resolveServerEngineStatus(source: { status?: string; busy?: boolean }): KimiCodeEngineStatus {
-  if (source.busy === true) return "running";
-  return mapServerStatus(source.status ?? "");
+export function resolveServerEngineStatus(source: { status?: unknown; busy?: unknown }): KimiCodeEngineStatus {
+  const activity = classifyServerSessionActivity(source);
+  const status = typeof source.status === "string" ? source.status.trim().toLowerCase() : "";
+  if (activity === "active") {
+    if (status === "awaiting_approval") return "waiting_approval";
+    if (status === "awaiting_question") return "waiting_question";
+    return "running";
+  }
+  if (activity === "terminal") {
+    if (status === "aborted" || status === "interrupted" || status === "cancelled" || status === "canceled") return "interrupted";
+    if (status === "error" || status === "failed") return "error";
+    if (status === "completed") return "completed";
+    return "idle";
+  }
+  return "unknown";
 }
 
 function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSession {
