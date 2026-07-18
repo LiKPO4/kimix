@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-17 轮次内容混入（回放跨轮合并 placeholder）
+
+- 当前目标：修复会话回复"一轮夹杂多轮"——14:24 轮 placeholder 内容被旧轮回放 assistant 污染成摸底，与官方剧情回复（i=158）被 mergeAssistantProcessEvents 拼成一条显示。
+- 根因证据（CDP 直读 IndexedDB）：官方快照干净（14:24 后就是正确剧情回复，无"摸底"）；本地 events 中 14:24 轮有 i=131（placeholder，内容=摸底）与 i=158（剧情）两条 assistant。`mergeEvents` 的 assistant 合并只看"最后一个未完成 assistant"、不查轮次身份，snapshot 回放把旧轮摸底 append 进 placeholder 并标完成，官方剧情只能另立 i=158；上游 i=2 本身已是拼接体（"我先并行读取"+"已完成项目快速摸底"），导致 alreadyMounted 同文检查失效。
+- 修复：`reconcileRunningKimiSnapshot` 对早于当前轮的 assistant 不走 mergeEvents 合并、直接独立追加；alreadyMounted 对已完成 assistant 增加"本地内容已包含 canonical 干净版即跳过"。数据修复：CDP 删除被污染的 i=131（保留 i=158 剧情）。
+- 验证：新增 2 项回归（旧轮不合并到 placeholder/包含即跳过）；全量 103 文件 824 项通过；typecheck 通过。
+- 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验该会话 14:24 轮只剩剧情回复。
+- 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`。
+- 下一步：用户复验；与本轮一并提交后移除探针、同步知识库回放幂等不变量。
+
 ## 2026-07-17 会话回复被重复 user 消息淹没（snapshot 回放去重）
 
 - 当前目标：修复会话（session_8723c487）agent 回复全部"消失"——实际是被 66 条重复 user 消息挤出 28 项渲染窗口（官方仅 16 条 user）。

@@ -100,6 +100,11 @@ export function reconcileRunningKimiSnapshot(
         if (local.isComplete === event.isComplete &&
           local.content === event.content &&
           (local.thinking ?? "") === (event.thinking ?? "")) return true;
+        // A locally complete assistant that already contains the canonical body
+        // (e.g. a streamed opening followed by the same summary) must not let
+        // the replay re-append the clean copy elsewhere.
+        if (local.isComplete && event.isComplete && event.content.trim().length > 0 &&
+          local.content.includes(event.content)) return true;
         // 内容已被本地覆盖的 canonical 助手（同文不同完成态）同样视为已挂载，跳过合并。
         if (!local.isComplete) {
           const localText = normalizeText([local.thinking ?? "", local.content].filter(Boolean).join("\n"));
@@ -113,6 +118,13 @@ export function reconcileRunningKimiSnapshot(
       }
       return false;
     });
+    // Older-turn assistants must never go through mergeEvents: its streaming
+    // merge would append them into the current turn's open placeholder,
+    // polluting it with unrelated older content. They are appended as
+    // independent history entries instead.
+    if (!alreadyMounted && event.type === "assistant_message" && event.timestamp < lastLocalUserTs) {
+      return [...events, event];
+    }
     return alreadyMounted ? events : mergeEvents(events, event);
   }, [...localEvents]);
 }

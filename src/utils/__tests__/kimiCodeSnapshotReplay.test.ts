@@ -257,3 +257,41 @@ describe("reconcileRunningKimiSnapshot user replay dedup", () => {
     expect(result.filter((event) => event.type === "user_message")[0].id).toBe("local-user");
   });
 });
+
+describe("reconcileRunningKimiSnapshot cross-turn pollution guard", () => {
+  it("does not merge an older-turn assistant into the current turn placeholder", () => {
+    // The current turn has an open placeholder; the snapshot carries an older
+    // turn's completed assistant. mergeEvents would append it into the
+    // placeholder and replace its content — the exact "一轮夹杂多轮" pollution.
+    const live: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "第一个问题",
+    }, {
+      id: "assistant-old", type: "assistant_message", timestamp: 110, content: "旧回答", isThinking: false, isComplete: true,
+    }, {
+      id: "user-new", type: "user_message", timestamp: 1000, content: "新问题",
+    }, {
+      id: "placeholder", type: "assistant_message", timestamp: 1001, content: "", isThinking: false, isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:msg_old:assistant:0", type: "assistant_message", timestamp: 120, content: "另一段旧轮回复", isThinking: false, isComplete: true,
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const placeholder = result.find((event) => event.id === "placeholder");
+    expect(placeholder).toMatchObject({ content: "", isComplete: false });
+    const older = result.find((event) => event.id === "snapshot:msg_old:assistant:0");
+    expect(older).toBeDefined();
+  });
+
+  it("skips a clean replay body already contained in a locally complete assistant", () => {
+    const live: TimelineEvent[] = [{
+      id: "assistant-merged", type: "assistant_message", timestamp: 110,
+      content: "开场白。最终总结全文。", isThinking: false, isComplete: true,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:msg_a:assistant:0", type: "assistant_message", timestamp: 120,
+      content: "最终总结全文。", isThinking: false, isComplete: true,
+    }];
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(1);
+  });
+});
