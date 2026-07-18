@@ -8,7 +8,7 @@
 - 验证：新增排序回归（回放旧轮回到时间序位置）；typecheck 通过。
 - 阻塞：无；不推送、不打 tag、不发布。等待用户实机验收该会话重建后显示正确。
 - 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`。
-- 下一步：用户验收；提交后移除探针并同步知识库回放幂等/乱序不变量。
+- 下一步：用户验收；临时渲染探针已在后续 Review 修复中移除。
 
 ## 2026-07-17 轮次内容混入（回放跨轮合并 placeholder）
 
@@ -18,7 +18,7 @@
 - 验证：新增 2 项回归（旧轮不合并到 placeholder/包含即跳过）；全量 103 文件 824 项通过；typecheck 通过。
 - 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验该会话 14:24 轮只剩剧情回复。
 - 关键文件：`src/utils/kimiCodeSnapshotReplay.ts`。
-- 下一步：用户复验；与本轮一并提交后移除探针、同步知识库回放幂等不变量。
+- 下一步：用户复验；临时渲染探针已在后续 Review 修复中移除。
 
 ## 2026-07-17 会话回复被重复 user 消息淹没（snapshot 回放去重）
 
@@ -38,7 +38,7 @@
 - 验证：新增 useChatViewport 响应式跟随状态回归（pause/resume/会话切换）；全量 103 文件 816 项通过；typecheck 通过。
 - 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验启动置底与流式不跳。
 - 关键文件：`src/index.css`、`src/hooks/useChatViewport.ts`、`src/hooks/useChatViewport/useAutoFollow.ts`、`src/components/chat/ChatThread.tsx`。
-- 下一步：用户复验；视口与 busy 两批修复验收后移除探针并同步知识库（f7b5d13c 改写的 kimix.md 锚定不变量需按条件化结果再修订）。
+- 下一步：用户复验；临时渲染探针已在后续 Review 修复中移除，视口锚定不变量已按条件化结果同步。
 
 ## 2026-07-17 运行中闪"输出完成"根治（v2 busy 权威信号）
 
@@ -48,7 +48,7 @@
 - 验证：新增 resolveServerEngineStatus 三组回归（busy 优先/真结束/旧兼容）；typecheck 通过；全量回归见本行更新时的测试输出。
 - 阻塞：无；不推送、不打 tag、不发布。等待用户实机复验"不再闪输出完成"。
 - 关键文件：`electron/kimiCodeHost.ts`、`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerHost.test.ts`。
-- 下一步：用户复验后移除 footerRenderDivergence 探针并同步知识库运行不变量。
+- 下一步：用户复验；`footerRenderDivergence` 临时探针已在后续 Review 修复中移除。
 
 ## 2026-07-17 提前"输出完成"与消息头消失根治（渲染派生层）
 

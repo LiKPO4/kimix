@@ -30,8 +30,6 @@ import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, To
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 import { getPrimaryRoomAgent, getRoomAgentEvents } from "@/utils/collaborationRooms";
-import { roomHasExecutingAgentWork } from "@/utils/sessionArchive";
-import { isSessionRuntimeTracked } from "@/utils/sessionActivity";
 
 type PermissionModeDiagDetail = {
   traceId?: string;
@@ -638,17 +636,6 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
-// TEMP PROBE (v2.16.46): buildRenderItems writes the latest turn's decision
-// vector here (ungated); the component-level effect reads it and logs once per
-// distinct divergence. Remove together with the probe effect.
-const turnSettledProbeSeen = new Set<string>();
-let latestTurnProbeSlot: Record<string, unknown> | null = null;
-function readLatestTurnProbeSlot(): Record<string, unknown> | null {
-  const slot = latestTurnProbeSlot;
-  latestTurnProbeSlot = null;
-  return slot;
-}
-
 export function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
@@ -777,36 +764,6 @@ export function buildRenderItems(
           ? { ...mergedAssistantEvent, isComplete: false }
           : mergedAssistantEvent
       : undefined;
-    // TEMP PROBE (v2.16.46): record the latest turn's full decision vector into
-    // a module-level slot, WITHOUT gating on any running signal (the previous
-    // probe gated itself on isSessionRunning, the very flag suspected of being
-    // wrong, so it never fired). The component-level effect reads this slot and
-    // logs once when it detects the header/footer divergence, using the footer's
-    // own running predicate as the independent reference.
-    if (isLatestTurn) {
-      latestTurnProbeSlot = {
-        isSessionRunning,
-        isPrimaryRoomAgentTurn,
-        roomAgentId: roomAgentId ?? null,
-        primaryRoomAgentId: primaryRoomAgentId ?? null,
-        roomAgentIdMatchesPrimary: roomAgentId === primaryRoomAgentId,
-        agentTurnId: agentTurnId ?? null,
-        roomMessageId: roomMessageId ?? null,
-        activeRoomAgentTurnMatched: Boolean(activeRoomAgentTurn),
-        activeTurnIdOnActivity: activeRoomAgentTurn?.activeTurnId ?? null,
-        activityStatus: activeRoomAgentTurn?.status ?? null,
-        hasCompletedAssistantOutput,
-        isRuntimeAwaitingTurnOutput,
-        isTurnActive,
-        turnSettled,
-        hasOpenAssistant: assistantEvents.some((event) => !event.isComplete),
-        assistantCount: assistantEvents.length,
-        mergedIsComplete: mergedAssistantEvent?.isComplete ?? null,
-        renderAssistantIsComplete: renderAssistantEvent?.isComplete ?? null,
-        renderAssistantIsUndefined: !renderAssistantEvent,
-        runningToolCount: tools.filter((event) => event.status === "running").length,
-      };
-    }
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
     const trailingStatusEvents = turnSettled
@@ -1224,66 +1181,6 @@ export const ChatThread = memo(function ChatThread() {
     ),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, sessionRoomAgentActivities, primaryRoomAgentId]
   );
-  // TEMP PROBE (v2.16.45): the footer and the render layer use two independent
-  // "is running" signals. Capture, at the component level, the moment the footer
-  // says running while the render layer's latest turn is settled or headerless.
-  // This is NOT gated on the render-layer running signal, so it fires even when
-  // that signal is the one that (wrongly) went false.
-  useEffect(() => {
-    if (!session) return;
-    const footerRunning = session.collaboration
-      ? roomHasExecutingAgentWork(session, sessionRoomAgentActivities)
-      : isSessionRuntimeTracked(session, runningSessionId);
-    // Find the latest user render item and whatever assistant follows it.
-    let lastUserIndex = -1;
-    for (let i = renderItems.length - 1; i >= 0; i--) {
-      const item = renderItems[i];
-      if (item.type === "event" && item.event.type === "user_message") { lastUserIndex = i; break; }
-    }
-    const tail = lastUserIndex >= 0 ? renderItems.slice(lastUserIndex + 1) : renderItems;
-    const latestAssistant = tail.find((item) => item.type === "event" && item.event.type === "assistant_message");
-    const latestAssistantActive = latestAssistant?.type === "event" ? Boolean(latestAssistant.isAssistantActive) : false;
-    const latestAssistantComplete = latestAssistant?.type === "event" && latestAssistant.event.type === "assistant_message"
-      ? latestAssistant.event.isComplete
-      : null;
-    const headerless = !latestAssistant;
-    const settledWhileFooterRunning = footerRunning && Boolean(latestAssistant) && !latestAssistantActive;
-    if (footerRunning && (headerless || settledWhileFooterRunning)) {
-      const signature = [
-        session.id,
-        latestAssistant?.type === "event" ? latestAssistant.event.id : "none",
-        headerless ? "headerless" : "settled",
-      ].join("|");
-      if (!turnSettledProbeSeen.has(signature)) {
-        turnSettledProbeSeen.add(signature);
-        const deliveries = session.collaboration
-          ? session.collaboration.messages.flatMap((message) => Object.values(message.deliveries).map((d) => d.status))
-          : [];
-        logEvent("footerRenderDivergence.probe", {
-          problem: headerless ? "P1-headerless" : "P2-settled-while-footer-running",
-          sessionId: session.id,
-          engine: session.engine ?? null,
-          isCollaboration: Boolean(session.collaboration),
-          footerRunning,
-          hasActiveTurn,
-          runningSessionId: runningSessionId ?? null,
-          runtimeSessionId: runtimeSessionId ?? null,
-          primaryRoomAgentId: primaryRoomAgentId ?? null,
-          activityCount: sessionRoomAgentActivities.length,
-          activityStatuses: sessionRoomAgentActivities.map((a) => a.status),
-          activityTurnIds: sessionRoomAgentActivities.map((a) => a.activeTurnId ?? null),
-          deliveryStatuses: deliveries,
-          latestAssistantId: latestAssistant?.type === "event" ? latestAssistant.event.id : null,
-          latestAssistantActive,
-          latestAssistantComplete,
-          headerless,
-          // Render-layer internal decision vector for the latest turn, captured
-          // inside buildRenderItems this same render.
-          renderLayer: readLatestTurnProbeSlot(),
-        });
-      }
-    }
-  }, [renderItems, session, sessionRoomAgentActivities, hasActiveTurn, runningSessionId, runtimeSessionId, primaryRoomAgentId]);
   const surfacedSubagentContentKeysRef = useRef(new Set<string>());
   useEffect(() => {
     if (!session) return;
