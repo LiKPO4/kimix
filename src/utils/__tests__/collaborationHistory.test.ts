@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RoomAgent, Session, TimelineEvent } from "@/types/ui";
 import { createCollaborationStateFromSession } from "../collaborationRooms";
-import { reconcileAgentCanonicalHistory } from "../collaborationHistory";
+import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "../collaborationHistory";
+import { KIMI_HISTORY_CACHE_VERSION } from "../kimiHistoryCache";
 import { projectCollaborationTimeline } from "../collaborationTimeline";
 
 function room(): { session: Session; primaryId: string; secondaryId: string } {
@@ -54,6 +55,32 @@ function room(): { session: Session; primaryId: string; secondaryId: string } {
 }
 
 describe("reconcileAgentCanonicalHistory", () => {
+  it("does not mark an unaccepted canonical candidate as a migrated cache", () => {
+    const current = room();
+    current.session.collaboration!.agents[0].kimiHistoryCacheVersion = KIMI_HISTORY_CACHE_VERSION - 1;
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [{ id: "canonical", type: "user_message", timestamp: 20, content: "Canonical" }],
+      reason: "startup",
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.session.collaboration?.agents.find((agent) => agent.id === current.primaryId)?.kimiHistoryCacheVersion)
+      .toBe(KIMI_HISTORY_CACHE_VERSION - 1);
+  });
+
+  it("marks only the adopted Agent cache as current", () => {
+    const current = room();
+    const marked = markAgentKimiHistoryCacheCurrent(current.session, current.primaryId);
+
+    expect(marked.collaboration?.agents.find((agent) => agent.id === current.primaryId)?.kimiHistoryCacheVersion)
+      .toBe(KIMI_HISTORY_CACHE_VERSION);
+    expect(marked.collaboration?.agents.find((agent) => agent.id === current.secondaryId)?.kimiHistoryCacheVersion)
+      .toBeUndefined();
+  });
+
   it("lets an authoritative undo shorten only one Agent history", () => {
     const current = room();
     const result = reconcileAgentCanonicalHistory({

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
 import * as reportError from "@/utils/reportError";
-import { shouldReplaceWithCanonicalKimiHistory } from "../kimiHistoryReconciliation";
+import { hasEquivalentKimiHistoryTurnBodies, shouldReplaceWithCanonicalKimiHistory } from "../kimiHistoryReconciliation";
 
 const userMessage: TimelineEvent = {
   id: "user-1",
@@ -51,6 +51,41 @@ beforeEach(() => {
 });
 
 describe("shouldReplaceWithCanonicalKimiHistory", () => {
+  it("certifies a clean turn-equivalent cache without requiring replacement", () => {
+    const cached: TimelineEvent[] = [{
+      id: "local-user", type: "user_message", timestamp: 100, content: "  同一个问题 ",
+    }, assistant("同一个回答", { id: "local-answer" })];
+    const canonical: TimelineEvent[] = [{
+      id: "official-user", type: "user_message", timestamp: 200, content: "同一个问题",
+    }, assistant("同一个回答", {
+      id: "official-answer",
+      snapshotMessageId: "msg-answer",
+      snapshotMessageIdStable: true,
+    })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical)).toBe(false);
+    expect(hasEquivalentKimiHistoryTurnBodies(cached, canonical)).toBe(true);
+  });
+
+  it("does not certify equal global text mounted beneath different user boundaries", () => {
+    const first = "第一轮正式回答正文。";
+    const second = "第二轮正式回答正文。";
+    const cached: TimelineEvent[] = [
+      { id: "local-user-1", type: "user_message", timestamp: 100, content: "问题一" },
+      { id: "local-user-2", type: "user_message", timestamp: 200, content: "问题二" },
+      assistant(first, { id: "local-answer-1" }),
+      assistant(second, { id: "local-answer-2" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { id: "official-user-1", type: "user_message", timestamp: 100, content: "问题一" },
+      assistant(first, { id: "official-answer-1" }),
+      { id: "official-user-2", type: "user_message", timestamp: 200, content: "问题二" },
+      assistant(second, { id: "official-answer-2" }),
+    ];
+
+    expect(hasEquivalentKimiHistoryTurnBodies(cached, canonical)).toBe(false);
+  });
+
   it("replaces when canonical has more assistant body text", () => {
     const local = [userMessage, assistant("short")];
     const canonical = [userMessage, assistant("much longer body text here")];
@@ -118,6 +153,37 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     }, assistant(currentAnswer, {
       id: "official-current",
       timestamp: 1_100,
+      snapshotMessageId: "msg-current",
+      snapshotMessageIdStable: true,
+    })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+  });
+
+  it("repairs multiple cached assistant rows from different canonical turns under one user boundary", () => {
+    const oldAnswer = "这是上一轮已经完成的正式回答，长度足以排除短语偶然重合。";
+    const currentAnswer = "这是当前这一轮的正式回答，应该单独显示在当前消息气泡中。";
+    const local: TimelineEvent[] = [{
+      id: "local-user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, assistant(oldAnswer, { id: "local-old", timestamp: 200 }), {
+      id: "local-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant(currentAnswer, {
+      id: "local-current",
+      timestamp: 1_100,
+    }), assistant(oldAnswer, {
+      id: "identity-less-replayed-old",
+      timestamp: 1_101,
+    })];
+    const canonical: TimelineEvent[] = [{
+      id: "official-user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, assistant(oldAnswer, {
+      id: "official-old",
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+    }), {
+      id: "official-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant(currentAnswer, {
+      id: "official-current",
       snapshotMessageId: "msg-current",
       snapshotMessageIdStable: true,
     })];

@@ -68,6 +68,54 @@ function normalizedUserTurnContent(content: string): string {
   return content.trim().replace(/\s+/g, " ");
 }
 
+type KimiHistoryTurnBody = {
+  type: "user_message" | "steer_message";
+  user: string;
+  assistant: string;
+};
+
+function kimiHistoryTurnBodies(events: TimelineEvent[]): KimiHistoryTurnBody[] {
+  const turns: KimiHistoryTurnBody[] = [];
+  for (const event of events) {
+    if (event.type === "user_message" || event.type === "steer_message") {
+      turns.push({
+        type: event.type,
+        user: normalizedUserTurnContent(event.content),
+        assistant: "",
+      });
+      continue;
+    }
+    if (event.type !== "assistant_message" || turns.length === 0) continue;
+    const body = event.content.trim();
+    if (!body) continue;
+    const current = turns[turns.length - 1];
+    current.assistant = normalizedUserTurnContent(
+      current.assistant ? `${current.assistant}\n\n${body}` : body,
+    );
+  }
+  return turns;
+}
+
+/**
+ * A successful official load can certify an old cache without replacing its
+ * richer local tool/process frames when every visible user boundary and its
+ * aggregate Assistant body are already identical.
+ */
+export function hasEquivalentKimiHistoryTurnBodies(
+  cachedEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): boolean {
+  const cachedTurns = kimiHistoryTurnBodies(cachedEvents);
+  const canonicalTurns = kimiHistoryTurnBodies(canonicalEvents);
+  if (cachedTurns.length === 0 || cachedTurns.length !== canonicalTurns.length) return false;
+  return cachedTurns.every((turn, index) => {
+    const canonical = canonicalTurns[index];
+    return turn.type === canonical.type &&
+      turn.user === canonical.user &&
+      turn.assistant === canonical.assistant;
+  });
+}
+
 function stableSnapshotAssistantTurnOwners(events: TimelineEvent[]): Map<string, Set<string>> {
   const owners = new Map<string, Set<string>>();
   let currentUserContent = "";
@@ -150,12 +198,40 @@ function mergedIntervalCoverage(intervals: Array<{ start: number; end: number }>
   return total + currentEnd - currentStart;
 }
 
+function bodyHasCrossTurnCanonicalReplyComposition(
+  localBody: string,
+  currentUserContent: string,
+  canonicalReplies: CanonicalAssistantReply[],
+): boolean {
+  if (localBody.length < MIN_CANONICAL_REPLY_MATCH_LENGTH * 2) return false;
+  const matches = canonicalReplies.flatMap((reply) => {
+    const intervals: Array<CanonicalAssistantReply & { start: number; end: number }> = [];
+    let start = localBody.indexOf(reply.body);
+    while (start >= 0) {
+      intervals.push({ ...reply, start, end: start + reply.body.length });
+      start = localBody.indexOf(reply.body, start + 1);
+    }
+    return intervals;
+  });
+  const sameTurnMatches = matches.filter((match) => match.owner === currentUserContent);
+  const foreignTurnMatches = matches.filter((match) => match.owner !== currentUserContent);
+  const hasDisjointCrossTurnPair = sameTurnMatches.some((sameTurn) => foreignTurnMatches.some((foreignTurn) => (
+    sameTurn.end <= foreignTurn.start || foreignTurn.end <= sameTurn.start
+  )));
+  if (!hasDisjointCrossTurnPair) return false;
+
+  const coveredLength = mergedIntervalCoverage(matches);
+  return coveredLength / localBody.length >= MIN_CROSS_TURN_REPLY_COVERAGE;
+}
+
 /**
  * Older caches can contain no trustworthy snapshot id at all. Accept a
- * shorter canonical history only when one local Assistant row is almost
- * entirely composed of complete, identity-backed canonical replies owned by
- * this user turn and by another user turn. Requiring disjoint matches and high
- * coverage avoids treating ordinary quoted text as cross-turn pollution.
+ * shorter canonical history only when one local user turn is almost entirely
+ * composed of complete, identity-backed canonical replies owned by this turn
+ * and by another turn. The local reply can be split across several Assistant
+ * rows because the renderer merges every row between two user boundaries.
+ * Requiring disjoint matches and high coverage avoids treating ordinary quoted
+ * text as cross-turn pollution.
  */
 function hasCrossTurnCanonicalReplyComposition(
   cachedEvents: TimelineEvent[],
@@ -171,35 +247,28 @@ function hasCrossTurnCanonicalReplyComposition(
   const unambiguousReplies = canonicalReplies.filter((reply) => bodyOwners.get(reply.body)?.size === 1);
 
   let currentUserContent = "";
+  let currentTurnBodies: string[] = [];
+  const flushCurrentTurn = () => {
+    if (!currentUserContent || currentTurnBodies.length === 0) return false;
+    const localBody = normalizedUserTurnContent(currentTurnBodies.join("\n\n"));
+    return bodyHasCrossTurnCanonicalReplyComposition(
+      localBody,
+      currentUserContent,
+      unambiguousReplies,
+    );
+  };
   for (const event of cachedEvents) {
     if (event.type === "user_message" || event.type === "steer_message") {
+      if (flushCurrentTurn()) return true;
       currentUserContent = normalizedUserTurnContent(event.content);
+      currentTurnBodies = [];
       continue;
     }
     if (event.type !== "assistant_message" || !currentUserContent) continue;
-    const localBody = normalizedUserTurnContent(event.content);
-    if (localBody.length < MIN_CANONICAL_REPLY_MATCH_LENGTH * 2) continue;
-
-    const matches = unambiguousReplies.flatMap((reply) => {
-      const intervals: Array<CanonicalAssistantReply & { start: number; end: number }> = [];
-      let start = localBody.indexOf(reply.body);
-      while (start >= 0) {
-        intervals.push({ ...reply, start, end: start + reply.body.length });
-        start = localBody.indexOf(reply.body, start + 1);
-      }
-      return intervals;
-    });
-    const sameTurnMatches = matches.filter((match) => match.owner === currentUserContent);
-    const foreignTurnMatches = matches.filter((match) => match.owner !== currentUserContent);
-    const hasDisjointCrossTurnPair = sameTurnMatches.some((sameTurn) => foreignTurnMatches.some((foreignTurn) => (
-      sameTurn.end <= foreignTurn.start || foreignTurn.end <= sameTurn.start
-    )));
-    if (!hasDisjointCrossTurnPair) continue;
-
-    const coveredLength = mergedIntervalCoverage(matches);
-    if (coveredLength / localBody.length >= MIN_CROSS_TURN_REPLY_COVERAGE) return true;
+    const body = event.content.trim();
+    if (body) currentTurnBodies.push(body);
   }
-  return false;
+  return flushCurrentTurn();
 }
 
 export function hasPossiblyLostUserImages(events: TimelineEvent[]): boolean {

@@ -32,7 +32,7 @@ import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { getPrimaryRoomAgent, getRoomAgent, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
-import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
+import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import {
   appendRoomAgentSteerEvent,
   getRoomAgentControlTargets,
@@ -2580,7 +2580,9 @@ export function Composer() {
               canonicalEvents: mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []),
               reason: "undo",
             });
-            return reconciliation.applied ? reconciliation.session : session;
+            return reconciliation.applied
+              ? markAgentKimiHistoryCacheCurrent(reconciliation.session, runtime.roomAgentId)
+              : session;
           });
           syncCurrentSessionFromStore(runtime.uiSessionId);
         }

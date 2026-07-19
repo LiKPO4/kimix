@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Cache v8 repairs cross-row turn composition and certifies only adopted or turn-equivalent history**: Cross-turn proof aggregates every Assistant row under one user boundary because the renderer presents that partition as one bubble; successful official loads may certify an unchanged local projection while retaining richer tool frames, but rejected non-equivalent candidates keep their stale cache version and remain eligible for repair on the next hydration. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
+
 ## 2026-07-19
 
 * **Session-open scrolling starts when the viewport exists**: Official-history placeholders cannot prime a null scroll ref; readiness re-runs bottom settlement and observer attachment after the real node mounts, while ordinary wheel/touch input leaves the bounded initial-tail DOM unchanged. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md) and [/project/kimix.md](/project/kimix.md).

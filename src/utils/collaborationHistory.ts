@@ -35,6 +35,17 @@ export interface ReconcileAgentCanonicalHistoryResult {
   discardedReason?: "agent-missing" | "runtime-changed";
 }
 
+/** Mark a Kimi history cache current only after its caller adopts canonical events. */
+export function markAgentKimiHistoryCacheCurrent(session: Session, roomAgentId: string): Session {
+  if (session.collaboration) {
+    return updateRoomAgent(session, roomAgentId, (current) => ({
+      ...current,
+      kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+    }));
+  }
+  return { ...session, kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION };
+}
+
 function runtimeIdentityMatches(session: Session, roomAgentId: string, expectedRuntimeSessionId?: string): boolean {
   if (!expectedRuntimeSessionId) return true;
   const agent = getRoomAgent(session, roomAgentId);
@@ -221,13 +232,11 @@ export function reconcileAgentCanonicalHistory({
     next = updateRoomAgent(next, roomAgentId, (current) => ({
       ...current,
       modelAlias: model ?? current.modelAlias,
-      kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
     }));
   } else {
     next = {
       ...next,
       model: model ?? next.model,
-      kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
     };
   }
   return {

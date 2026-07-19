@@ -12,7 +12,8 @@ import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { compareSessionsByRecentConversation, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
-import { hasCanonicalKimiThinkingHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { reportError } from "@/utils/reportError";
@@ -668,16 +669,20 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       return;
     }
     updateSession(session.id, (current) => {
-      const hydratedEvents = !hasConversation ||
-        hasRicherKimiProcessHistory(current.events, events) ||
-        hasCanonicalKimiThinkingHistory(current.events, events)
-        ? events
-        : current.events;
+      const currentHasConversation = current.events.some((event) => (
+        event.type === "user_message" || event.type === "assistant_message"
+      ));
+      const canonicalAdopted = !currentHasConversation || shouldReplaceWithCanonicalKimiHistory(
+        current.events,
+        events,
+        { sessionId: session.id, reason: "sidebar-select" },
+      );
+      const hydratedEvents = canonicalAdopted ? events : current.events;
       return {
         ...current,
         events: hydratedEvents,
         model: getLastUsedModelFromEvents(hydratedEvents) ?? current.model,
-        kimiHistoryCacheVersion: KIMI_HISTORY_CACHE_VERSION,
+        kimiHistoryCacheVersion: canonicalAdopted ? KIMI_HISTORY_CACHE_VERSION : current.kimiHistoryCacheVersion,
         title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
           hydratedEvents,
           current.title,

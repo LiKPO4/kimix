@@ -29,7 +29,7 @@ import {
   scopeEventToRoomAgent,
   updateRoomAgentEvents,
 } from "@/utils/collaborationRooms";
-import { reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
+import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 import { isRoomDeliveryWaitingBehindAgentWork } from "@/utils/roomDelivery";
 import {
@@ -454,7 +454,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
           if (!reconciliation.applied) {
             throw new Error("官方撤回完成后会话运行时已变化，请重新打开会话确认历史。");
           }
-          return reconciliation.session;
+          return markAgentKimiHistoryCacheCurrent(reconciliation.session, roomAgentId);
         });
       } else {
         const withdrawnAt = Date.now();

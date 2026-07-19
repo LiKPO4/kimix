@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.54 多行跨轮回复合并根治
+
+- 当前目标：根治多个旧 Agent 回复被并入当前一轮的严重回归，同时保留 v2.16.53 已稳定的首会话滚动行为。
+- 根因证据：目标官方会话与重载后的 store 均为 82 条正确分轮事件，当前官方 Assistant 正文不含截图中的旧回复；`diag.log` 在 10:03 明确记录 `assistant-body-regression`，本地 36204 字符、canonical 22422 字符，证明旧 v7 门禁拒绝了正确的较短官方历史。污染形态是同一用户边界内存在多个无稳定身份的 Assistant 行，渲染层按边界合成一条；v7 只检查单行，未识别跨行组合。更底层的问题是 canonical 候选尚未被调用方采用，`reconcileAgentCanonicalHistory` 就把缓存标为当前版本，使污染缓存失去下次启动自愈机会。
+- 修复：跨轮组合证明改为聚合一个用户轮次内的全部 Assistant 正文，再要求当前轮和外轮的稳定官方完整回复具有不重叠区间并覆盖至少 80%；单行与多行污染共用同一保守规则。缓存版本升至 8；canonical reconciliation 只构造候选，只有入口明确采用 canonical，或成功加载的官方快照与本地“用户边界 + 聚合 Assistant 正文”逐轮完全等价时，才标记当前版本；真正拒绝候选时保留旧版本并在下次入口继续重试。未改动滚动链路。
+- 验证：新增三类先失败后通过的回归：多 Assistant 行跨轮组合修复、未采用候选不升级缓存、逐轮等价与跨边界不等价判定；定向 3 文件 52 项、全量 104 文件 859 项通过；`pnpm build` 通过，renderer 为 `assets/index-CrEyTWyq.js`。CDP 对目标会话核验本地/官方均为 82 事件、13 个用户轮次，逐轮投影完全等价且首个差异为 -1；干净重启后 session 与 primary Agent 均从 cache v7 升到 v8，当前边界只有 `user_message + assistant_message`、Assistant 数量 1、正文 184 字符，未包含已知旧轮回复。
+- 阻塞：无；代码与数据链路已验证，视觉最终验收仍由用户在 v2.16.54 窗口确认。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/utils/collaborationHistory.ts`、`src/App.tsx`、`src/components/layout/Sidebar.tsx`、`src/utils/kimiHistoryCache.ts`。
+- 下一步：完成知识校验并提交；用户在已启动的 v2.16.54 窗口复验原截图位置及新发一轮消息。
+
 ## 2026-07-19 v2.16.53 跨轮缓存污染与首会话轻滚大跳
 
 - 当前目标：根治旧回复被塞进新一轮，以及首个自动打开会话轻滚即大幅上跳。
