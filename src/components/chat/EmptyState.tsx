@@ -224,6 +224,7 @@ export function EmptyState() {
         sessionId: runtimeSessionId,
         content: text,
         images: [],
+        model: targetSession?.switchedToModel ?? targetSession?.model ?? undefined,
       });
       if (!sendRes.success) throw new Error(sendRes.error);
       updateLinkStatus(kimiCodeRouteStatus(sendRes.data.route), "success");

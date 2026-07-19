@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Current session models no longer come from historical turns**: Official profile/status repairs stale local model mirrors, event models remain turn-scoped, each prompt carries the visible pending-or-committed selection immutably, and revision-gated status refreshes cannot expose an older model across a switch. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Prompt completion now waits for its authoritative Assistant delivery**: The Server Client replays the bounded official prompt messages before exposing `prompt.completed`, so an ultra-fast turn cannot lose its first response and wait for the next prompt's running snapshot to repair it. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Third-party models now share Provider-owned connections**: Settings groups existing aliases under Provider records, saves credentials once, keeps model deletion separate from Provider deletion, and preserves official managed Providers as read-only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

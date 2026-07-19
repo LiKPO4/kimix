@@ -111,6 +111,29 @@ describe("reconcileAgentCanonicalHistory", () => {
     expect(result.session).toBe(current.session);
   });
 
+  it("does not let running history replay roll the selected session model backward", () => {
+    const current = room();
+    current.session.collaboration!.agents[0].modelAlias = "opencode-go/deepseek-v4-pro";
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [{
+        id: "assistant-old-model",
+        type: "assistant_message",
+        timestamp: 20,
+        content: "Done",
+        model: "opencode-go/deepseek-v4-flash",
+        isThinking: false,
+        isComplete: true,
+      }],
+      reason: "running-sample",
+    });
+
+    expect(result.session.collaboration?.agents[0].modelAlias)
+      .toBe("opencode-go/deepseek-v4-pro");
+  });
+
   it("scopes repaired canonical events to the target Agent", () => {
     const current = room();
     const result = reconcileAgentCanonicalHistory({

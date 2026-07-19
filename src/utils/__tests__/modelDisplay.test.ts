@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getLastUsedModelFromEventsAfter, getSessionModelForDisplay, resolveResumedSessionModel } from "../modelDisplay";
+import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getLastUsedModelFromEventsAfter, getSessionModelForDisplay, resolveAuthoritativeSessionModel, resolveResumedSessionModel } from "../modelDisplay";
 
 describe("modelDisplay", () => {
   it("shows only the segment after the final slash", () => {
@@ -42,11 +42,32 @@ describe("modelDisplay", () => {
     expect(getLastUsedModelFromEvents(events)).toBeNull();
   });
 
-  it("prefers the last actual history model over stale session metadata", () => {
+  it("keeps the authoritative session model even when a later replay carries an older turn model", () => {
     expect(getSessionModelForDisplay({
-      sessionModel: "kimi-for-coding",
+      sessionModel: "deepseek-v4-pro",
+      events: [{ type: "assistant_message", timestamp: 100, model: "deepseek-v4-flash" }],
+    })).toBe("deepseek-v4-pro");
+  });
+
+  it("falls back to the latest turn model only when the session has no authoritative model", () => {
+    expect(getSessionModelForDisplay({
       events: [{ type: "assistant_message", timestamp: 100, model: "deepseek-v4-flash" }],
     })).toBe("deepseek-v4-flash");
+  });
+
+  it("uses the official runtime profile to repair stale local and history models", () => {
+    expect(resolveAuthoritativeSessionModel({
+      runtimeModel: "opencode-go/deepseek-v4-pro",
+      sessionModel: "opencode-go/deepseek-v4-flash",
+      historyModel: "opencode-go/deepseek-v4-flash",
+    })).toBe("opencode-go/deepseek-v4-pro");
+  });
+
+  it("uses local session state before historical turn metadata when runtime status is unavailable", () => {
+    expect(resolveAuthoritativeSessionModel({
+      sessionModel: "opencode-go/deepseek-v4-pro",
+      historyModel: "opencode-go/deepseek-v4-flash",
+    })).toBe("opencode-go/deepseek-v4-pro");
   });
 
   it("keeps a pending manual model switch visible until a new assistant confirms it", () => {
@@ -73,7 +94,16 @@ describe("modelDisplay", () => {
     expect(resolveResumedSessionModel({
       resumedModel: "old-model",
       sessionModel: "new-model",
+      switchedToModel: "new-model",
       modelSwitchedAt: 200,
     })).toBe("new-model");
+  });
+
+  it("uses the resumed official model when only an old switch timestamp remains", () => {
+    expect(resolveResumedSessionModel({
+      resumedModel: "opencode-go/deepseek-v4-pro",
+      sessionModel: "opencode-go/deepseek-v4-flash",
+      modelSwitchedAt: 200,
+    })).toBe("opencode-go/deepseek-v4-pro");
   });
 });

@@ -559,6 +559,8 @@ type ServerManagedSession = {
   workDir: string;
   status: KimiCodeEngineStatus;
   model?: string;
+  modelRevision: number;
+  modelMutation?: Promise<void>;
   thinking?: string;
   permission: KimiCodePermissionMode;
   planMode: boolean;
@@ -917,11 +919,24 @@ async function migrateServerSessionToSdk(
 }
 
 export async function setModel(sessionId: string, model: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    if (serverManaged.model === model) return;
-    await getServerClient().updateSession(sessionId, { model });
-    serverManaged.model = model;
+    const previous = serverManaged.modelMutation ?? Promise.resolve();
+    const mutation = previous
+      .catch(() => undefined)
+      .then(async () => {
+        if (serverManaged.model === model) return;
+        serverManaged.modelRevision += 1;
+        await getServerClient().updateSession(sessionId, { model });
+        serverManaged.model = model;
+      });
+    serverManaged.modelMutation = mutation;
+    try {
+      await mutation;
+    } finally {
+      if (serverManaged.modelMutation === mutation) serverManaged.modelMutation = undefined;
+    }
     return;
   }
   const managed = getManagedSession(sessionId);
@@ -1002,19 +1017,51 @@ async function ensureModelOutputLimitBeforePrompt(model: string | undefined): Pr
   }
 }
 
-export async function sendPrompt(sessionId: string, input: string | KimiCodePromptPart[]): Promise<KimiCodePromptRouteResult> {
+export function resolvePromptModel(expectedModel: string | undefined, managedModel: string | undefined): string | undefined {
+  return expectedModel?.trim() || managedModel?.trim() || undefined;
+}
+
+export function shouldApplyServerModelRefresh(
+  refreshRevision: number,
+  currentRevision: number,
+  modelMutationPending: boolean,
+): boolean {
+  return refreshRevision === currentRevision && !modelMutationPending;
+}
+
+export function resolveServerModelRefresh(
+  statusModel: string | undefined,
+  managedModel: string | undefined,
+  applyStatusModel: boolean,
+  modelMutationPending: boolean,
+): string | undefined {
+  if (applyStatusModel) return statusModel?.trim() || managedModel?.trim() || undefined;
+  if (modelMutationPending) return undefined;
+  return managedModel?.trim() || undefined;
+}
+
+export async function sendPrompt(
+  sessionId: string,
+  input: string | KimiCodePromptPart[],
+  expectedModel?: string,
+): Promise<KimiCodePromptRouteResult> {
   sessionId = resolveMigratedSessionId(sessionId);
   let serverManaged = serverSessions.get(sessionId);
   if (!serverManaged && !sessions.has(sessionId)) {
     await resumeSession(sessionId);
     serverManaged = serverSessions.get(sessionId);
   }
-  await ensureModelOutputLimitBeforePrompt(serverManaged?.model ?? sessions.get(sessionId)?.model);
+  const promptModel = resolvePromptModel(expectedModel, serverManaged?.model ?? sessions.get(sessionId)?.model);
+  if (promptModel && promptModel !== (serverManaged?.model ?? sessions.get(sessionId)?.model)) {
+    await setModel(sessionId, promptModel);
+    serverManaged = serverSessions.get(sessionId);
+  }
+  await ensureModelOutputLimitBeforePrompt(promptModel);
   serverManaged ??= sdkPinnedSessionIds.has(sessionId) ? undefined : await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
     try {
-      await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
+      await getServerClient().prompt(sessionId, input, serverControls(serverManaged, promptModel));
       return { route: "server" };
     } catch (error) {
       console.warn("[KimiCodeServerHost] prompt failed mid-turn; error will propagate to caller without fallback:", error);
@@ -2435,6 +2482,7 @@ async function registerServerSession(
     workDir,
     status: resolveServerEngineStatus(session),
     model: typeof config.model === "string" ? config.model : options.model,
+    modelRevision: 0,
     thinking: typeof config.thinking === "string" ? config.thinking : options.thinking,
     permission: config.permission_mode === "auto" || config.permission_mode === "yolo"
       ? config.permission_mode
@@ -2558,16 +2606,34 @@ function handleServerFrame(frame: ServerFrame) {
 async function refreshServerSessionStatus(sessionId: string, emitEvent: boolean): Promise<ServerSessionStatus> {
   const managed = serverSessions.get(sessionId);
   if (!managed) throw new Error(`Kimi Server session is not active: ${sessionId}`);
+  const modelRevision = managed.modelRevision;
   const status = await getServerClient().getSessionStatus(sessionId);
-  if (status.model) managed.model = status.model;
+  const modelMutationPending = Boolean(managed.modelMutation);
+  const applyStatusModel = shouldApplyServerModelRefresh(
+    modelRevision,
+    managed.modelRevision,
+    modelMutationPending,
+  );
+  if (status.model && applyStatusModel) {
+    managed.model = status.model;
+  }
+  const effectiveStatus = {
+    ...status,
+    model: resolveServerModelRefresh(
+      status.model,
+      managed.model,
+      applyStatusModel,
+      modelMutationPending,
+    ),
+  };
   managed.thinking = status.thinking_level;
   if (status.permission === "manual" || status.permission === "auto" || status.permission === "yolo") {
     managed.permission = status.permission;
   }
   managed.planMode = status.plan_mode;
   managed.swarmMode = status.swarm_mode;
-  if (emitEvent) eventSink?.({ sessionId, event: serverStatusToAgentEvent(status) });
-  return status;
+  if (emitEvent) eventSink?.({ sessionId, event: serverStatusToAgentEvent(effectiveStatus) });
+  return effectiveStatus;
 }
 
 export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<string, unknown> {
@@ -2607,9 +2673,9 @@ function emitServerError(sessionId: string, error: unknown) {
   eventSink?.({ sessionId, event: { type: "error", message } });
 }
 
-function serverControls(managed: ServerManagedSession): Record<string, unknown> {
+function serverControls(managed: ServerManagedSession, promptModel?: string): Record<string, unknown> {
   return {
-    model: managed.model ?? "kimi-code/kimi-for-coding",
+    model: resolvePromptModel(promptModel, managed.model) ?? "kimi-code/kimi-for-coding",
     thinking: managed.thinking,
     permission_mode: managed.permission,
     plan_mode: managed.planMode,

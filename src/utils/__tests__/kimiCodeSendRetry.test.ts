@@ -48,6 +48,7 @@ describe("kimiCodeSendRetry", () => {
       sessionId: "runtime-1",
       content: "hello",
       images: [],
+      model: "opencode-go/deepseek-v4-pro",
     });
 
     await vi.runAllTimersAsync();
@@ -55,6 +56,12 @@ describe("kimiCodeSendRetry", () => {
 
     expect(result.success).toBe(false);
     expect(sendKimiCodePrompt).toHaveBeenCalledTimes(5);
+    expect(sendKimiCodePrompt).toHaveBeenNthCalledWith(5, {
+      sessionId: "runtime-1",
+      content: "hello",
+      images: [],
+      model: "opencode-go/deepseek-v4-pro",
+    });
     expect(cancelKimiCodeTurn).not.toHaveBeenCalled();
   });
 });

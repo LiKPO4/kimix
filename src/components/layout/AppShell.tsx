@@ -1350,6 +1350,7 @@ ${isFinalStep
       const res = await window.api.sendKimiCodePrompt({
         sessionId: latestSession.longTask?.executorSessionId ?? latestSession.runtimeSessionId ?? latestSession.id,
         content: prompt,
+        model: latestSession.switchedToModel ?? latestSession.model ?? undefined,
       });
       if (!res.success) throw new Error(res.error);
       showToast(wasRecovering ? "已继续长程任务" : "已启动长程任务");

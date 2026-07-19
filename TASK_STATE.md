@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.59 会话模型所有权与单轮模型锁定
+
+- 当前目标：根治用户切换到 Pro 后界面和实际回复又回退到 Flash，以及切换后长时间无响应的模型路由竞态。
+- 根因证据：目标会话 `session_01ea935b-5c5d-455a-a6aa-b8e9b2dbdefb` 的官方 0.27.0 Server profile/status 在问题发生后仍为 `opencode-go/deepseek-v4-pro`，隔离探针的 Flash → Pro → 立即发送也确认所有带 model 的官方 WebSocket 帧均为 Pro；截图却同时把消息头和底部选择器显示为 Flash，且 `running-sample` 对账紧随发送触发。Kimix 过去把历史 Assistant/status 的 turn model 反写成当前会话 model，并允许旧 `/status` 响应覆盖刚完成的切换；模型菜单切换中又只让 `switchedToModel` 负责显示，prompt 仍读取旧 `modelAlias`，形成“看见 Pro、发送 Flash”的窗口。
+- 修复：当前模型由官方 session/profile 状态与本地显式选择共同拥有，历史事件模型只描述对应轮次；启动恢复和侧栏选择使用官方 runtime model 修复旧本地污染。每个 prompt 从 renderer 显式携带 `switchedToModel ?? modelAlias`，主进程将其作为不可变模型贯穿重试和 Server controls。Server 模型切换按 session 串行，status 刷新受 revision 门禁约束，切换中的旧响应不再对外暴露旧模型。
+- 验证：定向 4 文件 49 项通过；全量 106 文件 880 项通过；Electron 与 renderer 两套严格类型检查通过；生产构建通过，renderer 为 `assets/index-gRWhfgp9.js`；OKF 严格校验通过（10 概念、18 Markdown、249 链接）；`git diff --check` 通过（仅 LF/CRLF 提示）。
+- 关键文件：`electron/kimiCodeHost.ts`、`electron/main.ts`、`src/App.tsx`、`src/components/chat/ContextBar.tsx`、`src/components/chat/Composer.tsx`、`src/components/layout/Sidebar.tsx`、`src/hooks/useEventStream.ts`、`src/utils/modelDisplay.ts`、`docs/issue-model-switch-routing-events-snapshot.md`。
+- 下一步：提交本轮；由用户在 v2.16.59 复验 Flash → Pro 后立即发送和重启旧会话两条路径。
+
 ## 2026-07-19 v2.16.58 Prompt 完成屏障根治首轮消息头缺失
 
 - 当前目标：根治切换模型后首轮 Assistant/消息头不显示、发送第二条消息后上一轮才突然补出的缺陷。

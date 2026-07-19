@@ -49,8 +49,23 @@ export function resolveResumedSessionModel(input: {
   switchedToModel?: string | null;
   modelSwitchedAt?: number;
 }): string | null {
-  const pendingModel = input.switchedToModel?.trim() || (input.modelSwitchedAt ? input.sessionModel?.trim() : "");
-  return pendingModel || input.resumedModel?.trim() || input.sessionModel?.trim() || null;
+  // Only an explicit in-flight target may outrank the resumed official profile.
+  // modelSwitchedAt is historical metadata and cannot prove a mutation is pending.
+  return input.switchedToModel?.trim()
+    || input.resumedModel?.trim()
+    || input.sessionModel?.trim()
+    || null;
+}
+
+export function resolveAuthoritativeSessionModel(input: {
+  runtimeModel?: string | null;
+  sessionModel?: string | null;
+  historyModel?: string | null;
+}): string | null {
+  return input.runtimeModel?.trim()
+    || input.sessionModel?.trim()
+    || input.historyModel?.trim()
+    || null;
 }
 
 export function getSessionModelForDisplay(input: {
@@ -59,15 +74,8 @@ export function getSessionModelForDisplay(input: {
   modelSwitchedAt?: number;
 }): string | null {
   const sessionModel = input.sessionModel?.trim() || null;
-  const lastUsedModel = getLastUsedModelFromEvents(input.events);
-  const hasModelEvidenceAfterSwitch = typeof input.modelSwitchedAt === "number" && input.events.some((event) => (
-    typeof event.timestamp === "number" &&
-    event.timestamp > input.modelSwitchedAt! &&
-    (
-      (event.type === "assistant_message" && typeof event.model === "string" && Boolean(event.model.trim())) ||
-      (event.type === "status_update" && Boolean(extractModelFromStatusMessage(event.message)))
-    )
-  ));
-  const hasPendingManualSwitch = Boolean(sessionModel && input.modelSwitchedAt && !hasModelEvidenceAfterSwitch);
-  return hasPendingManualSwitch ? sessionModel : lastUsedModel ?? sessionModel;
+  // Session/profile state owns the model selector. Event models describe the
+  // turn that produced them and may arrive late through replay/reconciliation;
+  // they must never roll the current session model backward.
+  return sessionModel ?? getLastUsedModelFromEvents(input.events);
 }

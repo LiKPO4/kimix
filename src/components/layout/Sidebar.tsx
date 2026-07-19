@@ -18,10 +18,10 @@ import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { reportError } from "@/utils/reportError";
 import { reconcileOfficialSessionCatalog, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
-import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
+import { getLastUsedModelFromEvents, resolveAuthoritativeSessionModel } from "@/utils/modelDisplay";
 import { getHiddenHandoffSessionIds } from "@/utils/persistence";
 import { getSidebarProjectClickAction, persistSidebarExpandedProjectPaths, readSidebarExpandedProjectPaths } from "@/utils/sidebarProjectExpansion";
-import { getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgentRuntimeId, updateRoomAgent } from "@/utils/collaborationRooms";
 import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 import { APP_VERSION } from "@/utils/appVersion";
 
@@ -113,6 +113,34 @@ function dedupeSidebarSessions(sessions: Session[], currentSessionId?: string): 
 
 interface SidebarProps {
   width?: number;
+}
+
+function hydrateSessionModel(
+  session: Session,
+  runtimeModel: string | null | undefined,
+  historyModel: string | null | undefined,
+): Session {
+  if (!session.collaboration) {
+    return {
+      ...session,
+      model: resolveAuthoritativeSessionModel({
+        runtimeModel,
+        sessionModel: session.switchedToModel ?? session.model,
+        historyModel,
+      }),
+      switchedToModel: runtimeModel ? undefined : session.switchedToModel,
+    };
+  }
+  const primary = getPrimaryRoomAgent(session);
+  return updateRoomAgent(session, primary.id, (agent) => ({
+    ...agent,
+    modelAlias: resolveAuthoritativeSessionModel({
+      runtimeModel,
+      sessionModel: agent.switchedToModel ?? agent.modelAlias,
+      historyModel,
+    }),
+    switchedToModel: runtimeModel ? undefined : agent.switchedToModel,
+  }));
 }
 
 export function Sidebar({ width = 320 }: SidebarProps) {
@@ -642,21 +670,33 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     if (!session) return;
     syncProjectForSession(session);
     setCurrentSession(session);
+    const runtimeSessionId = getRuntimeSessionId(session) ?? session.id;
+    const runtimeStatusPromise = window.api.getKimiCodeStatus({ sessionId: runtimeSessionId }).catch(() => null);
     const hasConversation = session.events.some((event) => event.type === "user_message" || event.type === "assistant_message");
     if (hasConversation && session.kimiHistoryCacheVersion === KIMI_HISTORY_CACHE_VERSION) {
-      if (session.isLoading) {
-        updateSession(session.id, (current) => ({ ...current, isLoading: false }));
+      const runtimeStatus = await runtimeStatusPromise;
+      if (session.isLoading || (runtimeStatus?.success && runtimeStatus.data.model)) {
+        updateSession(session.id, (current) => ({
+          ...hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined),
+          isLoading: false,
+        }));
         const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-        if (updated) setCurrentSession(updated);
+        if (updated && useAppStore.getState().currentSession?.id === session.id) setCurrentSession(updated);
       }
       return;
     }
 
-    const loaded = await loadSessionWithSkillParentFallback(session);
+    const [loaded, runtimeStatus] = await Promise.all([
+      loadSessionWithSkillParentFallback(session),
+      runtimeStatusPromise,
+    ]);
     if (!loaded.success) {
-      updateSession(session.id, (current) => ({ ...current, isLoading: false }));
+      updateSession(session.id, (current) => ({
+        ...hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined),
+        isLoading: false,
+      }));
       const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-      if (updated) setCurrentSession(updated);
+      if (updated && useAppStore.getState().currentSession?.id === session.id) setCurrentSession(updated);
       toast(`读取会话失败：${loaded.error}`);
       return;
     }
@@ -679,9 +719,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       );
       const hydratedEvents = canonicalAdopted ? events : current.events;
       return {
-        ...current,
+        ...hydrateSessionModel(
+          current,
+          runtimeStatus?.success ? runtimeStatus.data.model : undefined,
+          getLastUsedModelFromEvents(hydratedEvents),
+        ),
         events: hydratedEvents,
-        model: getLastUsedModelFromEvents(hydratedEvents) ?? current.model,
         kimiHistoryCacheVersion: canonicalAdopted ? KIMI_HISTORY_CACHE_VERSION : current.kimiHistoryCacheVersion,
         title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
           hydratedEvents,
@@ -691,7 +734,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       };
     });
     const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
-    if (updated) {
+    if (updated && useAppStore.getState().currentSession?.id === session.id) {
       syncProjectForSession(updated);
       setCurrentSession(updated);
     }

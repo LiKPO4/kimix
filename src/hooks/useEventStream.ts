@@ -2,17 +2,14 @@ import { useRef, useCallback } from "react";
 import { useSessionStore } from "@/stores/sessionStore";
 import { mergeEvents } from "@/utils/eventMapper";
 import { deriveSessionTitle } from "@/utils/sessionTitle";
-import { getLastUsedModelFromEventsAfter } from "@/utils/modelDisplay";
 import type { TimelineEvent } from "@/types/ui";
 import {
   getEventRoomAgentId,
 
-  getRoomAgent,
   getRoomAgentEvents,
   isPrimaryRoomAgent,
   replaceRoomAgentEvents,
   scopeEventToRoomAgent,
-  updateRoomAgent,
 } from "@/utils/collaborationRooms";
 
 const STREAM_EVENT_FLUSH_MS = 80;
@@ -72,18 +69,9 @@ export function useEventStream() {
         for (const item of coalesceStreamEventBatch(items)) {
           events = mergeEvents(events, item);
         }
-        const agent = getRoomAgent(session, roomAgentId);
-        const modelSwitchedAt = agent?.modelSwitchedAt ?? session.modelSwitchedAt;
-        const lastUsedModel = getLastUsedModelFromEventsAfter(events, modelSwitchedAt);
         let next = replaceRoomAgentEvents(session, roomAgentId, events);
-        if (session.collaboration && lastUsedModel) {
-          next = updateRoomAgent(next, roomAgentId, (current) => ({ ...current, modelAlias: lastUsedModel }));
-        }
         if (isPrimaryRoomAgent(session, roomAgentId) && !session.titleLocked) {
           next = { ...next, title: deriveSessionTitle(events, session.title) };
-        }
-        if (!session.collaboration && lastUsedModel) {
-          next = { ...next, model: lastUsedModel };
         }
         return { ...next, updatedAt: Date.now() };
       });

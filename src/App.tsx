@@ -8,7 +8,7 @@ import type { Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { mapHistoryEvents, mapStreamEvent, mergeEvents, preserveLocalUserMediaInCanonicalHistory } from "@/utils/eventMapper";
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
-import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
+import { getLastUsedModelFromEvents, resolveAuthoritativeSessionModel } from "@/utils/modelDisplay";
 import { reconcileOfficialSessionCatalog, selectStartupOfficialSession } from "@/utils/sessionCatalog";
 import { recoverOrphanRoomsFromOfficialCatalog } from "@/utils/orphanRoomSessions";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
@@ -92,6 +92,13 @@ import {
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
 import { getRoomAgentReconciliationTargets, getRunnableRoomAgentReconciliationTargets, isRoomAgentReconciliationStatus, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
+
+function currentSessionPromptModel(sessionId: string): string | undefined {
+  const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+  if (!session) return undefined;
+  const primary = getPrimaryRoomAgent(session);
+  return primary.switchedToModel ?? primary.modelAlias ?? undefined;
+}
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
@@ -383,6 +390,7 @@ type StartupRoomAgentRecoveryResult = {
   canonicalEvents?: TimelineEvent[];
   runtimeIsActive?: boolean;
   engineStatus?: string;
+  model?: string;
   swarmMode?: boolean;
   error?: string;
 };
@@ -437,6 +445,7 @@ async function loadStartupRoomAgentHistory(
       canonicalEvents: runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents),
       runtimeIsActive,
       engineStatus: runtimeStatus?.success ? runtimeStatus.data.engineStatus : undefined,
+      model: runtimeStatus?.success ? runtimeStatus.data.model : undefined,
       swarmMode: runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined,
     };
   }
@@ -499,7 +508,12 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
           ...agent,
           runtimeSessionId: result.sessionId,
           officialSessionId: agent.officialSessionId ?? result.sessionId,
-          modelAlias: agent.modelAlias ?? getLastUsedModelFromEvents(hydratedEvents) ?? null,
+          modelAlias: resolveAuthoritativeSessionModel({
+            runtimeModel: result.model,
+            sessionModel: agent.switchedToModel ?? agent.modelAlias,
+            historyModel: getLastUsedModelFromEvents(hydratedEvents),
+          }),
+          switchedToModel: result.model ? undefined : agent.switchedToModel,
           swarmMode: result.swarmMode ?? agent.swarmMode,
           missingSince: undefined,
           recoveryIssue: undefined,
@@ -1260,6 +1274,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
   await window.api.sendKimiCodePrompt({
     sessionId: session.id,
     content,
+    model: session.model ?? undefined,
   });
 }
 
@@ -1769,6 +1784,7 @@ function App() {
     void window.api.sendKimiCodePrompt({
       sessionId: latestSession.longTask.executorSessionId,
       content: prompt,
+      model: latestSession.switchedToModel ?? latestSession.model ?? undefined,
     }).then((res) => {
       if (res.success) return;
       throw new Error(res.error);
@@ -1849,6 +1865,7 @@ function App() {
         sessionId: runtimeSessionId,
         content: contentWithFileAttachments(next.content, next.images),
         images: promptImages(next.images),
+        model: currentSessionPromptModel(uiSessionId),
       }).then((res) => {
         if (res.success) return;
         throw new Error(res.error);
@@ -1897,6 +1914,7 @@ function App() {
               sessionId: recoveryRes.data.sessionId,
               content: contentWithFileAttachments(next.content, next.images),
               images: promptImages(next.images),
+              model: currentSessionPromptModel(uiSessionId),
             });
             if (retryRes.success) return;
             message = retryRes.error;
@@ -2146,6 +2164,7 @@ function App() {
               const runtimeIsActive = Boolean(
                 runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
               );
+              const runtimeModel = runtimeStatus?.success ? runtimeStatus.data.model : undefined;
               const runtimeSwarmMode = runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined;
               const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
               const canonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
@@ -2174,7 +2193,12 @@ function App() {
                     ...agent,
                     runtimeSessionId: agent.runtimeSessionId ?? historySessionId,
                     officialSessionId: agent.officialSessionId ?? historySessionId,
-                    modelAlias: getLastUsedModelFromEvents(hydratedEvents) ?? agent.modelAlias,
+                    modelAlias: resolveAuthoritativeSessionModel({
+                      runtimeModel,
+                      sessionModel: agent.switchedToModel ?? agent.modelAlias,
+                      historyModel: getLastUsedModelFromEvents(hydratedEvents),
+                    }),
+                    switchedToModel: runtimeModel ? undefined : agent.switchedToModel,
                     swarmMode: runtimeSwarmMode ?? agent.swarmMode,
                   }));
                 } else {
@@ -2182,7 +2206,12 @@ function App() {
                     ...hydrated,
                     runtimeSessionId: hydrated.runtimeSessionId ?? historySessionId,
                     officialSessionId: hydrated.officialSessionId ?? historySessionId,
-                    model: getLastUsedModelFromEvents(hydratedEvents) ?? hydrated.model ?? null,
+                    model: resolveAuthoritativeSessionModel({
+                      runtimeModel,
+                      sessionModel: hydrated.switchedToModel ?? hydrated.model,
+                      historyModel: getLastUsedModelFromEvents(hydratedEvents),
+                    }),
+                    switchedToModel: runtimeModel ? undefined : hydrated.switchedToModel,
                     swarmMode: runtimeSwarmMode ?? hydrated.swarmMode,
                   };
                 }
@@ -2226,7 +2255,11 @@ function App() {
               const events = preserveLocalUserMediaInCanonicalHistory(activeLocalSession?.events ?? [], canonicalEvents);
               const session = hydrateLongTaskProgressFromHistory({
                 id: historySessionId,
-                model: getLastUsedModelFromEvents(events) ?? activeLocalSession?.model ?? null,
+                model: resolveAuthoritativeSessionModel({
+                  runtimeModel,
+                  sessionModel: activeLocalSession?.switchedToModel ?? activeLocalSession?.model,
+                  historyModel: getLastUsedModelFromEvents(events),
+                }),
                 swarmMode: runtimeSwarmMode ?? activeLocalSession?.swarmMode,
                 title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
                 projectPath: activeProject.path,
@@ -2413,6 +2446,7 @@ function App() {
         const sendRes = await window.api.sendKimiCodePrompt({
           sessionId: startRes.data.sessionId,
           content: prompt,
+          model: startRes.data.model ?? undefined,
         });
         if (!sendRes.success) throw new Error(sendRes.error);
       })().catch((err) => {
@@ -2985,6 +3019,7 @@ function App() {
               sessionId: runtimeSessionId,
               content: contentWithFileAttachments(next.content, next.images),
               images: promptImages(next.images),
+              model: currentSessionPromptModel(uiSessionId),
             });
             sendPromise.then((res) => {
               if (res.success) return;

@@ -1330,6 +1330,7 @@ export const ChatThread = memo(function ChatThread() {
       sessionId: runtimeSessionId,
       content: lastPrompt.content,
       images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl) : [],
+      model: getPrimaryRoomAgent(session).switchedToModel ?? getPrimaryRoomAgent(session).modelAlias ?? undefined,
     });
     if (!res.success) {
       setRunningSessionId(null);

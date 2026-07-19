@@ -237,6 +237,7 @@ export function LongTasksPanel() {
     const kickoff = await sendKimiCodePromptWithRetry({
       sessionId: task.executorSessionId,
       content: buildPlanningKickoffPrompt(task),
+      model: latestSession?.switchedToModel ?? latestSession?.model ?? undefined,
     });
     if (!kickoff.success) throw new Error(kickoff.error);
     setRecoverableTask(null);

@@ -1150,6 +1150,7 @@ export function Composer() {
             sessionId: runtimeSessionId,
             content: outboundPrompt,
             images: promptImages,
+            model: agent.switchedToModel ?? agent.modelAlias ?? undefined,
           });
           if (!response.success && /not active|not found|session/i.test(response.error)) {
             try {
@@ -1171,6 +1172,7 @@ export function Composer() {
               sessionId: runtimeSessionId,
               content: outboundPrompt,
               images: promptImages,
+              model: agent.switchedToModel ?? agent.modelAlias ?? undefined,
             });
           }
           if (!response.success) {
@@ -1568,6 +1570,7 @@ export function Composer() {
           sessionId: kimiCodeSessionId,
           content: outboundContent,
           images: imagesForApi,
+          model: getPrimaryRoomAgent(targetSession).switchedToModel ?? getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
         });
         if (!res.success && /not active|not found|session/i.test(res.error)) {
           updateSession(targetSession.id, (session) => ({ ...session, runtimeSessionId: undefined }));
@@ -1578,6 +1581,7 @@ export function Composer() {
             sessionId: kimiCodeSessionId,
             content: outboundContent,
             images: imagesForApi,
+            model: getPrimaryRoomAgent(targetSession).switchedToModel ?? getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
           });
         }
         if (!res.success) throw new Error(res.error);

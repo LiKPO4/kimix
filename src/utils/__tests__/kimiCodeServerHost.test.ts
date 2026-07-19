@@ -5,7 +5,12 @@ import {
   KimiCodeServerHost,
   shouldClearUnresponsiveServerLock,
 } from "../../../electron/kimiCodeServerHost";
-import { resolveServerEngineStatus } from "../../../electron/kimiCodeHost";
+import {
+  resolvePromptModel,
+  resolveServerEngineStatus,
+  resolveServerModelRefresh,
+  shouldApplyServerModelRefresh,
+} from "../../../electron/kimiCodeHost";
 import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
@@ -130,5 +135,35 @@ describe("resolveServerEngineStatus", () => {
     expect(resolveServerEngineStatus({ busy: false, status: "running" })).toBe("idle");
     expect(resolveServerEngineStatus({ busy: false, status: "completed" })).toBe("completed");
     expect(resolveServerEngineStatus({ busy: false, status: "failed" })).toBe("error");
+  });
+});
+
+describe("server prompt model ownership", () => {
+  it("uses the renderer-selected model as the immutable prompt override", () => {
+    expect(resolvePromptModel("opencode-go/deepseek-v4-pro", "opencode-go/deepseek-v4-flash"))
+      .toBe("opencode-go/deepseek-v4-pro");
+    expect(resolvePromptModel(undefined, "opencode-go/deepseek-v4-flash"))
+      .toBe("opencode-go/deepseek-v4-flash");
+  });
+
+  it("rejects a status response that started before a model mutation", () => {
+    expect(shouldApplyServerModelRefresh(3, 3, false)).toBe(true);
+    expect(shouldApplyServerModelRefresh(2, 3, false)).toBe(false);
+    expect(shouldApplyServerModelRefresh(3, 3, true)).toBe(false);
+  });
+
+  it("never exposes a stale status model while or after a newer mutation", () => {
+    expect(resolveServerModelRefresh(
+      "opencode-go/deepseek-v4-flash",
+      "opencode-go/deepseek-v4-flash",
+      false,
+      true,
+    )).toBeUndefined();
+    expect(resolveServerModelRefresh(
+      "opencode-go/deepseek-v4-flash",
+      "opencode-go/deepseek-v4-pro",
+      false,
+      false,
+    )).toBe("opencode-go/deepseek-v4-pro");
   });
 });

@@ -11,7 +11,6 @@ import {
 import { preserveLocalUserMediaInCanonicalHistory } from "@/utils/eventMapper";
 import { reconcileRunningKimiSnapshot } from "@/utils/kimiCodeSnapshotReplay";
 import { applyCanonicalUndoHistory } from "@/utils/undoHistory";
-import { getLastUsedModelFromEvents } from "@/utils/modelDisplay";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import {
   isOfficialUserEventIdUniqueToDelivery,
@@ -225,18 +224,6 @@ export function reconcileAgentCanonicalHistory({
     next = {
       ...next,
       collaboration,
-    };
-  }
-  const model = getLastUsedModelFromEvents(events);
-  if (session.collaboration) {
-    next = updateRoomAgent(next, roomAgentId, (current) => ({
-      ...current,
-      modelAlias: model ?? current.modelAlias,
-    }));
-  } else {
-    next = {
-      ...next,
-      model: model ?? next.model,
     };
   }
   return {

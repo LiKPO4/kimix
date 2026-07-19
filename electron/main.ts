@@ -5688,13 +5688,14 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
+    const requestedModel = typeof req.model === "string" && req.model.trim() ? req.model.trim() : undefined;
     if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
-    const model = kimiCodeHost.getSessionModel(sessionId);
+    const model = requestedModel ?? kimiCodeHost.getSessionModel(sessionId);
     const trySend = async (promptContent: string, promptImages: { name: string; dataUrl: string }[]) => {
       const input = toKimiCodePromptInput(promptContent, promptImages);
       const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
       const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-      return kimiCodeHost.sendPrompt(sessionId, finalInput);
+      return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel);
     };
     const adapted = adaptPromptForModel(content, images, model);
     try {

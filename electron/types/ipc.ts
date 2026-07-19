@@ -1757,6 +1757,8 @@ export type KimiCodePromptRequest = {
   sessionId: string;
   content: string;
   images?: { name: string; dataUrl: string }[];
+  /** Renderer-selected session model; immutable for this prompt dispatch. */
+  model?: string;
 };
 
 export type KimiCodeBtwRequest = {
