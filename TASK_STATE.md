@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.56 初始五轮窗口与折叠入口贴顶
+
+- 当前目标：初次打开长会话时至少显示最近 5 个完整用户轮次，并消除折叠历史展开按钮上方过大的空白。
+- 根因：初始尾窗按“最少 4 个 RenderItem、至少 2 条完成 Assistant”选取，不理解用户轮次，因此典型会话只挂载 `user + assistant + user + assistant` 两轮；滚动容器又固定保留 42px 顶部 padding，折叠入口自身再加 4px，按钮距顶部明显悬空。
+- 修复：`selectInitialChatTail` 增加可选轮次边界，ChatThread 以 `user_message` 为轮次起点，在 28 项普通窗口内向前补足最近 5 轮；普通滚轮仍不扩容。存在折叠入口时滚动区顶部 padding 改为 10px，保留按钮自身 4px 呼吸空间；无折叠入口及长程任务布局保持原值。版本升至 v2.16.56。
+- 验证：定向 2 文件 22 项、全量 104 文件 864 项和严格类型检查通过；生产构建通过，renderer 为 `assets/index-Dki-dToo.js`；OKF 严格校验通过（10 概念、18 Markdown、246 链接）。正式构建 DOM 实测初始挂载 10 项，滚动区顶部 padding 10px，滚到顶部后按钮距可视区顶边 14px、按钮高 34px。
+- 关键文件：`src/utils/chatTailWindow.ts`、`src/components/chat/ChatThread.tsx`、`src/utils/__tests__/chatTailWindow.test.ts`。
+- 下一步：全量回归、知识校验并提交；用户截图验收五轮刻度密度和按钮顶部位置。
+
 ## 2026-07-19 v2.16.55 稳定快照消息跨轮合并根治
 
 - 当前目标：根治重启最新版本后仍把多轮 Agent 回复塞进同一条消息的问题；本轮不改动已稳定的滚动链路。

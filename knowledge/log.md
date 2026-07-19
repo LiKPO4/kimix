@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Initial history window now follows five user turns**: Session open starts at the fifth-latest `user_message` within the 28-item safety window, while ordinary scrolling remains structurally read-only; a visible folded-history disclosure reduces the scroll area's top inset to 10px. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md) and [/project/kimix.md](/project/kimix.md).
+
 * **Stable snapshot identity now prevents and repairs cross-message absorption**: The stream batcher and timeline merger keep different upstream message IDs independent even without a visible user boundary; cache v9 repairs exact-ID expansion and also handles formal startup's identity-less SDK/wire fallback when a multi-row local turn with a stable ID is almost entirely composed of complete replies from different canonical turns. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
 
 * **Cache v8 repairs cross-row turn composition and certifies only adopted or turn-equivalent history**: Cross-turn proof aggregates every Assistant row under one user boundary because the renderer presents that partition as one bubble; successful official loads may certify an unchanged local projection while retaining richer tool frames, but rejected non-equivalent candidates keep their stale cache version and remain eligible for repair on the next hydration. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
@@ -92,7 +94,7 @@
 
 * **Auto-follow has one geometry observer**: ResizeObserver owns streamed-content and viewport size changes; content-version work no longer serializes the full timeline or performs a second automatic bottom scroll, while manual anchor recovery remains intact. See [/project/kimix.md](/project/kimix.md).
 
-* **Message virtualization requires a long-history trace**: The bounded 4–12/28 item windows remain the current DOM control; item-level virtualization is intentionally deferred because it cannot reduce one tall reply and would replace several mature viewport contracts. See [/project/kimix.md](/project/kimix.md).
+* **Message virtualization requires a long-history trace**: The bounded five-user-turn/28-item windows remain the current DOM control; item-level virtualization is intentionally deferred because it cannot reduce one tall reply and would replace several mature viewport contracts. See [/project/kimix.md](/project/kimix.md).
 
 * **Running history reconciliation is process-monotonic**: Intermediate `tool_use` step ends no longer settle a turn, and a Server snapshot with fewer tool/process events cannot replace a richer live timeline merely because its latest thinking differs. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 

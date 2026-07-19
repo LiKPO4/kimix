@@ -1408,6 +1408,9 @@ export const ChatThread = memo(function ChatThread() {
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - visibleItemLimit : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-visibleItemLimit) : renderItems;
   const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
+    minTurns: 5,
+    maxItems: CHAT_FULL_RENDER_ITEM_LIMIT,
+    isTurnStart: (item) => item.type === "event" && item.event.type === "user_message",
     isCompletedAssistant: (item) => item.type === "event" &&
       item.event.type === "assistant_message" &&
       item.event.isComplete &&
@@ -1415,6 +1418,8 @@ export const ChatThread = memo(function ChatThread() {
   }), [fullVisibleRenderItems]);
   const visibleRenderItems = isInitialTailOnly ? initialTailRenderItems : fullVisibleRenderItems;
   const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
+  const hasFoldedHistoryNotice = (isInitialTailOnly && initialTailHiddenCount > 0) ||
+    (!isInitialTailOnly && foldedItemCount > 0);
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId ?? undefined, hasActiveTurn));
   const isSessionScrollPrimed = viewport.isSessionScrollPrimed;
   const eagerMarkdown = viewport.eagerMarkdown;
@@ -1566,7 +1571,7 @@ export const ChatThread = memo(function ChatThread() {
         ref={viewport.scrollRef}
         className={`kimix-content-x kimix-chat-scroll-area kimix-stable-scrollbar h-full overflow-y-auto${viewport.isFollowing ? "" : " kimix-chat-scroll-area--detached"}`}
         style={{
-          paddingTop: session.longTask ? 124 : 42,
+          paddingTop: session.longTask ? 124 : hasFoldedHistoryNotice ? 10 : 42,
           paddingBottom: 0,
           scrollbarGutter: "stable",
           overscrollBehavior: "contain",

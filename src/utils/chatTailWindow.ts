@@ -2,7 +2,9 @@ interface TailWindowOptions<T> {
   minItems?: number;
   maxItems?: number;
   minCompletedAssistants?: number;
+  minTurns?: number;
   isCompletedAssistant: (item: T) => boolean;
+  isTurnStart?: (item: T) => boolean;
 }
 
 export function shouldUseInitialChatTail(
@@ -23,13 +25,21 @@ export function selectInitialChatTail<T>(items: T[], options: TailWindowOptions<
   const minItems = Math.max(1, options.minItems ?? 4);
   const maxItems = Math.max(minItems, options.maxItems ?? 12);
   const minCompletedAssistants = Math.max(0, options.minCompletedAssistants ?? 2);
+  const minTurns = Math.max(0, options.minTurns ?? 0);
   let start = Math.max(0, items.length - minItems);
   const earliestStart = Math.max(0, items.length - maxItems);
   let completedAssistants = items.slice(start).filter(options.isCompletedAssistant).length;
+  let turns = options.isTurnStart
+    ? items.slice(start).filter(options.isTurnStart).length
+    : minTurns;
 
-  while (start > earliestStart && completedAssistants < minCompletedAssistants) {
+  while (
+    start > earliestStart &&
+    (completedAssistants < minCompletedAssistants || turns < minTurns)
+  ) {
     start -= 1;
     if (options.isCompletedAssistant(items[start])) completedAssistants += 1;
+    if (options.isTurnStart?.(items[start])) turns += 1;
   }
 
   return items.slice(start);

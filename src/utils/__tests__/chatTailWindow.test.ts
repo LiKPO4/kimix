@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "../chatTailWindow";
 
-type Item = { id: string; completedAssistant?: boolean };
+type Item = { id: string; completedAssistant?: boolean; turnStart?: boolean };
 
 const select = (items: Item[]) => selectInitialChatTail(items, {
   isCompletedAssistant: (item) => Boolean(item.completedAssistant),
@@ -44,6 +44,24 @@ describe("selectInitialChatTail", () => {
     const items = Array.from({ length: 20 }, (_, index) => ({ id: `user-${index}` }));
     expect(select(items)).toHaveLength(12);
     expect(select(items)[0]?.id).toBe("user-8");
+  });
+
+  it("keeps the latest five complete user turns when turn boundaries are provided", () => {
+    const items = Array.from({ length: 7 }, (_, turn) => ([
+      { id: `user-${turn}`, turnStart: true },
+      { id: `assistant-${turn}`, completedAssistant: true },
+    ])).flat();
+
+    const result = selectInitialChatTail(items, {
+      minTurns: 5,
+      maxItems: 28,
+      isTurnStart: (item) => Boolean(item.turnStart),
+      isCompletedAssistant: (item) => Boolean(item.completedAssistant),
+    });
+
+    expect(result).toHaveLength(10);
+    expect(result[0]?.id).toBe("user-2");
+    expect(result.at(-1)?.id).toBe("assistant-6");
   });
 });
 
