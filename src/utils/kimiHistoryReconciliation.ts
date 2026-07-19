@@ -103,6 +103,105 @@ function hasStableSnapshotTurnOwnershipMismatch(
   return false;
 }
 
+const MIN_CANONICAL_REPLY_MATCH_LENGTH = 24;
+const MIN_CROSS_TURN_REPLY_COVERAGE = 0.8;
+
+type CanonicalAssistantReply = {
+  body: string;
+  owner: string;
+};
+
+function canonicalStableAssistantReplies(events: TimelineEvent[]): CanonicalAssistantReply[] {
+  const replies: CanonicalAssistantReply[] = [];
+  let currentUserContent = "";
+  for (const event of events) {
+    if (event.type === "user_message" || event.type === "steer_message") {
+      currentUserContent = normalizedUserTurnContent(event.content);
+      continue;
+    }
+    if (
+      event.type !== "assistant_message" ||
+      event.snapshotMessageIdStable !== true ||
+      !event.snapshotMessageId ||
+      !currentUserContent
+    ) continue;
+    const body = normalizedUserTurnContent(event.content);
+    if (body.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
+    replies.push({ body, owner: currentUserContent });
+  }
+  return replies;
+}
+
+function mergedIntervalCoverage(intervals: Array<{ start: number; end: number }>): number {
+  if (intervals.length === 0) return 0;
+  const sorted = [...intervals].sort((left, right) => left.start - right.start || left.end - right.end);
+  let total = 0;
+  let currentStart = sorted[0].start;
+  let currentEnd = sorted[0].end;
+  for (const interval of sorted.slice(1)) {
+    if (interval.start <= currentEnd) {
+      currentEnd = Math.max(currentEnd, interval.end);
+      continue;
+    }
+    total += currentEnd - currentStart;
+    currentStart = interval.start;
+    currentEnd = interval.end;
+  }
+  return total + currentEnd - currentStart;
+}
+
+/**
+ * Older caches can contain no trustworthy snapshot id at all. Accept a
+ * shorter canonical history only when one local Assistant row is almost
+ * entirely composed of complete, identity-backed canonical replies owned by
+ * this user turn and by another user turn. Requiring disjoint matches and high
+ * coverage avoids treating ordinary quoted text as cross-turn pollution.
+ */
+function hasCrossTurnCanonicalReplyComposition(
+  cachedEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): boolean {
+  const canonicalReplies = canonicalStableAssistantReplies(canonicalEvents);
+  const bodyOwners = new Map<string, Set<string>>();
+  for (const reply of canonicalReplies) {
+    const owners = bodyOwners.get(reply.body) ?? new Set<string>();
+    owners.add(reply.owner);
+    bodyOwners.set(reply.body, owners);
+  }
+  const unambiguousReplies = canonicalReplies.filter((reply) => bodyOwners.get(reply.body)?.size === 1);
+
+  let currentUserContent = "";
+  for (const event of cachedEvents) {
+    if (event.type === "user_message" || event.type === "steer_message") {
+      currentUserContent = normalizedUserTurnContent(event.content);
+      continue;
+    }
+    if (event.type !== "assistant_message" || !currentUserContent) continue;
+    const localBody = normalizedUserTurnContent(event.content);
+    if (localBody.length < MIN_CANONICAL_REPLY_MATCH_LENGTH * 2) continue;
+
+    const matches = unambiguousReplies.flatMap((reply) => {
+      const intervals: Array<CanonicalAssistantReply & { start: number; end: number }> = [];
+      let start = localBody.indexOf(reply.body);
+      while (start >= 0) {
+        intervals.push({ ...reply, start, end: start + reply.body.length });
+        start = localBody.indexOf(reply.body, start + 1);
+      }
+      return intervals;
+    });
+    const sameTurnMatches = matches.filter((match) => match.owner === currentUserContent);
+    const foreignTurnMatches = matches.filter((match) => match.owner !== currentUserContent);
+    const hasDisjointCrossTurnPair = sameTurnMatches.some((sameTurn) => foreignTurnMatches.some((foreignTurn) => (
+      sameTurn.end <= foreignTurn.start || foreignTurn.end <= sameTurn.start
+    )));
+    if (!hasDisjointCrossTurnPair) continue;
+
+    const coveredLength = mergedIntervalCoverage(matches);
+    if (coveredLength / localBody.length >= MIN_CROSS_TURN_REPLY_COVERAGE) return true;
+  }
+  return false;
+}
+
 export function hasPossiblyLostUserImages(events: TimelineEvent[]): boolean {
   return events.some((event) => {
     if (event.type !== "user_message" && event.type !== "steer_message") return false;
@@ -129,6 +228,8 @@ export function shouldReplaceWithCanonicalKimiHistory(
   context?: { sessionId?: string; roomAgentId?: string; reason?: string },
 ): boolean {
   if (canonicalEvents.length === 0) return false;
+  const canonicalAssistantSize = assistantBodySize(canonicalEvents);
+  const cachedAssistantSize = assistantBodySize(cachedEvents);
 
   // A stable official Assistant id mounted under a different user prompt is
   // proof of historical replay pollution, not richer local history. In this
@@ -138,8 +239,21 @@ export function shouldReplaceWithCanonicalKimiHistory(
     logEvent("kimiHistoryReconciliation.accepted", {
       ...context,
       reason: "stable-snapshot-turn-ownership-mismatch",
-      localSize: assistantBodySize(cachedEvents),
-      canonicalSize: assistantBodySize(canonicalEvents),
+      localSize: cachedAssistantSize,
+      canonicalSize: canonicalAssistantSize,
+    });
+    return true;
+  }
+
+  if (
+    canonicalAssistantSize < cachedAssistantSize &&
+    hasCrossTurnCanonicalReplyComposition(cachedEvents, canonicalEvents)
+  ) {
+    logEvent("kimiHistoryReconciliation.accepted", {
+      ...context,
+      reason: "cross-turn-canonical-reply-composition",
+      localSize: cachedAssistantSize,
+      canonicalSize: canonicalAssistantSize,
     });
     return true;
   }
@@ -159,8 +273,6 @@ export function shouldReplaceWithCanonicalKimiHistory(
 
   const canonicalAssistantBody = assistantBodyText(canonicalEvents);
   const cachedAssistantBody = assistantBodyText(cachedEvents);
-  const canonicalAssistantSize = assistantBodySize(canonicalEvents);
-  const cachedAssistantSize = assistantBodySize(cachedEvents);
   const canonicalThinkingSize = thinkingHistorySize(canonicalEvents);
   const cachedThinkingSize = thinkingHistorySize(cachedEvents);
   const canonicalImageCount = displayableUserImageCount(canonicalEvents);

@@ -94,6 +94,63 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
+  it("repairs a cached assistant composed of stable canonical replies from multiple user turns", () => {
+    const oldAnswer = "这是上一轮已经完成的正式回答，长度足以排除短语偶然重合。";
+    const currentAnswer = "这是当前这一轮的正式回答，应该单独显示在当前消息气泡中。";
+    const local: TimelineEvent[] = [{
+      id: "local-user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, assistant(oldAnswer, { id: "local-old", timestamp: 200 }), {
+      id: "local-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant(`${currentAnswer}\n\n${oldAnswer}`, {
+      id: "polluted-current",
+      timestamp: 1_100,
+      isComplete: false,
+    })];
+    const canonical: TimelineEvent[] = [{
+      id: "official-user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, assistant(oldAnswer, {
+      id: "official-old",
+      timestamp: 200,
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+    }), {
+      id: "official-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant(currentAnswer, {
+      id: "official-current",
+      timestamp: 1_100,
+      snapshotMessageId: "msg-current",
+      snapshotMessageIdStable: true,
+    })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+  });
+
+  it("does not treat a short quotation from an older canonical reply as cross-turn pollution", () => {
+    const oldAnswer = "这是上一轮已经完成的正式回答，长度足以排除短语偶然重合。";
+    const currentAnswer = "这是当前这一轮的正式回答，应该单独显示在当前消息气泡中。";
+    const local: TimelineEvent[] = [{
+      id: "local-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant(`${currentAnswer}\n\n引用旧答：${oldAnswer}\n\n这里还有大量独立分析，不能被官方较短快照破坏性覆盖。`, {
+      id: "quoted-current",
+      timestamp: 1_100,
+    })];
+    const canonical: TimelineEvent[] = [{
+      id: "official-user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, assistant(oldAnswer, {
+      id: "official-old",
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+    }), {
+      id: "official-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant(currentAnswer, {
+      id: "official-current",
+      snapshotMessageId: "msg-current",
+      snapshotMessageIdStable: true,
+    })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+  });
+
   it("does not replace shorter assistant body when canonical thinking differs", () => {
     const local = [userMessage, assistant("local complete answer", { thinking: "local thought" })];
     const canonical = [userMessage, assistant("short", { thinking: "different canonical thought" })];

@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.53 跨轮缓存污染与首会话轻滚大跳
+
+- 当前目标：根治旧回复被塞进新一轮，以及首个自动打开会话轻滚即大幅上跳。
+- 根因证据：目标会话官方历史与完成加载后的 store 均为 82 条正确分轮事件，但旧 v6 缓存可绕过官方重载，且无稳定 ID 的污染行会被“本地正文更长”门禁保留；硬重载另复现 loading 占位期间滚动 ref 为 null 却提前 primed，加载完成后真实 viewport 不重跑初始化。首屏规则还把第一次向上滚动与隐藏历史扩容绑定，单次手势同时改变 `scrollTop` 和 DOM 高度。
+- 修复：缓存版本升至 7；仅当稳定官方回复跨两个用户轮次、匹配区间互不重叠且覆盖污染行至少 80% 时允许较短 canonical 修复。视口增加 readiness 边界，真实节点挂载后才 primed/接 ResizeObserver；初始 4–12 项尾部保持稳定，普通滚轮不再触发历史扩容，完整历史只由显式展开或导航挂载。
+- 验证：定向回归 3 文件 45 项、全量 104 文件 854 项通过；typecheck、生产构建（renderer `assets/index-B4unjDul.js`）与 OKF 校验通过。CDP 硬重载后缓存版本为 7，首会话 `bottomGap=0`、仅挂载 4 项；真实 `deltaY=-40` 后 `scrollDelta=-40`、`heightDelta=0`、仍为 4 项。
+- 阻塞：无；等待用户 v2.16.53 截图验收。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/utils/kimiHistoryCache.ts`、`src/components/chat/ChatThread.tsx`、`src/hooks/useChatViewport.ts`。
+- 下一步：用户重点复验原目标会话、首次轻滚，以及折叠历史/搜索导航的显式展开。
+
 ## 2026-07-17 回放乱序与损坏会话重建（一次性）
 
 - 当前目标：根治会话显示错乱——snapshot 回放把旧轮事件追加到 events 数组末尾，渲染按数组顺序分组把旧轮 assistant 错配进最新轮拼接显示；叠加历史 mergeEvents 跨轮合并，该会话多轮回复被拼进单个 assistant。

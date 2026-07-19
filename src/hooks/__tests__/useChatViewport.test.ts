@@ -15,7 +15,6 @@ const defaultOptions: UseChatViewportOptions = {
   olderItemsPage: 0,
   expandedInitialTailSessionId: null,
   hasMoreOlderItems: false,
-  onExpandInitialTail: vi.fn(),
   onExpandOlderItemsToEnd: vi.fn(),
   onHighlightEvent: vi.fn(),
 };
@@ -39,6 +38,9 @@ let latestViewport: ReturnType<typeof useChatViewport> | null = null;
 function TestComponent({ options }: { options: UseChatViewportOptions }) {
   const viewport = useChatViewport(options);
   latestViewport = viewport;
+  if (options.viewportReady === false) {
+    return createElement("div", { "data-testid": "loading" });
+  }
   return createElement(
     "div",
     {
@@ -147,12 +149,10 @@ describe("useChatViewport", () => {
     expect(snap).toHaveProperty("contentScrollHeight");
   });
 
-  it("calls onExpandInitialTail when wheeling up in initial tail mode", () => {
-    const onExpand = vi.fn();
+  it("treats an ordinary upward wheel only as user scroll intent", () => {
     const { viewport } = renderTest({
       sessionId: "session-1",
       expandedInitialTailSessionId: null,
-      onExpandInitialTail: onExpand,
       renderItems: [eventRenderItem("a"), eventRenderItem("b")],
     });
 
@@ -160,23 +160,7 @@ describe("useChatViewport", () => {
       viewport().handlers.onWheel({ deltaY: -10 } as React.WheelEvent<HTMLDivElement>);
     });
 
-    expect(onExpand).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not call onExpandInitialTail when already expanded", () => {
-    const onExpand = vi.fn();
-    const { viewport } = renderTest({
-      sessionId: "session-1",
-      expandedInitialTailSessionId: "session-1",
-      onExpandInitialTail: onExpand,
-      renderItems: [eventRenderItem("a"), eventRenderItem("b")],
-    });
-
-    act(() => {
-      viewport().handlers.onWheel({ deltaY: -10 } as React.WheelEvent<HTMLDivElement>);
-    });
-
-    expect(onExpand).not.toHaveBeenCalled();
+    expect(viewport().userHasScrolled).toBe(true);
   });
 
   it("tracks userHasScrolled via wheel interactions", () => {
@@ -202,6 +186,25 @@ describe("useChatViewport", () => {
     rerender({ sessionId: "session-2", renderItems: [eventRenderItem("b")] });
 
     expect(viewport().userHasScrolled).toBe(false);
+  });
+
+  it("primes the session after a loading placeholder is replaced by the scroll viewport", () => {
+    vi.useFakeTimers();
+    const { viewport, rerender, container } = renderTest({ viewportReady: false });
+
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(viewport().scrollRef.current).toBeNull();
+    expect(viewport().isSessionScrollPrimed).toBe(false);
+
+    rerender({ viewportReady: true });
+    expect(container.querySelector("[data-testid='scroll']")).toBeInstanceOf(HTMLDivElement);
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(viewport().isSessionScrollPrimed).toBe(true);
   });
 
   it("focuses a timeline event by id", () => {

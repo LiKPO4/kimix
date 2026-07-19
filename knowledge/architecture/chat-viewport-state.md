@@ -4,7 +4,7 @@ title: Chat Viewport State
 description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-18T12:45:00+08:00"
+timestamp: "2026-07-19T09:15:00+08:00"
 ---
 
 # Chat Viewport State
@@ -51,6 +51,16 @@ The chat viewport has two modes:
   settlement, invalidate the old anchor generation, and capture a new rendered
   message anchor after the move. Streaming may preserve that anchor but may not
   resume following without explicit downward intent reaching the tail.
+
+The session-open transaction starts only after the real scroll viewport has
+mounted. An official-history loading placeholder has no scroll owner and may
+not mark the session as primed; when loading finishes, readiness re-runs both
+bottom settlement and `ResizeObserver` attachment against the mounted node.
+The bounded initial tail remains structurally stable during ordinary wheel or
+touch input. Hidden history is mounted only by an explicit history disclosure
+or navigation request, with a rendered-message anchor protecting that explicit
+expansion. User input must never both move the viewport and change its history
+window in the same transaction.
 
 Rail/search navigation uses an immediate scroll transaction. A smooth animation
 would expose multiple intermediate `scrollTop` values while streaming commits

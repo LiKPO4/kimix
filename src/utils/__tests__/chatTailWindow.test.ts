@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectInitialChatTail } from "../chatTailWindow";
+import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "../chatTailWindow";
 
 type Item = { id: string; completedAssistant?: boolean };
 
@@ -44,5 +44,18 @@ describe("selectInitialChatTail", () => {
     const items = Array.from({ length: 20 }, (_, index) => ({ id: `user-${index}` }));
     expect(select(items)).toHaveLength(12);
     expect(select(items)[0]?.id).toBe("user-8");
+  });
+});
+
+describe("shouldUseInitialChatTail", () => {
+  it("keeps the bounded tail until that session is explicitly expanded", () => {
+    expect(shouldUseInitialChatTail("session-1", null)).toBe(true);
+    expect(shouldUseInitialChatTail("session-1", "session-2")).toBe(true);
+    expect(shouldUseInitialChatTail("session-1", "session-1")).toBe(false);
+  });
+
+  it("exposes initial-tail history to explicit navigation even below the ordinary page limit", () => {
+    expect(hasExpandableChatHistory(false, true)).toBe(true);
+    expect(hasExpandableChatHistory(false, false)).toBe(false);
   });
 });

@@ -24,7 +24,7 @@ import { reliableAssistantDurationMs } from "@/utils/duration";
 import { hasMetricStatus, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError, logEvent } from "@/utils/reportError";
-import { selectInitialChatTail } from "@/utils/chatTailWindow";
+import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
 import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
 import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
@@ -1253,21 +1253,22 @@ export const ChatThread = memo(function ChatThread() {
   );
 
   const hasMoreOlderItems = renderItems.length > CHAT_FULL_RENDER_ITEM_LIMIT + olderItemsPage * OLDER_ITEMS_BATCH_SIZE;
+  const isRestoringOfficialHistory = Boolean(session?.isLoading && roomTimeline.length > 0);
+  const isInitialTailOnly = shouldUseInitialChatTail(session?.id, expandedInitialTailSessionId);
 
-  const expandInitialTailRef = useRef<() => void>(() => {});
   const expandOlderItemsRef = useRef<() => void>(() => {});
   const expandOlderItemsToEndRef = useRef<() => void>(() => {});
 
   const viewport = useChatViewport({
     sessionId: session?.id,
+    viewportReady: !isRestoringOfficialHistory,
     runtimeSessionId,
     runningSessionId,
     contentVersion,
     renderItems,
     olderItemsPage,
     expandedInitialTailSessionId,
-    hasMoreOlderItems,
-    onExpandInitialTail: () => expandInitialTailRef.current(),
+    hasMoreOlderItems: hasExpandableChatHistory(hasMoreOlderItems, isInitialTailOnly),
     onExpandOlderItemsToEnd: () => expandOlderItemsToEndRef.current(),
     onHighlightEvent: setHighlightedEventId,
   });
@@ -1406,7 +1407,6 @@ export const ChatThread = memo(function ChatThread() {
   const shouldFoldOlderItems = renderItems.length > visibleItemLimit;
   const foldedItemCount = shouldFoldOlderItems ? renderItems.length - visibleItemLimit : 0;
   const fullVisibleRenderItems = shouldFoldOlderItems ? renderItems.slice(-visibleItemLimit) : renderItems;
-  const isInitialTailOnly = Boolean(session?.id && expandedInitialTailSessionId !== session.id && !viewport.userHasScrolled);
   const initialTailRenderItems = useMemo(() => selectInitialChatTail(fullVisibleRenderItems, {
     isCompletedAssistant: (item) => item.type === "event" &&
       item.event.type === "assistant_message" &&
@@ -1416,7 +1416,6 @@ export const ChatThread = memo(function ChatThread() {
   const visibleRenderItems = isInitialTailOnly ? initialTailRenderItems : fullVisibleRenderItems;
   const initialTailHiddenCount = isInitialTailOnly ? Math.max(0, renderItems.length - visibleRenderItems.length) : 0;
   const hasVisibleContent = Boolean(session && visibleEvents.length > 0 && hasVisibleConversation(visibleEvents, runningSessionId, session.id, runtimeSessionId ?? undefined, hasActiveTurn));
-  const isRestoringOfficialHistory = Boolean(session?.isLoading && roomTimeline.length > 0);
   const isSessionScrollPrimed = viewport.isSessionScrollPrimed;
   const eagerMarkdown = viewport.eagerMarkdown;
 
@@ -1517,16 +1516,6 @@ export const ChatThread = memo(function ChatThread() {
     viewport.getScrollDiagSnapshot,
   ]);
 
-
-  useEffect(() => {
-    if (!session?.id || !isInitialTailOnly || isRestoringOfficialHistory) return;
-    const sessionId = session.id;
-    const frame = window.requestAnimationFrame(() => {
-      setExpandedInitialTailSessionId(sessionId);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [session?.id, isInitialTailOnly, isRestoringOfficialHistory]);
-
   if (isRestoringOfficialHistory) {
     return <SessionHistoryLoadingState />;
   }
@@ -1542,14 +1531,20 @@ export const ChatThread = memo(function ChatThread() {
   expandOlderItemsRef.current = expandOlderItems;
 
   const expandOlderItemsToEnd = () => {
+    if (!session?.id) return;
     const maxPage = Math.max(
       0,
       Math.ceil((renderItems.length - CHAT_FULL_RENDER_ITEM_LIMIT) / OLDER_ITEMS_BATCH_SIZE)
     );
-    if (olderItemsPage >= maxPage) return;
-    viewport.prepareOlderItemsExpandToEnd();
-    setOlderItemsPage(maxPage);
-    setExpandedInitialTailSessionId(null);
+    const shouldExpandOlderItems = olderItemsPage < maxPage;
+    if (!shouldExpandOlderItems && !isInitialTailOnly) return;
+    if (shouldExpandOlderItems) {
+      viewport.prepareOlderItemsExpandToEnd();
+      setOlderItemsPage(maxPage);
+    } else {
+      viewport.prepareInitialTailExpand();
+    }
+    setExpandedInitialTailSessionId(session.id);
   };
   expandOlderItemsToEndRef.current = expandOlderItemsToEnd;
 
@@ -1558,10 +1553,6 @@ export const ChatThread = memo(function ChatThread() {
     viewport.prepareInitialTailExpand();
     setExpandedInitialTailSessionId(session.id);
   };
-  expandInitialTailRef.current = expandInitialTail;
-
-
-
   return (
     <div className="relative h-full" style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
       {session.longTask && (

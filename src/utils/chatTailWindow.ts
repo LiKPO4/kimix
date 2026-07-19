@@ -5,6 +5,20 @@ interface TailWindowOptions<T> {
   isCompletedAssistant: (item: T) => boolean;
 }
 
+export function shouldUseInitialChatTail(
+  sessionId: string | undefined,
+  explicitlyExpandedSessionId: string | null,
+): boolean {
+  return Boolean(sessionId && explicitlyExpandedSessionId !== sessionId);
+}
+
+export function hasExpandableChatHistory(
+  hasMoreOlderItems: boolean,
+  isInitialTailOnly: boolean,
+): boolean {
+  return hasMoreOlderItems || isInitialTailOnly;
+}
+
 export function selectInitialChatTail<T>(items: T[], options: TailWindowOptions<T>): T[] {
   const minItems = Math.max(1, options.minItems ?? 4);
   const maxItems = Math.max(minItems, options.maxItems ?? 12);

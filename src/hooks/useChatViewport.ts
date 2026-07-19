@@ -37,6 +37,7 @@ export type { ViewportAnchor, ResizeViewportAnchor, ProcessCollapseViewportSnaps
 
 export interface UseChatViewportOptions {
   sessionId: string | undefined;
+  viewportReady?: boolean;
   runtimeSessionId?: string | null;
   runningSessionId?: string | null;
   contentVersion: string;
@@ -44,7 +45,6 @@ export interface UseChatViewportOptions {
   olderItemsPage: number;
   expandedInitialTailSessionId: string | null;
   hasMoreOlderItems: boolean;
-  onExpandInitialTail: () => void;
   onExpandOlderItemsToEnd: () => void;
   onHighlightEvent?: (eventId: string | null) => void;
 }
@@ -99,6 +99,7 @@ export interface UseChatViewportResult {
 export function useChatViewport(options: UseChatViewportOptions): UseChatViewportResult {
   const {
     sessionId,
+    viewportReady = true,
     runtimeSessionId,
     runningSessionId,
     contentVersion,
@@ -106,7 +107,6 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     olderItemsPage,
     expandedInitialTailSessionId,
     hasMoreOlderItems,
-    onExpandInitialTail,
     onExpandOlderItemsToEnd,
     onHighlightEvent,
   } = options;
@@ -151,8 +151,6 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   const [isFollowing, setIsFollowing] = useState(true);
 
   contentVersionRef.current = contentVersion;
-
-  const isInitialTailOnly = Boolean(sessionId && expandedInitialTailSessionId !== sessionId && !userHasScrolled);
 
   const showScrollToBottomRef = useRef(false);
 
@@ -249,6 +247,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   });
 
   useResizeObserver({
+    enabled: viewportReady,
     scrollRef,
     streamContentRef,
     sessionId,
@@ -295,12 +294,11 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     if (event.deltaY < 0) {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
-      if (isInitialTailOnly) onExpandInitialTail();
     } else if (event.deltaY > 0) {
       recordExplicitUserScrollIntent();
       userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
-  }, [isInitialTailOnly, lockScrollForUserInput, onExpandInitialTail, pauseAutoFollowForUser, recordExplicitUserScrollIntent]);
+  }, [lockScrollForUserInput, pauseAutoFollowForUser, recordExplicitUserScrollIntent]);
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
     touchStartYRef.current = event.touches[0]?.clientY ?? null;
@@ -686,7 +684,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     cancelPendingAnchorCapture();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
-    if (sessionId) {
+    if (sessionId && viewportReady) {
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       const node = scrollRef.current;
       if (node) {
@@ -714,6 +712,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     };
   }, [
     sessionId,
+    viewportReady,
     cancelSessionAutoBottom,
     cancelPendingAnchorCapture,
     resetScrollAnchor,
@@ -771,7 +770,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     updateShowScrollToBottom(distance > 80);
   }, [olderItemsPage, renderItems.length, updateAutoFollow, updateShowScrollToBottom, autoFollowRef, userScrollRef, pendingOlderItemsScrollAnchorRef, scrollRef]);
 
-  const isSessionScrollPrimed = !sessionId || primedSessionId === sessionId;
+  const isSessionScrollPrimed = !sessionId || (viewportReady && primedSessionId === sessionId);
   const eagerMarkdown = Boolean(sessionId && (
     Date.now() < sessionAutoBottomUntilRef.current || userHasScrolled
   ));

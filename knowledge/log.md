@@ -2,6 +2,10 @@
 
 ## 2026-07-19
 
+* **Session-open scrolling starts when the viewport exists**: Official-history placeholders cannot prime a null scroll ref; readiness re-runs bottom settlement and observer attachment after the real node mounts, while ordinary wheel/touch input leaves the bounded initial-tail DOM unchanged. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md) and [/project/kimix.md](/project/kimix.md).
+
+* **Cache v7 repairs identity-less cross-turn compositions conservatively**: A shorter canonical history may replace one polluted local Assistant row only when disjoint, unambiguous, stable official replies from its current and another user turn cover nearly the whole row; quotations and low-coverage matches remain protected by monotonicity. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
+
 * **Snapshot replay is ordered, settled, and repaired by official message identity**: Nested Server replay retains `created_at` and stable `snapshotMessageId`; content and terminal frames update only that message, older unseen replies are inserted before the correct user boundary, timeline-open heuristics cannot suppress an authoritative inactive snapshot terminal, and a proven stable-ID/user-turn mismatch lets canonical history replace already persisted cross-turn pollution. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-18

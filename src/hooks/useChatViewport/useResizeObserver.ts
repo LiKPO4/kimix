@@ -2,6 +2,7 @@ import { useRef, useLayoutEffect, useCallback } from "react";
 import { USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS } from "./constants";
 
 export interface UseResizeObserverOptions {
+  enabled?: boolean;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   streamContentRef: React.RefObject<HTMLDivElement | null>;
   sessionId?: string;
@@ -20,6 +21,7 @@ export interface UseResizeObserverOptions {
 
 export function useResizeObserver(options: UseResizeObserverOptions): void {
   const {
+    enabled = true,
     scrollRef,
     streamContentRef,
     sessionId,
@@ -45,6 +47,7 @@ export function useResizeObserver(options: UseResizeObserverOptions): void {
   }), []);
 
   useLayoutEffect(() => {
+    if (!enabled) return;
     const node = scrollRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
     let resizeFrame = 0;
@@ -123,6 +126,7 @@ export function useResizeObserver(options: UseResizeObserverOptions): void {
   }, [
     scrollRef,
     streamContentRef,
+    enabled,
     sessionId,
     olderItemsPage,
     readScrollSize,
