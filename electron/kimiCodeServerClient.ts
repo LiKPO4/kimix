@@ -507,6 +507,42 @@ export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, session
   ];
 }
 
+export function completedPromptMessagesToServerFrames(
+  messages: readonly unknown[],
+  sessionId: string,
+  promptId: string,
+  seq: number,
+  epoch?: string,
+): ServerFrame[] {
+  const chronological = [...messages]
+    .filter(isRecord)
+    .map((message, index) => ({ message, index }))
+    .sort((left, right) => {
+      const leftTime = Date.parse(typeof left.message.created_at === "string" ? left.message.created_at : "");
+      const rightTime = Date.parse(typeof right.message.created_at === "string" ? right.message.created_at : "");
+      if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+      // `/messages` returns newest first. Reverse equal/unknown timestamps so
+      // prompt -> injection -> assistant stays causal even at millisecond ties.
+      return right.index - left.index;
+    })
+    .map(({ message }) => message);
+  const promptIndex = chronological.findIndex((message) => (
+    message.id === promptId || message.prompt_id === promptId
+  ));
+  if (promptIndex === -1) return [];
+  return chronological
+    .slice(promptIndex)
+    .flatMap((message) => snapshotMessageToServerFrames(message, sessionId, seq, epoch, "history"))
+    .map((frame) => ({
+      ...frame,
+      payload: isRecord(frame.payload)
+        ? { ...frame.payload, kimixPromptCompletionBarrier: true }
+        : frame.payload,
+    }));
+}
+
 export function snapshotToHistoryFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
   const frames = snapshotMessagesToServerFrames(snapshot, sessionId);
   const seq = snapshot.as_of_seq;
@@ -529,6 +565,7 @@ export class KimiCodeServerClient {
   private readonly subscribed = new Set<string>();
   private readonly cursors = new Map<string, ServerCursor>();
   private readonly recoveringSnapshots = new Map<string, Promise<void>>();
+  private readonly promptCompletionBarriers = new Map<string, Promise<void>>();
   private readonly queued: ServerFrame[] = [];
   private readonly waiters = new Set<{
     match: (frame: ServerFrame) => boolean;
@@ -1067,6 +1104,71 @@ export class KimiCodeServerClient {
   }
 
   private receive(frame: ServerFrame) {
+    const payload = isRecord(frame.payload) ? frame.payload : {};
+    if (
+      frame.type === "prompt.completed" &&
+      typeof frame.session_id === "string" &&
+      payload.recovered_from_snapshot !== true
+    ) {
+      this.queuePromptCompletion(frame);
+      return;
+    }
+    this.deliver(frame);
+  }
+
+  private queuePromptCompletion(frame: ServerFrame) {
+    const sessionId = frame.session_id;
+    if (!sessionId) {
+      this.deliver(frame);
+      return;
+    }
+    const previous = this.promptCompletionBarriers.get(sessionId) ?? Promise.resolve();
+    const barrier = previous
+      .catch(() => undefined)
+      .then(() => this.deliverPromptCompletion(frame));
+    this.promptCompletionBarriers.set(sessionId, barrier);
+    void barrier.finally(() => {
+      if (this.promptCompletionBarriers.get(sessionId) === barrier) {
+        this.promptCompletionBarriers.delete(sessionId);
+      }
+    });
+  }
+
+  private async deliverPromptCompletion(frame: ServerFrame) {
+    const sessionId = frame.session_id;
+    const payload = isRecord(frame.payload) ? frame.payload : {};
+    const promptId = typeof (payload.promptId ?? payload.prompt_id) === "string"
+      ? String(payload.promptId ?? payload.prompt_id)
+      : "";
+    if (sessionId && promptId) {
+      try {
+        const latest = await this.listMessages(sessionId, 100);
+        let replayFrames = completedPromptMessagesToServerFrames(
+          latest.items,
+          sessionId,
+          promptId,
+          frame.seq ?? 0,
+          frame.epoch,
+        );
+        if (replayFrames.length === 0 && latest.has_more) {
+          const snapshot = await this.getSnapshot(sessionId);
+          replayFrames = completedPromptMessagesToServerFrames(
+            snapshot.messages?.items ?? [],
+            sessionId,
+            promptId,
+            snapshot.as_of_seq,
+            snapshot.epoch,
+          );
+        }
+        for (const replayFrame of replayFrames) this.deliver(replayFrame);
+      } catch (error) {
+        console.warn(`[KimiCodeServerClient] prompt ${promptId} completion snapshot barrier failed:`, error);
+      }
+    }
+    this.deliver(frame);
+  }
+
+  private deliver(frame: ServerFrame) {
     if (frame.type === "ping") {
       const nonce = (frame.payload as { nonce?: unknown } | undefined)?.nonce;
       this.socket?.send(JSON.stringify({ type: "pong", payload: { nonce } }));

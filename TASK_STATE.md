@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.58 Prompt 完成屏障根治首轮消息头缺失
+
+- 当前目标：根治切换模型后首轮 Assistant/消息头不显示、发送第二条消息后上一轮才突然补出的缺陷。
+- 根因证据：目标官方会话在首条用户消息后 2ms 已创建含 thinking + text 的完整 Assistant；隔离 WebSocket 探针确认切换前后 epoch 不变、seq 连续且 `assistant.delta` 完整，排除模型与 Server 切换断流。`diag.log` 直到第二条消息运行约 6 秒才记录 `running-sample` 接纳第一轮官方正文，证明 Kimix 在超快 prompt 结束前漏接实时增量后，先关闭了运行态，而首个 1.2 秒快照采样尚未启动，缺失正文只能等下一轮补回。
+- 修复：将 `prompt.completed` 改为协议级完成屏障。Client 收到完成帧后先从官方 messages 端点读取最近消息，按 prompt ID 截取本轮并以稳定 `snapshotMessageId` 回放；最近 100 条找不到 prompt 时才回退完整 snapshot。只有本轮官方消息已交付给 Host/renderer（或读取失败并明确降级）后，才下发原始 `prompt.completed`，从而保证状态完成、批量 flush 和 Assistant 渲染的因果顺序，不再依赖下一轮轮询。版本升至 v2.16.58。
+- 验证：新增先失败后通过的协议与渲染回归，覆盖实时 delta 全丢/半丢、prompt 中夹有注入 user message、官方 messages 倒序且时间戳相同，以及完成前 Assistant 必须已进入可见且已收口的 renderItems；真实 0.27.0 Server 集成验证通过。严格 Node/Renderer 类型检查通过；全量 106 文件 872 项通过；生产构建通过，renderer 为 `assets/index-DRLmWo3M.js`；OKF 严格校验通过（10 概念、18 Markdown、248 链接）；`git diff --check` 通过（仅 LF/CRLF 提示）。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`、`knowledge/architecture/runtime-routing.md`。
+- 下一步：提交本轮；由用户在 v2.16.58 切换模型后连续复验首轮短回复。
+
 ## 2026-07-19 v2.16.57 第三方模型供应商分层管理
 
 - 当前目标：将设置页第三方模型配置完整重做为“供应商连接配置 + 供应商下多个模型”的两级管理，同时直接兼容现有 `config.toml` 数据。

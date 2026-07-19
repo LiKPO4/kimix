@@ -400,6 +400,8 @@ export interface AssistantMessageEvent {
   snapshotMessageId?: string;
   /** False when the snapshot identity had to fall back to role + body text. */
   snapshotMessageIdStable?: boolean;
+  /** Authoritative prompt-completion replay; replaces partial live dimensions in the same turn. */
+  completionBarrierReplay?: boolean;
   agentId?: string;
   agentRole?: "executor" | "reviewer";
   content: string;

@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Prompt completion now waits for its authoritative Assistant delivery**: The Server Client replays the bounded official prompt messages before exposing `prompt.completed`, so an ultra-fast turn cannot lose its first response and wait for the next prompt's running snapshot to repair it. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Third-party models now share Provider-owned connections**: Settings groups existing aliases under Provider records, saves credentials once, keeps model deletion separate from Provider deletion, and preserves official managed Providers as read-only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Initial history window now follows five user turns**: Session open starts at the fifth-latest `user_message` within the 28-item safety window, while ordinary scrolling remains structurally read-only; a visible folded-history disclosure reduces the scroll area's top inset to 10px. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md) and [/project/kimix.md](/project/kimix.md).

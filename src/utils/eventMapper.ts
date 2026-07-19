@@ -1511,15 +1511,25 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         return result;
       }
       const remainsComplete = target.isComplete || incoming.isComplete;
+      const replaceCanonicalDimensions = incoming.completionBarrierReplay === true;
       const result = [...existing];
       result[stableAssistantIndex] = {
         ...target,
+        completionBarrierReplay: incoming.completionBarrierReplay ?? target.completionBarrierReplay,
         agentRole: incoming.agentRole ?? target.agentRole,
         model: incoming.model ?? target.model,
-        content: appendAssistantContent(target.content, incoming.content),
-        thinking: incoming.thinking ? (target.thinking ?? "") + incoming.thinking : target.thinking,
+        content: replaceCanonicalDimensions && incoming.content
+          ? incoming.content
+          : appendAssistantContent(target.content, incoming.content),
+        thinking: replaceCanonicalDimensions && incoming.thinking
+          ? incoming.thinking
+          : incoming.thinking
+            ? (target.thinking ?? "") + incoming.thinking
+            : target.thinking,
         thinkingParts: incoming.thinkingParts
-          ? [...(target.thinkingParts ?? []), ...incoming.thinkingParts]
+          ? replaceCanonicalDimensions
+            ? incoming.thinkingParts
+            : [...(target.thinkingParts ?? []), ...incoming.thinkingParts]
           : target.thinkingParts,
         isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
         isComplete: remainsComplete,
@@ -1528,6 +1538,33 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           : reliableAssistantDurationMs(target.durationMs),
       };
       return result;
+    }
+
+    if (stableSnapshotId && incoming.completionBarrierReplay) {
+      const completionTargetIndex = existing.findLastIndex((event) => (
+        event.type === "assistant_message" &&
+        !event.isComplete &&
+        (!incoming.roomAgentId || event.roomAgentId === incoming.roomAgentId) &&
+        (!incoming.roomMessageId || event.roomMessageId === incoming.roomMessageId) &&
+        (!incoming.agentTurnId || event.agentTurnId === incoming.agentTurnId)
+      ));
+      if (completionTargetIndex !== -1) {
+        const target = existing[completionTargetIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
+        const result = [...existing];
+        result[completionTargetIndex] = {
+          ...target,
+          snapshotMessageId: incoming.snapshotMessageId,
+          snapshotMessageIdStable: incoming.snapshotMessageIdStable,
+          completionBarrierReplay: true,
+          agentRole: incoming.agentRole ?? target.agentRole,
+          model: incoming.model ?? target.model,
+          content: incoming.content || target.content,
+          thinking: incoming.thinking || target.thinking,
+          thinkingParts: incoming.thinkingParts ?? target.thinkingParts,
+          isThinking: target.isThinking || Boolean(incoming.thinking),
+        };
+        return result;
+      }
     }
 
     // A previously unseen stable snapshot event that predates the latest local

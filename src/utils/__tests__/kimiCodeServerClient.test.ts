@@ -14,6 +14,9 @@ import {
   toServerPromptContent,
 } from "../../../electron/kimiCodeServerClient";
 import { mapHistoryEvents } from "../eventMapper";
+import { reduceKimiCodeEvents } from "../kimiCodeEventMapper";
+import { settleInactiveEvents } from "../eventHelpers";
+import { buildRenderItems } from "../../components/chat/ChatThread";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -211,6 +214,101 @@ describe("KimiCodeServerClient protocol adapters", () => {
         recovered_from_snapshot: true,
       },
     });
+  });
+
+  it("delivers the completed prompt's authoritative assistant before prompt.completed", async () => {
+    const promptId = "msg_01PROMPT";
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      expect(url).toContain("/api/v1/sessions/session-1/messages?");
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          has_more: false,
+          items: [
+            {
+              id: "msg_session-1_000002",
+              role: "assistant",
+              created_at: "2026-07-19T13:56:09.526Z",
+              content: [
+                { type: "thinking", thinking: "确认在线" },
+                { type: "text", text: "在的，有什么需要？" },
+              ],
+            },
+            {
+              id: "msg_session-1_000001",
+              role: "user",
+              created_at: "2026-07-19T13:56:09.526Z",
+              content: [{ type: "text", text: "<system-reminder>injected</system-reminder>" }],
+              metadata: { origin: { kind: "injection" } },
+            },
+            {
+              id: promptId,
+              role: "user",
+              created_at: "2026-07-19T13:56:09.526Z",
+              content: [{ type: "text", text: "你还在吗" }],
+            },
+          ],
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const observed: Array<{ type: string; payload?: unknown }> = [];
+    client.onFrame((frame) => observed.push(frame));
+    const internals = client as unknown as {
+      receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+
+    internals.receive({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 13,
+      epoch: "epoch-1",
+      payload: { prompt_id: promptId, reason: "completed" },
+    });
+
+    await vi.waitFor(() => expect(observed.some((frame) => frame.type === "prompt.completed")).toBe(true));
+    const completionIndex = observed.findIndex((frame) => frame.type === "prompt.completed");
+    const assistantIndex = observed.findIndex((frame) => (
+      frame.type === "content.part" &&
+      (frame.payload as { part?: { text?: string } } | undefined)?.part?.text === "在的，有什么需要？"
+    ));
+    expect(assistantIndex).toBeGreaterThanOrEqual(0);
+    expect(assistantIndex).toBeLessThan(completionIndex);
+
+    const timeline = settleInactiveEvents(reduceKimiCodeEvents([
+      {
+        id: promptId,
+        type: "user_message",
+        timestamp: Date.parse("2026-07-19T13:56:09.526Z"),
+        content: "你还在吗",
+      },
+      {
+        id: "assistant-placeholder",
+        type: "assistant_message",
+        timestamp: Date.parse("2026-07-19T13:56:09.526Z") + 1,
+        content: "在",
+        thinking: "确",
+        thinkingParts: [{
+          id: "thinking-partial",
+          timestamp: Date.parse("2026-07-19T13:56:09.526Z") + 1,
+          text: "确",
+        }],
+        isThinking: true,
+        isComplete: false,
+      },
+    ], observed.map((frame) => flattenServerEvent(frame as Parameters<typeof flattenServerEvent>[0]))));
+    const renderedAssistant = buildRenderItems(timeline, "kimi-code")
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(renderedAssistant).toMatchObject({
+      type: "event",
+      event: {
+        type: "assistant_message",
+        content: "在的，有什么需要？",
+        isComplete: true,
+      },
+    });
+    await client.close();
   });
 
   it("uses official P3 REST routes for fork, children, tasks and terminals", async () => {
