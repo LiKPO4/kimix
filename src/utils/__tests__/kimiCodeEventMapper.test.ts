@@ -66,6 +66,43 @@ describe("mapKimiCodeEvent", () => {
     expect(assistant?.timestamp).toBe(3000);
   });
 
+  it("keeps the official snapshot timestamp and identity through nested replay events", () => {
+    const createdAt = "2026-07-17T07:10:07.216Z";
+    const assistant = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      created_at: createdAt,
+      snapshotReplay: "history",
+      snapshotMessageId: "msg-history",
+      snapshotMessageIdStable: true,
+      event: { type: "content.part", part: { type: "text", text: "历史回答" } },
+    }, testOptions());
+    const ended = mapKimiCodeEvent({
+      type: "context.append_loop_event",
+      created_at: createdAt,
+      snapshotReplay: "history",
+      snapshotMessageId: "msg-history",
+      snapshotMessageIdStable: true,
+      event: { type: "turn.ended" },
+    }, testOptions());
+
+    expect(assistant).toMatchObject({
+      type: "assistant_message",
+      timestamp: Date.parse(createdAt),
+      snapshotMessageId: "msg-history",
+      snapshotMessageIdStable: true,
+      content: "历史回答",
+      isComplete: false,
+    });
+    expect(ended).toMatchObject({
+      type: "assistant_message",
+      timestamp: Date.parse(createdAt),
+      snapshotMessageId: "msg-history",
+      snapshotMessageIdStable: true,
+      content: "",
+      isComplete: true,
+    });
+  });
+
   it("maps tool call streaming and result events", () => {
     const options = testOptions();
     const delta = mapKimiCodeEvent({

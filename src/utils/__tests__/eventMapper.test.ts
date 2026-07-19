@@ -1642,6 +1642,96 @@ describe("mapHistoryEvents", () => {
       isComplete: true,
     });
   });
+
+  it("routes an older stable snapshot message by identity instead of merging it into the current turn", () => {
+    const current: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
+      id: "assistant-old", type: "assistant_message", timestamp: 200,
+      snapshotMessageId: "msg-old", snapshotMessageIdStable: true,
+      content: "旧回答前半", isThinking: false, isComplete: false,
+    }, {
+      id: "user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, {
+      id: "assistant-current", type: "assistant_message", timestamp: 1_100,
+      snapshotMessageId: "msg-current", snapshotMessageIdStable: true,
+      content: "当前回答", isThinking: false, isComplete: false,
+    }];
+
+    const withOldTail = mergeEvents(current, {
+      id: "old-tail", type: "assistant_message", timestamp: 210,
+      snapshotMessageId: "msg-old", snapshotMessageIdStable: true,
+      content: "旧回答后半", isThinking: false, isComplete: false,
+    });
+    const settled = mergeEvents(withOldTail, {
+      id: "old-end", type: "assistant_message", timestamp: 220,
+      snapshotMessageId: "msg-old", snapshotMessageIdStable: true,
+      content: "", isThinking: false, isComplete: true,
+    });
+
+    expect(settled).toHaveLength(4);
+    expect(settled[1]).toMatchObject({
+      snapshotMessageId: "msg-old",
+      content: "旧回答前半旧回答后半",
+      isComplete: true,
+    });
+    expect(settled[3]).toMatchObject({
+      snapshotMessageId: "msg-current",
+      content: "当前回答",
+      isComplete: false,
+    });
+  });
+
+  it("inserts an unseen historical assistant before the current user boundary", () => {
+    const current: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
+      id: "user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, {
+      id: "assistant-current", type: "assistant_message", timestamp: 1_100,
+      content: "当前回答", isThinking: false, isComplete: false,
+    }];
+
+    const withHistory = mergeEvents(current, {
+      id: "old-content", type: "assistant_message", timestamp: 200,
+      snapshotMessageId: "msg-old", snapshotMessageIdStable: true,
+      content: "迟到的旧回答", isThinking: false, isComplete: false,
+    });
+    const settled = mergeEvents(withHistory, {
+      id: "old-end", type: "assistant_message", timestamp: 210,
+      snapshotMessageId: "msg-old", snapshotMessageIdStable: true,
+      content: "", isThinking: false, isComplete: true,
+    });
+
+    expect(settled.map((event) => event.id)).toEqual([
+      "user-old", "old-content", "user-current", "assistant-current",
+    ]);
+    expect(settled[1]).toMatchObject({ content: "迟到的旧回答", isComplete: true });
+    expect(settled[3]).toMatchObject({ content: "当前回答", isComplete: false });
+  });
+
+  it("does not let a stable terminal for an earlier completed step close the current step", () => {
+    const current: TimelineEvent[] = [{
+      id: "user", type: "user_message", timestamp: 1_000, content: "检查项目",
+    }, {
+      id: "step-one", type: "assistant_message", timestamp: 1_100,
+      snapshotMessageId: "msg-step-one", snapshotMessageIdStable: true,
+      content: "第一步完成", isThinking: false, isComplete: true,
+    }, {
+      id: "step-two", type: "assistant_message", timestamp: 1_200,
+      snapshotMessageId: "msg-step-two", snapshotMessageIdStable: true,
+      content: "继续检查", isThinking: false, isComplete: false,
+    }];
+
+    const result = mergeEvents(current, {
+      id: "step-one-end", type: "assistant_message", timestamp: 1_150,
+      snapshotMessageId: "msg-step-one", snapshotMessageIdStable: true,
+      content: "", isThinking: false, isComplete: true,
+    });
+
+    expect(result).toBe(current);
+    expect(result[2]).toMatchObject({ snapshotMessageId: "msg-step-two", isComplete: false });
+  });
 });
 
 describe("preserveLocalUserMediaInCanonicalHistory", () => {

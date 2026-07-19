@@ -29,8 +29,21 @@ function isKimixFallbackSteer(event: Record<string, unknown>): boolean {
   return event.source === "kimix-fallback";
 }
 
+function readTimestampCandidate(value: unknown): number | undefined {
+  if (isNumber(value) && value > 0) return value;
+  if (!isString(value) || !value.trim()) return undefined;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function getTimestamp(event: Record<string, unknown>, options: KimiCodeEventMapperOptions): number {
-  return isNumber(event.time) ? event.time : options.now ?? Date.now();
+  for (const candidate of [event.timestamp, event.createdAt, event.created_at, event.time, event.at]) {
+    const timestamp = readTimestampCandidate(candidate);
+    if (timestamp !== undefined) return timestamp;
+  }
+  return options.now ?? Date.now();
 }
 
 function getId(options: KimiCodeEventMapperOptions): string {
@@ -173,8 +186,15 @@ function normalizeKimiCodeEvent(event: Record<string, unknown>): Record<string, 
     return {
       ...event.event,
       agentId: isString(event.event.agentId) ? event.event.agentId : event.agentId,
-      time: isNumber(event.event.time) ? event.event.time : event.time,
+      timestamp: event.event.timestamp ?? event.timestamp,
+      createdAt: event.event.createdAt ?? event.createdAt,
+      created_at: event.event.created_at ?? event.created_at,
+      time: event.event.time ?? event.time,
+      at: event.event.at ?? event.at,
       kimixTerminalScope: event.kimixTerminalScope,
+      snapshotReplay: event.event.snapshotReplay ?? event.snapshotReplay,
+      snapshotRole: event.event.snapshotRole ?? event.snapshotRole,
+      snapshotMessageText: event.event.snapshotMessageText ?? event.snapshotMessageText,
       snapshotMessageId: isString(event.event.snapshotMessageId)
         ? event.event.snapshotMessageId
         : event.snapshotMessageId,
@@ -437,6 +457,8 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        snapshotMessageId: getSnapshotMessageId(event),
+        snapshotMessageIdStable: getSnapshotMessageIdStable(event),
         agentId: getAgentId(event),
         content: "",
         model: isString(event.model) ? event.model : undefined,
@@ -451,6 +473,8 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "assistant_message",
         timestamp,
+        snapshotMessageId: getSnapshotMessageId(event),
+        snapshotMessageIdStable: getSnapshotMessageIdStable(event),
         agentId: getAgentId(event),
         content: "",
         model: isString(event.model) ? event.model : undefined,

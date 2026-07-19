@@ -18,7 +18,7 @@ import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError,
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCodeSessionUnavailableError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
-import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
 import { selectStartupLocalSession, selectStartupProject } from "@/utils/startupContext";
@@ -2441,7 +2441,11 @@ function App() {
         : undefined;
       const runtimeActive = targetSession?.collaboration && roomAgentId
         ? Boolean(roomActivity && isRoomAgentReconciliationStatus(roomActivity.status))
-        : isSessionRuntimeRunning(targetAgentSession, useAppStore.getState().runningSessionId);
+        // Snapshot completion must be guarded only by authoritative runtime
+        // ownership. Using recent open timeline work here creates a loop: the
+        // replayed assistant makes itself look active, so its own TurnEnd is
+        // skipped and the row can remain "running" forever.
+        : isSessionRuntimeTracked(targetAgentSession, useAppStore.getState().runningSessionId);
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;

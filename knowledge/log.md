@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+## 2026-07-19
+
+* **Snapshot replay is ordered and settled by official message identity**: Nested Server replay retains `created_at` and stable `snapshotMessageId`; content and terminal frames update only that message, older unseen replies are inserted before the correct user boundary, and timeline-open heuristics cannot suppress an authoritative inactive snapshot terminal. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 ## 2026-07-18
 
 * **Vendored fallback tracks Kimi Code 0.27 source, not package version alone**: The private Node SDK still reports 0.13.4, but the regenerated `5cc1949` bundle incorporates workspace `agent-core` fixes for interrupted tool-call closure, FetchURL SSRF defense, and Windows workspace identity; singleton-aware Server and subagent probes validate 0.27 without stopping an already-owned runtime. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

@@ -1480,6 +1480,72 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
   // Merge streaming assistant messages
   if (incoming.type === "assistant_message") {
+    const stableSnapshotId = incoming.snapshotMessageIdStable === true
+      ? incoming.snapshotMessageId
+      : undefined;
+    const stableAssistantIndex = stableSnapshotId
+      ? existing.findLastIndex((event) => (
+        event.type === "assistant_message" &&
+        event.snapshotMessageIdStable === true &&
+        event.snapshotMessageId === stableSnapshotId
+      ))
+      : -1;
+    const latestUserTimestamp = existing.reduce<number | undefined>((latest, event) => (
+      event.type === "user_message" && (latest === undefined || event.timestamp > latest)
+        ? event.timestamp
+        : latest
+    ), undefined);
+
+    if (stableAssistantIndex !== -1) {
+      const target = existing[stableAssistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
+      const isIdentityTerminal = incoming.isComplete && !incoming.content && !incoming.thinking;
+      if (isIdentityTerminal) {
+        if (target.isComplete) return existing;
+        const result = [...existing];
+        result[stableAssistantIndex] = {
+          ...target,
+          isThinking: false,
+          isComplete: true,
+          durationMs: completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs),
+        };
+        return result;
+      }
+      const remainsComplete = target.isComplete || incoming.isComplete;
+      const result = [...existing];
+      result[stableAssistantIndex] = {
+        ...target,
+        agentRole: incoming.agentRole ?? target.agentRole,
+        model: incoming.model ?? target.model,
+        content: appendAssistantContent(target.content, incoming.content),
+        thinking: incoming.thinking ? (target.thinking ?? "") + incoming.thinking : target.thinking,
+        thinkingParts: incoming.thinkingParts
+          ? [...(target.thinkingParts ?? []), ...incoming.thinkingParts]
+          : target.thinkingParts,
+        isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
+        isComplete: remainsComplete,
+        durationMs: incoming.isComplete && !target.isComplete
+          ? completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs)
+          : reliableAssistantDurationMs(target.durationMs),
+      };
+      return result;
+    }
+
+    // A previously unseen stable snapshot event that predates the latest local
+    // user belongs to history. Insert it by official time so it can never be
+    // appended to the current open assistant merely because it arrived later.
+    if (
+      stableSnapshotId &&
+      latestUserTimestamp !== undefined &&
+      incoming.timestamp < latestUserTimestamp
+    ) {
+      if (incoming.isComplete && !incoming.content && !incoming.thinking) return existing;
+      const insertionIndex = existing.findIndex((event) => event.timestamp > incoming.timestamp);
+      if (insertionIndex === -1) return [...existing, incoming];
+      const result = [...existing];
+      result.splice(insertionIndex, 0, incoming);
+      return result;
+    }
+
     if (incoming.isComplete && !incoming.content && !incoming.thinking) {
       const latestOpenIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
       const hasRunningSubagent = existing.some((e) => e.type === "subagent" && e.status === "running");

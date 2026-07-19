@@ -145,6 +145,42 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
     expect(shouldSkipKimiCodeSnapshotReplay(historicalTurnEnd, events, true)).toBe(true);
     expect(shouldSkipKimiCodeSnapshotReplay(historicalTurnEnd, events, false)).toBe(false);
   });
+
+  it("allows an older identified history turn to settle while a newer turn is active", () => {
+    const events: TimelineEvent[] = [{
+      id: "assistant-old",
+      type: "assistant_message",
+      timestamp: 200,
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+      content: "旧回答",
+      isThinking: false,
+      isComplete: false,
+    }, {
+      id: "user-new",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "新问题",
+    }, {
+      id: "assistant-new",
+      type: "assistant_message",
+      timestamp: 1_100,
+      snapshotMessageId: "msg-new",
+      snapshotMessageIdStable: true,
+      content: "新回答",
+      isThinking: false,
+      isComplete: false,
+    }];
+
+    expect(shouldSkipKimiCodeSnapshotReplay({
+      type: "turn.ended",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+      created_at: 220,
+    }, events, true)).toBe(false);
+  });
 });
 
 describe("reconcileRunningKimiSnapshot", () => {

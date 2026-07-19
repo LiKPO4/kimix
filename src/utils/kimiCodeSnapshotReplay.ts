@@ -83,6 +83,34 @@ export function shouldSkipKimiCodeSnapshotReplay(
     (rawType === "turn.ended" || rawType === "TurnEnd") &&
     (runtimeActive || hasPendingLocalPromptPlaceholder(events))
   ) {
+    const messageId = isString(rawEvent.snapshotMessageId) && rawEvent.snapshotMessageId
+      ? rawEvent.snapshotMessageId
+      : undefined;
+    const messageIdStable = rawEvent.snapshotMessageIdStable === true;
+    const latestOpenAssistantIndex = events.findLastIndex((event) => (
+      event.type === "assistant_message" && !event.isComplete
+    ));
+    const matchingAssistantIndex = messageId && messageIdStable
+      ? events.findLastIndex((event) => (
+        event.type === "assistant_message" &&
+        event.snapshotMessageIdStable === true &&
+        snapshotMessageIdFromEvent(event) === messageId
+      ))
+      : -1;
+    // A replayed terminal for an older identified message is authoritative for
+    // that message and must not be mistaken for the live turn's terminal.
+    if (matchingAssistantIndex !== -1 && matchingAssistantIndex !== latestOpenAssistantIndex) {
+      return false;
+    }
+    const timestamp = snapshotTimestamp(rawEvent);
+    const latestUserTimestamp = events.reduce<number | undefined>((latest, event) => (
+      event.type === "user_message" && (latest === undefined || event.timestamp > latest)
+        ? event.timestamp
+        : latest
+    ), undefined);
+    if (timestamp !== undefined && latestUserTimestamp !== undefined && timestamp < latestUserTimestamp) {
+      return false;
+    }
     return true;
   }
   const text = snapshotText(rawEvent);
