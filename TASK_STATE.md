@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.57 第三方模型供应商分层管理
+
+- 当前目标：将设置页第三方模型配置完整重做为“供应商连接配置 + 供应商下多个模型”的两级管理，同时直接兼容现有 `config.toml` 数据。
+- 根因：底层 Kimi Code 已将 `[providers.*]` 与 `[models.*]` 分离，但旧设置页仍把 Provider 名称、Base URL、API Key、模型别名、模型 ID、Context 塞进同一份草稿；每新增或修改一个模型都要重复处理供应商凭据，删除最后一个模型还会隐式删除 Provider。
+- 修复：新增 Kimix 风格双栏管理器，左侧区分内置/第三方 Provider，右侧独立编辑连接信息并维护共享模型列表；现有配置按 provider 引用直接分组，未绑定旧模型仍可见。新增独立 Provider 保存、模型保存和 Provider 删除 IPC；模型删除只删除模型，Provider 删除需二次确认并连同引用模型处理。官方 managed Provider 保持只读；连接测试可复用直接保存或 `[providers.*.env]` 提供的 API Key；跨 Provider 的模型别名冲突会显式拒绝。SDK 保存失败时 TOML fallback 原位置按字段更新，保留未知字段及 `.env`/`.oauth` 子表顺序。版本升至 v2.16.57。
+- 验证：新增 Provider 分组/旧数据迁移与 TOML 原位置编辑共 7 项测试；全量 106 文件 871 项通过；严格 Node/Renderer 类型检查通过；生产构建通过，renderer 为 `assets/index-CPvOlTmx.js`；OKF 严格校验通过（10 概念、18 Markdown、247 链接）；`git diff --check` 通过（仅 LF/CRLF 提示）。
+- 关键文件：`src/components/settings/ModelProviderManager.tsx`、`src/components/settings/SettingsPanel.tsx`、`src/utils/modelProviderConfig.ts`、`src/utils/tomlSectionEditor.ts`、`electron/main.ts`、`electron/preload.ts`、`electron/types/ipc.ts`、`knowledge/architecture/runtime-routing.md`。
+- 下一步：用户在 v2.16.57 设置页视觉验收内置/第三方 Provider 分组、添加 Provider、同一 Provider 连续添加多个模型及删除边界。
+
 ## 2026-07-19 v2.16.56 初始五轮窗口与折叠入口贴顶
 
 - 当前目标：初次打开长会话时至少显示最近 5 个完整用户轮次，并消除折叠历史展开按钮上方过大的空白。

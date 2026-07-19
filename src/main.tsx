@@ -63,6 +63,7 @@ import type {
   PrepareKimiSkillResponse,
   SyncKimiAgentSkillsResponse,
   SearchProjectFilesResponse,
+  SaveKimiModelConfigResponse,
   SettingsResponse,
   StartSessionResponse,
   UpdateKimiCliResponse,
@@ -149,6 +150,32 @@ function installBrowserPreviewApi() {
   const okVoid = (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined });
   const fail = <T,>(action: string): Promise<T> =>
     Promise.resolve({ success: false, error: unsupported(action) } as T);
+  const previewModelConfigMutation = (message: string): Promise<SaveKimiModelConfigResponse> => Promise.resolve({
+    success: true,
+    data: {
+      configPath: "~/.kimi-code/config.toml",
+      exists: true,
+      defaultModel: "deepseek/deepseek-v4-flash",
+      providers: [{
+        name: "deepseek",
+        type: "openai",
+        baseUrl: "https://api.deepseek.com",
+        hasApiKey: true,
+        hasEnv: false,
+        hasOauth: false,
+      }],
+      models: [{
+        alias: "deepseek/deepseek-v4-flash",
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        displayName: "deepseek/deepseek-v4-flash",
+        maxContextSize: 1000000,
+        adaptiveThinking: false,
+        isDefault: true,
+      }],
+      message,
+    },
+  });
 
   const previewApi: WindowAPI = {
     platform: "linux" as NodeJS.Platform,
@@ -230,6 +257,7 @@ function installBrowserPreviewApi() {
           type: "kimi",
           baseUrl: "https://api.kimi.com/coding/v1",
           hasApiKey: true,
+          hasEnv: false,
           hasOauth: true,
         }],
         models: [{
@@ -254,6 +282,7 @@ function installBrowserPreviewApi() {
           type: "openai",
           baseUrl: "https://api.deepseek.com",
           hasApiKey: true,
+          hasEnv: false,
           hasOauth: false,
         }],
         models: [{
@@ -268,6 +297,8 @@ function installBrowserPreviewApi() {
         message: "浏览器预览已模拟保存",
       },
     }),
+    saveKimiProvider: () => previewModelConfigMutation("浏览器预览已模拟保存 Provider"),
+    saveKimiProviderModel: () => previewModelConfigMutation("浏览器预览已模拟保存模型"),
     setKimiDefaultModel: () => Promise.resolve({
       success: true,
       data: {
@@ -279,6 +310,7 @@ function installBrowserPreviewApi() {
           type: "openai",
           baseUrl: "https://api.deepseek.com",
           hasApiKey: true,
+          hasEnv: false,
           hasOauth: false,
         }],
         models: [{
@@ -304,6 +336,7 @@ function installBrowserPreviewApi() {
           type: "kimi",
           baseUrl: "https://api.kimi.com/coding/v1",
           hasApiKey: true,
+          hasEnv: false,
           hasOauth: true,
         }],
         models: [{
@@ -329,6 +362,7 @@ function installBrowserPreviewApi() {
           type: "kimi",
           baseUrl: "https://api.kimi.com/coding/v1",
           hasApiKey: true,
+          hasEnv: false,
           hasOauth: true,
         }],
         models: [{
@@ -343,6 +377,7 @@ function installBrowserPreviewApi() {
         message: "浏览器预览已模拟删除模型配置",
       },
     }),
+    removeKimiProviderConfig: () => previewModelConfigMutation("浏览器预览已模拟删除 Provider"),
     listKimiProviderCatalog: () => Promise.resolve({
       success: true,
       data: {

@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Third-party models now share Provider-owned connections**: Settings groups existing aliases under Provider records, saves credentials once, keeps model deletion separate from Provider deletion, and preserves official managed Providers as read-only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Initial history window now follows five user turns**: Session open starts at the fifth-latest `user_message` within the 28-item safety window, while ordinary scrolling remains structurally read-only; a visible folded-history disclosure reduces the scroll area's top inset to 10px. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md) and [/project/kimix.md](/project/kimix.md).
 
 * **Stable snapshot identity now prevents and repairs cross-message absorption**: The stream batcher and timeline merger keep different upstream message IDs independent even without a visible user boundary; cache v9 repairs exact-ID expansion and also handles formal startup's identity-less SDK/wire fallback when a multi-row local turn with a stable ID is almost entirely composed of complete replies from different canonical turns. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).

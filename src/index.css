@@ -1907,6 +1907,138 @@ button.bg-accent-primary:disabled:hover,
   color: var(--text-muted);
 }
 
+.kimix-model-provider-manager {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.34fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+}
+
+.kimix-model-provider-sidebar {
+  min-width: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+}
+
+.kimix-model-provider-item {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  transition: background-color var(--duration-fast) ease-out,
+              border-color var(--duration-fast) ease-out,
+              color var(--duration-fast) ease-out;
+}
+
+.kimix-model-provider-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-model-provider-item.is-active {
+  border-color: var(--border-default);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+.kimix-model-provider-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.kimix-model-provider-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.kimix-model-provider-action-buttons {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.kimix-model-editor-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.kimix-model-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease-out,
+              border-color var(--duration-fast) ease-out;
+}
+
+.kimix-model-row:hover {
+  background: var(--surface-hover);
+}
+
+.kimix-model-row.is-active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+.kimix-model-row:focus-visible {
+  border-color: var(--border-default);
+  box-shadow: 0 0 0 2px var(--surface-hover);
+  outline: none;
+}
+
+@media (max-width: 860px) {
+  .kimix-model-provider-manager {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kimix-model-provider-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+}
+
+@media (max-width: 680px) {
+  .kimix-model-provider-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kimix-model-provider-actions,
+  .kimix-model-editor-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kimix-model-provider-action-buttons {
+    flex-wrap: wrap;
+  }
+
+  .kimix-model-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .kimix-model-row > :last-child {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
 .kimix-number-input {
   appearance: textfield;
   -moz-appearance: textfield;

@@ -18,11 +18,12 @@ import {
 import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/sessionArchive";
-import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog } from "@electron/types/ipc";
+import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
 import { usePresence } from "@/hooks/usePresence";
 import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/roomAgentProvisioning";
 import { APP_VERSION } from "@/utils/appVersion";
 import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
+import { ModelProviderManager } from "./ModelProviderManager";
 
 type FreezeReport = {
   at: string;
@@ -45,7 +46,6 @@ const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const SETTINGS_SECTION_ORDER_KEY = "kimix_settings_section_order";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
-const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
 
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
@@ -98,42 +98,6 @@ type KimiAuthStatus = {
   message: string;
 };
 
-type KimiModelConfigSummary = {
-  configPath: string;
-  exists: boolean;
-  defaultModel: string | null;
-  providers: {
-    name: string;
-    type: string | null;
-    baseUrl: string | null;
-    hasApiKey: boolean;
-    hasOauth: boolean;
-  }[];
-  models: {
-    alias: string;
-    provider: string | null;
-    model: string | null;
-    displayName: string | null;
-    maxContextSize: number | null;
-    adaptiveThinking: boolean | null;
-    isDefault: boolean;
-  }[];
-};
-
-type KimiProviderCatalogEntry = {
-  providerId: string;
-  type: string;
-  baseUrl: string | null;
-  modelCount: number;
-  models: {
-    id: string;
-    name: string | null;
-    maxContextSize: number | null;
-    thinking: boolean;
-    toolUse: boolean;
-  }[];
-};
-
 type KimiEnvironmentSummary = {
   kimiCodeHome: string;
   proxy: {
@@ -165,12 +129,6 @@ const settingsStatusCache: {
   modelConfigMessage: "",
   kimiEnvironment: null,
 };
-
-function normalizeOpenAiProviderContextSize(value: number | null | undefined) {
-  const fallback = 262144;
-  const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  return Math.max(1, input);
-}
 
 function normalizeSettingsSectionOrder(order: unknown[]): SettingsSectionId[] {
   const known = new Set<SettingsSectionId>(DEFAULT_SETTINGS_SECTION_ORDER);
@@ -482,7 +440,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
-  const [modelAliasesExpanded, setModelAliasesExpanded] = useState(false);
   const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
   const [experimentalKimiToolSelect, setExperimentalKimiToolSelect] = useState(false);
@@ -495,22 +452,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
   }, [filePreviewExtensions]);
-  const [providerDraft, setProviderDraft] = useState({
-    providerName: "deepseek",
-    modelAlias: "deepseek/deepseek-v4-flash",
-    baseUrl: "https://api.deepseek.com",
-    apiKey: "",
-    model: "deepseek-v4-flash",
-    maxContextSize: "1000000",
-  });
-  const [providerBusyAction, setProviderBusyAction] = useState<"test" | "save" | "default" | "remove" | null>(null);
-  const [adaptiveThinkingBusyAlias, setAdaptiveThinkingBusyAlias] = useState<string | null>(null);
-  const [providerMessage, setProviderMessage] = useState("");
-  const [providerCatalog, setProviderCatalog] = useState<KimiProviderCatalogEntry[]>([]);
-  const [providerCatalogLoading, setProviderCatalogLoading] = useState(false);
-  const [selectedCatalogProviderId, setSelectedCatalogProviderId] = useState("");
-  const [selectedCatalogModelId, setSelectedCatalogModelId] = useState("");
-  const [selectedModelAlias, setSelectedModelAlias] = useState("");
   const authSettingsRef = useRef<HTMLDivElement>(null);
   const modelSettingsRef = useRef<HTMLDivElement>(null);
   const settingsSectionRefs = useRef(new Map<SettingsSectionId, HTMLElement>());
@@ -743,217 +684,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }
   };
 
-  const buildProviderPayload = () => {
-    const contextText = providerDraft.maxContextSize.trim();
-    const contextSize = Number(contextText);
-    if (!contextText || !Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1048576) {
-      return null;
-    }
-    const normalizedContextSize = normalizeOpenAiProviderContextSize(contextSize);
-    return {
-      providerName: providerDraft.providerName.trim(),
-      modelAlias: providerDraft.modelAlias.trim(),
-      baseUrl: providerDraft.baseUrl.trim(),
-      apiKey: providerDraft.apiKey.trim() || undefined,
-      model: providerDraft.model.trim(),
-      maxContextSize: normalizedContextSize,
-    };
-  };
-
-  const handleSelectModel = (model: KimiModelConfigSummary["models"][number]) => {
-    setSelectedModelAlias(model.alias);
-    const provider = modelConfig?.providers.find((item) => item.name === model.provider);
-    setProviderDraft((current) => ({
-      ...current,
-      providerName: provider?.name ?? model.provider ?? current.providerName,
-      modelAlias: model.alias,
-      baseUrl: provider?.baseUrl ?? current.baseUrl,
-      model: model.model ?? model.alias,
-      maxContextSize: String(model.maxContextSize ?? current.maxContextSize),
-    }));
-    setProviderMessage(model.isDefault ? "当前正在使用此模型，可新建会话测试。" : "已选中模型；点击使用后，新会话会使用它。");
-  };
-
-  const fillProviderDraftFromCatalog = (provider: KimiProviderCatalogEntry, model: KimiProviderCatalogEntry["models"][number]) => {
-    const normalizedContextSize = normalizeOpenAiProviderContextSize(model.maxContextSize);
-    setProviderDraft((current) => ({
-      ...current,
-      providerName: provider.providerId,
-      modelAlias: `${provider.providerId}/${model.id}`,
-      baseUrl: provider.baseUrl ?? current.baseUrl,
-      model: model.id,
-      maxContextSize: String(normalizedContextSize),
-    }));
-    setProviderMessage(`已从官方 catalog 填入 ${provider.providerId}/${model.id}，请补 API Key 后测试或保存。`);
-  };
-
-  const handleLoadProviderCatalog = async () => {
-    if (typeof window.api.listKimiProviderCatalog !== "function") {
-      setProviderMessage("Provider catalog 接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
-      return;
-    }
-    setProviderCatalogLoading(true);
-    setProviderMessage("正在读取官方 Provider catalog...");
-    const res = await window.api.listKimiProviderCatalog();
-    setProviderCatalogLoading(false);
-    if (!res.success) {
-      setProviderMessage(`读取 Provider catalog 失败：${res.error}`);
-      return;
-    }
-    setProviderCatalog(res.data.providers);
-    const firstProvider = res.data.providers[0];
-    const firstModel = firstProvider?.models[0];
-    if (firstProvider && firstModel) {
-      setSelectedCatalogProviderId(firstProvider.providerId);
-      setSelectedCatalogModelId(firstModel.id);
-      fillProviderDraftFromCatalog(firstProvider, firstModel);
-      return;
-    }
-    setSelectedCatalogProviderId("");
-    setSelectedCatalogModelId("");
-    setProviderMessage("官方 catalog 暂无可直接填入的 OpenAI-compatible Provider。");
-  };
-
-  const handleSelectCatalogProvider = (providerId: string) => {
-    const provider = providerCatalog.find((item) => item.providerId === providerId);
-    setSelectedCatalogProviderId(providerId);
-    const model = provider?.models[0];
-    setSelectedCatalogModelId(model?.id ?? "");
-    if (provider && model) fillProviderDraftFromCatalog(provider, model);
-  };
-
-  const handleSelectCatalogModel = (modelId: string) => {
-    const provider = providerCatalog.find((item) => item.providerId === selectedCatalogProviderId);
-    const model = provider?.models.find((item) => item.id === modelId);
-    setSelectedCatalogModelId(modelId);
-    if (provider && model) fillProviderDraftFromCatalog(provider, model);
-  };
-
-  const handleSetDefaultModel = async (modelAlias = selectedModelAlias || providerDraft.modelAlias.trim()) => {
-    const alias = modelAlias.trim();
-    if (!alias) {
-      setProviderMessage("请先选中一个模型。");
-      return;
-    }
-    if (typeof window.api.setKimiDefaultModel !== "function") {
-      setProviderMessage("模型使用接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
-      return;
-    }
-    setProviderBusyAction("default");
-    setProviderMessage("正在切换使用模型...");
-    const res = await window.api.setKimiDefaultModel({ modelAlias: alias });
-    setProviderBusyAction(null);
-    if (res.success) {
-      settingsStatusCache.modelConfig = res.data;
-      settingsStatusCache.modelConfigMessage = res.data.message ?? "";
-      setModelConfig(res.data);
-      setSelectedModelAlias(alias);
-      setProviderDraft((current) => ({ ...current, modelAlias: alias }));
-      setProviderMessage(settingsStatusCache.modelConfigMessage);
-      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
-      return;
-    }
-    setProviderMessage(`切换使用失败：${res.error}`);
-  };
-
-  const handleToggleAdaptiveThinking = async (model: KimiModelConfigSummary["models"][number]) => {
-    const provider = modelConfig?.providers.find((item) => item.name === model.provider);
-    const externalOpenAiProvider = provider?.type === "openai";
-    if (externalOpenAiProvider) {
-      setProviderMessage("OpenAI-compatible Provider 不使用 Kimi Code 的自适应思考开关；请用输入区“思考开/关”控制本轮。");
-      return;
-    }
-    if (typeof window.api.setKimiModelAdaptiveThinking !== "function") {
-      setProviderMessage("自适应思考接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
-      return;
-    }
-    const next = !Boolean(model.adaptiveThinking);
-    setAdaptiveThinkingBusyAlias(model.alias);
-    setProviderMessage(`正在${next ? "开启" : "关闭"}自适应思考...`);
-    const res = await window.api.setKimiModelAdaptiveThinking({
-      modelAlias: model.alias,
-      adaptiveThinking: next,
-    });
-    setAdaptiveThinkingBusyAlias(null);
-    if (res.success) {
-      settingsStatusCache.modelConfig = res.data;
-      settingsStatusCache.modelConfigMessage = `${res.data.message}：${model.alias} ${next ? "开启" : "关闭"}`;
-      setModelConfig(res.data);
-      setSelectedModelAlias(model.alias);
-      setProviderMessage(settingsStatusCache.modelConfigMessage);
-      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
-      return;
-    }
-    setProviderMessage(`更新自适应思考失败：${res.error}`);
-  };
-
-  const handleRemoveModel = async (model: KimiModelConfigSummary["models"][number]) => {
-    const provider = modelConfig?.providers.find((item) => item.name === model.provider);
-    if (provider?.type !== "openai") {
-      setProviderMessage("官方 managed 模型不能在 Kimix 中删除。");
-      return;
-    }
-    if (typeof window.api.removeKimiModelConfig !== "function") {
-      setProviderMessage("模型删除接口尚未载入，请完全关闭 Kimix dev 窗口后重新启动。");
-      return;
-    }
-    const ok = window.confirm(`删除模型配置「${model.displayName || model.alias}」？\n\nKimix 会备份 config.toml，并在无其他模型引用时一并移除对应 Provider。`);
-    if (!ok) return;
-    setProviderBusyAction("remove");
-    setProviderMessage(`正在删除 ${model.alias}...`);
-    const res = await window.api.removeKimiModelConfig({ modelAlias: model.alias });
-    setProviderBusyAction(null);
-    if (res.success) {
-      settingsStatusCache.modelConfig = res.data;
-      settingsStatusCache.modelConfigMessage = res.data.message ?? "";
-      setModelConfig(res.data);
-      setSelectedModelAlias(res.data.defaultModel ?? "");
-      setProviderMessage(settingsStatusCache.modelConfigMessage);
-      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
-      return;
-    }
-    setProviderMessage(`删除失败：${res.error}`);
-  };
-
-  const handleTestProvider = async () => {
-    const payload = buildProviderPayload();
-    if (!payload) {
-      setProviderMessage("上下文大小填写错误，无法测试。");
-      return;
-    }
-    setProviderBusyAction("test");
-    if (payload.maxContextSize !== Number(providerDraft.maxContextSize.trim())) {
-      setProviderDraft((current) => ({ ...current, maxContextSize: String(payload.maxContextSize) }));
-    }
-    setProviderMessage(payload.maxContextSize !== Number(providerDraft.maxContextSize.trim()) ? `Context 已收敛到 ${payload.maxContextSize}，正在测试连接...` : "正在测试连接...");
-    const res = await window.api.testKimiOpenAiProvider(payload);
-    setProviderBusyAction(null);
-    setProviderMessage(res.success ? `测试通过：${res.data.output || res.data.message}` : `测试失败：${res.error}`);
-  };
-
-  const handleSaveProvider = async () => {
-    const payload = buildProviderPayload();
-    if (!payload) {
-      setProviderMessage("上下文大小填写错误，无法保存。");
-      return;
-    }
-    setProviderBusyAction("save");
-    if (payload.maxContextSize !== Number(providerDraft.maxContextSize.trim())) {
-      setProviderDraft((current) => ({ ...current, maxContextSize: String(payload.maxContextSize) }));
-    }
-    setProviderMessage(payload.maxContextSize !== Number(providerDraft.maxContextSize.trim()) ? `Context 已收敛到 ${payload.maxContextSize}，正在保存配置...` : "正在保存配置...");
-    const res = await window.api.saveKimiOpenAiProvider(payload);
-    setProviderBusyAction(null);
-    if (res.success) {
-      settingsStatusCache.modelConfig = res.data;
-      settingsStatusCache.modelConfigMessage = "";
-      setModelConfig(res.data);
-      setModelConfigMessage("");
-      setProviderMessage(res.data.message);
-      window.dispatchEvent(new CustomEvent(KIMI_MODEL_CONFIG_CHANGED_EVENT));
-      return;
-    }
-    setProviderMessage(`保存失败：${res.error}`);
+  const handleModelProviderConfigChange = (next: KimiModelConfigSummary, message: string) => {
+    settingsStatusCache.modelConfig = next;
+    settingsStatusCache.modelConfigMessage = message;
+    setModelConfig(next);
+    setModelConfigMessage(message);
   };
 
   const handleLogin = async () => {
@@ -2204,7 +1939,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
                           <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Provider</div>
                           <div className="kimix-settings-permission-label text-[13px]">
-                            {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasOauth).length} 个已配置凭据
+                            {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasEnv || provider.hasOauth).length} 个已配置凭据
                           </div>
                         </div>
                         {serverModelCatalog && (
@@ -2273,276 +2008,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         {modelConfigMessage && (
                           <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>{modelConfigMessage}</div>
                         )}
-                        <div className="flex flex-col" style={{ gap: 8, marginTop: 2 }}>
-                          {(modelAliasesExpanded ? modelConfig.models : modelConfig.models.slice(0, 3)).map((model) => {
-                            const selected = selectedModelAlias === model.alias || (!selectedModelAlias && model.isDefault);
-                            const provider = modelConfig.providers.find((item) => item.name === model.provider);
-                            const externalOpenAiProvider = provider?.type === "openai";
-                            return (
-                              <div
-                                key={model.alias}
-                                onClick={() => handleSelectModel(model)}
-                                className={`kimix-settings-permission ${selected ? "is-active" : ""}`}
-                                style={{
-                                  padding: "12px 14px",
-                                  display: "grid",
-                                  gridTemplateColumns: "auto minmax(0, 1fr) auto",
-                                  gap: 12,
-                                  alignItems: "center",
-                                }}
-                              >
-                                <SelectionIndicator selected={selected} />
-                                <div className="kimix-settings-permission-copy">
-                                  <div className="kimix-settings-permission-label truncate">{model.displayName || model.alias}</div>
-                                  <div className="kimix-settings-permission-desc">
-                                    {model.provider ?? "未绑定 provider"} · {model.model ?? model.alias} · {externalOpenAiProvider ? "思考由输入区控制" : `自适应思考${model.adaptiveThinking ? "开" : "关"}`}
-                                  </div>
-                                </div>
-                                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-                                  {!externalOpenAiProvider && (
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        void handleToggleAdaptiveThinking(model);
-                                      }}
-                                      disabled={adaptiveThinkingBusyAlias === model.alias}
-                                      className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
-                                    >
-                                      <Zap size={13} className={adaptiveThinkingBusyAlias === model.alias ? "kimix-spin" : ""} />
-                                      {model.adaptiveThinking ? "思考开" : "思考关"}
-                                    </button>
-                                  )}
-                                  {model.isDefault ? (
-                                    <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>
-                                      使用中
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        void handleSetDefaultModel(model.alias);
-                                      }}
-                                      disabled={providerBusyAction === "default"}
-                                      className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
-                                    >
-                                      <Check size={13} />
-                                      使用
-                                    </button>
-                                  )}
-                                  {externalOpenAiProvider && (
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        void handleRemoveModel(model);
-                                      }}
-                                      disabled={providerBusyAction === "remove"}
-                                      className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-accent-danger-light hover:text-accent-danger"
-                                      title={`删除 ${model.displayName || model.alias}`}
-                                      aria-label={`删除 ${model.displayName || model.alias}`}
-                                    >
-                                      <Trash2 size={13} />
-                                      删除
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {modelConfig.models.length > 3 && (
-                          <button
-                            type="button"
-                            onClick={() => setModelAliasesExpanded(!modelAliasesExpanded)}
-                            className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
-                            style={{ marginTop: 10 }}
-                          >
-                            {modelAliasesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span>
-                              {modelAliasesExpanded
-                                ? `点击折叠 ${modelConfig.models.length - 3} 个模型`
-                                : `已折叠 ${modelConfig.models.length - 3} 个模型，点击展开`}
-                            </span>
-                          </button>
-                        )}
+                        <ModelProviderManager config={modelConfig} onConfigChange={handleModelProviderConfigChange} />
                       </>
                     ) : (
                       <div className="kimix-settings-permission-desc">{modelConfigMessage || "未读取到模型配置。"}</div>
                     )}
                   </div>
 
-                  <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 16, paddingTop: 16 }}>
-                    <div className="kimix-settings-permission-label">OpenAI-compatible Provider</div>
-                    <div
-                      className="kimix-settings-permission"
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: providerCatalog.length > 0 ? "minmax(0, 1fr) minmax(260px, 456px)" : "minmax(0, 1fr)",
-                        columnGap: 18,
-                        rowGap: 14,
-                        alignItems: "center",
-                        padding: "14px 16px",
-                        marginTop: 12,
-                      }}
-                    >
-                      <div
-                        className="grid min-w-0"
-                        style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, alignItems: "center", minHeight: 48 }}
-                      >
-                        <div className="kimix-settings-permission-copy min-w-0">
-                          <div className="kimix-settings-permission-label">官方 catalog</div>
-                          <div className="kimix-settings-permission-desc">
-                            {providerCatalog.length > 0 ? `${providerCatalog.length} 个 OpenAI-compatible Provider 可填入` : "从 models.dev 拉取可用 Provider 和模型名"}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void handleLoadProviderCatalog()}
-                          disabled={providerCatalogLoading}
-                          className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
-                          style={{ alignSelf: "center" }}
-                        >
-                          <RefreshCw size={13} className={providerCatalogLoading ? "kimix-spin" : ""} />
-                          {providerCatalog.length > 0 ? "刷新" : "载入"}
-                        </button>
-                      </div>
-                      {providerCatalog.length > 0 && (
-                        <div className="flex min-w-0 flex-col" style={{ gap: 12, justifySelf: "end", width: "100%", maxWidth: 456 }}>
-                          <label className="min-w-0">
-                            <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider</span>
-                            <select
-                              value={selectedCatalogProviderId}
-                              onChange={(event) => handleSelectCatalogProvider(event.target.value)}
-                              className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                              style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                            >
-                              {providerCatalog.map((provider) => (
-                                <option key={provider.providerId} value={provider.providerId}>
-                                  {provider.providerId} ({provider.modelCount})
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="min-w-0">
-                            <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型</span>
-                            <select
-                              value={selectedCatalogModelId}
-                              onChange={(event) => handleSelectCatalogModel(event.target.value)}
-                              className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                              style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                            >
-                              {(providerCatalog.find((provider) => provider.providerId === selectedCatalogProviderId)?.models ?? []).map((model) => (
-                                <option key={model.id} value={model.id}>
-                                  {model.name ?? model.id}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
-                      <label className="min-w-0">
-                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Provider 名称</span>
-                        <input
-                          value={providerDraft.providerName}
-                          onChange={(event) => setProviderDraft((current) => ({ ...current, providerName: event.target.value }))}
-                          className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                        />
-                      </label>
-                      <label className="min-w-0">
-                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名</span>
-                        <input
-                          value={providerDraft.modelAlias}
-                          onChange={(event) => setProviderDraft((current) => ({ ...current, modelAlias: event.target.value }))}
-                          className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                        />
-                      </label>
-                    </div>
-                    <label className="block min-w-0" style={{ marginTop: 10 }}>
-                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Base URL</span>
-                      <input
-                        value={providerDraft.baseUrl}
-                        onChange={(event) => setProviderDraft((current) => ({ ...current, baseUrl: event.target.value }))}
-                        className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                        style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                      />
-                    </label>
-                    <div className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 1fr) 128px", gap: 10, marginTop: 10 }}>
-                      <label className="min-w-0">
-                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型名</span>
-                        <input
-                          value={providerDraft.model}
-                          onChange={(event) => setProviderDraft((current) => ({ ...current, model: event.target.value }))}
-                          className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                        />
-                      </label>
-                      <label className="min-w-0">
-                        <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Context</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={1048576}
-                          value={providerDraft.maxContextSize}
-                          onChange={(event) => setProviderDraft((current) => ({ ...current, maxContextSize: event.target.value }))}
-                          className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[13px] outline-none transition-colors"
-                          style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                        />
-                      </label>
-                    </div>
-                    <label className="block min-w-0" style={{ marginTop: 10 }}>
-                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>API Key</span>
-                      <input
-                        type="password"
-                        value={providerDraft.apiKey}
-                        onChange={(event) => setProviderDraft((current) => ({ ...current, apiKey: event.target.value }))}
-                        className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none transition-colors"
-                        style={{ marginTop: 5, paddingLeft: 11, paddingRight: 11 }}
-                      />
-                    </label>
-                    <div
-                      className="grid min-w-0 items-center"
-                      style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, marginTop: 14 }}
-                    >
-                      <div className="min-w-0 break-all text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
-                        {providerMessage}
-                      </div>
-                      <div className="flex min-w-0 justify-end" style={{ gap: 8 }}>
-                        <button
-                          type="button"
-                          onClick={() => void handleSetDefaultModel()}
-                          disabled={Boolean(providerBusyAction) || !providerDraft.modelAlias.trim()}
-                          className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
-                        >
-                          <Check size={13} />
-                          使用
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleTestProvider()}
-                          disabled={Boolean(providerBusyAction)}
-                          className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
-                        >
-                          <RefreshCw size={13} className={providerBusyAction === "test" ? "kimix-spin" : ""} />
-                          测试
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleSaveProvider()}
-                          disabled={Boolean(providerBusyAction)}
-                          className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-55"
-                        >
-                          <Check size={13} />
-                          保存
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
 

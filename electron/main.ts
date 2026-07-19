@@ -26,6 +26,7 @@ import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
+import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
 import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
@@ -1206,10 +1207,23 @@ function removeTomlSection(raw: string, sectionName: string) {
   return `${before}${before && after ? "\n\n" : ""}${after}`;
 }
 
+function readTomlBoolean(sectionText: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*(true|false)\\s*$`, "mi"));
+  return match ? match[1].toLowerCase() === "true" : null;
+}
+
+function setTomlSectionValue(raw: string, sectionName: string, key: string, valueLiteral: string) {
+  return setTomlSectionValuePreservingLayout(raw, sectionName, key, valueLiteral);
+}
+
 function resolveExistingManagedApiKey(raw: string, providerName: string) {
   const providerKey = toTomlTableKey(providerName);
   const body = readTomlSectionBody(raw, `providers.${providerKey}`);
-  return body ? readTomlString(body, "api_key") : null;
+  const directApiKey = body ? readTomlString(body, "api_key") : null;
+  if (directApiKey) return directApiKey;
+  const envBody = readTomlSectionBody(raw, `providers.${providerKey}.env`);
+  return envBody ? readTomlString(envBody, "OPENAI_API_KEY") : null;
 }
 
 function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
@@ -1265,6 +1279,11 @@ function readKimiModelConfig() {
       .filter((section) => /^providers\..+\.oauth$/.test(section.name))
       .map((section) => section.name.replace(/\.oauth$/, ""))
   );
+  const hasEnv = new Set(
+    sections
+      .filter((section) => /^providers\..+\.env$/.test(section.name))
+      .map((section) => section.name.replace(/\.env$/, ""))
+  );
   const stripTablePrefix = (sectionName: string, prefix: string) => {
     const rawName = sectionName.slice(prefix.length);
     const quoted = rawName.match(/^"((?:\\.|[^"])*)"$/);
@@ -1280,6 +1299,7 @@ function readKimiModelConfig() {
       type: readTomlString(section.body, "type"),
       baseUrl: readTomlString(section.body, "base_url"),
       hasApiKey: Boolean(readTomlString(section.body, "api_key")),
+      hasEnv: hasEnv.has(section.name),
       hasOauth: hasOauth.has(section.name),
     })).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")),
     models: modelSections.map((section) => {
@@ -1290,6 +1310,7 @@ function readKimiModelConfig() {
         model: readTomlString(section.body, "model"),
         displayName: readTomlString(section.body, "display_name"),
         maxContextSize: readTomlInteger(section.body, "max_context_size"),
+        adaptiveThinking: readTomlBoolean(section.body, "adaptive_thinking"),
         isDefault: alias === defaultModel,
       };
     }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN")),
@@ -1304,6 +1325,7 @@ function kimiCodeConfigToModelSummary(config: kimiCodeHost.KimiCodeConfig) {
     type: provider.type ?? null,
     baseUrl: provider.baseUrl ?? null,
     hasApiKey: Boolean(provider.apiKey),
+    hasEnv: Boolean(provider.env && Object.keys(provider.env).length > 0),
     hasOauth: Boolean(provider.oauth),
   })).sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   const defaultModel = config.defaultModel ?? null;
@@ -1349,8 +1371,119 @@ const SaveOpenAiProviderConfigSchema = OpenAiProviderBaseConfigSchema.extend({
 });
 
 const TestOpenAiProviderConfigSchema = OpenAiProviderBaseConfigSchema.extend({
-  apiKey: z.string().trim().min(1).max(4096),
+  apiKey: z.string().trim().max(4096).optional(),
 });
+
+const SaveProviderConfigSchema = z.object({
+  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  baseUrl: z.string().trim().url(),
+  apiKey: z.string().trim().max(4096).optional(),
+});
+
+const SaveProviderModelConfigSchema = z.object({
+  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  modelAlias: z.string().trim().min(2).max(120).regex(/^[A-Za-z0-9_./:-]+$/),
+  model: z.string().trim().min(1).max(160),
+  maxContextSize: z.number().int().min(1).max(1048576).optional(),
+  makeDefault: z.boolean().optional(),
+});
+
+async function saveProviderConfigWithSdk(input: unknown) {
+  const config = SaveProviderConfigSchema.parse(input);
+  ensureKimiCodeMigratedConfig();
+  const configPath = getKimiPaths().config;
+  const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+  const apiKey = config.apiKey?.trim() || resolveExistingManagedApiKey(raw, config.providerName);
+
+  try {
+    const current = await kimiCodeHost.getConfig({ reload: true });
+    const existing = current.providers?.[config.providerName];
+    if (existing && existing.type !== "openai") {
+      throw new Error("官方 managed Provider 不能在 Kimix 中修改连接配置。");
+    }
+    if (!existing && !apiKey) throw new Error("API Key 为空，无法保存新 Provider。");
+    await kimiCodeHost.setConfig({
+      providers: {
+        [config.providerName]: {
+          ...existing,
+          type: "openai",
+          baseUrl: config.baseUrl,
+          ...(apiKey ? { apiKey } : {}),
+        },
+      },
+    });
+    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("managed Provider")) throw error;
+    console.warn("[kimi-code] SDK setConfig(provider-only) failed, falling back to TOML writer:", error);
+    ensureDirectoryExists(path.dirname(configPath));
+    const existingBody = readTomlSectionBody(raw, `providers.${toTomlTableKey(config.providerName)}`);
+    if (existingBody === null && !apiKey) throw new Error("API Key 为空，无法保存新 Provider。");
+    backupFileIfExists(configPath);
+    const sectionName = `providers.${toTomlTableKey(config.providerName)}`;
+    let next = setTomlSectionValue(raw, sectionName, "type", '"openai"');
+    next = setTomlSectionValue(next, sectionName, "base_url", `"${escapeTomlString(config.baseUrl)}"`);
+    if (apiKey) next = setTomlSectionValue(next, sectionName, "api_key", `"${escapeTomlString(apiKey)}"`);
+    fs.writeFileSync(configPath, next, "utf-8");
+    return readKimiModelConfig();
+  }
+}
+
+async function saveProviderModelConfigWithSdk(input: unknown) {
+  const config = SaveProviderModelConfigSchema.parse(input);
+  ensureKimiCodeMigratedConfig();
+  const maxContextSize = normalizeOpenAiProviderContextSize(config);
+  try {
+    const current = await kimiCodeHost.getConfig({ reload: true });
+    const provider = current.providers?.[config.providerName];
+    if (!provider) throw new Error(`Provider ${config.providerName} 不存在，请先保存 Provider 连接配置。`);
+    if (provider.type !== "openai") throw new Error("官方 managed Provider 的模型定义不能在 Kimix 中修改。");
+    const existing = current.models?.[config.modelAlias];
+    if (existing?.provider && existing.provider !== config.providerName) {
+      throw new Error(`模型别名 ${config.modelAlias} 已由 Provider ${existing.provider} 使用，请换一个别名。`);
+    }
+    await kimiCodeHost.setConfig({
+      models: {
+        [config.modelAlias]: {
+          ...existing,
+          provider: config.providerName,
+          model: config.model,
+          maxContextSize,
+          displayName: existing?.displayName || config.modelAlias,
+          adaptiveThinking: existing?.adaptiveThinking ?? (`${config.providerName} ${provider.baseUrl ?? ""} ${config.model}`.toLowerCase().includes("deepseek") ? false : undefined),
+        },
+      },
+      ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),
+    });
+    if (config.makeDefault) return await readKimiModelConfigAfterSdkSet(config.modelAlias);
+    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("不存在，请先保存") || error.message.includes("managed Provider") || error.message.includes("已由 Provider"))) throw error;
+    console.warn("[kimi-code] SDK setConfig(model-only) failed, falling back to TOML writer:", error);
+    const configPath = getKimiPaths().config;
+    const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+    const summary = readKimiModelConfig();
+    const provider = summary.providers.find((item) => item.name === config.providerName);
+    if (!provider) throw new Error(`Provider ${config.providerName} 不存在，请先保存 Provider 连接配置。`);
+    if (provider.type !== "openai") throw new Error("官方 managed Provider 的模型定义不能在 Kimix 中修改。");
+    const existing = summary.models.find((item) => item.alias === config.modelAlias);
+    if (existing?.provider && existing.provider !== config.providerName) {
+      throw new Error(`模型别名 ${config.modelAlias} 已由 Provider ${existing.provider} 使用，请换一个别名。`);
+    }
+    backupFileIfExists(configPath);
+    const sectionName = `models.${toTomlTableKey(config.modelAlias)}`;
+    let next = setTomlSectionValue(raw, sectionName, "provider", `"${escapeTomlString(config.providerName)}"`);
+    next = setTomlSectionValue(next, sectionName, "model", `"${escapeTomlString(config.model)}"`);
+    next = setTomlSectionValue(next, sectionName, "max_context_size", String(maxContextSize));
+    next = setTomlSectionValue(next, sectionName, "display_name", `"${escapeTomlString(existing?.displayName || config.modelAlias)}"`);
+    if (`${config.providerName} ${provider.baseUrl ?? ""} ${config.model}`.toLowerCase().includes("deepseek")) {
+      next = setTomlSectionValue(next, sectionName, "adaptive_thinking", "false");
+    }
+    if (config.makeDefault) next = setTopLevelTomlString(next, "default_model", config.modelAlias);
+    fs.writeFileSync(configPath, next, "utf-8");
+    return readKimiModelConfig();
+  }
+}
 
 function saveOpenAiProviderConfig(input: unknown) {
   const config = SaveOpenAiProviderConfigSchema.parse(input);
@@ -1527,14 +1660,39 @@ function removeKimiModelConfig(input: unknown) {
   backupFileIfExists(configPath);
   let next = removeTomlSection(current, `models.${toTomlTableKey(target.alias)}`);
   const remainingModels = summary.models.filter((model) => model.alias !== target.alias);
-  const providerStillUsed = remainingModels.some((model) => model.provider === target.provider);
-  if (target.provider && !providerStillUsed) {
-    const providerKey = toTomlTableKey(target.provider);
-    next = removeTomlSection(next, `providers.${providerKey}`);
-    next = removeTomlSection(next, `providers.${providerKey}.oauth`);
-    next = removeTomlSection(next, `providers.${providerKey}.env`);
-  }
   if (summary.defaultModel === target.alias) {
+    const fallback = remainingModels.find((model) => model.alias === fallbackDefault)?.alias ?? remainingModels[0]?.alias ?? fallbackDefault;
+    next = setTopLevelTomlString(next, "default_model", fallback);
+  }
+  fs.writeFileSync(configPath, next.trimEnd() + "\n", "utf-8");
+  return readKimiModelConfig();
+}
+
+function removeKimiProviderConfig(input: unknown) {
+  const req = z.object({ providerName: z.string().trim().min(1).max(80) }).parse(input);
+  ensureKimiCodeMigratedConfig();
+  const configPath = getKimiPaths().config;
+  if (!fs.existsSync(configPath)) throw new Error("尚未找到 Kimi Code config.toml");
+
+  const current = fs.readFileSync(configPath, "utf-8");
+  const summary = readKimiModelConfig();
+  const provider = summary.providers.find((item) => item.name === req.providerName);
+  if (!provider) throw new Error(`Provider ${req.providerName} 不存在，请先刷新模型配置`);
+  if (provider.type !== "openai") {
+    throw new Error("只能删除 OpenAI-compatible 第三方 Provider；官方 managed Provider 请保留。");
+  }
+
+  const removedAliases = summary.models.filter((model) => model.provider === req.providerName).map((model) => model.alias);
+  const remainingModels = summary.models.filter((model) => model.provider !== req.providerName);
+  backupFileIfExists(configPath);
+  let next = current;
+  for (const alias of removedAliases) next = removeTomlSection(next, `models.${toTomlTableKey(alias)}`);
+  const providerKey = toTomlTableKey(req.providerName);
+  next = removeTomlSection(next, `providers.${providerKey}`);
+  next = removeTomlSection(next, `providers.${providerKey}.oauth`);
+  next = removeTomlSection(next, `providers.${providerKey}.env`);
+  if (summary.defaultModel && removedAliases.includes(summary.defaultModel)) {
+    const fallbackDefault = "kimi-code/kimi-for-coding";
     const fallback = remainingModels.find((model) => model.alias === fallbackDefault)?.alias ?? remainingModels[0]?.alias ?? fallbackDefault;
     next = setTopLevelTomlString(next, "default_model", fallback);
   }
@@ -1544,6 +1702,14 @@ function removeKimiModelConfig(input: unknown) {
 
 async function testOpenAiProviderConfig(input: unknown) {
   const config = TestOpenAiProviderConfigSchema.parse(input);
+  const configPath = getKimiPaths().config;
+  const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+  let apiKey = config.apiKey?.trim() || resolveExistingManagedApiKey(current, config.providerName);
+  if (!apiKey) {
+    const savedProvider = (await kimiCodeHost.getConfig({ reload: true }).catch(() => null))?.providers?.[config.providerName];
+    apiKey = savedProvider?.apiKey?.trim() || savedProvider?.env?.OPENAI_API_KEY?.trim() || null;
+  }
+  if (!apiKey) throw new Error("API Key 为空，无法测试 Provider。");
   const kimiPath = await requireKimiExecutable();
   // 把测试会话隔离到临时 KIMI_CODE_HOME，避免污染用户真实会话历史和当前项目侧栏。
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-provider-test-"));
@@ -1554,7 +1720,7 @@ async function testOpenAiProviderConfig(input: unknown) {
       KIMI_MODEL_PROVIDER_TYPE: "openai",
       KIMI_MODEL_NAME: config.model,
       KIMI_MODEL_BASE_URL: config.baseUrl,
-      KIMI_MODEL_API_KEY: config.apiKey,
+      KIMI_MODEL_API_KEY: apiKey,
       KIMI_MODEL_MAX_CONTEXT_SIZE: String(normalizeOpenAiProviderContextSize(config)),
       KIMI_MODEL_DISPLAY_NAME: config.modelAlias,
     };
@@ -5125,6 +5291,26 @@ ipcMain.handle("kimi:saveOpenAiProvider", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi:saveProvider", async (_, request: unknown) => {
+  try {
+    const config = await saveProviderConfigWithSdk(request);
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已保存 Provider 连接配置${buildConfigReloadSuffix(reloadResult)}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:saveProviderModel", async (_, request: unknown) => {
+  try {
+    const config = await saveProviderModelConfigWithSdk(request);
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已保存 Provider 模型${buildConfigReloadSuffix(reloadResult)}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:setDefaultModel", async (_, request: unknown) => {
   try {
     const config = await setDefaultKimiModelWithSdk(request);
@@ -5150,6 +5336,16 @@ ipcMain.handle("kimi:removeModelConfig", async (_, request: unknown) => {
     const config = removeKimiModelConfig(request);
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
     return { success: true, data: { ...config, message: `已删除模型配置${buildConfigReloadSuffix(reloadResult)}` } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:removeProviderConfig", async (_, request: unknown) => {
+  try {
+    const config = removeKimiProviderConfig(request);
+    const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return { success: true, data: { ...config, message: `已删除 Provider 及其模型${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

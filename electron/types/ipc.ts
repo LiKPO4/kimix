@@ -379,6 +379,7 @@ export type KimiModelProviderSummary = {
   type: string | null;
   baseUrl: string | null;
   hasApiKey: boolean;
+  hasEnv: boolean;
   hasOauth: boolean;
 };
 
@@ -418,6 +419,20 @@ export type KimiOpenAiProviderConfigRequest = {
   makeDefault?: boolean;
 };
 
+export type SaveKimiProviderRequest = {
+  providerName: string;
+  baseUrl: string;
+  apiKey?: string;
+};
+
+export type SaveKimiProviderModelRequest = {
+  providerName: string;
+  modelAlias: string;
+  model: string;
+  maxContextSize?: number;
+  makeDefault?: boolean;
+};
+
 export type SetKimiDefaultModelRequest = {
   modelAlias: string;
 };
@@ -429,6 +444,10 @@ export type SetKimiModelAdaptiveThinkingRequest = {
 
 export type RemoveKimiModelConfigRequest = {
   modelAlias: string;
+};
+
+export type RemoveKimiProviderConfigRequest = {
+  providerName: string;
 };
 
 export type KimiProviderCatalogModelSummary = {

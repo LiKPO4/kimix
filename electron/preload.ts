@@ -24,6 +24,8 @@ import type {
   GetKimiModelConfigResponse,
   InstallKimiCliResponse,
   KimiOpenAiProviderConfigRequest,
+  SaveKimiProviderRequest,
+  SaveKimiProviderModelRequest,
   CheckKimiCliUpdateResponse,
   KimiLoginResponse,
   KimiLogoutResponse,
@@ -31,6 +33,7 @@ import type {
   SetKimiDefaultModelRequest,
   SetKimiModelAdaptiveThinkingRequest,
   RemoveKimiModelConfigRequest,
+  RemoveKimiProviderConfigRequest,
   KimiDoctorConfigResponse,
   ListMcpServersResponse,
   ListKimiProviderCatalogResponse,
@@ -272,12 +275,18 @@ const api = {
     ipcRenderer.invoke("kimi:getModelConfig"),
   saveKimiOpenAiProvider: (req: KimiOpenAiProviderConfigRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:saveOpenAiProvider", req),
+  saveKimiProvider: (req: SaveKimiProviderRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:saveProvider", req),
+  saveKimiProviderModel: (req: SaveKimiProviderModelRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:saveProviderModel", req),
   setKimiDefaultModel: (req: SetKimiDefaultModelRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:setDefaultModel", req),
   setKimiModelAdaptiveThinking: (req: SetKimiModelAdaptiveThinkingRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:setModelAdaptiveThinking", req),
   removeKimiModelConfig: (req: RemoveKimiModelConfigRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:removeModelConfig", req),
+  removeKimiProviderConfig: (req: RemoveKimiProviderConfigRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:removeProviderConfig", req),
   listKimiProviderCatalog: (): Promise<ListKimiProviderCatalogResponse> =>
     ipcRenderer.invoke("kimi:listProviderCatalog"),
   doctorKimiConfig: (): Promise<KimiDoctorConfigResponse> =>
