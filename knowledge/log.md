@@ -2,7 +2,7 @@
 
 ## 2026-07-19
 
-* **Snapshot replay is ordered and settled by official message identity**: Nested Server replay retains `created_at` and stable `snapshotMessageId`; content and terminal frames update only that message, older unseen replies are inserted before the correct user boundary, and timeline-open heuristics cannot suppress an authoritative inactive snapshot terminal. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+* **Snapshot replay is ordered, settled, and repaired by official message identity**: Nested Server replay retains `created_at` and stable `snapshotMessageId`; content and terminal frames update only that message, older unseen replies are inserted before the correct user boundary, timeline-open heuristics cannot suppress an authoritative inactive snapshot terminal, and a proven stable-ID/user-turn mismatch lets canonical history replace already persisted cross-turn pollution. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 ## 2026-07-18
 

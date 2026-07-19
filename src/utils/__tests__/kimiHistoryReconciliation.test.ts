@@ -63,6 +63,37 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
   });
 
+  it("repairs a longer local assistant whose stable snapshot id belongs to another user turn", () => {
+    const local: TimelineEvent[] = [{
+      id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, {
+      id: "user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant("当前回答\n错误拼入的旧回答", {
+      id: "polluted-current",
+      timestamp: 1_100,
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+      isComplete: false,
+    })];
+    const canonical: TimelineEvent[] = [{
+      id: "official-user-old", type: "user_message", timestamp: 100, content: "旧问题",
+    }, assistant("旧回答", {
+      id: "official-old",
+      timestamp: 200,
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+    }), {
+      id: "official-user-current", type: "user_message", timestamp: 1_000, content: "新问题",
+    }, assistant("当前回答", {
+      id: "official-current",
+      timestamp: 1_100,
+      snapshotMessageId: "msg-current",
+      snapshotMessageIdStable: true,
+    })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+  });
+
   it("does not replace shorter assistant body when canonical thinking differs", () => {
     const local = [userMessage, assistant("local complete answer", { thinking: "local thought" })];
     const canonical = [userMessage, assistant("short", { thinking: "different canonical thought" })];

@@ -64,6 +64,45 @@ function displayableUserImageCount(events: TimelineEvent[]): number {
     )).length, 0);
 }
 
+function normalizedUserTurnContent(content: string): string {
+  return content.trim().replace(/\s+/g, " ");
+}
+
+function stableSnapshotAssistantTurnOwners(events: TimelineEvent[]): Map<string, Set<string>> {
+  const owners = new Map<string, Set<string>>();
+  let currentUserContent = "";
+  for (const event of events) {
+    if (event.type === "user_message") {
+      currentUserContent = normalizedUserTurnContent(event.content);
+      continue;
+    }
+    if (
+      event.type !== "assistant_message" ||
+      event.snapshotMessageIdStable !== true ||
+      !event.snapshotMessageId ||
+      !currentUserContent
+    ) continue;
+    const turnOwners = owners.get(event.snapshotMessageId) ?? new Set<string>();
+    turnOwners.add(currentUserContent);
+    owners.set(event.snapshotMessageId, turnOwners);
+  }
+  return owners;
+}
+
+function hasStableSnapshotTurnOwnershipMismatch(
+  cachedEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): boolean {
+  const cachedOwners = stableSnapshotAssistantTurnOwners(cachedEvents);
+  const canonicalOwners = stableSnapshotAssistantTurnOwners(canonicalEvents);
+  for (const [messageId, localTurnOwners] of cachedOwners) {
+    const officialTurnOwners = canonicalOwners.get(messageId);
+    if (!officialTurnOwners) continue;
+    if (Array.from(localTurnOwners).some((owner) => !officialTurnOwners.has(owner))) return true;
+  }
+  return false;
+}
+
 export function hasPossiblyLostUserImages(events: TimelineEvent[]): boolean {
   return events.some((event) => {
     if (event.type !== "user_message" && event.type !== "steer_message") return false;
@@ -90,6 +129,20 @@ export function shouldReplaceWithCanonicalKimiHistory(
   context?: { sessionId?: string; roomAgentId?: string; reason?: string },
 ): boolean {
   if (canonicalEvents.length === 0) return false;
+
+  // A stable official Assistant id mounted under a different user prompt is
+  // proof of historical replay pollution, not richer local history. In this
+  // one identity-backed case the canonical snapshot may shrink the body and
+  // process projection to repair an already persisted cross-turn merge.
+  if (hasStableSnapshotTurnOwnershipMismatch(cachedEvents, canonicalEvents)) {
+    logEvent("kimiHistoryReconciliation.accepted", {
+      ...context,
+      reason: "stable-snapshot-turn-ownership-mismatch",
+      localSize: assistantBodySize(cachedEvents),
+      canonicalSize: assistantBodySize(canonicalEvents),
+    });
+    return true;
+  }
 
   // Server snapshots can contain the newest assistant text/thinking while
   // omitting tool-call lifecycle frames. Never let such a partial snapshot
