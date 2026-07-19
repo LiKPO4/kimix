@@ -34,6 +34,25 @@ describe("coalesceStreamEventBatch", () => {
     });
   });
 
+  it("never coalesces history replay from different stable snapshot messages", () => {
+    const result = coalesceStreamEventBatch([
+      assistant("第一条官方回复", {
+        snapshotMessageId: "msg-000048",
+        snapshotMessageIdStable: true,
+      }),
+      assistant("第二条官方回复", {
+        snapshotMessageId: "msg-000051",
+        snapshotMessageIdStable: true,
+      }),
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual([
+      expect.objectContaining({ content: "第一条官方回复", snapshotMessageId: "msg-000048" }),
+      expect.objectContaining({ content: "第二条官方回复", snapshotMessageId: "msg-000051" }),
+    ]);
+  });
+
   it("keeps terminal, tool-boundary, and different-turn events independent", () => {
     const tool: TimelineEvent = {
       id: "tool-1",

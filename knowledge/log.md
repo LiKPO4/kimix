@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Stable snapshot identity now prevents and repairs cross-message absorption**: The stream batcher and timeline merger keep different upstream message IDs independent even without a visible user boundary; cache v9 repairs exact-ID expansion and also handles formal startup's identity-less SDK/wire fallback when a multi-row local turn with a stable ID is almost entirely composed of complete replies from different canonical turns. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
+
 * **Cache v8 repairs cross-row turn composition and certifies only adopted or turn-equivalent history**: Cross-turn proof aggregates every Assistant row under one user boundary because the renderer presents that partition as one bubble; successful official loads may certify an unchanged local projection while retaining richer tool frames, but rejected non-equivalent candidates keep their stale cache version and remain eligible for repair on the next hydration. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
 
 ## 2026-07-19

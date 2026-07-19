@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-19 v2.16.55 稳定快照消息跨轮合并根治
+
+- 当前目标：根治重启最新版本后仍把多轮 Agent 回复塞进同一条消息的问题；本轮不改动已稳定的滚动链路。
+- 根因证据：正式 v2.16.54 重启后，目标会话本地 cache v7 有 152 个事件、Assistant 正文共 36204 字符；污染行 `kimi-code-event-1784419270510-4` 持有稳定官方身份 `msg_session_8723c487-47bf-4bc6-95a6-8ca7d3063fa6_000048`，本地正文长 13782 字符，而官方同一稳定身份只有 50 字符。官方历史共 140 个事件且正确分轮，DOM 确实含跨轮旧回复，排除截图误判和旧安装包。`diag.log` 同时记录 `assistant-body-regression`（local 36204 / canonical 22422），说明 v2.16.54 只补了迁移门禁，没有阻止污染继续产生。
+- 根因：`useEventStream` 每 80ms 批量刷新时，会在进入主时间线前预合并相邻未完成 Assistant；该门禁只比较 room/turn/agent/model，没有比较 `snapshotMessageId`，所以同批回放的多个不同官方消息先被压成一条并继承第一条稳定 ID。随后 `mergeEvents` 对“尚未挂载的稳定 ID”仍会落入“最近未完成 Assistant”通用兜底；当官方窗口缺少原始 user 边界时，第二次把不同稳定消息吸入同一行。
+- 修复：批处理仅允许无快照身份的实时 delta 互并，或相同 ID 且稳定性一致的快照片段互并；`mergeEvents` 将未见过的稳定 ID 视为独立不可变官方消息，禁止进入通用 open-Assistant 兜底。缓存版本升至 9；迁移优先按同一稳定 ID 对照官方正文。正式启动可能在 Server 就绪前回退到无 ID 的 SDK/wire 历史，因此另加保守证明：仅当本地同一用户轮次有多条 Assistant、至少一条持有稳定 ID，且聚合正文 80% 以上由多个不同 canonical 用户轮次的完整、不歧义、互不重叠回复构成时，才允许较短 canonical 绕过 no-shrink 门禁。
+- 验证：四个精确回归覆盖不同稳定 ID 同批不得预合并、无 user 边界的两个未见稳定 ID 不得合并、同 ID 正文膨胀迁移、正式启动无 ID fallback 迁移；定向 4 文件 146 项、全量 104 文件 863 项通过；`pnpm build` 通过，renderer 为 `assets/index-B1xylDP9.js`；OKF 严格校验通过。正式 `file://` origin 实测从 cache v7 / 152 事件 / Assistant 36204 字符迁移为 cache v9 / 150 事件 / 22422 字符，13782 字符污染行消失，DOM 不含跨轮旧回复；完整关闭并第二次重启后上述数值和干净 DOM 保持不变。已确认源码 dev 与正式构建使用不同 IndexedDB origin，最终验收只采用正式 origin。
+- 关键文件：`src/hooks/useEventStream.ts`、`src/utils/eventMapper.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/kimiHistoryCache.ts`。
+- 下一步：提交本轮；用户在当前 v2.16.55 正式窗口进行视觉复验，并新发一轮消息确认生产入口不再产生跨 ID 合并。
+
 ## 2026-07-19 v2.16.54 多行跨轮回复合并根治
 
 - 当前目标：根治多个旧 Agent 回复被并入当前一轮的严重回归，同时保留 v2.16.53 已稳定的首会话滚动行为。

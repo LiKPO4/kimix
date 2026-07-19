@@ -28,7 +28,14 @@ function canCoalesceAssistantDelta(previous: TimelineEvent, incoming: TimelineEv
     previous.dispatchAttemptId === incoming.dispatchAttemptId &&
     previous.agentId === incoming.agentId &&
     previous.agentRole === incoming.agentRole &&
-    previous.model === incoming.model;
+    previous.model === incoming.model &&
+    (
+      (!previous.snapshotMessageId && !incoming.snapshotMessageId) ||
+      (
+        previous.snapshotMessageId === incoming.snapshotMessageId &&
+        previous.snapshotMessageIdStable === incoming.snapshotMessageIdStable
+      )
+    );
 }
 
 export function coalesceStreamEventBatch(items: TimelineEvent[]): TimelineEvent[] {

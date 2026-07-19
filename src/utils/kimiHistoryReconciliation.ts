@@ -154,12 +154,54 @@ function hasStableSnapshotTurnOwnershipMismatch(
 const MIN_CANONICAL_REPLY_MATCH_LENGTH = 24;
 const MIN_CROSS_TURN_REPLY_COVERAGE = 0.8;
 
+function stableSnapshotAssistantBodies(events: TimelineEvent[]): Map<string, string> {
+  const bodies = new Map<string, string[]>();
+  for (const event of events) {
+    if (
+      event.type !== "assistant_message" ||
+      event.snapshotMessageIdStable !== true ||
+      !event.snapshotMessageId
+    ) continue;
+    const body = normalizedUserTurnContent(event.content);
+    if (!body) continue;
+    const parts = bodies.get(event.snapshotMessageId) ?? [];
+    parts.push(body);
+    bodies.set(event.snapshotMessageId, parts);
+  }
+  return new Map(Array.from(bodies, ([messageId, parts]) => [messageId, parts.join(" ")]));
+}
+
+/**
+ * A stable snapshot message is an immutable official identity. If the local
+ * body for that exact identity contains the complete canonical body plus a
+ * substantial suffix/prefix, the row has absorbed content from other official
+ * messages. This remains conclusive even when the canonical window no longer
+ * contains the original user boundary for the old message.
+ */
+function hasStableSnapshotMessageBodyExpansion(
+  cachedEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): boolean {
+  const cachedBodies = stableSnapshotAssistantBodies(cachedEvents);
+  const canonicalBodies = stableSnapshotAssistantBodies(canonicalEvents);
+  for (const [messageId, localBody] of cachedBodies) {
+    const canonicalBody = canonicalBodies.get(messageId);
+    if (!canonicalBody || canonicalBody.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
+    if (localBody.length - canonicalBody.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
+    if (localBody.includes(canonicalBody)) return true;
+  }
+  return false;
+}
+
 type CanonicalAssistantReply = {
   body: string;
   owner: string;
 };
 
-function canonicalStableAssistantReplies(events: TimelineEvent[]): CanonicalAssistantReply[] {
+function canonicalAssistantReplies(
+  events: TimelineEvent[],
+  requireStableIdentity: boolean,
+): CanonicalAssistantReply[] {
   const replies: CanonicalAssistantReply[] = [];
   let currentUserContent = "";
   for (const event of events) {
@@ -169,8 +211,9 @@ function canonicalStableAssistantReplies(events: TimelineEvent[]): CanonicalAssi
     }
     if (
       event.type !== "assistant_message" ||
-      event.snapshotMessageIdStable !== true ||
-      !event.snapshotMessageId ||
+      (requireStableIdentity && (
+        event.snapshotMessageIdStable !== true || !event.snapshotMessageId
+      )) ||
       !currentUserContent
     ) continue;
     const body = normalizedUserTurnContent(event.content);
@@ -237,36 +280,55 @@ function hasCrossTurnCanonicalReplyComposition(
   cachedEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
 ): boolean {
-  const canonicalReplies = canonicalStableAssistantReplies(canonicalEvents);
-  const bodyOwners = new Map<string, Set<string>>();
-  for (const reply of canonicalReplies) {
-    const owners = bodyOwners.get(reply.body) ?? new Set<string>();
-    owners.add(reply.owner);
-    bodyOwners.set(reply.body, owners);
-  }
-  const unambiguousReplies = canonicalReplies.filter((reply) => bodyOwners.get(reply.body)?.size === 1);
+  const unambiguous = (replies: CanonicalAssistantReply[]) => {
+    const bodyOwners = new Map<string, Set<string>>();
+    for (const reply of replies) {
+      const owners = bodyOwners.get(reply.body) ?? new Set<string>();
+      owners.add(reply.owner);
+      bodyOwners.set(reply.body, owners);
+    }
+    return replies.filter((reply) => bodyOwners.get(reply.body)?.size === 1);
+  };
+  const stableReplies = unambiguous(canonicalAssistantReplies(canonicalEvents, true));
+  const allReplies = unambiguous(canonicalAssistantReplies(canonicalEvents, false));
 
   let currentUserContent = "";
   let currentTurnBodies: string[] = [];
+  let currentTurnHasStableAssistant = false;
   const flushCurrentTurn = () => {
     if (!currentUserContent || currentTurnBodies.length === 0) return false;
     const localBody = normalizedUserTurnContent(currentTurnBodies.join("\n\n"));
-    return bodyHasCrossTurnCanonicalReplyComposition(
+    if (bodyHasCrossTurnCanonicalReplyComposition(
       localBody,
       currentUserContent,
-      unambiguousReplies,
-    );
+      stableReplies,
+    )) return true;
+    // Formal startup may temporarily fall back to SDK/wire history before the
+    // Server snapshot is ready. That history retains exact bodies and user
+    // boundaries but has no snapshot IDs. Only relax the canonical-ID
+    // requirement when the polluted local turn itself contains multiple
+    // Assistant rows and at least one immutable upstream identity.
+    return currentTurnHasStableAssistant && currentTurnBodies.length >= 2 &&
+      bodyHasCrossTurnCanonicalReplyComposition(
+        localBody,
+        currentUserContent,
+        allReplies,
+      );
   };
   for (const event of cachedEvents) {
     if (event.type === "user_message" || event.type === "steer_message") {
       if (flushCurrentTurn()) return true;
       currentUserContent = normalizedUserTurnContent(event.content);
       currentTurnBodies = [];
+      currentTurnHasStableAssistant = false;
       continue;
     }
     if (event.type !== "assistant_message" || !currentUserContent) continue;
     const body = event.content.trim();
-    if (body) currentTurnBodies.push(body);
+    if (body) {
+      currentTurnBodies.push(body);
+      currentTurnHasStableAssistant ||= event.snapshotMessageIdStable === true && Boolean(event.snapshotMessageId);
+    }
   }
   return flushCurrentTurn();
 }
@@ -299,6 +361,16 @@ export function shouldReplaceWithCanonicalKimiHistory(
   if (canonicalEvents.length === 0) return false;
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);
   const cachedAssistantSize = assistantBodySize(cachedEvents);
+
+  if (hasStableSnapshotMessageBodyExpansion(cachedEvents, canonicalEvents)) {
+    logEvent("kimiHistoryReconciliation.accepted", {
+      ...context,
+      reason: "stable-snapshot-message-body-expansion",
+      localSize: cachedAssistantSize,
+      canonicalSize: canonicalAssistantSize,
+    });
+    return true;
+  }
 
   // A stable official Assistant id mounted under a different user prompt is
   // proof of historical replay pollution, not richer local history. In this

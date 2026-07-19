@@ -1643,6 +1643,37 @@ describe("mapHistoryEvents", () => {
     });
   });
 
+  it("keeps unseen stable snapshot messages separate before any user boundary exists", () => {
+    const first: TimelineEvent = {
+      id: "snapshot-first",
+      type: "assistant_message",
+      timestamp: 100,
+      snapshotMessageId: "msg-first",
+      snapshotMessageIdStable: true,
+      content: "第一条官方历史回复",
+      isThinking: false,
+      isComplete: false,
+    };
+    const second: TimelineEvent = {
+      id: "snapshot-second",
+      type: "assistant_message",
+      timestamp: 200,
+      snapshotMessageId: "msg-second",
+      snapshotMessageIdStable: true,
+      content: "第二条官方历史回复",
+      isThinking: false,
+      isComplete: false,
+    };
+
+    const result = mergeEvents(mergeEvents([], first), second);
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual([
+      expect.objectContaining({ snapshotMessageId: "msg-first", content: "第一条官方历史回复" }),
+      expect.objectContaining({ snapshotMessageId: "msg-second", content: "第二条官方历史回复" }),
+    ]);
+  });
+
   it("routes an older stable snapshot message by identity instead of merging it into the current turn", () => {
     const current: TimelineEvent[] = [{
       id: "user-old", type: "user_message", timestamp: 100, content: "旧问题",

@@ -129,6 +129,72 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
+  it("repairs a stable snapshot message whose body expanded after its original user boundary was lost", () => {
+    const officialOldReply = "这是官方稳定消息原本唯一的完整回答，长度足以证明它不是偶然引用。";
+    const currentReply = "这是当前轮唯一应当显示的回答，不能与旧消息合并。";
+    const local: TimelineEvent[] = [{
+      id: "local-current-user",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "当前问题",
+    }, assistant(currentReply, {
+      id: "local-current-reply",
+      snapshotMessageId: "msg-current",
+      snapshotMessageIdStable: true,
+    }), assistant(`${officialOldReply}\n\n这是被错误串入同一稳定 ID 的其他多轮回复，而且原始用户边界已经不在官方窗口内。`, {
+      id: "polluted-stable-old-reply",
+      timestamp: 1_100,
+      snapshotMessageId: "msg-old-orphaned",
+      snapshotMessageIdStable: true,
+    })];
+    const canonical: TimelineEvent[] = [assistant(officialOldReply, {
+      id: "official-old-reply",
+      timestamp: 100,
+      snapshotMessageId: "msg-old-orphaned",
+      snapshotMessageIdStable: true,
+    }), {
+      id: "official-current-user",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "当前问题",
+    }, assistant(currentReply, {
+      id: "official-current-reply",
+      timestamp: 1_050,
+      snapshotMessageId: "msg-current",
+      snapshotMessageIdStable: true,
+    })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+  });
+
+  it("repairs a stable local cross-turn composition from identity-less startup fallback history", () => {
+    const oldReply = "这是较早用户轮次的完整官方回答，长度足以作为严格的跨轮匹配证据。";
+    const currentReply = "这是当前用户轮次唯一正确的官方回答，同样具有足够长度。";
+    const local: TimelineEvent[] = [{
+      id: "current-user",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "当前问题",
+    }, assistant(currentReply, { id: "current-local" }), assistant(oldReply, {
+      id: "polluted-stable-row",
+      snapshotMessageId: "msg-old",
+      snapshotMessageIdStable: true,
+    })];
+    const canonical: TimelineEvent[] = [{
+      id: "old-user",
+      type: "user_message",
+      timestamp: 100,
+      content: "较早问题",
+    }, assistant(oldReply, { id: "old-official" }), {
+      id: "current-official-user",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "当前问题",
+    }, assistant(currentReply, { id: "current-official" })];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+  });
+
   it("repairs a cached assistant composed of stable canonical replies from multiple user turns", () => {
     const oldAnswer = "这是上一轮已经完成的正式回答，长度足以排除短语偶然重合。";
     const currentAnswer = "这是当前这一轮的正式回答，应该单独显示在当前消息气泡中。";

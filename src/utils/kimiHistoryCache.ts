@@ -1,6 +1,6 @@
 import type { TimelineEvent } from "@/types/ui";
 
-export const KIMI_HISTORY_CACHE_VERSION = 8;
+export const KIMI_HISTORY_CACHE_VERSION = 9;
 
 const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 

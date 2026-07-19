@@ -1546,6 +1546,14 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       return result;
     }
 
+    // An unseen stable snapshot identity is a distinct immutable official
+    // message. Never let the generic "latest open Assistant" fallback absorb
+    // it merely because the replay window lacks its original user boundary.
+    if (stableSnapshotId) {
+      const isIdentityTerminal = incoming.isComplete && !incoming.content && !incoming.thinking;
+      return isIdentityTerminal ? existing : [...existing, incoming];
+    }
+
     if (incoming.isComplete && !incoming.content && !incoming.thinking) {
       const latestOpenIndex = existing.findLastIndex((e) => e.type === "assistant_message" && !e.isComplete);
       const hasRunningSubagent = existing.some((e) => e.type === "subagent" && e.status === "running");
