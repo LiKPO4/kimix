@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.74 B1 activeTurnDraft
+
+- 计划：`docs/plan-streaming-scroll-performance.md` B1。
+- 做法：
+  1. `activeTurnDraftStore` 按 `sessionId + roomAgentId + agentTurnId` 隔离
+  2. 可延迟 text/thinking delta **只写 draft**（无 snapshot barrier）；不触发 80ms session flush
+  3. 工具/完成/失败等边界与 `flushStreamEvents` 先 commit draft 再 merge 正式 events
+  4. 活跃助手 Body/过程 thinking 订 draft；历史泡不订
+  5. flag：`kimix_active_turn_draft`（默认开，`"0"` 关）
+- 回退：无 agentTurnId / 有 snapshotMessageId 走旧路径
+- 验收：全量 938 + typecheck；用户实机边输出边滚 + 多工具回合正文完整性
+
 ## 2026-07-20 v2.16.73 PR-A2 + B2/B3 流式滚动性能
 
 - 计划：`docs/plan-streaming-scroll-performance.md` v2。
@@ -9,7 +21,7 @@
   3. A2：memo 引用快路径 + WeakMap memoKey；助手泡拆 Process/Body 子树
   4. B2：贴底 `scrollToBottom("auto")` 同帧 rAF 合并
   5. B3：运行中过程区默认折叠单行摘要
-- 未做：B1 activeTurnDraft（局部 draft store，风险更高，单独立项）
+- 后续：v2.16.74 完成 B1
 - 验收：全量 932 + typecheck；用户生产 build 边输出边滚体感
 
 ## 2026-07-20 v2.16.72 PR-A1 流式滚动性能（Phase 0 + A1 + A3）

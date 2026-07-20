@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { coalesceStreamEventBatch } from "../useEventStream";
+import {
+  applyActiveTurnDraftDelta,
+  getActiveTurnDraft,
+  makeActiveTurnDraftKey,
+  resetActiveTurnDraftStoreForTests,
+} from "@/utils/activeTurnDraftStore";
+import { coalesceStreamEventBatch, commitActiveTurnDraftsToBatch } from "../useEventStream";
 
 function assistant(content: string, patch: Partial<Extract<TimelineEvent, { type: "assistant_message" }>> = {}): TimelineEvent {
   return {
@@ -81,5 +87,32 @@ describe("coalesceStreamEventBatch", () => {
       "assistant_message",
       "assistant_message",
     ]);
+  });
+});
+
+describe("commitActiveTurnDraftsToBatch", () => {
+  beforeEach(() => {
+    resetActiveTurnDraftStoreForTests();
+  });
+
+  it("materializes draft text ahead of a boundary event", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, assistant("流式正文", { agentTurnId: "turn-1", roomAgentId: "agent-1" }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>();
+    commitActiveTurnDraftsToBatch(batches, {
+      sessionId: "session-1",
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-1",
+    });
+
+    const batch = batches.get(JSON.stringify(["session-1", "agent-1"]));
+    expect(batch?.items).toHaveLength(1);
+    expect(batch?.items[0]).toMatchObject({
+      type: "assistant_message",
+      content: "流式正文",
+      isComplete: false,
+      agentTurnId: "turn-1",
+    });
+    expect(getActiveTurnDraft(key)).toBeNull();
   });
 });

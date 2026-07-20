@@ -11,18 +11,68 @@ import {
   replaceRoomAgentEvents,
   scopeEventToRoomAgent,
 } from "@/utils/collaborationRooms";
-import { isScrollYieldEnabled } from "@/utils/perfFlags";
+import {
+  applyActiveTurnDraftDelta,
+  draftToAssistantEvent,
+  listActiveTurnDraftKeys,
+  makeActiveTurnDraftKey,
+  parseActiveTurnDraftKey,
+  takeActiveTurnDraft,
+} from "@/utils/activeTurnDraftStore";
+import { isActiveTurnDraftEnabled, isScrollYieldEnabled } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
 
 const STREAM_EVENT_FLUSH_MS = 80;
 const STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING = 250;
 
-function isDeferrableStreamEvent(event: TimelineEvent): boolean {
+export function isDeferrableStreamEvent(event: TimelineEvent): boolean {
   return event.type === "assistant_message" && !event.isComplete;
 }
 
 function batchHasBoundaryEvent(items: TimelineEvent[]): boolean {
   return items.some((event) => !isDeferrableStreamEvent(event));
+}
+
+function resolveActiveTurnDraftKey(
+  sessionId: string,
+  roomAgentId: string,
+  event: TimelineEvent,
+): string | null {
+  if (event.type !== "assistant_message" || !event.agentTurnId) return null;
+  return makeActiveTurnDraftKey(sessionId, roomAgentId, event.agentTurnId);
+}
+
+/** Commit buffered draft text/thinking into the stream batch before formal merge. */
+export function commitActiveTurnDraftsToBatch(
+  batches: Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>,
+  options?: { sessionId?: string; roomAgentId?: string; agentTurnId?: string },
+): void {
+  const keys = listActiveTurnDraftKeys().filter((key) => {
+    const parsed = parseActiveTurnDraftKey(key);
+    if (!parsed) return false;
+    if (options?.sessionId && parsed.sessionId !== options.sessionId) return false;
+    if (options?.roomAgentId !== undefined && parsed.roomAgentId !== options.roomAgentId) return false;
+    if (options?.agentTurnId && parsed.agentTurnId !== options.agentTurnId) return false;
+    return true;
+  });
+
+  for (const key of keys) {
+    const parsed = parseActiveTurnDraftKey(key);
+    const draft = takeActiveTurnDraft(key);
+    if (!parsed || !draft) continue;
+    if (!draft.content && !draft.thinking && !(draft.thinkingParts?.length)) continue;
+    const batchKey = JSON.stringify([parsed.sessionId, parsed.roomAgentId]);
+    const current = batches.get(batchKey) ?? {
+      roomId: parsed.sessionId,
+      roomAgentId: parsed.roomAgentId,
+      items: [] as TimelineEvent[],
+    };
+    current.items.unshift(scopeEventToRoomAgent(
+      draftToAssistantEvent(key, draft),
+      parsed.roomAgentId,
+    ));
+    batches.set(batchKey, current);
+  }
 }
 
 function canCoalesceAssistantDelta(previous: TimelineEvent, incoming: TimelineEvent): boolean {
@@ -71,6 +121,9 @@ export function useEventStream() {
 
   const flushStreamEvents = useCallback(() => {
     streamFlushTimerRef.current = null;
+    if (isActiveTurnDraftEnabled()) {
+      commitActiveTurnDraftsToBatch(streamBatchRef.current);
+    }
     const batches = streamBatchRef.current;
     if (batches.size === 0) return;
     streamBatchRef.current = new Map();
@@ -93,12 +146,39 @@ export function useEventStream() {
     const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
     if (!session) return;
     const roomAgentId = getEventRoomAgentId(session, event);
+    const scoped = scopeEventToRoomAgent(event, roomAgentId);
+    const draftKey = resolveActiveTurnDraftKey(uiSessionId, roomAgentId, scoped);
+
+    // B1: pure text/thinking deltas stay in the active-turn draft store so
+    // historical session subscribers are not woken on every token.
+    // Stable snapshot / barrier frames stay on the formal path (they may REPLACE
+    // body text; draft only knows how to append live deltas).
+    if (
+      isActiveTurnDraftEnabled() &&
+      draftKey &&
+      isDeferrableStreamEvent(scoped) &&
+      scoped.type === "assistant_message" &&
+      !scoped.snapshotMessageId &&
+      !scoped.snapshotMessageIdStable
+    ) {
+      applyActiveTurnDraftDelta(draftKey, scoped);
+      return;
+    }
+
+    if (isActiveTurnDraftEnabled()) {
+      commitActiveTurnDraftsToBatch(streamBatchRef.current, {
+        sessionId: uiSessionId,
+        roomAgentId,
+        agentTurnId: typeof scoped.agentTurnId === "string" ? scoped.agentTurnId : undefined,
+      });
+    }
+
     const key = JSON.stringify([uiSessionId, roomAgentId]);
-    const current = streamBatchRef.current.get(key) ?? { roomId: uiSessionId, roomAgentId, items: [] };
-    current.items.push(scopeEventToRoomAgent(event, roomAgentId));
+    const current = streamBatchRef.current.get(key) ?? { roomId: uiSessionId, roomAgentId, items: [] as TimelineEvent[] };
+    current.items.push(scoped);
     streamBatchRef.current.set(key, current);
 
-    const immediate = !isDeferrableStreamEvent(event) || batchHasBoundaryEvent(current.items);
+    const immediate = !isDeferrableStreamEvent(scoped) || batchHasBoundaryEvent(current.items);
     if (immediate) {
       if (streamFlushTimerRef.current) {
         clearTimeout(streamFlushTimerRef.current);

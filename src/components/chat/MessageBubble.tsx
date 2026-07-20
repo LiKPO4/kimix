@@ -43,6 +43,12 @@ import {
   CHAT_PROCESS_COLLAPSE_VIEWPORT_EVENT,
   type ChatProcessCollapseViewportDetail,
 } from "@/utils/chatViewportTransaction";
+import {
+  makeActiveTurnDraftKey,
+  pickDraftText,
+  useActiveTurnDraft,
+} from "@/utils/activeTurnDraftStore";
+import { isActiveTurnDraftEnabled } from "@/utils/perfFlags";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -2256,8 +2262,35 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
       Object.values(roomAgentActivities),
     )
   );
-  const hasContent = event.content.trim().length > 0;
   const isActiveAssistant = Boolean(isAssistantActive);
+  const draftKey = (
+    isActiveTurnDraftEnabled() &&
+    isActiveAssistant &&
+    !event.isComplete &&
+    sessionId &&
+    event.agentTurnId
+  ) ? makeActiveTurnDraftKey(sessionId, event.roomAgentId, event.agentTurnId) : null;
+  const activeDraft = useActiveTurnDraft(draftKey);
+  const displayContent = pickDraftText(activeDraft?.content, event.content);
+  const displayThinking = pickDraftText(activeDraft?.thinking, event.thinking);
+  const displayThinkingParts = (
+    activeDraft?.thinkingParts &&
+    (activeDraft.thinkingParts?.length ?? 0) >= (event.thinkingParts?.length ?? 0)
+  ) ? activeDraft.thinkingParts : event.thinkingParts;
+  const processEvent = useMemo(() => {
+    if (
+      displayThinking === (event.thinking ?? "") &&
+      displayThinkingParts === event.thinkingParts
+    ) {
+      return event;
+    }
+    return {
+      ...event,
+      thinking: displayThinking || undefined,
+      thinkingParts: displayThinkingParts,
+    };
+  }, [event, displayThinking, displayThinkingParts]);
+  const hasContent = displayContent.trim().length > 0;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
@@ -2300,7 +2333,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: processToBodyGap }}>
         {!hideProcessSummary && (
           <AssistantProcessBlock
-            event={event}
+            event={processEvent}
             sessionId={sessionId}
             roomAgentDisplayName={roomAgent?.displayName}
             tools={leadingTools}
@@ -2324,9 +2357,9 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
 
         {shouldShowBodyFooter && (
           <AssistantBodyBlock
-            content={event.content}
-            thinking={event.thinking}
-            thinkingParts={event.thinkingParts}
+            content={displayContent}
+            thinking={displayThinking || undefined}
+            thinkingParts={displayThinkingParts}
             timestamp={event.timestamp}
             isActiveAssistant={isActiveAssistant}
             isComplete={event.isComplete}
