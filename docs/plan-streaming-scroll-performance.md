@@ -44,8 +44,9 @@ SSE/事件
 | 批处理间隔 | `STREAM_EVENT_FLUSH_MS = 80` | 约 12.5 次/秒写 store |
 | 更新粒度 | `updateSession` 替换整段 agent events | 订阅会话的树大面积重渲染 |
 | 活跃轮缓存 | 运行中最新轮**禁止** completed-turn cache | 每批都重跑 `renderTurnBody` |
+| 历史轮缓存命中 | 缓存命中检查用引用相等 `event === turnEvents[i]`（`ChatThread.tsx:1063-1068`），但 `projectCollaborationTimeline` 每次 flush 都用 spread 重建事件对象（`collaborationTimeline.ts:53-58, 146-160`） | **历史已完成轮每次 flush 都重跑 `renderTurnBody`，缓存实际完全失效** |
 
-相关：`src/hooks/useEventStream.ts`、`src/components/chat/ChatThread.tsx`（`buildRenderItems` / `canCacheTurn`）。
+相关：`src/hooks/useEventStream.ts`、`src/components/chat/ChatThread.tsx`（`buildRenderItems` / `canCacheTurn` / `renderCachedTurnBody`）、`src/utils/collaborationTimeline.ts`（`projectCollaborationTimeline` 每次 spread 重建事件，是 A4 的根因所在）。
 
 ### 2.2 渲染过重
 
@@ -53,7 +54,7 @@ SSE/事件
 |----|------|------|
 | 流式 Markdown | `streaming={isActiveAssistant}` 仍用完整 remark/rehype 栈 | 每批对“最后一块”全量 parse + highlight/math |
 | memo 失效 | `timelineEventMemoKey` 把整段 `content`/`thinking` 拼进 key | 每字变化 → 整泡（过程区+正文+footer）重渲 |
-| 过程区与正文同泡 | 同一 `AssistantMessageBubble` | 正文变也会带动过程摘要/工具行重算 |
+| 过程区与正文同泡 | 同一 `AssistantMessageBubble`，共享 `messageBubblePropsEqual` | 正文变 → memo 破 → 整泡子树 VNode 重建与 commit（含过程摘要/工具行/footer）。注：`AssistantProcessSummary` 内部 `useMemo` 已不依赖 content，代价是 commit 而非内部计算重跑 |
 
 相关：`src/components/chat/MarkdownRenderer.tsx`、`src/components/chat/MessageBubble.tsx`。
 
@@ -125,9 +126,16 @@ L3 视口：滚时让路       → 保锚/重测/跟尾给用户滚动让路
 
 ## 5. 分阶段计划
 
-### Phase A — 质变（优先，建议 1～2 个工作日量级）
+### Phase A — 质变（优先，建议 3～5 个工作日量级，拆两个 PR）
 
 > 目标：先让“边输出边滚”明显好转。
+
+**拆 PR（降低风险、便于归因回滚）**
+
+- **PR-A1（低风险，1～2 人日）**：A1 流式轻 Markdown + A3 滚动让路（含诊断埋点前置）。两者都有 flag，可独立关闭，不触及协作时间线核心。
+- **PR-A2（高风险，2～3 人日）**：A2 拆泡 + memo 收紧 + A4 修复缓存命中。两者都改渲染正确性核心，无 flag，靠 8.3 单测 + 多 Agent/撤回/reload 回归用例作为合并门禁。
+
+不要把 PR-A1 和 PR-A2 合并成一个 PR；A4 触及协作时间线，单 PR 难以归因和回滚。
 
 #### A1. 流式便宜 Markdown / 完成态富文本
 
@@ -149,6 +157,12 @@ L3 视口：滚时让路       → 保锚/重测/跟尾给用户滚动让路
 - 流式与完成态样式可能有一次轻微跳变 → 用相近排版、仅增强代码/公式，避免布局大跳。
 - 完成瞬间升级要避开用户正在滚动（见 A3）。
 
+**与现有 `StreamingMarkdownBlock` 分块的关系**
+
+- 当前 `MarkdownRenderer.tsx:62-126` 已有 `splitStreamingMarkdownBlocks`（按 markdown 块切分）+ `StreamingMarkdownBlock`（`React.memo`，key 为 block index）。这套分块本身是对的，StreamingPlain 阶段**保留分块边界**（避免最后一块全量重 parse），只把每块的渲染换成轻量路径。
+- StreamingPlain 阶段：每块走轻量渲染（`<pre>` 代码块、基础结构、不挂 `remark-math`/`rehype-katex`/`rehype-highlight`）。
+- SettledRich 升级时整泡切回完整 remark/rehype 栈，分块逻辑退出。不要在 StreamingPlain 内复用完整栈。
+
 #### A2. 过程区与正文拆分订阅 + memo 收紧
 
 **做什么**
@@ -161,54 +175,83 @@ L3 视口：滚时让路       → 保锚/重测/跟尾给用户滚动让路
 
 **为什么**
 
-- 现在 content 一变，过程摘要和工具行跟着整泡重渲，折叠也省不下多少。
+- 现在 content 一变，`timelineEventMemoKey` 全文拼接导致 memo 每字必破，整泡子树（含过程摘要/工具行/footer）VNode 重建与 commit。注：`AssistantProcessSummary` 内部 `useMemo` 已不依赖 content，所以真正省下的是 commit 成本而非内部计算成本。
 - React `memo` 只有在 props 真稳定时才有效；全文 key 导致每字必破。
 
 **风险与缓解**
 
 - 自定义 equal 写错会漏更新 → 单测覆盖：delta 追加、完成、工具状态变化、失败回合。
 
-#### A3. 用户滚动锁（Scroll Yield）
+#### A3. 用户滚动让路（Scroll Yield）—— 补齐 + 统一现有时间戳型让路
 
-**做什么**
+> 现状不是“没有让路”，而是“让路全是时间戳型、零散、有缺口”。本项是**补齐缺口 + 加活跃标志 + 统一调度**，不是从零新增滚动锁。
 
-在最近约 **400–700ms** 存在 wheel/touch/scrollbar 等明确用户滚动意图时：
+**现有让路机制（已存在，保留）**
 
-| 子系统 | 行为 |
-|--------|------|
-| 脱离子跟随的 anchor restore | 跳过 |
-| 导航轨 measure | 暂停或降频到 ≥200ms |
-| auto-follow 抢尾 | 保持 detached，不写 `scrollTop` |
-| 文本类 flush | 降频到 200–320ms |
-| Streaming → Settled 升级 | 延后到滚动停稳 |
+| 机制 | 位置 | 保护路径 | 窗口 |
+|------|------|----------|------|
+| `USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS` | `useScrollAnchor.ts:262` | contentVersion 锚点恢复 | 700ms |
+| `USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS` | `useResizeObserver.ts:91` | ResizeObserver 锚点恢复 | 260ms |
+| `lastManualAnchorRestoreAtRef` 节流 | `useScrollAnchor.ts:269` | `restoreManualScrollAnchor` | 350ms 最低间隔 |
+| `userInputLockUntilRef` | `useChatViewport.ts:132` / `useAutoFollow.ts:89,105` | `scrollToBottom`（贴底写） | 200ms |
+| `pauseAutoFollowForUser` | `useAutoFollow.ts:201` | 整体切离 auto-follow | 持续到重新触底 |
 
-工具开始/结束、审批、完成、失败等**边界事件仍立即提交**。
+**缺口（本项要补）**
+
+1. **无“正在滚动”活跃标志**：全靠 `lastUserScrollAtRef` 时间戳。慢速滚轮（事件间隔 >700ms）会在滚动序列中途触发锚点写入。→ 新增 `isUserScrollingRef` 活跃标志，wheel/touch/scrollbar 事件刷新 + 短超时（约 350ms 无事件）清零；活跃标志为真时直接跳过保锚与保底距 effect。
+2. **`useChatViewport.ts:635-664` 的 contentVersion “保底距” effect 无任何让路**：只按模式门控（`autoFollow && !userScroll`），不感知用户当前交互。→ 加活跃标志门控。
+3. **`ChatNavigationRail` measure 无让路**：`ChatNavigationRail.tsx:111-113` 的 `useLayoutEffect` **无依赖数组**，每次重渲染都 `scheduleMeasure` → 滚动期间持续 `setMarkers` 触发重渲染。→ 加依赖数组 + 滚动活跃时降频到 ≥200ms。
+4. **无降频 flush**：→ 新增“用户滚动活跃时，文本类 flush 降频到 200–320ms”（工具边界/完成/失败仍立即提交）。
+5. **Streaming → Settled 升级**：→ 延后到滚动停稳（与 A1 协同）。
+
+**诊断埋点（前置到本项，不放到 C2）**
+
+- 滚动期间 `scrollTop` 写入计数，按写手来源标注：anchor restore / auto-follow / resize / settle rAF。
+- flush 间隔、活跃 commit 耗时。
+- 仅诊断开关开启时上报，默认关闭；用于 A 验收的“滚动 2s 内 scrollTop 写入 ≈ 0”成功标准。
+
+**边界事件仍立即提交**
+
+工具开始/结束、审批、完成、失败等边界事件不降频、不让路，保持即时性。
 
 **为什么**
 
 - 卡顿是“输出改高度 + 保锚改 scrollTop + 用户在滚”三方争用。
+- 现有时间戳让路在慢速滚动下漏判，且保底距 effect / 导航轨 measure / flush 完全没让路。
 - Codex 感的关键是：**人在滚时，系统别抢方向盘**。
 
 **风险与缓解**
 
 - 跟随时误判为用户上滚 → 依赖现有 intent 信号（wheel 方向、scrollbar、navigation key），并保留“明确回到底部则恢复跟随”。
+- 活跃标志超时太长会延迟跟尾恢复 → 超时取 350ms（介于 wheel 事件间隔与用户停顿之间），并在“回到底部”时立即清零。
 
-#### A4. `buildRenderItems` 只重算 open turn
+#### A4. 修复历史轮缓存失效 —— 让 `completedTurnRenderCache` 真正命中
 
-**做什么**
+> 这是 Phase A 收益最大但风险也最高的一项。现状不是“历史轮可能被扫到”，而是**缓存实际完全失效**。
 
-- 流式期间：已完成轮继续走 `completedTurnRenderCache`，且**不因活跃轮更新而失效**。
-- 仅对“未完成 / 最新活跃轮”调用 `renderTurnBody`。
-- 保证 cache key 与事件身份比较在活跃轮更新时仍正确。
+**真因（必须先理解）**
+
+- 缓存命中检查（`ChatThread.tsx:1063-1068`）用引用相等：`cached.events.every((event, index) => event === turnEvents[index])`。
+- 但所有会话都走 `projectCollaborationTimeline`（`collaborationTimeline.ts:53-58, 146-160`），它每次都用 spread 重建事件对象 → 引用每次都变。
+- 结果：**每次 80ms flush，所有历史已完成轮的缓存命中检查都失败 → 全部重跑 `renderTurnBody`**。缓存只起“记录上次结果但下次必 miss”的作用。
+- `canCacheTurn` 第 1015-1022 行注释已暗示设计意图是“保持对象身份让 React 复用 DOM”，但这个意图在协作会话路径上从未达成。
+
+**做什么（两种方案二选一，建议方案 A）**
+
+- **方案 A（推荐，改动小、回滚易）**：把命中检查从引用相等 `===` 改成 `timelineEventMemoKey(event)` 相等（已有函数，`MessageBubble.tsx:68`）。历史已完成轮的 content/thinking 不再变化，`timelineEventMemoKey` 对稳定事件的相等检查是稳定的。
+- **方案 B（影响面大）**：让 `projectCollaborationTimeline` 在事件未变时保留原引用。`scopeEventToRoomAgent` 在 `roomAgentId` 匹配时已返回同一引用，但外层 spread（`collaborationTimeline.ts:53-58, 146-160`）破坏了它。需改 `deliveryEvents` / unclaimed 段，触及协作时间线核心，回滚成本高。
 
 **为什么**
 
-- 现在活跃轮每批全量投影；历史轮虽有 cache，仍可能被整次 `buildRenderItems` 扫到。
-- 目标复杂度：更新 ≈ O(活跃轮)，不是 O(全会话)。
+- 修好后，历史已完成轮在流式期间接近零重跑（O(活跃轮) 而非 O(全会话)）。
+- 这是 §3.1 目标 2“历史已完成轮流式期间接近零重渲”的直接实现路径，不修则目标 2 无法达成。
 
-**风险与缓解**
+**风险与缓解（高风险）**
 
+- **触及协作时间线核心路径**，回归面覆盖：多 Agent 房间、撤回后重发、官方历史 reload、snapshot reconciliation。→ 必须配针对性回归用例（见 8.1），并作为合并门禁。
+- **方案 A 的 `timelineEventMemoKey` 相等检查有性能成本**（每项拼字符串比较），但历史轮数量有限且 key 计算已是项目既有模式，可接受；若发现热点再用方案 B。
 - 缓存误命中导致旧头/旧过程 → 沿用并加强 `canCacheTurn`（运行中最新轮永不缓存）回归测试。
+- **无 flag**：改动在缓存命中逻辑，加 flag 反而增加分支复杂度，靠 8.3 单测 + 多 Agent/撤回/reload 回归用例作为合并门禁。
 
 ---
 
@@ -273,10 +316,12 @@ L3 视口：滚时让路       → 保锚/重测/跟尾给用户滚动让路
 ## 6. 建议实施顺序与依赖
 
 ```
-A1 流式 Markdown 降载 ─┐
-A2 拆泡 + memo       ├─→ A 验收（边输出边滚）
-A3 滚动锁            │
-A4 open-turn 投影    ─┘
+PR-A1: A1 流式 Markdown 降载 + A3 滚动让路（含埋点前置）
+         │  (低风险, 有 flag)
+         ▼  A 验收第一轮: 边输出边滚改善 + 历史轮仍重跑
+PR-A2: A2 拆泡 + memo 收紧 + A4 修复缓存命中
+         │  (高风险, 无 flag, 靠单测+回归门禁)
+         ▼  A 验收第二轮: 历史轮接近零重渲
          │
          ▼
 B1 draft 局部 store → B2 跟随单写手 → B3 过程默认摘要
@@ -285,7 +330,8 @@ B1 draft 局部 store → B2 跟随单写手 → B3 过程默认摘要
 C1 虚拟列表（若长会话仍吃力）→ C2 精排/埋点
 ```
 
-**不要**先做 C1 虚拟列表再做 A1–A3（顺序反了，风险大、收益慢）。
+**不要**先做 C1 虚拟列表再做 A1–A4（顺序反了，风险大、收益慢）。
+**不要**把 PR-A1 和 PR-A2 合并；A4 触及协作时间线核心，单 PR 难以归因和回滚。
 
 ---
 
@@ -322,17 +368,19 @@ C1 虚拟列表（若长会话仍吃力）→ C2 精排/埋点
 ### 8.3 自动化
 
 - [ ] Markdown：streaming 路径不挂载 katex/highlight（或等价断言）
-- [ ] memo/拆分：content 追加不导致 Process 无故重渲（可用 render counter 测试）
-- [ ] 滚动锁：模拟 userScroll + contentVersion，不调用 restore anchor
-- [ ] open-turn：活跃更新不重建已缓存完成轮 items
+- [ ] memo/拆分（A2）：content 追加不导致 Process 无故重渲（可用 render counter 测试）；equal 函数覆盖 delta 追加、完成、工具状态变化、失败回合
+- [ ] 滚动让路（A3）：模拟 userScroll 活跃 + contentVersion 变化，不调用 restore anchor；慢速滚轮（间隔 >700ms）在活跃标志窗口内也不写入
+- [ ] 缓存命中（A4）：活跃更新不重建已缓存完成轮 items；多 Agent 房间、撤回后重发、官方历史 reload、snapshot reconciliation 后缓存 key 仍正确、不误命中旧头/旧过程
+- [ ] 诊断埋点（A3 前置）：scrollTop 写入计数按写手来源标注，滚动期间目标 ≈ 0
 
 ---
 
 ## 9. 回滚策略
 
-- 各 Phase 独立 PR/提交，可单相 revert。
+- 各 Phase 拆 PR（见 §5），可单 PR revert。
 - A1 可用 flag：`streamingPlainMarkdown`（默认开，出问题关回全量 Markdown）。
-- A3 可用 flag：`scrollYieldWhenUserScrolling`。
+- A3 可用 flag：`scrollYieldWhenUserScrolling`（默认开，出问题关回现有时间戳型让路）。
+- A2、A4 无 flag：改动在 memo 相等函数与缓存命中逻辑，加 flag 反而增加分支复杂度。回滚靠 `git revert` 对应 PR；合并门禁靠 8.3 单测 + 多 Agent/撤回/reload 回归用例，不通过不合并。
 - 不改持久化 schema；draft 未 commit 前杀进程仅丢未落盘流式尾（与今类似或更好）。
 
 ---
@@ -341,9 +389,12 @@ C1 虚拟列表（若长会话仍吃力）→ C2 精排/埋点
 
 | 阶段 | 粗估 | 预期体感 |
 |------|------|----------|
-| Phase A | 1–2 人日 | 边输出边滚应有明显改善 |
+| PR-A1（A1 + A3 含埋点） | 1–2 人日 | 边输出边滚应有明显改善 |
+| PR-A2（A2 + A4） | 2–3 人日 | 历史轮接近零重渲，流式期间整体稳感提升 |
 | Phase B | 1–2 人日 | 接近 Codex 稳感，结构更干净 |
 | Phase C | 2–4 人日 | 超长会话与可观测性 |
+
+注：Phase A 原估 1–2 人日偏乐观，实际含 A4 协作时间线回归，拆两个 PR 后合计 3–5 人日更稳。
 
 ---
 
@@ -364,15 +415,17 @@ C1 虚拟列表（若长会话仍吃力）→ C2 精排/埋点
 
 ## 12. 评审时请重点拍板的点
 
-1. **是否同意 Phase A 四项作为第一刀**（尤其 StreamingPlain，会有流式/完成态一次视觉升级）。
-2. **滚动锁窗口** 400ms vs 700ms（更跟手 vs 更少误伤跟随）。
-3. **B1 activeTurnDraft** 是否纳入第二阶段，还是 A 够用就先停。
-4. **运行中过程默认单行**（B3）是否接受为默认产品行为（可设置项）。
+1. **是否同意拆 PR-A1 / PR-A2 两个 PR**（见 §5），而不是合并成一个 Phase A PR。
+2. **A4 方案选择**：方案 A（改命中检查为 `timelineEventMemoKey` 相等，推荐）还是方案 B（改 `projectCollaborationTimeline` 保留引用，影响面大）。
+3. **A2/A4 无 flag** 是否接受（回滚靠 `git revert`，门禁靠单测 + 多 Agent/撤回/reload 回归用例）。
+4. **A3 活跃标志超时取 350ms**（介于 wheel 事件间隔与用户停顿之间），是否需要更长/更短。
+5. **B1 activeTurnDraft** 是否纳入第二阶段，还是 A 够用就先停。
+6. **运行中过程默认单行**（B3）是否接受为默认产品行为（可设置项）。
 
 ---
 
 ## 13. 一句话摘要（给忙的人）
 
-> 卡顿是因为流式输出以约 80ms 频率驱动「整会话更新 + 全量 Markdown 精排 + 视口保锚」，与用户滚动抢主线程。  
-> 最优解是：**活跃轮局部写、流式轻渲染/完成再精排、滚动时暂停保锚与降频、历史轮冻结**。  
-> 先做 Phase A，用生产 build 验滚动；再视情况做 draft 与虚拟列表。
+> 卡顿是因为流式输出以约 80ms 频率驱动「整会话更新 + 全量 Markdown 精排 + 视口保锚」，与用户滚动抢主线程；且历史轮缓存因 `projectCollaborationTimeline` spread 重建事件对象而**实际完全失效**，每次 flush 重跑所有历史轮 `renderTurnBody`。
+> 最优解是：**活跃轮局部写、流式轻渲染/完成再精排、滚动时补齐让路 + 加活跃标志、修复历史轮缓存命中、历史轮冻结**。
+> 先做 PR-A1（A1+A3，低风险有 flag），再做 PR-A2（A2+A4，高风险靠单测+回归门禁），用生产 build 验滚动；再视情况做 draft 与虚拟列表。
