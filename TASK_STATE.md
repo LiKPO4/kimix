@@ -1,5 +1,23 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.65 正常轮次被提前判定终端导致消息头消失（6 秒 bug）
+
+- 当前目标：v2.16.64 修复了失败轮次头消失后，用户报告新现象——发送消息后约 6 秒 Assistant 消息头消失，只剩 "Context: 13.87%" 气泡；轮次最终成功，body 后到时头又回来（闪烁）。
+- 根因证据（经完整事件链 + Explore agent 确认，与失败轮次完全不同路径）：
+  1. 0.27 Server 在 assistant body 还没 stream 到时提前报 `idle`/`completed`（step 边界 quirk）。
+  2. `App.tsx:3261-3303` 终端轮询路径：2.5s guard + 连续 2 次终端 poll → ~5.7s 触发 `settleTerminalRoomAgent`（1.5s 轮询间隔）。
+  3. `settleInactiveEvents`（eventHelpers.ts:265）把空 assistant placeholder `return []` 删除。
+  4. `buildRenderItems`：`turnSettled=true` + `mergedAssistantEvent=undefined` + `isTurnActive=false` → 头消失，只剩 `status_update`（Context: 13.87%）当独立气泡。
+  5. body 后到 → 头又回来（闪烁）。
+  6. 改 `settleInactiveEvents` 本身不够：`mergeAssistantProcessEvents` 过滤空 assistant，`isTurnActive=false` 让 pending-placeholder fallback 不触发。
+- 修复（单个修复点，最小）：
+  - `src/utils/eventHelpers.ts`：新增纯函数 `hasTurnReceivedBody(events)`——判断当前轮次（latest user message 之后）是否收过 assistant body/thinking/tool/subagent/error 事件。`status_update` 不算 body。
+  - `src/App.tsx`：终端轮询路径在 `terminalPolls < 2` 之后、`flushStreamEvents()` 之前加守卫：60 秒内 + `!hasTurnReceivedBody` → 不 settle，return 等待，写回 `terminalPolls` 让计数继续累积。超过 60 秒允许 settle（兜底真正失败但无 error event 的轮次）。
+- 验证：eventHelpers 测试 27 项通过（含新增 10 个 `hasTurnReceivedBody` 测试）；全量 106 文件 910 项通过；typecheck 通过；build 通过，renderer `assets/index-B4uS4UGQ.js`。
+- 关键文件：`src/utils/eventHelpers.ts`、`src/App.tsx`、`src/utils/__tests__/eventHelpers.test.ts`。
+- 风险与回滚：真正失败但无 error event 的轮次会等 60 秒才 settle（可接受）。revert 即可，无 schema/持久化变更。
+- 下一步：用户实机复验 v2.16.65，确认正常轮次 6 秒后头不再消失。
+
 ## 2026-07-20 v2.16.64 live 失败头消失三层根因根治
 
 - 当前目标：v2.16.63 仍存在“发送消息失败后 agent 消息头先消失、第二次打开才显示”的问题，需从最底层根治。

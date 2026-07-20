@@ -233,6 +233,32 @@ export function removeLocalUserSendAttempt(events: TimelineEvent[], userEventId:
   return events.filter((event) => !removeIds.has(event.id));
 }
 
+/**
+ * Whether the latest user turn (events after the last user_message) has
+ * received any displayable Assistant body, thinking, tool, subagent, or error
+ * event. Used by the terminal-status polling path to detect a premature
+ * terminal report: 0.27 Server may report idle/completed before the assistant
+ * body streams. A turn that never received body must not be settled, or the
+ * empty optimistic placeholder is deleted and the message header disappears
+ * leaving only a status bubble. status_update events (e.g. "Context: X%")
+ * do not count as body.
+ */
+export function hasTurnReceivedBody(events: TimelineEvent[]): boolean {
+  const latestUserIndex = events.findLastIndex((event) => event.type === "user_message");
+  if (latestUserIndex < 0) return false;
+  return events.slice(latestUserIndex + 1).some((event) => (
+    (event.type === "assistant_message" && (
+      event.content.trim() ||
+      Boolean(event.thinking?.trim()) ||
+      Boolean(event.thinkingParts?.some((part) => part.text.trim()))
+    )) ||
+    event.type === "tool_call" ||
+    event.type === "tool_result" ||
+    event.type === "subagent" ||
+    event.type === "error"
+  ));
+}
+
 function isStaleRunningEvent(event: TimelineEvent, settledAt: number) {
   return settledAt - event.timestamp > STALE_TIMELINE_WORK_MS;
 }

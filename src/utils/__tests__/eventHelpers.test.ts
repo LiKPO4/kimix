@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -231,5 +231,90 @@ describe("hasMalformedAssistantMarkdown", () => {
 
     expect(hasMalformedAssistantMarkdown(malformed)).toBe(true);
     expect(hasMalformedAssistantMarkdown(canonical)).toBe(false);
+  });
+
+  describe("hasTurnReceivedBody", () => {
+    it("returns false when the latest turn has only an empty assistant placeholder", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+        { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "", isThinking: false, isComplete: false },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(false);
+    });
+
+    it("returns true when the latest turn has an assistant with content", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+        { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "你好，有什么需要？", isThinking: false, isComplete: false },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(true);
+    });
+
+    it("returns true when the latest turn has an assistant with thinking", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+        { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "", thinking: "正在思考", isThinking: true, isComplete: false },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(true);
+    });
+
+    it("returns true when the latest turn has thinking parts", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+        { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "", thinkingParts: [{ id: "tp-1", timestamp: 2, text: "分析中" }], isThinking: true, isComplete: false },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(true);
+    });
+
+    it("returns true when the latest turn has a tool_call", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "列出文件" },
+        { id: "tool-1", type: "tool_call", timestamp: 2, toolCallId: "tc-1", toolName: "bash", status: "running", arguments: {} },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(true);
+    });
+
+    it("returns true when the latest turn has an error event", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+        { id: "error-1", type: "error", timestamp: 2, message: "额度不足", canDismiss: true },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(true);
+    });
+
+    it("returns false when the latest turn has only a status_update", () => {
+      // A status_update (e.g. "Context: 13.87%") is not Assistant body.
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+        { id: "status-1", type: "status_update", timestamp: 2, contextSize: 35000, message: "Context: 13.87%" },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(false);
+    });
+
+    it("returns false when there are no events after the latest user message", () => {
+      const events: TimelineEvent[] = [
+        { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(false);
+    });
+
+    it("returns false when there is no user message", () => {
+      const events: TimelineEvent[] = [
+        { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "你好", isThinking: false, isComplete: false },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(false);
+    });
+
+    it("only checks the latest turn, not older turns", () => {
+      // An older turn with body should not satisfy the guard for the current
+      // turn that has only an empty placeholder.
+      const events: TimelineEvent[] = [
+        { id: "user-old", type: "user_message", timestamp: 1, content: "旧问题" },
+        { id: "assistant-old", type: "assistant_message", timestamp: 2, content: "旧回复", isThinking: false, isComplete: true },
+        { id: "user-new", type: "user_message", timestamp: 3, content: "新问题" },
+        { id: "assistant-new", type: "assistant_message", timestamp: 4, content: "", isThinking: false, isComplete: false },
+      ];
+      expect(hasTurnReceivedBody(events)).toBe(false);
+    });
   });
 });
