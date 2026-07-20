@@ -182,6 +182,51 @@ function appendAssistantContent(existingContent: string, incomingContent: string
   return existingContent + incomingContent;
 }
 
+type AssistantThinkingPart = NonNullable<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>[number];
+
+/** Merge thinking text without losing earlier steps or duplicating stream prefixes. */
+function mergeAssistantThinkingText(existing?: string, incoming?: string): string | undefined {
+  const left = existing ?? "";
+  const right = incoming ?? "";
+  if (!right.trim()) return existing;
+  if (!left.trim()) return incoming;
+  if (right === left || right.includes(left)) return right;
+  if (left.includes(right)) return left;
+  return left + right;
+}
+
+/** Append thinking parts across multi-step barrier frames; upgrade supersets in place. */
+function mergeAssistantThinkingParts(
+  existing: AssistantThinkingPart[] | undefined,
+  incoming: AssistantThinkingPart[] | undefined,
+): AssistantThinkingPart[] | undefined {
+  if (!incoming?.length) return existing;
+  if (!existing?.length) return incoming;
+  const result = [...existing];
+  for (const part of incoming) {
+    const text = part.text.trim();
+    if (!text) continue;
+    const matchIndex = result.findIndex((item) => (
+      item.id === part.id ||
+      item.text === part.text ||
+      item.text.includes(part.text) ||
+      part.text.includes(item.text)
+    ));
+    if (matchIndex === -1) {
+      result.push(part);
+      continue;
+    }
+    if (part.text.length > result[matchIndex].text.length) {
+      result[matchIndex] = {
+        ...result[matchIndex],
+        ...part,
+        text: part.text,
+      };
+    }
+  }
+  return result;
+}
+
 function isInsideUnclosedInlineCode(content: string) {
   const currentLine = content.split(/\r?\n/).pop() ?? "";
   const withoutFences = currentLine.replace(/```/g, "");
@@ -1519,26 +1564,22 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         return result;
       }
       const remainsComplete = target.isComplete || incoming.isComplete;
-      const replaceCanonicalDimensions = incoming.completionBarrierReplay === true;
+      // Barrier may rewrite final body text, but thinking must accumulate across
+      // multi-part / multi-step frames. Replacing thinkingParts with the latest
+      // frame alone drops earlier tool-step thoughts (only the last "N 个工具调用"
+      // row remains visible).
+      const replaceCanonicalBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
       const result = [...existing];
       result[stableAssistantIndex] = {
         ...target,
         completionBarrierReplay: incoming.completionBarrierReplay ?? target.completionBarrierReplay,
         agentRole: incoming.agentRole ?? target.agentRole,
         model: incoming.model ?? target.model,
-        content: replaceCanonicalDimensions && incoming.content
+        content: replaceCanonicalBody
           ? incoming.content
           : appendAssistantContent(target.content, incoming.content),
-        thinking: replaceCanonicalDimensions && incoming.thinking
-          ? incoming.thinking
-          : incoming.thinking
-            ? (target.thinking ?? "") + incoming.thinking
-            : target.thinking,
-        thinkingParts: incoming.thinkingParts
-          ? replaceCanonicalDimensions
-            ? incoming.thinkingParts
-            : [...(target.thinkingParts ?? []), ...incoming.thinkingParts]
-          : target.thinkingParts,
+        thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
+        thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
         isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
         isComplete: remainsComplete,
         durationMs: incoming.isComplete && !target.isComplete
@@ -1549,9 +1590,13 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     }
 
     if (stableSnapshotId && incoming.completionBarrierReplay) {
+      // Bind the live placeholder to the first official barrier message only.
+      // Later steps have different stable message IDs and must stay separate so
+      // mergeAssistantProcessEvents can join every step's thinking + tools.
       const completionTargetIndex = existing.findLastIndex((event) => (
         event.type === "assistant_message" &&
         !event.isComplete &&
+        event.snapshotMessageIdStable !== true &&
         (!incoming.roomAgentId || event.roomAgentId === incoming.roomAgentId) &&
         (!incoming.roomMessageId || event.roomMessageId === incoming.roomMessageId) &&
         (!incoming.agentTurnId || event.agentTurnId === incoming.agentTurnId)
@@ -1567,8 +1612,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           agentRole: incoming.agentRole ?? target.agentRole,
           model: incoming.model ?? target.model,
           content: incoming.content || target.content,
-          thinking: incoming.thinking || target.thinking,
-          thinkingParts: incoming.thinkingParts ?? target.thinkingParts,
+          thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
+          thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
           isThinking: target.isThinking || Boolean(incoming.thinking),
         };
         return result;

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   classifyServerSessionActivity,
+  completedPromptMessagesToServerFrames,
   flattenServerEvent,
   isKimiCodeServerSessionRoutingEnabled,
   KimiCodeServerClient,
@@ -305,10 +306,97 @@ describe("KimiCodeServerClient protocol adapters", () => {
       event: {
         type: "assistant_message",
         content: "在的，有什么需要？",
+        thinking: expect.stringContaining("确认在线"),
         isComplete: true,
       },
     });
     await client.close();
+  });
+
+  it("keeps every step's thinking when a multi-tool prompt completion barrier arrives", () => {
+    const promptId = "msg_prompt_multi_step";
+    const messages = [
+      {
+        id: "msg_asst_final",
+        role: "assistant",
+        created_at: "2026-07-20T10:00:10.000Z",
+        content: [
+          { type: "thinking", thinking: "最终整理回答要点。" },
+          { type: "text", text: "三处剧情铺垫已补全。" },
+        ],
+      },
+      {
+        id: "msg_tool_2",
+        role: "tool",
+        created_at: "2026-07-20T10:00:09.000Z",
+        tool_call_id: "tool_2",
+        content: [{ type: "tool_result", tool_call_id: "tool_2", output: "ok2" }],
+      },
+      {
+        id: "msg_asst_2",
+        role: "assistant",
+        created_at: "2026-07-20T10:00:08.000Z",
+        content: [
+          { type: "thinking", thinking: "第二段思考，准备再读一个文件。" },
+          { type: "tool_use", tool_call_id: "tool_2", tool_name: "Read", input: { path: "b.ts" } },
+        ],
+      },
+      {
+        id: "msg_tool_1",
+        role: "tool",
+        created_at: "2026-07-20T10:00:07.000Z",
+        tool_call_id: "tool_1",
+        content: [{ type: "tool_result", tool_call_id: "tool_1", output: "ok1" }],
+      },
+      {
+        id: "msg_asst_1",
+        role: "assistant",
+        created_at: "2026-07-20T10:00:06.000Z",
+        content: [
+          { type: "thinking", thinking: "第一段很长的思考内容，分析项目结构和剧情规范。" },
+          { type: "tool_use", tool_call_id: "tool_1", tool_name: "Bash", input: { command: "ls" } },
+        ],
+      },
+      {
+        id: "msg_inject",
+        role: "user",
+        created_at: "2026-07-20T10:00:00.000Z",
+        content: [{ type: "text", text: "<system-reminder>injected</system-reminder>" }],
+        metadata: { origin: { kind: "injection" } },
+      },
+      {
+        id: promptId,
+        role: "user",
+        created_at: "2026-07-20T10:00:00.000Z",
+        content: [{ type: "text", text: "快速全面了解一下当前项目" }],
+      },
+    ];
+
+    const frames = completedPromptMessagesToServerFrames(messages, "session-multi", promptId, 10, "epoch-1");
+    const live = reduceKimiCodeEvents([], [
+      { type: "TurnBegin", payload: { user_input: "快速全面了解一下当前项目" }, timestamp: 1 },
+      { type: "thinking.delta", delta: "live partial thinking", timestamp: 2 },
+      { type: "tool.call.started", payload: { toolCallId: "live-tool", name: "Bash", args: { command: "pwd" } }, timestamp: 3 },
+    ] as Parameters<typeof reduceKimiCodeEvents>[1]);
+    const timeline = settleInactiveEvents(reduceKimiCodeEvents(
+      live,
+      frames.map((frame) => flattenServerEvent(frame as Parameters<typeof flattenServerEvent>[0])),
+    ));
+    const rendered = buildRenderItems(timeline, "kimi-code")
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(rendered).toBeTruthy();
+    if (!rendered || rendered.type !== "event" || rendered.event.type !== "assistant_message") {
+      throw new Error("expected assistant render item");
+    }
+    const thinking = [
+      rendered.event.thinking ?? "",
+      ...(rendered.event.thinkingParts ?? []).map((part) => part.text),
+    ].join("\n");
+    expect(rendered.leadingTools?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(thinking).toContain("第一段很长的思考内容");
+    expect(thinking).toContain("第二段思考");
+    expect(thinking).toContain("最终整理回答要点");
+    expect(rendered.event.content).toContain("三处剧情铺垫已补全");
   });
 
   it("waits for a displayable assistant when prompt completion reaches message storage first", async () => {

@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.67 多步工具轮次展开只剩工具、思考丢失
+
+- 当前目标：用户报告过程展开只能看到「N 个工具调用」，思考段全部消失。
+- 根因：`prompt.completed` barrier 回放多步官方 Assistant（每步 think+tool_use）时，`mergeEvents` 的 `completionBarrierReplay` 路径把后续稳定 message ID 反复绑到同一个 incomplete 占位上，并用后一步的 `thinking/thinkingParts` 覆盖前序思考；同 ID 多帧时 `replaceCanonicalDimensions` 也会用最新 think 帧替换整段 thinkingParts。工具事件独立累积，所以 UI 只剩工具卡。
+- 修复：barrier 仅绑定尚未持有 stable snapshot ID 的 live 占位；thinking 文本/parts 跨 barrier 帧合并累积（去重/升级超集），正文仍允许 barrier 权威改写。
+- 验证：新增多步 barrier 思考保留回归；定向 barrier 2 项通过；全量 106 文件 913 项通过；typecheck 通过。
+- 关键文件：`src/utils/eventMapper.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`、`knowledge/architecture/runtime-routing.md`。
+- 下一步：用户在 v2.16.67 实机展开多工具轮次，确认思考段与工具同时可见。
+
 ## 2026-07-20 v2.16.66 移除 60 秒上限，改为保留空 placeholder
 
 - 当前目标：v2.16.65 的 60 秒上限太短，用户报告 1 分 03 秒后头消失（body 来得慢，401 余额不足重试），轮次最终成功。
