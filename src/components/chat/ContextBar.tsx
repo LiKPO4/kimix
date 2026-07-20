@@ -898,11 +898,11 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
             {!iconOnly && <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>}
           </button>
         )}
-        <div ref={modelMenuRef} className="relative hidden min-w-0 shrink-0 lg:block" style={{ width: iconOnly ? "auto" : 168 }}>
+        <div ref={modelMenuRef} className="relative hidden min-w-0 max-w-[280px] shrink lg:block" style={{ flexBasis: "auto" }}>
           <button
             type="button"
             onClick={toggleModelMenu}
-            className="kimix-contextbar-action kimix-muted-action flex w-full min-w-0 items-center rounded-lg"
+            className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
             style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title={modelTitle}
             aria-label={`${modelTitle}，选择会话模型`}
