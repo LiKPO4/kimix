@@ -1015,11 +1015,11 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
   });
 
-  it("restores a visible failure event when the authoritative snapshot ends with an empty failed assistant", () => {
+  it("restores a visible failure event when a real 0.27 snapshot ends with an empty assistant and omits the failure reason", () => {
     const frames = snapshotMessagesToServerFrames({
       as_of_seq: 619,
       epoch: "epoch-failed",
-      session: { id: "session-failed", status: "idle", busy: false, last_turn_reason: "failed" },
+      session: { id: "session-failed", status: "idle", busy: false, main_turn_active: false },
       messages: {
         items: [
           { id: "msg-user-failed", role: "user", content: [{ type: "text", text: "继续检查" }] },
@@ -1033,14 +1033,62 @@ describe("KimiCodeServerClient protocol adapters", () => {
       type: "content.part",
       payload: {
         snapshotReplay: "history",
-        part: { type: "text", text: expect.stringContaining("本轮失败") },
+        part: { type: "text", text: expect.stringContaining("未返回可显示内容") },
       },
     });
-    const rendered = buildRenderItems(mapHistoryEvents(frames.map((current) => ({
+    const mapped = mapHistoryEvents(frames.map((current) => ({
       type: current.type,
       payload: current.payload,
-    }))), "kimi-code");
+    })));
+    expect(mapped.findLast((event) => event.type === "assistant_message")).toMatchObject({
+      snapshotMessageId: "msg-assistant-failed",
+      snapshotMessageIdStable: true,
+    });
+    const rendered = buildRenderItems(mapped, "kimi-code");
     expect(rendered.some((item) => item.type === "event" && item.event.type === "assistant_message")).toBe(true);
+  });
+
+  it("does not invent a failure body when the terminal turn already has visible tool output", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 620,
+      epoch: "epoch-tool-only",
+      session: { id: "session-tool-only", status: "idle", busy: false, main_turn_active: false },
+      messages: {
+        items: [
+          { id: "msg-user", role: "user", content: [{ type: "text", text: "检查状态" }] },
+          {
+            id: "msg-tool-call",
+            role: "assistant",
+            content: [{ type: "tool_use", tool_call_id: "call-1", tool_name: "Shell", input: { command: "git status" } }],
+          },
+          { id: "msg-tool-result", role: "tool", content: [{ type: "tool_result", tool_call_id: "call-1", output: "clean" }] },
+          { id: "msg-empty-assistant", role: "assistant", content: [] },
+        ],
+      },
+      in_flight_turn: null,
+    }, "session-tool-only");
+
+    expect(frames.some((frame) => (
+      frame.type === "content.part" &&
+      (frame.payload as { snapshotMessageId?: string } | undefined)?.snapshotMessageId === "msg-empty-assistant"
+    ))).toBe(false);
+  });
+
+  it("does not synthesize terminal failure content while the snapshot session is still busy", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 621,
+      epoch: "epoch-busy-empty",
+      session: { id: "session-busy-empty", status: "running", busy: true, main_turn_active: true },
+      messages: {
+        items: [
+          { id: "msg-user", role: "user", content: [{ type: "text", text: "等待首 token" }] },
+          { id: "msg-empty-assistant", role: "assistant", content: [] },
+        ],
+      },
+      in_flight_turn: null,
+    }, "session-busy-empty");
+
+    expect(frames.some((frame) => frame.type === "content.part")).toBe(false);
   });
 
   it("adds pending approvals and questions when loading a server snapshot as history", () => {

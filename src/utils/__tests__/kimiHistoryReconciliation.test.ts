@@ -1,7 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
 import * as reportError from "@/utils/reportError";
-import { hasEquivalentKimiHistoryTurnBodies, shouldReplaceWithCanonicalKimiHistory } from "../kimiHistoryReconciliation";
+import {
+  hasEquivalentKimiHistoryTurnBodies,
+  mergeMissingLatestCanonicalAssistant,
+  shouldReplaceWithCanonicalKimiHistory,
+} from "../kimiHistoryReconciliation";
 
 const userMessage: TimelineEvent = {
   id: "user-1",
@@ -380,6 +384,109 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
   it("does not replace when canonical is identical", () => {
     const events = [userMessage, assistant("same body")];
     expect(shouldReplaceWithCanonicalKimiHistory(events, events)).toBe(false);
+  });
+});
+
+describe("mergeMissingLatestCanonicalAssistant", () => {
+  const failedAssistant = assistant("本轮请求未能开始生成：第三方模型余额不足。", {
+    id: "canonical-failed-assistant",
+    timestamp: 10_100,
+    snapshotMessageId: "msg-failed-assistant",
+    snapshotMessageIdStable: true,
+  });
+
+  it("keeps richer local history and patches only the missing latest failed assistant", () => {
+    const local: TimelineEvent[] = [
+      { id: "local-old-user", type: "user_message", timestamp: 100, content: "旧问题" },
+      assistant("本地保留的旧回复正文远比官方当前窗口更长，不能被整体替换。".repeat(20), {
+        id: "local-rich-answer",
+        timestamp: 200,
+      }),
+      {
+        id: "local-latest-user",
+        type: "user_message",
+        timestamp: 10_000,
+        content: "把铸剑事件拉出来我看下",
+      },
+    ];
+    const canonical: TimelineEvent[] = [
+      {
+        id: "official-latest-user",
+        type: "user_message",
+        timestamp: 10_001,
+        content: "把铸剑事件拉出来我看下",
+      },
+      {
+        ...failedAssistant,
+      },
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+
+    expect(patched.slice(0, local.length)).toEqual(local);
+    expect(patched).toHaveLength(local.length + 1);
+    expect(patched.at(-1)).toMatchObject({
+      type: "assistant_message",
+      snapshotMessageId: "msg-failed-assistant",
+      content: "本轮请求未能开始生成：第三方模型余额不足。",
+    });
+    expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
+  it("does not patch a different latest user turn", () => {
+    const local: TimelineEvent[] = [{
+      id: "local-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "另一个问题",
+      roomMessageId: "room-message-other",
+      agentTurnId: "turn-other",
+    }];
+    const canonical: TimelineEvent[] = [{
+      id: "canonical-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "当前问题",
+      roomMessageId: "room-message-current",
+      agentTurnId: "turn-current",
+    }, failedAssistant];
+
+    expect(mergeMissingLatestCanonicalAssistant(local, canonical)).toBe(local);
+  });
+
+  it("does not patch an assistant without stable official identity", () => {
+    const local: TimelineEvent[] = [{
+      id: "same-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "当前问题",
+    }];
+    const canonical: TimelineEvent[] = [local[0], assistant("失败", {
+      id: "identity-less-assistant",
+      snapshotMessageId: "assistant:失败",
+      snapshotMessageIdStable: false,
+    })];
+
+    expect(mergeMissingLatestCanonicalAssistant(local, canonical)).toBe(local);
+  });
+
+  it("does not patch when the local latest turn already has visible output", () => {
+    const local: TimelineEvent[] = [{
+      id: "same-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "当前问题",
+    }, {
+      id: "local-error",
+      type: "error",
+      timestamp: 10_050,
+      message: "本地已经显示失败原因",
+      canDismiss: false,
+    }];
+    const canonical: TimelineEvent[] = [local[0], failedAssistant];
+
+    expect(mergeMissingLatestCanonicalAssistant(local, canonical)).toBe(local);
   });
 });
 

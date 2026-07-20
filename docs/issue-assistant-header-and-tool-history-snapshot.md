@@ -50,4 +50,13 @@
 - `prompt.completed`: `reason=failed`
 - 官方 message history：user + injection user + content 为空的 Assistant
 
-Server snapshot 不持久化瞬时 error。若失败 completion 仍进入成功正文屏障，它会等待不存在的 Assistant 正文，随后 message-only snapshot 会覆盖本地错误证据。修复后的规则是：失败终态直接交付；live error 投影为稳定 Assistant 失败回复；重启历史只能依据 `last_turn_reason=failed` 恢复通用失败说明，不猜测具体 Provider 原因。
+Server snapshot 不持久化瞬时 error，而且 0.27.0 的真实 snapshot/session 响应也不稳定提供 `last_turn_reason`。若失败 completion 仍进入成功正文屏障，它会等待不存在的 Assistant 正文，随后 message-only snapshot 会覆盖本地错误证据。修复后的规则是：失败终态直接交付；live error 投影为稳定 Assistant 失败回复；重启时仅在会话已静止、无 in-flight turn、历史末尾是稳定 ID 的空 Assistant，且该轮没有正文或工具输出时恢复通用失败说明，不猜测具体 Provider 原因。
+
+## 2026-07-20 启动恢复竞态与局部对账补丁
+
+v2.16.61 实机仍未恢复失败头，CDP 证明是两层问题叠加：
+
+1. 主窗口先绘制、Server 延后 2 秒启动；当前会话 hydration 在 Server ready 前读取了本地 wire 镜像，镜像没有官方空 Assistant。Server 随后就绪，但当前会话被后台旧会话修复排除，启动期不会再读 snapshot。
+2. 即使拿到 snapshot，完整 canonical 因旧历史正文更短被 `assistant-body-regression` 正确拒绝；失败 Assistant 会跟随整包候选一起丢弃，不能通过放宽整体单调性门禁解决。
+
+最终不变量：首次历史读取会触发并有界等待同一个 Server startup promise；若 Server 在 4 秒内可用，直接读取官方 snapshot。完整 canonical 仍保持防倒退门禁；被拒绝时，只允许在本地最新用户轮次没有任何可显示输出、最新用户可由身份或相同文本加 30 秒时间窗对应、且 canonical Assistant 拥有稳定官方 message ID 时，单条补入最新 Assistant。旧历史不改写，重复执行幂等。

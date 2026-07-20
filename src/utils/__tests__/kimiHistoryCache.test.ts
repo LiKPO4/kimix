@@ -22,8 +22,8 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 11 for failed empty-assistant and tool-use replay migration", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(11);
+  it("uses cache version 12 for rejected-history latest-turn patch migration", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(12);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {

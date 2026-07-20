@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.62 失败轮次启动恢复根治
+
+- 当前目标：修复 v2.16.61 重启后目标失败轮次仍只剩用户消息、Assistant 头与左侧刻度继续缺失。
+- 根因证据：真实 0.27.0 snapshot 末尾是 user + injection user + 稳定 ID 空 Assistant，但 snapshot/session 不提供 `last_turn_reason`；更关键的是当前会话 hydration 早于延后 2 秒的 Server startup，首次读取落到本地 wire 镜像，Server 就绪后不再重试。拿到官方 snapshot 后，完整 canonical 又因 `assistant-body-regression` 被正确拒绝，失败 Assistant 随整包候选丢失。
+- 修复：首次历史读取触发并有界等待同一个 Server startup promise，避免启动竞态永久选中本地镜像。终态空 Assistant 恢复改为基于“静止会话 + 无 in-flight + 最新空 Assistant + 该轮无正文/工具”的真实可观测条件。整体 canonical 继续禁止正文倒退；拒绝时仅把同一最新用户轮次、稳定官方 message ID 的缺失 Assistant 单条补入，旧历史不动且幂等。缓存升级到 v12。
+- 验证：定向 3 文件 80 项通过；全量 106 文件 890 项通过；Node/Renderer 严格类型检查通过；生产构建通过，renderer 为 `assets/index-D73YmxPk.js`；OKF 严格校验通过。CDP 正式构建实测目标会话已持久化 `msg_...000270` 失败 Assistant，DOM 命中通用失败说明，导航轨道末尾恢复“用户第 9 节点 → 助手第 10 节点”。
+- 关键文件：`electron/main.ts`、`electron/kimiCodeServerClient.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/App.tsx`、`src/components/layout/Sidebar.tsx`。
+- 下一步：全量回归、知识校验并提交；用户在 v2.16.62 窗口视觉复验。
+
 ## 2026-07-20 v2.16.61 第三方模型失败轮次可见性
 
 - 当前目标：修复切换第三方模型后请求失败时，整轮只剩用户消息、Assistant 消息头与左侧刻度消失的问题。

@@ -508,16 +508,25 @@ export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, session
     ...inFlightItems.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch, "in_flight")),
   ];
   const latestHistoryMessage = historyItems.at(-1);
+  const latestTurnBeginIndex = frames.findLastIndex((frame) => frame.type === "TurnBegin");
+  const latestTurnHasDisplayFrame = latestTurnBeginIndex >= 0 && frames.slice(latestTurnBeginIndex + 1).some((frame) => (
+    frame.type === "assistant.delta" ||
+    frame.type === "content.part" ||
+    frame.type === "tool.call.started" ||
+    frame.type === "tool.result"
+  ));
   if (
     inFlightItems.length === 0 &&
-    snapshot.session.last_turn_reason === "failed" &&
+    snapshot.session.busy !== true &&
+    snapshot.session.main_turn_active !== true &&
+    !latestTurnHasDisplayFrame &&
     isRecord(latestHistoryMessage) &&
     latestHistoryMessage.role === "assistant" &&
     !contentToText(latestHistoryMessage.content).trim()
   ) {
     const messageIdentity = snapshotMessageIdentity(latestHistoryMessage, "assistant");
     const messageTimestamp = snapshotMessageTimestamp(latestHistoryMessage);
-    const failureContent = "模型请求失败：官方会话记录显示本轮失败，且模型未返回可显示内容。请检查模型账户、Provider 配置或额度后重试。";
+    const failureContent = "模型请求失败：本轮已结束，但模型未返回可显示内容。请检查模型账户、Provider 配置或额度后重试。";
     frames.push({
       type: "content.part",
       session_id: sessionId,

@@ -1,5 +1,6 @@
 import type { TimelineEvent } from "@/types/ui";
 import { hasMalformedAssistantMarkdown } from "@/utils/eventHelpers";
+import { mergeEvents } from "@/utils/eventMapper";
 import {
   hasCanonicalKimiThinkingHistory,
   hasKimiProcessHistoryRegression,
@@ -341,6 +342,84 @@ export function hasPossiblyLostUserImages(events: TimelineEvent[]): boolean {
       !(typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/"))
     ));
   });
+}
+
+function sameMatchedUserTurn(
+  local: Extract<TimelineEvent, { type: "user_message" }>,
+  canonical: Extract<TimelineEvent, { type: "user_message" }>,
+): boolean {
+  if (local.roomMessageId && canonical.roomMessageId) {
+    return local.roomMessageId === canonical.roomMessageId;
+  }
+  if (local.agentTurnId && canonical.agentTurnId) {
+    return local.agentTurnId === canonical.agentTurnId;
+  }
+  if (local.id === canonical.id) return true;
+  return normalizedUserTurnContent(local.content) === normalizedUserTurnContent(canonical.content) &&
+    Math.abs(local.timestamp - canonical.timestamp) <= 30_000;
+}
+
+function isVisibleTurnOutput(event: TimelineEvent): boolean {
+  if (event.type === "assistant_message") {
+    return Boolean(event.content.trim() || event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim()));
+  }
+  return event.type === "tool_call" ||
+    event.type === "tool_result" ||
+    event.type === "subagent" ||
+    event.type === "error" ||
+    event.type === "file_artifact" ||
+    event.type === "change_summary" ||
+    event.type === "diff";
+}
+
+/**
+ * When the complete canonical history is rejected by the monotonicity gate,
+ * recover one otherwise invisible latest turn without touching older local
+ * history. The latest user boundary must match by persisted identity or a
+ * bounded content/time echo, while the Assistant itself must have an
+ * immutable official message identity.
+ */
+export function mergeMissingLatestCanonicalAssistant(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+  context?: { sessionId?: string; roomAgentId?: string; reason?: string },
+): TimelineEvent[] {
+  const canonicalUserIndex = canonicalEvents.findLastIndex((event) => event.type === "user_message");
+  const localUserIndex = localEvents.findLastIndex((event) => event.type === "user_message");
+  if (canonicalUserIndex < 0 || localUserIndex < 0) return localEvents;
+
+  const canonicalUser = canonicalEvents[canonicalUserIndex];
+  const localUser = localEvents[localUserIndex];
+  if (
+    canonicalUser.type !== "user_message" ||
+    localUser.type !== "user_message" ||
+    !sameMatchedUserTurn(localUser, canonicalUser)
+  ) return localEvents;
+
+  if (localEvents.slice(localUserIndex + 1).some(isVisibleTurnOutput)) return localEvents;
+
+  const canonicalAssistant = canonicalEvents.slice(canonicalUserIndex + 1).findLast((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+    event.type === "assistant_message" &&
+    event.snapshotMessageIdStable === true &&
+    Boolean(event.snapshotMessageId) &&
+    isVisibleTurnOutput(event)
+  ));
+  if (!canonicalAssistant?.snapshotMessageId) return localEvents;
+
+  const alreadyMounted = flattenTimelineEvents(localEvents).some((event) => (
+    event.type === "assistant_message" &&
+    event.snapshotMessageIdStable === true &&
+    event.snapshotMessageId === canonicalAssistant.snapshotMessageId
+  ));
+  if (alreadyMounted) return localEvents;
+
+  const patched = mergeEvents(localEvents, canonicalAssistant);
+  if (patched === localEvents || patched.length === localEvents.length) return localEvents;
+  logEvent("kimiHistoryReconciliation.latestAssistantPatched", {
+    ...context,
+    snapshotMessageId: canonicalAssistant.snapshotMessageId,
+  });
+  return patched;
 }
 
 /**

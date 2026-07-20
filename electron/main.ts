@@ -56,6 +56,7 @@ const DEFAULT_PROJECT_DISPLAY_NAME = "Kimix 默认项目";
 const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "Interrupt", "UserPromptSubmit", "SessionStart", "SessionEnd", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact"] as const;
 const HOOK_ACTIONS = ["allow", "block", "notify", "run_command"] as const;
 let kimiServerStartupScheduled = false;
+let kimiServerStartupPromise: ReturnType<typeof kimiCodeServerHost.start> | null = null;
 
 function prependProcessPath(dir: string) {
   if (!dir) return;
@@ -4175,18 +4176,27 @@ function createWindow() {
   mainWindow.on("leave-full-screen", emitWindowState);
 }
 
+function requestKimiServerStartup() {
+  if (kimiServerStartupPromise) return kimiServerStartupPromise;
+  logMainStartup("kimi-server:start");
+  kimiServerStartupPromise = kimiCodeServerHost.start().then((serverStatus) => {
+    if (serverStatus.enabled) {
+      logMainStartup("kimi-server:ready", serverStatus);
+    }
+    return serverStatus;
+  }).catch((error) => {
+    kimiServerStartupPromise = null;
+    console.warn("[KimiCodeServerHost] background startup failed:", error);
+    throw error;
+  });
+  return kimiServerStartupPromise;
+}
+
 function scheduleKimiServerStartupAfterFirstPaint() {
   if (kimiServerStartupScheduled) return;
   kimiServerStartupScheduled = true;
   setTimeout(() => {
-    logMainStartup("kimi-server:start");
-    void kimiCodeServerHost.start().then((serverStatus) => {
-      if (serverStatus.enabled) {
-        logMainStartup("kimi-server:ready", serverStatus);
-      }
-    }).catch((error) => {
-      console.warn("[KimiCodeServerHost] background startup failed:", error);
-    });
+    void requestKimiServerStartup().catch(() => undefined);
   }, 2_000);
 }
 
@@ -6292,6 +6302,12 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
     const workDir = typeof req.workDir === "string" ? req.workDir : "";
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!workDir || !sessionId) return { success: false, error: "Missing workDir or sessionId" };
+    if (!kimiCodeHost.isListingSessionsFromServer()) {
+      await Promise.race([
+        requestKimiServerStartup().catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 4_000)),
+      ]);
+    }
     if (kimiCodeHost.isListingSessionsFromServer()) {
       const history = await loadSessionHistoryWithFallback(
         () => kimiCodeHost.loadServerSessionHistory(sessionId),

@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Startup history waits briefly for Server authority and patches only a missing stable latest Assistant**: The first history load shares one bounded Server-startup promise, while a rejected shorter canonical timeline may contribute only an identity-backed Assistant to an otherwise output-less matching latest local turn. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Failed model turns retain an Assistant header and failure body**: Failed prompt completions bypass the success-only body barrier, live provider errors project into a stable Assistant failure response, and snapshots ending in an empty failed Assistant recover a generic non-fabricated explanation. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Prompt completion is gated by displayable Assistant delivery and snapshots retain tool calls**: A prompt/injection-only message page no longer releases terminal state; bounded retries wait for Assistant thinking, text, or tool calls, and official `tool_use` content is replayed with stable call identity so tool results remain visible after hydration. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
