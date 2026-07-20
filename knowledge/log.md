@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Vendored SDK tracks Kimi Code 0.28 and multi-instance Server ports**: Fallback bundle refreshed from tag `@moonshot-ai/kimi-code@0.28.0` (`a05228c6`). Host attaches via `server/instances` registry (preferred port, then longest-running healthy), and managed spawn walks the next free ports after `kimi web --no-open`. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Kimi Code 0.28 managed Server launches via `kimi web --no-open`**: Upstream removed `kimi server …` (exit 1). Kimix managed runtimes spawn `web --no-open --port …` and still prefer attaching a healthy lock owner. Permission copy matches official YOLO/Auto semantics. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and `docs/kimi-code-0.28-followup.md`.
 
 * **Multi-step prompt completion barrier must accumulate every step's thinking**: One user prompt may produce several official Assistant messages (think + tool_use per step). Barrier merge may bind the live placeholder to only the first unbound stable message ID, must keep later stable IDs separate, and must merge thinking text/parts instead of replacing them with the latest step; otherwise the process card shows tools only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

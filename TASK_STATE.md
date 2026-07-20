@@ -1,12 +1,19 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.69 SDK 0.28 + 多实例端口
+
+- 目标：完成 0.28 跟进剩余两项——vendor SDK 升 0.28、多实例端口策略。
+- 已完成：
+  1. `vendor/kimi-code-sdk` 自 tag `@moonshot-ai/kimi-code@0.28.0` / `a05228c6` 重打，MCP 4s 补丁保留。
+  2. Host 读 `server/instances/*.json` + legacy lock；attach 优先配置端口再最长运行实例；spawn 从偏好端口递增最多 20 口。
+- 验证：host/vendor 定向 21 项；全量 + typecheck + OKF（提交前跑）。
+- 下一步：用户冷启动确认 Server 路由与端口占用时的换口；可选完整 server 探针。
+
 ## 2026-07-20 v2.16.68 跟进 Kimi Code 0.28.0
 
 - 当前目标：对照官方 0.28.0 changelog，修 Kimix 必跟项。
-- 发现：P0 managed Server 仍 spawn `kimi server run --foreground`，0.28 上 exit 1 整路 fallback；YOLO/Auto 文案与官方语义不符；vendored SDK 仍 0.27（本轮不重打包）。
-- 修复：`buildManagedKimiServerArgs` → `kimi web --no-open`；Composer/设置/加 Agent 权限文案对齐官方；新增 `docs/kimi-code-0.28-followup.md`。
-- 未做：SDK 重打到 0.28、多实例自动换端口、模型切换 cache 提示、thinking max 持久化对齐。
-- 下一步：用户升到 CLI 0.28 后冷启动确认 Server 路由；择期 vendor SDK 0.28 探针。
+- 修复：`kimi web --no-open` 启动；YOLO/Auto 文案；`docs/kimi-code-0.28-followup.md`。
+- 后续在 v2.16.69 完成 SDK 与多实例端口。
 
 ## 2026-07-20 v2.16.67 多步工具轮次展开只剩工具、思考丢失
 

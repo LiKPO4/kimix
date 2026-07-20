@@ -6,6 +6,7 @@ import { execFile, spawn } from "node:child_process";
 const DEFAULT_PORT = 58_627;
 const START_TIMEOUT_MS = 20_000;
 const SERVER_LOCK_STARTUP_GRACE_MS = 30_000;
+const MANAGED_PORT_ATTEMPTS = 20;
 const REQUIRED_PATHS = [
   "/api/v1/sessions",
   "/api/v1/sessions/{session_id}/snapshot",
@@ -98,6 +99,16 @@ function serverAuthHeaders(): Record<string, string> {
 
 type ServerLockContents = { pid: number; port: number; host?: string; started_at?: string };
 
+export type KimiServerInstanceRecord = {
+  serverId?: string;
+  pid: number;
+  host: string;
+  port: number;
+  startedAtMs: number;
+  heartbeatAtMs?: number;
+  source: "instance" | "legacy-lock";
+};
+
 export function shouldClearUnresponsiveServerLock(
   lock: Pick<ServerLockContents, "started_at">,
   now = Date.now(),
@@ -106,8 +117,12 @@ export function shouldClearUnresponsiveServerLock(
   return Number.isFinite(startedAt) && now - startedAt >= SERVER_LOCK_STARTUP_GRACE_MS;
 }
 
+function serverHomeDir() {
+  return path.join(os.homedir(), ".kimi-code", "server");
+}
+
 function serverLockPath() {
-  return path.join(os.homedir(), ".kimi-code", "server", "lock");
+  return path.join(serverHomeDir(), "lock");
 }
 
 /**
@@ -118,14 +133,127 @@ export function buildManagedKimiServerArgs(port: string | number): string[] {
   return ["web", "--no-open", "--port", String(port), "--log-level", "warn"];
 }
 
-function readServerLock(): ServerLockContents | undefined {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(serverLockPath(), "utf-8")) as Partial<ServerLockContents> | undefined;
-    if (typeof parsed?.pid === "number" && typeof parsed?.port === "number") return parsed as ServerLockContents;
-  } catch {
-    // 锁缺失或不可读时按无锁处理。
+export function preferredKimiServerPorts(preferredPort: number, attempts = MANAGED_PORT_ATTEMPTS): number[] {
+  const base = Number.isFinite(preferredPort) && preferredPort > 0 ? Math.floor(preferredPort) : DEFAULT_PORT;
+  const count = Math.max(1, Math.floor(attempts));
+  return Array.from({ length: count }, (_, index) => base + index);
+}
+
+export function endpointForKimiServerInstance(instance: Pick<KimiServerInstanceRecord, "host" | "port">): string {
+  return `http://${instance.host || "127.0.0.1"}:${instance.port}`;
+}
+
+function toStartedAtMs(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value < 1e12 ? value * 1000 : value;
   }
-  return undefined;
+  if (typeof value === "string" && value.trim()) {
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber)) return asNumber < 1e12 ? asNumber * 1000 : asNumber;
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+export function parseKimiServerInstanceRecord(
+  value: unknown,
+  source: KimiServerInstanceRecord["source"] = "instance",
+): KimiServerInstanceRecord | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const pid = typeof record.pid === "number" ? record.pid : Number(record.pid);
+  const port = typeof record.port === "number" ? record.port : Number(record.port);
+  if (!Number.isFinite(pid) || !Number.isFinite(port) || port <= 0) return undefined;
+  const host = typeof record.host === "string" && record.host.trim() ? record.host.trim() : "127.0.0.1";
+  const serverId = typeof record.server_id === "string" && record.server_id.trim()
+    ? record.server_id.trim()
+    : typeof record.serverId === "string" && record.serverId.trim()
+      ? record.serverId.trim()
+      : undefined;
+  return {
+    serverId,
+    pid: Math.floor(pid),
+    host,
+    port: Math.floor(port),
+    startedAtMs: toStartedAtMs(record.started_at ?? record.startedAt),
+    heartbeatAtMs: (() => {
+      const raw = record.heartbeat_at ?? record.heartbeatAt;
+      const ms = toStartedAtMs(raw);
+      return ms > 0 ? ms : undefined;
+    })(),
+    source,
+  };
+}
+
+/** Read 0.28+ multi-instance registry plus the legacy singleton lock file. */
+export function listKimiServerInstanceRecords(homeDir = serverHomeDir()): KimiServerInstanceRecord[] {
+  const records: KimiServerInstanceRecord[] = [];
+  const seen = new Set<string>();
+  const push = (record: KimiServerInstanceRecord | undefined) => {
+    if (!record) return;
+    const key = `${record.host}:${record.port}:${record.pid}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    records.push(record);
+  };
+
+  const instancesDir = path.join(homeDir, "instances");
+  try {
+    for (const name of fs.readdirSync(instancesDir)) {
+      if (!name.endsWith(".json")) continue;
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.join(instancesDir, name), "utf-8")) as unknown;
+        push(parseKimiServerInstanceRecord(raw, "instance"));
+      } catch {
+        // Skip unreadable instance files.
+      }
+    }
+  } catch {
+    // instances dir may be absent on older installs.
+  }
+
+  try {
+    const legacy = JSON.parse(fs.readFileSync(path.join(homeDir, "lock"), "utf-8")) as unknown;
+    push(parseKimiServerInstanceRecord(legacy, "legacy-lock"));
+  } catch {
+    // legacy lock optional
+  }
+
+  return records;
+}
+
+/**
+ * Prefer the configured port when a live registry entry matches it; otherwise
+ * attach to the longest-running instance (stable shared home multi-server).
+ */
+export function selectKimiServerAttachCandidates(
+  instances: readonly KimiServerInstanceRecord[],
+  preferredPort: number,
+): KimiServerInstanceRecord[] {
+  const preferred = Number.isFinite(preferredPort) ? Math.floor(preferredPort) : DEFAULT_PORT;
+  return [...instances].sort((left, right) => {
+    const leftPreferred = left.port === preferred ? 0 : 1;
+    const rightPreferred = right.port === preferred ? 0 : 1;
+    if (leftPreferred !== rightPreferred) return leftPreferred - rightPreferred;
+    if (left.startedAtMs !== right.startedAtMs) {
+      if (left.startedAtMs === 0) return 1;
+      if (right.startedAtMs === 0) return -1;
+      return left.startedAtMs - right.startedAtMs;
+    }
+    return left.port - right.port;
+  });
+}
+
+function readServerLock(): ServerLockContents | undefined {
+  const legacy = listKimiServerInstanceRecords().find((item) => item.source === "legacy-lock");
+  if (!legacy) return undefined;
+  return {
+    pid: legacy.pid,
+    port: legacy.port,
+    host: legacy.host,
+    started_at: legacy.startedAtMs > 0 ? new Date(legacy.startedAtMs).toISOString() : undefined,
+  };
 }
 
 /**
@@ -219,94 +347,129 @@ export class KimiCodeServerHost {
     if (!this.status.enabled) return this.getStatus();
     if (this.status.state === "attached" || this.status.state === "managed") return this.getStatus();
     this.status = { ...this.status, state: "starting", error: undefined };
+    this.stderr = "";
+
+    const preferredPort = (() => {
+      try {
+        const port = Number(new URL(this.status.endpoint).port || DEFAULT_PORT);
+        return Number.isFinite(port) && port > 0 ? port : DEFAULT_PORT;
+      } catch {
+        return DEFAULT_PORT;
+      }
+    })();
 
     try {
-      const capabilities = await this.probe();
+      const capabilities = await this.probe(this.status.endpoint);
       this.status = { ...this.status, state: "attached", managed: false, capabilities };
       return this.getStatus();
     } catch {
-      // No compatible server is listening; start the installed CLI below.
+      // Preferred endpoint empty; discover registry instances or spawn below.
     }
 
-    // Prefer an already-running official instance (0.28 allows multiple servers in
-    // one home; attach to the lock owner when it is healthy). Stale Windows dead-pid
-    // locks are cleared after the startup grace period, then we spawn.
+    // 0.28 multi-instance registry under server/instances/*.json, plus legacy lock.
+    const registry = selectKimiServerAttachCandidates(listKimiServerInstanceRecords(), preferredPort);
+    for (const instance of registry) {
+      if (!(await isLockOwnerAlive(instance.pid))) continue;
+      const endpoint = endpointForKimiServerInstance(instance);
+      try {
+        const capabilities = await this.probe(endpoint);
+        this.status = {
+          ...this.status,
+          state: "attached",
+          managed: false,
+          endpoint,
+          capabilities,
+          error: undefined,
+        };
+        return this.getStatus();
+      } catch {
+        // Stale registry row or not yet healthy; try the next candidate.
+      }
+    }
+
+    // Clear a dead or long-unresponsive legacy lock so spawn is not blocked.
     const lock = readServerLock();
     if (lock) {
-      if (await isLockOwnerAlive(lock.pid)) {
-        const lockEndpoint = `http://${lock.host ?? "127.0.0.1"}:${lock.port}`;
-        try {
-          const capabilities = await this.probe(lockEndpoint);
-          this.status = { ...this.status, state: "attached", managed: false, endpoint: lockEndpoint, capabilities };
-          return this.getStatus();
-        } catch (error) {
-          if (!shouldClearUnresponsiveServerLock(lock)) {
-            this.status = {
-              ...this.status,
-              state: "fallback",
-              managed: false,
-              error: `检测到运行中的 Kimi Server（pid ${lock.pid}，${lockEndpoint}），但能力探测失败：${errorMessage(error)}`,
-            };
-            return this.getStatus();
-          }
-          try {
-            fs.unlinkSync(serverLockPath());
-          } catch (unlinkError) {
-            this.status = {
-              ...this.status,
-              state: "fallback",
-              managed: false,
-              error: `Kimi Server 陈旧锁无法清理（${serverLockPath()}）：${errorMessage(unlinkError)}`,
-            };
-            return this.getStatus();
-          }
-        }
-      } else {
+      const alive = await isLockOwnerAlive(lock.pid);
+      if (!alive || shouldClearUnresponsiveServerLock(lock)) {
         try {
           fs.unlinkSync(serverLockPath());
         } catch {
-          // 清理失败时让 spawn 的错误原样上报，不掩盖真实原因。
+          // ignore
         }
       }
     }
 
-    try {
-      const executable = this.resolveExecutable();
-      const port = new URL(this.status.endpoint).port || String(DEFAULT_PORT);
-      // 0.28+: `kimi server run` exits 1 with a deprecation notice. The official
-      // foreground server entry is `kimi web --no-open` (same REST/WS surface).
-      this.child = spawn(executable, buildManagedKimiServerArgs(port), {
-        cwd: os.homedir(),
-        env: { ...this.env, KIMI_CODE_NO_AUTO_UPDATE: this.env.KIMI_CODE_NO_AUTO_UPDATE || "1" },
-        windowsHide: true,
-        shell: false,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      this.child.stderr?.on("data", (chunk) => {
-        this.stderr = `${this.stderr}${chunk.toString()}`.slice(-4_000);
-      });
-      this.child.once("error", (error) => {
-        if (this.child && this.status.state === "starting") {
-          this.stderr = `${this.stderr}\n${errorMessage(error)}`.trim().slice(-4_000);
-        }
-      });
-      this.child.once("close", (code, signal) => {
-        if (this.status.state !== "managed") return;
-        const detail = signal ? `signal ${signal}` : `code ${String(code)}`;
-        this.markStopped(new Error(`Kimi Server 进程已退出：${detail}`));
-      });
-      const capabilities = await this.waitUntilReady();
-      this.status = { ...this.status, state: "managed", managed: true, capabilities };
-    } catch (error) {
-      this.child?.kill();
-      this.child = null;
-      this.status = {
-        ...this.status,
-        state: "fallback",
-        managed: false,
-        error: [errorMessage(error), this.stderr.trim()].filter(Boolean).join("\n").slice(0, 4_000),
-      };
+    const executable = this.resolveExecutable();
+    const spawnErrors: string[] = [];
+    for (const port of preferredKimiServerPorts(preferredPort, MANAGED_PORT_ATTEMPTS)) {
+      const endpoint = `http://127.0.0.1:${port}`;
+      try {
+        const capabilities = await this.probe(endpoint);
+        this.status = {
+          ...this.status,
+          state: "attached",
+          managed: false,
+          endpoint,
+          capabilities,
+          error: undefined,
+        };
+        return this.getStatus();
+      } catch {
+        // Port free or non-Kimi listener; attempt managed spawn.
+      }
+
+      try {
+        this.stderr = "";
+        this.status = { ...this.status, endpoint };
+        // 0.28+: official foreground server entry is `kimi web --no-open`.
+        this.child = spawn(executable, buildManagedKimiServerArgs(port), {
+          cwd: os.homedir(),
+          env: { ...this.env, KIMI_CODE_NO_AUTO_UPDATE: this.env.KIMI_CODE_NO_AUTO_UPDATE || "1" },
+          windowsHide: true,
+          shell: false,
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        this.child.stderr?.on("data", (chunk) => {
+          this.stderr = `${this.stderr}${chunk.toString()}`.slice(-4_000);
+        });
+        this.child.once("error", (error) => {
+          if (this.child && this.status.state === "starting") {
+            this.stderr = `${this.stderr}\n${errorMessage(error)}`.trim().slice(-4_000);
+          }
+        });
+        this.child.once("close", (code, signal) => {
+          if (this.status.state !== "managed") return;
+          const detail = signal ? `signal ${signal}` : `code ${String(code)}`;
+          this.markStopped(new Error(`Kimi Server 进程已退出：${detail}`));
+        });
+        const capabilities = await this.waitUntilReady(endpoint);
+        this.status = {
+          ...this.status,
+          state: "managed",
+          managed: true,
+          endpoint,
+          capabilities,
+          error: undefined,
+        };
+        return this.getStatus();
+      } catch (error) {
+        this.child?.kill();
+        this.child = null;
+        spawnErrors.push(`port ${port}: ${errorMessage(error)}`);
+      }
     }
+
+    this.status = {
+      ...this.status,
+      state: "fallback",
+      managed: false,
+      error: [
+        `无法在端口 ${preferredPort}–${preferredPort + MANAGED_PORT_ATTEMPTS - 1} 附着或启动 Kimi Server`,
+        ...spawnErrors.slice(-4),
+        this.stderr.trim(),
+      ].filter(Boolean).join("\n").slice(0, 4_000),
+    };
     return this.getStatus();
   }
 
@@ -354,12 +517,12 @@ export class KimiCodeServerHost {
     return capabilities;
   }
 
-  private async waitUntilReady() {
+  private async waitUntilReady(endpoint = this.status.endpoint) {
     const deadline = Date.now() + START_TIMEOUT_MS;
     while (Date.now() < deadline) {
       if (this.child?.exitCode !== null) throw new Error(`Kimi Server 提前退出：${String(this.child?.exitCode)}`);
       try {
-        return await this.probe();
+        return await this.probe(endpoint);
       } catch {
         await new Promise((resolve) => setTimeout(resolve, 300));
       }

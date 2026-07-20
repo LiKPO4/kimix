@@ -4,8 +4,15 @@ import {
   inspectKimiCodeServerContract,
   isKimiCodeServerExperimentEnabled,
   KimiCodeServerHost,
+  listKimiServerInstanceRecords,
+  parseKimiServerInstanceRecord,
+  preferredKimiServerPorts,
+  selectKimiServerAttachCandidates,
   shouldClearUnresponsiveServerLock,
 } from "../../../electron/kimiCodeServerHost";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
   resolvePromptModel,
   resolveServerEngineStatus,
@@ -40,6 +47,49 @@ describe("kimiCodeServerHost", () => {
       "--log-level",
       "warn",
     ]);
+  });
+
+  it("walks preferred ports when the default is already taken", () => {
+    expect(preferredKimiServerPorts(58_627, 3)).toEqual([58_627, 58_628, 58_629]);
+  });
+
+  it("prefers the configured port among multi-instance registry rows", () => {
+    const ordered = selectKimiServerAttachCandidates([
+      { pid: 1, host: "127.0.0.1", port: 58_628, startedAtMs: 100, source: "instance" },
+      { pid: 2, host: "127.0.0.1", port: 58_627, startedAtMs: 200, source: "instance" },
+      { pid: 3, host: "127.0.0.1", port: 58_629, startedAtMs: 50, source: "instance" },
+    ], 58_627);
+    expect(ordered.map((item) => item.port)).toEqual([58_627, 58_629, 58_628]);
+  });
+
+  it("parses 0.28 instance registry files and merges the legacy lock", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-server-instances-"));
+    const instancesDir = path.join(root, "instances");
+    fs.mkdirSync(instancesDir, { recursive: true });
+    fs.writeFileSync(path.join(instancesDir, "a.json"), JSON.stringify({
+      server_id: "srv-a",
+      pid: 11,
+      host: "127.0.0.1",
+      port: 58_628,
+      started_at: 1_000,
+      heartbeat_at: 2_000,
+      host_version: "0.28.0",
+    }));
+    fs.writeFileSync(path.join(root, "lock"), JSON.stringify({
+      pid: 22,
+      port: 58_627,
+      host: "127.0.0.1",
+      started_at: "2026-07-20T12:00:00.000Z",
+    }));
+    const records = listKimiServerInstanceRecords(root);
+    expect(records).toHaveLength(2);
+    expect(parseKimiServerInstanceRecord({
+      server_id: "x",
+      pid: "33",
+      port: "58630",
+      started_at: 1_784_000_000_000,
+    })?.port).toBe(58_630);
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
   it("detects capabilities without trusting the reported version", () => {
