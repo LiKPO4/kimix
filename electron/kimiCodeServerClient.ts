@@ -528,6 +528,19 @@ export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, session
     const messageTimestamp = snapshotMessageTimestamp(latestHistoryMessage);
     const failureContent = "模型请求失败：本轮已结束，但模型未返回可显示内容。请检查模型账户、Provider 配置或额度后重试。";
     frames.push({
+      type: "turn.step.interrupted",
+      session_id: sessionId,
+      seq: snapshot.as_of_seq,
+      epoch: snapshot.epoch,
+      payload: snapshotReplayPayload(
+        { type: "turn.step.interrupted", reason: "failed" },
+        "history",
+        messageIdentity,
+        failureContent,
+        "assistant",
+        messageTimestamp,
+      ),
+    }, {
       type: "content.part",
       session_id: sessionId,
       seq: snapshot.as_of_seq,
@@ -1203,12 +1216,18 @@ export class KimiCodeServerClient {
       ? String(payload.promptId ?? payload.prompt_id)
       : "";
     const completionReason = typeof payload.reason === "string" ? payload.reason.toLowerCase() : "";
-    // Failed prompts have no displayable Assistant body by definition. Their
-    // turn.ended/error frames already precede prompt.completed on the same
-    // ordered stream; running the success-only message barrier here waits for
-    // content that will never exist, then replays a snapshot that cannot carry
-    // the transient error frame and erases the only visible failure evidence.
+    // Failed prompts have no displayable Assistant body by definition. Do not
+    // run the success-only message barrier, but also do not assume transient
+    // error frames reached the renderer: restore one authoritative snapshot so
+    // an empty official Assistant becomes a stable generic failure response.
     if (FAILED_PROMPT_COMPLETION_REASONS.has(completionReason)) {
+      if (sessionId) {
+        try {
+          await this.recoverSnapshot(sessionId);
+        } catch (error) {
+          console.warn(`[KimiCodeServerClient] failed prompt ${promptId} snapshot recovery failed:`, error);
+        }
+      }
       this.deliver(frame);
       return;
     }

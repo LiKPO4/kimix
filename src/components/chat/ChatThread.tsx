@@ -60,6 +60,10 @@ function isRenderActivityActive(activity: RoomAgentActivity): boolean {
   return RENDER_ACTIVE_ROOM_AGENT_STATUSES.has(activity.status);
 }
 
+function isInterruptedStatusEvent(event: Extract<TimelineEvent, { type: "status_update" }>): boolean {
+  return Boolean(event.message && /中断|打断|cancelled|canceled|interrupted/i.test(event.message));
+}
+
 function roomAgentActivityMatchesTurn(
   activity: RoomAgentActivity,
   identity: Pick<TimelineEvent, "roomAgentId" | "roomMessageId" | "agentTurnId">,
@@ -802,8 +806,11 @@ export function buildRenderItems(
       : projectedFailureAssistant;
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
+    const interruptedStatus = settledStatusEvents.findLast(isInterruptedStatusEvent);
     const trailingStatusEvents = turnSettled
-      ? (finalUsageStatus ? [finalUsageStatus] : settledStatusEvents.slice(-1))
+      ? interruptedStatus
+        ? [interruptedStatus, ...(finalUsageStatus && finalUsageStatus !== interruptedStatus ? [finalUsageStatus] : [])]
+        : (finalUsageStatus ? [finalUsageStatus] : settledStatusEvents.slice(-1))
       : [];
     const activeStatusEvent = turnSettled
       ? undefined
@@ -1134,8 +1141,10 @@ export function filterStatusUpdates(events: TimelineEvent[], display: "each" | "
       if (event.roomAgentId) return candidate.roomAgentId === event.roomAgentId && !candidate.agentTurnId;
       return !candidate.agentTurnId && !candidate.roomAgentId;
     });
-    const preferredStatus = statusesInAgentTurn.findLast(hasMetricStatus) ?? statusesInAgentTurn.at(-1);
-    return preferredStatus === event;
+    const interruptedStatus = statusesInAgentTurn.findLast(isInterruptedStatusEvent);
+    const metricStatus = statusesInAgentTurn.findLast(hasMetricStatus);
+    const preferredStatus = metricStatus ?? statusesInAgentTurn.at(-1);
+    return interruptedStatus === event || preferredStatus === event;
   });
 }
 

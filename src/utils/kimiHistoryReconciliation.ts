@@ -396,9 +396,8 @@ export function mergeMissingLatestCanonicalAssistant(
     !sameMatchedUserTurn(localUser, canonicalUser)
   ) return localEvents;
 
-  if (localEvents.slice(localUserIndex + 1).some(isVisibleTurnOutput)) return localEvents;
-
-  const canonicalAssistant = canonicalEvents.slice(canonicalUserIndex + 1).findLast((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
+  const canonicalTurnEvents = canonicalEvents.slice(canonicalUserIndex + 1);
+  const canonicalAssistant = canonicalTurnEvents.findLast((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
     event.type === "assistant_message" &&
     event.snapshotMessageIdStable === true &&
     Boolean(event.snapshotMessageId) &&
@@ -406,16 +405,34 @@ export function mergeMissingLatestCanonicalAssistant(
   ));
   if (!canonicalAssistant?.snapshotMessageId) return localEvents;
 
+  const localTurnEvents = localEvents.slice(localUserIndex + 1);
+  const mountedInLatestTurn = localTurnEvents.some((event) => (
+    event.type === "assistant_message" &&
+    event.snapshotMessageIdStable === true &&
+    event.snapshotMessageId === canonicalAssistant.snapshotMessageId
+  ));
+  if (localTurnEvents.some(isVisibleTurnOutput) && !mountedInLatestTurn) return localEvents;
+
   const alreadyMounted = flattenTimelineEvents(localEvents).some((event) => (
     event.type === "assistant_message" &&
     event.snapshotMessageIdStable === true &&
     event.snapshotMessageId === canonicalAssistant.snapshotMessageId
   ));
-  if (alreadyMounted) return localEvents;
+  if (alreadyMounted && !mountedInLatestTurn) return localEvents;
 
-  const patched = mergeEvents(localEvents, canonicalAssistant);
-  if (patched === localEvents || patched.length === localEvents.length) return localEvents;
-  logEvent("kimiHistoryReconciliation.latestAssistantPatched", {
+  const interruptedStatus = canonicalTurnEvents.findLast((event): event is Extract<TimelineEvent, { type: "status_update" }> => (
+    event.type === "status_update" && Boolean(event.message && /中断|打断|cancelled|canceled|interrupted/i.test(event.message))
+  ));
+  const withInterruptedStatus = interruptedStatus && !localEvents.slice(localUserIndex + 1).some((event) => (
+    event.type === "status_update" && Boolean(event.message && /中断|打断|cancelled|canceled|interrupted/i.test(event.message))
+  ))
+    ? mergeEvents(localEvents, interruptedStatus)
+    : localEvents;
+  const patched = mountedInLatestTurn
+    ? withInterruptedStatus
+    : mergeEvents(withInterruptedStatus, canonicalAssistant);
+  if (patched === localEvents) return localEvents;
+  logEvent("kimiHistoryReconciliation.latestFailedTurnPatched", {
     ...context,
     snapshotMessageId: canonicalAssistant.snapshotMessageId,
   });

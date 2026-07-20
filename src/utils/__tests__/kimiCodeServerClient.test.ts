@@ -355,17 +355,34 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await client.close();
   });
 
-  it("does not run the assistant snapshot barrier for failed prompts", async () => {
-    const fetchMock = vi.fn(async () => {
-      throw new Error("failed prompt must not query messages");
+  it("recovers a stable failure assistant before delivering a failed prompt completion", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("http://127.0.0.1:58627/api/v1/sessions/session-1/snapshot");
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          as_of_seq: 19,
+          epoch: "epoch-1",
+          session: { id: "session-1", status: "idle", busy: false, main_turn_active: false, last_turn_reason: "failed" },
+          messages: {
+            items: [
+              { id: "msg-user-failed", role: "user", content: [{ type: "text", text: "？？？" }] },
+              { id: "msg-assistant-failed", role: "assistant", content: [] },
+            ],
+          },
+          in_flight_turn: null,
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
     const client = new KimiCodeServerClient("http://127.0.0.1:58627");
     const observed: Array<{ type: string; payload?: unknown }> = [];
     client.onFrame((current) => observed.push(current));
     const internals = client as unknown as {
+      subscribed: Set<string>;
       receive: (current: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
     };
+    internals.subscribed.add("session-1");
 
     internals.receive({
       type: "prompt.completed",
@@ -376,7 +393,11 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
 
     await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
-    expect(fetchMock).not.toHaveBeenCalled();
+    const snapshotIndex = observed.findIndex((current) => current.type === "kimix.server.snapshot");
+    const completionIndex = observed.findIndex((current) => current.type === "prompt.completed");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(snapshotIndex).toBeGreaterThanOrEqual(0);
+    expect(snapshotIndex).toBeLessThan(completionIndex);
     await client.close();
   });
 
@@ -1040,12 +1061,18 @@ describe("KimiCodeServerClient protocol adapters", () => {
       type: current.type,
       payload: current.payload,
     })));
+    expect(mapped.findLast((event) => event.type === "status_update")).toMatchObject({
+      message: "输出打断",
+    });
     expect(mapped.findLast((event) => event.type === "assistant_message")).toMatchObject({
       snapshotMessageId: "msg-assistant-failed",
       snapshotMessageIdStable: true,
     });
     const rendered = buildRenderItems(mapped, "kimi-code");
-    expect(rendered.some((item) => item.type === "event" && item.event.type === "assistant_message")).toBe(true);
+    expect(rendered.findLast((item) => item.type === "event" && item.event.type === "assistant_message")).toMatchObject({
+      type: "event",
+      trailingStatuses: [expect.objectContaining({ message: "输出打断" })],
+    });
   });
 
   it("does not invent a failure body when the terminal turn already has visible tool output", () => {

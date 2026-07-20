@@ -1301,6 +1301,14 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
     }
 
+    case "turn.step.interrupted":
+      return {
+        id: generateId(),
+        type: "status_update",
+        timestamp: eventTimestamp,
+        message: "输出打断",
+      };
+
     case "TurnChanges": {
       const files = Array.isArray(payload.files) ? payload.files.filter(isRecord) : [];
       const mappedFiles = files

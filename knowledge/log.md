@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Failed prompt completion now restores a snapshot before settling**: Transient provider errors are no longer assumed to be lossless; an authoritative terminal snapshot guarantees a stable failure Assistant and interrupted UI status before `prompt.completed` reaches the renderer. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Startup history waits briefly for Server authority and patches only a missing stable latest Assistant**: The first history load shares one bounded Server-startup promise, while a rejected shorter canonical timeline may contribute only an identity-backed Assistant to an otherwise output-less matching latest local turn. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Failed model turns retain an Assistant header and failure body**: Failed prompt completions bypass the success-only body barrier, live provider errors project into a stable Assistant failure response, and snapshots ending in an empty failed Assistant recover a generic non-fabricated explanation. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

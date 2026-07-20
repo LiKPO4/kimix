@@ -60,3 +60,7 @@ v2.16.61 实机仍未恢复失败头，CDP 证明是两层问题叠加：
 2. 即使拿到 snapshot，完整 canonical 因旧历史正文更短被 `assistant-body-regression` 正确拒绝；失败 Assistant 会跟随整包候选一起丢弃，不能通过放宽整体单调性门禁解决。
 
 最终不变量：首次历史读取会触发并有界等待同一个 Server startup promise；若 Server 在 4 秒内可用，直接读取官方 snapshot。完整 canonical 仍保持防倒退门禁；被拒绝时，只允许在本地最新用户轮次没有任何可显示输出、最新用户可由身份或相同文本加 30 秒时间窗对应、且 canonical Assistant 拥有稳定官方 message ID 时，单条补入最新 Assistant。旧历史不改写，重复执行幂等。
+
+## 2026-07-20 live 失败完成帧补充
+
+v2.16.62 只解决了重启 hydration，仍错误假设失败 `prompt.completed` 前的 transient `error` 必定进入 renderer。新发“？？？”再次复现：官方 session 为 `last_turn_reason=failed`，末尾空 Assistant ID 为 `msg_...000273`，本地却只有用户消息。失败 completion 现在必须先恢复一次权威 snapshot，再交付完成帧；snapshot 合成的失败 Assistant 同时携带“输出打断”状态，禁止 UI 将失败轮次显示为“输出完成/已完成”。

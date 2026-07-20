@@ -751,6 +751,57 @@ describe("filterStatusUpdates room isolation", () => {
     expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual(["reviewer-usage"]);
   });
 
+  it("keeps an interrupted terminal status together with the final metric status", () => {
+    const statuses: TimelineEvent[] = [{
+      id: "usage",
+      type: "status_update",
+      timestamp: 1,
+      inputTokenCount: 22036,
+      tokenCount: 22,
+      contextSize: 0.42,
+    }, {
+      id: "interrupted",
+      type: "status_update",
+      timestamp: 2,
+      message: "输出打断",
+    }];
+
+    expect(filterStatusUpdates(statuses, "turn_end").map((event) => event.id)).toEqual(["usage", "interrupted"]);
+  });
+
+  it("attaches interrupted state to a failed Assistant even when usage metrics exist", () => {
+    const items = buildRenderItems([{
+      id: "user-failed",
+      type: "user_message",
+      timestamp: 1,
+      content: "？？？",
+    }, {
+      id: "usage-failed",
+      type: "status_update",
+      timestamp: 2,
+      inputTokenCount: 138592,
+      contextSize: 0.138592,
+    }, {
+      id: "assistant-failed",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "模型请求失败：本轮已结束，但模型未返回可显示内容。",
+      snapshotMessageId: "msg-failed",
+      snapshotMessageIdStable: true,
+      isThinking: false,
+      isComplete: true,
+    }, {
+      id: "interrupted-failed",
+      type: "status_update",
+      timestamp: 4,
+      message: "输出打断",
+    }], "kimi-code");
+    const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event") return;
+    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["interrupted-failed", "usage-failed"]);
+  });
+
   it("keeps the latest generic status when an Agent turn has no metrics", () => {
     const statuses: TimelineEvent[] = [{
       id: "reviewer-plan",

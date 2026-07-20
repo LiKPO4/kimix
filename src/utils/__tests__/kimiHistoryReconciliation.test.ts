@@ -417,6 +417,12 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
         content: "把铸剑事件拉出来我看下",
       },
       {
+        id: "canonical-interrupted",
+        type: "status_update",
+        timestamp: 10_050,
+        message: "输出打断",
+      },
+      {
         ...failedAssistant,
       },
     ];
@@ -425,13 +431,39 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
     const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
 
     expect(patched.slice(0, local.length)).toEqual(local);
-    expect(patched).toHaveLength(local.length + 1);
+    expect(patched).toHaveLength(local.length + 2);
+    expect(patched.at(-2)).toMatchObject({ type: "status_update", message: "输出打断" });
     expect(patched.at(-1)).toMatchObject({
       type: "assistant_message",
       snapshotMessageId: "msg-failed-assistant",
       content: "本轮请求未能开始生成：第三方模型余额不足。",
     });
     expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
+  it("patches an interrupted status when the stable failed assistant is already mounted", () => {
+    const local: TimelineEvent[] = [{
+      id: "local-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "？？？",
+    }, failedAssistant];
+    const canonical: TimelineEvent[] = [{
+      id: "canonical-user",
+      type: "user_message",
+      timestamp: 10_001,
+      content: "？？？",
+    }, {
+      id: "canonical-interrupted",
+      type: "status_update",
+      timestamp: 10_050,
+      message: "输出打断",
+    }, failedAssistant];
+
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+    expect(patched).toHaveLength(local.length + 1);
+    expect(patched.at(-2)).toMatchObject({ snapshotMessageId: "msg-failed-assistant" });
+    expect(patched.at(-1)).toMatchObject({ type: "status_update", message: "输出打断" });
   });
 
   it("does not patch a different latest user turn", () => {

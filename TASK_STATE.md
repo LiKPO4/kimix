@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.63 live 失败轮次权威收口
+
+- 当前目标：修复 v2.16.62 中新发消息在 Provider 首 token 前失败时，仍只剩用户消息；同时纠正失败回复被显示为“输出完成/已完成”。
+- 根因证据：用户在 v2.16.62 新发“？？？”后，官方 0.27.0 会话再次记录 `last_turn_reason=failed`，snapshot 末尾为 `msg_...MV3K` 用户消息 + injection user + 稳定 ID 空 Assistant `msg_...000273`，但本地没有该 Assistant。Client 对失败 `prompt.completed` 直接放行，错误依赖瞬时 `error` 一定先到 renderer；该证据丢失时既无失败投影，也没有权威 snapshot 收口。
+- 修复：失败/中断/取消 completion 在交付前强制恢复一次官方 snapshot；snapshot 对终态空 Assistant 合成稳定失败正文，并同步生成“输出打断”状态。即使 transient error 丢失，也能恢复 Assistant 头、正文和左侧刻度，消息头/底部不再声称正常完成。缓存升级到 v13，版本升至 v2.16.63。
+- 验证：精确失败测试先红后绿；定向链路最终 3 文件 110 项、全量 106 文件 894 项通过；严格类型检查与生产构建通过，renderer 为 `assets/index-BwNbJomS.js`；OKF 严格校验通过。CDP 正式构建实测最新“？？？”轮次已持久化稳定失败 Assistant `msg_...000273`，导航轨道末尾为用户第 9 节点/助手第 10 节点，DOM 中“输出打断”同时出现在消息头与终态区。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/eventMapper.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+- 下一步：全量门禁、清理临时 CDP 探针并提交；用户在当前 v2.16.63 窗口复验。
+
 ## 2026-07-20 v2.16.62 失败轮次启动恢复根治
 
 - 当前目标：修复 v2.16.61 重启后目标失败轮次仍只剩用户消息、Assistant 头与左侧刻度继续缺失。
