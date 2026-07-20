@@ -24,6 +24,23 @@ const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN = 12;
 const CONTEXT_BAR_POPOVER_GAP = 8;
 
+/** Pure placement helper — exported for unit tests. */
+export function computeContextBarPopoverLeft(input: {
+  align: "left" | "right";
+  anchorLeft: number;
+  anchorRight: number;
+  panelWidth: number;
+  viewportWidth: number;
+  margin?: number;
+}): number {
+  const margin = input.margin ?? CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN;
+  const preferredLeft = input.align === "right"
+    ? input.anchorRight - input.panelWidth
+    : input.anchorLeft;
+  const maxLeft = Math.max(margin, input.viewportWidth - input.panelWidth - margin);
+  return Math.min(Math.max(preferredLeft, margin), maxLeft);
+}
+
 function ContextBarPopover({
   anchorRef,
   panelRef,
@@ -46,31 +63,49 @@ function ContextBarPopover({
   children: ReactNode;
 }) {
   const [position, setPosition] = useState<{ left: number; bottom: number; width: number } | null>(null);
+  // Freeze the open-time horizontal edges so the panel does not slide when the
+  // anchor button width changes (e.g. model name becomes longer/shorter mid-open).
+  const frozenHorizontalRef = useRef<{ left: number; right: number } | null>(null);
 
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
     if (!anchor) return;
-    const updatePosition = () => {
+    frozenHorizontalRef.current = null;
+
+    const updatePosition = (reanchorHorizontal: boolean) => {
       const rect = anchor.getBoundingClientRect();
+      if (reanchorHorizontal || !frozenHorizontalRef.current) {
+        frozenHorizontalRef.current = { left: rect.left, right: rect.right };
+      }
+      const edges = frozenHorizontalRef.current;
       const availableWidth = Math.max(0, window.innerWidth - CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN * 2);
       const panelWidth = Math.min(width, availableWidth);
-      const preferredLeft = align === "right" ? rect.right - panelWidth : rect.left;
-      const maxLeft = Math.max(CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN, window.innerWidth - panelWidth - CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN);
       setPosition({
-        left: Math.min(Math.max(preferredLeft, CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN), maxLeft),
+        left: computeContextBarPopoverLeft({
+          align,
+          anchorLeft: edges.left,
+          anchorRight: edges.right,
+          panelWidth,
+          viewportWidth: window.innerWidth,
+        }),
         bottom: Math.max(CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN, window.innerHeight - rect.top + CONTEXT_BAR_POPOVER_GAP),
         width: panelWidth,
       });
     };
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePosition);
+
+    // Anchor content resize (model label) must keep the frozen horizontal edges.
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => updatePosition(false));
     observer?.observe(anchor);
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    updatePosition(true);
+    const onViewportChange = () => updatePosition(true);
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
     return () => {
       observer?.disconnect();
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
     };
   }, [align, anchorRef, width]);
 
@@ -863,11 +898,11 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
             {!iconOnly && <span className="max-w-[150px] truncate" style={{ lineHeight: "20px", paddingBottom: 1 }}>{gitBranch}</span>}
           </button>
         )}
-        <div ref={modelMenuRef} className="relative hidden min-w-0 max-w-[280px] shrink lg:block" style={{ flexBasis: "auto" }}>
+        <div ref={modelMenuRef} className="relative hidden min-w-0 shrink-0 lg:block" style={{ width: iconOnly ? "auto" : 168 }}>
           <button
             type="button"
             onClick={toggleModelMenu}
-            className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
+            className="kimix-contextbar-action kimix-muted-action flex w-full min-w-0 items-center rounded-lg"
             style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title={modelTitle}
             aria-label={`${modelTitle}，选择会话模型`}
