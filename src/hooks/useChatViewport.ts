@@ -305,10 +305,12 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   }, [lockScrollForUserInput, pauseAutoFollowForUser, recordExplicitUserScrollIntent]);
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    noteUserScrollActivity();
     touchStartYRef.current = event.touches[0]?.clientY ?? null;
   }, []);
 
   const handleTouchMove = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    noteUserScrollActivity();
     const startY = touchStartYRef.current;
     if (startY === null) return;
     const currentY = event.touches[0]?.clientY ?? startY;
@@ -355,7 +357,11 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       ? naturalDistanceFromBottom(node)
       : geometricDistance;
     const now = Date.now();
-      if (shouldResumeAutoFollowAtBottom({
+    // Scrollbar drags land here without wheel/touch/key events. Only count
+    // scrolls while the user owns the viewport (manual mode), so programmatic
+    // follow/anchor writes never masquerade as user scrolling.
+    if (userScrollRef.current) noteUserScrollActivity();
+    if (shouldResumeAutoFollowAtBottom({
       distance,
       autoFollow: autoFollowRef.current,
       userScroll: userScrollRef.current,

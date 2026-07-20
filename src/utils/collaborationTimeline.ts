@@ -21,6 +21,14 @@ const OPEN_DELIVERY_STATUSES = new Set<RoomAgentDelivery["status"]>([
  */
 const projectedEventCache = new WeakMap<TimelineEvent, Map<string, TimelineEvent>>();
 const projectedRoomUserMessageCache = new WeakMap<RoomUserMessage, TimelineEvent>();
+/**
+ * Fallback events (failed/indeterminate error frames, open-delivery placeholder)
+ * are synthesized per projection call. Cache them per room message ref so settled
+ * turns containing them keep stable identity across flushes too. The inner
+ * signature covers every field the fallback derives from, so in-place delivery
+ * mutations still produce a fresh object.
+ */
+const projectedDeliveryFallbackCache = new WeakMap<RoomUserMessage, Map<string, TimelineEvent>>();
 
 function projectionSignature(
   roomAgentId: string,
@@ -144,13 +152,37 @@ function roomAgentEventClaimKey(roomAgentId: string, eventId: string): string {
   return JSON.stringify([roomAgentId, eventId]);
 }
 
+function rememberDeliveryFallback(
+  message: RoomUserMessage,
+  roomAgentId: string,
+  delivery: RoomAgentDelivery,
+  create: () => TimelineEvent,
+): TimelineEvent {
+  const signature = [
+    roomAgentId,
+    delivery.agentTurnId,
+    delivery.status,
+    delivery.error ?? "",
+  ].join(" ");
+  let bySignature = projectedDeliveryFallbackCache.get(message);
+  if (!bySignature) {
+    bySignature = new Map();
+    projectedDeliveryFallbackCache.set(message, bySignature);
+  }
+  const cached = bySignature.get(signature);
+  if (cached) return cached;
+  const created = create();
+  bySignature.set(signature, created);
+  return created;
+}
+
 function deliveryFallbackEvents(
   message: RoomUserMessage,
   roomAgentId: string,
   delivery: RoomAgentDelivery,
 ): TimelineEvent[] {
   if (delivery.status === "failed" || delivery.status === "indeterminate") {
-    return [{
+    return [rememberDeliveryFallback(message, roomAgentId, delivery, () => ({
       id: `${delivery.agentTurnId}:error`,
       type: "error",
       timestamp: message.timestamp,
@@ -161,10 +193,10 @@ function deliveryFallbackEvents(
       roomAgentId,
       roomMessageId: message.id,
       agentTurnId: delivery.agentTurnId,
-    }];
+    }))];
   }
   if (!OPEN_DELIVERY_STATUSES.has(delivery.status)) return [];
-  return [{
+  return [rememberDeliveryFallback(message, roomAgentId, delivery, () => ({
     id: `assistant:${delivery.agentTurnId}`,
     type: "assistant_message",
     timestamp: message.timestamp,
@@ -175,7 +207,7 @@ function deliveryFallbackEvents(
     roomMessageId: message.id,
     agentTurnId: delivery.agentTurnId,
     roomDeliveryStatus: delivery.status,
-  }];
+  }))];
 }
 
 export function projectCollaborationTimeline(session: Session): TimelineEvent[] {

@@ -103,6 +103,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
   }, [contentRef, scrollRef]);
 
   const lastScrollMeasureAtRef = useRef(0);
+  const trailingMeasureTimerRef = useRef<number | null>(null);
   const scheduleMeasure = useCallback((force = false) => {
     if (frameRef.current !== null) return;
     frameRef.current = window.requestAnimationFrame(() => {
@@ -110,12 +111,29 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
       const now = Date.now();
       // While the user is scrolling, throttle expensive marker geometry work.
       if (!force && isScrollYieldEnabled() && isUserScrollActive() && now - lastScrollMeasureAtRef.current < 200) {
+        // Trailing measure: guarantee one final measurement after the scroll
+        // burst settles so markers never stay stale at a mid-scroll position.
+        if (trailingMeasureTimerRef.current === null) {
+          trailingMeasureTimerRef.current = window.setTimeout(() => {
+            trailingMeasureTimerRef.current = null;
+            if (Date.now() - lastScrollMeasureAtRef.current < 200) return;
+            lastScrollMeasureAtRef.current = Date.now();
+            measure();
+          }, 200);
+        }
         return;
       }
       lastScrollMeasureAtRef.current = now;
       measure();
     });
   }, [measure]);
+
+  useEffect(() => () => {
+    if (trailingMeasureTimerRef.current !== null) {
+      window.clearTimeout(trailingMeasureTimerRef.current);
+      trailingMeasureTimerRef.current = null;
+    }
+  }, []);
 
   useLayoutEffect(() => {
     scheduleMeasure(true);

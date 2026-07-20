@@ -783,4 +783,53 @@ describe("projectCollaborationTimeline", () => {
     expect(secondProjected).not.toBe(firstProjected);
     expect(secondProjected).toMatchObject({ content: "A updated" });
   });
+
+  it("keeps delivery fallback event identity across flushes, and refreshes on delivery change", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const roomMessage = {
+      id: "message-failed",
+      content: "Run",
+      recipientAgentIds: [primary.id],
+      deliveries: {
+        [primary.id]: { status: "failed" as const, agentTurnId: "turn-failed", error: "boom" },
+      },
+      timestamp: 10,
+    };
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [roomMessage],
+        agentEvents: { [primary.id]: [] },
+      },
+    };
+
+    const first = projectCollaborationTimeline(room);
+    const second = projectCollaborationTimeline(room);
+    const firstError = first.find((event) => event.type === "error");
+    const secondError = second.find((event) => event.type === "error");
+    expect(firstError).toBeDefined();
+    expect(secondError).toBe(firstError);
+
+    const changedRoom: Session = {
+      ...room,
+      collaboration: {
+        ...room.collaboration!,
+        messages: [{
+          ...roomMessage,
+          deliveries: {
+            [primary.id]: { status: "failed" as const, agentTurnId: "turn-failed", error: "boom-2" },
+          },
+        }],
+      },
+    };
+    const third = projectCollaborationTimeline(changedRoom);
+    const thirdError = third.find((event) => event.type === "error");
+    expect(thirdError).toBeDefined();
+    expect(thirdError).not.toBe(firstError);
+    expect(thirdError).toMatchObject({ message: "boom-2" });
+  });
 });
+

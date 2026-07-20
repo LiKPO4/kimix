@@ -89,6 +89,7 @@ export interface AppState {
   notificationMode: NotificationMode;
   notificationShowContent: boolean;
   processDisplayMode: ProcessDisplayMode;
+  collapseProcessWhileRunning: boolean;
   filePreviewExtensions: string[];
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;

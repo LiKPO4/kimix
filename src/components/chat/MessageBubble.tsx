@@ -1756,11 +1756,11 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserv
   );
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean }) {
   const isKimiWeb = displayMode === "kimi-web";
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
-  const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent && !isActiveAssistant;
+  const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent && !(isActiveAssistant && collapseWhileRunning);
   const [expanded, setExpanded] = useState(defaultExpanded);
   const previousHasFinalContentRef = useRef(hasFinalContent);
   const manuallyExpandedRef = useRef(false);
@@ -2055,6 +2055,7 @@ type AssistantProcessBlockProps = {
   isActiveAssistant: boolean;
   hasFinalContent: boolean;
   isInterrupted: boolean;
+  collapseWhileRunning: boolean;
   turnStartedAt?: number;
   activeStatusMessage?: string;
 };
@@ -2067,6 +2068,7 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.isActiveAssistant === next.isActiveAssistant &&
     prev.hasFinalContent === next.hasFinalContent &&
     prev.isInterrupted === next.isInterrupted &&
+    prev.collapseWhileRunning === next.collapseWhileRunning &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.activeStatusMessage === next.activeStatusMessage &&
     (
@@ -2100,6 +2102,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   isActiveAssistant,
   hasFinalContent,
   isInterrupted,
+  collapseWhileRunning,
   turnStartedAt,
   activeStatusMessage,
 }: AssistantProcessBlockProps) {
@@ -2138,6 +2141,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       expandByDefault={expandByDefault}
       isActiveAssistant={isActiveAssistant}
       hasFinalContent={hasFinalContent}
+      collapseWhileRunning={collapseWhileRunning}
       label={processLabel}
     />
   );
@@ -2246,6 +2250,7 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
 
 function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
+  const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
   const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
@@ -2344,6 +2349,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             isActiveAssistant={isActiveAssistant}
             hasFinalContent={hasContent}
             isInterrupted={Boolean(isInterrupted)}
+            collapseWhileRunning={collapseProcessWhileRunning}
             turnStartedAt={turnStartedAt}
             activeStatusMessage={activeStatus?.message}
           />

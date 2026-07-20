@@ -7,6 +7,24 @@ import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
 const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
+const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
+
+function readCollapseProcessWhileRunning(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem(COLLAPSE_PROCESS_WHILE_RUNNING_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function writeCollapseProcessWhileRunning(enabled: boolean) {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(COLLAPSE_PROCESS_WHILE_RUNNING_KEY, enabled ? "1" : "0");
+  } catch {
+    // Ignore local persistence errors; the in-memory value still updates.
+  }
+}
 
 function readProcessDisplayMode(): ProcessDisplayMode {
   try {
@@ -79,6 +97,7 @@ export interface AppStore extends AppState {
   setNotificationMode: (mode: NotificationMode) => void;
   setNotificationShowContent: (enabled: boolean) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
+  setCollapseProcessWhileRunning: (enabled: boolean) => void;
   setFilePreviewExtensions: (extensions: string[]) => void;
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
@@ -124,6 +143,7 @@ export const useAppStore = create<AppStore>((set) => ({
   notificationMode: "unfocused",
   notificationShowContent: false,
   processDisplayMode: readProcessDisplayMode(),
+  collapseProcessWhileRunning: readCollapseProcessWhileRunning(),
   filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
   longTaskInspectorOpen: false,
@@ -183,6 +203,10 @@ export const useAppStore = create<AppStore>((set) => ({
   setProcessDisplayMode: (mode) => {
     writeProcessDisplayMode(mode);
     set({ processDisplayMode: mode });
+  },
+  setCollapseProcessWhileRunning: (enabled) => {
+    writeCollapseProcessWhileRunning(enabled);
+    set({ collapseProcessWhileRunning: enabled });
   },
   setFilePreviewExtensions: (extensions) => set({
     filePreviewExtensions: Array.from(new Set(extensions

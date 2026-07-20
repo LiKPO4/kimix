@@ -391,6 +391,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setNotificationShowContent = useAppStore((s) => s.setNotificationShowContent);
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const setProcessDisplayMode = useAppStore((s) => s.setProcessDisplayMode);
+  const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
+  const setCollapseProcessWhileRunning = useAppStore((s) => s.setCollapseProcessWhileRunning);
   const filePreviewExtensions = useAppStore((s) => s.filePreviewExtensions);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -1425,6 +1427,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       </div>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setCollapseProcessWhileRunning(!collapseProcessWhileRunning)}
+                    className={`kimix-settings-permission ${collapseProcessWhileRunning ? "is-active" : ""}`}
+                  >
+                    <SelectionIndicator selected={collapseProcessWhileRunning} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">运行中折叠过程详情</div>
+                      <div className="kimix-settings-permission-desc">默认开启，Agent 输出期间过程区只显示单行摘要以保持滚动流畅；关闭后运行中也按过程展示方式展开</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
