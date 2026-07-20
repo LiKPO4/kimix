@@ -10,6 +10,8 @@ import {
   CHAT_NAVIGATION_MARKER_GAP_MAX,
   type ChatNavigationMarker,
 } from "@/utils/chatNavigation";
+import { isScrollYieldEnabled } from "@/utils/perfFlags";
+import { isUserScrollActive } from "@/utils/userScrollActivity";
 import { ChatNavigationPreview, type ChatNavigationPreviewAnchor } from "./ChatNavigationPreview";
 
 interface ChatNavigationRailProps {
@@ -100,32 +102,40 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
     setMarkerGap((current) => current === nextMarkerGap ? current : nextMarkerGap);
   }, [contentRef, scrollRef]);
 
-  const scheduleMeasure = useCallback(() => {
+  const lastScrollMeasureAtRef = useRef(0);
+  const scheduleMeasure = useCallback((force = false) => {
     if (frameRef.current !== null) return;
     frameRef.current = window.requestAnimationFrame(() => {
       frameRef.current = null;
+      const now = Date.now();
+      // While the user is scrolling, throttle expensive marker geometry work.
+      if (!force && isScrollYieldEnabled() && isUserScrollActive() && now - lastScrollMeasureAtRef.current < 200) {
+        return;
+      }
+      lastScrollMeasureAtRef.current = now;
       measure();
     });
   }, [measure]);
 
   useLayoutEffect(() => {
-    scheduleMeasure();
-  });
+    scheduleMeasure(true);
+  }, [items, scheduleMeasure]);
 
   useEffect(() => {
     const scrollNode = scrollRef.current;
     const contentNode = contentRef.current;
     if (!scrollNode || !contentNode) return;
 
-    scrollNode.addEventListener("scroll", scheduleMeasure, { passive: true });
+    const onScroll = () => scheduleMeasure(false);
+    scrollNode.addEventListener("scroll", onScroll, { passive: true });
     const observer = typeof ResizeObserver === "undefined"
       ? null
-      : new ResizeObserver(scheduleMeasure);
+      : new ResizeObserver(() => scheduleMeasure(true));
     observer?.observe(scrollNode);
     observer?.observe(contentNode);
 
     return () => {
-      scrollNode.removeEventListener("scroll", scheduleMeasure);
+      scrollNode.removeEventListener("scroll", onScroll);
       observer?.disconnect();
       if (frameRef.current !== null) {
         window.cancelAnimationFrame(frameRef.current);

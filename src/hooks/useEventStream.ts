@@ -11,8 +11,19 @@ import {
   replaceRoomAgentEvents,
   scopeEventToRoomAgent,
 } from "@/utils/collaborationRooms";
+import { isScrollYieldEnabled } from "@/utils/perfFlags";
+import { isUserScrollActive } from "@/utils/userScrollActivity";
 
 const STREAM_EVENT_FLUSH_MS = 80;
+const STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING = 250;
+
+function isDeferrableStreamEvent(event: TimelineEvent): boolean {
+  return event.type === "assistant_message" && !event.isComplete;
+}
+
+function batchHasBoundaryEvent(items: TimelineEvent[]): boolean {
+  return items.some((event) => !isDeferrableStreamEvent(event));
+}
 
 function canCoalesceAssistantDelta(previous: TimelineEvent, incoming: TimelineEvent): boolean {
   return previous.type === "assistant_message" &&
@@ -86,8 +97,22 @@ export function useEventStream() {
     const current = streamBatchRef.current.get(key) ?? { roomId: uiSessionId, roomAgentId, items: [] };
     current.items.push(scopeEventToRoomAgent(event, roomAgentId));
     streamBatchRef.current.set(key, current);
+
+    const immediate = !isDeferrableStreamEvent(event) || batchHasBoundaryEvent(current.items);
+    if (immediate) {
+      if (streamFlushTimerRef.current) {
+        clearTimeout(streamFlushTimerRef.current);
+        streamFlushTimerRef.current = null;
+      }
+      flushStreamEvents();
+      return;
+    }
+
     if (!streamFlushTimerRef.current) {
-      streamFlushTimerRef.current = setTimeout(flushStreamEvents, STREAM_EVENT_FLUSH_MS);
+      const delay = isScrollYieldEnabled() && isUserScrollActive()
+        ? STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING
+        : STREAM_EVENT_FLUSH_MS;
+      streamFlushTimerRef.current = setTimeout(flushStreamEvents, delay);
     }
   }, [flushStreamEvents]);
 

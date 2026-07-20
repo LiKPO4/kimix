@@ -6,12 +6,15 @@ import {
   useCallback,
 } from "react";
 import { logError } from "@/utils/reportError";
+import { noteScrollTopWrite } from "@/utils/perfDiag";
+import { isScrollYieldEnabled } from "@/utils/perfFlags";
 import {
   distanceFromBottom,
   scrollTopPreservingBottomDistance,
   shouldResumeAutoFollowAtBottom,
   USER_SCROLL_INTENT_MS,
 } from "@/utils/scrollIntent";
+import { clearUserScrollActivity, isUserScrollActive, noteUserScrollActivity } from "@/utils/userScrollActivity";
 import type { RenderItem } from "@/types/chatRender";
 import {
   canReleaseViewportTailCompensation,
@@ -291,6 +294,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   }, [recordExplicitUserScrollIntent]);
 
   const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    noteUserScrollActivity();
     if (event.deltaY < 0) {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
@@ -318,10 +322,13 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   }, [lockScrollForUserInput, pauseAutoFollowForUser, recordExplicitUserScrollIntent]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (["PageUp", "ArrowUp", "Home", "PageDown", "ArrowDown", "End", " "].includes(event.key)) {
+      noteUserScrollActivity();
+    }
     if (["PageUp", "ArrowUp", "Home"].includes(event.key)) {
       lockScrollForUserInput();
       pauseAutoFollowForUser();
-    } else if (["PageDown", "ArrowDown", "End"].includes(event.key)) {
+    } else if (["PageDown", "ArrowDown", "End", " "].includes(event.key)) {
       recordExplicitUserScrollIntent();
       userBottomIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
     }
@@ -348,7 +355,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       ? naturalDistanceFromBottom(node)
       : geometricDistance;
     const now = Date.now();
-    if (shouldResumeAutoFollowAtBottom({
+      if (shouldResumeAutoFollowAtBottom({
       distance,
       autoFollow: autoFollowRef.current,
       userScroll: userScrollRef.current,
@@ -360,6 +367,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       autoFollowRef.current = true;
       userBottomIntentUntilRef.current = 0;
       lastUserScrollAtRef.current = 0;
+      clearUserScrollActivity();
       cancelPendingAnchorCapture();
       clearResizeAnchor();
       clearDetachedViewportCompensation();
@@ -641,6 +649,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       snapshot.sessionId === sessionId &&
       snapshot.autoFollow &&
       !snapshot.userScroll &&
+      !(isScrollYieldEnabled() && isUserScrollActive()) &&
       node.scrollHeight < snapshot.scrollHeight
     ) {
       ignoreScrollUntilRef.current = Date.now() + 120;
@@ -651,6 +660,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
         nextScrollHeight: node.scrollHeight,
         nextClientHeight: node.clientHeight,
       });
+      noteScrollTopWrite("bottom-preserve");
     }
     contentResizeSnapshotRef.current = node ? {
       sessionId,

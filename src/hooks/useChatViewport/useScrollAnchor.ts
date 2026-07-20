@@ -1,6 +1,9 @@
 import { useRef, useCallback, useLayoutEffect } from "react";
 import { logError } from "@/utils/reportError";
 import { isViewportAnchorGenerationCurrent } from "@/utils/chatViewportTransaction";
+import { noteScrollTopWrite } from "@/utils/perfDiag";
+import { isScrollYieldEnabled } from "@/utils/perfFlags";
+import { noteUserScrollActivity, isUserScrollActive, clearUserScrollActivity } from "@/utils/userScrollActivity";
 import {
   MAX_RESIZE_ANCHOR_RESTORE_PX,
   SCROLL_ANCHOR_IDLE_CAPTURE_MS,
@@ -110,6 +113,7 @@ export function useScrollAnchor(options: UseScrollAnchorOptions): UseScrollAncho
     }
     if (Math.abs(delta) <= maxDelta) {
       node.scrollTop += delta;
+      noteScrollTopWrite("resize");
       return true;
     }
     return false;
@@ -135,6 +139,7 @@ export function useScrollAnchor(options: UseScrollAnchorOptions): UseScrollAncho
     const afterScrollTop = node.scrollTop;
     const afterDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
     if (restored) {
+      noteScrollTopWrite("anchor-restore");
       updateShowScrollToBottom(afterDistance > 80);
       scheduleAnchorCapture();
     }
@@ -201,6 +206,7 @@ export function useScrollAnchor(options: UseScrollAnchorOptions): UseScrollAncho
     userScrollGenerationRef.current += 1;
     resizeScrollAnchorRef.current = null;
     lastUserScrollAtRef.current = Date.now();
+    noteUserScrollActivity();
     scheduleIdleAnchorCapture();
   }, [lastUserScrollAtRef, scheduleIdleAnchorCapture]);
 
@@ -246,6 +252,7 @@ export function useScrollAnchor(options: UseScrollAnchorOptions): UseScrollAncho
     resizeScrollAnchorRef.current = null;
     userScrollGenerationRef.current = 0;
     lastUserScrollAtRef.current = 0;
+    clearUserScrollActivity();
     cancelPendingAnchorCapture();
   }, [cancelPendingAnchorCapture, lastUserScrollAtRef]);
 
@@ -255,6 +262,11 @@ export function useScrollAnchor(options: UseScrollAnchorOptions): UseScrollAncho
     const node = scrollRef.current;
     if (!node) return;
     if (Date.now() < intentionalResizeRestoreUntilRef.current) {
+      updateShowScrollToBottom(naturalDistanceFromBottom(node) > 80);
+      return;
+    }
+    // Scroll yield: while the user is actively scrolling, never fight the wheel.
+    if (isScrollYieldEnabled() && isUserScrollActive()) {
       updateShowScrollToBottom(naturalDistanceFromBottom(node) > 80);
       return;
     }

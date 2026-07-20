@@ -1,4 +1,6 @@
 import { useRef, useLayoutEffect, useCallback } from "react";
+import { isScrollYieldEnabled } from "@/utils/perfFlags";
+import { isUserScrollActive } from "@/utils/userScrollActivity";
 import { USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS } from "./constants";
 
 export interface UseResizeObserverOptions {
@@ -89,7 +91,8 @@ export function useResizeObserver(options: UseResizeObserverOptions): void {
       }
       if (userScrollRef.current) {
         const isRecentUserScroll = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS;
-        if (!isRecentUserScroll) {
+        const yieldActive = isScrollYieldEnabled() && isUserScrollActive();
+        if (!isRecentUserScroll && !yieldActive) {
           restoreResizeScrollAnchor();
           scheduleAnchorCapture();
         }

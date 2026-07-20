@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.72 PR-A1 流式滚动性能（Phase 0 + A1 + A3）
+
+- 计划：`docs/plan-streaming-scroll-performance.md` v2，PR-A1 低风险有 flag。
+- 已完成：
+  1. `perfFlags` / `userScrollActivity` / `perfDiag` 基线埋点约定
+  2. A1：流式 StreamingPlain（无 katex/hljs，fence 分块）；完成或滚动停后再 SettledRich
+  3. A3：滚动活跃 350ms 让路（保锚/保底距/resize/导航轨降频）；flush 滚动时 250ms，边界事件立即 flush
+- 未做：PR-A2（A4 身份保持投影 / A5 / A2 拆泡）
+- 验收：定向单测 + 全量 + typecheck；生产 build 体感复测由用户回传
+
 ## 2026-07-20 v2.16.71 模型按钮恢复自适应宽度
 
 - 用户反馈：固定 168px 导致长模型名显示不全。

@@ -1,6 +1,8 @@
 import { useRef, useCallback } from "react";
 import { logError } from "@/utils/reportError";
+import { noteScrollTopWrite } from "@/utils/perfDiag";
 import { bottomScrollTop } from "@/utils/scrollIntent";
+import { clearUserScrollActivity, noteUserScrollActivity } from "@/utils/userScrollActivity";
 import {
   USER_SUBMIT_BOTTOM_MAX_WAIT_MS,
   SESSION_LAYOUT_STABLE_MS,
@@ -107,8 +109,10 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
     ignoreScrollUntilRef.current = Date.now() + 420;
     if (behavior === "auto") {
       node.scrollTop = targetTop;
+      noteScrollTopWrite("auto-follow");
     } else {
       node.scrollTo({ top: targetTop, behavior });
+      noteScrollTopWrite("auto-follow");
     }
     window.setTimeout(() => {
       if (token !== scrollTokenRef.current || !autoFollowRef.current) return;
@@ -179,6 +183,7 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
     userBottomIntentUntilRef.current = 0;
     autoFollowRef.current = true;
     userScrollRef.current = false;
+    clearUserScrollActivity();
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
     scrollToBottom("smooth");
@@ -201,6 +206,7 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
   const pauseAutoFollowForUser = useCallback(() => {
     cancelSessionAutoBottom();
     recordExplicitUserScrollIntent();
+    noteUserScrollActivity();
     userBottomIntentUntilRef.current = 0;
     userScrollRef.current = true;
     scrollTokenRef.current += 1;

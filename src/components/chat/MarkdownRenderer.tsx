@@ -13,6 +13,9 @@ import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreAssistantProgressParagraphs, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
 import { truncateMarkdownForPreview } from "@/utils/markdownTruncate";
+import { isStreamingPlainMarkdownEnabled } from "@/utils/perfFlags";
+import { isUserScrollActive } from "@/utils/userScrollActivity";
+import { renderStreamingPlainBlockToHtml, splitStreamingPlainBlocks } from "@/utils/streamingPlainMarkdown";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 
 interface MarkdownRendererProps {
@@ -98,7 +101,23 @@ const StreamingMarkdownBlock = React.memo(function StreamingMarkdownBlock({
   );
 });
 
-function StreamingMarkdown({
+const StreamingPlainBlock = React.memo(function StreamingPlainBlock({ content }: { content: string }) {
+  const html = useMemo(() => renderStreamingPlainBlockToHtml(content), [content]);
+  return <div className="kimix-streaming-plain-block" dangerouslySetInnerHTML={{ __html: html }} />;
+});
+
+function StreamingPlainMarkdown({ content }: { content: string }) {
+  const blocks = useMemo(() => splitStreamingPlainBlocks(content), [content]);
+  return (
+    <div className="kimix-streaming-markdown kimix-streaming-plain">
+      {blocks.map((block, index) => (
+        <StreamingPlainBlock key={index} content={block} />
+      ))}
+    </div>
+  );
+}
+
+function StreamingRichMarkdown({
   content,
   components,
   remarkPlugins,
@@ -122,6 +141,30 @@ function StreamingMarkdown({
         />
       ))}
     </div>
+  );
+}
+
+function StreamingMarkdown({
+  content,
+  components,
+  remarkPlugins,
+  rehypePlugins,
+  plain,
+}: {
+  content: string;
+  components: Components;
+  remarkPlugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>;
+  rehypePlugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>;
+  plain: boolean;
+}) {
+  if (plain) return <StreamingPlainMarkdown content={content} />;
+  return (
+    <StreamingRichMarkdown
+      content={content}
+      components={components}
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
+    />
   );
 }
 
@@ -233,10 +276,45 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   const [shouldRender, setShouldRender] = useState(!deferOffscreen);
   const [isExpanded, setIsExpanded] = useState(false);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  // Delay StreamingPlain -> SettledRich while the user is actively scrolling.
+  const [settleRichAllowed, setSettleRichAllowed] = useState(() => !isUserScrollActive());
+  const wasStreamingRef = useRef(streaming);
   const normalizedContent = useMemo(
     () => normalizeMarkdownContent(content, normalizeAssistantProgress),
     [content, normalizeAssistantProgress],
   );
+
+  useEffect(() => {
+    if (streaming) {
+      wasStreamingRef.current = true;
+      setSettleRichAllowed(false);
+      return;
+    }
+    if (!wasStreamingRef.current) {
+      setSettleRichAllowed(true);
+      return;
+    }
+    if (!isStreamingPlainMarkdownEnabled()) {
+      setSettleRichAllowed(true);
+      return;
+    }
+    if (!isUserScrollActive()) {
+      setSettleRichAllowed(true);
+      return;
+    }
+    setSettleRichAllowed(false);
+    const timer = window.setInterval(() => {
+      if (!isUserScrollActive()) {
+        setSettleRichAllowed(true);
+        window.clearInterval(timer);
+      }
+    }, 120);
+    return () => window.clearInterval(timer);
+  }, [streaming]);
+
+  const usePlainStreaming = streaming && isStreamingPlainMarkdownEnabled();
+  const renderAsStreaming = streaming || (wasStreamingRef.current && !settleRichAllowed && isStreamingPlainMarkdownEnabled());
+  const plainPath = usePlainStreaming || (renderAsStreaming && !streaming && !settleRichAllowed);
   const isCollapsible = collapsibleThreshold > 0 && normalizedContent.length > collapsibleThreshold;
   const displayContent = useMemo(() => {
     if (!isCollapsible || isExpanded) return normalizedContent;
@@ -464,12 +542,13 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       ref={containerRef}
       className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
     >
-      {streaming ? (
+      {renderAsStreaming ? (
         <StreamingMarkdown
           content={displayContent}
           components={components}
           remarkPlugins={remarkPlugins}
           rehypePlugins={rehypePlugins}
+          plain={plainPath}
         />
       ) : (
         <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
