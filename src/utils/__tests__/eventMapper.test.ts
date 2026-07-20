@@ -1741,6 +1741,62 @@ describe("mapHistoryEvents", () => {
     expect(settled[3]).toMatchObject({ content: "当前回答", isComplete: false });
   });
 
+  it("inserts a late-replayed official message before an already-bound later official message", () => {
+    // Repro: session_01ea935b — official message 000389 (early plan text)
+    // replayed after 000397 (final answer) was already bound, and landed at
+    // the tail so the plan sentence rendered after the final answer.
+    const existing: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 1_000, content: "查一下全部剧情",
+    }, {
+      id: "assistant-final", type: "assistant_message", timestamp: 2_000,
+      snapshotMessageId: "msg_session-x_000397", snapshotMessageIdStable: true,
+      content: "最终回答（表格）", isThinking: false, isComplete: true,
+    }];
+
+    const result = mergeEvents(existing, {
+      id: "assistant-plan", type: "assistant_message", timestamp: 2_001,
+      snapshotMessageId: "msg_session-x_000389", snapshotMessageIdStable: true,
+      completionBarrierReplay: true,
+      content: "先改这两处", isThinking: false, isComplete: true,
+    });
+
+    expect(result.map((event) => event.id)).toEqual([
+      "user-1", "assistant-plan", "assistant-final",
+    ]);
+  });
+
+  it("appends a replayed official message at the tail when its sequence is the highest", () => {
+    const existing: TimelineEvent[] = [{
+      id: "assistant-plan", type: "assistant_message", timestamp: 2_000,
+      snapshotMessageId: "msg_session-x_000389", snapshotMessageIdStable: true,
+      content: "先改这两处", isThinking: false, isComplete: true,
+    }];
+
+    const result = mergeEvents(existing, {
+      id: "assistant-final", type: "assistant_message", timestamp: 2_001,
+      snapshotMessageId: "msg_session-x_000397", snapshotMessageIdStable: true,
+      content: "最终回答", isThinking: false, isComplete: true,
+    });
+
+    expect(result.map((event) => event.id)).toEqual(["assistant-plan", "assistant-final"]);
+  });
+
+  it("appends a replayed official message at the tail when the id has no sequence suffix", () => {
+    const existing: TimelineEvent[] = [{
+      id: "assistant-final", type: "assistant_message", timestamp: 2_000,
+      snapshotMessageId: "msg-late", snapshotMessageIdStable: true,
+      content: "最终回答", isThinking: false, isComplete: true,
+    }];
+
+    const result = mergeEvents(existing, {
+      id: "assistant-other", type: "assistant_message", timestamp: 2_001,
+      snapshotMessageId: "msg-other", snapshotMessageIdStable: true,
+      content: "另一条", isThinking: false, isComplete: true,
+    });
+
+    expect(result.map((event) => event.id)).toEqual(["assistant-final", "assistant-other"]);
+  });
+
   it("does not let a stable terminal for an earlier completed step close the current step", () => {
     const current: TimelineEvent[] = [{
       id: "user", type: "user_message", timestamp: 1_000, content: "检查项目",

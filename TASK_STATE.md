@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.76 官方回放消息乱序修复（session_01ea935b）
+
+- 现象：最终正文末尾出现一句本应更早出现的话（"先改这两处，同时拉全部多场景剧情。"）。
+- 快照取证（IndexedDB blob）：官方消息 `..._000389`（计划句，complete、stable、barrier replay）在事件数组里位于 `..._000397`（最终答案）之后；全文仅出现一次；diag.log 显示当日多次 kimiHistoryReconciliation rewrite。根因：回放不保证按官方顺序到达，000389 迟到且无可绑定的未完成 placeholder 时，mergeEvents 把"未见过的 stable 事件"直接追加到末尾。
+- 修复：`mergeEvents` 解析 snapshotMessageId 末尾 `_NNNNNN` 官方序号，迟到消息插入到同族第一个更大序号的 stable 事件之前；无序号/无更晚兄弟时保持末尾追加（eventMapper.ts `officialSnapshotSequence`）。
+- 测试：eventMapper.test.ts +3（迟到插入、最大序号末尾追加、无序号后缀末尾追加），全量 942 + typecheck。
+- 与性能改动（PR-A1/A2/B1）无关：这是历史绑定/回放管线问题。
+- 遗留：已落盘的该会话乱序事件不会自动修复（reconciliation 按 size 判等，31217==31217 已通过）；如需修复存量数据另立项。
+- 教训：会话全量事件在 IndexedDB blob（`IndexedDB/file__0.indexeddb.blob`），UTF-16 存储；localStorage leveldb 里只有摘要；CDP 需应用以 --remote-debugging-port 启动。
+
 ## 2026-07-20 v2.16.75 流式滚动性能审核修复
 
 - 背景：对 PR-A1/PR-A2/B1 的审核发现 3 个 P1 + 1 个 P2，按用户确认修复。

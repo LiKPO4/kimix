@@ -1473,6 +1473,19 @@ function isKimixSyntheticThinking(text: string) {
     trimmed.includes("Kimix 会继续回放");
 }
 
+/**
+ * Official snapshot message ids end with an incrementing sequence suffix
+ * (`msg_session_<id>_000389`). Replayed official messages can arrive after
+ * later steps of the same turn were already bound; the sequence lets merge
+ * place them in official order instead of blindly appending at the tail.
+ */
+function officialSnapshotSequence(snapshotMessageId?: string): { prefix: string; value: number } | undefined {
+  if (!snapshotMessageId) return undefined;
+  const match = /^(.*)_(\d+)$/.exec(snapshotMessageId);
+  if (!match) return undefined;
+  return { prefix: match[1], value: Number(match[2]) };
+}
+
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
@@ -1641,7 +1654,26 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     // it merely because the replay window lacks its original user boundary.
     if (stableSnapshotId) {
       const isIdentityTerminal = incoming.isComplete && !incoming.content && !incoming.thinking;
-      return isIdentityTerminal ? existing : [...existing, incoming];
+      if (isIdentityTerminal) return existing;
+      // Replayed official messages may arrive after later steps of the same
+      // turn were already bound (e.g. an early plan text replayed after the
+      // final answer). Insert by official sequence so early messages never
+      // land after later ones; fall back to tail append when no sequence or
+      // no later stable sibling exists.
+      const incomingSeq = officialSnapshotSequence(stableSnapshotId);
+      if (incomingSeq) {
+        const insertIndex = existing.findIndex((event) => {
+          if (event.type !== "assistant_message" || event.snapshotMessageIdStable !== true) return false;
+          const seq = officialSnapshotSequence(event.snapshotMessageId);
+          return Boolean(seq && seq.prefix === incomingSeq.prefix && seq.value > incomingSeq.value);
+        });
+        if (insertIndex !== -1) {
+          const result = [...existing];
+          result.splice(insertIndex, 0, incoming);
+          return result;
+        }
+      }
+      return [...existing, incoming];
     }
 
     if (incoming.isComplete && !incoming.content && !incoming.thinking) {
