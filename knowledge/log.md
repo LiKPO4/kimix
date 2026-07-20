@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Kimi Code 0.28 managed Server launches via `kimi web --no-open`**: Upstream removed `kimi server …` (exit 1). Kimix managed runtimes spawn `web --no-open --port …` and still prefer attaching a healthy lock owner. Permission copy matches official YOLO/Auto semantics. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and `docs/kimi-code-0.28-followup.md`.
+
 * **Multi-step prompt completion barrier must accumulate every step's thinking**: One user prompt may produce several official Assistant messages (think + tool_use per step). Barrier merge may bind the live placeholder to only the first unbound stable message ID, must keep later stable IDs separate, and must merge thinking text/parts instead of replacing them with the latest step; otherwise the process card shows tools only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Terminal settle preserves an empty placeholder when the turn never received body**: 0.27 Server may report idle/completed before the assistant body streams, and the body may arrive much later (401 retry, long-thinking model). `settleInactiveEvents` now takes `preserveEmptyAssistant`; `settleTerminalRoomAgent` passes `turnReceivedBody` (from `hasTurnReceivedBody`). When false, the empty placeholder is kept as `isComplete=false` so the header stays visible while the settle still clears the running state and dispatches the next queued message. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

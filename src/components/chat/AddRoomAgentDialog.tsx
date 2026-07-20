@@ -8,8 +8,8 @@ import type { RoomAgentDraft } from "@/utils/roomAgentProvisioning";
 
 const PERMISSIONS: Array<{ value: PermissionMode; label: string; description: string }> = [
   { value: "manual", label: "手动审批", description: "高风险操作先确认" },
-  { value: "auto", label: "自动权限", description: "减少中断并继续推进" },
-  { value: "yolo", label: "完全访问", description: "自动批准工具操作" },
+  { value: "auto", label: "自动权限", description: "全自动，不再向你提问" },
+  { value: "yolo", label: "完全访问", description: "自动批工具，仍可能提问" },
 ];
 
 function uniqueAgentName(label: string, session: Session) {

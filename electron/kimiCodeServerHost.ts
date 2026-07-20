@@ -110,6 +110,14 @@ function serverLockPath() {
   return path.join(os.homedir(), ".kimi-code", "server", "lock");
 }
 
+/**
+ * Kimi Code 0.28+ removed `kimi server …` (deprecated notice + exit 1).
+ * Managed runtimes must launch the same foreground server via `kimi web --no-open`.
+ */
+export function buildManagedKimiServerArgs(port: string | number): string[] {
+  return ["web", "--no-open", "--port", String(port), "--log-level", "warn"];
+}
+
 function readServerLock(): ServerLockContents | undefined {
   try {
     const parsed = JSON.parse(fs.readFileSync(serverLockPath(), "utf-8")) as Partial<ServerLockContents> | undefined;
@@ -220,8 +228,9 @@ export class KimiCodeServerHost {
       // No compatible server is listening; start the installed CLI below.
     }
 
-    // Kimi Code 0.24+ 单例锁：锁记录的活实例无法被第二个 server 取代，改为直连该实例；
-    // 死 pid 残留锁（上游 lock.ts 在 Windows 上可能误判存活）清理后再走正常启动。
+    // Prefer an already-running official instance (0.28 allows multiple servers in
+    // one home; attach to the lock owner when it is healthy). Stale Windows dead-pid
+    // locks are cleared after the startup grace period, then we spawn.
     const lock = readServerLock();
     if (lock) {
       if (await isLockOwnerAlive(lock.pid)) {
@@ -264,9 +273,9 @@ export class KimiCodeServerHost {
     try {
       const executable = this.resolveExecutable();
       const port = new URL(this.status.endpoint).port || String(DEFAULT_PORT);
-      this.child = spawn(executable, [
-        "server", "run", "--foreground", "--port", port, "--log-level", "warn",
-      ], {
+      // 0.28+: `kimi server run` exits 1 with a deprecation notice. The official
+      // foreground server entry is `kimi web --no-open` (same REST/WS surface).
+      this.child = spawn(executable, buildManagedKimiServerArgs(port), {
         cwd: os.homedir(),
         env: { ...this.env, KIMI_CODE_NO_AUTO_UPDATE: this.env.KIMI_CODE_NO_AUTO_UPDATE || "1" },
         windowsHide: true,

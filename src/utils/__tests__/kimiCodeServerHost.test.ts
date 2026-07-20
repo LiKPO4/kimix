@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildManagedKimiServerArgs,
   inspectKimiCodeServerContract,
   isKimiCodeServerExperimentEnabled,
   KimiCodeServerHost,
@@ -20,6 +21,25 @@ describe("kimiCodeServerHost", () => {
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "true" })).toBe(false);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "0" })).toBe(false);
+  });
+
+  it("launches the managed server through kimi web --no-open after 0.28 deprecates kimi server", () => {
+    expect(buildManagedKimiServerArgs(58_627)).toEqual([
+      "web",
+      "--no-open",
+      "--port",
+      "58627",
+      "--log-level",
+      "warn",
+    ]);
+    expect(buildManagedKimiServerArgs("58628")).toEqual([
+      "web",
+      "--no-open",
+      "--port",
+      "58628",
+      "--log-level",
+      "warn",
+    ]);
   });
 
   it("detects capabilities without trusting the reported version", () => {

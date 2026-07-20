@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.68 跟进 Kimi Code 0.28.0
+
+- 当前目标：对照官方 0.28.0 changelog，修 Kimix 必跟项。
+- 发现：P0 managed Server 仍 spawn `kimi server run --foreground`，0.28 上 exit 1 整路 fallback；YOLO/Auto 文案与官方语义不符；vendored SDK 仍 0.27（本轮不重打包）。
+- 修复：`buildManagedKimiServerArgs` → `kimi web --no-open`；Composer/设置/加 Agent 权限文案对齐官方；新增 `docs/kimi-code-0.28-followup.md`。
+- 未做：SDK 重打到 0.28、多实例自动换端口、模型切换 cache 提示、thinking max 持久化对齐。
+- 下一步：用户升到 CLI 0.28 后冷启动确认 Server 路由；择期 vendor SDK 0.28 探针。
+
 ## 2026-07-20 v2.16.67 多步工具轮次展开只剩工具、思考丢失
 
 - 当前目标：用户报告过程展开只能看到「N 个工具调用」，思考段全部消失。
