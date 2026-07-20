@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.75 流式滚动性能审核修复
+
+- 背景：对 PR-A1/PR-A2/B1 的审核发现 3 个 P1 + 1 个 P2，按用户确认修复。
+- 做法：
+  1. 触屏（touchstart/touchmove）与 scrollbar 拖动（native scroll + userScroll 模式）接入 `noteUserScrollActivity`；程序化写入不计入（仅 `userScrollRef` 为真时记）
+  2. 导航轨降频加尾部补偿：节流丢弃时起 200ms trailing 定时器，保证滚动收尾有一次最终测量
+  3. `deliveryFallbackEvents`（失败/不确定 delivery 的 error、开放 delivery 占位）按 message 引用 WeakMap 身份缓存，签名为 roomAgentId+agentTurnId+status+error
+  4. B3「运行中折叠过程详情」加用户设置：`collapseProcessWhileRunning`（localStorage `kimix_collapse_process_while_running`，默认开），SettingsPanel 过程展示方式区加开关，经 AssistantProcessBlock 透传到 AssistantProcessSummary
+- 知识库：新增 `knowledge/architecture/streaming-render-pipeline.md`，更新 architecture/index.md 与 log.md；`pnpm knowledge:validate` PASS
+- 验收：全量 939 + typecheck；新增 fallback 身份缓存测试
+- 注意：Windows 上 `perl -pi` 会把文件改写成 CRLF，本仓库禁止用；混合行尾文件 Edit 工具匹配不稳定时用 python 保持原行尾改写
+
 ## 2026-07-20 v2.16.74 B1 activeTurnDraft
 
 - 计划：`docs/plan-streaming-scroll-performance.md` B1。

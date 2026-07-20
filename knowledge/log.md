@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Streaming render pipeline: identity-preserving projection, active-turn draft, scroll yield**: Storage event refs are stable, so `projectCollaborationTimeline` caches projected identity in a WeakMap (including delivery fallback frames); `useProjectedTimeline` skips reprojection on metadata-only updates; text/thinking deltas write to a per-turn draft store with one commit point before flushes and boundary events; `userScrollActivity` is the shared 350 ms signal gating anchor restore, rail measurement, flush cadence, and the streaming→settled markdown upgrade. Memo keys keep full semantics; cost is cut by `===` fast paths and WeakMap key caches. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
 * **Vendored SDK tracks Kimi Code 0.28 and multi-instance Server ports**: Fallback bundle refreshed from tag `@moonshot-ai/kimi-code@0.28.0` (`a05228c6`). Host attaches via `server/instances` registry (preferred port, then longest-running healthy), and managed spawn walks the next free ports after `kimi web --no-open`. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Kimi Code 0.28 managed Server launches via `kimi web --no-open`**: Upstream removed `kimi server …` (exit 1). Kimix managed runtimes spawn `web --no-open --port …` and still prefer attaching a healthy lock owner. Permission copy matches official YOLO/Auto semantics. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and `docs/kimi-code-0.28-followup.md`.
