@@ -263,7 +263,7 @@ function isStaleRunningEvent(event: TimelineEvent, settledAt: number) {
   return settledAt - event.timestamp > STALE_TIMELINE_WORK_MS;
 }
 
-export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.now()): TimelineEvent[] {
+export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.now(), preserveEmptyAssistant = false): TimelineEvent[] {
   const settled = events.flatMap<TimelineEvent>((event) => {
     if (event.type === "subagent") {
       if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
@@ -288,7 +288,15 @@ export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.n
       event.thinking?.trim() ||
       event.thinkingParts?.some((part) => part.text.trim().length > 0)
     );
-    if (!hasContent && !hasThinking) return [];
+    if (!hasContent && !hasThinking) {
+      // A turn that never received body may be a premature terminal report
+      // (0.27 Server can report idle before the body streams). When
+      // preserveEmptyAssistant is set, keep the placeholder as isComplete=false
+      // so the message header stays visible and the turn is not settled; the
+      // real body can still arrive and fill it. Without this flag the empty
+      // placeholder is deleted (genuinely failed/orphaned turns).
+      return preserveEmptyAssistant ? [event] : [];
+    }
     return [{ ...event, isComplete: true, isThinking: false, durationMs: reliableAssistantDurationMs(event.durationMs) }];
   });
   return closeOpenCompaction(settled);

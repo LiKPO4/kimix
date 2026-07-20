@@ -74,6 +74,32 @@ describe("eventHelpers", () => {
     expect(settled[2]).toMatchObject({ type: "assistant_message", isThinking: false, isComplete: true, content: "已有部分输出" });
   });
 
+  it("preserves an empty assistant placeholder when preserveEmptyAssistant is set", () => {
+    // A premature terminal report (0.27 Server idle before body streams) must
+    // not delete the optimistic placeholder. It is kept as isComplete=false so
+    // the message header stays visible and the turn is not settled.
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "", isThinking: false, isComplete: false },
+    ];
+
+    const settled = settleInactiveEvents(events, 100, true);
+    const assistant = settled.find((event) => event.type === "assistant_message") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
+    expect(assistant).toBeDefined();
+    expect(assistant?.isComplete).toBe(false);
+    expect(assistant?.content).toBe("");
+  });
+
+  it("deletes an empty assistant placeholder when preserveEmptyAssistant is not set", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "你好" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "", isThinking: false, isComplete: false },
+    ];
+
+    const settled = settleInactiveEvents(events, 100);
+    expect(settled.find((event) => event.type === "assistant_message")).toBeUndefined();
+  });
+
   it("removes a local failed send attempt with its status, empty placeholder, and error", () => {
     const events: TimelineEvent[] = [
       { id: "user-1", type: "user_message", timestamp: 1, content: "卡住了吗" },

@@ -203,8 +203,9 @@ export function settleTerminalRoomAgent(
   target: Pick<RoomAgentControlTarget, "roomAgentId" | "roomMessageId">,
   status: "completed" | "interrupted" | "error" | "idle",
   now = Date.now(),
+  turnReceivedBody = true,
 ): Session {
-  let next = updateRoomAgentEvents(session, target.roomAgentId, (events) => settleInactiveEvents(events, now));
+  let next = updateRoomAgentEvents(session, target.roomAgentId, (events) => settleInactiveEvents(events, now, !turnReceivedBody));
   next = applyRoomDeliveryRuntimeStatus(
     next,
     target.roomMessageId,

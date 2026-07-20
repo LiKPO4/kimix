@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.66 移除 60 秒上限，改为保留空 placeholder
+
+- 当前目标：v2.16.65 的 60 秒上限太短，用户报告 1 分 03 秒后头消失（body 来得慢，401 余额不足重试），轮次最终成功。
+- 根因：60 秒上限假设"60 秒内没 body 就是误判"，但 body 可能来得很慢（401 重试、长思考模型）。上限放行后 settle 删空 placeholder，头消失。
+- 修复：移除时间上限。`settleInactiveEvents` 加 `preserveEmptyAssistant` 参数，`settleTerminalRoomAgent` 加 `turnReceivedBody` 参数。终端 settle 时若 `!turnReceivedBody`，保留空 placeholder 为 `isComplete=false`（不删），仍清 running state 和派发下一条。保留 `isComplete=false` 让 `mergeAssistantProcessEvents` 不过滤、`mergedAssistantEvent` 有值、`turnSettled=false`、消息头可见。
+- 验证：eventHelpers 29 项通过（含新增 2 个）；全量 106 文件 910 项通过；typecheck + build 通过，renderer `assets/index-Cr97Rwyw.js`。
+- 关键文件：`src/utils/eventHelpers.ts`、`src/utils/roomAgentControl.ts`、`src/App.tsx`、`src/utils/__tests__/eventHelpers.test.ts`。
+- 下一步：用户实机复验 v2.16.66。
+
 ## 2026-07-20 v2.16.65 正常轮次被提前判定终端导致消息头消失（6 秒 bug）
 
 - 当前目标：v2.16.64 修复了失败轮次头消失后，用户报告新现象——发送消息后约 6 秒 Assistant 消息头消失，只剩 "Context: 13.87%" 气泡；轮次最终成功，body 后到时头又回来（闪烁）。

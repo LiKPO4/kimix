@@ -3272,22 +3272,13 @@ function App() {
 
         // 提前误判终端保护：0.27 Server 可能在 assistant body 还没 stream 到时就
         // 报 idle/completed。如果当前轮次从未收到过任何 assistant body/thinking/
-        // tool/error 事件，这个"终端"很可能是误判——body 还在路上。此时不 settle，
-        // 让 pending-placeholder fallback 保持消息头可见，等 body 真正到达。
-        // 60 秒上限兜底：真正失败但无 error event 的轮次（如 Provider 断连）不能
-        // 永远不 settle。
-        const PREMATURE_TERMINAL_BODY_WAIT_MS = 60_000;
-        if (Date.now() - reconciliationStartedAt < PREMATURE_TERMINAL_BODY_WAIT_MS) {
-          const guardSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
-          const guardAgentEvents = getRoomAgentEvents(guardSession, roomAgentId);
-          if (!hasTurnReceivedBody(guardAgentEvents)) {
-            // body 未到，不 settle，下一轮 poll 继续检查。写回 terminalPolls 让
-            // 连续终端 poll 计数继续累积；如果 body 到达后运行时变 active，
-            // runtimeTerminalPollRef 会在 active 分支被清零。
-            runtimeTerminalPollRef.current.set(runtimeSessionId, terminalPolls);
-            return;
-          }
-        }
+        // tool/error 事件，这个"终端"很可能是误判——body 还在路上。此时仍 settle
+        // （清 running state、派发下一条排队消息），但保留空 placeholder 让消息头
+        // 可见，等 body 真正到达后填充。不设时间上限：body 可能来得很慢（401 重试、
+        // 长思考模型），只要从未收过 body 就保留 placeholder。
+        const guardSession = useSessionStore.getState().sessions.find((item) => item.id === session.id) ?? session;
+        const guardAgentEvents = getRoomAgentEvents(guardSession, roomAgentId);
+        const turnReceivedBody = hasTurnReceivedBody(guardAgentEvents);
 
         const active = useAppStore.getState().roomAgentActivities[roomAgentActivityKey(session.id, roomAgentId)];
         const latestRunningId = useAppStore.getState().runningSessionId;
@@ -3305,7 +3296,7 @@ function App() {
         updateSession(session.id, (item) => settleTerminalRoomAgent(item, {
           roomAgentId,
           roomMessageId: active?.roomMessageId ?? persistedTarget?.roomMessageId,
-        }, terminalStatus, settledAt));
+        }, terminalStatus, settledAt, turnReceivedBody));
         syncCurrentSessionFromStore(session.id);
         setRoomAgentActivity({
           roomId: session.id,
