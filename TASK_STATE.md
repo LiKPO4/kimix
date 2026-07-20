@@ -1,5 +1,22 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.64 live 失败头消失三层根因根治
+
+- 当前目标：v2.16.63 仍存在“发送消息失败后 agent 消息头先消失、第二次打开才显示”的问题，需从最底层根治。
+- 根因证据（三层叠加，经完整事件链快照确认）：
+  1. `snapshotMessagesToServerFrames` 合成失败三帧要求 6 个条件全部满足（`inFlightItems.length===0`、`session.busy!==true`、`session.main_turn_active!==true`、`!latestTurnHasDisplayFrame`、末尾空 Assistant、空正文）。live 失败瞬间 snapshot 处于过渡态，条件不满足 → 失败正文三帧一个都不发。重启恢复稳态成立 → 能合成。这是“第二次打开才显示”的直接原因。
+  2. `turn.ended(reason=failed)` 被 `kimixTerminalScope === "prompt"` 过滤（`flattenServerEvent` 给所有 Server frame 打 scope，`kimiCodeEventMapper` 对 prompt-scoped turn.ended 除 filtered 外全过滤）。`content.part` 产生 `isComplete=false`，只有 `turn.ended` 能产生 `isComplete=true` terminal marker，但它被过滤 → 失败 assistant 永远 incomplete。
+  3. `buildRenderItems.turnSettled` 要求所有 assistant `isComplete=true`。失败 assistant 永远 incomplete → `turnSettled=false` → `projectedFailureAssistant`（要求 turnSettled）不触发 → 不渲染消息头。
+  4. 次要：`isVisibleTurnOutput` 把 `error` 当可见输出，`mergeMissingLatestCanonicalAssistant` 在本地有 transient error 时拒绝补入 canonical 失败 Assistant。
+- 修复（三个修复点，全部最小且已验证不影响成功轮次）：
+  1. `electron/kimiCodeServerClient.ts`：`deliverPromptCompletion` 失败分支保留 `recoverSnapshot`（cursor 同步 + WS 重订阅副作用），再调 `getSnapshot`，由新增 `deliverFailedPromptFrames` 无条件自构三帧（`turn.step.interrupted` + `content.part(失败正文, kimixPromptCompletionBarrier:true)` + `turn.ended(reason=failed)`），带 stable messageIdentity。barrier 让 renderer mergeEvents 走 REPLACE 语义，与 recoverSnapshot 可能合成的相同 stable ID 帧幂等去重。
+  2. `src/utils/kimiCodeEventMapper.ts`：`turn.ended` 的 prompt-scope 过滤对 failed/cancelled/interrupted/error/canceled/aborted reason 放开（新增 `isFailedTurnEndedReason` helper）。成功 `reason=completed/missing` 仍被过滤，保持 780e6629e 设计不变。
+  3. `src/utils/kimiHistoryReconciliation.ts`：`isVisibleTurnOutput` 移除 `error` 类型。transient error 是状态信号不是 Assistant 正文。
+- 验证：定向 3 文件 111 项通过；全量 106 文件 900 项通过；typecheck 通过；build 通过，renderer `assets/index-DiS4qqMI.js`；OKF 严格校验通过（10 概念、18 Markdown、254 链接）。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/kimiCodeEventMapper.ts`、`src/utils/kimiHistoryReconciliation.ts`、三个对应测试文件。
+- 风险与回滚：revert 本次 commit 即可，无 schema/持久化变更，KIMI_HISTORY_CACHE_VERSION 不变。
+- 下一步：用户实机复验 v2.16.64，确认 live 失败时消息头不再消失、失败正文即时显示。
+
 ## 2026-07-20 v2.16.63 live 失败轮次权威收口
 
 - 当前目标：修复 v2.16.62 中新发消息在 Provider 首 token 前失败时，仍只剩用户消息；同时纠正失败回复被显示为“输出完成/已完成”。

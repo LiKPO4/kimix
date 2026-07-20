@@ -363,10 +363,13 @@ function isVisibleTurnOutput(event: TimelineEvent): boolean {
   if (event.type === "assistant_message") {
     return Boolean(event.content.trim() || event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim()));
   }
+  // A transient `error` event is a status signal, not Assistant body output;
+  // keeping it out of this predicate lets mergeMissingLatestCanonicalAssistant
+  // patch a canonical failed Assistant into a turn whose only local evidence
+  // is the transient error frame.
   return event.type === "tool_call" ||
     event.type === "tool_result" ||
     event.type === "subagent" ||
-    event.type === "error" ||
     event.type === "file_artifact" ||
     event.type === "change_summary" ||
     event.type === "diff";

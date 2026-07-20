@@ -1218,12 +1218,19 @@ export class KimiCodeServerClient {
     const completionReason = typeof payload.reason === "string" ? payload.reason.toLowerCase() : "";
     // Failed prompts have no displayable Assistant body by definition. Do not
     // run the success-only message barrier, but also do not assume transient
-    // error frames reached the renderer: restore one authoritative snapshot so
-    // an empty official Assistant becomes a stable generic failure response.
+    // error frames reached the renderer, nor that recoverSnapshot will
+    // synthesize a failure body: a live failure snapshot is often still in
+    // transition (busy / non-empty in-flight / stale history delta), so the
+    // strict synthesis gates inside snapshotMessagesToServerFrames do not
+    // fire. Restore one authoritative snapshot (cursor + WS resubscribe side
+    // effects), then unconditionally deliver self-constructed failure frames
+    // so the renderer receives a stable failed Assistant with isComplete=true.
     if (FAILED_PROMPT_COMPLETION_REASONS.has(completionReason)) {
       if (sessionId) {
         try {
           await this.recoverSnapshot(sessionId);
+          const snapshot = await this.getSnapshot(sessionId);
+          this.deliverFailedPromptFrames(sessionId, snapshot, promptId);
         } catch (error) {
           console.warn(`[KimiCodeServerClient] failed prompt ${promptId} snapshot recovery failed:`, error);
         }
@@ -1281,6 +1288,79 @@ export class KimiCodeServerClient {
       }
     }
     this.deliver(frame);
+  }
+
+  /**
+   * Construct and deliver the three failure frames for a failed prompt
+   * completion. Unlike snapshotMessagesToServerFrames, this does not depend on
+   * transition-state snapshot gates (busy / in_flight / display frames): a
+   * live failure must always produce a visible, settled failure Assistant.
+   *
+   * The three frames share the latest history assistant message's stable
+   * identity so renderer mergeEvents treats them as the same logical
+   * Assistant: content.part fills the empty body, turn.ended(reason=failed)
+   * marks it isComplete=true, and turn.step.interrupted surfaces the
+   * "输出打断" status. kimixPromptCompletionBarrier on content.part makes the
+   * body REPLACE-idempotent against any snapshot-replay frame recoverSnapshot
+   * already synthesized for the same stable id.
+   */
+  private deliverFailedPromptFrames(sessionId: string, snapshot: ServerSnapshot, promptId: string) {
+    const historyItems = Array.isArray(snapshot.messages?.items) ? snapshot.messages.items : [];
+    const latestAssistantMessage = historyItems.findLast((item) => (
+      isRecord(item) && item.role === "assistant"
+    ));
+    const messageIdentity = isRecord(latestAssistantMessage)
+      ? snapshotMessageIdentity(latestAssistantMessage, "assistant")
+      : { id: promptId, stable: true };
+    const messageTimestamp = isRecord(latestAssistantMessage)
+      ? snapshotMessageTimestamp(latestAssistantMessage)
+      : undefined;
+    const failureContent = "模型请求失败：本轮已结束，但模型未返回可显示内容。请检查模型账户、Provider 配置或额度后重试。";
+    const seq = snapshot.as_of_seq;
+    const epoch = snapshot.epoch;
+
+    this.deliver({
+      type: "turn.step.interrupted",
+      session_id: sessionId,
+      seq,
+      epoch,
+      payload: snapshotReplayPayload(
+        { type: "turn.step.interrupted", reason: "failed" },
+        "history",
+        messageIdentity,
+        failureContent,
+        "assistant",
+        messageTimestamp,
+      ),
+    });
+    this.deliver({
+      type: "content.part",
+      session_id: sessionId,
+      seq,
+      epoch,
+      payload: snapshotReplayPayload(
+        { part: { type: "text", text: failureContent }, kimixPromptCompletionBarrier: true },
+        "history",
+        messageIdentity,
+        failureContent,
+        "assistant",
+        messageTimestamp,
+      ),
+    });
+    this.deliver({
+      type: "turn.ended",
+      session_id: sessionId,
+      seq,
+      epoch,
+      payload: snapshotReplayPayload(
+        { type: "turn.ended", reason: "failed" },
+        "history",
+        messageIdentity,
+        failureContent,
+        "assistant",
+        messageTimestamp,
+      ),
+    });
   }
 
   private deliver(frame: ServerFrame) {

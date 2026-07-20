@@ -29,6 +29,19 @@ function isKimixFallbackSteer(event: Record<string, unknown>): boolean {
   return event.source === "kimix-fallback";
 }
 
+const FAILED_TURN_ENDED_REASONS = new Set([
+  "failed",
+  "error",
+  "interrupted",
+  "cancelled",
+  "canceled",
+  "aborted",
+]);
+
+function isFailedTurnEndedReason(reason: unknown): boolean {
+  return typeof reason === "string" && FAILED_TURN_ENDED_REASONS.has(reason.toLowerCase());
+}
+
 function readTimestampCandidate(value: unknown): number | undefined {
   if (isNumber(value) && value > 0) return value;
   if (!isString(value) || !value.trim()) return undefined;
@@ -460,7 +473,15 @@ export function mapKimiCodeEvent(
           canDismiss: true,
         };
       }
-      if (event.kimixTerminalScope === "prompt") return null;
+      // Successful Server turn boundaries (reason=completed/missing) inside a
+      // prompt are step boundaries, not prompt completion — keep them filtered
+      // so the Assistant card stays open until prompt.completed. Failed /
+      // cancelled / interrupted boundaries must still produce a terminal
+      // assistant_message marker so buildRenderItems can settle the turn
+      // (turnSettled requires every assistant isComplete=true); otherwise a
+      // failed live turn keeps an incomplete placeholder forever and the
+      // message header disappears.
+      if (event.kimixTerminalScope === "prompt" && !isFailedTurnEndedReason(event.reason)) return null;
       return {
         id: getId(options),
         type: "assistant_message",

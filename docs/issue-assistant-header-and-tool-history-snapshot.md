@@ -64,3 +64,20 @@ v2.16.61 实机仍未恢复失败头，CDP 证明是两层问题叠加：
 ## 2026-07-20 live 失败完成帧补充
 
 v2.16.62 只解决了重启 hydration，仍错误假设失败 `prompt.completed` 前的 transient `error` 必定进入 renderer。新发“？？？”再次复现：官方 session 为 `last_turn_reason=failed`，末尾空 Assistant ID 为 `msg_...000273`，本地却只有用户消息。失败 completion 现在必须先恢复一次权威 snapshot，再交付完成帧；snapshot 合成的失败 Assistant 同时携带“输出打断”状态，禁止 UI 将失败轮次显示为“输出完成/已完成”。
+
+## 2026-07-20 v2.16.64 live 失败头消失三层根因根治
+
+v2.16.62/63 的 `recoverSnapshot` 兜底仍不能让 live 失败的头出现。根因快照证明是三层叠加：
+
+1. **snapshot 合成条件在 live 过渡态不满足**：`snapshotMessagesToServerFrames` 合成失败三帧要求 `inFlightItems.length === 0`、`session.busy !== true`、`session.main_turn_active !== true`、`!latestTurnHasDisplayFrame`、末尾是空 Assistant 全部同时成立。live 失败瞬间 snapshot 处于过渡态（`busy` 仍 true、`in_flight_turn` 非空、或 history 残留上一轮 delta），条件不满足 → 失败正文三帧一个都不发。重启恢复时 session 已稳态，条件成立 → 能合成，这就是“第二次打开才显示”的直接原因。
+2. **`turn.ended(reason=failed)` 被 `kimixTerminalScope === "prompt"` 过滤**：`flattenServerEvent` 给所有 Server frame 打 `kimixTerminalScope: "prompt"`，`kimiCodeEventMapper` 对所有 prompt-scoped `turn.ended`（除 `reason=filtered` 外）直接 `return null`。`content.part` 产生 `isComplete=false` 的 assistant_message，只有 `turn.ended` 能产生 `isComplete=true` 的 terminal marker，但它被过滤 → 失败 assistant 永远 incomplete。
+3. **`buildRenderItems.turnSettled` 要求所有 assistant `isComplete=true`**：失败 assistant 永远 `isComplete=false` → `turnSettled=false` → `projectedFailureAssistant`（要求 `turnSettled && errorEvents.length > 0`）不触发 → 不渲染消息头。
+4. **次要**：`isVisibleTurnOutput` 把 `error` 当可见输出，`mergeMissingLatestCanonicalAssistant` 在本地有 transient error 时拒绝补入 canonical 失败 Assistant。
+
+修复（三个修复点，全部已验证）：
+
+- **修复点 1**（`electron/kimiCodeServerClient.ts`）：`deliverPromptCompletion` 失败分支不再仅依赖 `recoverSnapshot` 合成。保留 `recoverSnapshot`（cursor 同步 + WS 重订阅副作用），再调 `getSnapshot` 拿 snapshot，由新增的 `deliverFailedPromptFrames` 无条件自构三帧（`turn.step.interrupted` + `content.part(失败正文, barrier)` + `turn.ended(reason=failed)`），带 stable messageIdentity。`content.part` 的 `kimixPromptCompletionBarrier: true` 让 renderer `mergeEvents` 走 REPLACE 语义，与 `recoverSnapshot` 可能合成的相同 stable ID 帧幂等去重。
+- **修复点 2**（`src/utils/kimiCodeEventMapper.ts`）：`turn.ended` 的 `kimixTerminalScope === "prompt"` 过滤放开 failed/cancelled/interrupted/error/canceled/aborted reason。成功轮次（`reason=completed` 或 missing）仍被过滤，保持 780e6629e 的“Server 成功轮次中间 turn.ended 是 step 边界”设计不变。
+- **修复点 3**（`src/utils/kimiHistoryReconciliation.ts`）：`isVisibleTurnOutput` 移除 `error` 类型。transient error 是状态信号不是 Assistant 正文，移除后 live 失败时本地有 transient error 也不再阻止补入 canonical 失败 Assistant。
+
+不影响成功轮次的保证：失败分支仅在 `FAILED_PROMPT_COMPLETION_REASONS` 命中时进入；成功 `turn.ended(completed)` 仍被过滤；SDK 路径不带 `kimixTerminalScope` 不受影响；`isVisibleTurnOutput` 的 `tool_call`/`tool_result`/`subagent` 仍算可见输出，tool-only 轮次不受影响。

@@ -395,9 +395,133 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
     const snapshotIndex = observed.findIndex((current) => current.type === "kimix.server.snapshot");
     const completionIndex = observed.findIndex((current) => current.type === "prompt.completed");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // recoverSnapshot + getSnapshot both hit the snapshot endpoint.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(snapshotIndex).toBeGreaterThanOrEqual(0);
     expect(snapshotIndex).toBeLessThan(completionIndex);
+    await client.close();
+  });
+
+  it("delivers failure frames for a live failed prompt completion even when snapshot is in transition", async () => {
+    // Live failure snapshot is still in transition: busy=true and a non-empty
+    // in_flight_turn, so snapshotMessagesToServerFrames will NOT synthesize the
+    // failure body. deliverPromptCompletion must still self-construct the
+    // three failure frames so the renderer sees a settled failed Assistant.
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("http://127.0.0.1:58627/api/v1/sessions/session-1/snapshot");
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          as_of_seq: 19,
+          epoch: "epoch-1",
+          session: { id: "session-1", status: "idle", busy: true, main_turn_active: true, last_turn_reason: "failed" },
+          messages: {
+            items: [
+              { id: "msg-user-failed", role: "user", content: [{ type: "text", text: "？？？" }] },
+              { id: "msg-assistant-failed", role: "assistant", content: [] },
+            ],
+          },
+          in_flight_turn: {
+            messages: [{ id: "msg-assistant-failed", role: "assistant", content: [] }],
+          },
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const observed: Array<{ type: string; payload?: Record<string, unknown> }> = [];
+    client.onFrame((current) => observed.push({ type: current.type, payload: current.payload as Record<string, unknown> | undefined }));
+    const internals = client as unknown as {
+      subscribed: Set<string>;
+      receive: (current: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    internals.subscribed.add("session-1");
+
+    internals.receive({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 19,
+      epoch: "epoch-1",
+      payload: { prompt_id: "msg-failed", reason: "failed" },
+    });
+
+    await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
+    const completionIndex = observed.findIndex((current) => current.type === "prompt.completed");
+    const interruptedIndex = observed.findIndex((current) => current.type === "turn.step.interrupted");
+    const contentPartIndex = observed.findIndex((current) => current.type === "content.part");
+    const turnEndedIndex = observed.findIndex((current) => current.type === "turn.ended");
+
+    // All three failure frames must be delivered before prompt.completed.
+    expect(interruptedIndex).toBeGreaterThanOrEqual(0);
+    expect(contentPartIndex).toBeGreaterThan(interruptedIndex);
+    expect(turnEndedIndex).toBeGreaterThan(contentPartIndex);
+    expect(turnEndedIndex).toBeLessThan(completionIndex);
+
+    // content.part carries the failure body and the barrier flag for idempotent REPLACE merge.
+    const contentPart = observed[contentPartIndex]?.payload;
+    expect(contentPart).toMatchObject({
+      snapshotMessageId: "msg-assistant-failed",
+      snapshotMessageIdStable: true,
+      kimixPromptCompletionBarrier: true,
+    });
+    expect(String((contentPart?.part as { text?: unknown })?.text)).toContain("模型请求失败");
+
+    // turn.ended carries the failed reason and the same stable identity.
+    const turnEnded = observed[turnEndedIndex]?.payload;
+    expect(turnEnded).toMatchObject({
+      reason: "failed",
+      snapshotMessageId: "msg-assistant-failed",
+      snapshotMessageIdStable: true,
+    });
+
+    await client.close();
+  });
+
+  it("delivers failure frames with stable message identity from snapshot assistant", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("http://127.0.0.1:58627/api/v1/sessions/session-1/snapshot");
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          as_of_seq: 19,
+          epoch: "epoch-1",
+          session: { id: "session-1", status: "idle", busy: false, main_turn_active: false, last_turn_reason: "failed" },
+          messages: {
+            items: [
+              { id: "msg-user-failed", role: "user", content: [{ type: "text", text: "？？？" }] },
+              { id: "msg-empty-1", role: "assistant", content: [] },
+            ],
+          },
+          in_flight_turn: null,
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const observed: Array<{ type: string; payload?: Record<string, unknown> }> = [];
+    client.onFrame((current) => observed.push({ type: current.type, payload: current.payload as Record<string, unknown> | undefined }));
+    const internals = client as unknown as {
+      subscribed: Set<string>;
+      receive: (current: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    internals.subscribed.add("session-1");
+
+    internals.receive({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 19,
+      epoch: "epoch-1",
+      payload: { prompt_id: "msg-failed", reason: "failed" },
+    });
+
+    await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
+    for (const frameType of ["turn.step.interrupted", "content.part", "turn.ended"]) {
+      const frame = observed.find((current) => current.type === frameType);
+      expect(frame?.payload).toMatchObject({
+        snapshotMessageId: "msg-empty-1",
+        snapshotMessageIdStable: true,
+      });
+    }
     await client.close();
   });
 

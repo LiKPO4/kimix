@@ -249,6 +249,41 @@ describe("mapKimiCodeEvent", () => {
     expect(stepCompleted).toBeNull();
   });
 
+  it("maps prompt-scoped turn.ended with failed reason to a terminal assistant_message", () => {
+    // A failed turn boundary must still produce a terminal marker so
+    // buildRenderItems can settle the turn (turnSettled requires every
+    // assistant isComplete=true). Without this, a failed live turn keeps an
+    // incomplete placeholder forever and the message header disappears.
+    const ended = mapKimiCodeEvent({
+      type: "turn.ended",
+      reason: "failed",
+      kimixTerminalScope: "prompt",
+      snapshotMessageId: "msg-failed-1",
+      snapshotMessageIdStable: true,
+    }, testOptions()) as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect(ended?.type).toBe("assistant_message");
+    expect(ended.content).toBe("");
+    expect(ended.isComplete).toBe(true);
+    expect(ended.snapshotMessageId).toBe("msg-failed-1");
+    expect(ended.snapshotMessageIdStable).toBe(true);
+  });
+
+  it("still filters prompt-scoped turn.ended with completed reason", () => {
+    expect(mapKimiCodeEvent({
+      type: "turn.ended",
+      reason: "completed",
+      kimixTerminalScope: "prompt",
+    }, testOptions())).toBeNull();
+  });
+
+  it("still filters prompt-scoped turn.ended with missing reason", () => {
+    expect(mapKimiCodeEvent({
+      type: "turn.ended",
+      kimixTerminalScope: "prompt",
+    }, testOptions())).toBeNull();
+  });
+
   it("maps official turn.steer as the steer success marker", () => {
     const steer = mapKimiCodeEvent({
       type: "turn.steer",

@@ -510,6 +510,29 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
       timestamp: 10_000,
       content: "当前问题",
     }, {
+      id: "local-tool-call",
+      type: "tool_call",
+      timestamp: 10_050,
+      toolCallId: "call-1",
+      toolName: "read_file",
+      status: "success",
+      arguments: {},
+    }];
+    const canonical: TimelineEvent[] = [local[0], failedAssistant];
+
+    expect(mergeMissingLatestCanonicalAssistant(local, canonical)).toBe(local);
+  });
+
+  it("patches the canonical failed assistant when the local latest turn only has a transient error", () => {
+    // A transient `error` event is a status signal, not Assistant body output;
+    // the canonical failed Assistant must still be patched in so the failed
+    // turn shows a visible message header instead of disappearing.
+    const local: TimelineEvent[] = [{
+      id: "same-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "当前问题",
+    }, {
       id: "local-error",
       type: "error",
       timestamp: 10_050,
@@ -518,7 +541,13 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
     }];
     const canonical: TimelineEvent[] = [local[0], failedAssistant];
 
-    expect(mergeMissingLatestCanonicalAssistant(local, canonical)).toBe(local);
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+    expect(patched).not.toBe(local);
+    expect(patched.at(-1)).toMatchObject({
+      type: "assistant_message",
+      snapshotMessageId: "msg-failed-assistant",
+      content: "本轮请求未能开始生成：第三方模型余额不足。",
+    });
   });
 });
 
