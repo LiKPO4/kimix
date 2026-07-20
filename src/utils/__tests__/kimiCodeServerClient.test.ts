@@ -311,6 +311,50 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await client.close();
   });
 
+  it("waits for a displayable assistant when prompt completion reaches message storage first", async () => {
+    vi.useFakeTimers();
+    const promptId = "msg_01DELAYED";
+    let requestCount = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      requestCount += 1;
+      const items = requestCount === 1
+        ? [{ id: promptId, role: "user", content: [{ type: "text", text: "测试" }] }]
+        : [
+            { id: "msg-assistant", role: "assistant", content: [{ type: "text", text: "稍后落库的回答" }] },
+            { id: promptId, role: "user", content: [{ type: "text", text: "测试" }] },
+          ];
+      return new Response(JSON.stringify({ code: 0, data: { has_more: false, items } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const observed: Array<{ type: string; payload?: unknown }> = [];
+    client.onFrame((current) => observed.push(current));
+    const internals = client as unknown as {
+      receive: (current: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    internals.receive({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 18,
+      epoch: "epoch-1",
+      payload: { prompt_id: promptId },
+    });
+
+    await vi.waitFor(() => expect(requestCount).toBe(1));
+    expect(observed.some((current) => current.type === "prompt.completed")).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
+    const assistantIndex = observed.findIndex((current) => current.type === "content.part");
+    const completionIndex = observed.findIndex((current) => current.type === "prompt.completed");
+    expect(requestCount).toBe(2);
+    expect(assistantIndex).toBeGreaterThanOrEqual(0);
+    expect(assistantIndex).toBeLessThan(completionIndex);
+    await client.close();
+  });
+
   it("uses official P3 REST routes for fork, children, tasks and terminals", async () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -889,6 +933,60 @@ describe("KimiCodeServerClient protocol adapters", () => {
       type: "assistant_message",
       content: "最终回答",
       isComplete: false,
+    });
+  });
+
+  it("restores snapshot tool_use parts so tool results remain visible after reopening", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 51,
+      epoch: "epoch-tools",
+      session: { id: "session-tools", status: "idle" },
+      messages: {
+        items: [
+          { id: "msg-user", role: "user", content: [{ type: "text", text: "检查项目" }] },
+          {
+            id: "msg-assistant-tool",
+            role: "assistant",
+            content: [{
+              type: "tool_use",
+              tool_call_id: "call-1",
+              tool_name: "Shell",
+              input: { command: "git status --short" },
+            }],
+          },
+          {
+            id: "msg-tool-result",
+            role: "tool",
+            content: [{ type: "tool_result", tool_call_id: "call-1", output: "clean" }],
+          },
+        ],
+      },
+    }, "session-tools");
+
+    expect(frames).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "tool.call.started",
+        payload: expect.objectContaining({
+          toolCallId: "call-1",
+          name: "Shell",
+          args: { command: "git status --short" },
+          snapshotReplay: "history",
+          snapshotMessageId: "msg-assistant-tool",
+        }),
+      }),
+      expect.objectContaining({
+        type: "tool.result",
+        payload: expect.objectContaining({ toolCallId: "call-1", output: "clean" }),
+      }),
+    ]));
+    const mapped = mapHistoryEvents(frames.map((current) => ({ type: current.type, payload: current.payload })));
+    expect(mapped.find((event) => event.type === "tool_call")).toMatchObject({
+      type: "tool_call",
+      toolCallId: "call-1",
+      toolName: "Shell",
+      status: "success",
+      arguments: { command: "git status --short" },
+      result: "clean",
     });
   });
 

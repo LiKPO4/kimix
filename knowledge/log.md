@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Prompt completion is gated by displayable Assistant delivery and snapshots retain tool calls**: A prompt/injection-only message page no longer releases terminal state; bounded retries wait for Assistant thinking, text, or tool calls, and official `tool_use` content is replayed with stable call identity so tool results remain visible after hydration. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Current session models no longer come from historical turns**: Official profile/status repairs stale local model mirrors, event models remain turn-scoped, each prompt carries the visible pending-or-committed selection immutably, and revision-gated status refreshes cannot expose an older model across a switch. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Prompt completion now waits for its authoritative Assistant delivery**: The Server Client replays the bounded official prompt messages before exposing `prompt.completed`, so an ultra-fast turn cannot lose its first response and wait for the next prompt's running snapshot to repair it. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

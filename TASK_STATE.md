@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.60 Prompt 终态交付与工具历史完整性
+
+- 当前目标：根治 Agent 开始回答后消息头短暂消失，以及重开/展开过程信息时命令大量缺失。
+- 根因证据：目标官方 0.27.0 Server 会话在 `prompt.completed` 后持有完整 Assistant thinking/text，但 Kimix 本地 IndexedDB 同轮只有 user/status，证明终态先于 Assistant 交付；官方 Assistant snapshot 的 `content` 同时包含 `tool_use`，而 Client 只转换 text/thinking，导致本地 28 条 `tool_result` 无对应 `tool_call`，ChatThread 又按设计隐藏独立结果。
+- 修复：`prompt.completed` 完成屏障以“本轮至少出现可显示 Assistant/content/tool call frame”为成功条件，对官方 messages 做有限退避重试并以最终 snapshot 收口，禁止仅找到 prompt/注入消息就提前结束 UI 占位。快照转换完整恢复 `tool_use` 的调用 ID、名称和参数，使现有 tool result 合并回可展开命令；历史缓存升级到 v10，强制旧缺命令缓存重新接受官方历史。
+- 验证：新增延迟 Assistant 落库与 snapshot tool_use/tool_result 合并回归；全量 106 文件 882 项、Node/Renderer 严格类型检查、生产构建均通过，renderer 为 `assets/index-BdLNUMml.js`；OKF 严格校验通过（10 概念、18 Markdown、250 链接）。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`、`src/utils/kimiHistoryCache.ts`、`docs/issue-assistant-header-and-tool-history-snapshot.md`。
+- 下一步：提交本轮；由用户使用 v2.16.60 复验首轮短回复与展开命令完整性。
+
 ## 2026-07-19 v2.16.59 会话模型所有权与单轮模型锁定
 
 - 当前目标：根治用户切换到 Pro 后界面和实际回复又回退到 Flash，以及切换后长时间无响应的模型路由竞态。

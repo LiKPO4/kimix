@@ -543,6 +543,16 @@ export function completedPromptMessagesToServerFrames(
     }));
 }
 
+function hasPromptCompletionDisplayFrame(frames: readonly ServerFrame[]): boolean {
+  return frames.some((frame) => (
+    frame.type === "assistant.delta" ||
+    frame.type === "content.part" ||
+    frame.type === "tool.call.started"
+  ));
+}
+
+const PROMPT_COMPLETION_BARRIER_RETRY_DELAYS_MS = [0, 100, 250, 500, 1_000, 2_000, 3_000, 3_000] as const;
+
 export function snapshotToHistoryFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
   const frames = snapshotMessagesToServerFrames(snapshot, sessionId);
   const seq = snapshot.as_of_seq;
@@ -1142,15 +1152,32 @@ export class KimiCodeServerClient {
       : "";
     if (sessionId && promptId) {
       try {
-        const latest = await this.listMessages(sessionId, 100);
-        let replayFrames = completedPromptMessagesToServerFrames(
-          latest.items,
-          sessionId,
-          promptId,
-          frame.seq ?? 0,
-          frame.epoch,
-        );
-        if (replayFrames.length === 0 && latest.has_more) {
+        let replayFrames: ServerFrame[] = [];
+        for (const delayMs of PROMPT_COMPLETION_BARRIER_RETRY_DELAYS_MS) {
+          if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+          const latest = await this.listMessages(sessionId, 100);
+          replayFrames = completedPromptMessagesToServerFrames(
+            latest.items,
+            sessionId,
+            promptId,
+            frame.seq ?? 0,
+            frame.epoch,
+          );
+          if (hasPromptCompletionDisplayFrame(replayFrames)) break;
+
+          if (latest.has_more) {
+            const snapshot = await this.getSnapshot(sessionId);
+            replayFrames = completedPromptMessagesToServerFrames(
+              snapshot.messages?.items ?? [],
+              sessionId,
+              promptId,
+              snapshot.as_of_seq,
+              snapshot.epoch,
+            );
+            if (hasPromptCompletionDisplayFrame(replayFrames)) break;
+          }
+        }
+        if (!hasPromptCompletionDisplayFrame(replayFrames)) {
           const snapshot = await this.getSnapshot(sessionId);
           replayFrames = completedPromptMessagesToServerFrames(
             snapshot.messages?.items ?? [],
@@ -1160,7 +1187,14 @@ export class KimiCodeServerClient {
             snapshot.epoch,
           );
         }
-        for (const replayFrame of replayFrames) this.deliver(replayFrame);
+        if (hasPromptCompletionDisplayFrame(replayFrames)) {
+          for (const replayFrame of replayFrames) this.deliver(replayFrame);
+        } else {
+          console.warn(
+            `[KimiCodeServerClient] prompt ${promptId} completion barrier exhausted without a displayable assistant frame; keeping terminal delivery ordered after the final authoritative snapshot.`,
+          );
+          await this.recoverSnapshot(sessionId);
+        }
       } catch (error) {
         console.warn(`[KimiCodeServerClient] prompt ${promptId} completion snapshot barrier failed:`, error);
       }
@@ -1455,6 +1489,42 @@ function contentPartsToFrames(
         epoch,
         payload: snapshotReplayPayload({ part: { type: "think", think, ...(signature ? { signature } : {}) } }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
       }] : [];
+    }
+    if (type === "tool_use") {
+      const toolCallId = stringField(part, "tool_call_id") ??
+        stringField(part, "toolCallId") ??
+        stringField(part, "id");
+      if (!toolCallId) return [];
+      const name = stringField(part, "tool_name") ??
+        stringField(part, "toolName") ??
+        stringField(part, "name") ??
+        "unknown";
+      const rawArgs = part.input ?? part.args ?? part.arguments;
+      let args: Record<string, unknown> = {};
+      if (isRecord(rawArgs)) {
+        args = rawArgs;
+      } else if (typeof rawArgs === "string" && rawArgs.trim()) {
+        try {
+          const parsed = JSON.parse(rawArgs) as unknown;
+          if (isRecord(parsed)) args = parsed;
+        } catch {
+          args = { input: rawArgs };
+        }
+      }
+      return [{
+        type: "tool.call.started",
+        session_id: sessionId,
+        seq,
+        epoch,
+        payload: snapshotReplayPayload({
+          type: "tool.call.started",
+          toolCallId,
+          name,
+          args,
+          ...(typeof part.description === "string" ? { description: part.description } : {}),
+          ...(isRecord(part.display) ? { display: part.display } : {}),
+        }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
+      }];
     }
     return [];
   });
