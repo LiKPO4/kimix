@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.73 PR-A2 + B2/B3 流式滚动性能
+
+- 计划：`docs/plan-streaming-scroll-performance.md` v2。
+- 已完成：
+  1. A4：`collaborationTimeline` WeakMap 身份保持投影（历史事件引用跨 flush 稳定）
+  2. A5：`useProjectedTimeline` 仅在 agentEvents/messages/events 引用变化时重投影
+  3. A2：memo 引用快路径 + WeakMap memoKey；助手泡拆 Process/Body 子树
+  4. B2：贴底 `scrollToBottom("auto")` 同帧 rAF 合并
+  5. B3：运行中过程区默认折叠单行摘要
+- 未做：B1 activeTurnDraft（局部 draft store，风险更高，单独立项）
+- 验收：全量 932 + typecheck；用户生产 build 边输出边滚体感
+
 ## 2026-07-20 v2.16.72 PR-A1 流式滚动性能（Phase 0 + A1 + A3）
 
 - 计划：`docs/plan-streaming-scroll-performance.md` v2，PR-A1 低风险有 flag。
@@ -7,7 +19,7 @@
   1. `perfFlags` / `userScrollActivity` / `perfDiag` 基线埋点约定
   2. A1：流式 StreamingPlain（无 katex/hljs，fence 分块）；完成或滚动停后再 SettledRich
   3. A3：滚动活跃 350ms 让路（保锚/保底距/resize/导航轨降频）；flush 滚动时 250ms，边界事件立即 flush
-- 未做：PR-A2（A4 身份保持投影 / A5 / A2 拆泡）
+- 后续：v2.16.73 完成 PR-A2 + B2/B3
 - 验收：定向单测 + 全量 + typecheck；生产 build 体感复测由用户回传
 
 ## 2026-07-20 v2.16.71 模型按钮恢复自适应宽度

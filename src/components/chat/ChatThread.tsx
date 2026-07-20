@@ -6,6 +6,8 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { useChatRenderCache } from "@/hooks/useChatRenderCache";
+import { useProjectedTimeline } from "@/hooks/useProjectedTimeline";
+import { noteRenderTurnBodyRun } from "@/utils/perfDiag";
 import { useChatViewport } from "@/hooks/useChatViewport";
 import { EmptyState } from "./EmptyState";
 import { ChatNavigationRail } from "./ChatNavigationRail";
@@ -28,7 +30,7 @@ import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTa
 import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
 import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
-import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
+
 import { getPrimaryRoomAgent, getRoomAgentEvents } from "@/utils/collaborationRooms";
 
 type PermissionModeDiagDetail = {
@@ -1066,9 +1068,11 @@ export function buildRenderItems(
       cached.events.length === turnEvents.length &&
       cached.events.every((event, index) => event === turnEvents[index])
     ) {
+      noteRenderTurnBodyRun(true);
       items.push(...cached.items);
       return;
     }
+    noteRenderTurnBodyRun(false);
     const itemStart = items.length;
     renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary);
     completedTurnCache.set(cacheKey, {
@@ -1216,7 +1220,7 @@ export const ChatThread = memo(function ChatThread() {
   const [expandedInitialTailSessionId, setExpandedInitialTailSessionId] = useState<string | null>(null);
   const completedTurnRenderCacheRef = useChatRenderCache(session?.id);
 
-  const roomTimeline = useMemo(() => session ? projectCollaborationTimeline(session) : [], [session]);
+  const roomTimeline = useProjectedTimeline(session);
   const splitEvents = useMemo(
     () => splitUserAttachedStatuses(collapseCompletedCompactions(roomTimeline)),
     [roomTimeline]

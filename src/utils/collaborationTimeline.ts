@@ -14,6 +14,81 @@ const OPEN_DELIVERY_STATUSES = new Set<RoomAgentDelivery["status"]>([
   "waiting_question",
 ]);
 
+/**
+ * Identity-preserving projection cache (plan A4).
+ * Source event refs from storage are stable across flushes for untouched history;
+ * only projection spreads used to break that. Cache by source object + projection signature.
+ */
+const projectedEventCache = new WeakMap<TimelineEvent, Map<string, TimelineEvent>>();
+const projectedRoomUserMessageCache = new WeakMap<RoomUserMessage, TimelineEvent>();
+
+function projectionSignature(
+  roomAgentId: string,
+  roomMessageId: string,
+  agentTurnId = "",
+  recipientAgentIds = "",
+  roomDeliveryStatus = "",
+): string {
+  return `${roomAgentId}\u0000${roomMessageId}\u0000${agentTurnId}\u0000${recipientAgentIds}\u0000${roomDeliveryStatus}`;
+}
+
+function rememberProjectedEvent(
+  source: TimelineEvent,
+  signature: string,
+  create: () => TimelineEvent,
+): TimelineEvent {
+  let bySignature = projectedEventCache.get(source);
+  if (!bySignature) {
+    bySignature = new Map();
+    projectedEventCache.set(source, bySignature);
+  }
+  const cached = bySignature.get(signature);
+  if (cached) return cached;
+  const created = create();
+  bySignature.set(signature, created);
+  return created;
+}
+
+function projectScopedDeliveryEvent(
+  source: TimelineEvent,
+  roomAgentId: string,
+  roomMessageId: string,
+  agentTurnId: string,
+): TimelineEvent {
+  const signature = projectionSignature(roomAgentId, roomMessageId, agentTurnId);
+  return rememberProjectedEvent(source, signature, () => {
+    const scoped = scopeEventToRoomAgent(source, roomAgentId);
+    if (
+      scoped.roomAgentId === roomAgentId &&
+      scoped.roomMessageId === roomMessageId &&
+      scoped.agentTurnId === agentTurnId
+    ) {
+      return scoped;
+    }
+    return {
+      ...scoped,
+      roomMessageId,
+      agentTurnId,
+    };
+  });
+}
+
+function projectRoomUserMessageEvent(message: RoomUserMessage): TimelineEvent {
+  const cached = projectedRoomUserMessageCache.get(message);
+  if (cached) return cached;
+  const event: TimelineEvent = {
+    id: message.id,
+    type: "user_message",
+    timestamp: message.timestamp,
+    content: message.content,
+    images: message.images,
+    roomMessageId: message.id,
+    recipientAgentIds: message.recipientAgentIds,
+  };
+  projectedRoomUserMessageCache.set(message, event);
+  return event;
+}
+
 function deliveryEvents(
   session: Session,
   message: RoomUserMessage,
@@ -51,11 +126,12 @@ function deliveryEvents(
       })();
 
   return {
-    events: source.map((event) => ({
-      ...scopeEventToRoomAgent(event, roomAgentId),
-      roomMessageId: message.id,
-      agentTurnId: delivery.agentTurnId,
-    })),
+    events: source.map((event) => projectScopedDeliveryEvent(
+      event,
+      roomAgentId,
+      message.id,
+      delivery.agentTurnId,
+    )),
     claimedEventKeys: Array.from(new Set([
       ...matchingUserEventIds,
       ...(startIndex >= 0 ? [events[startIndex].id] : []),
@@ -110,15 +186,7 @@ export function projectCollaborationTimeline(session: Session): TimelineEvent[] 
   const groups: Array<{ timestamp: number; order: number; events: TimelineEvent[] }> = [];
   let order = 0;
   for (const message of collaboration.messages) {
-    const events: TimelineEvent[] = [{
-      id: message.id,
-      type: "user_message",
-      timestamp: message.timestamp,
-      content: message.content,
-      images: message.images,
-      roomMessageId: message.id,
-      recipientAgentIds: message.recipientAgentIds,
-    }];
+    const events: TimelineEvent[] = [projectRoomUserMessageEvent(message)];
 
     for (const roomAgentId of message.recipientAgentIds) {
       const delivery = message.deliveries[roomAgentId];
@@ -144,19 +212,28 @@ export function projectCollaborationTimeline(session: Session): TimelineEvent[] 
       const roomMessageId = firstUser?.roomMessageId ?? `unmatched-room:${agent.id}:${first.id}`;
       const agentTurnId = first.agentTurnId ?? `unmatched-turn:${agent.id}:${first.id}`;
       const events = segment.map((event, index) => {
-        const scoped = scopeEventToRoomAgent(event, agent.id);
-        if (index === 0 && scoped.type === "user_message") {
-          return {
-            ...scoped,
-            roomMessageId,
-            recipientAgentIds: [agent.id],
-          };
+        if (index === 0 && event.type === "user_message") {
+          const signature = projectionSignature(agent.id, roomMessageId, "", agent.id);
+          return rememberProjectedEvent(event, signature, () => {
+            const scoped = scopeEventToRoomAgent(event, agent.id);
+            if (
+              scoped.type === "user_message" &&
+              scoped.roomMessageId === roomMessageId &&
+              scoped.recipientAgentIds?.length === 1 &&
+              scoped.recipientAgentIds[0] === agent.id
+            ) {
+              return scoped;
+            }
+            return {
+              ...scoped,
+              roomMessageId,
+              recipientAgentIds: [agent.id],
+            };
+          });
         }
-        return {
-          ...scoped,
-          roomMessageId: scoped.roomMessageId ?? roomMessageId,
-          agentTurnId: scoped.agentTurnId ?? agentTurnId,
-        };
+        const resolvedRoomMessageId = event.roomMessageId ?? roomMessageId;
+        const resolvedAgentTurnId = event.agentTurnId ?? agentTurnId;
+        return projectScopedDeliveryEvent(event, agent.id, resolvedRoomMessageId, resolvedAgentTurnId);
       });
       groups.push({ timestamp: first.timestamp, order: order++, events });
       segment = [];

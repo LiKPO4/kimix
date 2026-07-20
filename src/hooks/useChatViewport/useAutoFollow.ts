@@ -62,6 +62,8 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
 
   const sessionAutoBottomTimerRef = useRef<number | null>(null);
   const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
+  // B2: coalesce same-frame auto-follow writes into a single rAF writer.
+  const pendingAutoFollowRafRef = useRef<number | null>(null);
 
   const updateAutoFollow = useCallback((value: boolean) => {
     if (isAutoFollowRef.current === value) return;
@@ -82,7 +84,7 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
     clearSessionAutoBottomTimer();
   }, [sessionAutoBottomUntilRef, clearSessionAutoBottomTimer]);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+  const applyScrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const node = scrollRef.current;
     if (!node) return;
     if (autoFollowRef.current && !userScrollRef.current) {
@@ -133,6 +135,22 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
       }).catch(logError("writeDiag"));
     }, 60);
   }, [scrollRef, autoFollowRef, userScrollRef, userInputLockUntilRef, scrollTokenRef, ignoreScrollUntilRef, clearDetachedViewportCompensation, updateShowScrollToBottom]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    if (behavior !== "auto") {
+      if (pendingAutoFollowRafRef.current !== null) {
+        window.cancelAnimationFrame(pendingAutoFollowRafRef.current);
+        pendingAutoFollowRafRef.current = null;
+      }
+      applyScrollToBottom(behavior);
+      return;
+    }
+    if (pendingAutoFollowRafRef.current !== null) return;
+    pendingAutoFollowRafRef.current = window.requestAnimationFrame(() => {
+      pendingAutoFollowRafRef.current = null;
+      applyScrollToBottom("auto");
+    });
+  }, [applyScrollToBottom]);
 
   const settleSessionAtBottom = useCallback(() => {
     const node = scrollRef.current;

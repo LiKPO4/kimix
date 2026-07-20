@@ -628,4 +628,159 @@ describe("projectCollaborationTimeline", () => {
     expect(projected.find((event) => event.id === "canonical-assistant-1")?.agentTurnId).not.toBe("turn-room");
     expect(projected.find((event) => event.id === "canonical-assistant-2")?.agentTurnId).not.toBe("turn-room");
   });
+
+  it("keeps projected event object identity across flushes for untouched history (A4)", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const primaryEvents: TimelineEvent[] = [
+      { id: "official-user-a", type: "user_message", timestamp: 10, content: "Review" },
+      { id: "assistant-a", type: "assistant_message", timestamp: 11, content: "A result", isThinking: false, isComplete: true },
+      { id: "tool-a", type: "tool_call", timestamp: 12, toolCallId: "tc-1", toolName: "Bash", status: "completed", arguments: {}, rawArguments: "{}" },
+    ];
+    const roomMessage = {
+      id: "message-1",
+      content: "Review",
+      recipientAgentIds: [primary.id],
+      deliveries: {
+        [primary.id]: { status: "completed" as const, agentTurnId: "turn-a", officialUserEventId: "official-user-a" },
+      },
+      timestamp: 10,
+    };
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [roomMessage],
+        agentEvents: { [primary.id]: primaryEvents },
+      },
+    };
+
+    const first = projectCollaborationTimeline(room);
+    const second = projectCollaborationTimeline(room);
+    expect(second).toHaveLength(first.length);
+    for (let index = 0; index < first.length; index += 1) {
+      expect(second[index]).toBe(first[index]);
+    }
+    expect(first[0]).toMatchObject({ type: "user_message", id: "message-1" });
+    expect(first.find((event) => event.id === "assistant-a")).toMatchObject({
+      roomAgentId: primary.id,
+      roomMessageId: "message-1",
+      agentTurnId: "turn-a",
+    });
+  });
+
+  it("does not reuse projected identity when the same source is stamped for a different room message", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const sharedAssistant: TimelineEvent = {
+      id: "assistant-shared",
+      type: "assistant_message",
+      timestamp: 20,
+      content: "Shared",
+      isThinking: false,
+      isComplete: true,
+    };
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [
+          {
+            id: "message-1",
+            content: "One",
+            recipientAgentIds: [primary.id],
+            deliveries: {
+              [primary.id]: { status: "completed", agentTurnId: "turn-1", officialUserEventId: "user-1" },
+            },
+            timestamp: 10,
+          },
+          {
+            id: "message-2",
+            content: "Two",
+            recipientAgentIds: [primary.id],
+            deliveries: {
+              [primary.id]: { status: "completed", agentTurnId: "turn-2", officialUserEventId: "user-2" },
+            },
+            timestamp: 30,
+          },
+        ],
+        agentEvents: {
+          [primary.id]: [
+            { id: "user-1", type: "user_message", timestamp: 10, content: "One" },
+            { ...sharedAssistant, agentTurnId: "turn-1" },
+            { id: "user-2", type: "user_message", timestamp: 30, content: "Two" },
+            { ...sharedAssistant, id: "assistant-shared-2", agentTurnId: "turn-2", timestamp: 31 },
+          ],
+        },
+      },
+    };
+
+    const projected = projectCollaborationTimeline(room);
+    const firstAssistant = projected.find((event) => event.id === "assistant-shared");
+    const secondAssistant = projected.find((event) => event.id === "assistant-shared-2");
+    expect(firstAssistant).toBeDefined();
+    expect(secondAssistant).toBeDefined();
+    expect(firstAssistant).not.toBe(secondAssistant);
+    expect(firstAssistant).toMatchObject({ roomMessageId: "message-1", agentTurnId: "turn-1" });
+    expect(secondAssistant).toMatchObject({ roomMessageId: "message-2", agentTurnId: "turn-2" });
+  });
+
+  it("invalidates projected identity when the source event object is replaced", () => {
+    const session = baseSession();
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const originalAssistant: TimelineEvent = {
+      id: "assistant-a",
+      type: "assistant_message",
+      timestamp: 11,
+      content: "A",
+      isThinking: false,
+      isComplete: true,
+    };
+    const roomMessage = {
+      id: "message-1",
+      content: "Review",
+      recipientAgentIds: [primary.id],
+      deliveries: {
+        [primary.id]: { status: "completed" as const, agentTurnId: "turn-a", officialUserEventId: "official-user-a" },
+      },
+      timestamp: 10,
+    };
+    const firstRoom: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        messages: [roomMessage],
+        agentEvents: {
+          [primary.id]: [
+            { id: "official-user-a", type: "user_message", timestamp: 10, content: "Review" },
+            originalAssistant,
+          ],
+        },
+      },
+    };
+    const first = projectCollaborationTimeline(firstRoom);
+    const updatedAssistant: TimelineEvent = { ...originalAssistant, content: "A updated" };
+    const secondRoom: Session = {
+      ...firstRoom,
+      collaboration: {
+        ...firstRoom.collaboration!,
+        agentEvents: {
+          [primary.id]: [
+            firstRoom.collaboration!.agentEvents[primary.id][0],
+            updatedAssistant,
+          ],
+        },
+      },
+    };
+    const second = projectCollaborationTimeline(secondRoom);
+    const firstProjected = first.find((event) => event.id === "assistant-a");
+    const secondProjected = second.find((event) => event.id === "assistant-a");
+    expect(firstProjected).toBeDefined();
+    expect(secondProjected).toBeDefined();
+    expect(secondProjected).not.toBe(firstProjected);
+    expect(secondProjected).toMatchObject({ content: "A updated" });
+  });
 });

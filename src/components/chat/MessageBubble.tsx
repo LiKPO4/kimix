@@ -65,7 +65,17 @@ interface MessageBubbleProps {
   onDeleteUserMessage?: (eventId: string) => void;
 }
 
+const timelineEventMemoKeyCache = new WeakMap<TimelineEvent, string>();
+
 export function timelineEventMemoKey(event: TimelineEvent): string {
+  const cached = timelineEventMemoKeyCache.get(event);
+  if (cached) return cached;
+  const key = computeTimelineEventMemoKey(event);
+  timelineEventMemoKeyCache.set(event, key);
+  return key;
+}
+
+function computeTimelineEventMemoKey(event: TimelineEvent): string {
   switch (event.type) {
     case "assistant_message":
       return [
@@ -201,16 +211,22 @@ function stringArrayMemoEqual(a?: string[], b?: string[]) {
 }
 
 function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubbleProps) {
-  return timelineEventMemoKey(prev.event) === timelineEventMemoKey(next.event) &&
-    prev.sessionId === next.sessionId &&
-    prev.runtimeSessionId === next.runtimeSessionId &&
-    prev.onDeleteUserMessage === next.onDeleteUserMessage &&
-    prev.turnStartedAt === next.turnStartedAt &&
-    prev.isAssistantActive === next.isAssistantActive &&
-    prev.hideProcessSummary === next.hideProcessSummary &&
-    prev.expandProcessByDefault === next.expandProcessByDefault &&
-    prev.eagerMarkdown === next.eagerMarkdown &&
-    eventArrayMemoEqual(prev.leadingTools, next.leadingTools) &&
+  if (
+    prev.sessionId !== next.sessionId ||
+    prev.runtimeSessionId !== next.runtimeSessionId ||
+    prev.onDeleteUserMessage !== next.onDeleteUserMessage ||
+    prev.turnStartedAt !== next.turnStartedAt ||
+    prev.isAssistantActive !== next.isAssistantActive ||
+    prev.hideProcessSummary !== next.hideProcessSummary ||
+    prev.expandProcessByDefault !== next.expandProcessByDefault ||
+    prev.eagerMarkdown !== next.eagerMarkdown
+  ) {
+    return false;
+  }
+  if (prev.event !== next.event && timelineEventMemoKey(prev.event) !== timelineEventMemoKey(next.event)) {
+    return false;
+  }
+  return eventArrayMemoEqual(prev.leadingTools, next.leadingTools) &&
     eventArrayMemoEqual(prev.leadingSubagents, next.leadingSubagents) &&
     eventArrayMemoEqual(prev.leadingHooks, next.leadingHooks) &&
     eventArrayMemoEqual(prev.leadingApprovals, next.leadingApprovals) &&
@@ -1736,7 +1752,9 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserv
 
 function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean }) {
   const isKimiWeb = displayMode === "kimi-web";
-  const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent;
+  // B3: while the turn is actively running, keep process details collapsed by
+  // default (one summary row). Users can still expand manually.
+  const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent && !isActiveAssistant;
   const [expanded, setExpanded] = useState(defaultExpanded);
   const previousHasFinalContentRef = useRef(hasFinalContent);
   const manuallyExpandedRef = useRef(false);
@@ -2019,9 +2037,208 @@ export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { typ
   return event.isComplete ? "已完成" : "消息处理中";
 }
 
-function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
+type AssistantProcessBlockProps = {
+  event: AssistantEvent;
+  sessionId?: string;
+  roomAgentDisplayName?: string;
+  tools: ToolEvent[];
+  subagents: SubagentEvent[];
+  approvals: ApprovalEvent[];
+  displayMode: ProcessDisplayMode;
+  expandByDefault: boolean;
+  isActiveAssistant: boolean;
+  hasFinalContent: boolean;
+  isInterrupted: boolean;
+  turnStartedAt?: number;
+  activeStatusMessage?: string;
+};
+
+function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: AssistantProcessBlockProps) {
+  return prev.sessionId === next.sessionId &&
+    prev.roomAgentDisplayName === next.roomAgentDisplayName &&
+    prev.displayMode === next.displayMode &&
+    prev.expandByDefault === next.expandByDefault &&
+    prev.isActiveAssistant === next.isActiveAssistant &&
+    prev.hasFinalContent === next.hasFinalContent &&
+    prev.isInterrupted === next.isInterrupted &&
+    prev.turnStartedAt === next.turnStartedAt &&
+    prev.activeStatusMessage === next.activeStatusMessage &&
+    (
+      prev.event === next.event ||
+      (
+        prev.event.id === next.event.id &&
+        prev.event.timestamp === next.event.timestamp &&
+        prev.event.isThinking === next.event.isThinking &&
+        prev.event.isComplete === next.event.isComplete &&
+        prev.event.durationMs === next.event.durationMs &&
+        prev.event.model === next.event.model &&
+        prev.event.agentRole === next.event.agentRole &&
+        prev.event.thinking === next.event.thinking &&
+        prev.event.thinkingParts === next.event.thinkingParts
+      )
+    ) &&
+    eventArrayMemoEqual(prev.tools, next.tools) &&
+    eventArrayMemoEqual(prev.subagents, next.subagents) &&
+    eventArrayMemoEqual(prev.approvals, next.approvals);
+}
+
+const AssistantProcessBlock = memo(function AssistantProcessBlock({
+  event,
+  sessionId,
+  roomAgentDisplayName,
+  tools,
+  subagents,
+  approvals,
+  displayMode,
+  expandByDefault,
+  isActiveAssistant,
+  hasFinalContent,
+  isInterrupted,
+  turnStartedAt,
+  activeStatusMessage,
+}: AssistantProcessBlockProps) {
+  const hasActualThinking = Boolean(
+    event.thinking?.trim() ||
+    event.thinkingParts?.some((part) => part.text.trim().length > 0)
+  );
+  const elapsedStartAt = assistantTurnStartedAt({
+    turnStartedAt,
+    eventTimestamp: event.timestamp,
+  });
+  const activeProcessLabel = isActiveAssistant && subagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
+    ? "子代理运行中"
+    : isActiveAssistant && tools.some((tool) => tool.status === "running")
+      ? "命令运行中"
+      : isActiveAssistant && hasFinalContent
+        ? "正在输出"
+        : isActiveAssistant && !hasActualThinking
+          ? activeStatusMessage?.trim().replace(/…$/u, "") || "等待首个模型事件"
+          : undefined;
+  const processLabel = (
+    <span className="inline-flex min-w-0 items-center" style={{ gap: 6 }}>
+      {roomAgentDisplayName && <span className="shrink-0 font-medium text-[var(--kimix-panel-text)]">{roomAgentDisplayName}</span>}
+      {roomAgentDisplayName && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">·</span>}
+      <AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />
+    </span>
+  );
+  return (
+    <AssistantProcessSummary
+      event={event}
+      sessionId={sessionId}
+      tools={tools}
+      subagents={subagents}
+      approvals={approvals}
+      displayMode={displayMode}
+      expandByDefault={expandByDefault}
+      isActiveAssistant={isActiveAssistant}
+      hasFinalContent={hasFinalContent}
+      label={processLabel}
+    />
+  );
+}, assistantProcessBlockEqual);
+
+type AssistantBodyBlockProps = {
+  content: string;
+  thinking?: string;
+  thinkingParts?: AssistantEvent["thinkingParts"];
+  timestamp: number;
+  isActiveAssistant: boolean;
+  isComplete: boolean;
+  eagerMarkdown: boolean;
+  changedFiles: string[];
+  changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>;
+  trailingStatuses: Extract<TimelineEvent, { type: "status_update" }>[];
+  hookBadgeEvents: Extract<TimelineEvent, { type: "hook" }>[];
+  footerFallbackLabel: string;
+};
+
+function assistantBodyBlockEqual(prev: AssistantBodyBlockProps, next: AssistantBodyBlockProps) {
+  return prev.content === next.content &&
+    prev.thinking === next.thinking &&
+    prev.thinkingParts === next.thinkingParts &&
+    prev.timestamp === next.timestamp &&
+    prev.isActiveAssistant === next.isActiveAssistant &&
+    prev.isComplete === next.isComplete &&
+    prev.eagerMarkdown === next.eagerMarkdown &&
+    prev.footerFallbackLabel === next.footerFallbackLabel &&
+    stringArrayMemoEqual(prev.changedFiles, next.changedFiles) &&
+    eventArrayMemoEqual(prev.trailingStatuses, next.trailingStatuses) &&
+    eventArrayMemoEqual(prev.hookBadgeEvents, next.hookBadgeEvents) &&
+    (
+      prev.changeSummary === next.changeSummary ||
+      (!prev.changeSummary && !next.changeSummary) ||
+      (Boolean(prev.changeSummary && next.changeSummary) && timelineEventMemoKey(prev.changeSummary as TimelineEvent) === timelineEventMemoKey(next.changeSummary as TimelineEvent))
+    );
+}
+
+const AssistantBodyBlock = memo(function AssistantBodyBlock({
+  content,
+  thinking,
+  thinkingParts,
+  timestamp,
+  isActiveAssistant,
+  isComplete,
+  eagerMarkdown,
+  changedFiles,
+  changeSummary,
+  trailingStatuses,
+  hookBadgeEvents,
+  footerFallbackLabel,
+}: AssistantBodyBlockProps) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
+  const hasContent = content.trim().length > 0;
+  const changedFilesSignature = changedFiles.join("\u001f");
+  const mdArtifacts = useMemo(() => {
+    if (!isComplete) return [];
+    const changedSet = new Set(changedFiles.map((filePath) => normalizePathForComparison(filePath)));
+    return Array.from(new Set(
+      content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
+    )).filter((filePath) => changedSet.has(normalizePathForComparison(filePath))).slice(0, 3);
+  }, [changedFilesSignature, content, isComplete]);
+  const fullCopyText = useMemo(
+    () => buildAssistantFullCopyText({ content, thinking, thinkingParts, timestamp } as AssistantEvent),
+    [content, thinking, thinkingParts, timestamp],
+  );
+  const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || isComplete || isActiveAssistant;
+  if (!shouldShowBodyFooter) return null;
+  return (
+    <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
+      {hasContent && (
+        <>
+          <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
+            <MarkdownRenderer
+              content={content}
+              streaming={isActiveAssistant}
+              normalizeAssistantProgress
+              deferOffscreen={!eagerMarkdown && !isActiveAssistant && isComplete && content.length > 1200}
+            />
+          </div>
+          {mdArtifacts.length > 0 && (
+            <div className="flex flex-col" style={{ gap: 12 }}>
+              {mdArtifacts.map((filePath) => (
+                <FileCard key={filePath} filePath={filePath} fileType="文档 · MD" />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {changeSummary && <ChangeCard event={changeSummary} />}
+      <AssistantMessageFooter
+        statuses={trailingStatuses}
+        fallbackLabel={footerFallbackLabel}
+        onCopy={() => void trigger(content)}
+        onCopyAll={() => void triggerAll(fullCopyText || content)}
+        copied={copied}
+        copiedAll={copiedAll}
+        hookBadgeEvents={hookBadgeEvents}
+        showActions={hasContent}
+      />
+    </div>
+  );
+}, assistantBodyBlockEqual);
+
+function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
@@ -2040,39 +2257,13 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
     )
   );
   const hasContent = event.content.trim().length > 0;
-  const changedFilesSignature = changedFiles.join("\u001f");
-  const mdArtifacts = useMemo(() => {
-    if (!event.isComplete) return [];
-    const changedSet = new Set(changedFiles.map((filePath) => normalizePathForComparison(filePath)));
-    return Array.from(new Set(
-      event.content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
-    )).filter((filePath) => changedSet.has(normalizePathForComparison(filePath))).slice(0, 3);
-  }, [changedFilesSignature, event.content, event.isComplete]);
-  // Activity ownership is resolved once in ChatThread's turn projection. A
-  // historical bubble must never read session-global runtime state on its own.
   const isActiveAssistant = Boolean(isAssistantActive);
-  const hasActualThinking = Boolean(
-    event.thinking?.trim() ||
-    event.thinkingParts?.some((part) => part.text.trim().length > 0)
-  );
-  const elapsedStartAt = assistantTurnStartedAt({
-    turnStartedAt,
-    eventTimestamp: event.timestamp,
-  });
-  const activeProcessLabel = isActiveAssistant && leadingSubagents.some((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended")
-    ? "子代理运行中"
-    : isActiveAssistant && leadingTools.some((tool) => tool.status === "running")
-      ? "命令运行中"
-      : isActiveAssistant && hasContent
-        ? "正在输出"
-        : isActiveAssistant && !hasActualThinking
-          ? activeStatus?.message?.trim().replace(/…$/u, "") || "等待首个模型事件"
-          : undefined;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
-  const fullCopyText = useMemo(() => buildAssistantFullCopyText(event), [event.content, event.thinking, event.thinkingParts, event.timestamp]);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
-  const footerFallbackLabel = assistantFooterFallbackLabel(event, isActiveAssistant);
+  const footerFallbackLabel = isInterrupted
+    ? "输出打断"
+    : assistantFooterFallbackLabel(event, isActiveAssistant);
   const processToBodyGap = processDisplayMode === "kimi-web" && !hideProcessSummary && shouldShowBodyFooter ? 12 : 20;
 
   if (roomDeliveryStatus === "queued" && isWaitingBehindAgentWork && event.roomAgentId && event.roomMessageId) {
@@ -2104,21 +2295,14 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
     );
   }
 
-  const processLabel = (
-    <span className="inline-flex min-w-0 items-center" style={{ gap: 6 }}>
-      {roomAgent && <span className="shrink-0 font-medium text-[var(--kimix-panel-text)]">{roomAgent.displayName}</span>}
-      {roomAgent && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">·</span>}
-      <AssistantProcessLabel event={event} isActiveAssistant={isActiveAssistant} isInterrupted={isInterrupted} activeProcessLabel={activeProcessLabel} elapsedStartAt={elapsedStartAt} />
-    </span>
-  );
-
   return (
     <div className="group flex justify-start">
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: processToBodyGap }}>
         {!hideProcessSummary && (
-          <AssistantProcessSummary
+          <AssistantProcessBlock
             event={event}
             sessionId={sessionId}
+            roomAgentDisplayName={roomAgent?.displayName}
             tools={leadingTools}
             subagents={leadingSubagents}
             approvals={leadingApprovals}
@@ -2126,7 +2310,9 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             expandByDefault={expandProcessByDefault}
             isActiveAssistant={isActiveAssistant}
             hasFinalContent={hasContent}
-            label={processLabel}
+            isInterrupted={Boolean(isInterrupted)}
+            turnStartedAt={turnStartedAt}
+            activeStatusMessage={activeStatus?.message}
           />
         )}
 
@@ -2137,44 +2323,20 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
         )}
 
         {shouldShowBodyFooter && (
-          <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
-            {hasContent && (
-              <>
-                <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
-                  {/* Assistant progress normalization includes the structural Markdown repair
-                      stack and additionally restores flattened progress paragraphs. */}
-                  <MarkdownRenderer
-                    content={event.content}
-                    streaming={isActiveAssistant}
-                    normalizeAssistantProgress
-                    deferOffscreen={!eagerMarkdown && !isActiveAssistant && event.isComplete && event.content.length > 1200}
-                  />
-                </div>
-                {mdArtifacts.length > 0 && (
-                  <div className="flex flex-col" style={{ gap: 12 }}>
-                    {mdArtifacts.map((filePath) => (
-                      <FileCard key={filePath} filePath={filePath} fileType="文档 · MD" />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {changeSummary && <ChangeCard event={changeSummary} />}
-
-            {shouldShowBodyFooter && (
-              <AssistantMessageFooter
-                statuses={trailingStatuses}
-                fallbackLabel={footerFallbackLabel}
-                onCopy={() => void trigger(event.content)}
-                onCopyAll={() => void triggerAll(fullCopyText || event.content)}
-                copied={copied}
-                copiedAll={copiedAll}
-                hookBadgeEvents={hookBadgeEvents}
-                showActions={hasContent}
-              />
-            )}
-          </div>
+          <AssistantBodyBlock
+            content={event.content}
+            thinking={event.thinking}
+            thinkingParts={event.thinkingParts}
+            timestamp={event.timestamp}
+            isActiveAssistant={isActiveAssistant}
+            isComplete={event.isComplete}
+            eagerMarkdown={eagerMarkdown}
+            changedFiles={changedFiles}
+            changeSummary={changeSummary}
+            trailingStatuses={trailingStatuses}
+            hookBadgeEvents={hookBadgeEvents}
+            footerFallbackLabel={footerFallbackLabel}
+          />
         )}
       </div>
     </div>
