@@ -355,6 +355,31 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await client.close();
   });
 
+  it("does not run the assistant snapshot barrier for failed prompts", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("failed prompt must not query messages");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const observed: Array<{ type: string; payload?: unknown }> = [];
+    client.onFrame((current) => observed.push(current));
+    const internals = client as unknown as {
+      receive: (current: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+
+    internals.receive({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 19,
+      epoch: "epoch-1",
+      payload: { prompt_id: "msg-failed", reason: "failed" },
+    });
+
+    await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
+    expect(fetchMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
   it("uses official P3 REST routes for fork, children, tasks and terminals", async () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -988,6 +1013,34 @@ describe("KimiCodeServerClient protocol adapters", () => {
       arguments: { command: "git status --short" },
       result: "clean",
     });
+  });
+
+  it("restores a visible failure event when the authoritative snapshot ends with an empty failed assistant", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 619,
+      epoch: "epoch-failed",
+      session: { id: "session-failed", status: "idle", busy: false, last_turn_reason: "failed" },
+      messages: {
+        items: [
+          { id: "msg-user-failed", role: "user", content: [{ type: "text", text: "继续检查" }] },
+          { id: "msg-assistant-failed", role: "assistant", content: [] },
+        ],
+      },
+      in_flight_turn: null,
+    }, "session-failed");
+
+    expect(frames.at(-2)).toMatchObject({
+      type: "content.part",
+      payload: {
+        snapshotReplay: "history",
+        part: { type: "text", text: expect.stringContaining("本轮失败") },
+      },
+    });
+    const rendered = buildRenderItems(mapHistoryEvents(frames.map((current) => ({
+      type: current.type,
+      payload: current.payload,
+    }))), "kimi-code");
+    expect(rendered.some((item) => item.type === "event" && item.event.type === "assistant_message")).toBe(true);
   });
 
   it("adds pending approvals and questions when loading a server snapshot as history", () => {

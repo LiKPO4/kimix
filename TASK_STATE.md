@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-20 v2.16.61 第三方模型失败轮次可见性
+
+- 当前目标：修复切换第三方模型后请求失败时，整轮只剩用户消息、Assistant 消息头与左侧刻度消失的问题。
+- 根因证据：现场会话 `session_01ea935b-5c5d-455a-a6aa-b8e9b2dbdefb` 的官方事件 seq 615-619 明确为 `turn.step.interrupted`、`turn.ended(reason=failed)`、`error(provider.auth_error: 401 Insufficient balance)`、`prompt.completed(reason=failed)`；官方消息只保存一个空 Assistant，snapshot 不保存瞬时 error。v2.16.60 错把失败 completion 送入成功正文屏障，等待不存在的正文后回放 snapshot，最终冲掉本地 error，只留下用户消息。
+- 修复：失败/中断/取消 completion 直接按官方顺序交付，不进入成功正文屏障。ChatThread 将“用户消息后只有 error”的终态投影成稳定 Assistant 失败回复，保留 Agent 头、输出打断状态和左侧刻度；余额不足与认证失败提供明确中文说明。历史恢复检测 `last_turn_reason=failed + 最新 Assistant 为空`，生成不伪造具体原因的通用失败回复；缓存升级到 v11，强制修复已受影响会话。
+- 验证：真实事件形态对应的 Client 与 renderItems 定向回归 72 项通过；全量 106 文件 885 项、Node/Renderer 严格类型检查、生产构建均通过，renderer 为 `assets/index-DrLxnDGM.js`；OKF 严格校验通过（10 概念、18 Markdown、251 链接）。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/components/chat/ChatThread.tsx`、`src/utils/__tests__/kimiCodeServerClient.test.ts`、`src/utils/__tests__/chatRenderItems.test.ts`。
+- 下一步：提交并重启本地 v2.16.61；用户重开目标会话，确认失败轮次出现 Assistant 失败头和说明。
+
 ## 2026-07-20 v2.16.60 Prompt 终态交付与工具历史完整性
 
 - 当前目标：根治 Agent 开始回答后消息头短暂消失，以及重开/展开过程信息时命令大量缺失。

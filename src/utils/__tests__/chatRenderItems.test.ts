@@ -286,6 +286,45 @@ describe("buildRenderItems usage footer", () => {
     expect(activeAssistant.event.isComplete).toBe(false);
   });
 
+  it("projects a failed provider turn into a stable Assistant header instead of leaving only the user message", () => {
+    const items = buildRenderItems([{
+      id: "user-provider-failure",
+      type: "user_message",
+      timestamp: 1,
+      content: "继续检查铸剑事件",
+      roomAgentId: "room-agent:flash",
+      roomMessageId: "room-message-provider-failure",
+      agentTurnId: "turn-provider-failure",
+    }, {
+      id: "status-provider-failure",
+      type: "status_update",
+      timestamp: 2,
+      message: "输出打断",
+      roomAgentId: "room-agent:flash",
+      roomMessageId: "room-message-provider-failure",
+      agentTurnId: "turn-provider-failure",
+    }, {
+      id: "error-provider-failure",
+      type: "error",
+      timestamp: 3,
+      message: "401 Insufficient balance. Manage your billing here: https://opencode.ai/billing",
+      source: "sdk",
+      canDismiss: true,
+      roomAgentId: "room-agent:flash",
+      roomMessageId: "room-message-provider-failure",
+      agentTurnId: "turn-provider-failure",
+    }], "kimi-code");
+
+    const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event" || assistant.event.type !== "assistant_message") return;
+    expect(assistant.event.id).toBe("assistant-failed-user-provider-failure");
+    expect(assistant.event.content).toContain("第三方模型账户余额不足");
+    expect(assistant.event.isComplete).toBe(true);
+    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["status-provider-failure"]);
+    expect(items.some((item) => item.type === "event" && item.event.type === "error")).toBe(false);
+  });
+
   it("keeps the Assistant header during the primary room send-to-first-model-event gap", () => {
     const primaryAgentId = "room-agent:primary";
     const items = buildRenderItems([{

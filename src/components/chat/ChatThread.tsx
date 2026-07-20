@@ -648,6 +648,16 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
+function assistantFailureContent(message: string): string {
+  if (/insufficient balance|余额不足/i.test(message)) {
+    return "模型请求失败：第三方模型账户余额不足。请充值该 Provider 账户，或切换到其他可用模型后重试。";
+  }
+  if (/provider\.auth_error|\b401\b|unauthorized|api[_ -]?key/i.test(message)) {
+    return "模型请求失败：第三方供应商认证失败。请检查 API Key、账户状态或模型权限后重试。";
+  }
+  return `模型请求失败：${message.trim() || "当前轮未返回可显示内容。"}`;
+}
+
 export function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
@@ -705,6 +715,7 @@ export function buildRenderItems(
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
     const steerEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "steer_message" }> => event.type === "steer_message");
     const assistantEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
+    const errorEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "error" }> => event.type === "error");
     const changedFiles = new Set(
       turnEvents
         .filter((e): e is Extract<TimelineEvent, { type: "change_summary" }> => e.type === "change_summary")
@@ -769,13 +780,26 @@ export function buildRenderItems(
       !tools.some((event) => event.status === "running") &&
       !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
     );
+    const projectedFailureAssistant: Extract<TimelineEvent, { type: "assistant_message" }> | undefined = !mergedAssistantEvent && turnSettled && turnUserEvent && errorEvents.length > 0
+      ? {
+          id: `assistant-failed-${turnUserEvent.id}`,
+          type: "assistant_message" as const,
+          timestamp: errorEvents.at(-1)?.timestamp ?? turnStartedAt ?? turnUserEvent.timestamp,
+          content: assistantFailureContent(errorEvents.at(-1)?.message ?? ""),
+          isThinking: false,
+          isComplete: true,
+          roomAgentId,
+          roomMessageId,
+          agentTurnId,
+        }
+      : undefined;
     const renderAssistantEvent = mergedAssistantEvent
       ? turnSettled && !mergedAssistantEvent.isComplete
         ? { ...mergedAssistantEvent, isThinking: false, isComplete: true }
         : !turnSettled && mergedAssistantEvent.isComplete
           ? { ...mergedAssistantEvent, isComplete: false }
           : mergedAssistantEvent
-      : undefined;
+      : projectedFailureAssistant;
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
     const trailingStatusEvents = turnSettled
@@ -806,6 +830,25 @@ export function buildRenderItems(
       steerEvents.forEach((event) => items.push({ type: "event", event }));
       steerAttached = true;
     };
+    if (projectedFailureAssistant) {
+      items.push({
+        type: "event",
+        event: projectedFailureAssistant,
+        turnStartedAt,
+        isAssistantActive: false,
+        leadingTools: tools,
+        leadingSubagents: subagents,
+        leadingHooks: hooks,
+        leadingApprovals: resolvedApprovals,
+        attachedSteers: getAttachedSteers(),
+        changedFiles: Array.from(changedFiles),
+        changeSummary: mergedChangeSummary ?? undefined,
+        trailingStatuses: trailingStatusEvents,
+      });
+      assistantAttached = true;
+      toolsAttached = true;
+      if (mergedChangeSummary) changeSummaryAttached = true;
+    }
     // The optimistic Assistant event is transport bookkeeping, not the source
     // of truth for whether an active user turn needs a visible process header.
     // Snapshot reconciliation, reload recovery, or a slow first model delta can
@@ -852,6 +895,7 @@ export function buildRenderItems(
       if (event.type === "status_update") continue;
       if (event.type === "change_summary") continue;
       if (event.type === "diff") continue;
+      if (event.type === "error" && projectedFailureAssistant) continue;
       if (event.type === "assistant_message") {
         if (assistantAttached || !renderAssistantEvent) continue;
         const hasContent = renderAssistantEvent.content.trim().length > 0;

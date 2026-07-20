@@ -41,6 +41,8 @@ export type ServerSession = {
   updated_at?: string;
   status?: string;
   busy?: boolean;
+  main_turn_active?: boolean;
+  last_turn_reason?: string;
   archived?: boolean;
   metadata?: Record<string, unknown>;
   agent_config?: Record<string, unknown>;
@@ -501,10 +503,50 @@ export function snapshotMessagesToServerFrames(snapshot: ServerSnapshot, session
   const inFlight = isRecord(snapshot.in_flight_turn) ? snapshot.in_flight_turn : {};
   const messages = "messages" in inFlight ? inFlight.messages : ("message" in inFlight ? [inFlight.message] : inFlight.items);
   const inFlightItems = Array.isArray(messages) ? messages : [];
-  return [
+  const frames = [
     ...historyItems.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch, "history")),
     ...inFlightItems.flatMap((item) => snapshotMessageToServerFrames(item, sessionId, snapshot.as_of_seq, snapshot.epoch, "in_flight")),
   ];
+  const latestHistoryMessage = historyItems.at(-1);
+  if (
+    inFlightItems.length === 0 &&
+    snapshot.session.last_turn_reason === "failed" &&
+    isRecord(latestHistoryMessage) &&
+    latestHistoryMessage.role === "assistant" &&
+    !contentToText(latestHistoryMessage.content).trim()
+  ) {
+    const messageIdentity = snapshotMessageIdentity(latestHistoryMessage, "assistant");
+    const messageTimestamp = snapshotMessageTimestamp(latestHistoryMessage);
+    const failureContent = "模型请求失败：官方会话记录显示本轮失败，且模型未返回可显示内容。请检查模型账户、Provider 配置或额度后重试。";
+    frames.push({
+      type: "content.part",
+      session_id: sessionId,
+      seq: snapshot.as_of_seq,
+      epoch: snapshot.epoch,
+      payload: snapshotReplayPayload(
+        { part: { type: "text", text: failureContent } },
+        "history",
+        messageIdentity,
+        failureContent,
+        "assistant",
+        messageTimestamp,
+      ),
+    }, {
+      type: "turn.ended",
+      session_id: sessionId,
+      seq: snapshot.as_of_seq,
+      epoch: snapshot.epoch,
+      payload: snapshotReplayPayload(
+        { type: "turn.ended", reason: "failed" },
+        "history",
+        messageIdentity,
+        failureContent,
+        "assistant",
+        messageTimestamp,
+      ),
+    });
+  }
+  return frames;
 }
 
 export function completedPromptMessagesToServerFrames(
@@ -552,6 +594,7 @@ function hasPromptCompletionDisplayFrame(frames: readonly ServerFrame[]): boolea
 }
 
 const PROMPT_COMPLETION_BARRIER_RETRY_DELAYS_MS = [0, 100, 250, 500, 1_000, 2_000, 3_000, 3_000] as const;
+const FAILED_PROMPT_COMPLETION_REASONS = new Set(["failed", "error", "interrupted", "cancelled", "canceled", "aborted", "filtered"]);
 
 export function snapshotToHistoryFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
   const frames = snapshotMessagesToServerFrames(snapshot, sessionId);
@@ -1150,6 +1193,16 @@ export class KimiCodeServerClient {
     const promptId = typeof (payload.promptId ?? payload.prompt_id) === "string"
       ? String(payload.promptId ?? payload.prompt_id)
       : "";
+    const completionReason = typeof payload.reason === "string" ? payload.reason.toLowerCase() : "";
+    // Failed prompts have no displayable Assistant body by definition. Their
+    // turn.ended/error frames already precede prompt.completed on the same
+    // ordered stream; running the success-only message barrier here waits for
+    // content that will never exist, then replays a snapshot that cannot carry
+    // the transient error frame and erases the only visible failure evidence.
+    if (FAILED_PROMPT_COMPLETION_REASONS.has(completionReason)) {
+      this.deliver(frame);
+      return;
+    }
     if (sessionId && promptId) {
       try {
         let replayFrames: ServerFrame[] = [];

@@ -39,3 +39,15 @@
 
 - 第一次 `/messages` 只有 prompt，第二次才出现 Assistant：终态不得先于 Assistant frame。
 - history snapshot 含 `tool_use`，并随后出现同 ID 的 `tool_result`：映射后必须得到可见且已完成的 tool call；同一转换器也服务于 in-flight snapshot。
+
+## 2026-07-20 失败轮次补充快照
+
+后续现场并非正文延迟，而是第三方 Provider 在首个 token 前失败：
+
+- `turn.step.interrupted`: `provider.auth_error / 401 Insufficient balance`
+- `turn.ended`: `reason=failed`
+- `error`: 带完整供应商错误
+- `prompt.completed`: `reason=failed`
+- 官方 message history：user + injection user + content 为空的 Assistant
+
+Server snapshot 不持久化瞬时 error。若失败 completion 仍进入成功正文屏障，它会等待不存在的 Assistant 正文，随后 message-only snapshot 会覆盖本地错误证据。修复后的规则是：失败终态直接交付；live error 投影为稳定 Assistant 失败回复；重启历史只能依据 `last_turn_reason=failed` 恢复通用失败说明，不猜测具体 Provider 原因。
