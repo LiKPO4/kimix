@@ -170,6 +170,42 @@ export function isLatestUserInputEvent(events: TimelineEvent[], userEventId: str
   return latestUserInput?.type === "user_message" && latestUserInput.id === userEventId;
 }
 
+/**
+ * Echo normalization for matching a local user message against official
+ * history: strip the attachment section and collapse whitespace.
+ */
+function normalizeUserContentForEcho(content: string): string {
+  const attachmentMarkerIndex = content.search(/(?:^|\n)附件文件：/);
+  const visible = attachmentMarkerIndex >= 0 ? content.slice(0, attachmentMarkerIndex) : content;
+  return visible.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Whether the official (canonical) history contains this user message as its
+ * latest user turn. A message that was dispatched but never answered leaves
+ * no official turn evidence, yet still lives in the official history;
+ * withdrawing it only locally keeps it in the model context and the next
+ * prompt sees the content twice. Used to decide whether a withdrawal must
+ * call the official undo API. The message must be the latest official user
+ * turn, because the official undo removes exactly one latest turn.
+ */
+export function officialHistoryHasUserMessageAsLatest(
+  events: TimelineEvent[],
+  match: { content: string; officialUserEventId?: string },
+): boolean {
+  const userIndexes = events.flatMap((event, index) => (
+    event.type === "user_message" ? [index] : []
+  ));
+  const latestIndex = userIndexes.at(-1);
+  if (latestIndex === undefined) return false;
+  const latest = events[latestIndex];
+  if (latest.type !== "user_message") return false;
+  if (match.officialUserEventId && latest.id === match.officialUserEventId) return true;
+  const expected = normalizeUserContentForEcho(match.content);
+  if (!expected) return false;
+  return normalizeUserContentForEcho(latest.content) === expected;
+}
+
 export function hasOfficialTurnEvidenceAfterUser(events: TimelineEvent[], userEventId: string): boolean {
   const userIndex = events.findIndex((event) => event.type === "user_message" && event.id === userEventId);
   if (userIndex === -1) return false;

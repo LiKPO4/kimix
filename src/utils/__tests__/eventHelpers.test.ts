@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -299,6 +299,37 @@ describe("hasMalformedAssistantMarkdown", () => {
 
     expect(hasMalformedAssistantMarkdown(malformed)).toBe(true);
     expect(hasMalformedAssistantMarkdown(canonical)).toBe(false);
+  });
+
+  describe("officialHistoryHasUserMessageAsLatest", () => {
+    const user = (id: string, content: string, timestamp = 1): TimelineEvent => ({
+      id, type: "user_message", timestamp, content,
+    });
+
+    it("matches by official user event id", () => {
+      const events = [user("msg-official-1", "改一下"), user("msg-official-2", "最新问题")];
+      expect(officialHistoryHasUserMessageAsLatest(events, { content: "别的内容", officialUserEventId: "msg-official-2" })).toBe(true);
+      expect(officialHistoryHasUserMessageAsLatest(events, { content: "改一下", officialUserEventId: "msg-official-1" })).toBe(false);
+    });
+
+    it("matches by content echo against the latest official user message", () => {
+      const events = [user("u1", "之前的消息"), user("u2", "改一下：\n\n[start] 旁白：山路旁……")];
+      // Whitespace differences between the local display copy and the official
+      // prompt copy must not break the echo match.
+      expect(officialHistoryHasUserMessageAsLatest(events, { content: "改一下： [start] 旁白：山路旁……" })).toBe(true);
+      expect(officialHistoryHasUserMessageAsLatest(events, { content: "改一下：\n[start] 旁白：山路旁……", officialUserEventId: "u1" })).toBe(true);
+      expect(officialHistoryHasUserMessageAsLatest(events, { content: "完全不同的问题" })).toBe(false);
+    });
+
+    it("returns false when the matching message is not the latest user turn", () => {
+      const events = [user("u1", "被撤回的消息"), user("u2", "更新的问题")];
+      expect(officialHistoryHasUserMessageAsLatest(events, { content: "被撤回的消息" })).toBe(false);
+    });
+
+    it("returns false when there is no official user message or content is empty", () => {
+      expect(officialHistoryHasUserMessageAsLatest([], { content: "任意" })).toBe(false);
+      expect(officialHistoryHasUserMessageAsLatest([user("u1", "任意")], { content: "  " })).toBe(false);
+    });
   });
 
   describe("hasTurnReceivedBody", () => {

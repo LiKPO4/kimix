@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Withdrawal must undo official history for dispatched-but-unanswered messages**: `hasOfficialTurnEvidenceAfterUser` proves output, not dispatch; withdrawing an unanswered dispatched message locally left it in the official history and the next prompt saw the block twice. The withdrawal now verifies against the official history (`officialHistoryHasUserMessageAsLatest`) before falling back to local-only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Settle authority split: guarded settle for heuristic paths**: `settleInactiveEvents` now takes `guardRecentActivity` — polling, hydration, and persistence no longer force-complete open assistants or delete placeholders while any timeline event is younger than the stale-work window; only the authoritative prompt.completed status event settles immediately. Fixes bubbles self-completing mid-output. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Assistant bubble id must survive pending→real swap; manual expand persists per turn**: the render-only pending placeholder now uses `assistant:<agentTurnId>` (same as the later merged event) and merged-id falls back to `assistant:<roomMessageId>`, so the bubble does not remount mid-turn; `processManualExpand` keeps the user's manual process expand/collapse per turn so any remaining remount restores it instead of auto-collapsing during output. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).

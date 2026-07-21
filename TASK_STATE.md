@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.79 撤回后模型看到重复内容块修复（session_01ea935b）
+
+- 现象：用户撤回一条消息并重发，Agent 思考中说"The user sent the same block twice"。
+- 快照取证（IndexedDB blob）：官方消息 `msg_01KY04Q44PZFASSHAJCPPYJHYV`（16:11 首次发送，无回复）与本地重发 `a3j0r8wth`（16:13，同文）都在时间线中；回答该重发的助手思考里确认模型上下文有两份相同内容块。首次发送已派发（官方历史有记录），但该轮没有任何官方回复证据。
+- 根因：撤回判定 `needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(...)` 用的是"该轮有没有官方输出证据"，而不是"这条消息有没有派发到官方运行时"。已派发但无应答（失败/静默轮）的消息没有输出证据 → 走本地 truncate 分支，官方历史里的消息从未被 undo → 重发后官方历史有两份 → 模型看到重复；之后 reconciliation 又把官方那份回放为 snapshot 用户事件，本地也显示两份。
+- 修复：无输出证据时，撤回前加载官方历史，用 `officialHistoryHasUserMessageAsLatest`（officialUserEventId 或空白归一化内容回声，且必须是官方最新用户轮）判定是否真正在官方历史中；在则走官方 undo（count:1 只撤最新一轮），不在才走本地撤回；历史加载失败回退本地撤回（不阻塞用户操作）。
+- 测试：eventHelpers +4（id 匹配/内容回声/非最新轮/空输入）；全量 954 + typecheck。
+- 知识库：runtime-routing 新增 19b + log。
+
 ## 2026-07-21 v2.16.78 消息气泡提前"已完成"治理（settle 权限分级）
 
 - 现象：Agent 输出中气泡经常自己变成"已完成"。用户判断正确——兜底太强制。

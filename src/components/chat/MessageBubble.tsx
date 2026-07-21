@@ -17,7 +17,7 @@ import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
-import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, truncateLatestUserTurn } from "@/utils/eventHelpers";
+import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import {
@@ -458,7 +458,25 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
 
     setResending(true);
     try {
-      const needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(agentEvents, targetUserEventId);
+      let needsOfficialUndo = hasOfficialTurnEvidenceAfterUser(agentEvents, targetUserEventId);
+      if (!needsOfficialUndo) {
+        // A message that was dispatched but never answered leaves no official
+        // turn evidence, yet still lives in the official history. Withdrawing
+        // it only locally keeps it in the model context; the next prompt then
+        // sees the same content block twice. Verify against the official
+        // history before falling back to the local-only withdrawal.
+        const history = await window.api.loadKimiCodeSession({
+          workDir: activeSession.projectPath,
+          sessionId: runtimeSessionId,
+        });
+        if (history.success) {
+          const canonical = mapHistoryEvents(Array.isArray(history.data.events) ? history.data.events : []);
+          needsOfficialUndo = officialHistoryHasUserMessageAsLatest(canonical, {
+            content: event.content,
+            officialUserEventId: delivery?.officialUserEventId,
+          });
+        }
+      }
       if (needsOfficialUndo) {
         const undoRes = await window.api.undoKimiCodeHistory({ sessionId: runtimeSessionId, count: 1 });
         if (!undoRes.success) throw new Error(`撤回上一轮官方历史失败：${undoRes.error}`);
