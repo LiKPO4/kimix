@@ -73,6 +73,8 @@ import type {
 import App from "./App";
 import "./index.css";
 import { applyCachedThemeSnapshot } from "@/utils/themeSnapshot";
+import { ensureLongTaskObserver, getPerfDiagSnapshot, resetPerfDiagCounters } from "@/utils/perfDiag";
+import { isPerfDiagEnabled } from "@/utils/perfFlags";
 
 const BROWSER_PREVIEW_SETTINGS_KEY = "kimix_browser_preview_settings";
 
@@ -690,3 +692,23 @@ createRoot(rootEl).render(
 requestAnimationFrame(() => {
   reportStartup("first animation frame");
 });
+
+// Perf diagnostics: when kimix_perf_diag is enabled, flush timing counters to
+// diag.log every 10 seconds so a reproduction run leaves attribution data.
+{
+  let perfDiagWasEnabled = isPerfDiagEnabled();
+  if (perfDiagWasEnabled) ensureLongTaskObserver();
+  window.setInterval(() => {
+    const enabled = isPerfDiagEnabled();
+    if (enabled && !perfDiagWasEnabled) ensureLongTaskObserver();
+    perfDiagWasEnabled = enabled;
+    if (!enabled) return;
+    const snapshot = getPerfDiagSnapshot();
+    const hasData = snapshot.longTasks.count > 0 ||
+      Object.keys(snapshot.timings).length > 0 ||
+      snapshot.renderTurnBodyRuns > 0;
+    if (!hasData) return;
+    resetPerfDiagCounters();
+    void window.api?.writeDiag?.({ message: "[perfDiag] 10s summary", data: snapshot })?.catch?.(() => {});
+  }, 10_000);
+}

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { Session, TimelineEvent } from "@/types/ui";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
+import { timeSync } from "@/utils/perfDiag";
 
 type ProjectionInputs = {
   agentEvents: Session["collaboration"] extends infer C
@@ -38,7 +39,7 @@ export function useProjectedTimeline(session: Session | null | undefined): Timel
     return cached.result;
   }
 
-  const result = projectCollaborationTimeline(session);
+  const result = timeSync("projectCollaborationTimeline", () => projectCollaborationTimeline(session));
   cacheRef.current = { agentEvents, messages, events, result };
   return result;
 }

@@ -20,6 +20,7 @@ import {
   takeActiveTurnDraft,
 } from "@/utils/activeTurnDraftStore";
 import { isActiveTurnDraftEnabled, isScrollYieldEnabled } from "@/utils/perfFlags";
+import { timeSync } from "@/utils/perfDiag";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
 
 const STREAM_EVENT_FLUSH_MS = 80;
@@ -128,7 +129,7 @@ export function useEventStream() {
   const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const updateSession = useSessionStore((s) => s.updateSession);
 
-  const flushStreamEvents = useCallback(() => {
+  const flushStreamEventsInner = useCallback(() => {
     streamFlushTimerRef.current = null;
     if (isActiveTurnDraftEnabled()) {
       commitActiveTurnDraftsToBatch(streamBatchRef.current);
@@ -150,6 +151,11 @@ export function useEventStream() {
       });
     });
   }, [updateSession]);
+
+  const flushStreamEvents = useCallback(
+    () => timeSync("flushStreamEvents", flushStreamEventsInner),
+    [flushStreamEventsInner],
+  );
 
   const enqueueStreamEvent = useCallback((uiSessionId: string, event: TimelineEvent) => {
     const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);

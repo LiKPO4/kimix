@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useMemo, useState, useCallback } from "react";
+import { memo, Profiler, useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -7,7 +7,7 @@ import { normalizePathForComparison } from "@/utils/pathCase";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { useChatRenderCache } from "@/hooks/useChatRenderCache";
 import { useProjectedTimeline } from "@/hooks/useProjectedTimeline";
-import { noteRenderTurnBodyRun } from "@/utils/perfDiag";
+import { noteProfilerCommit, noteRenderTurnBodyRun, timeSync } from "@/utils/perfDiag";
 import { useChatViewport } from "@/hooks/useChatViewport";
 import { EmptyState } from "./EmptyState";
 import { ChatNavigationRail } from "./ChatNavigationRail";
@@ -1239,7 +1239,7 @@ export const ChatThread = memo(function ChatThread() {
   )));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(
-    () => buildRenderItems(
+    () => timeSync("buildRenderItems", () => buildRenderItems(
       visibleEvents,
       session?.engine,
       splitEvents.attachedByUserId,
@@ -1247,7 +1247,7 @@ export const ChatThread = memo(function ChatThread() {
       sessionRoomAgentActivities,
       completedTurnRenderCacheRef.current,
       primaryRoomAgentId,
-    ),
+    )),
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, sessionRoomAgentActivities, primaryRoomAgentId]
   );
   const surfacedSubagentContentKeysRef = useRef(new Set<string>());
@@ -1617,6 +1617,10 @@ export const ChatThread = memo(function ChatThread() {
     setExpandedInitialTailSessionId(session.id);
   };
   return (
+    <Profiler
+      id="ChatThread"
+      onRender={(id, phase, actualDuration) => noteProfilerCommit(`react-commit:${id}:${phase}`, actualDuration)}
+    >
     <div className="relative h-full" style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
       {session.longTask && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
@@ -1720,5 +1724,6 @@ export const ChatThread = memo(function ChatThread() {
         </div>
       </div>
     </div>
+    </Profiler>
   );
 });

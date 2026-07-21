@@ -15,6 +15,7 @@ import {
   synchronizeCollaborationPrimaryMirror,
 } from "@/utils/collaborationRooms";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
+import { timeSync } from "./perfDiag";
 import { stripLegacyKimixClarificationWrapper } from "./eventMapper";
 import {
   commitState,
@@ -466,14 +467,14 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   try {
     const images: StoredImage[] = [];
     const [strippedSessions, strippedPending] = await Promise.all([
-      stripImagesFromSessions(snapshot.sessions, images),
+      timeSync("persist.stripSessions", () => stripImagesFromSessions(snapshot.sessions, images)),
       stripImagesFromPending(snapshot.pendingMessages, images),
     ]);
 
-    await commitState([
+    await timeSync("persist.commitState", () => commitState([
       { key: LOCAL_SESSIONS_KEY, value: strippedSessions },
       { key: LOCAL_PENDING_KEY, value: strippedPending },
-    ], images);
+    ], images));
 
     const referencedRefs = new Set<string>();
     collectImageRefs(strippedSessions, referencedRefs);
