@@ -717,7 +717,16 @@ export function AppShell() {
       setUpdateState((state) => ({ ...state, downloading: false, downloadProgress: null, message: `升级失败：${res.error}` }));
       return;
     }
-    setUpdateState((state) => ({ ...state, downloading: false, downloadProgress: state.downloadProgress ? { ...state.downloadProgress, percent: 100 } : { percent: 100, receivedBytes: 0 }, message: res.data.message }));
+    const downloaded = Boolean(res.data.filePath);
+    setUpdateState((state) => ({
+      ...state,
+      downloading: false,
+      // Avoid leaving a fake "0 B / 未知大小" after open-browser fallback.
+      downloadProgress: downloaded
+        ? (state.downloadProgress ? { ...state.downloadProgress, percent: 100 } : { percent: 100, receivedBytes: 0 })
+        : null,
+      message: res.data.message,
+    }));
     showToast(res.data.message);
   };
 

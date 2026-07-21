@@ -2,6 +2,8 @@ export type ReleaseFeedAsset = {
   name: string;
   downloadUrl: string;
   size?: number;
+  sha256?: string;
+  sha512?: string;
 };
 
 export type ReleaseFeedItem = {
@@ -85,4 +87,152 @@ export function parseReleaseAtom(xml: string, limit: number, releasesUrl: string
       };
     })
     .filter((release) => release.tagName);
+}
+
+export function normalizeReleaseTag(tagName: string) {
+  return tagName.trim().replace(/^v/i, "").toLowerCase();
+}
+
+export function electronBuilderLatestYmlName(platform: string = process.platform) {
+  if (platform === "darwin") return "latest-mac.yml";
+  if (platform === "linux") return "latest-linux.yml";
+  return "latest.yml";
+}
+
+export function buildGithubReleaseAssetUrl(repo: string, tagName: string, fileName: string) {
+  const tag = tagName.trim() || "latest";
+  const encodedTag = encodeURIComponent(tag).replace(/%2F/gi, "/");
+  const encodedName = encodeURIComponent(fileName).replace(/%2F/gi, "/");
+  return `https://github.com/${repo}/releases/download/${encodedTag}/${encodedName}`;
+}
+
+function stripYamlScalar(value: string) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+/**
+ * Parse electron-builder publish metadata (latest.yml / latest-mac.yml / latest-linux.yml).
+ * Avoids a runtime YAML dependency; only the fields Kimix needs are supported.
+ */
+export function parseElectronBuilderLatestYml(
+  yml: string,
+  repo: string,
+): {
+  version: string;
+  tagName: string;
+  publishedAt?: string;
+  assets: ReleaseFeedAsset[];
+} | null {
+  const version = yml.match(/^\s*version:\s*(.+)\s*$/m)?.[1];
+  if (!version) return null;
+  const normalizedVersion = stripYamlScalar(version);
+  if (!normalizedVersion) return null;
+  const tagName = normalizedVersion.startsWith("v") || normalizedVersion.startsWith("V")
+    ? normalizedVersion
+    : `v${normalizedVersion}`;
+  const releaseDateRaw = yml.match(/^\s*releaseDate:\s*(.+)\s*$/m)?.[1];
+  const publishedAt = releaseDateRaw ? stripYamlScalar(releaseDateRaw) : undefined;
+
+  const assets: ReleaseFeedAsset[] = [];
+  const lines = yml.split(/\r?\n/);
+  let inFiles = false;
+  let current: { url?: string; sha512?: string; size?: number } | null = null;
+
+  const flush = () => {
+    if (!current?.url) {
+      current = null;
+      return;
+    }
+    const urlOrName = current.url;
+    const name = urlOrName.split(/[?#]/, 1)[0]?.split("/").pop() || urlOrName;
+    const downloadUrl = /^https?:\/\//i.test(urlOrName)
+      ? urlOrName
+      : buildGithubReleaseAssetUrl(repo, tagName, name);
+    assets.push({
+      name,
+      downloadUrl,
+      size: current.size,
+      sha512: current.sha512,
+    });
+    current = null;
+  };
+
+  for (const raw of lines) {
+    if (!raw.trim() || raw.trimStart().startsWith("#")) continue;
+
+    if (/^\s*files:\s*$/.test(raw)) {
+      flush();
+      inFiles = true;
+      continue;
+    }
+
+    if (inFiles && raw.length > 0 && !/^\s/.test(raw)) {
+      flush();
+      inFiles = false;
+    }
+
+    if (!inFiles) continue;
+
+    const urlMatch = raw.match(/^\s*-\s*url:\s*(.+)\s*$/);
+    if (urlMatch) {
+      flush();
+      current = { url: stripYamlScalar(urlMatch[1]) };
+      continue;
+    }
+
+    if (!current) continue;
+
+    const shaMatch = raw.match(/^\s*sha512:\s*(.+)\s*$/);
+    if (shaMatch) {
+      current.sha512 = stripYamlScalar(shaMatch[1]);
+      continue;
+    }
+
+    const sizeMatch = raw.match(/^\s*size:\s*(\d+)\s*$/);
+    if (sizeMatch) {
+      const size = Number.parseInt(sizeMatch[1], 10);
+      if (Number.isFinite(size) && size > 0) current.size = size;
+    }
+  }
+  flush();
+
+  if (assets.length === 0) return null;
+  return { version: normalizedVersion, tagName, publishedAt, assets };
+}
+
+export function mergeReleaseAssets<T extends ReleaseFeedAsset>(
+  base: T[],
+  extra: T[],
+): T[] {
+  const byName = new Map<string, T>();
+  for (const asset of base) {
+    byName.set(asset.name, asset);
+  }
+  for (const asset of extra) {
+    const existing = byName.get(asset.name);
+    if (!existing) {
+      byName.set(asset.name, asset);
+      continue;
+    }
+    byName.set(asset.name, {
+      ...existing,
+      ...asset,
+      downloadUrl: existing.downloadUrl || asset.downloadUrl,
+      size: existing.size ?? asset.size,
+      sha256: existing.sha256 ?? asset.sha256,
+      sha512: existing.sha512 ?? asset.sha512,
+    });
+  }
+  return [...byName.values()];
+}
+
+export function releaseHasInstallerAsset(assets: { name: string }[]) {
+  return assets.some((asset) => /\.(exe|dmg|zip|appimage|deb)$/i.test(asset.name));
 }

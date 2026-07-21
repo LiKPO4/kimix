@@ -39,7 +39,15 @@ import {
   registerStartupBootstrapPublisher,
 } from "./startupBootstrap";
 import * as longTaskService from "./longTaskService";
-import { parseReleaseAtom } from "./releaseFeed";
+import {
+  electronBuilderLatestYmlName,
+  mergeReleaseAssets,
+  parseElectronBuilderLatestYml,
+  parseReleaseAtom,
+  releaseHasInstallerAsset,
+  type ReleaseFeedAsset,
+  type ReleaseFeedItem,
+} from "./releaseFeed";
 import type { AppSettings, ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload, Project } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
@@ -2830,6 +2838,9 @@ async function parseReleaseSha256(assets: { name?: unknown; browser_download_url
   }
 }
 
+type ReleaseAssetInfo = ReleaseFeedAsset;
+type ReleaseInfo = ReleaseFeedItem;
+
 async function mapGitHubRelease(data: {
   tag_name?: unknown;
   name?: unknown;
@@ -2837,7 +2848,7 @@ async function mapGitHubRelease(data: {
   published_at?: unknown;
   html_url?: unknown;
   assets?: unknown;
-}) {
+}): Promise<ReleaseInfo> {
   const assets = Array.isArray(data.assets) ? data.assets : [];
   const sha256Map = await parseReleaseSha256(assets);
   return {
@@ -2858,7 +2869,7 @@ async function mapGitHubRelease(data: {
   };
 }
 
-async function fetchReleaseAtom(limit: number) {
+async function fetchReleaseAtom(limit: number): Promise<ReleaseInfo[]> {
   const res = await fetchGitHubUpdateUrl(`https://github.com/${GITHUB_REPO}/releases.atom`, {
     headers: { "User-Agent": "Kimix" },
   });
@@ -2866,34 +2877,104 @@ async function fetchReleaseAtom(limit: number) {
   return parseReleaseAtom(await res.text(), limit, `https://github.com/${GITHUB_REPO}/releases`);
 }
 
-async function fetchRecentReleases(limit = 3) {
+async function fetchElectronBuilderLatestRelease(platform = process.platform): Promise<ReleaseInfo | null> {
+  const ymlName = electronBuilderLatestYmlName(platform);
+  const candidates = [
+    `https://github.com/${GITHUB_REPO}/releases/latest/download/${ymlName}`,
+    platform === "win32" ? `https://github.com/${GITHUB_REPO}/releases/latest/download/latest.yml` : "",
+  ].filter(Boolean);
+  for (const url of candidates) {
+    try {
+      const res = await fetchGitHubUpdateUrl(url, { headers: { "User-Agent": "Kimix" } });
+      if (!res.ok) continue;
+      const parsed = parseElectronBuilderLatestYml(await res.text(), GITHUB_REPO);
+      if (!parsed || parsed.assets.length === 0) continue;
+      return {
+        tagName: parsed.tagName,
+        name: `Kimix ${parsed.version}`,
+        body: "",
+        publishedAt: parsed.publishedAt ?? "",
+        htmlUrl: `https://github.com/${GITHUB_REPO}/releases/tag/${parsed.tagName}`,
+        assets: parsed.assets,
+      };
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+function enrichReleaseWithYmlAssets(release: ReleaseInfo, ymlRelease: ReleaseInfo | null): ReleaseInfo {
+  if (!ymlRelease) return release;
+  return {
+    ...release,
+    publishedAt: release.publishedAt || ymlRelease.publishedAt,
+    htmlUrl: release.htmlUrl || ymlRelease.htmlUrl,
+    assets: mergeReleaseAssets(release.assets, ymlRelease.assets),
+  };
+}
+
+async function ensureReleaseInstallerAssets(release: ReleaseInfo | null): Promise<ReleaseInfo | null> {
+  if (!release) return null;
+  if (releaseHasInstallerAsset(release.assets)) {
+    // Still merge yml checksums when present — API path has sha256, yml has sha512.
+    if (release.assets.some((asset) => !asset.sha256 && !asset.sha512)) {
+      const ymlRelease = await fetchElectronBuilderLatestRelease().catch(() => null);
+      if (ymlRelease && ymlRelease.tagName.replace(/^v/i, "").toLowerCase() === release.tagName.replace(/^v/i, "").toLowerCase()) {
+        return enrichReleaseWithYmlAssets(release, ymlRelease);
+      }
+    }
+    return release;
+  }
+  const ymlRelease = await fetchElectronBuilderLatestRelease().catch(() => null);
+  if (!ymlRelease) return release;
+  if (ymlRelease.tagName.replace(/^v/i, "").toLowerCase() !== release.tagName.replace(/^v/i, "").toLowerCase()) {
+    // Prefer the yml latest when Atom/API item has no installers at all.
+    return {
+      ...ymlRelease,
+      body: release.body || ymlRelease.body,
+      name: release.name || ymlRelease.name,
+    };
+  }
+  return enrichReleaseWithYmlAssets(release, ymlRelease);
+}
+
+async function fetchRecentReleases(limit = 3): Promise<ReleaseInfo[]> {
   const res = await fetchGitHubUpdateUrl(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${limit}`, {
     headers: {
       "Accept": "application/vnd.github+json",
       "User-Agent": "Kimix",
     },
   });
-  if (res.status === 403 || res.status === 429) return fetchReleaseAtom(limit);
-  if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
-  const data = await res.json() as unknown;
-  if (!Array.isArray(data)) return [];
-  const mapped = await Promise.all(data
-    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
-    .map((item) => mapGitHubRelease(item)));
-  return mapped.filter((release) => release.tagName);
+  let releases: ReleaseInfo[] = [];
+  if (res.status === 403 || res.status === 429) {
+    releases = await fetchReleaseAtom(limit);
+  } else if (res.status === 404) {
+    releases = [];
+  } else if (!res.ok) {
+    throw new Error(`GitHub 返回 ${res.status}`);
+  } else {
+    const data = await res.json() as unknown;
+    if (!Array.isArray(data)) return [];
+    const mapped = await Promise.all(data
+      .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+      .map((item) => mapGitHubRelease(item)));
+    releases = mapped.filter((release) => release.tagName);
+  }
+
+  if (releases.length === 0) {
+    const ymlOnly = await fetchElectronBuilderLatestRelease().catch(() => null);
+    return ymlOnly ? [ymlOnly] : [];
+  }
+
+  const [latest, ...rest] = releases;
+  const enrichedLatest = await ensureReleaseInstallerAssets(latest);
+  return enrichedLatest ? [enrichedLatest, ...rest] : releases;
 }
 
 async function fetchLatestRelease() {
   return (await fetchRecentReleases(1))[0] ?? null;
 }
-
-type ReleaseAssetInfo = {
-  name: string;
-  downloadUrl: string;
-  size?: number;
-  sha256?: string;
-};
 
 let githubUpdateSessionPromise: Promise<Electron.Session> | null = null;
 
@@ -3395,12 +3476,19 @@ async function downloadUpdateAsset(asset: ReleaseAssetInfo, tagName: string) {
     if (asset.size && actualSize !== asset.size) {
       throw new Error(`下载完整性校验失败：大小不匹配（期望 ${asset.size}，实际 ${actualSize}）`);
     }
-    if (!asset.sha256) {
-      throw new Error("缺少 SHA256 校验值，拒绝自动安装");
-    }
-    const actualSha256 = createHash("sha256").update(await fs.promises.readFile(tempPath)).digest("hex");
-    if (actualSha256 !== asset.sha256) {
-      throw new Error(`下载完整性校验失败：SHA256 不匹配（期望 ${asset.sha256}，实际 ${actualSha256}）`);
+    const fileBytes = await fs.promises.readFile(tempPath);
+    if (asset.sha256) {
+      const actualSha256 = createHash("sha256").update(fileBytes).digest("hex");
+      if (actualSha256 !== asset.sha256.toLowerCase()) {
+        throw new Error(`下载完整性校验失败：SHA256 不匹配（期望 ${asset.sha256}，实际 ${actualSha256}）`);
+      }
+    } else if (asset.sha512) {
+      const actualSha512 = createHash("sha512").update(fileBytes).digest("base64");
+      if (actualSha512 !== asset.sha512) {
+        throw new Error(`下载完整性校验失败：SHA512 不匹配（期望 ${asset.sha512}，实际 ${actualSha512}）`);
+      }
+    } else {
+      throw new Error("缺少 SHA256/SHA512 校验值，拒绝自动安装");
     }
     await fs.promises.rename(tempPath, targetPath);
   } catch (err) {
