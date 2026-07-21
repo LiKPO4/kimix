@@ -1,10 +1,12 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
 import {
+  appendStreamingText,
   applyActiveTurnDraftDelta,
   clearActiveTurnDraftsForSession,
   draftToAssistantEvent,
   getActiveTurnDraft,
+  isAuthoritativeAssistantBodyEvent,
   makeActiveTurnDraftKey,
   pickDraftText,
   resetActiveTurnDraftStoreForTests,
@@ -116,5 +118,30 @@ describe("activeTurnDraftStore", () => {
     expect(pickDraftText("hello world", "hello")).toBe("hello world");
     expect(pickDraftText("hi", "hello")).toBe("hello");
     expect(pickDraftText(undefined, "event")).toBe("event");
+  });
+
+  it("appendStreamingText does not double cumulative frames and keeps pure deltas", () => {
+    expect(appendStreamingText("你好霖江路", "你好霖江路\n\n本轮目标")).toBe("你好霖江路\n\n本轮目标");
+    expect(appendStreamingText("你好", "世界")).toBe("你好世界");
+    expect(appendStreamingText("Hel", "lo")).toBe("Hello");
+  });
+
+  it("does not double greeting when cumulative content.part frames arrive as draft deltas", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("你好霖江路"));
+    applyActiveTurnDraftDelta(key, delta("你好霖江路\n\n接手中：先读 TASK_STATE.md"));
+    applyActiveTurnDraftDelta(key, delta("你好霖江路\n\n接手中：先读 TASK_STATE.md\n\n## 本轮目标"));
+    const content = getActiveTurnDraft(key)?.content ?? "";
+    expect(content.startsWith("你好霖江路")).toBe(true);
+    expect(content.match(/你好霖江路/g)?.length).toBe(1);
+    expect(content).toContain("## 本轮目标");
+  });
+
+  it("marks complete/barrier bodies as authoritative", () => {
+    expect(isAuthoritativeAssistantBodyEvent(delta("全文", { isComplete: true }))).toBe(true);
+    expect(isAuthoritativeAssistantBodyEvent(delta("全文", { completionBarrierReplay: true }))).toBe(true);
+    expect(isAuthoritativeAssistantBodyEvent(delta("全文", { snapshotMessageIdStable: true, snapshotMessageId: "m1" }))).toBe(true);
+    expect(isAuthoritativeAssistantBodyEvent(delta("增量"))).toBe(false);
+    expect(isAuthoritativeAssistantBodyEvent(delta("", { isComplete: true }))).toBe(false);
   });
 });

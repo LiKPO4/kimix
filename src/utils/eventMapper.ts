@@ -1745,17 +1745,33 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         }
         return appendAfterConfirmedSteer(existing, [incoming]);
       }
+      // Complete / barrier frames with body text are authoritative: REPLACE.
+      // Live frames use prefix-safe merge so cumulative content.part does not
+      // double the greeting, while pure token deltas still concatenate.
+      const replaceOpenBody = Boolean(
+        incoming.content.trim() &&
+        (incoming.isComplete || incoming.completionBarrierReplay)
+      );
+      const mergeLiveBody = (existingContent: string, incomingContent: string) => {
+        if (!incomingContent) return existingContent;
+        if (!existingContent) return incomingContent;
+        if (incomingContent === existingContent) return existingContent;
+        if (incomingContent.startsWith(existingContent)) return incomingContent;
+        if (existingContent.startsWith(incomingContent)) return existingContent;
+        return existingContent + incomingContent;
+      };
       const updated: typeof last = {
         ...last,
         snapshotMessageId: last.snapshotMessageId ?? incoming.snapshotMessageId,
         snapshotMessageIdStable: last.snapshotMessageIdStable ?? incoming.snapshotMessageIdStable,
+        completionBarrierReplay: incoming.completionBarrierReplay ?? last.completionBarrierReplay,
         agentRole: incoming.agentRole ?? last.agentRole,
         model: incoming.model ?? last.model,
-        content: appendAssistantContent(last.content, incoming.content),
-        thinking: incoming.thinking ? (last.thinking ?? "") + incoming.thinking : last.thinking,
-        thinkingParts: incoming.thinkingParts
-          ? [...(last.thinkingParts ?? []), ...incoming.thinkingParts]
-          : last.thinkingParts,
+        content: replaceOpenBody
+          ? incoming.content
+          : mergeLiveBody(last.content, incoming.content),
+        thinking: mergeAssistantThinkingText(last.thinking, incoming.thinking),
+        thinkingParts: mergeAssistantThinkingParts(last.thinkingParts, incoming.thinkingParts),
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
         durationMs: incoming.isComplete

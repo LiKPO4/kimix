@@ -317,6 +317,63 @@ describe("mergeEvents", () => {
     expect(result[1].type).toBe("assistant_message");
   });
 
+  it("replaces open assistant body when a complete frame carries full content (no greeting double)", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 1, content: "hi", agentTurnId: "turn-1" },
+      {
+        id: "a-open",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "你好霖江路\n\n接手中：先读",
+        isThinking: false,
+        isComplete: false,
+        agentTurnId: "turn-1",
+      },
+    ];
+    const complete: TimelineEvent = {
+      id: "a-done",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "你好霖江路\n\n接手中：先读 TASK_STATE.md\n\n## 本轮目标\n对齐仓库",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, complete);
+    const assistant = result.find((event) => event.type === "assistant_message");
+    expect(assistant).toMatchObject({ isComplete: true });
+    expect(assistant && assistant.type === "assistant_message" ? assistant.content : "").toBe(
+      "你好霖江路\n\n接手中：先读 TASK_STATE.md\n\n## 本轮目标\n对齐仓库",
+    );
+    expect(assistant && assistant.type === "assistant_message" ? assistant.content.match(/你好霖江路/g)?.length : 0).toBe(1);
+  });
+
+  it("overlap-merges live deltas into the open assistant without doubling prefixes", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "a-open",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "你好霖江路",
+        isThinking: false,
+        isComplete: false,
+        agentTurnId: "turn-1",
+      },
+    ];
+    const cumulative: TimelineEvent = {
+      id: "a-delta",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "你好霖江路\n\n本轮目标",
+      isThinking: false,
+      isComplete: false,
+      agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, cumulative);
+    const assistant = result[0];
+    expect(assistant.type === "assistant_message" && assistant.content).toBe("你好霖江路\n\n本轮目标");
+  });
+
   it("keeps local user image data when the official echo only has an image file id", () => {
     const existing: TimelineEvent[] = [
       {

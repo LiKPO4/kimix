@@ -2298,13 +2298,22 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
     )
   );
   const isActiveAssistant = Boolean(isAssistantActive);
+  // Prefer event.agentTurnId; fall back to live room activity so the Body keeps
+  // reading the same draft key the stream writer uses when the placeholder is
+  // still missing a stamped turn id.
+  const activityTurnId = (
+    sessionId && event.roomAgentId
+      ? roomAgentActivities[roomAgentActivityKey(sessionId, event.roomAgentId)]?.activeTurnId
+      : undefined
+  );
+  const draftTurnId = event.agentTurnId ?? activityTurnId;
   const draftKey = (
     isActiveTurnDraftEnabled() &&
     isActiveAssistant &&
     !event.isComplete &&
     sessionId &&
-    event.agentTurnId
-  ) ? makeActiveTurnDraftKey(sessionId, event.roomAgentId, event.agentTurnId) : null;
+    draftTurnId
+  ) ? makeActiveTurnDraftKey(sessionId, event.roomAgentId, draftTurnId) : null;
   const activeDraft = useActiveTurnDraft(draftKey);
   const displayContent = pickDraftText(activeDraft?.content, event.content);
   const displayThinking = pickDraftText(activeDraft?.thinking, event.thinking);

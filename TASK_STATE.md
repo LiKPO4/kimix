@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.88 流式正文空白/问候重复
+
+- 现象：输出中正文短/像用户复述；结束后完整但「你好霖江路」出现两次。
+- 根因：draft 傻拼接 + 完成/barrier 全文再 append；Body 缺 turnId 时订不到 draft。
+- 修复（不动性能路径：draft 仍只写局部、合帧 10fps、权威帧仍走 formal）：
+  1. draft `appendStreamingText` 前缀安全合并（防累积帧加倍，真 delta 仍 concat）
+  2. 权威正文帧（complete/barrier/stable）到达时 **丢弃 draft** 不 commit
+  3. open assistant：complete/barrier 带 body → **REPLACE**；live 用前缀安全 merge
+  4. Body draft key 回退 `roomAgentActivities.activeTurnId`
+- 验收：973 测试 + typecheck；用户复测流式可见、完成后问候不重复。
+
 ## 2026-07-21 v2.16.87 CDP CPU profile 主因：isHiddenInternalSession 全量扫 events
 
 - 取证：lag-watch 抓到 stall lag=3425ms / 7828ms；profile self 热点：

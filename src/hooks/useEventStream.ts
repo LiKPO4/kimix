@@ -13,7 +13,9 @@ import {
 } from "@/utils/collaborationRooms";
 import {
   applyActiveTurnDraftDelta,
+  clearActiveTurnDraft,
   draftToAssistantEvent,
+  isAuthoritativeAssistantBodyEvent,
   listActiveTurnDraftKeys,
   makeActiveTurnDraftKey,
   parseActiveTurnDraftKey,
@@ -180,18 +182,26 @@ export function useEventStream() {
       isDeferrableStreamEvent(scoped) &&
       scoped.type === "assistant_message" &&
       !scoped.snapshotMessageId &&
-      !scoped.snapshotMessageIdStable
+      !scoped.snapshotMessageIdStable &&
+      !scoped.completionBarrierReplay
     ) {
       applyActiveTurnDraftDelta(draftKey, scoped);
       return;
     }
 
     if (isActiveTurnDraftEnabled()) {
-      commitActiveTurnDraftsToBatch(streamBatchRef.current, {
-        sessionId: uiSessionId,
-        roomAgentId,
-        agentTurnId: typeof scoped.agentTurnId === "string" ? scoped.agentTurnId : undefined,
-      });
+      // Authoritative full-body frames (barrier / stable snapshot / complete with
+      // content) own the final text. Drop the draft instead of committing it so
+      // mergeEvents does not append draft + full body (duplicate greeting).
+      if (draftKey && isAuthoritativeAssistantBodyEvent(scoped)) {
+        clearActiveTurnDraft(draftKey);
+      } else {
+        commitActiveTurnDraftsToBatch(streamBatchRef.current, {
+          sessionId: uiSessionId,
+          roomAgentId,
+          agentTurnId: typeof scoped.agentTurnId === "string" ? scoped.agentTurnId : undefined,
+        });
+      }
     }
 
     const key = JSON.stringify([uiSessionId, roomAgentId]);

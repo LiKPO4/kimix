@@ -129,6 +129,30 @@ function toAssistantShell(draft: ActiveTurnDraft, key: string): AssistantMessage
   };
 }
 
+/**
+ * Merge streaming text fragments without doubling cumulative frames.
+ * Only treats clear prefix/suffix relationships as non-delta; pure token
+ * fragments (e.g. "Hel" + "lo") must stay simple concatenation — fuzzy
+ * character overlap would corrupt them ("Helo").
+ */
+export function appendStreamingText(existing: string, incoming: string): string {
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  if (incoming === existing) return existing;
+  // Cumulative content.part / restated frames: incoming already contains prior text.
+  if (incoming.startsWith(existing)) return incoming;
+  if (existing.startsWith(incoming)) return existing;
+  // Exact repeated suffix (re-sent same tail).
+  if (existing.endsWith(incoming)) return existing;
+  return existing + incoming;
+}
+
+function appendStreamingThinking(existing: string | undefined, incoming: string | undefined): string | undefined {
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  return appendStreamingText(existing, incoming);
+}
+
 export function applyActiveTurnDraftDelta(
   key: string,
   event: AssistantMessage,
@@ -154,16 +178,15 @@ export function applyActiveTurnDraftDelta(
         agentId: event.agentId,
       };
 
-  // Deltas routed here are append-only text/thinking fragments (snapshot and
-  // barrier frames stay on the formal path upstream), so accumulate directly
-  // instead of running the full merge machinery per token. Snapshot-bearing
-  // events fall back to mergeEvents for safety.
+  // Deltas routed here are live text/thinking fragments (snapshot and barrier
+  // frames stay on the formal path upstream). Prefer O(fragment) accumulation
+  // with overlap-safe merge; snapshot-bearing events fall back to mergeEvents.
   const isAppendOnlyDelta = !event.snapshotMessageId && !event.snapshotMessageIdStable;
   const merged = isAppendOnlyDelta
     ? [{
         ...base,
-        content: base.content + (event.content ?? ""),
-        thinking: event.thinking ? (base.thinking ?? "") + event.thinking : base.thinking,
+        content: appendStreamingText(base.content, event.content ?? ""),
+        thinking: appendStreamingThinking(base.thinking, event.thinking),
         thinkingParts: event.thinkingParts
           ? [...(base.thinkingParts ?? []), ...event.thinkingParts]
           : base.thinkingParts,
@@ -241,7 +264,27 @@ export function draftToAssistantEvent(
 export function pickDraftText(draftText: string | undefined, eventText: string | undefined): string {
   const draft = draftText ?? "";
   const event = eventText ?? "";
+  if (!draft) return event;
+  if (!event) return draft;
+  // Prefer the longer snapshot when one is a prefix of the other (cumulative).
+  if (event.startsWith(draft)) return event;
+  if (draft.startsWith(event)) return draft;
   return draft.length >= event.length ? draft : event;
+}
+
+/**
+ * Formal frames that already carry the authoritative body. Committing draft
+ * text before these would append into the open assistant and then get a full
+ * body again → duplicated greetings / doubled early paragraphs.
+ */
+export function isAuthoritativeAssistantBodyEvent(event: TimelineEvent): boolean {
+  if (event.type !== "assistant_message") return false;
+  if (!event.content?.trim()) return false;
+  return Boolean(
+    event.completionBarrierReplay ||
+    event.snapshotMessageIdStable ||
+    event.isComplete
+  );
 }
 
 export function useActiveTurnDraft(key: string | null): ActiveTurnDraft | null {
