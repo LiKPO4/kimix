@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.84 冻结/爆发输出根因：running-sample 全量历史对账
+
+- 现象：输出中计时器冻结 11-20s 后跳变；正文长期不出、然后一下一大波；"已完成"复发。
+- 根因（归因数据 + 代码核验）：运行中对账循环在"流静默 4s 且状态 running"时触发 running-sample——**每次拉取整个官方历史**（IPC 传输 + 渲染主线程反序列化）+ `mapHistoryEvents` 全量映射 + `reconcileAgentCanonicalHistory` 全量对账。长思考（静默 8s+）时每 ~4s 触发一次，主线程秒级停滞（实测 lagMs 15225，无长任务归因说明成本在 IPC 反序列化/大批量小任务而非单个长 JS 任务）。正文"爆发"= 完成快照经对账一次性换入；冻结窗口中对账/权威帧把事件置完成 = "已完成"复发。
+- 修复：触发阈值 4s → 30s（30s 静默且 running 才是"可能丢事件"的强信号，频率降 10 倍）；fetch/map/reconcile 三段加 `timeSync("runningSample.*")` 归因，下次复现可在 diag.log 直接看到各段成本。
+- 说明：正文"一阵不出然后一大波"还有一部分是上游交付语义（deepseek 静默思考约 20s 后正文以大帧送达，历史快照证实正文为单个 completionBarrierReplay 大帧），不是 Kimix 渲染问题；本会话同时有多个会话的后台对账（含本机另一个 Kimi 会话）也是背景噪音。
+- 测试：全量 962 + typecheck + build；验收待用户复现（diag.log 看 runningSample.* 三段耗时）。
+
 ## 2026-07-21 v2.16.83 流式卡顿三轮根因（归因数据驱动）
 
 - 取证（v2.16.82 埋点 + 用户复现 diag.log + 视频）：

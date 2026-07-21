@@ -67,6 +67,7 @@ import {
   shouldReplaceWithCanonicalKimiHistory,
 } from "@/utils/kimiHistoryReconciliation";
 import { logError } from "@/utils/reportError";
+import { timeSync } from "@/utils/perfDiag";
 import {
   getRoomAgent,
   getRoomAgents,
@@ -3213,28 +3214,33 @@ function App() {
           const now = Date.now();
           const lastStreamEventAt = runtimeLastStreamEventAtRef.current.get(runtimeSessionId) ?? reconciliationStartedAt;
           const lastHistoryRefreshAt = runtimeHistoryRefreshAtRef.current.get(runtimeSessionId) ?? 0;
+          // The running-sample fetch pulls the ENTIRE official history over IPC
+          // and maps + reconciles it on the main thread. At 4s of stream
+          // silence (normal thinking!) this fired every ~4s and stalled the UI
+          // for seconds at a time. 30s silence with a still-running status is a
+          // far stronger "events were missed" signal and cuts the cost 10x.
           if (
             response.data.engineStatus === "running" &&
-            now - lastStreamEventAt >= 4_000 &&
-            now - lastHistoryRefreshAt >= 4_000
+            now - lastStreamEventAt >= 30_000 &&
+            now - lastHistoryRefreshAt >= 30_000
           ) {
             runtimeHistoryRefreshAtRef.current.set(runtimeSessionId, now);
-            const loaded = await window.api.loadKimiCodeSession({
+            const loaded = await timeSync("runningSample.loadHistory", () => window.api.loadKimiCodeSession({
               workDir: session.projectPath,
               sessionId: runtimeSessionId,
-            }).catch(() => null);
+            })).catch(() => null);
             if (disposed || !loaded?.success) return;
-            const canonicalSnapshotEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+            const canonicalSnapshotEvents = timeSync("runningSample.mapHistory", () => mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
             let applied = false;
             updateSession(session.id, (item) => {
               const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
-              const reconciliation = reconcileAgentCanonicalHistory({
+              const reconciliation = timeSync("runningSample.reconcile", () => reconcileAgentCanonicalHistory({
                 session: item,
                 roomAgentId,
                 expectedRuntimeSessionId: runtimeSessionId,
                 canonicalEvents: canonicalSnapshotEvents,
                 reason: "running-sample",
-              });
+              }));
               if (!reconciliation.applied) {
                 return item;
               }
