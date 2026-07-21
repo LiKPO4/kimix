@@ -7456,6 +7456,11 @@ app.on("activate", () => {
   }
 });
 
+// Expose the renderer over CDP so performance incidents can be profiled
+// remotely (electron --inspect covers only the main process).
+app.commandLine.appendSwitch("remote-debugging-port", "9222");
+app.commandLine.appendSwitch("remote-allow-origins", "http://127.0.0.1:9222");
+
 app.whenReady().then(() => {
   logMainStartup("app-ready");
   cleanupStaleScheduledShutdown();
