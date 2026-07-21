@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.81 流式全局卡顿二轮根因（持久化锤 + 状态事件失去批处理）
+
+- 现象：v2.16.80 后输出仍全局卡顿，菜单复制会话 id 困难。
+- 取证（IndexedDB blob）：持久化的会话值每代约 140MB（UTF-16，约 70MB JSON 文本）。输出期每次 80ms flush 都会调度防抖落盘（debounce 900ms / maxWait 5s）→ 每 ~5 秒一次：全量遍历 + JSON.stringify(70MB) + IDB 结构化克隆 140MB + 落盘 ≈ 1-3s 主线程阻塞 + 巨量 GC，周期性冻结所有交互（与 watchdog 10-14s 冻结一致）。
+- 第二根因（自查 A3 过度修正）：`status_update`（token 计数）与 running 子代理进度被归为"边界事件"立即 flush，高频信息事件绕过 80ms 批处理，每个都触发整树重渲染。冻结报告 lastEventType=status_update 佐证。
+- 修复：
+  1. `resolvePersistDelayMs`：流式活跃期间落盘降到每分钟最多一次；runningSessionId 结束、归档/删除、切后台、卸载时立即落盘。Server 会话崩溃后可从官方历史重建，窗口安全。
+  2. `isDeferrableStreamEvent` 扩到 status_update 与 running 子代理进度（留在 80ms/250ms 批内）；真正边界（工具生命周期、审批、提问、错误、完成、子代理状态跃迁）仍立即 flush。
+- 测试：persistDelay +2、useEventStream +1；全量 960 + typecheck。
+- 后续（若仍卡）：持久化分片（按会话增量序列化，消除 O(全量状态)）；projectCollaborationTimeline 每次 flush 对每条 room 消息重跑 delivery 解析的成本。
+
 ## 2026-07-21 v2.16.80 流式输出全局卡顿根因修复（draft 逐 token 唤醒）
 
 - 现象：Agent 输出时全 UI 卡顿，菜单里复制会话 id 都困难（watchdog 曾有 10-14s 冻结报告）。

@@ -31,6 +31,29 @@ export const LOCAL_ACTIVE_CONTEXT_KEY = "kimix_active_context";
 export const LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY = "kimix_archived_session_tombstones";
 export const LOCAL_PERSIST_DEBOUNCE_MS = 900;
 
+const STREAMING_PERSIST_DEBOUNCE_MS = 5000;
+const STREAMING_MAX_PERSIST_WAIT_MS = 60_000;
+const IDLE_MAX_PERSIST_WAIT_MS = 5000;
+
+/**
+ * Persist cadence for the debounced session-state writer. Each persist walks
+ * and serializes the whole sessions value (tens of MB for long sessions:
+ * stringify + IndexedDB structured clone on the main thread), so while the
+ * agent is actively streaming we trade durability window for UI
+ * responsiveness: at most one persist per minute, with an explicit flush when
+ * streaming ends, on archive/delete, on visibility loss, and on unload.
+ * Server-backed sessions re-import from canonical history after a crash, so
+ * the wider window is safe.
+ */
+export function resolvePersistDelayMs(options: {
+  streaming: boolean;
+  elapsedSincePersistMs: number;
+}): number {
+  const debounce = options.streaming ? STREAMING_PERSIST_DEBOUNCE_MS : LOCAL_PERSIST_DEBOUNCE_MS;
+  const maxWait = options.streaming ? STREAMING_MAX_PERSIST_WAIT_MS : IDLE_MAX_PERSIST_WAIT_MS;
+  return Math.max(0, Math.min(debounce, maxWait - options.elapsedSincePersistMs));
+}
+
 export type LocalActiveContext = {
   project: Project | null;
   sessionId: string | null;

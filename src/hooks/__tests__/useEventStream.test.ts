@@ -6,7 +6,7 @@ import {
   makeActiveTurnDraftKey,
   resetActiveTurnDraftStoreForTests,
 } from "@/utils/activeTurnDraftStore";
-import { coalesceStreamEventBatch, commitActiveTurnDraftsToBatch } from "../useEventStream";
+import { coalesceStreamEventBatch, commitActiveTurnDraftsToBatch, isDeferrableStreamEvent } from "../useEventStream";
 
 function assistant(content: string, patch: Partial<Extract<TimelineEvent, { type: "assistant_message" }>> = {}): TimelineEvent {
   return {
@@ -23,6 +23,20 @@ function assistant(content: string, patch: Partial<Extract<TimelineEvent, { type
     ...patch,
   };
 }
+
+describe("isDeferrableStreamEvent", () => {
+  it("defers informational high-frequency events but not true boundaries", () => {
+    const base = { id: "e1", timestamp: 1 };
+    expect(isDeferrableStreamEvent({ ...base, type: "assistant_message", content: "a", isThinking: false, isComplete: false })).toBe(true);
+    expect(isDeferrableStreamEvent({ ...base, type: "assistant_message", content: "a", isThinking: false, isComplete: true })).toBe(false);
+    expect(isDeferrableStreamEvent({ ...base, type: "status_update", message: "Context: 50%" })).toBe(true);
+    expect(isDeferrableStreamEvent({ ...base, type: "subagent", agentName: "w", status: "running", events: [] })).toBe(true);
+    expect(isDeferrableStreamEvent({ ...base, type: "subagent", agentName: "w", status: "completed", events: [] })).toBe(false);
+    expect(isDeferrableStreamEvent({ ...base, type: "tool_call", toolCallId: "t", toolName: "Bash", status: "running", arguments: {} })).toBe(false);
+    expect(isDeferrableStreamEvent({ ...base, type: "approval_request", requestId: "r", toolName: "Bash", description: "d", details: "x", riskLevel: "low", status: "pending" })).toBe(false);
+    expect(isDeferrableStreamEvent({ ...base, type: "error", message: "x" })).toBe(false);
+  });
+});
 
 describe("coalesceStreamEventBatch", () => {
   it("combines adjacent assistant text and thinking deltas", () => {

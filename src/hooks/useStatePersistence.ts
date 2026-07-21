@@ -3,11 +3,11 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useAppStore } from "@/stores/appStore";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import {
-  LOCAL_PERSIST_DEBOUNCE_MS,
   forgetArchivedSessionTombstone,
   persistLocalActiveContext,
   persistLocalConversationState,
   rememberArchivedSessionTombstone,
+  resolvePersistDelayMs,
 } from "@/utils/persistence";
 
 export function useStatePersistence(activeContextReady = true) {
@@ -24,7 +24,12 @@ export function useStatePersistence(activeContextReady = true) {
   }, [activeContextReady]);
 
   useEffect(() => {
-    const maxPersistWaitMs = 5000;
+    const STREAMING_ACTIVITY_STATUSES = new Set(["creating", "queued", "sending", "accepted", "running", "waiting_approval", "waiting_question"]);
+    const hasActiveStreamingWork = () => {
+      const appState = useAppStore.getState();
+      if (appState.runningSessionId) return true;
+      return Object.values(appState.roomAgentActivities).some((activity) => STREAMING_ACTIVITY_STATUSES.has(activity.status));
+    };
 
     const clearConversationPersistTimer = () => {
       if (persistenceTimerRef.current) {
@@ -45,7 +50,7 @@ export function useStatePersistence(activeContextReady = true) {
       conversationDirtyRef.current = true;
       if (persistenceTimerRef.current) clearTimeout(persistenceTimerRef.current);
       const elapsedSincePersist = Date.now() - lastConversationPersistAtRef.current;
-      const delay = Math.max(0, Math.min(LOCAL_PERSIST_DEBOUNCE_MS, maxPersistWaitMs - elapsedSincePersist));
+      const delay = resolvePersistDelayMs({ streaming: hasActiveStreamingWork(), elapsedSincePersistMs: elapsedSincePersist });
       persistenceTimerRef.current = setTimeout(() => {
         persistenceTimerRef.current = null;
         conversationDirtyRef.current = false;
@@ -85,6 +90,13 @@ export function useStatePersistence(activeContextReady = true) {
       if (!activeContextReadyRef.current) return;
       persistLocalActiveContext();
     });
+    // Streaming stretches the persist cadence to once per minute; flush as
+    // soon as the running turn ends so the wider durability window closes.
+    const unsubscribeStreamingEndPersistence = useAppStore.subscribe((state, prev) => {
+      if (prev.runningSessionId && !state.runningSessionId) {
+        void flushLocalConversationState();
+      }
+    });
 
     const handleBeforeUnload = () => {
       isUnloadingRef.current = true;
@@ -105,6 +117,7 @@ export function useStatePersistence(activeContextReady = true) {
     return () => {
       unsubscribeSessionPersistence();
       unsubscribeActiveContextPersistence();
+      unsubscribeStreamingEndPersistence();
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearConversationPersistTimer();

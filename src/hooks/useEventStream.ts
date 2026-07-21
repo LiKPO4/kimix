@@ -26,7 +26,16 @@ const STREAM_EVENT_FLUSH_MS = 80;
 const STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING = 250;
 
 export function isDeferrableStreamEvent(event: TimelineEvent): boolean {
-  return event.type === "assistant_message" && !event.isComplete;
+  if (event.type === "assistant_message" && !event.isComplete) return true;
+  // Status updates (token counts, progress text) and running-subagent progress
+  // are informational and can arrive at high frequency; flushing them
+  // immediately would bypass the 80ms batch and re-render the whole thread per
+  // event. They merge cheaply in the batch. True boundaries (tool lifecycle,
+  // approvals, questions, errors, completion, subagent status transitions)
+  // still flush immediately.
+  if (event.type === "status_update") return true;
+  if (event.type === "subagent" && event.status === "running") return true;
+  return false;
 }
 
 function batchHasBoundaryEvent(items: TimelineEvent[]): boolean {
