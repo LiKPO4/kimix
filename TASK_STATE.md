@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.86 贴底 settle 空转风暴（CDP 卡顿取证）
+
+- 证据：lag-watch 测到主线程 timer lag 1733ms；diag 在 07:09:53 起 1.5s 内 `settleSessionAtBottom`→`scrollToBottom` token 37→50+ 连打，且 height 已稳定在 9187/8681；10s 窗 auto-follow 写 scrollTop 23 次。
+- 根因：`settleSessionAtBottom` 每 80ms 递归贴底最多 6s，**从不检查是否已在底部**；`sessionAutoBottomStableRef` 写了从未用于提前退出；每次还 `writeDiag` IPC（before+after）→ 每秒数十次跨进程小任务，与「无长任务但事件循环停滞」一致。
+- 修复：已在底部且布局连续 3 次稳定则结束 settle；auto 贴底 no-op 直接 return；递归去掉双重 rAF/双重 scroll；轮询 80→200ms。
+- 工具：`scripts/cdp-cpu-profile*.mjs`（内联采样已修）。
+- 验收：typecheck + viewport 测试；用户复现卡顿对比 diag 中 settle 风暴是否消失。
+
 ## 2026-07-21 v2.16.84 冻结/爆发输出根因：running-sample 全量历史对账
 
 - 现象：输出中计时器冻结 11-20s 后跳变；正文长期不出、然后一下一大波；"已完成"复发。

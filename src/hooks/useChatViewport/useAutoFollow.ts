@@ -61,9 +61,11 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
   } = options;
 
   const sessionAutoBottomTimerRef = useRef<number | null>(null);
-  const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; count: number } | null>(null);
+  const sessionAutoBottomStableRef = useRef<{ scrollHeight: number; clientHeight: number; stableAtBottomCount: number } | null>(null);
   // B2: coalesce same-frame auto-follow writes into a single rAF writer.
   const pendingAutoFollowRafRef = useRef<number | null>(null);
+  /** Consecutive polls at bottom with unchanged layout before ending the settle loop. */
+  const STABLE_AT_BOTTOM_POLLS = 3;
 
   const updateAutoFollow = useCallback((value: boolean) => {
     if (isAutoFollowRef.current === value) return;
@@ -94,6 +96,13 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
     const beforeScrollTop = node.scrollTop;
     const beforeScrollHeight = node.scrollHeight;
     const targetTop = bottomScrollTop(node);
+    const alreadyAtBottom = Math.abs(beforeScrollTop - targetTop) <= 2;
+    // Skip no-op auto scrolls — the settle loop used to rewrite scrollTop every
+    // 80ms for up to 6s even when already pinned, flooding IPC writeDiag.
+    if (behavior === "auto" && alreadyAtBottom && !locked) {
+      updateShowScrollToBottom(false);
+      return;
+    }
     window.api?.writeDiag?.({
       message: "[useAutoFollow] scrollToBottom",
       data: {
@@ -158,23 +167,41 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
       cancelSessionAutoBottom();
       return;
     }
-    scrollToBottom("auto");
     const remaining = sessionAutoBottomUntilRef.current - Date.now();
-    window.api?.writeDiag?.({
-      message: "[useAutoFollow] settleSessionAtBottom",
-      data: {
-        remaining,
-        scrollHeight: node.scrollHeight,
-        scrollTop: node.scrollTop,
-        clientHeight: node.clientHeight,
-        autoFollow: autoFollowRef.current,
-        userScroll: userScrollRef.current,
-      },
-    }).catch(logError("writeDiag"));
     if (remaining <= 0) {
       cancelSessionAutoBottom();
       return;
     }
+
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const atBottom = distance <= 2;
+    const prev = sessionAutoBottomStableRef.current;
+    if (
+      prev &&
+      prev.scrollHeight === node.scrollHeight &&
+      prev.clientHeight === node.clientHeight &&
+      atBottom
+    ) {
+      prev.stableAtBottomCount += 1;
+    } else {
+      sessionAutoBottomStableRef.current = {
+        scrollHeight: node.scrollHeight,
+        clientHeight: node.clientHeight,
+        stableAtBottomCount: atBottom ? 1 : 0,
+      };
+    }
+
+    // Only write scrollTop when content actually grew away from the bottom.
+    if (!atBottom) {
+      scrollToBottom("auto");
+    }
+
+    const stableCount = sessionAutoBottomStableRef.current?.stableAtBottomCount ?? 0;
+    if (stableCount >= STABLE_AT_BOTTOM_POLLS) {
+      cancelSessionAutoBottom();
+      return;
+    }
+
     clearSessionAutoBottomTimer();
     sessionAutoBottomTimerRef.current = window.setTimeout(() => {
       sessionAutoBottomTimerRef.current = null;
@@ -182,15 +209,13 @@ export function useAutoFollow(options: UseAutoFollowOptions): UseAutoFollowResul
         cancelSessionAutoBottom();
         return;
       }
+      // One rAF is enough; double-rAF + nested scrollToBottom was thrashing.
       window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          if (!autoFollowRef.current || userScrollRef.current) {
-            cancelSessionAutoBottom();
-            return;
-          }
-          scrollToBottom("auto");
-          settleSessionAtBottom();
-        });
+        if (!autoFollowRef.current || userScrollRef.current) {
+          cancelSessionAutoBottom();
+          return;
+        }
+        settleSessionAtBottom();
       });
     }, Math.min(SESSION_LAYOUT_STABLE_MS, remaining));
   }, [scrollRef, autoFollowRef, userScrollRef, sessionAutoBottomUntilRef, scrollToBottom, cancelSessionAutoBottom, clearSessionAutoBottomTimer]);
