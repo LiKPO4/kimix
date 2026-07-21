@@ -8,6 +8,7 @@ import {
   makeActiveTurnDraftKey,
   pickDraftText,
   resetActiveTurnDraftStoreForTests,
+  subscribeActiveTurnDraft,
   takeActiveTurnDraft,
 } from "../activeTurnDraftStore";
 
@@ -77,6 +78,38 @@ describe("activeTurnDraftStore", () => {
     expect(getActiveTurnDraft(makeActiveTurnDraftKey("s1", "a", "t1"))).toBeNull();
     expect(getActiveTurnDraft(makeActiveTurnDraftKey("s1", "b", "t2"))).toBeNull();
     expect(getActiveTurnDraft(makeActiveTurnDraftKey("s2", "a", "t1"))?.content).toBe("3");
+  });
+
+  it("batches delta notifications to one per frame", async () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    let calls = 0;
+    const unsubscribe = subscribeActiveTurnDraft(key, () => { calls += 1; });
+    applyActiveTurnDraftDelta(key, delta("你"));
+    applyActiveTurnDraftDelta(key, delta("好"));
+    applyActiveTurnDraftDelta(key, delta("世"));
+    expect(calls).toBe(0);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(calls).toBe(1);
+    expect(getActiveTurnDraft(key)?.content).toBe("你好世");
+    unsubscribe();
+  });
+
+  it("take delivers pending notifications synchronously", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    let calls = 0;
+    const unsubscribe = subscribeActiveTurnDraft(key, () => { calls += 1; });
+    applyActiveTurnDraftDelta(key, delta("正文"));
+    const taken = takeActiveTurnDraft(key);
+    expect(taken?.content).toBe("正文");
+    expect(calls).toBeGreaterThanOrEqual(1);
+    unsubscribe();
+  });
+
+  it("accumulates thinking parts across append-only deltas", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("", { thinkingParts: [{ id: "p1", timestamp: 1, text: "第一段" }] }));
+    applyActiveTurnDraftDelta(key, delta("", { thinkingParts: [{ id: "p2", timestamp: 2, text: "第二段" }] }));
+    expect(getActiveTurnDraft(key)?.thinkingParts?.map((part) => part.text)).toEqual(["第一段", "第二段"]);
   });
 
   it("pickDraftText prefers the longer snapshot", () => {

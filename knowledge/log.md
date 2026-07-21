@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Draft notifications coalesce per frame; draft merge is append-only**: per-token `notify` made every delta re-render the whole bubble with full-content markdown work, starving all UI during streaming (10-14s watchdog freezes). Notifications now batch to one per rAF (250 ms while user scrolls), commit paths flush synchronously, delta merge skips the full mergeEvents machinery, and the plain streaming path skips markdown normalization. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
 * **Withdrawal must undo official history for dispatched-but-unanswered messages**: `hasOfficialTurnEvidenceAfterUser` proves output, not dispatch; withdrawing an unanswered dispatched message locally left it in the official history and the next prompt saw the block twice. The withdrawal now verifies against the official history (`officialHistoryHasUserMessageAsLatest`) before falling back to local-only. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Settle authority split: guarded settle for heuristic paths**: `settleInactiveEvents` now takes `guardRecentActivity` — polling, hydration, and persistence no longer force-complete open assistants or delete placeholders while any timeline event is younger than the stale-work window; only the authoritative prompt.completed status event settles immediately. Fixes bubbles self-completing mid-output. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

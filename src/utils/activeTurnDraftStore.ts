@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { TimelineEvent } from "@/types/ui";
 import { mergeEvents } from "@/utils/eventMapper";
+import { isScrollYieldEnabled } from "@/utils/perfFlags";
+import { isUserScrollActive } from "@/utils/userScrollActivity";
 
 type AssistantMessage = Extract<TimelineEvent, { type: "assistant_message" }>;
 
@@ -29,6 +31,42 @@ function notify(key: string) {
     for (const listener of keyed) listener();
   }
   for (const listener of globalListeners) listener();
+}
+
+/**
+ * Stream deltas can arrive at token frequency; waking React per delta saturates
+ * the main thread (whole-bubble re-render + full-content markdown work per
+ * event). Notifications are coalesced to at most one per animation frame, and
+ * to a slower timer while the user is actively scrolling (scroll-yield).
+ * Commit paths (take/clear) flush synchronously so no update is ever lost.
+ */
+const SCROLLING_NOTIFY_MS = 250;
+const pendingNotifyKeys = new Set<string>();
+let notifyTimer: ReturnType<typeof setTimeout> | number | null = null;
+let notifyTimerIsRaf = false;
+
+function flushPendingNotifications() {
+  if (notifyTimer !== null) {
+    if (notifyTimerIsRaf && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(notifyTimer as number);
+    else clearTimeout(notifyTimer as ReturnType<typeof setTimeout>);
+    notifyTimer = null;
+  }
+  const keys = [...pendingNotifyKeys];
+  pendingNotifyKeys.clear();
+  for (const key of keys) notify(key);
+}
+
+function scheduleNotify(key: string) {
+  pendingNotifyKeys.add(key);
+  if (notifyTimer !== null) return;
+  const useScrollThrottle = isScrollYieldEnabled() && isUserScrollActive();
+  if (!useScrollThrottle && typeof requestAnimationFrame !== "undefined") {
+    notifyTimerIsRaf = true;
+    notifyTimer = requestAnimationFrame(flushPendingNotifications);
+    return;
+  }
+  notifyTimerIsRaf = false;
+  notifyTimer = setTimeout(flushPendingNotifications, useScrollThrottle ? SCROLLING_NOTIFY_MS : 16);
 }
 
 export function makeActiveTurnDraftKey(
@@ -117,10 +155,26 @@ export function applyActiveTurnDraftDelta(
         agentId: event.agentId,
       };
 
-  const merged = mergeEvents([base], {
-    ...event,
-    isComplete: false,
-  });
+  // Deltas routed here are append-only text/thinking fragments (snapshot and
+  // barrier frames stay on the formal path upstream), so accumulate directly
+  // instead of running the full merge machinery per token. Snapshot-bearing
+  // events fall back to mergeEvents for safety.
+  const isAppendOnlyDelta = !event.snapshotMessageId && !event.snapshotMessageIdStable;
+  const merged = isAppendOnlyDelta
+    ? [{
+        ...base,
+        content: base.content + (event.content ?? ""),
+        thinking: event.thinking ? (base.thinking ?? "") + event.thinking : base.thinking,
+        thinkingParts: event.thinkingParts
+          ? [...(base.thinkingParts ?? []), ...event.thinkingParts]
+          : base.thinkingParts,
+        model: event.model ?? base.model,
+        agentRole: event.agentRole ?? base.agentRole,
+      }]
+    : mergeEvents([base], {
+        ...event,
+        isComplete: false,
+      });
   const nextEvent = merged.find((item): item is AssistantMessage => item.type === "assistant_message") ?? base;
   const next: ActiveTurnDraft = {
     content: nextEvent.content,
@@ -135,13 +189,17 @@ export function applyActiveTurnDraftDelta(
     timestamp: previous?.timestamp ?? event.timestamp,
   };
   drafts.set(key, next);
-  notify(key);
+  scheduleNotify(key);
   return next;
 }
 
 export function takeActiveTurnDraft(key: string): ActiveTurnDraft | null {
   const draft = drafts.get(key) ?? null;
   if (!draft) return null;
+  // Committing the draft into formal events: deliver any pending batched
+  // notification synchronously so subscribers never read a stale draft.
+  pendingNotifyKeys.delete(key);
+  flushPendingNotifications();
   drafts.delete(key);
   notify(key);
   return draft;
@@ -149,11 +207,14 @@ export function takeActiveTurnDraft(key: string): ActiveTurnDraft | null {
 
 export function clearActiveTurnDraft(key: string): void {
   if (!drafts.has(key)) return;
+  pendingNotifyKeys.delete(key);
+  flushPendingNotifications();
   drafts.delete(key);
   notify(key);
 }
 
 export function clearActiveTurnDraftsForSession(sessionId: string): void {
+  flushPendingNotifications();
   const prefix = `${sessionId}\u0000`;
   let changed = false;
   for (const key of [...drafts.keys()]) {
@@ -200,4 +261,10 @@ export function resetActiveTurnDraftStoreForTests(): void {
   drafts.clear();
   listeners.clear();
   globalListeners.clear();
+  pendingNotifyKeys.clear();
+  if (notifyTimer !== null) {
+    if (notifyTimerIsRaf && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(notifyTimer as number);
+    else clearTimeout(notifyTimer as ReturnType<typeof setTimeout>);
+    notifyTimer = null;
+  }
 }

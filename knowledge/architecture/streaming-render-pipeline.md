@@ -70,6 +70,8 @@ events (tool start/end, approvals, questions, completion, failure) always flush
 immediately and carry buffered deltas with them; immediacy is a correctness
 requirement, not a tuning knob.
 
+Draft notifications are coalesced, never per-token. SSE deltas arrive at token frequency; waking React per delta saturates the main thread (whole-bubble re-render plus full-content markdown work per event), starving unrelated UI like menus. `scheduleNotify` batches draft updates to at most one per animation frame — and to a 250 ms timer while the user is actively scrolling — while commit paths (`take`/`clear`) flush pending notifications synchronously so no update is lost. Draft accumulation itself is append-only by construction (snapshot/barrier frames stay formal), so per-delta work must stay O(fragment); the plain streaming path also skips the full markdown-repair stack and renders raw content until the settled rich pass.
+
 ## Streaming markdown is plain until settled
 
 While an assistant turn is active, the body renders through a fence-aware plain

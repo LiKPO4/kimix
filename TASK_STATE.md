@@ -1,5 +1,20 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.80 流式输出全局卡顿根因修复（draft 逐 token 唤醒）
+
+- 现象：Agent 输出时全 UI 卡顿，菜单里复制会话 id 都困难（watchdog 曾有 10-14s 冻结报告）。
+- 第一性原理核算（每个 SSE delta 在主线程的成本）：
+  1. `applyActiveTurnDraftDelta` 每 token 跑完整 `mergeEvents`（thinkingParts 全量数组拷贝 O(n)/delta → O(n²)）。
+  2. `notify(key)` 每 token 同步唤醒 `useSyncExternalStore` → 整个 AssistantMessageBubble 重渲染：ProcessBlock（thinkingBlocks 重建）+ BodyBlock。
+  3. 每次渲染对**全量正文**跑 `normalizeMarkdownContent`（5 层正则修复栈）+ `splitStreamingPlainBlocks`。
+  - kimi SSE 是 token 级碎片（快照中看到 "Test"/" passes"/". Now" 这类），30-100 delta/s × 每次 O(累计内容) → 主线程饱和，菜单/点击全部饿死。B1 把 80ms 批处理从热路径上拿掉后，渲染频率从 12.5/s 变成 delta 频率，比 B1 之前更差。
+- 修复（三刀，全部对准每帧成本）：
+  1. `scheduleNotify`：draft 通知合并到每 rAF 最多一次；用户滚动活跃时降到 250ms 定时器（scroll-yield）；`take`/`clear` 提交路径同步 flush，不丢更新。
+  2. draft 合并改 append-only（snapshot/barrier 帧上游已排除，保留 mergeEvents 兜底），不再每 token 跑完整 merge 机器。
+  3. 流式 plain 路径跳过 `normalizeMarkdownContent` 整套正则修复栈，直接用原始 content；settled 后 rich 路径不变。
+- 测试：activeTurnDraftStore +3（按帧合并/提交同步 flush/thinkingParts 累积）；全量 957 + typecheck。
+- 知识库：streaming-render-pipeline 增加"draft 通知必须合帧"不变量 + log。
+
 ## 2026-07-21 v2.16.79 撤回后模型看到重复内容块修复（session_01ea935b）
 
 - 现象：用户撤回一条消息并重发，Agent 思考中说"The user sent the same block twice"。

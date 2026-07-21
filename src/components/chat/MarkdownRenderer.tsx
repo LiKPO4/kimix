@@ -279,9 +279,15 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   // Delay StreamingPlain -> SettledRich while the user is actively scrolling.
   const [settleRichAllowed, setSettleRichAllowed] = useState(() => !isUserScrollActive());
   const wasStreamingRef = useRef(streaming);
+  const usePlainStreaming = streaming && isStreamingPlainMarkdownEnabled();
+  const renderAsStreaming = streaming || (wasStreamingRef.current && !settleRichAllowed && isStreamingPlainMarkdownEnabled());
+  const plainPath = usePlainStreaming || (renderAsStreaming && !streaming && !settleRichAllowed);
+  // The plain streaming path renders raw text with a fence-aware splitter, so
+  // the full markdown-repair stack (tables/fences/heading normalization, which
+  // is O(content) regex work per frame) is skipped until the settled rich pass.
   const normalizedContent = useMemo(
-    () => normalizeMarkdownContent(content, normalizeAssistantProgress),
-    [content, normalizeAssistantProgress],
+    () => (plainPath ? content : normalizeMarkdownContent(content, normalizeAssistantProgress)),
+    [content, normalizeAssistantProgress, plainPath],
   );
 
   useEffect(() => {
@@ -312,9 +318,6 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     return () => window.clearInterval(timer);
   }, [streaming]);
 
-  const usePlainStreaming = streaming && isStreamingPlainMarkdownEnabled();
-  const renderAsStreaming = streaming || (wasStreamingRef.current && !settleRichAllowed && isStreamingPlainMarkdownEnabled());
-  const plainPath = usePlainStreaming || (renderAsStreaming && !streaming && !settleRichAllowed);
   const isCollapsible = collapsibleThreshold > 0 && normalizedContent.length > collapsibleThreshold;
   const displayContent = useMemo(() => {
     if (!isCollapsible || isExpanded) return normalizedContent;
