@@ -48,6 +48,7 @@ import {
   pickDraftText,
   useActiveTurnDraft,
 } from "@/utils/activeTurnDraftStore";
+import { getProcessManualExpand, noteProcessManualExpand, processManualExpandTurnKey } from "@/utils/processManualExpand";
 import { isActiveTurnDraftEnabled } from "@/utils/perfFlags";
 
 interface MessageBubbleProps {
@@ -1761,7 +1762,17 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
   const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent && !(isActiveAssistant && collapseWhileRunning);
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  // The assistant bubble can remount mid-turn (pending placeholder swap,
+  // merged-id fallback). Restore the user's last manual expand/collapse
+  // choice after a remount instead of falling back to the default.
+  const manualExpandTurnKey = processManualExpandTurnKey({
+    sessionId,
+    agentTurnId: event.agentTurnId,
+    roomMessageId: event.roomMessageId,
+    eventId: event.id,
+  });
+  const manualExpandOverride = getProcessManualExpand(manualExpandTurnKey);
+  const [expanded, setExpanded] = useState(() => manualExpandOverride ?? defaultExpanded);
   const previousHasFinalContentRef = useRef(hasFinalContent);
   const manuallyExpandedRef = useRef(false);
   const summaryAnchorRef = useRef<HTMLButtonElement>(null);
@@ -1798,7 +1809,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     hasFinalContent,
     isKimiWeb,
     expanded,
-    manuallyExpanded: manuallyExpandedRef.current,
+    manuallyExpanded: manuallyExpandedRef.current || manualExpandOverride === true,
   });
 
   const dispatchProcessCollapseViewport = (
@@ -1841,6 +1852,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
 
   const toggleWithStableAnchor = (nextExpanded: boolean, anchorKind: "summary" | "content") => {
     manuallyExpandedRef.current = nextExpanded;
+    noteProcessManualExpand(manualExpandTurnKey, nextExpanded);
     const anchor = anchorKind === "summary" ? summaryAnchorRef.current : contentAnchorRef.current;
     const scrollNode = anchor?.closest<HTMLElement>(".kimix-chat-scroll-area");
     if (anchor && scrollNode) {

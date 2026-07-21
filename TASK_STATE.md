@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.77 输出中过程区自动折叠修复
+
+- 现象：Agent 输出中，用户手动展开过程详情后，过一会自行折叠回单行。
+- 根因：过程摘要的展开状态是组件内 useState + ref，无跨挂载持久化。助手泡的 React key 是渲染事件 id：
+  1. 轮次无助手事件时渲染 pending 占位泡（id `assistant-pending-<userId>`），首个正式助手事件出现后换成 merged 泡（id `assistant:<agentTurnId>`）→ key 变化 → 整泡重挂载，expanded 与 manuallyExpandedRef 一起丢失；B1(draft) 推迟首个正式 assistant 事件（要等第一个边界事件提交 draft），拉长了这个窗口。
+  2. merged id 在 first.agentTurnId 缺失时回退 first.id，visible[0] 变化也会改 key。
+  3. 重挂载后 final-content transition 的手动守卫（manuallyExpandedRef）失效，首次 hasFinalContent 上升沿即自动折叠。
+- 修复：
+  1. pending 占位 id 在 agentTurnId 已知时用 `assistant:<agentTurnId>`（与 merged id 一致，占位→真实不再换 key）；merged id 回退加 roomMessageId 档（ChatThread.tsx）。
+  2. 手动展开/折叠意图按轮次持久化到模块级 LRU Map（`src/utils/processManualExpand.ts`），useState 初始化与 auto-collapse 守卫都读它，任何剩余重挂载都恢复用户选择（MessageBubble.tsx）。
+- 测试：processManualExpand +3、chatRenderItems +1（pending 与真实泡 id 一致）；两处既有断言按新稳定 id 更新；全量 946 + typecheck。
+- 知识库：chat-viewport-state.md 新增 Render item identity 一节 + log。
+
 ## 2026-07-21 v2.16.76 官方回放消息乱序修复（session_01ea935b）
 
 - 现象：最终正文末尾出现一句本应更早出现的话（"先改这两处，同时拉全部多场景剧情。"）。

@@ -91,3 +91,7 @@ changes that may need detached-anchor recovery.
 creates another tail-follow loop. Process-collapse transactions may temporarily
 add exact tail compensation when content shrink would otherwise clamp the saved
 anchor beyond the new scroll range.
+
+## Render item identity
+
+The assistant bubble's React key is the rendered event id, so the id must stay constant across every projection of the same turn. The render-only pending placeholder uses `assistant:<agentTurnId>` whenever the turn identity is known — the same id `mergeAssistantProcessEvents` later gives the real merged assistant event — and the merged id falls back to `assistant:<roomMessageId>` before any raw underlying event id. A pending→real id swap (or any other id change) remounts the bubble, wiping component state such as process-summary expansion. Because remounts cannot be eliminated everywhere, the user's manual process expand/collapse choice is also persisted per turn in `processManualExpand` (module-level LRU map keyed by session + turn identity); a remounted summary restores that choice and the final-content auto-collapse treats it as manual intent.

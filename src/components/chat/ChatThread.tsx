@@ -697,7 +697,7 @@ export function buildRenderItems(
     const last = visible[visible.length - 1];
     return {
       ...first,
-      id: first.agentTurnId ? `assistant:${first.agentTurnId}` : first.id,
+      id: first.agentTurnId || first.roomMessageId ? `assistant:${first.agentTurnId ?? first.roomMessageId}` : first.id,
       timestamp: first.timestamp,
       content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
       thinking: visible.map((event) => event.thinking ?? "").filter((thinking) => thinking.trim()).join(""),
@@ -866,7 +866,7 @@ export function buildRenderItems(
     // depends on event arrival timing.
     if (!renderAssistantEvent && isTurnActive && turnUserEvent) {
       const pendingAssistantEvent: Extract<TimelineEvent, { type: "assistant_message" }> = {
-        id: `assistant-pending-${turnUserEvent.id}`,
+        id: agentTurnId ? `assistant:${agentTurnId}` : `assistant-pending-${turnUserEvent.id}`,
         type: "assistant_message",
         timestamp: turnStartedAt ?? identityEvent?.timestamp ?? Date.now(),
         content: "",

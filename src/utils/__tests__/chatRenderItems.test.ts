@@ -286,6 +286,46 @@ describe("buildRenderItems usage footer", () => {
     expect(activeAssistant.event.isComplete).toBe(false);
   });
 
+  it("keeps the pending placeholder id stable when the real assistant event arrives (no bubble remount)", () => {
+    const primaryAgentId = "room-agent:primary";
+    const userTurn: TimelineEvent = {
+      id: "user-active",
+      type: "user_message",
+      timestamp: 10,
+      content: "继续检查",
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-active",
+      agentTurnId: "turn-active",
+    };
+
+    const pending = buildRenderItems([userTurn], "kimi-code", undefined, true, [
+      activeRoomTurn(primaryAgentId, "turn-active", "room-message-active", "running"),
+    ], undefined, primaryAgentId)
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(pending?.type).toBe("event");
+    if (pending?.type !== "event") return;
+
+    const withAssistant = buildRenderItems([userTurn, {
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 11,
+      content: "",
+      isThinking: false,
+      isComplete: false,
+      roomAgentId: primaryAgentId,
+      roomMessageId: "room-message-active",
+      agentTurnId: "turn-active",
+    }], "kimi-code", undefined, true, [
+      activeRoomTurn(primaryAgentId, "turn-active", "room-message-active", "running"),
+    ], undefined, primaryAgentId)
+      .find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(withAssistant?.type).toBe("event");
+    if (withAssistant?.type !== "event") return;
+
+    expect(pending.event.id).toBe("assistant:turn-active");
+    expect(withAssistant.event.id).toBe(pending.event.id);
+  });
+
   it("projects a failed provider turn into a stable Assistant header instead of leaving only the user message", () => {
     const items = buildRenderItems([{
       id: "user-provider-failure",
@@ -353,7 +393,7 @@ describe("buildRenderItems usage footer", () => {
 
     expect(header?.type).toBe("event");
     if (header?.type !== "event" || header.event.type !== "assistant_message") return;
-    expect(header.event.id).toBe("assistant-pending-user-room-gap");
+    expect(header.event.id).toBe("assistant:turn-room-gap");
     expect(header.event.isComplete).toBe(false);
     expect(header.isAssistantActive).toBe(true);
   });
@@ -523,7 +563,7 @@ describe("buildRenderItems usage footer", () => {
       item.type === "event" && item.event.id === "assistant:turn-room-previous"
     ));
     const current = items.find((item) => (
-      item.type === "event" && item.event.id === "assistant-pending-user-room-current"
+      item.type === "event" && item.event.id === "assistant:turn-room-current"
     ));
 
     expect(previous?.type).toBe("event");
