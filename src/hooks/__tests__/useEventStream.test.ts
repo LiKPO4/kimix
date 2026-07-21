@@ -32,7 +32,9 @@ describe("isDeferrableStreamEvent", () => {
     expect(isDeferrableStreamEvent({ ...base, type: "status_update", message: "Context: 50%" })).toBe(true);
     expect(isDeferrableStreamEvent({ ...base, type: "subagent", agentName: "w", status: "running", events: [] })).toBe(true);
     expect(isDeferrableStreamEvent({ ...base, type: "subagent", agentName: "w", status: "completed", events: [] })).toBe(false);
-    expect(isDeferrableStreamEvent({ ...base, type: "tool_call", toolCallId: "t", toolName: "Bash", status: "running", arguments: {} })).toBe(false);
+    // streaming tool-call arguments batch; completion stays immediate
+    expect(isDeferrableStreamEvent({ ...base, type: "tool_call", toolCallId: "t", toolName: "Bash", status: "running", arguments: {} })).toBe(true);
+    expect(isDeferrableStreamEvent({ ...base, type: "tool_call", toolCallId: "t", toolName: "Bash", status: "completed", arguments: {} })).toBe(false);
     expect(isDeferrableStreamEvent({ ...base, type: "approval_request", requestId: "r", toolName: "Bash", description: "d", details: "x", riskLevel: "low", status: "pending" })).toBe(false);
     expect(isDeferrableStreamEvent({ ...base, type: "error", message: "x" })).toBe(false);
   });

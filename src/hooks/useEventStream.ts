@@ -28,14 +28,20 @@ const STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING = 250;
 
 export function isDeferrableStreamEvent(event: TimelineEvent): boolean {
   if (event.type === "assistant_message" && !event.isComplete) return true;
-  // Status updates (token counts, progress text) and running-subagent progress
-  // are informational and can arrive at high frequency; flushing them
-  // immediately would bypass the 80ms batch and re-render the whole thread per
-  // event. They merge cheaply in the batch. True boundaries (tool lifecycle,
-  // approvals, questions, errors, completion, subagent status transitions)
-  // still flush immediately.
+  // Status updates (token counts, progress text), running-subagent progress,
+  // and streaming tool-call arguments are informational and can arrive at high
+  // frequency; flushing them immediately would bypass the 80ms batch and
+  // re-render the whole thread per event. They merge cheaply in the batch.
+  // True boundaries (tool completion, approvals, questions, errors,
+  // completion, subagent status transitions) still flush immediately.
   if (event.type === "status_update") return true;
   if (event.type === "subagent" && event.status === "running") return true;
+  // Tool calls stream their rawArguments token by token; treating every
+  // argument delta as a boundary flushed ~40 times/sec at O(events) each and
+  // saturated the main thread (measured 395 flushes / 10s at 14ms avg).
+  // Argument streaming batches; the start (~80ms late is invisible) and the
+  // completion (status leaves running) stay immediate.
+  if (event.type === "tool_call" && event.status === "running") return true;
   return false;
 }
 

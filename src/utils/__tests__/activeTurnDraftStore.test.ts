@@ -88,7 +88,7 @@ describe("activeTurnDraftStore", () => {
     applyActiveTurnDraftDelta(key, delta("好"));
     applyActiveTurnDraftDelta(key, delta("世"));
     expect(calls).toBe(0);
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    await new Promise((resolve) => setTimeout(resolve, 150));
     expect(calls).toBe(1);
     expect(getActiveTurnDraft(key)?.content).toBe("你好世");
     unsubscribe();

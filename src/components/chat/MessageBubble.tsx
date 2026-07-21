@@ -16,7 +16,7 @@ import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
-import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
+import { buildThinkingBlocks, capLiveThinkingRenderText, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -1118,7 +1118,7 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
         className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
         style={KIMI_WEB_THINKING_SUMMARY_STYLE}
       >
-        {block.text}
+        {capLiveThinkingRenderText(block.text)}
       </div>
     );
   }

@@ -41,6 +41,10 @@ function notify(key: string) {
  * Commit paths (take/clear) flush synchronously so no update is ever lost.
  */
 const SCROLLING_NOTIFY_MS = 250;
+// Cap the streaming text cadence at 10fps even when idle: every notification
+// re-renders the growing bubble and re-shapes its text; 60fps typewriter
+// updates cost far more layout time than they are worth.
+const STREAMING_NOTIFY_MS = 100;
 const pendingNotifyKeys = new Set<string>();
 let notifyTimer: ReturnType<typeof setTimeout> | number | null = null;
 let notifyTimerIsRaf = false;
@@ -59,14 +63,9 @@ function flushPendingNotifications() {
 function scheduleNotify(key: string) {
   pendingNotifyKeys.add(key);
   if (notifyTimer !== null) return;
-  const useScrollThrottle = isScrollYieldEnabled() && isUserScrollActive();
-  if (!useScrollThrottle && typeof requestAnimationFrame !== "undefined") {
-    notifyTimerIsRaf = true;
-    notifyTimer = requestAnimationFrame(flushPendingNotifications);
-    return;
-  }
   notifyTimerIsRaf = false;
-  notifyTimer = setTimeout(flushPendingNotifications, useScrollThrottle ? SCROLLING_NOTIFY_MS : 16);
+  const useScrollThrottle = isScrollYieldEnabled() && isUserScrollActive();
+  notifyTimer = setTimeout(flushPendingNotifications, useScrollThrottle ? SCROLLING_NOTIFY_MS : STREAMING_NOTIFY_MS);
 }
 
 export function makeActiveTurnDraftKey(

@@ -113,3 +113,15 @@ export function buildThinkingBlocks(input: {
     })
     .filter((block) => block.text.length > 0);
 }
+/**
+ * Live streaming thinking can accumulate tens of KB; the live viewport only
+ * shows a 144px tail, so render just the tail while streaming. Re-shaping the
+ * full text every frame was a measurable layout hog.
+ */
+export const LIVE_THINKING_RENDER_MAX_CHARS = 2000;
+
+export function capLiveThinkingRenderText(text: string, maxChars = LIVE_THINKING_RENDER_MAX_CHARS): string {
+  if (text.length <= maxChars) return text;
+  return "…" + text.slice(text.length - maxChars);
+}
+

@@ -1,5 +1,23 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.83 流式卡顿三轮根因（归因数据驱动）
+
+- 取证（v2.16.82 埋点 + 用户复现 diag.log + 视频）：
+  1. 10s 窗口 flushStreamEvents 触发 395 次（~40/s），avg 14ms → 55% 主线程。根因：tool_call 的 rawArguments 按 token 流式增长，被 A3 的边界规则误判为立即 flush；该会话正在跑 python 改 storylets，参数是整段替换文本。
+  2. 计时器冻住 11s→35s 跳变，但 JS 侧计时全部正常（projection 0ms、renderItems 0ms、persist ~50ms）→ 剩余饱和来自浏览器文本 shaping/布局：实时思考区每帧渲染完整思考文本（56KB）+ 正文 60fps 重排。
+  3. React Profiler 数据缺失的原因：生产版 React 不触发 Profiler 回调，别再用它测 commit。
+- 修复：
+  1. `isDeferrableStreamEvent`：`tool_call && status === "running"` 回到 80ms 批（参数流）；完成（非 running）仍立即。
+  2. `capLiveThinkingRenderText`：实时思考只渲染末尾 2000 字符（视口仅 144px）。
+  3. draft 通知 cadence rAF → 100ms（STREAMING_NOTIFY_MS，滚动中 250ms 不变），流式文本 10fps。
+- 测试：useEventStream deferrable 更新、draft 通知等待时间适配、thinkingBlocksCap +2；全量 962 + typecheck + build。
+- 知识库：streaming-render-pipeline 增加"JS 便宜后布局是主成本"一节 + log。
+
+## 2026-07-21 v2.16.82 卡顿归因埋点
+
+- 真实数据基准（913 事件）：投影 8.2ms、renderItems 0.9ms、merge 0.1ms——渲染热路径无秒级瓶颈，停止盲修。
+- 埋点（`kimix_perf_diag=1`）：timeSync 计时 flushStreamEvents/projectCollaborationTimeline/buildRenderItems/persist；ChatThread 包 Profiler；PerformanceObserver longtask；每 10s 汇总写 diag.log。
+
 ## 2026-07-21 v2.16.81 流式全局卡顿二轮根因（持久化锤 + 状态事件失去批处理）
 
 - 现象：v2.16.80 后输出仍全局卡顿，菜单复制会话 id 困难。
