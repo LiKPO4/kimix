@@ -100,6 +100,48 @@ describe("eventHelpers", () => {
     expect(settled.find((event) => event.type === "assistant_message")).toBeUndefined();
   });
 
+  it("guarded settle keeps open assistants and placeholders while the timeline is still active", () => {
+    const now = 10 * 60 * 1000;
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: now - 50_000, content: "继续" },
+      { id: "assistant-open", type: "assistant_message", timestamp: now - 40_000, content: "写了一半", isThinking: false, isComplete: false },
+      { id: "assistant-empty", type: "assistant_message", timestamp: now - 30_000, content: "", isThinking: false, isComplete: false },
+    ];
+
+    const settled = settleInactiveEvents(events, now, false, true);
+    const open = settled.find((event) => event.id === "assistant-open") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
+    const empty = settled.find((event) => event.id === "assistant-empty") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
+    expect(open?.isComplete).toBe(false);
+    expect(empty).toBeDefined();
+    expect(empty?.isComplete).toBe(false);
+  });
+
+  it("guarded settle closes open work once the whole timeline is stale", () => {
+    const now = 10 * 60 * 1000;
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: now - 400_000, content: "继续" },
+      { id: "assistant-open", type: "assistant_message", timestamp: now - 300_000, content: "写了一半", isThinking: false, isComplete: false },
+      { id: "assistant-empty", type: "assistant_message", timestamp: now - 250_000, content: "", isThinking: false, isComplete: false },
+    ];
+
+    const settled = settleInactiveEvents(events, now, false, true);
+    const open = settled.find((event) => event.id === "assistant-open") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
+    expect(open?.isComplete).toBe(true);
+    expect(settled.find((event) => event.id === "assistant-empty")).toBeUndefined();
+  });
+
+  it("immediate settle still force-completes recent open assistants (authoritative path unchanged)", () => {
+    const now = 10 * 60 * 1000;
+    const events: TimelineEvent[] = [
+      { id: "assistant-open", type: "assistant_message", timestamp: now - 5_000, content: "写了一半", isThinking: true, isComplete: false },
+    ];
+
+    const settled = settleInactiveEvents(events, now);
+    const open = settled[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(open.isComplete).toBe(true);
+    expect(open.isThinking).toBe(false);
+  });
+
   it("removes a local failed send attempt with its status, empty placeholder, and error", () => {
     const events: TimelineEvent[] = [
       { id: "user-1", type: "user_message", timestamp: 1, content: "卡住了吗" },

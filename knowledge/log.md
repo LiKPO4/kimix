@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Settle authority split: guarded settle for heuristic paths**: `settleInactiveEvents` now takes `guardRecentActivity` — polling, hydration, and persistence no longer force-complete open assistants or delete placeholders while any timeline event is younger than the stale-work window; only the authoritative prompt.completed status event settles immediately. Fixes bubbles self-completing mid-output. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Assistant bubble id must survive pending→real swap; manual expand persists per turn**: the render-only pending placeholder now uses `assistant:<agentTurnId>` (same as the later merged event) and merged-id falls back to `assistant:<roomMessageId>`, so the bubble does not remount mid-turn; `processManualExpand` keeps the user's manual process expand/collapse per turn so any remaining remount restores it instead of auto-collapsing during output. See [/architecture/chat-viewport-state.md](/architecture/chat-viewport-state.md).
 
 * **Late official replay inserts by sequence, never blind tail-append**: A replayed Assistant with an unseen stable snapshot id can arrive after later steps were already bound; `mergeEvents` now parses the trailing `_NNNNNN` sequence and inserts before the first higher-sequence stable sibling, fixing the inverted plan-sentence-after-final-answer seen in session_01ea935b. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

@@ -510,7 +510,7 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
       appState.runningSessionId === session.officialSessionId
     );
     const active = activity ? activeStatuses.has(activity.status) : legacyPrimaryRunning || legacySessionRunning;
-    const settled = active ? events : settleInactiveEvents(events);
+    const settled = active ? events : settleInactiveEvents(events, Date.now(), false, true);
     const sanitized = resetStaleSessionRecommendationEvents(sanitizePersistedEvents(settled));
     return roomAgentId ? sanitized.map((event) => scopeEventToRoomAgent(event, roomAgentId)) : sanitized;
   };

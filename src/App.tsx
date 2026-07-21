@@ -456,7 +456,7 @@ async function loadStartupRoomAgentHistory(
       target,
       success: true,
       sessionId,
-      canonicalEvents: runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents),
+      canonicalEvents: runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents, Date.now(), false, true),
       runtimeIsActive,
       engineStatus: runtimeStatus?.success ? runtimeStatus.data.engineStatus : undefined,
       model: runtimeStatus?.success ? runtimeStatus.data.model : undefined,
@@ -522,7 +522,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
             { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery" },
           );
         const hydratedEvents = !canonicalAdopted
-          ? (result.runtimeIsActive ? rejectedPatchedEvents : settleInactiveEvents(rejectedPatchedEvents))
+          ? (result.runtimeIsActive ? rejectedPatchedEvents : settleInactiveEvents(rejectedPatchedEvents, Date.now(), false, true))
           : reconciliation.events;
         next = updateRoomAgentEvents(reconciliation.session, result.target.roomAgentId, () => hydratedEvents);
         next = updateRoomAgent(next, result.target.roomAgentId, (agent) => ({
@@ -2188,7 +2188,7 @@ function App() {
               const runtimeModel = runtimeStatus?.success ? runtimeStatus.data.model : undefined;
               const runtimeSwarmMode = runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined;
               const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
-              const canonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents);
+              const canonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents, Date.now(), false, true);
 
               if (runtimeOwner) {
                 const latestOwner = useSessionStore.getState().sessions.find((item) => item.id === runtimeOwner.id) ?? runtimeOwner;
@@ -2212,7 +2212,7 @@ function App() {
                     { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup" },
                   );
                 const hydratedEvents = !canonicalAdopted
-                  ? (runtimeIsActive ? rejectedPatchedEvents : settleInactiveEvents(rejectedPatchedEvents))
+                  ? (runtimeIsActive ? rejectedPatchedEvents : settleInactiveEvents(rejectedPatchedEvents, Date.now(), false, true))
                   : reconciliation.events;
                 let hydrated = reconciliation.applied ? reconciliation.session : latestOwner;
                 hydrated = updateRoomAgentEvents(hydrated, ownerAgentId, () => hydratedEvents);

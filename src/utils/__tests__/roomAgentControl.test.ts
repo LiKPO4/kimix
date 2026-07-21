@@ -295,12 +295,30 @@ describe("roomAgentControl", () => {
     const room = roomFixture();
     const target = getRoomAgentReconciliationTargets(room, [])
       .find((candidate) => candidate.roomAgentId === "agent-secondary")!;
-    const next = settleTerminalRoomAgent(room, target, "completed", 100);
+    // The fixture timeline is milliseconds old; use a settledAt beyond the
+    // stale window so the guarded settle closes open events.
+    const next = settleTerminalRoomAgent(room, target, "completed", 100 + 200_000);
 
     expect(next.collaboration?.messages[1].deliveries["agent-secondary"].status).toBe("completed");
     expect(next.collaboration?.agentEvents["agent-secondary"]?.[0]).toMatchObject({
       id: "secondary-assistant",
       isComplete: true,
+    });
+  });
+
+  it("keeps recent open events open when the terminal report may be premature", () => {
+    const room = roomFixture();
+    const target = getRoomAgentReconciliationTargets(room, [])
+      .find((candidate) => candidate.roomAgentId === "agent-secondary")!;
+    // settledAt within the stale window of the fixture events: the guarded
+    // settle marks the delivery terminal but must not force-complete the
+    // still-active assistant.
+    const next = settleTerminalRoomAgent(room, target, "completed", 100);
+
+    expect(next.collaboration?.messages[1].deliveries["agent-secondary"].status).toBe("completed");
+    expect(next.collaboration?.agentEvents["agent-secondary"]?.[0]).toMatchObject({
+      id: "secondary-assistant",
+      isComplete: false,
     });
   });
 });

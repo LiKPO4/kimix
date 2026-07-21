@@ -263,7 +263,20 @@ function isStaleRunningEvent(event: TimelineEvent, settledAt: number) {
   return settledAt - event.timestamp > STALE_TIMELINE_WORK_MS;
 }
 
-export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.now(), preserveEmptyAssistant = false): TimelineEvent[] {
+/**
+ * Guarded settle for non-authoritative paths (status polling, one-shot
+ * hydration queries, persistence). A transient terminal report must not
+ * force-complete a turn that is still producing events: when any event in the
+ * timeline is younger than the stale-work window, open assistants stay open
+ * and empty placeholders are preserved. Once the whole timeline has been
+ * silent past the window, guarded mode settles exactly like the immediate
+ * path. Authoritative completions (prompt.completed status events) keep the
+ * immediate behavior.
+ */
+export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.now(), preserveEmptyAssistant = false, guardRecentActivity = false): TimelineEvent[] {
+  const hasRecentActivity = guardRecentActivity && events.some((event) => (
+    settledAt - event.timestamp <= STALE_TIMELINE_WORK_MS
+  ));
   const settled = events.flatMap<TimelineEvent>((event) => {
     if (event.type === "subagent") {
       if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
@@ -294,9 +307,11 @@ export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.n
       // preserveEmptyAssistant is set, keep the placeholder as isComplete=false
       // so the message header stays visible and the turn is not settled; the
       // real body can still arrive and fill it. Without this flag the empty
-      // placeholder is deleted (genuinely failed/orphaned turns).
-      return preserveEmptyAssistant ? [event] : [];
+      // placeholder is deleted (genuinely failed/orphaned turns). Guarded
+      // settles never delete placeholders while the timeline is still active.
+      return (preserveEmptyAssistant || hasRecentActivity) ? [event] : [];
     }
+    if (hasRecentActivity) return [event];
     return [{ ...event, isComplete: true, isThinking: false, durationMs: reliableAssistantDurationMs(event.durationMs) }];
   });
   return closeOpenCompaction(settled);

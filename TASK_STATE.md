@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.78 消息气泡提前"已完成"治理（settle 权限分级）
+
+- 现象：Agent 输出中气泡经常自己变成"已完成"。用户判断正确——兜底太强制。
+- 排查（explore 子代理全路径梳理 + 代码核验）：
+  - 路径 A（状态事件终态 App.tsx:2862）：权威（Server prompt.completed），保留立即 settle。
+  - 路径 B（运行状态轮询 → settleTerminalRoomAgent）：启发式，1.5s×2 次 poll，步间隙 busy/status 抖动即可误判；原守卫（hasTurnReceivedBody）只保护空气泡，已有内容的轮次无保护。
+  - 路径 C（hydration 一次性状态查询）：单发无守卫。
+  - 路径 D（持久化 prepareEvents）：把 A/B/C 的误判永久烘进磁盘。
+  - 路径 E（step.end end_turn 标记）：prompt scope 已过滤，SDK turn scope 语义正确，不动。
+- 修复：`settleInactiveEvents` 增加第 4 参 `guardRecentActivity`——时间线内有任何事件比 STALE_TIMELINE_WORK_MS（2min）新时，不强制完成未完成助手、不删空 placeholder；全部静默过期后与立即模式行为一致（真实结束帧丢失也能在 stale 窗口内收敛）。应用到路径 B（roomAgentControl.settleTerminalRoomAgent）、C（App.tsx 4 处 hydration）、D（persistence.prepareEvents）。
+- 测试：eventHelpers +3（活跃时保留/全 stale 后收敛/立即模式不变），roomAgentControl 1 改 1 增（stale 后完成/近期事件保持开放）；全量 950 + typecheck。
+- 知识库：runtime-routing 新增 18i + log。
+
 ## 2026-07-21 v2.16.77 输出中过程区自动折叠修复
 
 - 现象：Agent 输出中，用户手动展开过程详情后，过一会自行折叠回单行。

@@ -205,7 +205,9 @@ export function settleTerminalRoomAgent(
   now = Date.now(),
   turnReceivedBody = true,
 ): Session {
-  let next = updateRoomAgentEvents(session, target.roomAgentId, (events) => settleInactiveEvents(events, now, !turnReceivedBody));
+  // The only caller is the runtime polling reconciliation, which is heuristic,
+  // so recent turn activity must block the settle (guardRecentActivity).
+  let next = updateRoomAgentEvents(session, target.roomAgentId, (events) => settleInactiveEvents(events, now, !turnReceivedBody, true));
   next = applyRoomDeliveryRuntimeStatus(
     next,
     target.roomMessageId,
