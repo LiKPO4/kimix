@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-21 v2.16.87 CDP CPU profile 主因：isHiddenInternalSession 全量扫 events
+
+- 取证：lag-watch 抓到 stall lag=3425ms / 7828ms；profile self 热点：
+  - `areRelatedSidebarSessions` / `dedupeSidebarSessions`（侧栏每次 sessions 更新）
+  - **`isInternalPromptText` ~3s**（对每条消息 content 做正则）
+  - `commitState` + IDB `put` ~1–2s（大状态落盘，次要）
+- 根因：Sidebar / useStatePersistence 订完整 `sessions`；每次流式 flush 换数组 → 对**每个会话全量 events** 跑 `isHiddenInternalSession` → 每条 content 正则。长会话 + 多会话 = 每秒数百碎任务，无 >50ms longtask。
+- 修复：`internalSessions.ts`——WeakMap 按 session 引用缓存；正文只取头 800 字；只扫前 6 条 user/steer；prompt 文本 Map 缓存；协作 agentEvents 同样限扫。
+- 验收：968 测试 + typecheck + build；用户重启 2.16.87 复测卡顿。
+
 ## 2026-07-21 v2.16.86 贴底 settle 空转风暴（CDP 卡顿取证）
 
 - 证据：lag-watch 测到主线程 timer lag 1733ms；diag 在 07:09:53 起 1.5s 内 `settleSessionAtBottom`→`scrollToBottom` token 37→50+ 连打，且 height 已稳定在 9187/8681；10s 窗 auto-follow 写 scrollTop 23 次。
