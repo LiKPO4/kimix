@@ -146,7 +146,6 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const selectedGroup = groups.find((group) => group.provider.name === selectedProviderName) ?? null;
   const isCreatingProvider = selectedProviderName === NEW_PROVIDER_ID || !selectedGroup;
   const selectedProviderManaged = selectedGroup?.managed ?? false;
-  const selectedCatalogProvider = catalog.find((provider) => provider.providerId === providerDraft.providerName) ?? null;
   const selectedProviderHasCredential = Boolean(
     selectedGroup?.provider.hasApiKey || selectedGroup?.provider.hasEnv || selectedGroup?.provider.hasOauth,
   );
@@ -237,25 +236,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     }));
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
-    const firstModel = provider.models[0];
-    if (firstModel) {
-      setModelDraft({
-        modelAlias: defaultModelAliasForProvider(provider.providerId, firstModel.id),
-        model: firstModel.id,
-        maxContextSize: String(firstModel.maxContextSize ?? DEFAULT_CONTEXT_SIZE),
-      });
-    }
-  };
-
-  const handleCatalogModel = (modelId: string) => {
-    const model = selectedCatalogProvider?.models.find((item) => item.id === modelId);
-    if (!model) return;
-    setSelectedModelAlias("");
-    setModelDraft({
-      modelAlias: defaultModelAliasForProvider(providerDraft.providerName, model.id),
-      model: model.id,
-      maxContextSize: String(model.maxContextSize ?? DEFAULT_CONTEXT_SIZE),
-    });
+    setModelDraft(createModelDraft());
   };
 
   const readContextSize = () => {
@@ -444,12 +425,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const handleAddModel = () => {
     setSelectedModelAlias("");
-    const catalogModel = selectedCatalogProvider?.models[0];
-    setModelDraft(catalogModel ? {
-      modelAlias: defaultModelAliasForProvider(providerDraft.providerName, catalogModel.id),
-      model: catalogModel.id,
-      maxContextSize: String(catalogModel.maxContextSize ?? DEFAULT_CONTEXT_SIZE),
-    } : createModelDraft());
+    setModelDraft(createModelDraft());
     setMessage("填写模型 ID、别名和 Context 后保存；Provider 的连接信息会自动复用。");
   };
 
@@ -592,7 +568,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[12.5px] font-medium text-text-primary">官方 Provider 目录</div>
-                    <div className="kimix-settings-permission-desc">可自动填充名称、Base URL 和推荐模型</div>
+                    <div className="kimix-settings-permission-desc">可自动填充供应商名称和 Base URL</div>
                   </div>
                   <button type="button" onClick={() => void handleLoadCatalog()} disabled={catalogLoading} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover">
                     <RefreshCw size={13} className={catalogLoading ? "kimix-spin" : ""} />
@@ -750,17 +726,6 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                     </div>
                     <KeyRound size={15} className="text-text-muted" />
                   </div>
-                  {catalog.length === 0 ? (
-                    <button type="button" onClick={() => void handleLoadCatalog()} disabled={catalogLoading} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover" style={{ marginTop: 10 }}>
-                      <RefreshCw size={13} className={catalogLoading ? "kimix-spin" : ""} />
-                      从官方目录选择模型
-                    </button>
-                  ) : selectedCatalogProvider && (
-                    <select value={selectedCatalogProvider.models.some((item) => item.id === modelDraft.model) ? modelDraft.model : ""} onChange={(event) => handleCatalogModel(event.target.value)} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 10, paddingLeft: 12, paddingRight: 12 }}>
-                      <option value="">手动填写模型</option>
-                      {selectedCatalogProvider.models.map((model) => <option key={model.id} value={model.id}>{model.name || model.id}</option>)}
-                    </select>
-                  )}
                   <div className="kimix-model-provider-form" style={{ marginTop: 12 }}>
                     <label className="min-w-0">
                       <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型 ID</span>

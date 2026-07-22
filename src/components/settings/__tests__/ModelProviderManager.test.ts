@@ -98,6 +98,7 @@ describe("ModelProviderManager", () => {
     expect(discoveryTitle && modelEditorTitle
       ? Boolean(discoveryTitle.compareDocumentPosition(modelEditorTitle) & Node.DOCUMENT_POSITION_FOLLOWING)
       : false).toBe(true);
+    expect(buttonByText(container, "从官方目录选择模型")).toBeUndefined();
 
     await act(async () => buttonByText(container, "探测模型")?.click());
     const discoveredSelect = Array.from(container.querySelectorAll("select"))
