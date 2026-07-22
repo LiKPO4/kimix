@@ -130,9 +130,26 @@ Kimix 三条历史链路对已污染会话均不会渲染 goal 续跑 prompt，*
 - 快照 100 条窗口外的更老污染记录：本身不在渲染窗口内，且 transcript 证据表明读取侧已全量标记。
 - CLI 自渲染（TUI/Web）不在 Kimix 范围。
 
-## 项 6：中断回归验证（待处理）
+## 项 6：中断回归验证（已完成——通过；另立一个观察项）
 
-计划：#1970 后取消请求不再被包装成可重试错误，验证 Esc 中断在 Server 与 SDK 双路由下无静默重试。
+### 结论
+
+#1970（取消请求不再被包装成可重试 provider 错误）在 Server 与 SDK 双路由下均生效：**无静默重试、无中断后回归**。
+
+### 证据（双路由真实模型轮次探针）
+
+- **Server 路由**（0.29 真实 Server，长输出 prompt 流中 `:abort`）：20ms 内 `prompts.active` 清空；帧序列 `turn.step.interrupted` → `turn.ended` → `prompt.aborted`；**`turn.step.retrying` 零次**；终态后 5s 观察窗内**零**新 delta/新 turn/新 completed。
+- **SDK 路由**（vendored 0.29 底座 bundle，`session.cancel()`）：`turn.ended` reason = `cancelled`（interrupted 家族，非 failed/retryable）；取消后**零** retry 事件；`turn.ended` 后 3s 尾巴**零**新 delta/新 turn。
+
+### 立项观察项（不属 #1970 回归，修复超出本轮范围）
+
+- **现象**：`KimiCodeServerClient.prompt()` 的完成等待器只认 `prompt.completed`，不认 0.29 实测的取消终态拼写 `prompt.aborted`。Esc 后该 dispatch promise 要等 180s 空闲超时 → 官方状态查询 → 快照恢复才合成完成帧收场。
+- **影响**：无用户可见阻塞——渲染层 `sendPromise` 为 fire-and-forget（`App.tsx:3123`），`turn.ended` 让 UI 立即结算；仅 host 内部 dispatch promise 的收场被延迟。
+- **建议**：后续把 `prompt.aborted`（及载荷 reason）纳入 `prompt()` 等待器的终态匹配，按中断语义结算（部分正文的快照补齐语义需单独设计验证），不在本轮改动。
+
+### 探针说明
+
+临时脚本两份（用完已删）：双路由中断探针（Server 2/4 项因等待 `prompt.completed` 失败——正是上述拼写差异的首次暴露，其余全过）、Server 终态补充探针（轮询 `prompts` + 帧直方图，锁定 `prompt.aborted` 拼写与 20ms 结算）。
 
 ## 回滚
 
