@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-22 验收修复：思考按钮省略、会话树卡片挤压、overrides 伪模型
+
+- 思考按钮：`Composer` 思考强度按钮外层由固定 108px 改为 minWidth 108，档位名（如"思考 · 最高"）完整显示不再省略。
+- 会话树卡片：右侧栏"官方会话树"头部的"新建子会话"由文字按钮改为与同排刷新一致的 32px 图标按钮（title/aria 保留语义），标题与说明不再被挤压竖排。
+- overrides 伪模型：`readKimiModelConfig` 新增 `directModelSectionAlias`，只接受 `models.<alias>` 直接子表，过滤官方运行时写入的 `models.<alias>.overrides` 嵌套子表（含已删模型残留的孤儿 overrides）；单模型与 Provider 删除路径连带删除 `.overrides` 子表，防止再残留。
+- 验证：真实 config.toml CDP 实测模型列表 14 个干净别名、零 overrides 伪条目；vitest 1036 全绿；typecheck 通过。
+
 ## 2026-07-22 Kimi Code 0.29.0 全量跟进（目标驱动）
 
 - 范围：0.29 剩余跟进六项（思考强度 v2.16.104、视频 v2.16.105 已完成在先）。全程记录 `docs/kimi-code-0.29-followup.md`。

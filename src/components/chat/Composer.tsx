@@ -4618,7 +4618,7 @@ export function Composer() {
               <ClipboardList size={14} className="shrink-0" />
               <span>Plan</span>
             </button>
-            <div ref={thinkingBtnRef} className="relative shrink-0" style={{ width: 108 }}>
+            <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 108 }}>
               <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={toggleThinkingMenu}

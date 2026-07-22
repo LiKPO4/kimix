@@ -2292,10 +2292,11 @@ export function LongTaskInspectorPanel({
                       type="button"
                       onClick={() => void createServerTreeChild()}
                       disabled={serverTreeLoading || Boolean(serverTreeBusy)}
-                      className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
+                      title="新建子会话"
+                      aria-label="新建子会话"
                     >
                       {serverTreeBusy === "create" ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                      <span>新建子会话</span>
                     </button>
                     {rightCardDragHandle("serverTree", "官方会话树")}
                   </div>

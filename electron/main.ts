@@ -1300,6 +1300,16 @@ function readKimiModelConfig() {
     const quoted = rawName.match(/^"((?:\\.|[^"])*)"$/);
     return quoted ? unescapeTomlString(quoted[1]) : rawName;
   };
+  // 只接受 models.<alias> 直接子表；官方运行时会为已用模型写 models.<alias>.overrides 子表，
+  // 引用键含点（如 deepseek/deepseek-v4-flash）时简单去前缀会产生 ".overrides" 伪模型条目。
+  const directModelSectionAlias = (sectionName: string): string | null => {
+    const rawName = sectionName.slice("models.".length);
+    if (rawName.startsWith('"')) {
+      const quoted = rawName.match(/^"((?:\\.|[^"])*)"$/);
+      return quoted ? unescapeTomlString(quoted[1]) : null;
+    }
+    return rawName.includes(".") ? null : rawName;
+  };
 
   return {
     configPath,
@@ -1313,8 +1323,9 @@ function readKimiModelConfig() {
       hasEnv: hasEnv.has(section.name),
       hasOauth: hasOauth.has(section.name),
     })).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")),
-    models: modelSections.map((section) => {
-      const alias = stripTablePrefix(section.name, "models.");
+    models: modelSections.flatMap((section) => {
+      const alias = directModelSectionAlias(section.name);
+      if (alias === null) return [];
       return {
         alias,
         provider: readTomlString(section.body, "provider"),
@@ -1678,6 +1689,7 @@ function removeKimiModelConfig(input: unknown) {
   const fallbackDefault = "kimi-code/kimi-for-coding";
   backupFileIfExists(configPath);
   let next = removeTomlSection(current, `models.${toTomlTableKey(target.alias)}`);
+  next = removeTomlSection(next, `models.${toTomlTableKey(target.alias)}.overrides`);
   const remainingModels = summary.models.filter((model) => model.alias !== target.alias);
   if (summary.defaultModel === target.alias) {
     const fallback = remainingModels.find((model) => model.alias === fallbackDefault)?.alias ?? remainingModels[0]?.alias ?? fallbackDefault;
@@ -1705,7 +1717,10 @@ function removeKimiProviderConfig(input: unknown) {
   const remainingModels = summary.models.filter((model) => model.provider !== req.providerName);
   backupFileIfExists(configPath);
   let next = current;
-  for (const alias of removedAliases) next = removeTomlSection(next, `models.${toTomlTableKey(alias)}`);
+  for (const alias of removedAliases) {
+    next = removeTomlSection(next, `models.${toTomlTableKey(alias)}`);
+    next = removeTomlSection(next, `models.${toTomlTableKey(alias)}.overrides`);
+  }
   const providerKey = toTomlTableKey(req.providerName);
   next = removeTomlSection(next, `providers.${providerKey}`);
   next = removeTomlSection(next, `providers.${providerKey}.oauth`);
