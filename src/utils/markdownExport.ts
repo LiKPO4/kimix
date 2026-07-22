@@ -17,7 +17,12 @@ export function formatEventAsMarkdown(event: TimelineEvent): string {
   }
   if (event.type === "tool_call") return `> 命令：${event.toolName}\n>\n> ${event.rawArguments ?? JSON.stringify(event.arguments)}`;
   if (event.type === "status_update") return `> 状态：${event.message ?? "处理中"}`;
-  if (event.type === "change_summary") return `> 已更改 ${event.files.length} 个文件，+${event.additions} -${event.deletions}`;
+  if (event.type === "change_summary") {
+    const statsKnown = event.files.every((file) => file.additions !== undefined && file.deletions !== undefined);
+    return statsKnown
+      ? `> 已更改 ${event.files.length} 个文件，+${event.files.reduce((sum, file) => sum + (file.additions ?? 0), 0)} -${event.files.reduce((sum, file) => sum + (file.deletions ?? 0), 0)}`
+      : `> 已更改 ${event.files.length} 个文件，增删统计未知`;
+  }
   if (event.type === "file_artifact") return `> 文件：${event.filePath}`;
   if (event.type === "error") return `> 错误：${event.message}`;
   if (event.type === "todo") return `> TodoList：${event.items.length} 项`;

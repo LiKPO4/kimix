@@ -570,6 +570,12 @@ export interface ChangeSummaryFile {
   path: string;
   additions?: number;
   deletions?: number;
+  /** Stable identity of the diff event that owns this summary row. */
+  diffEventId?: string;
+  /** Source summary identities retained when one turn aggregates several cards. */
+  sourceEventIds?: string[];
+  /** Immutable Git commit used by a lazily recovered historical preview. */
+  commitSha?: string;
   /** SHA-256 of the file content after the Agent modification. Used to detect subsequent user edits before revert. */
   snapshotHash?: string;
 }

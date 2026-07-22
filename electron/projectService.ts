@@ -461,6 +461,107 @@ export async function getGitLineStats(projectPath: string, files: string[]): Pro
   return stats;
 }
 
+const MAX_CHANGE_PREVIEW_CHARS = 64 * 1024;
+const HISTORICAL_CHANGE_WINDOW_MS = 15 * 60 * 1000;
+
+function truncateChangePreview(patch: string) {
+  if (patch.length <= MAX_CHANGE_PREVIEW_CHARS) return { patch, truncated: false };
+  return {
+    patch: `${patch.slice(0, MAX_CHANGE_PREVIEW_CHARS)}\n\n…差异过大，已截断`,
+    truncated: true,
+  };
+}
+
+function parseSingleNumstat(output: string): { additions?: number; deletions?: number } {
+  const line = output.split(/\r?\n/).find(Boolean);
+  if (!line) return {};
+  const [addedRaw, deletedRaw] = line.split("\t");
+  const additions = Number.parseInt(addedRaw ?? "", 10);
+  const deletions = Number.parseInt(deletedRaw ?? "", 10);
+  return {
+    additions: Number.isFinite(additions) ? additions : undefined,
+    deletions: Number.isFinite(deletions) ? deletions : undefined,
+  };
+}
+
+async function resolveHistoricalChangeCommit(gitRoot: string, filePath: string, eventTimestamp?: number) {
+  if (!eventTimestamp || !Number.isFinite(eventTimestamp)) return { commitSha: undefined, ambiguous: false };
+  const since = new Date(eventTimestamp - HISTORICAL_CHANGE_WINDOW_MS).toISOString();
+  const until = new Date(eventTimestamp + HISTORICAL_CHANGE_WINDOW_MS).toISOString();
+  const output = await runGit(gitRoot, [
+    "log",
+    "--all",
+    `--since=${since}`,
+    `--until=${until}`,
+    "--format=%H",
+    "--",
+    filePath,
+  ], 10000).catch(() => "");
+  const candidates = Array.from(new Set(output.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)));
+  return {
+    commitSha: candidates.length === 1 ? candidates[0] : undefined,
+    ambiguous: candidates.length > 1,
+  };
+}
+
+export async function getChangePreview(request: {
+  projectPath: string;
+  filePath: string;
+  eventTimestamp?: number;
+  commitSha?: string;
+}) {
+  const gitRoot = await requireGitRoot(request.projectPath);
+  const filePath = normalizeGitPath(gitRoot, request.filePath);
+  const requestedCommit = request.commitSha && /^[0-9a-f]{7,40}$/i.test(request.commitSha)
+    ? request.commitSha
+    : undefined;
+  const historical = requestedCommit
+    ? { commitSha: requestedCommit, ambiguous: false }
+    : await resolveHistoricalChangeCommit(gitRoot, filePath, request.eventTimestamp);
+  const commitSha = historical.commitSha;
+
+  if (commitSha) {
+    const resolvedCommit = await runGit(gitRoot, ["rev-parse", "--verify", `${commitSha}^{commit}`], 5000).catch(() => "");
+    if (resolvedCommit) {
+      const [patchOutput, numstatOutput] = await Promise.all([
+        runGit(gitRoot, ["show", "--format=", "--no-ext-diff", "--unified=3", resolvedCommit, "--", filePath], 10000).catch(() => ""),
+        runGit(gitRoot, ["show", "--format=", "--numstat", resolvedCommit, "--", filePath], 10000).catch(() => ""),
+      ]);
+      if (patchOutput) {
+        return {
+          source: "commit" as const,
+          ...truncateChangePreview(patchOutput),
+          ...parseSingleNumstat(numstatOutput),
+          commitSha: resolvedCommit,
+        };
+      }
+    }
+    if (requestedCommit) {
+      return getChangePreview({ ...request, commitSha: undefined });
+    }
+  }
+
+  if (historical.ambiguous) return { source: "unavailable" as const, patch: "" };
+  const eventIsRecent = request.eventTimestamp !== undefined
+    && Math.abs(Date.now() - request.eventTimestamp) <= 5 * 60 * 1000;
+  if (request.eventTimestamp !== undefined && !eventIsRecent) {
+    return { source: "unavailable" as const, patch: "" };
+  }
+
+  const [workspacePatch, workspaceNumstat] = await Promise.all([
+    runGit(gitRoot, ["diff", "--no-ext-diff", "--unified=3", "HEAD", "--", filePath], 10000).catch(() => ""),
+    runGit(gitRoot, ["diff", "--numstat", "HEAD", "--", filePath], 10000).catch(() => ""),
+  ]);
+  if (workspacePatch) {
+    return {
+      source: "workspace" as const,
+      ...truncateChangePreview(workspacePatch),
+      ...parseSingleNumstat(workspaceNumstat),
+    };
+  }
+  return { source: "unavailable" as const, patch: "" };
+}
+
 export async function getGitDetails(projectPath: string): Promise<{ branch?: string; status: string; gitRoot?: string; files: Array<GitStatusFile & { additions?: number; deletions?: number }>; totalFileCount?: number; truncated?: boolean } & GitRemoteState> {
   const snapshot = await getGitSnapshot(projectPath, { includeRemote: true });
   if (!snapshot.gitRoot) return { ...snapshot, files: [], totalFileCount: 0, truncated: false };

@@ -1,10 +1,12 @@
-import { ChevronDown, ChevronRight, ChevronUp, FileText, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Loader2, RotateCcw } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import type { TimelineEvent } from "@/types/ui";
 import { sha256Hex } from "@/utils/hash";
+import { countUnifiedDiffChanges } from "@/utils/diff";
+import { findDiffForChangeFile } from "@/utils/changePreview";
 
 interface Change {
   path: string;
@@ -25,12 +27,10 @@ type ChangeRow = {
   newText?: string;
   additions?: number;
   deletions?: number;
+  diffEventId?: string;
+  commitSha?: string;
+  sourceEventIds?: string[];
 };
-
-function countLines(value?: string) {
-  if (!value) return 0;
-  return value.split("\n").filter(Boolean).length;
-}
 
 function stripOuterQuotes(value: string) {
   const trimmed = value.trim();
@@ -61,32 +61,27 @@ function mergeChangeRows(rows: ChangeRow[], projectPath?: string) {
   rows.forEach((row) => {
     const key = normalizePath(row.path, projectPath);
     const existing = byPath.get(key);
+    const stats = row.additions === undefined && row.deletions === undefined && (row.oldText !== undefined || row.newText !== undefined)
+      ? countUnifiedDiffChanges(row.oldText, row.newText)
+      : undefined;
+    const additions = row.additions ?? stats?.additions;
+    const deletions = row.deletions ?? stats?.deletions;
     byPath.set(key, {
       path: existing?.path ?? row.path,
       oldText: existing?.oldText ?? row.oldText,
       newText: row.newText ?? existing?.newText,
-      additions: (existing?.additions ?? 0) + (row.additions ?? 0),
-      deletions: (existing?.deletions ?? 0) + (row.deletions ?? 0),
+      additions: existing
+        ? existing.additions === undefined || additions === undefined ? undefined : existing.additions + additions
+        : additions,
+      deletions: existing
+        ? existing.deletions === undefined || deletions === undefined ? undefined : existing.deletions + deletions
+        : deletions,
+      diffEventId: row.diffEventId ?? existing?.diffEventId,
+      commitSha: row.commitSha ?? existing?.commitSha,
+      sourceEventIds: Array.from(new Set([...(existing?.sourceEventIds ?? []), ...(row.sourceEventIds ?? [])])),
     });
   });
   return Array.from(byPath.values());
-}
-
-function findDiffForPath(events: TimelineEvent[], filePath: string, projectPath?: string) {
-  const normalizedFile = normalizePath(filePath, projectPath);
-  const diffs = events.filter((item): item is Extract<TimelineEvent, { type: "diff" }> => item.type === "diff");
-  for (let index = diffs.length - 1; index >= 0; index -= 1) {
-    const diff = diffs[index];
-    const normalizedDiff = normalizePath(diff.filePath, projectPath);
-    if (
-      normalizedDiff === normalizedFile ||
-      normalizedDiff.endsWith(`/${normalizedFile}`) ||
-      normalizedFile.endsWith(`/${normalizedDiff}`)
-    ) {
-      return diff;
-    }
-  }
-  return null;
 }
 
 type DiffLine = {
@@ -162,6 +157,40 @@ function renderDiffColumn(lines: DiffLine[], side: "old" | "new") {
   });
 }
 
+function renderGitPatch(patch: string) {
+  return patch.split(/\r?\n/).map((line, index) => {
+    const isHeader = line.startsWith("diff --git") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ");
+    const isHunk = line.startsWith("@@");
+    const isAdded = line.startsWith("+") && !line.startsWith("+++");
+    const isRemoved = line.startsWith("-") && !line.startsWith("---");
+    return (
+      <div
+        key={`${index}-${line.slice(0, 24)}`}
+        className="whitespace-pre-wrap break-words font-mono text-[12px] leading-5"
+        style={{
+          minHeight: 20,
+          paddingLeft: 12,
+          paddingRight: 12,
+          color: isAdded
+            ? "var(--accent-success)"
+            : isRemoved
+              ? "var(--accent-danger)"
+              : isHunk || isHeader
+                ? "var(--text-muted)"
+                : "var(--text-secondary)",
+          backgroundColor: isAdded
+            ? "var(--accent-success-light)"
+            : isRemoved
+              ? "var(--accent-danger-light)"
+              : "transparent",
+        }}
+      >
+        {line || " "}
+      </div>
+    );
+  });
+}
+
 export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const project = useAppStore((s) => s.currentProject);
@@ -171,17 +200,37 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [expandedDiffs, setExpandedDiffs] = useState<Record<string, boolean>>({});
+  const [loadedPreviews, setLoadedPreviews] = useState<Record<string, {
+    patch: string;
+    source: "commit" | "workspace";
+    additions?: number;
+    deletions?: number;
+    commitSha?: string;
+    truncated?: boolean;
+  }>>({});
+  const [previewLoading, setPreviewLoading] = useState<Record<string, boolean>>({});
+  const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
   const [headerToggleActive, setHeaderToggleActive] = useState(false);
   const projectPath = event?.projectPath ?? project?.path;
-  const files = useMemo(() => mergeChangeRows(event?.files ?? (changes ?? []).map((change) => ({
+  const baseFiles = useMemo(() => mergeChangeRows(event?.files ?? (changes ?? []).map((change) => ({
     path: change.path,
     oldText: change.oldText,
     newText: change.newText,
-    additions: change.additions ?? Math.max(0, countLines(change.newText) - countLines(change.oldText)),
-    deletions: change.deletions ?? Math.max(0, countLines(change.oldText) - countLines(change.newText)),
+    additions: change.additions,
+    deletions: change.deletions,
   })), projectPath), [changes, event?.files, projectPath]);
-  const additions = files.reduce((sum, file) => sum + (file.additions ?? 0), 0);
-  const deletions = files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
+  const files = useMemo(() => baseFiles.map((file) => {
+    const preview = loadedPreviews[normalizePath(file.path, projectPath)];
+    return preview ? {
+      ...file,
+      additions: preview.additions ?? file.additions,
+      deletions: preview.deletions ?? file.deletions,
+      commitSha: preview.commitSha ?? file.commitSha,
+    } : file;
+  }), [baseFiles, loadedPreviews, projectPath]);
+  const statsKnown = files.every((file) => file.additions !== undefined && file.deletions !== undefined);
+  const additions = statsKnown ? files.reduce((sum, file) => sum + (file.additions ?? 0), 0) : undefined;
+  const deletions = statsKnown ? files.reduce((sum, file) => sum + (file.deletions ?? 0), 0) : undefined;
   const canExpand = files.length > 3;
   const visibleFiles = expanded ? files : files.slice(0, 3);
   const hiddenFileCount = Math.max(0, files.length - visibleFiles.length);
@@ -199,12 +248,13 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
   const removeRevertedFiles = (paths: string[]) => {
     if (!currentSession || !event) return;
     const reverted = new Set(paths.map((path) => normalizePath(path, projectPath)));
+    const sourceEventIds = new Set(event.files.flatMap((file) => file.sourceEventIds ?? []));
+    if (sourceEventIds.size === 0) sourceEventIds.add(event.id);
     updateSession(currentSession.id, (session) => ({
       ...session,
       events: session.events.flatMap<TimelineEvent>((item) => {
         if (item.type !== "change_summary") return [item];
-        const eventIds = event.id.split(":");
-        if (!eventIds.includes(item.id)) return [item];
+        if (!sourceEventIds.has(item.id)) return [item];
         const nextFiles = item.files.filter((file) => !reverted.has(normalizePath(file.path, projectPath)));
         if (nextFiles.length === 0) return [];
         return [{
@@ -236,7 +286,9 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     try {
       const filesWithSnapshot = await Promise.all(targetFiles.map(async (file) => {
         const key = normalizePath(file.path, projectPath);
-        const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path, projectPath) : null;
+        const diffEvent = currentSession && event
+          ? findDiffForChangeFile(currentSession.events, event, file, projectPath)
+          : null;
         const change = changesByPath.get(key);
         const newText = change?.newText ?? diffEvent?.newText;
         const snapshotHash = newText ? await sha256Hex(newText) : undefined;
@@ -290,15 +342,82 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     }
   };
 
-  const renderFileRow = (file: { path: string; additions?: number; deletions?: number }) => {
+  const toggleFilePreview = async (file: ChangeRow, hasStructuredDiff: boolean) => {
     const key = normalizePath(file.path, projectPath);
-    const diffEvent = currentSession ? findDiffForPath(currentSession.events, file.path, projectPath) : null;
+    if (hasStructuredDiff || loadedPreviews[key]) {
+      setExpandedDiffs((state) => ({ ...state, [key]: !state[key] }));
+      return;
+    }
+    if (!projectPath || previewLoading[key]) return;
+    setPreviewLoading((state) => ({ ...state, [key]: true }));
+    setPreviewErrors((state) => ({ ...state, [key]: "" }));
+    try {
+      const response = await window.api.getChangePreview({
+        projectPath,
+        filePath: file.path,
+        eventTimestamp: event?.timestamp,
+        commitSha: file.commitSha,
+      });
+      if (!response.success) throw new Error(response.error);
+      const preview = response.data;
+      if (preview.source === "unavailable" || !preview.patch) {
+        setPreviewErrors((state) => ({ ...state, [key]: "未找到可确认属于本轮的差异，未使用其他轮次或当前文件内容代替。" }));
+        return;
+      }
+      const previewSource: "commit" | "workspace" = preview.source;
+      setLoadedPreviews((state) => ({
+        ...state,
+        [key]: {
+          patch: preview.patch,
+          source: previewSource,
+          additions: preview.additions,
+          deletions: preview.deletions,
+          commitSha: preview.commitSha,
+          truncated: preview.truncated,
+        },
+      }));
+      if (currentSession && event && preview.source === "commit" && preview.commitSha) {
+        const sourceEventIds = new Set(file.sourceEventIds?.length ? file.sourceEventIds : [event.id]);
+        const normalizedFile = normalizePath(file.path, projectPath);
+        updateSession(currentSession.id, (session) => ({
+          ...session,
+          events: session.events.map((item) => {
+            if (item.type !== "change_summary" || !sourceEventIds.has(item.id)) return item;
+            return {
+              ...item,
+              files: item.files.map((itemFile) => normalizePath(itemFile.path, projectPath) === normalizedFile
+                ? { ...itemFile, commitSha: preview.commitSha }
+                : itemFile),
+            };
+          }),
+          updatedAt: Date.now(),
+        }));
+      }
+      setExpandedDiffs((state) => ({ ...state, [key]: true }));
+    } catch (previewError) {
+      setPreviewErrors((state) => ({
+        ...state,
+        [key]: previewError instanceof Error ? previewError.message : String(previewError),
+      }));
+    } finally {
+      setPreviewLoading((state) => ({ ...state, [key]: false }));
+    }
+  };
+
+  const renderFileRow = (file: ChangeRow) => {
+    const key = normalizePath(file.path, projectPath);
+    const diffEvent = currentSession && event
+      ? findDiffForChangeFile(currentSession.events, event, file, projectPath)
+      : null;
     const change = changesByPath.get(key);
     const oldText = change?.oldText ?? diffEvent?.oldText;
     const newText = change?.newText ?? diffEvent?.newText;
     const hasStructuredDiff = oldText !== undefined || newText !== undefined;
-    const diffExpanded = hasStructuredDiff && Boolean(expandedDiffs[key]);
+    const loadedPreview = loadedPreviews[key];
+    const diffExpanded = Boolean(expandedDiffs[key]) && (hasStructuredDiff || Boolean(loadedPreview));
     const diffLines = hasStructuredDiff ? buildLineDiff(oldText, newText) : [];
+    const loading = Boolean(previewLoading[key]);
+    const previewError = previewErrors[key];
     return (
       <div key={file.path} className="border-b border-border-subtle last:border-b-0">
         <div
@@ -312,35 +431,35 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
         >
           <button
             type="button"
-            onClick={() => {
-              if (!hasStructuredDiff) return;
-              setExpandedDiffs((state) => ({ ...state, [key]: !state[key] }));
-            }}
-            className={`flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors ${hasStructuredDiff ? "hover:bg-surface-hover" : "cursor-default"}`}
+            onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
+            className="flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors hover:bg-surface-hover"
             style={{ gap: 8, padding: "6px 8px" }}
-            title={file.path}
+            title={`预览 ${file.path} 的本轮变更`}
           >
-            {hasStructuredDiff
-              ? diffExpanded
+            {loading
+              ? <Loader2 size={14} className="shrink-0 animate-spin text-text-muted" />
+              : diffExpanded
                 ? <ChevronDown size={14} className="shrink-0 text-text-muted" />
-                : <ChevronRight size={14} className="shrink-0 text-text-muted" />
-              : <FileText size={14} className="shrink-0 text-text-muted" />}
+                : <ChevronRight size={14} className="shrink-0 text-text-muted" />}
             <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{formatPathForDisplay(file.path, projectPath)}</span>
           </button>
           <div className="kimix-tabular-nums flex items-center justify-self-end text-[13.5px]" style={{ gap: 8, minWidth: 72 }}>
-            <span className="text-accent-success">+{file.additions ?? 0}</span>
-            <span className="text-accent-danger">-{file.deletions ?? 0}</span>
+            {file.additions !== undefined && file.deletions !== undefined ? (
+              <>
+                <span className="text-accent-success">+{file.additions}</span>
+                <span className="text-accent-danger">-{file.deletions}</span>
+              </>
+            ) : <span className="text-text-muted" title="点击预览后尝试恢复统计">统计待恢复</span>}
           </div>
-          {!hasStructuredDiff && (
-            <span
-              className="justify-self-end rounded-md bg-surface-hover text-[12.5px] leading-5 text-text-muted"
-              style={{ paddingLeft: 8, paddingRight: 8 }}
-              title={`完整路径：${file.path}`}
-            >
-              摘要
-            </span>
-          )}
-          {hasStructuredDiff && <span />}
+          <button
+            type="button"
+            onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
+            disabled={loading}
+            className="justify-self-end rounded-md text-[12.5px] leading-5 text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:opacity-50"
+            style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+          >
+            {loading ? "加载中" : diffExpanded ? "收起" : "预览"}
+          </button>
           <button
             type="button"
             onClick={() => void handleRevert([file])}
@@ -369,6 +488,24 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        {!hasStructuredDiff && loadedPreview && diffExpanded && (
+          <div className="bg-surface-base" style={{ padding: "0 18px 14px 40px" }}>
+            <div className="overflow-hidden rounded-lg border border-border-subtle bg-surface-elevated">
+              <div className="flex items-center justify-between border-b border-border-subtle text-[12px] leading-5 text-text-muted" style={{ minHeight: 36, paddingLeft: 12, paddingRight: 12, gap: 12 }}>
+                <span>{loadedPreview.source === "commit" ? `提交 ${loadedPreview.commitSha?.slice(0, 7) ?? ""}` : "当前工作区差异"}</span>
+                {loadedPreview.truncated && <span>内容过大，已截断</span>}
+              </div>
+              <div className="max-h-80 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                {renderGitPatch(loadedPreview.patch)}
+              </div>
+            </div>
+          </div>
+        )}
+        {previewError && (
+          <div className="text-[12.5px] leading-5 text-text-muted" style={{ padding: "0 22px 12px 40px" }}>
+            {previewError}
           </div>
         )}
       </div>
@@ -404,8 +541,12 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           {canExpand && (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
           <span className="truncate">文件变更</span>
           <span className="kimix-tabular-nums shrink-0 text-[13.5px] text-text-muted">{files.length} 个</span>
-          <span className="kimix-tabular-nums shrink-0 text-accent-success">+{additions}</span>
-          <span className="kimix-tabular-nums shrink-0 text-accent-danger">-{deletions}</span>
+          {statsKnown ? (
+            <>
+              <span className="kimix-tabular-nums shrink-0 text-accent-success">+{additions}</span>
+              <span className="kimix-tabular-nums shrink-0 text-accent-danger">-{deletions}</span>
+            </>
+          ) : <span className="shrink-0 text-[12.5px] text-text-muted">统计待恢复</span>}
         </button>
         <button
           type="button"

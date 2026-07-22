@@ -76,6 +76,8 @@ import type {
   GitActionResponse,
   KimiUsageResponse,
   OpenFileRequest,
+  ChangePreviewRequest,
+  ChangePreviewResponse,
   OpenEditorRequest,
   OpenPathRequest,
   ListPreviewFilesRequest,
@@ -230,6 +232,8 @@ const api = {
     ipcRenderer.invoke("project:listPreviewFiles", req),
   openFile: (req: OpenFileRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:openFile", req),
+  getChangePreview: (req: ChangePreviewRequest): Promise<ChangePreviewResponse> =>
+    ipcRenderer.invoke("project:getChangePreview", req),
   revertFiles: (req: RevertFilesRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("project:revertFiles", req),
   checkRevertConflicts: (req: CheckRevertConflictsRequest): Promise<CheckRevertConflictsResponse> =>

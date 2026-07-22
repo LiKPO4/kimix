@@ -231,6 +231,15 @@ describe("mapStreamEvent", () => {
     expect(change.deletions).toBe(1);
   });
 
+  it("keeps missing TurnChanges line statistics unknown", () => {
+    const event = mapStreamEvent({
+      type: "TurnChanges",
+      payload: { files: [{ path: "a.ts" }] },
+    }) as Extract<TimelineEvent, { type: "change_summary" }>;
+
+    expect(event.files).toEqual([{ path: "a.ts" }]);
+  });
+
   it("returns null for TurnChanges with no files", () => {
     expect(mapStreamEvent({ type: "TurnChanges", payload: { files: [] } })).toBeNull();
   });
@@ -1306,9 +1315,86 @@ describe("mergeEvents", () => {
     expect(result.map((event) => event.type)).toEqual(["tool_call", "change_summary", "diff"]);
     const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
     expect(change.files[0].path).toBe("src/app.ts");
-    expect(change.additions).toBe(1);
+    expect(change.additions).toBe(2);
+    expect(change.deletions).toBe(1);
     const diff = result[2] as Extract<TimelineEvent, { type: "diff" }>;
     expect(diff.filePath).toBe("src/app.ts");
+  });
+
+  it("counts an equal-line structured replacement as both an addition and deletion", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-replace", toolName: "edit", status: "running", arguments: {} },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-replace",
+      toolName: "edit",
+      result: "ok",
+      display: { diff: { path: "src/app.ts", oldText: "before", newText: "after" } },
+    };
+
+    const result = mergeEvents(existing, incoming);
+    const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0]).toMatchObject({ additions: 1, deletions: 1 });
+  });
+
+  it("binds current-turn change summaries to a successful git commit", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user", type: "user_message", timestamp: 1, content: "修改", agentTurnId: "turn-1" },
+      { id: "change", type: "change_summary", timestamp: 2, files: [{ path: "src/app.ts", additions: 1, deletions: 1 }], additions: 1, deletions: 1, agentTurnId: "turn-1" },
+      {
+        id: "commit-call",
+        type: "tool_call",
+        timestamp: 3,
+        toolCallId: "commit-call",
+        toolName: "Bash",
+        status: "running",
+        arguments: { command: "git add src/app.ts && git commit -m fix" },
+        agentTurnId: "turn-1",
+      },
+    ];
+    const result = mergeEvents(existing, {
+      id: "commit-result",
+      type: "tool_result",
+      timestamp: 4,
+      toolCallId: "commit-call",
+      toolName: "Bash",
+      result: "[main 2933405] fix\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+      agentTurnId: "turn-1",
+    });
+    const change = result.find((event) => event.type === "change_summary") as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0].commitSha).toBe("2933405");
+  });
+
+  it("binds a later TurnChanges summary to the current turn commit", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user", type: "user_message", timestamp: 1, content: "修改", agentTurnId: "turn-1" },
+      {
+        id: "commit-call",
+        type: "tool_call",
+        timestamp: 2,
+        toolCallId: "commit-call",
+        toolName: "Bash",
+        status: "success",
+        arguments: { command: "git commit -am fix" },
+        result: "[main 2933405] fix",
+        agentTurnId: "turn-1",
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "turn-changes",
+      type: "change_summary",
+      timestamp: 3,
+      files: [{ path: "src/app.ts" }],
+      additions: 0,
+      deletions: 0,
+      agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, incoming);
+    const change = result.at(-1) as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0]).toMatchObject({ path: "src/app.ts", commitSha: "2933405" });
   });
 
   it("keeps native tool display metadata on tool calls", () => {

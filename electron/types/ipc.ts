@@ -1085,6 +1085,28 @@ export type OpenFileRequest = {
   filePath: string;
 }
 
+export type ChangePreviewRequest = {
+  projectPath: string;
+  filePath: string;
+  eventTimestamp?: number;
+  commitSha?: string;
+}
+
+export type ChangePreviewResponse = {
+  success: true;
+  data: {
+    source: "commit" | "workspace" | "unavailable";
+    patch: string;
+    additions?: number;
+    deletions?: number;
+    commitSha?: string;
+    truncated?: boolean;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type RevertFilesRequest = {
   projectPath: string;
   additionalWorkDirs?: string[];

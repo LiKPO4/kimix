@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **File-change cards preserve real statistics and immutable preview ownership**: equal-line replacements now use an exact line edit path, missing upstream counts remain unknown, and clicking a file row expands its stable structured diff or a uniquely matched Git commit patch. Same-path diffs from later turns and ambiguous commit windows are rejected rather than guessed. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Active retries reject older history replay and preserve complete turn metrics**: snapshot recovery replays full history before live frames; older or unowned history can no longer attach to the active retry, completed tools are idempotent by official call ID, and cache v14 safely removes persisted duplicates only with complete canonical identity coverage. Retry placeholders carry the requested model. Footer usage dimensions merge within one user turn, so a context-only update no longer erases model/input/output. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **A stronger live turn identity migrates the same room-message draft**: the local optimistic and later official `agentTurnId` previously created two buffers for one response; repeated batch `unshift` reversed their fragments during streaming, while the terminal full body hid the corruption. Drafts now rekey by immutable `roomMessageId`, and multi-draft commits preserve insertion order. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).

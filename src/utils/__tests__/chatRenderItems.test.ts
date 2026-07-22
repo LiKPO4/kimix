@@ -418,6 +418,7 @@ describe("buildRenderItems usage footer", () => {
       path: "TASK_STATE.md",
       additions: 23,
       deletions: 0,
+      sourceEventIds: ["legacy-random-change-summary"],
     }]);
     expect(failedAssistant.changeSummary).toBeUndefined();
   });

@@ -787,7 +787,11 @@ function eventToHandoffLine(event: TimelineEvent): string | null {
   if (event.type === "assistant_message") return event.content.trim() ? `助手：${event.content.trim()}` : null;
   if (event.type === "tool_call") return `执行命令：${event.toolName} ${event.rawArguments ?? JSON.stringify(event.arguments)}`;
   if (event.type === "change_summary") {
-    const files = event.files.map((file) => `${file.path} (+${file.additions ?? 0}/-${file.deletions ?? 0})`).join("；");
+    const files = event.files.map((file) => (
+      file.additions === undefined || file.deletions === undefined
+        ? `${file.path}（统计未知）`
+        : `${file.path} (+${file.additions}/-${file.deletions})`
+    )).join("；");
     return `文件变更：${files}`;
   }
   if (event.type === "file_artifact") return `文件：${event.filePath}`;

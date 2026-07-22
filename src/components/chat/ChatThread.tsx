@@ -630,15 +630,25 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
 
 function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change_summary" }>[]): Extract<TimelineEvent, { type: "change_summary" }> | null {
   if (events.length === 0) return null;
-  const filesByPath = new Map<string, { path: string; additions?: number; deletions?: number }>();
+  const filesByPath = new Map<string, { path: string; additions?: number; deletions?: number; diffEventId?: string; commitSha?: string; sourceEventIds?: string[] }>();
   for (const event of events) {
     for (const file of event.files) {
       const key = normalizeFilePath(file.path);
       const existing = filesByPath.get(key);
       filesByPath.set(key, {
         path: existing?.path ?? file.path,
-        additions: (existing?.additions ?? 0) + (file.additions ?? 0),
-        deletions: (existing?.deletions ?? 0) + (file.deletions ?? 0),
+        additions: existing
+          ? existing.additions === undefined || file.additions === undefined ? undefined : existing.additions + file.additions
+          : file.additions,
+        deletions: existing
+          ? existing.deletions === undefined || file.deletions === undefined ? undefined : existing.deletions + file.deletions
+          : file.deletions,
+        ...((file.diffEventId ?? existing?.diffEventId) ? { diffEventId: file.diffEventId ?? existing?.diffEventId } : {}),
+        ...((file.commitSha ?? existing?.commitSha) ? { commitSha: file.commitSha ?? existing?.commitSha } : {}),
+        sourceEventIds: Array.from(new Set([
+          ...(existing?.sourceEventIds ?? []),
+          ...(file.sourceEventIds ?? [event.id]),
+        ])),
       });
     }
   }

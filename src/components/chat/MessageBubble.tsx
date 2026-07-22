@@ -194,7 +194,7 @@ function computeTimelineEventMemoKey(event: TimelineEvent): string {
         event.id,
         event.type,
         event.timestamp,
-        event.files.map((file) => `${file.path}:${file.additions ?? ""}:${file.deletions ?? ""}`).join("\u001f"),
+        event.files.map((file) => `${file.path}:${file.additions ?? ""}:${file.deletions ?? ""}:${file.diffEventId ?? ""}:${file.commitSha ?? ""}`).join("\u001f"),
         event.additions ?? "",
         event.deletions ?? "",
       ].join("\u001e");

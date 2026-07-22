@@ -200,6 +200,7 @@ function installBrowserPreviewApi() {
     readTextFile: (): Promise<ReadTextFileResponse> => fail("读取文本文件"),
     listPreviewFiles: () => Promise.resolve({ success: true, data: [] }),
     openFile: () => fail<VoidResponse>("打开文件"),
+    getChangePreview: () => Promise.resolve({ success: true, data: { source: "unavailable", patch: "" } }),
     revertFiles: () => fail<VoidResponse>("回退文件"),
     checkRevertConflicts: () => Promise.resolve({ success: true, conflicts: [] }),
     openProjectEditor: () => fail<VoidResponse>("打开编辑器"),

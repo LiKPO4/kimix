@@ -4828,6 +4828,25 @@ ipcMain.handle("project:openFile", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:getChangePreview", async (_, request: unknown) => {
+  try {
+    if (!request || typeof request !== "object") return { success: false, error: "Invalid request" };
+    const req = request as { projectPath?: unknown; filePath?: unknown; eventTimestamp?: unknown; commitSha?: unknown };
+    if (typeof req.projectPath !== "string" || typeof req.filePath !== "string" || !req.projectPath || !req.filePath) {
+      return { success: false, error: "Invalid change preview request" };
+    }
+    const data = await projectService.getChangePreview({
+      projectPath: req.projectPath,
+      filePath: req.filePath,
+      eventTimestamp: typeof req.eventTimestamp === "number" ? req.eventTimestamp : undefined,
+      commitSha: typeof req.commitSha === "string" ? req.commitSha : undefined,
+    });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:revertFiles", async (_, request: unknown) => {
   try {
     if (!request || typeof request !== "object") {

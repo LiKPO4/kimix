@@ -17,11 +17,6 @@ export type SessionDiffEntry = {
   deletions: number;
 };
 
-function countDiffLines(value: string) {
-  if (!value.trim()) return 0;
-  return value.split("\n").length;
-}
-
 function normalizePath(value: string) {
   return value.replace(/\\/g, "/").replace(/^\/+/, "").replace(/^"|"$/g, "");
 }
@@ -98,6 +93,49 @@ export function buildUnifiedDiff(oldText = "", newText = ""): DiffLine[] {
   return diff;
 }
 
+export function countUnifiedDiffChanges(oldText = "", newText = "") {
+  const toLines = (value: string) => {
+    if (!value) return [];
+    const lines = value.replace(/\r\n/g, "\n").split("\n");
+    if (lines.at(-1) === "") lines.pop();
+    return lines;
+  };
+  const oldLines = toLines(oldText);
+  const newLines = toLines(newText);
+  const oldCount = oldLines.length;
+  const newCount = newLines.length;
+  if (oldCount === 0) return { additions: newCount, deletions: 0 };
+  if (newCount === 0) return { additions: 0, deletions: oldCount };
+
+  // Myers shortest-edit-path: exact line statistics without the O(n*m)
+  // matrix used by the small visual diff renderer.
+  const furthest = new Map<number, number>([[1, 0]]);
+  const maxDistance = oldCount + newCount;
+  for (let distance = 0; distance <= maxDistance; distance += 1) {
+    for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
+      const down = diagonal === -distance
+        || (diagonal !== distance && (furthest.get(diagonal - 1) ?? -1) < (furthest.get(diagonal + 1) ?? -1));
+      let oldIndex = down
+        ? furthest.get(diagonal + 1) ?? 0
+        : (furthest.get(diagonal - 1) ?? 0) + 1;
+      let newIndex = oldIndex - diagonal;
+      while (oldIndex < oldCount && newIndex < newCount && oldLines[oldIndex] === newLines[newIndex]) {
+        oldIndex += 1;
+        newIndex += 1;
+      }
+      furthest.set(diagonal, oldIndex);
+      if (oldIndex >= oldCount && newIndex >= newCount) {
+        const delta = newCount - oldCount;
+        return {
+          additions: (distance + delta) / 2,
+          deletions: (distance - delta) / 2,
+        };
+      }
+    }
+  }
+  return { additions: newCount, deletions: oldCount };
+}
+
 export function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[] {
   return events
     .filter((event): event is Extract<TimelineEvent, { type: "diff" }> => event.type === "diff")
@@ -107,8 +145,7 @@ export function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[]
       timestamp: event.timestamp,
       oldText: event.oldText,
       newText: event.newText,
-      additions: Math.max(0, countDiffLines(event.newText) - countDiffLines(event.oldText)),
-      deletions: Math.max(0, countDiffLines(event.oldText) - countDiffLines(event.newText)),
+      ...countUnifiedDiffChanges(event.oldText, event.newText),
     }))
     .sort((a, b) => b.timestamp - a.timestamp);
 }

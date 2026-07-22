@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { alignSessionDiffsToGitStatus, buildUnifiedDiff, collectSessionDiffs } from "../diff";
+import { alignSessionDiffsToGitStatus, buildUnifiedDiff, collectSessionDiffs, countUnifiedDiffChanges } from "../diff";
 import type { TimelineEvent } from "@/types/ui";
 
 describe("buildUnifiedDiff", () => {
@@ -42,6 +42,16 @@ describe("buildUnifiedDiff", () => {
   });
 });
 
+describe("countUnifiedDiffChanges", () => {
+  it("counts an equal-line replacement as one addition and one deletion", () => {
+    expect(countUnifiedDiffChanges("before", "after")).toEqual({ additions: 1, deletions: 1 });
+  });
+
+  it("does not count unchanged context around a replacement", () => {
+    expect(countUnifiedDiffChanges("a\nbefore\nc", "a\nafter\nc")).toEqual({ additions: 1, deletions: 1 });
+  });
+});
+
 describe("collectSessionDiffs", () => {
   it("extracts diff events", () => {
     const events: TimelineEvent[] = [
@@ -57,8 +67,8 @@ describe("collectSessionDiffs", () => {
     const diffs = collectSessionDiffs(events);
     expect(diffs).toHaveLength(1);
     expect(diffs[0].filePath).toBe("src/app.ts");
-    expect(diffs[0].additions).toBe(0);
-    expect(diffs[0].deletions).toBe(0);
+    expect(diffs[0].additions).toBe(1);
+    expect(diffs[0].deletions).toBe(1);
   });
 
   it("ignores non-diff events", () => {

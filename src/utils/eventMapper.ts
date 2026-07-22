@@ -4,6 +4,7 @@ import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from ".
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
 import { logEvent } from "@/utils/reportError";
 import { normalizePathForComparison } from "./pathCase";
+import { countUnifiedDiffChanges } from "./diff";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -460,11 +461,6 @@ function completedAssistantDuration(
   return direct;
 }
 
-function countTextLines(value: string): number {
-  if (!value) return 0;
-  return value.split(/\r?\n/).filter((line) => line.length > 0).length;
-}
-
 function derivedEventId(sourceId: string, kind: string): string {
   return `${sourceId}:${kind}`;
 }
@@ -473,15 +469,18 @@ function createChangeSummaryFromDiff(
   diff: Extract<TimelineEvent, { type: "diff" }>,
   sourceId = diff.id,
 ): TimelineEvent {
-  const additions = Math.max(0, countTextLines(diff.newText) - countTextLines(diff.oldText));
-  const deletions = Math.max(0, countTextLines(diff.oldText) - countTextLines(diff.newText));
+  const { additions, deletions } = countUnifiedDiffChanges(diff.oldText, diff.newText);
   return {
     id: derivedEventId(sourceId, "change-summary"),
     type: "change_summary",
     timestamp: diff.timestamp,
-    files: [{ path: diff.filePath, additions, deletions }],
+    files: [{ path: diff.filePath, additions, deletions, diffEventId: diff.id }],
     additions,
     deletions,
+    roomAgentId: diff.roomAgentId,
+    roomMessageId: diff.roomMessageId,
+    agentTurnId: diff.agentTurnId,
+    dispatchAttemptId: diff.dispatchAttemptId,
   };
 }
 
@@ -572,17 +571,16 @@ function createChangeSummaryFromToolCall(
     if (!path) return null;
     const newText = firstStringValue(args, ["content", "newString", "new_string", "replacement", "text"]);
     const oldText = firstStringValue(args, ["oldString", "old_string", "oldText", "old_text"]) ?? "";
-    const additions = newText !== undefined ? Math.max(0, countTextLines(newText) - countTextLines(oldText)) : 0;
-    const deletions = oldText ? Math.max(0, countTextLines(oldText) - countTextLines(newText ?? "")) : 0;
+    const stats = newText !== undefined ? countUnifiedDiffChanges(oldText, newText) : undefined;
 
     return {
       id: derivedEventId(sourceId, "change-summary"),
       type: "change_summary",
       timestamp,
       projectPath: call.display?.cwd,
-      files: [{ path, additions, deletions }],
-      additions,
-      deletions,
+      files: [{ path, additions: stats?.additions, deletions: stats?.deletions }],
+      additions: stats?.additions ?? 0,
+      deletions: stats?.deletions ?? 0,
       roomAgentId: call.roomAgentId,
       roomMessageId: call.roomMessageId,
       agentTurnId: call.agentTurnId,
@@ -608,6 +606,50 @@ function createChangeSummaryFromToolCall(
   }
 
   return null;
+}
+
+function toolResultText(result: unknown) {
+  if (typeof result === "string") return result;
+  if (isRecord(result) && typeof result.output === "string") return result.output;
+  return "";
+}
+
+function gitCommitShaFromToolCall(call: Extract<TimelineEvent, { type: "tool_call" }>) {
+  if (call.status !== "success" || !isShellLikeTool(call.toolName.toLowerCase())) return undefined;
+  const command = firstStringValue(call.arguments ?? {}, ["command", "cmd", "script"]);
+  if (!command || !/\bgit\s+(?:-[^\s]+\s+)*commit\b/i.test(command)) return undefined;
+  const output = toolResultText(call.result);
+  return output.match(/^\[[^\]\r\n]+\s+([0-9a-f]{7,40})\]/im)?.[1];
+}
+
+function sameTurnScope(left: TimelineEvent, right: TimelineEvent) {
+  if (left.agentTurnId && right.agentTurnId) return left.agentTurnId === right.agentTurnId;
+  if (left.roomMessageId && right.roomMessageId) return left.roomMessageId === right.roomMessageId;
+  return true;
+}
+
+function attachCommitToCurrentTurnChanges(events: TimelineEvent[], commitCallIndex: number, commitSha: string) {
+  const userBoundary = events.findLastIndex((event, index) => index < commitCallIndex && event.type === "user_message");
+  const commitCall = events[commitCallIndex];
+  return events.map((event, index) => {
+    if (index <= userBoundary || index >= commitCallIndex || event.type !== "change_summary" || !sameTurnScope(event, commitCall)) return event;
+    return {
+      ...event,
+      files: event.files.map((file) => file.commitSha ? file : { ...file, commitSha }),
+    };
+  });
+}
+
+function latestCurrentTurnCommitSha(events: TimelineEvent[], incoming: TimelineEvent) {
+  const userBoundary = events.findLastIndex((event) => event.type === "user_message");
+  const commitShas = new Set<string>();
+  for (let index = events.length - 1; index > userBoundary; index -= 1) {
+    const event = events[index];
+    if (event.type !== "tool_call" || !sameTurnScope(event, incoming)) continue;
+    const commitSha = gitCommitShaFromToolCall(event);
+    if (commitSha) commitShas.add(commitSha);
+  }
+  return commitShas.size === 1 ? Array.from(commitShas)[0] : undefined;
 }
 
 function sameDerivedToolEvent(left: TimelineEvent, right: TimelineEvent): boolean {
@@ -1417,8 +1459,8 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       const mappedFiles = files
         .map((file) => ({
           path: isString(file.path) ? file.path : "",
-          additions: isNumber(file.additions) ? file.additions : 0,
-          deletions: isNumber(file.deletions) ? file.deletions : 0,
+          additions: isNumber(file.additions) ? file.additions : undefined,
+          deletions: isNumber(file.deletions) ? file.deletions : undefined,
         }))
         .filter((file) => file.path.length > 0);
       if (mappedFiles.length === 0) return null;
@@ -1968,7 +2010,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const fallbackChangeEvent = displayEvents.length === 0
         ? createChangeSummaryFromToolCall(call, incoming.timestamp, incoming.id)
         : null;
-      return upsertDerivedToolEvents(result, incoming.toolCallId, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
+      const merged = upsertDerivedToolEvents(result, incoming.toolCallId, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
+      const updatedCallIndex = merged.findIndex((event) => event.type === "tool_call" && event.toolCallId === incoming.toolCallId);
+      const updatedCall = updatedCallIndex >= 0 && merged[updatedCallIndex].type === "tool_call" ? merged[updatedCallIndex] : null;
+      const commitSha = updatedCall?.type === "tool_call" ? gitCommitShaFromToolCall(updatedCall) : undefined;
+      return commitSha ? attachCommitToCurrentTurnChanges(merged, updatedCallIndex, commitSha) : merged;
     }
     if (displayEvents.length > 0) return upsertDerivedToolEvents(existing, incoming.toolCallId, displayEvents);
   }
@@ -2028,7 +2074,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const [statusEvent] = result.splice(lastStatusIndex, 1);
       result.push(statusEvent);
     }
-    return appendAroundTrailingSteer(result, [incoming]);
+    const commitSha = latestCurrentTurnCommitSha(result, incoming);
+    const ownedIncoming = commitSha
+      ? { ...incoming, files: incoming.files.map((file) => file.commitSha ? file : { ...file, commitSha }) }
+      : incoming;
+    return appendAroundTrailingSteer(result, [ownedIncoming]);
   }
 
   return appendAroundTrailingSteer(existing, [incoming]);
